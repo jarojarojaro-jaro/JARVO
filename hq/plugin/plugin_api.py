@@ -613,11 +613,25 @@ async def edit_srt(path: str):
 
 
 async def _proc(*args: str, timeout: float = 3600) -> tuple[int, str]:
-    """Program (ffmpeg, jarvo-stt, film.py) w wątku (przenosne.uruchom: także na Windows) → (kod, stderr)."""
+    """Program (ffmpeg, jarvo-stt, film.py) w wątku (przenosne.uruchom: także na Windows) → (kod, stderr). Na Windows
+    program dostaje zaraz po starcie własny Job Object (edytor.przypnij_drzewo): limit czasu i przerwana trasa kończą
+    całe drzewo (lektor: launcher venvu → python film.py → jarvo-tts i jarvo-stt z Pythonem), a padnięty albo
+    zrestartowany panel zamyka uchwyt zadania razem z programami. Poza Windows bez zmian (kill programu)."""
+    uruchomione = []
+
+    def start(proc) -> None:
+        uruchomione.append(proc)
+        ed.przypnij_drzewo(proc)
     try:
-        code, _out, err = await przenosne.uruchom(args, timeout=timeout)
+        code, _out, err = await przenosne.uruchom(args, timeout=timeout, przy_starcie=start)
     except asyncio.TimeoutError:
+        for proc in uruchomione:                 # przenosne zabił sam program: wnuki (jarvo-tts, Python) też
+            ed.zabij_drzewo(proc)
         raise RuntimeError("Przekroczony czas") from None
+    except BaseException:
+        for proc in uruchomione:
+            ed.zabij_drzewo(proc)
+        raise
     return code, err.decode("utf-8", "replace")
 
 
@@ -827,6 +841,10 @@ async def _run_export(job: dict, cmd: list[str], total: float, tmpdir: Path, out
     cmd = cmd[:-1] + [str(part)]
     buf = ""
 
+    def start(proc) -> None:                     # Windows: ffmpeg w Job Object panelu (restart = koniec ffmpeg)
+        ed.przypnij_drzewo(proc)
+        job.update(proc=proc)
+
     def postep(line: bytes) -> None:          # w wątku programu (przenosne.uruchom): blok `-progress` ffmpeg
         nonlocal buf
         buf += line.decode("utf-8", "replace").replace("\r\n", "\n")
@@ -837,7 +855,8 @@ async def _run_export(job: dict, cmd: list[str], total: float, tmpdir: Path, out
             buf = ""
 
     try:
-        code, _out, err = await przenosne.uruchom(cmd, na_linie=postep, przy_starcie=lambda p: job.update(proc=p))
+        ed.zapisz_eksport(tmpdir, part)          # gdyby panel padł w trakcie: następny eksport sprząta plik częściowy
+        code, _out, err = await przenosne.uruchom(cmd, na_linie=postep, przy_starcie=start)
         err = err.decode("utf-8", "replace").strip()
         if job.get("state") == "cancelled":
             return
@@ -849,7 +868,9 @@ async def _run_export(job: dict, cmd: list[str], total: float, tmpdir: Path, out
     except Exception as exc:  # zadanie ma skończyć się stanem, nie wiszącym „w toku”
         job.update(state="error", error=str(exc)[:400])
     finally:
-        job.pop("proc", None)
+        proc = job.pop("proc", None)
+        if proc is not None:                     # przerwane zadanie (koniec pętli panelu): nic nie koduje dalej
+            ed.zabij_drzewo(proc)
         job["ended"] = time.time()
         part.unlink(missing_ok=True)
         shutil.rmtree(tmpdir, ignore_errors=True)
@@ -880,6 +901,9 @@ async def edit_export(request: Request):
                 raise ed.ProjectError("Napisy karaoke: liczba obrazów słów nie zgadza się z projektem.")
     except ed.ProjectError as exc:
         raise HTTPException(400, str(exc))
+    # eksporty przerwane padnięciem albo restartem panelu: ffmpeg skończył się z Job Object (Windows) albo z procesem
+    # panelu, a plik częściowy obok filmu i katalog roboczy zostały
+    await asyncio.to_thread(ed.sprzataj_porzucone_eksporty, core.JARVO_DIR / "state" / "edytor")
     tmpdir = core.JARVO_DIR / "state" / "edytor" / uuid.uuid4().hex[:12]
     tmpdir.mkdir(parents=True, exist_ok=True)
     try:
@@ -942,8 +966,8 @@ async def edit_cancel(jid: str):
     if job.get("state") == "running":
         job["state"] = "cancelled"
         proc = job.get("proc")
-        if proc is not None:
-            przenosne.zabij(proc)
+        if proc is not None:                     # Windows: całe zadanie (TerminateJobObject), poza nim kill()
+            ed.zabij_drzewo(proc)
     return _job_view(job)
 
 

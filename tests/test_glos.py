@@ -214,23 +214,29 @@ def test_glos_aplikacji_z_programu_floty(monkeypatch, tmp_path):
 
 
 def test_glos_aplikacji_przypina_lektora_do_zadania(monkeypatch):
-    """Lektor aplikacji startuje w przenosne.uruchom z przy_starcie = edytor.przypnij_drzewo: na Windows własny Job
-    Object, więc restart albo upadek dashboardu nie zostawia jarvo-tts z Pythonem w tle; limit czasu = BladGlosu."""
+    """Lektor aplikacji startuje w przenosne.uruchom z przy_starcie, które woła edytor.przypnij_drzewo: na Windows
+    własny Job Object, więc restart albo upadek dashboardu nie zostawia jarvo-tts z Pythonem w tle; limit czasu =
+    BladGlosu po edytor.zabij_drzewo całego drzewa (nie czeka na zamknięcie uchwytu z obiektem procesu)."""
     import asyncio
     G = load_script("hq/plugin/glos.py", "jarvo_test_glos_zadanie")
-    widziane = {}
+    widziane, przypiete, zabite = {}, [], []
+    ed = G._edytor()
+    monkeypatch.setattr(ed, "przypnij_drzewo", lambda proc: przypiete.append(proc) or True)
+    monkeypatch.setattr(ed, "zabij_drzewo", lambda proc: zabite.append(proc))
 
     class P:
         DEVNULL = subprocess.DEVNULL
 
         async def uruchom(self, argv, **kw):
             widziane.update(kw, argv=argv)
+            kw["przy_starcie"](f"proc-{len(przypiete)}")
             if kw.get("timeout") == 0.01:
                 raise asyncio.TimeoutError
             return 0, b"", b""
 
     monkeypatch.setattr(G, "_przenosne", lambda: P())
     assert asyncio.run(G._uruchom(["jarvo-tts", "Dzień dobry.", "-o", "a.wav"], 5)) == 0
-    assert widziane["przy_starcie"] is G._edytor().przypnij_drzewo and widziane["argv"][0] == "jarvo-tts"
+    assert przypiete == ["proc-0"] and zabite == [] and widziane["argv"][0] == "jarvo-tts"
     with pytest.raises(G.BladGlosu):
         asyncio.run(G._uruchom(["jarvo-tts", "x"], 0.01))
+    assert przypiete == ["proc-0", "proc-1"] and zabite == ["proc-1"]

@@ -17,9 +17,11 @@ i Silero VAD (`modele.silero-vad`) z manifestu Jarva (vendor/natywne.lock.json):
 modelu, suma sha256 i rozmiar każdego pliku. Przy pierwszym użyciu pobieracz Jarva (jarvo/pobieracz.py: pasek na
 stderr, wznawianie, suma przed użyciem) kładzie je w $JARVO_MODELS_DIR/<katalog z manifestu> (domyślnie
 /opt/data/jarvo/models), pod tą samą blokadą co transkrypcja; onnx-asr ładuje je stamtąd bez sieci (żadnego
-huggingface_hub bez rewizji i sumy). Pliki, które starszy jarvo-stt pobrał do $JARVO_MODELS_DIR/huggingface, przechodzą
-do nowego katalogu po sprawdzeniu sumy, bez drugiego pobierania. Manifest i pobieracz bierzemy z kodu Jarva: JARVO_REPO,
-katalog nad infra/bin tego skryptu albo /opt/jarvo/repo w obrazie.
+huggingface_hub bez rewizji i sumy). Pliki, które starszy jarvo-stt pobrał do $JARVO_MODELS_DIR/huggingface (bloby LFS
+i małe pliki ze snapshots/), przechodzą do nowego katalogu po sprawdzeniu sumy twardym dowiązaniem: bez drugiego
+pobierania i bez drugiej kopii na dysku; brak samych plików opisu (README, LICENSE), których starszy jarvo-stt nie
+pobierał, nie zatrzymuje transkrypcji bez sieci. Manifest i pobieracz bierzemy z kodu Jarva: JARVO_REPO, katalog nad
+infra/bin tego skryptu albo /opt/jarvo/repo w obrazie.
 """
 
 from __future__ import annotations
@@ -132,35 +134,75 @@ def wpisy_modeli(repo: Path) -> dict[str, dict]:
 
 
 _PLIK_HF = re.compile(r"^https://huggingface\.co/([^/]+)/([^/]+)/resolve/[0-9a-f]{40}/")
+OPISY_MODELU = ("README", "LICENSE")       # pliki opisu modelu (nie do transkrypcji): ich brak nie zatrzymuje STT
+
+
+def _na_miejsce(zrodlo: Path, cel: Path) -> None:
+    """Plik z dawnego cache na miejsce modelu: twarde dowiązanie (ten sam wolumen, np. /opt/data w kontenerze: bez
+    drugiej kopii 0,67 GB na dysku), a kopia tylko wtedy, gdy dowiązania się nie da (inny dysk, system plików bez
+    dowiązań)."""
+    tmp = cel.with_name(cel.name + ".z-cache")
+    tmp.unlink(missing_ok=True)
+    try:
+        os.link(zrodlo, tmp)
+    except OSError:
+        shutil.copyfile(zrodlo, tmp)
+    os.replace(tmp, cel)
 
 
 def z_cache_hf(katalog_modelu: Path, wpis: dict, sha256_pliku, log=_na_stderr) -> int:
     """Pliki modelu, które starszy jarvo-stt pobrał przez huggingface_hub (HF_HOME = <modele>/huggingface): plik LFS
-    leży tam jako blob nazwany sumą sha256 treści. Blob o sumie i rozmiarze z manifestu (suma sprawdzona) kopiujemy
-    na miejsce zamiast pobierać drugi raz. Zwraca liczbę skopiowanych plików."""
+    leży tam jako blob nazwany sumą sha256 treści, a mały (config.json, vocab.txt) w snapshots/<rewizja>/<ścieżka
+    w repo> (dowiązanie do bloba nazwanego sumą gita albo zwykły plik). Plik o rozmiarze i sumie z manifestu (suma
+    sprawdzona) trafia na miejsce twardym dowiązaniem zamiast drugiego pobrania. Zwraca liczbę plików z cache."""
     n = 0
     for p in wpis.get("pliki") or []:
-        m = _PLIK_HF.match(str(p.get("url") or ""))
+        url = str(p.get("url") or "")
+        m = _PLIK_HF.match(url)
         cel = Path(katalog_modelu) / str(p["cel"])
         if not m or cel.exists():
             continue
-        blob = MODELS_DIR / "huggingface" / "hub" / f"models--{m[1]}--{m[2]}" / "blobs" / str(p["sha256"])
+        repo = MODELS_DIR / "huggingface" / "hub" / f"models--{m[1]}--{m[2]}"
+        kandydaci = [repo / "blobs" / str(p["sha256"])]
         try:
-            if not blob.is_file() or (p.get("rozmiar") and blob.stat().st_size != int(p["rozmiar"])):
-                continue
-            if sha256_pliku(blob) != p["sha256"]:
-                continue
-            cel.parent.mkdir(parents=True, exist_ok=True)
-            tmp = cel.with_name(cel.name + ".z-cache")
-            shutil.copyfile(blob, tmp)
-            os.replace(tmp, cel)
+            kandydaci += [d / url[m.end():] for d in sorted((repo / "snapshots").iterdir()) if d.is_dir()]
         except OSError:
-            continue
-        n += 1
+            pass
+        for k in kandydaci:
+            try:
+                if not k.is_file() or (p.get("rozmiar") and k.stat().st_size != int(p["rozmiar"])):
+                    continue
+                if sha256_pliku(k) != p["sha256"]:
+                    continue
+                cel.parent.mkdir(parents=True, exist_ok=True)
+                _na_miejsce(k.resolve(), cel)
+            except OSError:
+                continue
+            n += 1
+            break
     if n:
-        log(f"jarvo-stt: {n} plików modelu z dawnego cache Hugging Face ({MODELS_DIR / 'huggingface'}), suma zgodna; "
-            "ten katalog można potem usunąć")
+        log(f"jarvo-stt: {n} plików modelu z dawnego cache Hugging Face ({MODELS_DIR / 'huggingface'}), suma zgodna, "
+            "bez drugiej kopii (twarde dowiązanie); jarvo-stt tego katalogu już nie używa (docs/RUNBOOK.md)")
     return n
+
+
+def bez_opisow_gotowy(katalog_modelu: Path, wpis: dict) -> list[str]:
+    """Czy model nadaje się do transkrypcji, choć brak plików opisu (README, LICENSE): pliki modelu na dysku
+    w rozmiarach z manifestu (sumy sprawdził pobieracz albo z_cache_hf). Zwraca brakujące opisy, a [] = nie (brak
+    pliku modelu albo brak niczego)."""
+    brak_opisow = []
+    for p in wpis.get("pliki") or []:
+        plik = Path(katalog_modelu) / str(p["cel"])
+        try:
+            jest = plik.is_file() and (not p.get("rozmiar") or plik.stat().st_size == int(p["rozmiar"]))
+        except OSError:
+            jest = False
+        if jest:
+            continue
+        if not str(p["cel"]).upper().startswith(OPISY_MODELU):
+            return []
+        brak_opisow.append(str(p["cel"]))
+    return brak_opisow
 
 
 def przygotuj_modele(log=_na_stderr) -> dict[str, Path]:
@@ -178,7 +220,13 @@ def przygotuj_modele(log=_na_stderr) -> dict[str, Path]:
             try:
                 modele.zainstaluj(nazwa, wpis, MODELS_DIR, log=log, pasek=True)
             except modele.BladModelu as e:
-                raise BrakModelu(f"model {nazwa} się nie pobrał: {e}") from None
+                # po aktualizacji bez sieci: pliki modelu z dawnego cache są, brak tylko opisów (README, LICENSE,
+                # których starszy jarvo-stt nie pobierał) → transkrypcja teraz, opisy przy następnym użyciu z siecią
+                opisy = bez_opisow_gotowy(kat, wpis)
+                if not opisy:
+                    raise BrakModelu(f"model {nazwa} się nie pobrał: {e}") from None
+                log(f"jarvo-stt: model {nazwa} gotowy bez plików opisu ({', '.join(opisy)}: {e}); pobiorą się przy "
+                    "następnym użyciu")
         katalogi[nazwa] = kat
     return katalogi
 

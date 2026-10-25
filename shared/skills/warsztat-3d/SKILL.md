@@ -1,7 +1,7 @@
 ---
 name: warsztat-3d
 description: "Model 3D z kodu (build123d): STEP, STL, GLB, 3MF, podgląd PNG, film obrotu."
-version: 1.1.0
+version: 1.1.1
 author: "Jarvo (silnik: build123d, Apache-2.0, na OpenCascade, LGPL-2.1; podgląd: Three.js, MIT)"
 license: MIT
 metadata:
@@ -40,17 +40,18 @@ i bez tokenów na render; sieć tylko raz, gdy na komputerze właściciela pierw
 ```bash
 C="$HERMES_HOME/skills/design/warsztat-3d/scripts/cad.py"
 @@PY@@ "$C" stan                                            # silnik, podgląd, ffmpeg (albo co pobierze 1. użycie)
-@@PY@@ "$C" zainstaluj                                      # 1. użycie u właściciela: silnik i Three.js teraz
+@@PY@@ "$C" zainstaluj                                      # 1. użycie u właściciela: silnik CAD teraz
 @@PY@@ "$C" zbuduj model.py -o out/3d/uchwyt --podglad      # STEP, STL, GLB, 3MF, raport JSON i PNG
 @@PY@@ "$C" zbuduj model.py -o out/3d/uchwyt --formaty stl,3mf --material petg
 @@PY@@ "$C" podglad out/3d/uchwyt/model.glb -o out/3d/uchwyt/spod.png --wysokosc -40 --siatka
 @@PY@@ "$C" obrot out/3d/uchwyt/model.glb -o out/3d/uchwyt/obrot.mp4 --sekundy 6 --rozmiar 1080x1080
 ```
-**Pierwsze użycie na komputerze właściciela.** W instalacji Jarva na komputerze (bez kontenera) silnika i Three.js
-do podglądu na początku nie ma: `stan` mówi wtedy „pobierze się przy pierwszym…” (z `--json`: `silnik_przy_uzyciu`,
-ok. 215 MB, i `three_przy_uzyciu_mb`). Pierwsze `zbuduj` albo `podglad` pobiera je z sumami z manifestu (1–3 min),
-więc najpierw `cad.py zainstaluj` z limitem czasu terminala ok. 900 s i jedno zdanie do właściciela („instaluję raz
-silnik 3D, ok. 2 min”). Przerwane pobieranie wznowi się przy następnym poleceniu. Błąd instalacji (brak sieci, inna
+**Pierwsze użycie na komputerze właściciela.** W instalacji Jarva na komputerze (bez kontenera) silnika CAD na
+początku nie ma: `stan` mówi wtedy „pobierze się przy pierwszym…” (z `--json`: `silnik_przy_uzyciu`, ok. 215 MB).
+Pierwsze `zbuduj` pobiera go z sumami z manifestu (1–3 min), więc najpierw `cad.py zainstaluj` z limitem czasu
+terminala ok. 900 s i jedno zdanie do właściciela („instaluję raz silnik 3D, ok. 2 min”). Przerwane pobieranie
+wznowi się przy następnym poleceniu. Three.js do podglądu przychodzi już z instalacją Jarva (narzędzia npm floty);
+gdy `stan` pokazuje „brak Three.js”, właściciel uruchamia instalację jeszcze raz. Błąd instalacji (brak sieci, inna
 suma) zgłaszasz właścicielowi, nie obchodzisz go.
 
 1. **Wymagania w liczbach.** Zanim napiszesz kod: wymiary (mm), do czego pasuje (śruba M4? płytka 50 × 30?),

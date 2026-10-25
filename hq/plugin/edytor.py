@@ -1504,8 +1504,10 @@ def tools() -> dict:
 # którego uchwyt trzyma dashboard: dzieci programu dziedziczą zadanie, `zabij_drzewo(proc)` kończy całe drzewo
 # (anulowanie eksportu, limit czasu), a uchwyt zamyka się z obiektem procesu albo z samym dashboardem (padnięty
 # dashboard = koniec jego programów, bez sierot piszących pliki). Na Linuksie i macOS bez zmian: proc.kill().
-# Używa ich lektor aplikacji (glos.py: przy_starcie w przenosne.uruchom); trasy edytora w plugin_api.py (eksport,
-# lektor, analiza mowy) podłącza się tak samo: przy_starcie=przypnij_drzewo, anulowanie przez zabij_drzewo.
+# Używają ich lektor aplikacji (glos.py) i trasy edytora w plugin_api.py: `_proc` (lektor, analiza mowy, nagranie,
+# kopia podglądowa, odsłuch: przy_starcie=przypnij_drzewo, po limicie czasu i przerwaniu zabij_drzewo) oraz eksport
+# (`_run_export`: przypnij_drzewo przy starcie ffmpeg, anulowanie `edit_cancel` przez zabij_drzewo). Plik częściowy
+# eksportu, który przeżył padnięty panel, sprząta następny eksport (sprzataj_porzucone_eksporty).
 _JOB_KILL_ON_JOB_CLOSE = 0x2000
 _JOB_EXTENDED_LIMIT_INFORMATION = 9
 
@@ -1601,6 +1603,42 @@ def zabij_drzewo(proc: subprocess.Popen) -> None:
             proc.kill()
         except OSError:              # skończył się między poll() a kill()
             pass
+
+
+ZNACZNIK_EKSPORTU = "eksport.json"   # w katalogu roboczym eksportu: proces panelu i plik częściowy obok filmu
+
+
+def zapisz_eksport(katalog: Path, czesc: Path, pid: int | None = None) -> None:
+    """Znacznik trwającego eksportu w jego katalogu roboczym (`<dane>/jarvo/state/edytor/<id>`): PID procesu panelu
+    i plik częściowy `.<film>.part.mp4` obok filmu właściciela."""
+    (Path(katalog) / ZNACZNIK_EKSPORTU).write_text(
+        json.dumps({"pid": os.getpid() if pid is None else pid, "czesc": str(czesc)}, ensure_ascii=False),
+        encoding="utf-8")
+
+
+def sprzataj_porzucone_eksporty(baza: Path, pid: int | None = None) -> list[Path]:
+    """Eksporty innego (wcześniejszego) procesu panelu: padł albo zrestartował się w trakcie, więc jego `finally` nie
+    usunęło pliku częściowego ani katalogu roboczego. Znika plik częściowy (tylko `.<nazwa>.part.mp4`, nic innego obok
+    filmu) i katalog roboczy; eksporty tego procesu (`pid`, domyślnie bieżący) zostają. Zwraca usunięte ścieżki."""
+    pid = os.getpid() if pid is None else pid
+    usuniete: list[Path] = []
+    for znacznik in sorted(Path(baza).glob(f"*/{ZNACZNIK_EKSPORTU}")):
+        try:
+            dane = json.loads(znacznik.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(dane, dict) or dane.get("pid") == pid:
+            continue
+        czesc = Path(str(dane.get("czesc") or ""))
+        if czesc.name.startswith(".") and czesc.name.endswith(".part.mp4") and czesc.is_file():
+            try:
+                czesc.unlink()
+                usuniete.append(czesc)
+            except OSError:              # Windows: plik jeszcze otwarty (ffmpeg kończy się z zadaniem) → następnym razem
+                continue
+        shutil.rmtree(znacznik.parent, ignore_errors=True)
+        usuniete.append(znacznik.parent)
+    return usuniete
 
 
 # ----------------------------------------------------------------------------- audio: biblioteka, wyodrębnienie, lektor

@@ -84,6 +84,8 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
 10. **HyperFrames: check przed renderem.** Po każdej zmianie kompozycji `hyperframes check` (lint + walidacja
    w przeglądarce, `--snapshots` na klatki) i render dopiero przy czystym wyniku: według HeyGen mediana 1 render zamiast 2
    i ~połowa kosztu tokenów. Promo z marki: `hyperframes capture <URL>` (skill `product-launch-video`) albo `assety.py`.
+   Kompozycja bez GSAP (sam CSS): `data-no-timeline` na elemencie z `data-composition-id`, inaczej render czeka 45 s
+   na oś czasu. `npx hyperframes` ze skilli HyperFrames bierze tę samą przypiętą wersję co `hyperframes` z PATH.
 11. **Za wolno?** `krytyka.py tempo` (przestoje i luki obrazu, zasada tempa) i `puls` pokazują, gdzie film zwalnia; poprawiasz na osi czasu przez `retime.py`
    (`references/retime.md`), nie cięciem MP4.
 9. **Pętla krytyki przed oddaniem:** `kontrola-wideo` krok 4a (7 osi 1–10, 3 najgorsze problemy, aż wszystko ≥ 8).

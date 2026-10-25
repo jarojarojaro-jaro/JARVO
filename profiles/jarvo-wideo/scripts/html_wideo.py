@@ -752,19 +752,22 @@ def main(argv: list[str] | None = None) -> int:
         if not a.wyjscie and not a.klatki:
             raise SystemExit("lottie: podaj -o film.mp4 albo --klatki 0,45,89")
         work = Path(a.out) if a.klatki else wl.katalog_roboczy("jarvo-lottie-klatki-")
-        with wl.miejsce_renderu("html_wideo lottie") if a.wyjscie else contextlib.nullcontext():
-            frames, labels, info = lottie_render(Path(a.plik).resolve(), parse_times(a.klatki) if a.klatki else None,
-                                                 a.fps, work, a.alfa, a.tlo, a.skala)
-        result = {"klatek": len(frames), "fps_animacji": info["fps"], "rozmiar": [info["w"], info["h"]]}
-        if a.arkusz:
-            pick = frames if a.klatki else frames[:: max(1, len(frames) // 12)]
-            lab = labels if a.klatki else labels[:: max(1, len(frames) // 12)]
-            result["arkusz"] = sheet(pick, lab, Path(a.arkusz)).as_posix()
-        if a.wyjscie:
-            result["film"] = encode(work, a.fps or info["fps"], Path(a.wyjscie), a.alfa).as_posix()
-        if not a.klatki:
-            shutil.rmtree(work, ignore_errors=True)
-        else:
+        try:
+            with wl.miejsce_renderu("html_wideo lottie") if a.wyjscie else contextlib.nullcontext():
+                frames, labels, info = lottie_render(Path(a.plik).resolve(),
+                                                     parse_times(a.klatki) if a.klatki else None,
+                                                     a.fps, work, a.alfa, a.tlo, a.skala)
+            result = {"klatek": len(frames), "fps_animacji": info["fps"], "rozmiar": [info["w"], info["h"]]}
+            if a.arkusz:
+                pick = frames if a.klatki else frames[:: max(1, len(frames) // 12)]
+                lab = labels if a.klatki else labels[:: max(1, len(frames) // 12)]
+                result["arkusz"] = sheet(pick, lab, Path(a.arkusz)).as_posix()
+            if a.wyjscie:
+                result["film"] = encode(work, a.fps or info["fps"], Path(a.wyjscie), a.alfa).as_posix()
+        finally:                             # klatki filmu (katalog roboczy) znikają także po błędzie renderu
+            if not a.klatki:
+                shutil.rmtree(work, ignore_errors=True)
+        if a.klatki:
             result["katalog"] = work.as_posix()
         print(json.dumps(result, ensure_ascii=False))
         return 0
@@ -787,29 +790,38 @@ def main(argv: list[str] | None = None) -> int:
     work = wl.katalog_roboczy("jarvo-html-klatki-")     # natywnie na dysku instalacji, nie w %TEMP% właściciela
     n = max(1, a.subklatki)
     przegladarki = ile_przegladarek(len(times) * n, a.rownolegle)
-    if not zrzut_na_dysk(len(times) * (n + (n > 1)), size, a.skala, shutil.disk_usage(work).free):
-        o = {**o, "zrzut_lekki": True}
-        print("ℹ mało miejsca na dysku: klatki zwykłym zrzutem (pliki o połowę mniejsze, render ok. 3× wolniejszy)",
-              file=sys.stderr)
-    with wl.miejsce_renderu("html_wideo wideo"):
-        if n == 1:
-            frames = capture_rownolegle(a.zrodlo, times, [f"f{i:05d}.png" for i in range(len(times))], work, o, a.fps,
-                                        size, bool(a.rozmiar), a.skala, a.alfa, a.czekaj, przegladarki)
-        else:
-            sub_times = subframe_times(times, a.fps, n)
-            subs = capture_rownolegle(a.zrodlo, sub_times, [f"s{i:06d}.png" for i in range(len(sub_times))], work / "sub",
-                                      o, a.fps, size, bool(a.rozmiar), a.skala, a.alfa, a.czekaj, przegladarki)
-            frames = [blend(subs[i * n:(i + 1) * n], work / f"f{i:05d}.png", a.alfa) for i in range(len(times))]
-        out = encode(work, a.fps, Path(a.wyjscie), a.alfa)
-    result = {"film": out.as_posix(), "klatek": len(frames), "fps": a.fps, "przegladarki": przegladarki,
-              **({"subklatki": n} if n > 1 else {})}
-    if a.arkusz:
-        step = max(1, len(frames) // 12)
-        result["arkusz"] = sheet(frames[::step], [f"t={t:.2f}s" for t in times[::step]], Path(a.arkusz)).as_posix()
+    gotowe = False
+    try:
+        if not zrzut_na_dysk(len(times) * (n + (n > 1)), size, a.skala, shutil.disk_usage(work).free):
+            o = {**o, "zrzut_lekki": True}
+            print("ℹ mało miejsca na dysku: klatki zwykłym zrzutem (pliki o połowę mniejsze, render ok. 3× wolniejszy)",
+                  file=sys.stderr)
+        with wl.miejsce_renderu("html_wideo wideo"):
+            if n == 1:
+                frames = capture_rownolegle(a.zrodlo, times, [f"f{i:05d}.png" for i in range(len(times))], work, o,
+                                            a.fps, size, bool(a.rozmiar), a.skala, a.alfa, a.czekaj, przegladarki)
+            else:
+                sub_times = subframe_times(times, a.fps, n)
+                subs = capture_rownolegle(a.zrodlo, sub_times, [f"s{i:06d}.png" for i in range(len(sub_times))],
+                                          work / "sub", o, a.fps, size, bool(a.rozmiar), a.skala, a.alfa, a.czekaj,
+                                          przegladarki)
+                frames = [blend(subs[i * n:(i + 1) * n], work / f"f{i:05d}.png", a.alfa) for i in range(len(times))]
+            out = encode(work, a.fps, Path(a.wyjscie), a.alfa)
+        result = {"film": out.as_posix(), "klatek": len(frames), "fps": a.fps, "przegladarki": przegladarki,
+                  **({"subklatki": n} if n > 1 else {})}
+        if a.arkusz:
+            step = max(1, len(frames) // 12)
+            result["arkusz"] = sheet(frames[::step], [f"t={t:.2f}s" for t in times[::step]],
+                                     Path(a.arkusz)).as_posix()
+        gotowe = True
+    finally:
+        # klatki w trwałym katalogu roboczym Wideografa (natywnie <dane>/jarvo/cache/wideo/robocze, przy 1080p setki
+        # MB): po błędzie przechwytywania albo kodowania też znikają, a --zostaw-klatki trzyma je tylko po udanym
+        # renderze (system ich nie posprząta, jak %TEMP% czy /tmp)
+        if not (gotowe and a.zostaw_klatki):
+            shutil.rmtree(work, ignore_errors=True)
     if a.zostaw_klatki:
         result["katalog_klatek"] = work.as_posix()
-    else:
-        shutil.rmtree(work, ignore_errors=True)
     print(json.dumps(result, ensure_ascii=False))
     if "://" not in a.zrodlo:
         import pomiar as pm

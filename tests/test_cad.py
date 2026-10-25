@@ -1,9 +1,11 @@
 """Warsztat 3D (shared/skills/warsztat-3d): cad.py, cad_model.py, cad_render.py, przypięcie silnika w obrazie
-i instalacja natywna (venv cad i Three.js przy pierwszym użyciu, docs/NATYWNIE.md E11).
+i instalacja natywna (venv cad przy pierwszym użyciu, Three.js i playwright-core z narzędzi npm floty: wpis
+node-floty w narzedzia.json, docs/NATYWNIE.md E11, P02), sonda Node z katalogu skryptu (`cad_render.cjs --sprawdz`).
 
 Część z prawdziwym silnikiem (build123d) i podglądem idzie tylko tam, gdzie są: kontener Jarva (node + three +
-Chromium), instalacja natywna albo JARVO_CAD_PYTHON z CHROME_PATH i JARVO_THREE_DIR (Playwright dla Pythona w tym
-interpreterze albo w JARVO_TOOLS_PYTHON); reszta działa bez nich. Na żywo w instalacji: tests/live/natywnie_telefon_3d.py.
+Chromium), instalacja natywna albo JARVO_CAD_PYTHON z CHROME_PATH i NODE_PATH albo JARVO_THREE_DIR (Playwright dla
+Pythona w tym interpreterze albo w JARVO_TOOLS_PYTHON); reszta działa bez nich. Na żywo w instalacji:
+tests/live/natywnie_telefon_3d.py i tests/live/natywnie_media.py (punkt narzędzi npm floty).
 """
 
 from __future__ import annotations
@@ -190,8 +192,16 @@ def test_obraz_przypina_silnik_sumami_bez_zbednych_paczek():
 
 # ------------------------------------------------------------------ instalacja natywna (E11): silnik i Three.js przy użyciu
 
+def _paczka_three(k: Path) -> Path:
+    for rel in ("build/three.module.js", "examples/jsm/loaders/GLTFLoader.js"):
+        (k / rel).parent.mkdir(parents=True, exist_ok=True)
+        (k / rel).write_text("//", encoding="utf-8")
+    return k
+
+
 class AtrapaPrzyUzyciu:
-    """Atrapa jarvo/przy_uzyciu.py: venv cad i narzędzie three „instalowane” do katalogu tymczasowego."""
+    """Atrapa jarvo/przy_uzyciu.py: venv cad „instalowany” do katalogu tymczasowego, a Three.js w narzędziach npm floty
+    z instalacji (wpis node-floty w narzedzia.json z NODE_PATH, jak z kroku instalatora „Narzędzia npm floty”)."""
 
     class BladPrzyUzyciu(RuntimeError):
         pass
@@ -200,20 +210,16 @@ class AtrapaPrzyUzyciu:
         self.tmp, self.blad = tmp, blad
         self.wywolania: list[str] = []
         self.python = tmp / "venvs" / "cad-abc" / "python.exe"
-        self.three = tmp / "narzedzia" / "three" / "0.186.1"
+        self.node_modules = tmp / "program" / "node-floty" / "b5a1f4c9e3b8" / "node_modules"
+        self.three = self.node_modules / "three"
         if venv:
             self._venv()
         if three:
-            self._three()
+            _paczka_three(self.three)
 
     def _venv(self):
         self.python.parent.mkdir(parents=True, exist_ok=True)
         self.python.write_bytes(b"")
-
-    def _three(self):
-        for rel in ("build/three.module.js", "examples/jsm/loaders/GLTFLoader.js"):
-            (self.three / rel).parent.mkdir(parents=True, exist_ok=True)
-            (self.three / rel).write_text("//", encoding="utf-8")
 
     def gotowy_venv(self, _u, nazwa):
         assert nazwa == "cad"
@@ -227,27 +233,17 @@ class AtrapaPrzyUzyciu:
         self._venv()
         return self.gotowy_venv(_u, nazwa)
 
-    def gotowe_narzedzie(self, _u, nazwa):
-        return {"katalog": str(self.three)} if nazwa == "three" and self.three.is_dir() else None
+    def narzedzie(self, _u, nazwa, log=print):            # Three.js nie pobiera się już przy pierwszym użyciu
+        pytest.fail(f"cad.py nie pobiera narzędzia {nazwa}: three przychodzi z narzędziami npm floty")
 
-    def narzedzie(self, _u, nazwa, log=print):
-        self.wywolania.append(f"narzedzie {nazwa}")
-        if self.blad:
-            raise self.BladPrzyUzyciu(self.blad)
-        self._three()
-        return {"katalog": str(self.three)}
-
-    def wpis(self, _u, _nazwa):
+    def wpis(self, _u, nazwa):
+        if nazwa == "node-floty" and self.node_modules.is_dir():
+            return {"katalog": str(self.node_modules.parent), "bin": [str(self.node_modules / ".bin")],
+                    "env": {"NODE_PATH": str(self.node_modules)}}
         return None
 
     def opis_venvu(self, _u, nazwa):
         return {"venv": nazwa, "pobranie_mb": 215, "venv_mb": 597, "paczek": 56}
-
-    def app_instalacji(self, _u):
-        return REPO
-
-    def rozmiar_mb(self, _app, nazwa):
-        return 4.6 if nazwa == "three" else None
 
 
 @pytest.fixture
@@ -299,27 +295,29 @@ def test_silnik_natywnie_instaluje_sie_przy_pierwszym_uzyciu(natywnie, capsys):
         cad.cad_python()
 
 
-def test_three_kolejnosc_zrodel_i_pobranie_przy_uzyciu(natywnie, monkeypatch, tmp_path):
-    def paczka(k: Path) -> Path:
-        for rel in ("build/three.module.js", "examples/jsm/loaders/GLTFLoader.js"):
-            (k / rel).parent.mkdir(parents=True, exist_ok=True)
-            (k / rel).write_text("//", encoding="utf-8")
-        return k
-
+def test_three_z_narzedzi_npm_floty_bez_pobierania(natywnie, monkeypatch, tmp_path):
+    """Three.js natywnie z narzędzi npm floty (wpis node-floty z NODE_PATH w narzedzia.json, kontrola-19: bez wpisu
+    three w manifeście), potem JARVO_THREE_DIR i NODE_PATH; nigdy pobranie przy podglądzie. Bez niczego w instalacji
+    natywnej: komunikat z krokiem instalacji, a nie z wpisem manifestu."""
     pu = natywnie()
-    with pytest.raises(cad.Blad, match="Three.js"):
-        cad.three_root(instaluj=False)
+    with pytest.raises(cad.Blad, match="Narzędzia npm floty") as e:
+        cad.three_root()
+    assert "manifeście" not in str(e.value)
     (tmp_path / "niepelny" / "three").mkdir(parents=True)                      # katalog bez plików paczki: pomijany
-    z_node = paczka(tmp_path / "node_modules" / "three")
+    z_node = _paczka_three(tmp_path / "node_modules" / "three")
     monkeypatch.setenv("NODE_PATH", os.pathsep.join([str(tmp_path / "niepelny"), str(tmp_path / "node_modules")]))
-    assert cad.three_root() == z_node and pu.wywolania == []                  # paczka z NODE_PATH: bez pobierania
-    monkeypatch.setenv("NODE_PATH", "")
-    assert cad.three_root() == pu.three and pu.wywolania == ["narzedzie three"]
-    wlasny = paczka(tmp_path / "wlasny-three")
+    assert cad.three_root() == z_node                                          # paczka z NODE_PATH procesu
+    pu = natywnie(three=True)
+    assert cad.three_root() == pu.three              # instalacja: node-floty z narzedzia.json, nie zmienna sprzed restartu
+    wlasny = _paczka_three(tmp_path / "wlasny-three")
     monkeypatch.setenv("JARVO_THREE_DIR", str(wlasny))
-    assert cad.three_root() == pu.three                     # instalacja: wersja z manifestu, nie zmienna sprzed restartu
+    assert cad.three_root() == pu.three
     monkeypatch.setattr(cad, "_przy_uzyciu", lambda: (None, None))
     assert cad.three_root() == wlasny                                          # bez instalacji natywnej: zmienna
+    monkeypatch.delenv("JARVO_THREE_DIR")
+    monkeypatch.setenv("NODE_PATH", "")
+    with pytest.raises(cad.Blad, match="JARVO_THREE_DIR"):
+        cad.three_root()
 
 
 def test_silnik_natywnie_wygrywa_ze_zmienna_sprzed_aktualizacji(natywnie, monkeypatch, tmp_path):
@@ -379,7 +377,7 @@ def test_podglad_python_przekazuje_chromium_i_three(natywnie, monkeypatch, tmp_p
 
 
 def test_stan_mowi_co_pobierze_pierwsze_uzycie(natywnie, monkeypatch, tmp_path):
-    natywnie()
+    pu = natywnie(three=True)
     chrome = tmp_path / "chrome.exe"
     chrome.write_bytes(b"")
     monkeypatch.setenv("CHROME_PATH", str(chrome))
@@ -388,10 +386,94 @@ def test_stan_mowi_co_pobierze_pierwsze_uzycie(natywnie, monkeypatch, tmp_path):
     monkeypatch.setattr(cad, "program_ffmpeg", lambda: str(tmp_path / "ffmpeg.exe"))
     r = cad.stan()
     assert r["silnik"] is None and r["silnik_przy_uzyciu"]["pobranie_mb"] == 215
-    assert r["podglad"]["sposob"] == "python" and r["podglad"]["three_przy_uzyciu_mb"] == 4.6
+    assert r["podglad"]["sposob"] == "python" and r["podglad"]["three"] == pu.three.as_posix()
+    assert "three_przy_uzyciu_mb" not in r["podglad"]                       # Three.js nie pobiera się przy użyciu
     assert cad.stan_gotowy(r) and "pobierze się przy pierwszym" in cad._opis_stanu(r)
     assert not cad.stan_gotowy({**r, "ffmpeg": None})
     assert not cad.stan_gotowy({**r, "silnik_przy_uzyciu": None})
+    shutil.rmtree(pu.node_modules)
+    natywnie()                                                               # instalacja bez narzędzi npm floty
+    r = cad.stan()
+    assert not cad.stan_gotowy(r) and r["podglad"]["three"] is None
+    assert "Narzędzia npm floty" in r["podglad"]["blad"] and "Narzędzia npm floty" in cad._opis_stanu(r)
+
+
+def test_zbuduj_z_podgladem_zostawia_raport_gdy_podglad_padnie(natywnie, monkeypatch, tmp_path, capsys):
+    """Pliki CAD gotowe, a podgląd się nie udał (np. brak Three.js): raport JSON i tak wychodzi (kontrola-19:
+    wcześniej przepadał przez błąd podglądu), z ostrzeżeniem i kodem 0."""
+    m = tmp_path / "czesc.py"
+    m.write_text("wynik = None\n", encoding="utf-8")
+    glb = tmp_path / "out" / "czesc.glb"
+    glb.parent.mkdir()
+    glb.write_bytes(b"glTF")
+    rap = {"model": str(m), "bledy": [], "ostrzezenia": [], "wymiary_mm": [10, 20, 30], "objetosc_mm3": 6000.0,
+           "masa_g": 7.4, "gestosc_g_cm3": 1.24, "bryly": 1, "poprawny": True,
+           "pliki": {"glb": {"plik": glb.as_posix(), "bajty": 4}}}
+    monkeypatch.setenv("JARVO_CAD_PYTHON", _falszywy_python(tmp_path, rap))
+    monkeypatch.setattr(cad, "_przy_uzyciu", lambda: (None, None))
+
+    def podglad(_glb, _out, _widok):
+        raise cad.Blad("brak Three.js do podglądu")
+    monkeypatch.setattr(cad, "podglad", podglad)
+    assert cad.main(["zbuduj", str(m), "-o", str(tmp_path / "out"), "--podglad", "--json"]) == 0
+    wynik = json.loads(capsys.readouterr().out)
+    assert wynik["wymiary_mm"] == [10, 20, 30] and "podglad" not in wynik
+    assert wynik["ostrzezenia"] == ["podgląd się nie udał: brak Three.js do podglądu"]
+
+
+def test_sonda_node_z_katalogu_skryptu_jak_render(monkeypatch, tmp_path):
+    """node_podglad pyta `cad_render.cjs --sprawdz` (ta sama ścieżka modułów co render), a nie `node -e` w katalogu
+    bieżącym agenta: projekt z własnymi node_modules (three i playwright-core) nie zmienia sposobu podglądu."""
+    zapis = tmp_path / "node.json"
+    node = atrapy.program(tmp_path / "bin", "node", f"""
+import json, os, sys
+open({str(zapis)!r}, "w", encoding="utf-8").write(json.dumps({{"argv": sys.argv[1:], "cwd": os.getcwd()}}))
+sys.exit(int(os.environ.get("ATRAPA_KOD", "0")))
+""")
+    monkeypatch.setattr(cad.shutil, "which", lambda nazwa: str(node) if nazwa == "node" else None)
+    monkeypatch.chdir(tmp_path)
+    assert cad.node_podglad() == str(node)
+    z = json.loads(zapis.read_text(encoding="utf-8"))
+    assert z["argv"] == [str(cad.RENDER_JS), "--sprawdz"] and Path(z["cwd"]) == cad.HERE
+    monkeypatch.setenv("ATRAPA_KOD", "1")
+    assert cad.node_podglad() is None
+
+
+def _paczka_npm(nm: Path, nazwa: str, glowny: str) -> None:
+    (nm / nazwa / Path(glowny).parent).mkdir(parents=True, exist_ok=True)
+    (nm / nazwa / glowny).write_text("module.exports = {};\n", encoding="utf-8")
+    (nm / nazwa / "package.json").write_text(json.dumps({"name": nazwa, "version": "1.0.0", "main": glowny}),
+                                             encoding="utf-8")
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="brak node")
+def test_cad_render_sprawdz_widzi_paczki_tylko_z_node_path(monkeypatch, tmp_path):
+    """Prawdziwy node: `cad_render.cjs --sprawdz` w katalogu projektu z three i playwright-core w node_modules ich
+    nie widzi (render też by nie zobaczył, kontrola-19), a z NODE_PATH narzędzi npm floty widzi."""
+    projekt = tmp_path / "projekt"
+    for nazwa, glowny in (("three", "build/three.cjs"), ("playwright-core", "index.js")):
+        _paczka_npm(projekt / "node_modules", nazwa, glowny)
+    monkeypatch.chdir(projekt)
+    monkeypatch.setenv("NODE_PATH", "")
+    monkeypatch.delenv("CAD_PLAYWRIGHT", raising=False)
+    stary = subprocess.run(["node", "-e", "require.resolve('three'); require.resolve('playwright-core')"],
+                           capture_output=True)
+    assert stary.returncode == 0                                       # dawna sonda widziała paczki projektu
+    if subprocess.run(["node", str(cad.RENDER_JS), "--sprawdz"], capture_output=True).returncode == 0:
+        pytest.skip("node widzi three i playwright-core z katalogu globalnego (np. obraz Jarva)")
+    assert cad.node_podglad() is None
+    monkeypatch.setenv("NODE_PATH", str(projekt / "node_modules"))
+    assert cad.node_podglad() is not None
+    p = subprocess.run(["node", str(cad.RENDER_JS), "--sprawdz"], capture_output=True, text=True)
+    assert p.returncode == 0 and Path(json.loads(p.stdout)["three"]) == projekt / "node_modules" / "three"
+
+
+def test_skrypty_warsztatu_bez_surowych_tokenow_buildu():
+    """build podstawia tokeny (@@PY@@…) tylko w plikach .md skilli wspólnych: w skryptach i komunikatach agent
+    zobaczyłby surowy token (kontrola-19)."""
+    for p in sorted((SKILL / "scripts").iterdir()):
+        if p.suffix in (".py", ".cjs", ".html"):
+            assert not re.search(r"@@[A-Z_]+@@", p.read_text(encoding="utf-8")), p.name
 
 
 def test_cad_render_adresy_bez_sieci_i_piaskownica(tmp_path):
@@ -428,17 +510,17 @@ def _silnik() -> str | None:
 
 
 def _podglad_dostepny() -> bool:
-    """Podgląd z obrazu (node + three + playwright-core) albo natywny (Playwright dla Pythona, CHROME_PATH, three)."""
-    if shutil.which("node"):
-        p = subprocess.run(["node", "-e", "require.resolve('three'); require('playwright-core')"], capture_output=True)
-        if p.returncode == 0 and (Path("/etc/hermes/agent-browser-executable-path").exists()
-                                  or bool(os.environ.get("CHROME_PATH"))):
-            return True
+    """Podgląd przez Node (three i playwright-core w NODE_PATH: obraz albo narzędzia npm floty) albo przez Playwright
+    dla Pythona (CHROME_PATH, three); w obu potrzebna przeglądarka."""
+    if not cad.przegladarka():
+        return False
+    if cad.node_podglad():
+        return True
     try:
-        cad.three_root(instaluj=False)
+        cad.three_root()
     except cad.Blad:
         return False
-    return bool(cad.python_playwright() and cad.przegladarka())
+    return bool(cad.python_playwright())
 
 
 @pytest.mark.skipif(_silnik() is None, reason="brak venvu CAD (kontener Jarva albo JARVO_CAD_PYTHON)")

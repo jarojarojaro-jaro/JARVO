@@ -473,6 +473,111 @@ def test_zadanie_zamyka_sie_z_obiektem_procesu():
     assert not _pid_zyje(dziecko)
 
 
+def _api(tmp_path, monkeypatch):
+    """plugin_api wtyczki HQ z danymi w katalogu testu, bez serwera podglądu i wspólnych kluczy."""
+    pytest.importorskip("fastapi")
+    pytest.importorskip("httpx")
+    from conftest import load_script
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))
+    monkeypatch.setenv("JARVO_PREVIEW_PORT", "0")
+    monkeypatch.setenv("JARVO_SHARE_KEYS", "0")
+    return load_script("hq/plugin/plugin_api.py", f"jarvo_test_edytor_api_{tmp_path.name}")
+
+
+@pytest.mark.windows_only
+def test_proc_edytora_konczy_cale_drzewo_po_limicie_czasu(tmp_path, monkeypatch):
+    """Windows (kontrola-17): trasy edytora (`_proc`: lektor, analiza mowy, nagranie) przypinają program do Job Object,
+    a po limicie czasu kończą całe drzewo, nie tylko sam program (launcher venvu → film.py → jarvo-tts z Pythonem)."""
+    import asyncio
+    import sys
+    import time
+    api = _api(tmp_path, monkeypatch)
+    pid_plik = tmp_path / "dziecko.pid"
+    rodzic = ("import subprocess, sys, time; p = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)']); "
+              f"open({str(pid_plik)!r}, 'w').write(str(p.pid)); time.sleep(60)")
+    start = time.monotonic()
+    with pytest.raises(RuntimeError, match="Przekroczony czas"):
+        asyncio.run(api._proc(sys.executable, "-c", rodzic, timeout=3))
+    assert time.monotonic() - start < 30                      # wątek programu nie czeka na osierocone dziecko
+    dziecko = int(pid_plik.read_text())
+    for _ in range(50):
+        if not _pid_zyje(dziecko):
+            break
+        time.sleep(0.1)
+    assert not _pid_zyje(dziecko)
+
+
+def test_eksport_i_anulowanie_edytora_przez_drzewo_procesow(tmp_path, monkeypatch):
+    """Eksport (`_run_export`): ffmpeg przypięty do zadania przy starcie (przy_starcie = przypnij_drzewo i uchwyt
+    w zadaniu), znacznik eksportu w katalogu roboczym na czas pracy; anulowanie (`edit_cancel`) przez zabij_drzewo,
+    a nie sam kill(). `_proc` też przypina program."""
+    import asyncio
+    api = _api(tmp_path, monkeypatch)
+    przypiete, zabite, widziane = [], [], {}
+
+    class Proc:
+        def poll(self):
+            return 0
+
+    monkeypatch.setattr(api.ed, "przypnij_drzewo", lambda p: przypiete.append(p) or True)
+    monkeypatch.setattr(api.ed, "zabij_drzewo", lambda p: zabite.append(p))
+    film = tmp_path / "Ania's film" / "film-edycja.mp4"
+    film.parent.mkdir()
+    tmpdir = tmp_path / "state" / "edytor" / "abc"
+    tmpdir.mkdir(parents=True)
+    job = {"id": "abc", "state": "running"}
+
+    async def uruchom(argv, *, na_linie=None, przy_starcie=None, timeout=None, **kw):
+        p = Proc()
+        przy_starcie(p)
+        widziane.update(proc=job.get("proc"), znacznik=json.loads((tmpdir / ed.ZNACZNIK_EKSPORTU).read_text("utf-8")))
+        Path(argv[-1]).write_bytes(b"mp4")                    # ffmpeg pisze plik częściowy
+        return 0, b"", b""
+    prawdziwe = api.przenosne.uruchom
+    monkeypatch.setattr(api.przenosne, "uruchom", uruchom)
+    asyncio.run(api._run_export(job, ["ffmpeg", "-i", "x", str(film)], 1.0, tmpdir, film))
+    monkeypatch.setattr(api.przenosne, "uruchom", prawdziwe)
+    assert job["state"] == "done" and film.read_bytes() == b"mp4" and not tmpdir.exists()
+    assert przypiete == [widziane["proc"]] and "proc" not in job and zabite == [widziane["proc"]]   # koniec: sprzątnięty
+    assert widziane["znacznik"]["czesc"] == str(film.with_name(".film-edycja.part.mp4"))
+    proc = Proc()
+    api._edit.jobs["xyz"] = {"id": "xyz", "state": "running", "proc": proc}
+    widok = asyncio.run(api.edit_cancel("xyz"))
+    assert widok["state"] == "cancelled" and zabite[-1] is proc and "proc" not in widok
+    przypiete.clear()
+    assert asyncio.run(api._proc(sys_executable(), "-c", "print('ok')", timeout=60))[0] == 0 and len(przypiete) == 1
+
+
+def sys_executable() -> str:
+    import sys
+    return sys.executable
+
+
+def test_porzucony_eksport_innego_procesu_panelu_znika(tmp_path):
+    """Eksport przerwany padnięciem albo restartem panelu: następny eksport usuwa plik częściowy obok filmu
+    (`.<film>.part.mp4`) i katalog roboczy; eksporty tego procesu i żadne inne pliki obok filmu nie znikają."""
+    import os
+    baza = tmp_path / "state" / "edytor"
+    filmy = tmp_path / "filmy"
+    filmy.mkdir()
+    stary, moj, obcy = baza / "stary", baza / "moj", baza / "obcy"
+    for k in (stary, moj, obcy):
+        k.mkdir(parents=True)
+    czesc = filmy / ".film-edycja.part.mp4"
+    czesc.write_bytes(b"pol filmu")
+    ed.zapisz_eksport(stary, czesc, pid=os.getpid() + 1)
+    (filmy / ".moj-edycja.part.mp4").write_bytes(b"trwa")
+    ed.zapisz_eksport(moj, filmy / ".moj-edycja.part.mp4")
+    (filmy / "film.mp4").write_bytes(b"oryginal")
+    ed.zapisz_eksport(obcy, filmy / "film.mp4", pid=os.getpid() + 1)       # nie plik częściowy: zostaje
+    (baza / "proxy").mkdir()                                              # inne katalogi edytora bez znacznika
+    usuniete = ed.sprzataj_porzucone_eksporty(baza)
+    assert not czesc.exists() and not stary.exists() and not obcy.exists() and (baza / "proxy").is_dir()
+    assert (filmy / "film.mp4").read_bytes() == b"oryginal" and moj.is_dir() and (filmy / ".moj-edycja.part.mp4").exists()
+    assert set(usuniete) == {czesc, stary, obcy}
+    assert ed.sprzataj_porzucone_eksporty(baza) == []
+
+
 @pytest.mark.posix_only
 def test_zabij_drzewo_poza_windows_jak_kill():
     """Linux i macOS: bez Job Object (False), zabij_drzewo = kill() programu, jak dotąd."""

@@ -947,6 +947,43 @@ def test_cache_i_pliki_robocze_w_danych_jarva(monkeypatch, tmp_path):
     roboczy.rmdir()
 
 
+@pytest.mark.parametrize("pada", ["klatki", "kodowanie"])
+def test_html_wideo_sprzata_klatki_po_bledzie(monkeypatch, tmp_path, pada):
+    """`html_wideo.py wideo` trzyma klatki w trwałym katalogu roboczym Wideografa (natywnie <dane>/jarvo/cache/wideo/
+    robocze, system go nie sprząta): błąd przechwytywania albo kodowania też go usuwa (kontrola-17), a udany render
+    z --zostaw-klatki go zostawia."""
+    monkeypatch.setenv("JARVO_DATA_DIR", str(tmp_path / "dane" / "jarvo"))
+    monkeypatch.delenv("JARVO_WIDEO_CACHE", raising=False)
+    monkeypatch.setenv("JARVO_RENDER_KATALOG", str(tmp_path / "miejsca"))
+    monkeypatch.setattr(hw, "ensure_playwright", lambda: None)
+    robocze = tmp_path / "dane" / "jarvo" / "cache" / "wideo" / "robocze"
+
+    def capture(src, times, names, out_dir, *rest):
+        out_dir.mkdir(parents=True, exist_ok=True)
+        klatki = [out_dir / n for n in names]
+        for k in klatki:
+            k.write_bytes(b"\x89PNG" + b"\0" * 1000)
+        if pada == "klatki":
+            raise RuntimeError("przeglądarka padła")
+        return klatki
+
+    def encode(work, fps, out, alfa):
+        if pada == "kodowanie":
+            raise SystemExit("ffmpeg: błąd kodowania")
+        out.write_bytes(b"mp4")
+        return out
+    monkeypatch.setattr(hw, "capture_rownolegle", capture)
+    monkeypatch.setattr(hw, "encode", encode)
+    (tmp_path / "a.html").write_text("<html></html>", encoding="utf-8")
+    argv = ["wideo", "https://example.invalid/a.html", "--dlugosc", "0.2", "--fps", "10", "-o", str(tmp_path / "a.mp4")]
+    with pytest.raises((RuntimeError, SystemExit)):
+        hw.main(argv)
+    assert robocze.is_dir() and list(robocze.iterdir()) == []
+    pada = ""
+    assert hw.main([*argv, "--zostaw-klatki"]) == 0
+    assert len(list(robocze.iterdir())) == 1 and len(list(next(robocze.iterdir()).glob("*.png"))) == 2
+
+
 def test_przegladarka_renderu_z_manifestu(monkeypatch, tmp_path):
     """Bez Chromium w PLAYWRIGHT_BROWSERS_PATH (natywnie nie ma /opt/hermes/.playwright) html_wideo bierze
     chrome-headless-shell z manifestu (CHROME_PATH z narzedzia.json); rewizja z obrazu wygrywa, gdy jest."""
@@ -1064,15 +1101,33 @@ def test_lock_npm_floty_z_hyperframes_i_sumami():
     assert b"\r\n" not in (NODE / "package-lock.json").read_bytes()
 
 
+def test_obraz_bierze_narzedzia_npm_z_tego_samego_locka_i_jedna_kopie_hyperframes():
+    """Obraz (kontrola-17): /opt/jarvo/node z package.json i package-lock.json przez `npm ci` (to samo drzewo co
+    natywnie), bez drugiej, globalnej instalacji HyperFrames; `npx hyperframes` ze skilli trafia przez dowiązanie
+    w globalnym bin npm w tę kopię, a próba `npx --yes=false` spoza /opt/jarvo/node wywraca build, gdyby npx chciał
+    pobierać (sprawdzone na npm 11.20: bez wpisu w globalnym bin npx pobrałby najnowszą wersję)."""
+    docker = (REPO / "infra" / "Dockerfile").read_text(encoding="utf-8")
+    kod = "\n".join(linia for linia in docker.splitlines() if not linia.lstrip().startswith("#"))
+    assert "COPY infra/node/package.json infra/node/package-lock.json /opt/jarvo/node/" in kod
+    run = next(r for r in kod.split("\nRUN ") if "cd /opt/jarvo/node" in r)
+    assert "npm ci --omit=dev" in run and "npm install" not in run
+    assert "HYPERFRAMES_VERSION" not in kod and not re.search(r"npm install -g[^\n]*hyperframes", kod)
+    hf = next(r for r in kod.split("\nRUN ") if "npm prefix -g" in r)
+    assert '/opt/jarvo/node/node_modules/.bin/$b" "$g/$b"' in hf and "hyperframes hyperframes-localize-fonts" in hf
+    assert "cd /tmp && test \"$(npx --yes=false hyperframes --version)\" = \"$v\"" in hf
+    assert kod.index("HYPERFRAMES_NO_UPDATE_CHECK=1") < kod.index("npm prefix -g")     # bez sprawdzania wersji w buildzie
+
+
 def _node_floty():
     return load_script("infra/node/node_floty.py", "jarvo_test_node_floty")
 
 
 def test_node_floty_npm_ci_z_locka(monkeypatch, tmp_path):
     """npm ci --ignore-scripts z locka tej wersji do `<program>/node-floty/<skrót locka>` (npm bez npmrc właściciela,
-    node obok npm w PATH), bez onnxruntime-node; wpis narzedzia.json: node_modules/.bin w PATH, NODE_PATH, HyperFrames
-    bez telemetrii i autoaktualizacji, ffmpeg i ffprobe z manifestu (na macOS z dwóch katalogów). Drugi przebieg bez
-    npm; nieudany npm ci nie zostawia katalogu."""
+    node obok npm w PATH, paczki w osobnym cache `<cache>/npm-floty`, który sprząta instalator), bez onnxruntime-node;
+    wpis narzedzia.json: node_modules/.bin w PATH, NODE_PATH, HyperFrames bez telemetrii i autoaktualizacji, ffmpeg
+    i ffprobe z manifestu (na macOS z dwóch katalogów), globalny prefix npm z `hyperframes` dla `npx hyperframes`.
+    Drugi przebieg bez npm; katalog sprzed prefiksu dostaje go bez npm; nieudany npm ci nie zostawia katalogu ani .new."""
     import atrapy
     nf = _node_floty()
     zapis = tmp_path / "npm-wywolania.jsonl"
@@ -1081,13 +1136,19 @@ import json, os, sys
 from pathlib import Path
 with open({str(zapis)!r}, "a", encoding="utf-8") as f:
     f.write(json.dumps({{"argv": sys.argv[1:], "cwd": os.getcwd(), "userconfig": os.environ.get("npm_config_userconfig"),
-                        "cache": os.environ.get("npm_config_cache"), "path0": os.environ["PATH"].split(os.pathsep)[0]}}) + "\\n")
+                        "cache": os.environ.get("npm_config_cache"), "path0": os.environ["PATH"].split(os.pathsep)[0],
+                        "prefix": os.environ.get("npm_config_prefix")}}) + "\\n")
 if os.environ.get("NPM_PADA"):
+    Path("node_modules", "polowa").mkdir(parents=True)
     sys.exit(3)
 for p in {list(nf.SPRAWDZ) + ["onnxruntime-node"]!r}:
     d = Path("node_modules") / p
     d.mkdir(parents=True, exist_ok=True)
     (d / "package.json").write_text("{{}}", encoding="utf-8")
+b = Path("node_modules", ".bin")
+b.mkdir(exist_ok=True)
+for n in ("hyperframes", "hyperframes.cmd"):
+    (b / n).write_text("atrapa", encoding="utf-8")
 """)
     rozsz = ".exe" if os.name == "nt" else ""
     (tmp_path / "ffmpeg" / "bin").mkdir(parents=True)
@@ -1095,6 +1156,7 @@ for p in {list(nf.SPRAWDZ) + ["onnxruntime-node"]!r}:
     (tmp_path / "ffprobe").mkdir()
     (tmp_path / "ffprobe" / f"ffprobe{rozsz}").write_bytes(b"")
     monkeypatch.setenv("npm_config_registry", "https://obcy.example")       # konfiguracja właściciela nie przechodzi
+    monkeypatch.setenv("npm_config_prefix", str(tmp_path / "prefix-wlasciciela"))
     program = tmp_path / "program"
     wpis, zmiana = nf.zainstaluj(program, npm, cache=tmp_path / "cache", log=lambda t: None,
                                  bin_ffmpeg=[tmp_path / "ffmpeg" / "bin", tmp_path / "ffprobe"])
@@ -1106,45 +1168,165 @@ for p in {list(nf.SPRAWDZ) + ["onnxruntime-node"]!r}:
     assert wpis["env"]["HYPERFRAMES_FFMPEG_PATH"] == str(tmp_path / "ffmpeg" / "bin" / f"ffmpeg{rozsz}")
     assert wpis["env"]["HYPERFRAMES_FFPROBE_PATH"] == str(tmp_path / "ffprobe" / f"ffprobe{rozsz}")
     assert wpis["env"]["HYPERFRAMES_EXTRACT_CACHE_DIR"] == str(tmp_path / "cache" / "hyperframes")
+    assert wpis["env"]["npm_config_prefix"] == str(kat / "npm-prefix")
+    # strażnik przodków renderu HyperFrames poza Linuksem myli odzyskane PID-y: tam render „odłączony”
+    assert (wpis["env"].get("HYPERFRAMES_RENDER_DETACHED") == "1") is (os.name == "nt" or sys.platform == "darwin")
     wywolania = [json.loads(x) for x in zapis.read_text(encoding="utf-8").splitlines()]
     assert len(wywolania) == 1 and wywolania[0]["argv"][:3] == ["ci", "--ignore-scripts", "--omit=dev"]
-    assert Path(wywolania[0]["cache"]) == tmp_path / "cache" / "npm"
+    assert Path(wywolania[0]["cache"]) == tmp_path / "cache" / "npm-floty" and wywolania[0]["prefix"] is None
     assert Path(wywolania[0]["path0"]) == npm.parent                         # node obok npm na początku PATH
     assert Path(wywolania[0]["userconfig"]).name == ".npmrc-uzytkownika"     # pusty plik zamiast ~/.npmrc
     assert not (kat / "node_modules" / "onnxruntime-node").exists() and (kat / ".jarvo-lock").is_file()
     assert (kat / "package-lock.json").read_bytes() == (NODE / "package-lock.json").read_bytes()
     assert not list(kat.glob(".npmrc*"))
+    prefix = kat / "npm-prefix"
+    if os.name == "nt":                     # npx sprawdza plik bez rozszerzenia, a cmd.exe uruchamia .cmd
+        assert (prefix / "hyperframes.cmd").read_bytes() == \
+            b'@"%~dp0..\\node_modules\\.bin\\hyperframes.cmd" %*\r\n'
+        assert (prefix / "hyperframes").is_file()
+    else:
+        assert os.readlink(prefix / "bin" / "hyperframes") == "../../node_modules/.bin/hyperframes"
+        assert (prefix / "bin" / "hyperframes").read_text(encoding="utf-8") == "atrapa"
+    assert not (prefix / ("hyperframes-localize-fonts.cmd" if os.name == "nt" else "bin/hyperframes-localize-fonts")
+                ).exists()                                                   # paczka bez tego programu: bez wpisu
+    alias = program / "node-floty" / "node_modules"                         # stała ścieżka buildu floty (inspo-mcp)
+    assert os.path.samefile(alias, kat / "node_modules") and (alias / "three" / "package.json").is_file()
     assert nf.zainstaluj(program, npm, cache=tmp_path / "cache", log=lambda t: None)[1] is False   # bez npm
     assert len(zapis.read_text(encoding="utf-8").splitlines()) == 1
+    shutil.rmtree(prefix)                                                    # katalog sprzed globalnego prefiksu
+    assert nf.zainstaluj(program, npm, cache=tmp_path / "cache", log=lambda t: None)[1] is True
+    assert len(zapis.read_text(encoding="utf-8").splitlines()) == 1 and prefix.is_dir()
     shutil.rmtree(kat)
     monkeypatch.setenv("NPM_PADA", "1")
     with pytest.raises(nf.BladNodeFloty, match="npm ci"):
         nf.zainstaluj(program, npm, cache=tmp_path / "cache", log=lambda t: None)
-    assert not kat.exists()
+    assert not kat.exists() and not kat.with_name(kat.name + ".new").exists()
+
+
+def test_node_floty_alias_biezacego_locka(tmp_path):
+    """`<program>/node-floty/node_modules` (domyślne --node-modules buildu floty: serwer MCP inspo Weba) wskazuje
+    node_modules bieżącego locka: junction na Windows, dowiązanie na macOS i Linuksie; nowy lock przestawia alias bez
+    ruszania starego katalogu, wiszący alias jest zastępowany, a zwykłego katalogu z plikami alias nie nadpisuje."""
+    nf = _node_floty()
+    floty = tmp_path / "program" / "node-floty"
+    for skrot in ("aaaaaaaaaaaa", "bbbbbbbbbbbb"):
+        (floty / skrot / "node_modules" / "three").mkdir(parents=True)
+        (floty / skrot / "node_modules" / "three" / "package.json").write_text(skrot, encoding="utf-8")
+    alias = floty / "node_modules"
+    assert nf.alias_biezacy(floty / "aaaaaaaaaaaa") and not nf.alias_biezacy(floty / "aaaaaaaaaaaa")
+    assert (alias / "three" / "package.json").read_text(encoding="utf-8") == "aaaaaaaaaaaa"
+    assert nf.alias_biezacy(floty / "bbbbbbbbbbbb")
+    assert (alias / "three" / "package.json").read_text(encoding="utf-8") == "bbbbbbbbbbbb"
+    assert (floty / "aaaaaaaaaaaa" / "node_modules" / "three" / "package.json").is_file()      # stary lock zostaje
+    shutil.rmtree(floty / "bbbbbbbbbbbb")                                                     # wiszący alias
+    assert nf.alias_biezacy(floty / "aaaaaaaaaaaa") and (alias / "three").is_dir()
+    if os.name == "nt":
+        os.rmdir(alias)
+    else:
+        os.unlink(alias)
+    alias.mkdir()
+    (alias / "cudzy.txt").write_text("x", encoding="utf-8")
+    with pytest.raises(nf.BladNodeFloty, match="zwykłym katalogiem"):
+        nf.alias_biezacy(floty / "aaaaaaaaaaaa")
+    assert (alias / "cudzy.txt").is_file()
+
+
+@pytest.mark.posix_only
+def test_node_floty_prefix_npm_dowiazania_wzgledne(tmp_path):
+    """macOS i Linux: `<prefix>/bin/<program>` to dowiązanie względne do node_modules/.bin, więc działa po zmianie nazwy
+    katalogu z `.new`; drugie wywołanie niczego nie zmienia, a obcy plik na tym miejscu zostaje zastąpiony."""
+    nf = _node_floty()
+    b = tmp_path / "x.new" / "node_modules" / ".bin"
+    b.mkdir(parents=True)
+    (b / "hyperframes").write_text("#!/bin/sh\necho 0.8.78\n", encoding="utf-8")
+    assert nf.prefix_npm(tmp_path / "x.new", windows=False) and not nf.prefix_npm(tmp_path / "x.new", windows=False)
+    os.replace(tmp_path / "x.new", tmp_path / "x")
+    assert (tmp_path / "x" / "npm-prefix" / "bin" / "hyperframes").read_text(encoding="utf-8").endswith("0.8.78\n")
+    cel = tmp_path / "x" / "npm-prefix" / "bin" / "hyperframes"
+    cel.unlink()
+    cel.write_text("obcy", encoding="utf-8")
+    assert nf.prefix_npm(tmp_path / "x", windows=False) and cel.is_symlink()
 
 
 def test_test_na_zywo_mediow_bez_instalacji(tmp_path):
-    """tests/live/natywnie_media.py: osiem punktów jak w opisie, PNG napisu poprawny, kod STT i TTS bramy się
-    kompiluje, a bez instalacji raport z błędem i kod 1 (bez śladu na ekranie i bez plików poza katalogiem wyników)."""
+    """tests/live/natywnie_media.py: dziewięć punktów jak w opisie, PNG napisu i GLB sześcianu poprawne, kod STT i TTS
+    bramy się kompiluje, --dopusc z powodem i nieznane punkty (kod 2), a bez instalacji raport z błędem i czasem i kod 1
+    (bez śladu na ekranie i bez plików poza katalogiem wyników); opis nie obiecuje kroku CI."""
     import base64
     nm = load_script("tests/live/natywnie_media.py", "jarvo_test_natywnie_media")
-    assert [nr for nr, _o, _f in nm.PUNKTY] == ["1", "2", "3", "4", "5", "6", "7", "8"]
+    assert [nr for nr, _o, _f in nm.PUNKTY] == ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
     compile(nm.GLOS_BRAMY, "glos_bramy", "exec")
     assert all(f"  {nr}. " in nm.__doc__ for nr, _o, _f in nm.PUNKTY)
+    assert "natywnie.yml" not in nm.__doc__ and "CI (" not in nm.__doc__
     png = base64.b64decode(nm.png_napisu(8, 10).split(",", 1)[1])
     assert png.startswith(b"\x89PNG\r\n\x1a\n") and struct.unpack(">II", png[16:24]) == (8, 10)
+    glb = nm.glb_szescianu()
+    magia, wersja, dlugosc = struct.unpack("<III", glb[:12])
+    js_dl, js_typ = struct.unpack("<II", glb[12:20])
+    gltf = json.loads(glb[20:20 + js_dl])
+    assert (magia, wersja, dlugosc, js_typ) == (0x46546C67, 2, len(glb), 0x4E4F534A) and len(glb) % 4 == 0
+    assert gltf["accessors"][0]["count"] == 8 and gltf["buffers"][0]["byteLength"] == 96 + 72
+    assert nm.dopuszczenia("5=runner bez GPU; 9=x") == {"5": "runner bez GPU", "9": "x"} and nm.dopuszczenia("") == {}
+    with pytest.raises(ValueError):
+        nm.dopuszczenia("5")
+    with pytest.raises(SystemExit) as e:
+        nm.main(["--wyniki", str(tmp_path / "wyniki"), "--punkty", "10"])
+    assert e.value.code == 2
     assert nm.main(["--wyniki", str(tmp_path / "wyniki"), "--korzen", str(tmp_path / "brak")]) == 1
     raport = json.loads((tmp_path / "wyniki" / "raport.json").read_text(encoding="utf-8"))
-    assert raport["ok"] is False and "brak instalacji Jarva" in raport["blad"]
+    assert raport["ok"] is False and "brak instalacji Jarva" in raport["blad"] and raport["s"] >= 0
     assert sorted(p.name for p in tmp_path.iterdir()) == ["wyniki"]
 
 
-def test_render_html_studia_z_piaskownica_poza_kontenerem():
-    """render_html.cjs Studia: --no-sandbox tylko tam, gdzie piaskownica Chromium nie ruszy (Linux jako root,
-    kontener), jak har.cjs i audit.py; natywnie na Windows i macOS z piaskownicą."""
-    js = (REPO / "profiles" / "jarvo-studio" / "scripts" / "render_html.cjs").read_text(encoding="utf-8")
-    assert "args: argsPiaskownicy()" in js and "args: ['--no-sandbox']" not in js
-    assert "process.platform !== 'linux'" in js and "/.dockerenv" in js
+ATRAPA_PLAYWRIGHT = r"""
+// atrapa playwright-core: zapisuje opcje chromium.launch i robi „zrzut” (pusty PNG) w podanym miejscu
+const fs = require('fs');
+const zapis = process.env.ATRAPA_PW_ZAPIS;
+const strona = { goto: async () => {}, evaluate: async () => {}, close: async () => {},
+                 screenshot: async (o) => fs.writeFileSync(o.path, Buffer.from('89504e47', 'hex')) };
+module.exports.chromium = { launch: async (o) => { fs.writeFileSync(zapis, JSON.stringify(o));
+                                                   return { newPage: async () => strona, close: async () => {} }; } };
+"""
+
+
+def _bez_piaskownicy_tutaj() -> bool:
+    """To samo co bezPiaskownicy() w render_html.cjs i cad_render.cjs dla tego komputera."""
+    if not sys.platform.startswith("linux"):
+        return False
+
+    def czytaj(p):
+        try:
+            return Path(p).read_text(encoding="utf-8")
+        except OSError:
+            return ""
+    return (os.geteuid() == 0 or Path("/.dockerenv").exists() or "docker" in czytaj("/proc/1/cgroup")
+            or czytaj("/proc/sys/kernel/apparmor_restrict_unprivileged_userns").strip() == "1")
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="brak node")
+def test_render_html_studia_z_piaskownica_poza_kontenerem(tmp_path):
+    """render_html.cjs Studia naprawdę z piaskownicą Chromium poza kontenerem (kontrola-17): playwright-core dodaje
+    --no-sandbox sam, gdy chromiumSandbox nie jest true, więc skrypt podaje chromiumSandbox jawnie, a --no-sandbox
+    tylko tam, gdzie piaskownica nie ruszy (Linux jako root, kontener, zakaz przestrzeni nazw). Uruchomienie na
+    atrapie playwright-core z NODE_PATH (jak narzędzia npm floty), plik wyniku z „/” w ścieżce."""
+    nm = tmp_path / "node_modules" / "playwright-core"
+    nm.mkdir(parents=True)
+    (nm / "package.json").write_text('{"name": "playwright-core", "main": "index.js"}', encoding="utf-8")
+    (nm / "index.js").write_text(ATRAPA_PLAYWRIGHT, encoding="utf-8")
+    (tmp_path / "g.html").write_text("<html><body>Zażółć</body></html>", encoding="utf-8")
+    zapis = tmp_path / "launch.json"
+    env = {**os.environ, "NODE_PATH": str(tmp_path / "node_modules"), "ATRAPA_PW_ZAPIS": str(zapis),
+           "CHROME_PATH": str(tmp_path / "g.html")}
+    p = subprocess.run(["node", str(REPO / "profiles" / "jarvo-studio" / "scripts" / "render_html.cjs"),
+                        str(tmp_path / "g.html"), str(tmp_path / "out" / "post"), "--size", "100x50"],
+                       env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
+    assert p.returncode == 0, p.stderr
+    opcje = json.loads(zapis.read_text(encoding="utf-8"))
+    bez = _bez_piaskownicy_tutaj()
+    assert opcje["chromiumSandbox"] is (not bez) and ("--no-sandbox" in opcje["args"]) is bez
+    assert Path(opcje["executablePath"]) == tmp_path / "g.html"                 # przeglądarka z CHROME_PATH
+    wynik = json.loads(p.stdout)
+    assert wynik["outputs"][0]["file"].endswith("out/post-100x50.png") and "\\" not in wynik["outputs"][0]["file"]
 
 
 # ------------------------------------------------------------------ html_wideo (animacja HTML / Lottie → wideo)

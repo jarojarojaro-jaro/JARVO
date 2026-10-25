@@ -395,24 +395,74 @@ def test_stt_bez_manifestu_niczego_nie_pobiera(monkeypatch, tmp_path):
 
 def test_stt_przenosi_pliki_z_dawnego_cache_hugging_face(monkeypatch, tmp_path):
     """Starszy jarvo-stt pobierał model przez huggingface_hub do <modele>/huggingface: blob LFS o sumie z manifestu
-    trafia na miejsce bez pobierania, blob o innej treści zostaje pominięty."""
+    i mały plik ze snapshots/<rewizja>/ (config.json: blob nazwany sumą gita) trafiają na miejsce bez pobierania,
+    twardym dowiązaniem, czyli bez drugiej kopii na dysku (kontrola-17: kontener kopiował 0,67 GB); bez dowiązań
+    (inny dysk) kopia. Plik o innej treści zostaje pominięty."""
     import hashlib
     stt = _stt(monkeypatch, tmp_path)
-    dobry, zly = b"model" * 100, b"inny" * 100
+    dobry, zly, konfig = b"model" * 100, b"inny" * 100, b'{"model_type": "nemo"}'
     s_dobry = hashlib.sha256(dobry).hexdigest()
+    rewizja = "b" * 40
+    adres = f"https://huggingface.co/istupakov/parakeet/resolve/{rewizja}/"
     wpis = {"pliki": [{"cel": "encoder-model.int8.onnx", "sha256": s_dobry, "rozmiar": len(dobry),
-                       "url": f"https://huggingface.co/istupakov/parakeet/resolve/{'b' * 40}/encoder-model.int8.onnx"},
-                      {"cel": "vocab.txt", "sha256": "c" * 64, "rozmiar": len(zly),
-                       "url": f"https://huggingface.co/istupakov/parakeet/resolve/{'b' * 40}/vocab.txt"}]}
-    blobs = tmp_path / "models" / "huggingface" / "hub" / "models--istupakov--parakeet" / "blobs"
-    blobs.mkdir(parents=True)
-    (blobs / s_dobry).write_bytes(dobry)
-    (blobs / ("c" * 64)).write_bytes(zly)
+                       "url": adres + "encoder-model.int8.onnx"},
+                      {"cel": "vocab.txt", "sha256": "c" * 64, "rozmiar": len(zly), "url": adres + "vocab.txt"},
+                      {"cel": "config.json", "sha256": hashlib.sha256(konfig).hexdigest(), "rozmiar": len(konfig),
+                       "url": adres + "config.json"}]}
+    repo = tmp_path / "models" / "huggingface" / "hub" / "models--istupakov--parakeet"
+    (repo / "blobs").mkdir(parents=True)
+    (repo / "blobs" / s_dobry).write_bytes(dobry)
+    (repo / "blobs" / ("c" * 64)).write_bytes(zly)
+    (repo / "snapshots" / ("d" * 40)).mkdir(parents=True)                # inna rewizja niż w manifeście: suma decyduje
+    (repo / "snapshots" / ("d" * 40) / "config.json").write_bytes(konfig)
+    (repo / "snapshots" / ("d" * 40) / "vocab.txt").write_bytes(zly)
     kat = tmp_path / "models" / "parakeet"
     komunikaty = []
-    assert stt.z_cache_hf(kat, wpis, lambda p: hashlib.sha256(Path(p).read_bytes()).hexdigest(), komunikaty.append) == 1
+    suma = lambda p: hashlib.sha256(Path(p).read_bytes()).hexdigest()   # noqa: E731
+    assert stt.z_cache_hf(kat, wpis, suma, komunikaty.append) == 2
     assert (kat / "encoder-model.int8.onnx").read_bytes() == dobry and not (kat / "vocab.txt").exists()
-    assert komunikaty and "suma zgodna" in komunikaty[0]
+    assert os.path.samefile(kat / "encoder-model.int8.onnx", repo / "blobs" / s_dobry)       # bez drugiej kopii
+    assert (kat / "config.json").read_bytes() == konfig and not list(kat.glob("*.z-cache"))
+    assert komunikaty and "suma zgodna" in komunikaty[0] and "twarde dowiązanie" in komunikaty[0]
+    (kat / "encoder-model.int8.onnx").unlink()
+
+    def bez_dowiazan(*_a, **_k):
+        raise OSError(18, "Invalid cross-device link")
+    monkeypatch.setattr(stt.os, "link", bez_dowiazan)
+    assert stt.z_cache_hf(kat, wpis, suma, komunikaty.append) == 1
+    assert (kat / "encoder-model.int8.onnx").read_bytes() == dobry
+    assert not os.path.samefile(kat / "encoder-model.int8.onnx", repo / "blobs" / s_dobry)    # kopia
+
+
+def test_stt_bez_sieci_bez_samych_opisow_modelu(monkeypatch, tmp_path, capsys):
+    """Po aktualizacji z dawnym cache: pliki modelu są (z cache, sumy sprawdzone), a opisów (README, LICENSE) starszy
+    jarvo-stt nie pobierał. Bez sieci transkrypcja i tak rusza (kontrola-17), opisy dociągają się przy następnym
+    użyciu z siecią i dopiero wtedy jest znacznik gotowego modelu. Brak pliku modelu dalej zatrzymuje."""
+    import jarvo.modele  # noqa: F401  (pakiet jarvo z repo w sys.modules)
+    tresci = {"parakeet": {**TRESCI["parakeet"], "README.md": b"# Parakeet\n"},
+              "silero-vad": {**TRESCI["silero-vad"], "LICENSE.txt": b"MIT\n"}}
+    serwer = _Serwer({})                                               # „bez sieci”: każdy plik 404
+    stt = _stt(monkeypatch, tmp_path)
+    monkeypatch.setenv("JARVO_REPO", str(_repo_z_modelami(tmp_path, serwer.url, tresci)))
+    for nazwa, pliki in tresci.items():
+        for cel, b in pliki.items():
+            if not cel.startswith(("README", "LICENSE")):
+                (tmp_path / "models" / f"kat-{nazwa}").mkdir(parents=True, exist_ok=True)
+                (tmp_path / "models" / f"kat-{nazwa}" / cel).write_bytes(b)
+    try:
+        kat = stt.przygotuj_modele()
+        assert set(kat) == {"parakeet", "silero-vad"} and not (kat["parakeet"] / ".jarvo-model.json").exists()
+        assert "gotowy bez plików opisu (README.md" in capsys.readouterr().err
+        serwer.pliki.update({f"/{n}/{c}": b for n, pl in tresci.items() for c, b in pl.items()})
+        stt.przygotuj_modele()                                         # z siecią: opisy i znacznik
+        assert (kat["parakeet"] / "README.md").is_file() and (kat["silero-vad"] / ".jarvo-model.json").is_file()
+        (kat["parakeet"] / "vocab.txt").unlink()
+        (kat["parakeet"] / ".jarvo-model.json").unlink()
+        serwer.pliki.clear()
+        with pytest.raises(stt.BrakModelu, match="parakeet się nie pobrał"):
+            stt.przygotuj_modele()                                     # brak pliku modelu: bez transkrypcji
+    finally:
+        serwer.zamknij()
 
 
 def test_stt_laduje_modele_z_dysku_bez_huggingface(monkeypatch, tmp_path):

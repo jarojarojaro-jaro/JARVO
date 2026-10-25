@@ -1,5 +1,6 @@
 """Podgląd modelu GLB w Chromium przez Playwright dla Pythona: PNG albo klatki filmu obrotu. Odpowiednik
-cad_render.cjs dla instalacji natywnej, gdzie nie ma paczek Node z obrazu (three, playwright-core). Woła go cad.py
+cad_render.cjs, gdy Node nie widzi paczek three i playwright-core narzędzi npm floty (np. proces bez NODE_PATH, poza
+środowiskiem Jarva); Three.js bierze wtedy cad.py z katalogu narzędzi npm instalacji. Woła go cad.py
 (nie Ty):  <python z playwright> -I cad_render.py <zadanie.json>   → wynik JSON w ostatniej linii stdout
 
     {"tryb": "png", "glb", "out", "w", "h", "kat", "wysokosc", "kolor", "tlo", "siatka", "krawedzie", "skala",

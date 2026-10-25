@@ -19,16 +19,16 @@ function browserPath() {
   return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim() : undefined;
 }
 
-// --no-sandbox tylko tam, gdzie piaskownica Chromium nie ruszy (jak audit.py, har.cjs i Hermes): Linux jako root,
-// w kontenerze albo z zakazem przestrzeni nazw użytkownika bez profilu AppArmor (Ubuntu 23.10+). Windows i macOS
-// (instalacja natywna): z piaskownicą.
-function argsPiaskownicy() {
-  if (process.platform !== 'linux') return [];
+// Piaskownica Chromium tam, gdzie działa (jak cad_render.cjs i audit.py): bez niej tylko Linux jako root, w kontenerze
+// albo z zakazem przestrzeni nazw użytkownika bez profilu AppArmor (Ubuntu 23.10+). Windows i macOS (instalacja
+// natywna): z piaskownicą. playwright-core sam dodaje --no-sandbox, gdy chromiumSandbox nie jest true, więc o
+// piaskownicy decyduje jawne chromiumSandbox, a nie sama lista argumentów.
+function bezPiaskownicy() {
+  if (process.platform !== 'linux') return false;
   const czytaj = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch { return ''; } };
-  const bez = (process.getuid && process.getuid() === 0) || fs.existsSync('/.dockerenv')
+  return Boolean((process.getuid && process.getuid() === 0) || fs.existsSync('/.dockerenv')
     || czytaj('/proc/1/cgroup').includes('docker')
-    || czytaj('/proc/sys/kernel/apparmor_restrict_unprivileged_userns').trim() === '1';
-  return bez ? ['--no-sandbox'] : [];
+    || czytaj('/proc/sys/kernel/apparmor_restrict_unprivileged_userns').trim() === '1');
 }
 
 (async () => {
@@ -47,7 +47,9 @@ function argsPiaskownicy() {
     process.exit(2);
   }
   fs.mkdirSync(path.dirname(path.resolve(prefix)), { recursive: true });
-  const browser = await chromium.launch({ executablePath: browserPath(), args: argsPiaskownicy() });
+  const bez = bezPiaskownicy();
+  const browser = await chromium.launch({ executablePath: browserPath(), args: bez ? ['--no-sandbox'] : [],
+                                          chromiumSandbox: !bez });
   const outputs = [];
   try {
     for (const s of sizes) {

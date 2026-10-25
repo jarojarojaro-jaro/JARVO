@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Media natywnie na żywo: filmy, lektor, rozpoznawanie mowy i edytor HQ (docs/NATYWNIE.md etap E9: M01–M12, V01–V11).
+"""Media natywnie na żywo: filmy, lektor, rozpoznawanie mowy, edytor HQ i narzędzia npm floty (docs/NATYWNIE.md etap
+E9: M01–M12, V01–V11; P02, I32, E11).
 
-    python -X utf8 -B tests/live/natywnie_media.py --wyniki <katalog> [--korzen <JARVO_ROOT>] [--punkty 1,3] [--zostaw]
+    python -X utf8 -B tests/live/natywnie_media.py --wyniki <katalog> [--korzen <JARVO_ROOT>] [--punkty 1,3]
+        [--dopusc "5=powód;…"] [--zostaw]
 
 Sprawdza instalację z zewnątrz, tak jak pracuje flota: programy w środowisku procesów Jarva (jarvo/srodowisko.py
 z `<stan>/narzedzia.json` i `<program>/current.json`, jak brama i panel), skrypty Wideografa z zainstalowanego profilu
@@ -21,11 +23,14 @@ Punkty:
      już na dysku i ile trwało)
   3. krótki film: film.py render planu z dwiema scenami, lektorem Matcha i napisami karaoke (szkic 540×960): MP4
      z obrazem i dźwiękiem o długości z planu, SRT obok, jasne piksele napisów w pasie napisów; libass z `fontsdir`
-     instalacji wybiera dla stylu „Inter” krój Inter-Bold, a nie zastępczy krój systemu
+     instalacji wybiera dla stylu „Inter” krój Inter-Bold, a nie zastępczy krój systemu; do tego film z jedną sceną
+     i angielskim lektorem (en-US-Paradee): MP4 z dźwiękiem o długości z planu i SRT
   4. animacja HTML → wideo: html_wideo.py wideo (2 s, 30 kl./s, 2 przeglądarki naraz, zegar strony przez --seek) na
      chrome-headless-shell z instalacji: 60 klatek w MP4
-  5. HyperFrames z node_modules/.bin narzędzi npm floty (wpis node-floty w narzedzia.json, lock z infra/node):
-     wersja 0.8.78, przeglądarka instalacji, render krótkiej kompozycji CSS (bez sieci); bez wpisu: pominięte z powodem
+  5. HyperFrames z node_modules/.bin narzędzi npm floty (wpis node-floty w narzedzia.json z kroku instalatora
+     „Narzędzia npm floty”, lock z infra/node; brak wpisu to błąd): wersja 0.8.78, ta sama przez `npx --yes=false
+     hyperframes` (globalny prefix npm procesów Jarva, bez pobierania najnowszej), przeglądarka instalacji, render
+     krótkiej kompozycji CSS (bez sieci)
   6. edytor HQ przez panel: lektor (POST /edit/lektor, film.py lektor w procesie panelu), analiza mowy (/edit/speech:
      ffmpeg + jarvo-stt), eksport filmu z punktu 3 z napisem PNG (/edit/export, postęp z /edit/job) → plik obok
      oryginału; anulowanie dłuższego eksportu kończy ffmpeg i nie zostawia pliku ani pliku częściowego
@@ -33,10 +38,13 @@ Punkty:
   8. głos bramy (V11) kodem Hermesa z instalacji: głosówka „Próba Żółć/brama/głosówka_październik.wav” przez
      HERMES_LOCAL_STT_COMMAND (shlex jak tools/transcription_local.py) → transkrypcja z „dzień”; odpowiedź głosem
      przez tts.providers.matcha z config.yaml (render_command_template i run_command_provider Hermesa) → WAV
-Kod 0 = żaden punkt nie padł (pominięty z powodem to nie błąd); raport JSON na stdout i w <wyniki>/raport.json.
-
-CI (.github/workflows/natywnie.yml, po teście na żywo z natywnie_e2e.py, przed drugim przebiegiem instalacji):
-    python -X utf8 -B tests/live/natywnie_media.py --wyniki "$RUNNER_TEMP/natywnie-artefakty/media"
+  9. pozostałe narzędzia npm floty z NODE_PATH wpisu node-floty: `lighthouse --version` (13.4.1), grafika HTML Studia
+     (render_html.cjs: playwright-core z NODE_PATH, chrome-headless-shell z instalacji, PNG w dokładnych wymiarach)
+     i podgląd 3D warsztatu (cad.py `stan` = podgląd przez Node, `podglad` sześcianu GLB: Three.js z node-floty, bez
+     silnika CAD i bez pobierania)
+Każdy punkt w raporcie: ok, blad, uwaga (błąd dopuszczony przez --dopusc z powodem) albo pominiete (z powodem) i czas
+w sekundach. Kod wyjścia: 0 = żaden punkt nie ma stanu blad, 1 = jest błąd albo nie ma instalacji, 2 = złe argumenty;
+raport JSON na stdout i w <wyniki>/raport.json (ślady błędów w <wyniki>/punkt-<nr>-slad.txt).
 """
 from __future__ import annotations
 
@@ -75,6 +83,7 @@ HYPERFRAMES = "0.8.78"
 TOKEN = re.compile(r'window\.__HERMES_SESSION_TOKEN__="([^"]+)"')
 API = "/api/plugins/jarvo-hq"
 STANY_KONCOWE = {"done", "error", "cancelled"}
+ETYKIETY = {"ok": "ok", "pominiete": "pominięty", "uwaga": "uwaga", "blad": "BŁĄD"}
 
 
 class Niepowodzenie(Exception):
@@ -201,20 +210,33 @@ PLAN = {"tytul": "Próba mediów natywnie", "slug": "proba-mediow", "formaty": [
                   {"tekst": "Napisy mają polskie znaki.", "ujecie": {"kolor": "#202020"}}]}
 
 
-def punkt_film(p: Proba) -> dict:
-    kat = p.kat / "film"
+PLAN_EN = {"tytul": "Media test in English", "slug": "proba-en", "formaty": ["9:16"],
+           "lektor": {"glos": "en-US-Paradee"},
+           "napisy": {"styl": "karaoke", "akcent": "#FFD400", "font": "Inter", "pozycja": "dol"},
+           "przejscie": "ciecie",
+           "sceny": [{"tekst": "Jarvo renders this video without Docker.", "ujecie": {"kolor": "#1B2A41"}}]}
+
+
+def render_planu(p: Proba, kat: Path, plan: dict) -> tuple[dict, Path, dict]:
+    """film.py render planu w szkicu: (wynik film-szkic.json, MP4 9:16, ffprobe); obraz, dźwięk i długość z planu."""
     kat.mkdir(parents=True, exist_ok=True)
-    (kat / "plan.json").write_text(json.dumps(PLAN, ensure_ascii=False), encoding="utf-8")
-    start = time.monotonic()
+    (kat / "plan.json").write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
     p.uruchom([p.program("python3"), p.skrypty / "film.py", "render", "plan.json", "--szkic"], cwd=kat, timeout=900)
-    s = round(time.monotonic() - start, 1)
-    wynik = json.loads((kat / "out" / "wideo" / "proba-mediow" / "film-szkic.json").read_text(encoding="utf-8"))
-    mp4 = kat / "out" / "wideo" / "proba-mediow" / "proba-mediow-9x16-szkic.mp4"
+    wynik = json.loads((kat / "out" / "wideo" / plan["slug"] / "film-szkic.json").read_text(encoding="utf-8"))
+    mp4 = kat / "out" / "wideo" / plan["slug"] / f"{plan['slug']}-9x16-szkic.mp4"
     info = p.ffprobe(mp4)
-    musi(info["wideo"] == [540, 960] and info["dzwiek"], f"film: {info}")
+    musi(info["wideo"] == [540, 960] and info["dzwiek"], f"film {plan['slug']}: {info}")
     musi(abs(info["sek"] - float(wynik["sek"])) < 0.2, f"film {info['sek']} s, plan {wynik['sek']} s")
     srt = Path(wynik.get("srt") or "brak.srt")
-    musi((srt if srt.is_absolute() else kat / srt).is_file(), "brak SRT obok filmu")
+    musi((srt if srt.is_absolute() else kat / srt).is_file(), f"brak SRT obok filmu {plan['slug']}")
+    return wynik, mp4, info
+
+
+def punkt_film(p: Proba) -> dict:
+    kat = p.kat / "film"
+    start = time.monotonic()
+    wynik, mp4, info = render_planu(p, kat, PLAN)
+    s = round(time.monotonic() - start, 1)
     # pas napisów lektora (dół kadru 9:16) w chwili pierwszych słów: jasne litery na ciemnym tle sceny
     w, h = 270, 480
     szara = p.klatka_szara(mp4, 0.6, w, h)
@@ -222,8 +244,12 @@ def punkt_film(p: Proba) -> dict:
     jasne = sum(1 for b in pas if b > 180)
     musi(jasne > 50, f"w pasie napisów brak jasnych pikseli ({jasne})")
     kroj = sprawdz_kroj_napisow(p)
+    start = time.monotonic()                                   # ten sam film z angielskim lektorem (Paradee)
+    wynik_en, _mp4_en, info_en = render_planu(p, p.kat / "film-en", PLAN_EN)
     return {"film": mp4.as_posix(), "sek": info["sek"], "jasne_piksele_napisow": jasne, "kroj_napisow": kroj,
-            "czas_renderu_s": wynik.get("czas_renderu_s"), "s": s}
+            "czas_renderu_s": wynik.get("czas_renderu_s"), "s": s,
+            "film_en": {"sek": info_en["sek"], "czas_renderu_s": wynik_en.get("czas_renderu_s"),
+                        "s": round(time.monotonic() - start, 1)}}
 
 
 def sprawdz_kroj_napisow(p: Proba) -> str:
@@ -295,15 +321,36 @@ h1 { margin: 0; font-size: 28px; animation: wejscie 600ms ease-out 1 both; }
 """
 
 
-def punkt_hyperframes(p: Proba) -> dict:
+def wpis_node_floty(p: Proba) -> dict:
+    """Wpis node-floty z narzedzia.json (krok instalatora „Narzędzia npm floty”), a jego NODE_PATH w środowisku
+    procesów Jarva."""
     wpis = p.narz.get("node-floty")
-    if not isinstance(wpis, dict) or not wpis.get("bin"):
-        raise Pominiete("brak wpisu node-floty w narzedzia.json: instalacja bez kroku „Narzędzia npm floty” "
-                        "(npm ci z infra/node/package-lock.json, infra/node/node_floty.py)")
-    hf = Path(wpis["bin"][0]) / ("hyperframes.cmd" if WINDOWS else "hyperframes")
-    musi(hf.is_file(), f"brak {hf}")
+    musi(isinstance(wpis, dict) and wpis.get("bin"), "brak wpisu node-floty w narzedzia.json: instalacja bez kroku "
+         "„Narzędzia npm floty” (npm ci z infra/node/package-lock.json, infra/node/node_floty.py)")
+    musi(p.env.get("NODE_PATH") == wpis["env"]["NODE_PATH"], f"NODE_PATH procesów Jarva {p.env.get('NODE_PATH')!r} "
+         f"zamiast {wpis['env']['NODE_PATH']!r}")
+    return wpis
+
+
+def program_npm(wpis: dict, nazwa: str) -> Path:
+    p = Path(wpis["bin"][0]) / (f"{nazwa}.cmd" if WINDOWS else nazwa)
+    musi(p.is_file(), f"brak {p}")
+    return p
+
+
+def punkt_hyperframes(p: Proba) -> dict:
+    wpis = wpis_node_floty(p)
+    hf = program_npm(wpis, "hyperframes")
     wersja = p.uruchom([hf, "--version"], timeout=120).stdout.strip()
     musi(wersja == HYPERFRAMES, f"hyperframes {wersja!r} zamiast {HYPERFRAMES}")
+    # skille HyperFrames wołają `npx hyperframes`: npx szuka programu w globalnym bin npm (npm_config_prefix procesów
+    # Jarva), a bez niego pobrałby najnowszą wersję; --yes=false = błąd zamiast pobierania
+    npx = shutil.which("npx", path=p.env.get("PATH"))
+    musi(npx, "brak npx w PATH procesów Jarva (Node.js z manifestu)")
+    kat = p.kat / "npx"
+    kat.mkdir(parents=True, exist_ok=True)
+    z_npx = p.uruchom([npx, "--yes=false", "hyperframes", "--version"], cwd=kat, timeout=300).stdout.strip()
+    musi(z_npx.splitlines()[-1:] == [HYPERFRAMES], f"npx hyperframes: {z_npx[-200:]!r} zamiast {HYPERFRAMES}")
     przegladarka = p.uruchom([hf, "browser", "path"], timeout=120).stdout.strip().splitlines()[-1]
     musi(os.path.normcase(os.path.abspath(przegladarka)) == os.path.normcase(os.path.abspath(p.env["CHROME_PATH"])),
          f"HyperFrames bierze inną przeglądarkę: {przegladarka}")
@@ -318,7 +365,80 @@ def punkt_hyperframes(p: Proba) -> dict:
     s = round(time.monotonic() - start, 1)
     info = p.ffprobe(kat / "film.mp4")
     musi(info["wideo"] == [320, 180] and abs(info["sek"] - 1.0) < 0.1, f"film HyperFrames: {info}")
-    return {"wersja": wersja, "przegladarka": przegladarka, "sek": info["sek"], "s": s}
+    return {"wersja": wersja, "npx": z_npx.splitlines()[-1], "przegladarka": przegladarka, "sek": info["sek"], "s": s}
+
+
+GRAFIKA = """<!doctype html><html lang="pl"><head><meta charset="utf-8"><style>
+html,body{margin:0;width:400px;height:300px;background:#1b2a41;color:#fff;font:700 32px sans-serif}
+p{margin:0;padding:120px 20px}</style></head><body><p>Zażółć gęślą jaźń</p></body></html>
+"""
+
+
+def glb_szescianu(bok: float = 0.02) -> bytes:
+    """Najprostszy GLB (glTF 2.0): sześcian o boku `bok` m (8 wierzchołków, 12 trójkątów), bez silnika CAD."""
+    h = bok / 2
+    wierzcholki = [(-h, -h, -h), (h, -h, -h), (h, h, -h), (-h, h, -h), (-h, -h, h), (h, -h, h), (h, h, h), (-h, h, h)]
+    indeksy = [0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 2, 3, 7, 2, 7, 6, 1, 2, 6, 1, 6, 5, 3, 0, 4, 3, 4, 7]
+    pozycje = b"".join(struct.pack("<3f", *w) for w in wierzcholki)
+    dane = pozycje + b"".join(struct.pack("<H", i) for i in indeksy)
+    gltf = {"asset": {"version": "2.0"}, "scene": 0, "scenes": [{"nodes": [0]}], "nodes": [{"mesh": 0, "name": "kostka"}],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}, "indices": 1}]}],
+            "buffers": [{"byteLength": len(dane)}],
+            "bufferViews": [{"buffer": 0, "byteOffset": 0, "byteLength": len(pozycje), "target": 34962},
+                            {"buffer": 0, "byteOffset": len(pozycje), "byteLength": len(indeksy) * 2, "target": 34963}],
+            "accessors": [{"bufferView": 0, "componentType": 5126, "count": 8, "type": "VEC3", "min": [-h] * 3,
+                           "max": [h] * 3},
+                          {"bufferView": 1, "componentType": 5123, "count": len(indeksy), "type": "SCALAR"}]}
+    js = json.dumps(gltf).encode("utf-8")
+    js += b" " * (-len(js) % 4)
+    dane += b"\0" * (-len(dane) % 4)
+    bloki = struct.pack("<II", len(js), 0x4E4F534A) + js + struct.pack("<II", len(dane), 0x004E4942) + dane
+    return struct.pack("<III", 0x46546C67, 2, 12 + len(bloki)) + bloki
+
+
+def wymiary_png(plik: Path) -> tuple[int, int]:
+    b = plik.read_bytes()
+    musi(b[:8] == b"\x89PNG\r\n\x1a\n", f"{plik.name} to nie PNG")
+    return struct.unpack(">II", b[16:24])
+
+
+def punkt_npm_floty(p: Proba) -> dict:
+    wpis = wpis_node_floty(p)
+    nm = Path(wpis["env"]["NODE_PATH"])
+    for paczka in ("hyperframes", "lighthouse", "playwright-core", "three", "inspo-mcp", "sharp"):
+        musi((nm / paczka / "package.json").is_file(), f"brak paczki {paczka} w {nm}")
+    wynik: dict = {"node_modules": nm.as_posix()}
+    lighthouse = p.uruchom([program_npm(wpis, "lighthouse"), "--version"], timeout=120).stdout.strip()
+    musi(lighthouse.splitlines()[-1:] == ["13.4.1"], f"lighthouse --version: {lighthouse[-120:]!r}")
+    wynik["lighthouse"] = lighthouse.splitlines()[-1]
+    node = shutil.which("node", path=p.env.get("PATH"))
+    musi(node, "brak node w PATH procesów Jarva (Node.js z manifestu)")
+    kat = p.kat / "npm-floty"
+    kat.mkdir(parents=True, exist_ok=True)
+    (kat / "grafika.html").write_text(GRAFIKA, encoding="utf-8")
+    studio = p.u.dane / "profiles" / "jarvo-studio" / "scripts" / "render_html.cjs"
+    musi(studio.is_file(), f"brak {studio} (flota bez Studia)")
+    start = time.monotonic()
+    r = p.uruchom([node, studio, kat / "grafika.html", kat / "out" / "post", "--size", "400x300", "--scale", "2"],
+                  cwd=kat, timeout=300)
+    plik = Path(json.loads(r.stdout)["outputs"][0]["file"])
+    musi(wymiary_png(plik) == (800, 600), f"grafika Studia {wymiary_png(plik)} zamiast 800 × 600")
+    wynik["studio"] = {"png": plik.name, "s": round(time.monotonic() - start, 1)}
+    cad = p.u.dane / "profiles" / "jarvo-wideo" / "skills" / "design" / "warsztat-3d" / "scripts" / "cad.py"
+    musi(cad.is_file(), f"brak {cad} (warsztat-3d u Wideografa)")
+    stan = json.loads(p.uruchom([p.program("python3"), cad, "stan", "--json"], cwd=kat, timeout=300).stdout)
+    podglad = stan.get("podglad") or {}
+    musi(podglad.get("sposob") == "node" and podglad.get("gotowy"), f"podgląd 3D nie przez Node: {podglad}")
+    (kat / "kostka.glb").write_bytes(glb_szescianu())
+    start = time.monotonic()
+    r = p.uruchom([p.program("python3"), cad, "podglad", kat / "kostka.glb", "-o", kat / "kostka.png", "--rozmiar",
+                   "480x360", "--json"], cwd=kat, timeout=600)
+    w = json.loads(r.stdout)
+    musi(not w.get("bledy") and wymiary_png(kat / "kostka.png") == (480, 360) and (kat / "kostka.png").stat().st_size
+         > 3000, f"podgląd 3D: {str(w)[:300]}")
+    wynik["podglad_3d"] = {"sposob": "node", "render_s": w.get("render_s"), "s": round(time.monotonic() - start, 1),
+                           "przegladarka": podglad.get("przegladarka")}
+    return wynik
 
 
 # ------------------------------------------------------------------- edytor HQ przez panel (token sesji, 127.0.0.1)
@@ -506,26 +626,49 @@ def punkt_glos_bramy(p: Proba) -> dict:
 
 PUNKTY = [("1", "lektor jarvo-tts: trzy głosy (Matcha męski i damski, Paradee) jednym wsadem", punkt_lektor),
           ("2", "jarvo-stt na nagraniu z polską nazwą (modele z manifestu z sumą)", punkt_stt),
-          ("3", "krótki film: render z lektorem i napisami ASS z krojem Inter z instalacji", punkt_film),
+          ("3", "krótki film: render z lektorem PL i EN i napisami ASS z krojem Inter z instalacji", punkt_film),
           ("4", "animacja HTML → wideo w 2 przeglądarkach naraz (chrome-headless-shell z instalacji)", punkt_html),
           ("5", f"HyperFrames {HYPERFRAMES} z node_modules/.bin narzędzi npm floty", punkt_hyperframes),
           ("6", "edytor HQ przez panel: lektor, analiza mowy, eksport i anulowanie eksportu", punkt_edytor),
           ("7", "głos Jarva w aplikacji (POST /app/glos): polski męski i damski, angielski", punkt_glos_aplikacji),
           ("8", "głos bramy kodem Hermesa: głosówka przez HERMES_LOCAL_STT_COMMAND, odpowiedź przez tts.providers.matcha",
-           punkt_glos_bramy)]
+           punkt_glos_bramy),
+          ("9", "narzędzia npm floty: Lighthouse, grafika HTML Studia (playwright-core), podgląd 3D (Three.js) przez Node",
+           punkt_npm_floty)]
+
+
+def dopuszczenia(tekst: str) -> dict[str, str]:
+    """`--dopusc "5=powód;9=powód"`: błąd tych punktów jest uwagą z powodem (np. runner bez czegoś), nie błędem."""
+    wynik = {}
+    for czesc in (tekst or "").split(";"):
+        nr, _, powod = czesc.partition("=")
+        if nr.strip():
+            if not powod.strip():
+                raise ValueError(f"--dopusc {czesc!r}: potrzebny powód (punkt=powód)")
+            wynik[nr.strip()] = powod.strip()
+    return wynik
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--wyniki", required=True, help="katalog raportu i śladów błędów (CI: artefakty)")
+    ap.add_argument("--wyniki", required=True, help="katalog raportu i śladów błędów (np. artefakty)")
     ap.add_argument("--korzen", help="korzeń instalacji (jak JARVO_ROOT)")
     ap.add_argument("--punkty", default="", help="np. 1,3: tylko te punkty")
+    ap.add_argument("--dopusc", default="", help='np. "5=powód": błąd punktu 5 tylko uwagą z tym powodem')
     ap.add_argument("--zostaw", action="store_true", help="pliki próby zostają do obejrzenia")
     a = ap.parse_args(argv)
+    wybrane = {x.strip() for x in a.punkty.split(",") if x.strip()}
+    znane = {nr for nr, _o, _f in PUNKTY}
+    try:
+        dopusc = dopuszczenia(a.dopusc)
+    except ValueError as e:
+        ap.error(str(e))
+    if (wybrane | set(dopusc)) - znane:
+        ap.error(f"nieznane punkty: {', '.join(sorted((wybrane | set(dopusc)) - znane))} (są: {', '.join(sorted(znane))})")
     wyniki = Path(a.wyniki).resolve()
     wyniki.mkdir(parents=True, exist_ok=True)
-    wybrane = {x.strip() for x in a.punkty.split(",") if x.strip()}
-    raport: dict = {"punkty": []}
+    raport: dict = {"punkty": [], "start": time.strftime("%Y-%m-%dT%H:%M:%S")}
+    poczatek = time.monotonic()
     p = None
     try:
         p = Proba(a)
@@ -540,23 +683,27 @@ def main(argv=None) -> int:
             start = time.monotonic()
             wpis = {"punkt": nr, "opis": opis}
             try:
-                wpis.update(ok=True, wynik=f(p))
+                wpis.update(stan="ok", wynik=f(p))
             except Pominiete as e:
-                wpis.update(ok=True, pominiety=str(e))
+                wpis.update(stan="pominiete", pominiety=str(e))
             except Exception as e:            # noqa: BLE001 - każdy punkt w raporcie, test idzie dalej
-                wpis.update(ok=False, blad=f"{type(e).__name__}: {e}"[:800])
+                wpis.update(stan="uwaga" if nr in dopusc else "blad", blad=f"{type(e).__name__}: {e}"[:800])
+                if nr in dopusc:
+                    wpis["dopuszczony"] = dopusc[nr]
                 if not isinstance(e, Niepowodzenie):
                     (wyniki / f"punkt-{nr}-slad.txt").write_text(traceback.format_exc(), encoding="utf-8")
+            wpis["ok"] = wpis["stan"] != "blad"
             wpis["s"] = round(time.monotonic() - start, 1)
             raport["punkty"].append(wpis)
-            print(f"[{'ok' if wpis['ok'] else 'BŁĄD'}] {nr}. {opis} ({wpis['s']} s)"
-                  + (f": {wpis.get('blad') or wpis.get('pominiety')}" if not wpis["ok"] or "pominiety" in wpis else ""),
+            print(f"[{ETYKIETY[wpis['stan']]}] {nr}. {opis} ({wpis['s']} s)"
+                  + (f": {wpis.get('blad') or wpis.get('pominiety')}" if wpis["stan"] != "ok" else ""),
                   file=sys.stderr, flush=True)
     except Exception as e:                    # noqa: BLE001 - raport zamiast śladu na ekranie
         raport["blad"] = f"{type(e).__name__}: {e}"[:800]
     finally:
         if p is not None and not a.zostaw:
             shutil.rmtree(p.kat, ignore_errors=True)
+    raport["s"] = round(time.monotonic() - poczatek, 1)
     raport["ok"] = bool(raport["punkty"]) and all(x["ok"] for x in raport["punkty"]) and "blad" not in raport
     tekst = json.dumps(raport, ensure_ascii=False, indent=1)
     (wyniki / "raport.json").write_text(tekst + "\n", encoding="utf-8")

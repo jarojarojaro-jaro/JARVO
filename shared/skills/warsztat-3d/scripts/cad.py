@@ -8,17 +8,19 @@
                            [--tlo "#F4F4F2" | --przezroczyste] [--siatka] [--bez-krawedzi] [--skala 1]
     python3 cad.py obrot czesc.glb -o obrot.mp4 [--sekundy 6] [--fps 30] [--rozmiar 1080x1080] [opcje jak w podglad]
     python3 cad.py stan [--json]
-    python3 cad.py zainstaluj [--json]      # instalacja natywna: silnik i Three.js teraz, zamiast przy pierwszym użyciu
+    python3 cad.py zainstaluj [--json]      # instalacja natywna: silnik CAD teraz, zamiast przy pierwszym `zbuduj`
 
 Silnik: build123d (Apache-2.0) na OpenCascade (cadquery-ocp, LGPL-2.1) w osobnym venvie: w obrazie /opt/jarvo/venvs/cad,
 w instalacji natywnej venv `cad` z manifestu (vendor/natywne.yaml, `kiedy: przy-uzyciu`: pierwsze `zbuduj` instaluje
 go przez jarvo/przy_uzyciu.py z locka z sumami, ok. 215 MB pobrania), albo JARVO_CAD_PYTHON. Skrypt modelu przypisuje
 gotowy kształt do zmiennej `wynik`, wymiary w milimetrach. Budowa idzie bez sieci (cad_model.py blokuje gniazda).
 Podgląd i film: Three.js (MIT) na stronie cad_podglad.html, WebGL na CPU przez SwiftShader, film sklejany ffmpeg.
-W obrazie: Node z three i playwright-core z /opt/jarvo/node i Chromium z obrazu Hermesa (cad_render.cjs). Natywnie
-(bez tych paczek Node): Playwright dla Pythona z venvu narzędzi i chrome-headless-shell z instalacji (CHROME_PATH)
-w cad_render.py, a Three.js z wpisu `three` manifestu (pierwszy podgląd pobiera paczkę npm z sumą) albo z NODE_PATH.
-JARVO_CAD_RENDER=node|python wymusza sposób podglądu.
+Paczki three i playwright-core to narzędzia npm floty z infra/node/package-lock.json: w obrazie /opt/jarvo/node,
+natywnie `<program>/node-floty/<skrót locka>` z instalacji (NODE_PATH, wpis `node-floty` w narzedzia.json). Gdy Node
+je widzi (próba `cad_render.cjs --sprawdz`, ta sama ścieżka wyszukiwania co render), podgląd robi cad_render.cjs
+w Chromium z obrazu albo w chrome-headless-shell z instalacji (CHROME_PATH). Inaczej (np. proces bez środowiska Jarva)
+cad_render.py: Playwright dla Pythona z venvu narzędzi i Three.js z katalogu node-floty z narzedzia.json albo
+z NODE_PATH. JARVO_CAD_RENDER=node|python wymusza sposób podglądu.
 """
 
 from __future__ import annotations
@@ -69,7 +71,8 @@ def _czytaj_json(p: Path) -> dict:
 def _przy_uzyciu():
     """(moduł jarvo/przy_uzyciu.py aktywnej wersji Jarva, układ katalogów) w instalacji natywnej (JARVO_ROOT
     z program/current.json), inaczej (None, None): w obrazie silnik i Three.js są gotowe. Pakiet jarvo ładujemy
-    z kodu instalacji (JARVO_REPO albo current.json) bez dopisywania katalogu kodu do sys.path."""
+    z kodu instalacji (JARVO_REPO albo current.json) bez dopisywania katalogu kodu do sys.path. Moduł daje też wpisy
+    `<stan>/narzedzia.json` (`wpis`: node-floty z Three.js, chrome-headless-shell)."""
     korzen = os.environ.get("JARVO_ROOT")
     biezace = Path(korzen) / "program" / "current.json" if korzen else None
     if biezace is None or not biezace.is_file():
@@ -213,13 +216,14 @@ def _glb(s: str) -> Path:
 
 
 def node_podglad() -> str | None:
-    """node, gdy podgląd przez cad_render.cjs ma wszystko (three i playwright-core w Node, jak w obrazie Jarva)."""
+    """node, gdy cad_render.cjs znajdzie three i playwright-core (`cad_render.cjs --sprawdz`: te same funkcje
+    i ta sama ścieżka wyszukiwania modułów co render, czyli katalog skryptu, NODE_PATH i katalogi globalne Node,
+    a nie node_modules katalogu, w którym akurat pracuje agent)."""
     node = shutil.which("node")
     if not node:
         return None
     try:
-        p = subprocess.run([node, "-e", "require.resolve('three'); require.resolve('playwright-core')"],
-                           capture_output=True, timeout=60)
+        p = subprocess.run([node, str(RENDER_JS), "--sprawdz"], capture_output=True, timeout=60, cwd=str(HERE))
     except (OSError, subprocess.TimeoutExpired):
         return None
     return node if p.returncode == 0 else None
@@ -230,14 +234,20 @@ def _three_ok(p: Path) -> bool:
             and (p / "examples" / "jsm" / "loaders" / "GLTFLoader.js").is_file())
 
 
-def three_root(instaluj: bool = True) -> Path:
-    """Katalog paczki three dla cad_render.py: wpis three instalacji natywnej w wersji z manifestu tej wersji Jarva,
-    JARVO_THREE_DIR, NODE_PATH, narzędzia Wideografa (JARVO_NARZEDZIA/node), obraz Jarva; w instalacji natywnej bez
-    żadnego z nich pobranie paczki z manifestu (sha256) teraz, gdy `instaluj`."""
+def _node_modules_floty() -> str | None:
+    """node_modules narzędzi npm floty instalacji natywnej z `<stan>/narzedzia.json` (wpis node-floty, NODE_PATH):
+    aktualna wersja także w procesie uruchomionym przed aktualizacją albo bez środowiska Jarva."""
     pu, u = _przy_uzyciu()
-    kandydaci = []
-    if pu is not None:
-        kandydaci.append((pu.gotowe_narzedzie(u, "three") or {}).get("katalog"))
+    if pu is None:
+        return None
+    return ((pu.wpis(u, "node-floty") or {}).get("env") or {}).get("NODE_PATH")
+
+
+def three_root() -> Path:
+    """Katalog paczki three dla cad_render.py: narzędzia npm floty instalacji natywnej (wpis node-floty
+    w narzedzia.json), JARVO_THREE_DIR, NODE_PATH (w obrazie /opt/jarvo/node/node_modules), narzędzia Wideografa
+    (JARVO_NARZEDZIA/node), obraz Jarva. Niczego nie pobiera: three przychodzi z instalacją (infra/node, lock)."""
+    kandydaci = [str(Path(k) / "three") for k in (_node_modules_floty() or "").split(os.pathsep) if k]
     kandydaci.append(os.environ.get("JARVO_THREE_DIR"))
     kandydaci += [str(Path(k) / "three") for k in os.environ.get("NODE_PATH", "").split(os.pathsep) if k]
     narzedzia_floty = os.environ.get("JARVO_NARZEDZIA")
@@ -247,13 +257,12 @@ def three_root(instaluj: bool = True) -> Path:
     for k in kandydaci:
         if k and _three_ok(Path(k)):
             return Path(k)
-    if pu is not None and instaluj:
-        try:
-            return Path(pu.narzedzie(u, "three", log=_log)["katalog"])
-        except pu.BladPrzyUzyciu as e:
-            raise Blad(f"Three.js do podglądu: {e}") from None
-    raise Blad("brak Three.js do podglądu (paczka three: w obrazie /opt/jarvo/node; natywnie wpis three w manifeście "
-               "instalacji, NODE_PATH albo JARVO_THREE_DIR)")
+    if _przy_uzyciu()[0] is not None:
+        raise Blad("brak Three.js do podglądu: w instalacji Jarva paczkę three dają narzędzia npm floty (krok "
+                   "instalacji „Narzędzia npm floty”, infra/node/package-lock.json). Zgłoś to właścicielowi: polecenie "
+                   "instalacji Jarva uruchomione jeszcze raz (albo `jarvo update`) je doinstaluje")
+    raise Blad("brak Three.js do podglądu (paczka three: w obrazie /opt/jarvo/node; poza instalacją Jarva NODE_PATH "
+               "z paczką three albo JARVO_THREE_DIR)")
 
 
 def przegladarka() -> str | None:
@@ -274,8 +283,8 @@ def przegladarka() -> str | None:
 
 
 def python_playwright() -> str | None:
-    """Python z paczką playwright do cad_render.py: ten interpreter (natywnie @@PY@@ = venv narzędzi) albo
-    JARVO_TOOLS_PYTHON."""
+    """Python z paczką playwright do cad_render.py: ten interpreter (natywnie skille wołają cad.py Pythonem venvu
+    narzędzi Jarva) albo JARVO_TOOLS_PYTHON."""
     if importlib.util.find_spec("playwright") is not None:
         return sys.executable
     py = os.environ.get("JARVO_TOOLS_PYTHON")
@@ -301,14 +310,16 @@ def _uruchom_render(argv: list[str], zadanie: dict, limit: int, nazwa: str) -> d
 def _node(zadanie: dict, limit: int = 900, node: str | None = None) -> dict:
     node = node or shutil.which("node")
     if not node:
-        raise Blad("brak node (w kontenerze Jarva jest w obrazie)")
+        raise Blad("brak node (w kontenerze Jarva jest w obrazie, natywnie w instalacji)")
+    zadanie = {**zadanie, "chrome": przegladarka()}       # natywnie chrome-headless-shell z instalacji
     return _uruchom_render([node, str(RENDER_JS)], zadanie, limit, "cad_render.cjs")
 
 
 def _python(zadanie: dict, limit: int = 900) -> dict:
     py = python_playwright()
     if not py:
-        raise Blad("brak Playwright dla Pythona do podglądu (natywnie: venv narzędzi Jarva, @@PY@@; w obrazie: Node)")
+        raise Blad("brak Playwright dla Pythona do podglądu (natywnie: venv narzędzi Jarva, JARVO_TOOLS_PYTHON; "
+                   "w obrazie: Node)")
     chrome = przegladarka()
     if not chrome:
         raise Blad("brak Chromium do podglądu (natywnie chrome-headless-shell z instalacji: CHROME_PATH)")
@@ -317,8 +328,9 @@ def _python(zadanie: dict, limit: int = 900) -> dict:
 
 
 def render(zadanie: dict, limit: int = 900) -> dict:
-    """Podgląd PNG albo klatki filmu: Node z cad_render.cjs (obraz Jarva), inaczej Playwright dla Pythona
-    z cad_render.py (instalacja natywna); JARVO_CAD_RENDER=node|python wymusza sposób."""
+    """Podgląd PNG albo klatki filmu: Node z cad_render.cjs, gdy widzi three i playwright-core (obraz Jarva
+    i instalacja natywna z narzędziami npm floty), inaczej Playwright dla Pythona z cad_render.py;
+    JARVO_CAD_RENDER=node|python wymusza sposób."""
     tryb = os.environ.get("JARVO_CAD_RENDER", "").strip().lower()
     node = node_podglad() if tryb in ("", "node") else None
     if node:
@@ -365,20 +377,17 @@ def obrot(glb: Path, out: Path, widok: dict, sekundy: float, fps: float) -> dict
 # ---------------------------------------------------------------- CLI
 
 def stan_podgladu() -> dict:
-    """Czym zrobimy podgląd (bez instalowania): Node z obrazu albo Playwright dla Pythona z Chromium i Three.js
-    (gotowe albo do pobrania przy pierwszym podglądzie)."""
+    """Czym zrobimy podgląd (bez instalowania): Node z three i playwright-core (obraz, instalacja z narzędziami npm
+    floty) albo Playwright dla Pythona z Chromium i Three.js; `blad` mówi, czego brak."""
     tryb = os.environ.get("JARVO_CAD_RENDER", "").strip().lower()
     if tryb in ("", "node") and node_podglad():
-        return {"sposob": "node", "gotowy": True}
-    r = {"sposob": "python", "python": python_playwright(), "przegladarka": przegladarka(), "three": None,
-         "three_przy_uzyciu_mb": None}
+        return {"sposob": "node", "gotowy": True, "przegladarka": przegladarka()}
+    r = {"sposob": "python", "python": python_playwright(), "przegladarka": przegladarka(), "three": None}
     try:
-        r["three"] = three_root(instaluj=False).as_posix()
-    except Blad:
-        pu, u = _przy_uzyciu()
-        if pu is not None:
-            r["three_przy_uzyciu_mb"] = pu.rozmiar_mb(pu.app_instalacji(u), "three")
-    r["gotowy"] = bool(r["python"] and r["przegladarka"] and (r["three"] or r["three_przy_uzyciu_mb"]))
+        r["three"] = three_root().as_posix()
+    except Blad as e:
+        r["blad"] = str(e)
+    r["gotowy"] = bool(r["python"] and r["przegladarka"] and r["three"])
     return r
 
 
@@ -420,12 +429,13 @@ def _opis_stanu(r: dict) -> str:
         silnik = r.get("blad") or "brak"
     p = r.get("podglad") or {}
     if p.get("sposob") == "node":
-        podglad = "Node z three i playwright-core (cad_render.cjs)"
+        podglad = (f"Node z three i playwright-core (cad_render.cjs), Chromium "
+                   f"{p.get('przegladarka') or 'z obrazu'}")
     else:
-        three = p.get("three") or (f"pobierze się przy pierwszym podglądzie ({p['three_przy_uzyciu_mb']} MB)"
-                                   if p.get("three_przy_uzyciu_mb") else "brak")
         podglad = (f"Chromium {p.get('przegladarka') or 'brak'} z Playwright dla Pythona "
-                   f"({p.get('python') or 'brak'}), Three.js: {three}")
+                   f"({p.get('python') or 'brak'}), Three.js: {p.get('three') or 'brak'}")
+        if p.get("blad"):
+            podglad += f"\n  ! {p['blad']}"
     return f"silnik: {silnik}\npodgląd: {podglad}\nffmpeg: {r['ffmpeg']}"
 
 
@@ -482,7 +492,8 @@ def main(argv: list[str] | None = None) -> int:
     o.add_argument("--fps", type=float, default=30)
     s = sub.add_parser("stan", help="czy silnik CAD, podgląd i ffmpeg są na miejscu (albo pobiorą się przy użyciu)")
     s.add_argument("--json", action="store_true")
-    s = sub.add_parser("zainstaluj", help="instalacja natywna: silnik CAD i Three.js do podglądu teraz (z sumami)")
+    s = sub.add_parser("zainstaluj", help="instalacja natywna: silnik CAD teraz (z sumami), zamiast przy pierwszym "
+                                          "`zbuduj`; Three.js do podglądu przychodzi z instalacją Jarva")
     s.add_argument("--json", action="store_true")
     a = ap.parse_args(argv)
     try:
@@ -496,9 +507,13 @@ def main(argv: list[str] | None = None) -> int:
                 ns = argparse.Namespace(rozmiar="1600x1200", kat=35, wysokosc=25, kolor=None, tlo=None,
                                         przezroczyste=False, siatka=False, bez_krawedzi=False, skala=1)
                 png = Path(zad["out"]) / f"{zad['nazwa']}.png"
-                wr = podglad(Path(glb["plik"]), png, opcje_widoku(ns))
-                r["podglad"] = png.as_posix()
-                r["ostrzezenia"] += [f"podgląd: {b}" for b in wr.get("bledy", [])]
+                try:
+                    wr = podglad(Path(glb["plik"]), png, opcje_widoku(ns))
+                except Blad as e:            # pliki CAD są gotowe: raport zostaje, podgląd to ostrzeżenie
+                    r["ostrzezenia"].append(f"podgląd się nie udał: {e}")
+                else:
+                    r["podglad"] = png.as_posix()
+                    r["ostrzezenia"] += [f"podgląd: {b}" for b in wr.get("bledy", [])]
             print(json.dumps(r, ensure_ascii=False, indent=2)) if a.json else _wypisz_model(r)
             return 1 if r["bledy"] else 0
         if a.cmd == "stan":
@@ -506,9 +521,7 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(r, ensure_ascii=False, indent=2) if a.json else _opis_stanu(r))
             return 0 if stan_gotowy(r) else 1
         if a.cmd == "zainstaluj":
-            r = {"silnik": Path(cad_python()).as_posix()}
-            if stan_podgladu().get("sposob") == "python":
-                r["three"] = three_root().as_posix()
+            r = {"silnik": Path(cad_python()).as_posix()}       # Three.js przyszedł z instalacją (narzędzia npm)
             r["stan"] = stan()
             print(json.dumps(r, ensure_ascii=False, indent=2) if a.json else _opis_stanu(r["stan"]))
             return 0 if stan_gotowy(r["stan"]) else 1

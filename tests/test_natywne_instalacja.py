@@ -842,8 +842,8 @@ def test_potrzeba_prawdziwego_manifestu_na_kazdej_platformie(tmp_path, platforma
                                                                               instalator.gb(zostaje))
     assert {p.opis.split(" (")[0] for p in potrzeby} == {
         "archiwa narzędzi", "narzędzia", "venvy", "cache uv venvów", "modele", "cache pixi", "Tesseract", "Hermes",
-        "cache uv Hermesa", "node_modules frontu", "front panelu i cache npm", "źródła skilli floty", "build floty",
-        "profile floty"}
+        "cache uv Hermesa", "node_modules frontu", "front panelu i cache npm", "narzędzia npm floty",
+        "cache npm narzędzi floty", "źródła skilli floty", "build floty", "profile floty"}
     assert not u.root.exists()                                              # liczenie niczego nie zakłada
 
 
@@ -1374,3 +1374,129 @@ def test_tesseract_sprzatnij_cache_pixi(tmp_path):
     assert tesseract.sprzatnij_cache(u, log=logi.append) is True and not (u.cache / "pixi").exists()
     assert logi == ["Tesseract: cache paczek pixi usunięty (środowisko zostaje, znacznik pomija pixi w kolejnym "
                     "przebiegu)"]
+
+
+# ---------------------------------------------------------------- narzędzia npm floty i ManimGX w programach floty
+
+ATRAPA_NPM = r'''
+import json, os, sys
+from pathlib import Path
+with open(os.environ["ATRAPA_NPM_LOG"], "a", encoding="utf-8") as f:
+    f.write(json.dumps({"argv": sys.argv[1:], "cwd": os.getcwd(), "cache": os.environ.get("npm_config_cache")}) + "\n")
+Path(os.environ["npm_config_cache"], "_cacache").mkdir(parents=True, exist_ok=True)
+Path(os.environ["npm_config_cache"], "_cacache", "paczki.bin").write_bytes(b"t" * 3000)       # paczki z rejestru
+for p in ("hyperframes", "inspo-mcp", "lighthouse", "playwright-core", "sharp", "three"):
+    Path("node_modules", p).mkdir(parents=True, exist_ok=True)
+    Path("node_modules", p, "package.json").write_text("{}", encoding="utf-8")
+Path("node_modules", ".bin").mkdir(exist_ok=True)
+for n in ("hyperframes", "hyperframes.cmd"):
+    Path("node_modules", ".bin", n).write_text("atrapa", encoding="utf-8")
+'''
+
+
+def _app_z_node_floty(tmp_path: Path, adres: str, www: Path) -> Path:
+    """Kod Jarva jak _pelna_aplikacja, z infra/node tej wersji (node_floty.py i lock) i z Node.js z manifestu, którego
+    npm to atrapa `npm ci` (paczki z SPRAWDZ w node_modules, paczki „z rejestru” w cache npm)."""
+    app = _pelna_aplikacja(tmp_path, adres, www)
+    (app / "infra" / "node").mkdir(parents=True)
+    for plik in ("node_floty.py", "package.json", "package-lock.json"):
+        (app / "infra" / "node" / plik).write_bytes((REPO / "infra" / "node" / plik).read_bytes())
+    npm = {"node/npm_atrapa.py": ATRAPA_NPM.encode(), "node/node.exe": b"node",
+           "node/npm.cmd": f'@"{sys.executable}" "%~dp0npm_atrapa.py" %*\r\n'.encode(),
+           "node/npm": f"#!{sys.executable}\n{ATRAPA_NPM}".encode()}
+    dane = tc._tar_gz(npm)
+    (www / "npm-node.tar.gz").write_bytes(dane)
+    lock = json.loads((app / manifest.LOCK).read_text(encoding="utf-8"))
+    wpis = {"url": f"{adres}/npm-node.tar.gz", "sha256": _sha(dane), "rozmiar": len(dane), "format": "tar.gz",
+            "usun_poziom": 1, "bin": ["."]}
+    lock["narzedzia"]["node"] = {"wersja": "26.12.1", "kiedy": "instalacja",
+                                 "pliki": {p: wpis for p in sciezki.PLATFORMY}}
+    (app / manifest.LOCK).write_text(json.dumps(lock), encoding="utf-8")
+    return app
+
+
+def test_narzedzia_npm_floty_krok_instalatora_i_drugi_przebieg(tmp_path, stanowisko, monkeypatch):
+    """Krok „Narzędzia npm floty” (kontrola-17, bloker): po Node.js i Tesseracie, przed spisem narzędzi; npm ci z locka
+    infra/node npm-em z Node.js z manifestu, wpis node-floty w narzedzia.json (NODE_PATH, .bin w PATH, prefix npm dla
+    `npx hyperframes`) i w srodowisko.json, cache npm narzędzi sprzątnięty po instalacji, miejsce policzone przed.
+    Drugi przebieg: bez npm, bez sieci, „Zmiany: brak”."""
+    s, u = stanowisko, stanowisko["u"]
+    s["moduly"].update({"venvy": AtrapaVenvow(), "modele": AtrapaModeli(), "tesseract": AtrapaTesseracta(),
+                        "bin_floty": AtrapaProgramow()})
+    zapis = tmp_path / "npm.jsonl"
+    monkeypatch.setenv("ATRAPA_NPM_LOG", str(zapis))
+    app = _app_z_node_floty(tmp_path, s["adres"], s["www"])
+    potrzeby = {p.opis: p for p in instalator.potrzebne_miejsce(u, app, sciezki.platforma())}
+    assert potrzeby["narzędzia npm floty"].zostaje == instalator.NODE_FLOTY_MB["katalog"] * MB
+    assert potrzeby["cache npm narzędzi floty"].zostaje == 0 and potrzeby["cache npm narzędzi floty"].gdzie == u.cache
+    assert tc._instaluj(s, app) == 0, "\n".join(s["log"])
+    log = "\n".join(s["log"])
+    kroki = re.findall(r"^\[[#-]+\] +\d+/\d+  (.+)$", log, re.M)
+    assert kroki.index("Tesseract") < kroki.index("Narzędzia npm floty") == kroki.index("Spis narzędzi") - 1
+    assert kroki.index("Node.js i npm") < kroki.index("Narzędzia npm floty")
+    nf = instalator.modul_node_floty(app)
+    kat = u.program / "node-floty" / nf.suma_locka()[:12]
+    narz = srodowisko.narzedzia(u)["node-floty"]
+    assert narz["katalog"] == str(kat) and narz["bin"] == [str(kat / "node_modules" / ".bin")]
+    zapisane = json.loads((u.stan / "srodowisko.json").read_text(encoding="utf-8"))
+    assert zapisane["NODE_PATH"] == str(kat / "node_modules")
+    assert zapisane["npm_config_prefix"] == str(kat / "npm-prefix")
+    assert str(kat / "node_modules" / ".bin") in zapisane["PATH"].split(os.pathsep)
+    wywolania = [json.loads(x) for x in zapis.read_text(encoding="utf-8").splitlines()]
+    assert len(wywolania) == 1 and wywolania[0]["argv"][:2] == ["ci", "--ignore-scripts"]
+    assert Path(wywolania[0]["cache"]) == u.cache / "npm-floty" and not (u.cache / "npm-floty").exists()
+    assert "    narzędzia npm floty: zainstalowane" in log and "cache npm narzędzi floty 0,00 GB" in log
+    assert "narzędzia npm floty" in re.search(r"^Gotowe\. Zmiany w tym przebiegu: (.+)\.$", log, re.M).group(1)
+    assert not [p for p in instalator.potrzebne_miejsce(u, app, sciezki.platforma()) if "npm narzędzi" in p.opis
+                or p.opis == "narzędzia npm floty"]                       # gotowy katalog tego locka: 0
+    for p in s["www"].iterdir():                                       # drugi przebieg bez sieci
+        p.unlink()
+    assert tc._instaluj(s, app) == 0, "\n".join(s["log"])
+    assert "Gotowe. Zmiany w tym przebiegu: brak." in s["log"]
+    assert "    narzędzia npm floty: już są" in "\n".join(s["log"])
+    assert len(zapis.read_text(encoding="utf-8").splitlines()) == 1
+
+
+def test_narzedzia_npm_floty_tylko_z_lockiem_i_npm_z_manifestu(tmp_path, stanowisko):
+    """Kod bez infra/node (starsza wersja, atrapy testów): bez kroku; prawdziwy manifest ma Node.js na każdej
+    platformie, więc krok jest wszędzie tuż przed spisem narzędzi; Node.js bez npm: błąd z radą, bez npm z PATH."""
+    s = stanowisko
+
+    def kroki(app, platforma="linux-x64"):
+        inst = instalator._Instalacja(s["u"], app, s["otoczenie"](), s["log"].append, autostart=False,
+                                      web_lokalnie=False, start=False, bez_path=False, platforma=platforma)
+        return inst, [n for n, _f in inst.kroki()]
+    _inst, bez = kroki(_pelna_aplikacja(tmp_path, s["adres"], s["www"]))
+    assert "Narzędzia npm floty" not in bez and "Node.js i npm" in bez
+    for platforma in sciezki.PLATFORMY:
+        inst, z = kroki(REPO, platforma)
+        assert z.index("Narzędzia npm floty") == z.index("Spis narzędzi") - 1, platforma
+    inst.narz = {"node": {"katalog": str(tmp_path / "node-bez-npm"), "bin": [str(tmp_path / "node-bez-npm")]}}
+    with pytest.raises(instalator.BladInstalacji, match="npm z Node.js z manifestu"):
+        inst.node_floty()
+
+
+def test_programy_floty_maja_manimgx_z_kodu_tej_wersji(tmp_path, stanowisko):
+    """Krok „Programy floty”: `manimgx` (jarvo/manimgx.py tej wersji, M04) w bin-floty dla Pythona 3.13 z instalacji,
+    obok nakładki agent-browsera; program działa (`--jarvo-stan` bez ManimGX: JSON, kod 0), a drugi raz niczego nie
+    zapisuje. Bez Pythona 3.13 albo bez jarvo/manimgx.py w kodzie wersji: bez programu."""
+    s = stanowisko
+    inst = instalator._Instalacja(s["u"], REPO, s["otoczenie"](), s["log"].append, autostart=False, web_lokalnie=False,
+                                  start=False, bez_path=False, platforma=sciezki.platforma())
+    inst.narz = {"python313": {"katalog": str(Path(sys.base_prefix))}}
+    if not inst._bin_narzedzia("python313").is_file():
+        pytest.skip(f"brak {inst._bin_narzedzia('python313')} (Python w innym układzie niż z manifestu)")
+    s["u"].bin_floty.mkdir(parents=True, exist_ok=True)
+    program = s["u"].bin_floty / ("manimgx.exe" if WINDOWS else "manimgx")
+    assert inst._manimgx() == [str(program)] and inst._manimgx() == []
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("JARVO_", "MANIMGX_"))}
+    r = subprocess.run([str(program), "--jarvo-stan"], capture_output=True, text=True, encoding="utf-8", env=env,
+                       cwd=tmp_path, timeout=120)
+    assert r.returncode == 0, r.stderr
+    stan = json.loads(r.stdout)
+    assert isinstance(stan["gotowy"], bool) and stan["cache"]        # bez instalacji natywnej: stan, bez pobierania
+    inst.narz = {}
+    assert inst._manimgx() == []
+    inst.narz = {"python313": {"katalog": str(Path(sys.base_prefix))}}
+    inst.app = tmp_path / "bez-manimgx"
+    assert inst._manimgx() == []

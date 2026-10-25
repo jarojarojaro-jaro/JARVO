@@ -25,8 +25,11 @@ z paskiem i nazwą kroku:
    4. venvy z `kiedy: instalacja` (narzedzia, ocr, claude-seo; jarvo/venvy.py: uv venv + uv pip install
       --require-hashes --no-deps z locka o sumie z manifestu, do `<program>/venvs/<nazwa>-<skrót locka>`),
    5. modele z `kiedy: instalacja` do `<dane>/jarvo/models` (jarvo/modele.py: lektory, Indra OCR, języki
-      Tesseracta, fonty Noto), potem Tesseract z pixi.lock (jarvo/tesseract.py, TESSDATA_PREFIX na tessdata-fast),
-   6. `<stan>/narzedzia.json` (narzędzia, venvy, modele, Tesseract), 7. wersja Jarva (kod tej wersji),
+      Tesseracta, fonty Noto), potem Tesseract z pixi.lock (jarvo/tesseract.py, TESSDATA_PREFIX na tessdata-fast)
+      i narzędzia npm floty (infra/node/node_floty.py tej wersji: `npm ci --ignore-scripts` z package-lock.json npm-em
+      z Node.js z manifestu do `<program>/node-floty/<skrót locka>`: HyperFrames, Lighthouse, playwright-core, three,
+      inspo-mcp…; wpis `node-floty` z NODE_PATH i node_modules/.bin, P02, I32),
+   6. `<stan>/narzedzia.json` (narzędzia, venvy, modele, Tesseract, narzędzia npm), 7. wersja Jarva (kod tej wersji),
    8. Hermes: checkout przypiętego commitu i `uv sync --locked` (jarvo/hermes.py, I02) gitem z manifestu (Windows),
    9. front panelu zawsze z checkoutu bieżącego pinu npm-em z Node.js z manifestu (hermes.web_dist pomija gotowy;
       `--web-lokalnie` buduje go od nowa); bez Node.js jasna rada,
@@ -37,7 +40,8 @@ z paskiem i nazwą kroku:
       aktualizacja zostawia działającą starą wersję; serwis starej zatrzymujemy tuż przed przełączeniem (na ten czas
       znacznik zatrzymania), poprzedni current.json zostaje obok (current.poprzedni.json),
   13. programy floty w `<program>/bin-floty` (jarvo/bin_floty.py: python3, jarvo-tts, jarvo-stt, jarvo-klucz,
-      tesseract; S01, F12), tylko w PATH procesów Jarva,
+      tesseract; S01, F12; nakładka agent-browser i `manimgx`, który instaluje swój venv przy pierwszym wywołaniu,
+      M04), tylko w PATH procesów Jarva,
   14. flota (jarvo/flota.py): build.py w układzie natywnym ze ścieżkami instalacji (--py = Python venvu narzędzi,
       --bin-dir = bin-floty, --hermes-src = checkout) i install_fleet.py; restart usług zleca krok „Serwis”,
   15. `<stan>/srodowisko.json` (tylko część Jarva: bez PATH właściciela i przełączników bootstrapu, więc drugi
@@ -60,10 +64,11 @@ z paskiem i nazwą kroku:
       odcisk wtyczek (flota.potwierdz_restart_panelu).
 
 Po udanym przebiegu sprzątanie (c3 pkt 11, Z31): pobrane archiwa (`<cache>/pobrane`), cache uv (`uv cache clean`),
-cache pixi i resztki starych wersji narzędzi; node_modules frontu Hermesa znika już zaraz po budowie (hermes.web_dist).
-Cache sprzątamy pod zamkami, które biorą instalatory (przy pierwszym użyciu, venvy, hermes, tesseract), bez czekania:
-drugi instalator, który właśnie z nich korzysta, zostawia je do następnego sprzątania; świeży plik innego procesu
-w `<cache>/pobrane` (np. pobieranie przeglądarki komputera Jarva przy starcie usługi) też zostaje.
+cache pixi, cache npm narzędzi floty (`<cache>/npm-floty`) i resztki starych wersji narzędzi; node_modules frontu
+Hermesa znika już zaraz po budowie (hermes.web_dist). Cache sprzątamy pod zamkami, które biorą instalatory (przy
+pierwszym użyciu, venvy, hermes, tesseract), bez czekania: drugi instalator, który właśnie z nich korzysta, zostawia je
+do następnego sprzątania; świeży plik innego procesu w `<cache>/pobrane` (np. pobieranie przeglądarki komputera Jarva
+przy starcie usługi) też zostaje.
 Gotowe części mają znaczniki (suma narzędzia, venvu, modelu, Tesseracta, Hermesa, frontu), więc kolejny przebieg ich
 nie pobiera ani nie buduje i działa bez sieci. Kompromis: część uszkodzona albo usunięta ręcznie (np. venv bez
 znacznika, narzędzie bez katalogu) potrzebuje wtedy sieci, bo jej kół, paczek ani archiwów nie ma już w cache, a nowy
@@ -1133,6 +1138,10 @@ HERMES_MB = {"checkout": 850, "cache_uv": 350, "node_modules": 300, "front": 80}
 # flota: źródła skilli buildu w <cache>/build (31 repo, 0,94 GB; zostają, bo aktualizacja buduje flotę), build
 # w <root>/build i profile z wtyczkami w <dane>
 FLOTA_MB = {"zrodla": 1000, "build": 100, "profile": 150}
+# narzędzia npm floty w MB (infra/node, npm ci z locka b5a1f4c9e3b8; zmierzone 2026-10-25 na Windows 11 x64): katalog
+# `<program>/node-floty/<skrót>` bez onnxruntime, 438 MB plików i 483 MB na dysku NTFS (tysiące małych plików; zostaje),
+# i paczki w cache npm `<cache>/npm-floty`, 239 MB (znika po instalacji); do przeniesienia do manifestu (koordynator)
+NODE_FLOTY_MB = {"katalog": 490, "cache": 260}
 ZAPAS = 0.1                     # do potrzeby z manifestu +10 % (pliki tymczasowe, różnice archiwów między systemami)
 ZAPAS_MB = 500                  # i 0,5 GB na dysku korzenia zawsze: dziennik, bazy, build floty w każdym przebiegu
 MIN_WOLNEGO_GB = 2              # doctor: mniej = błąd (bazy SQLite, logi i rendery przestają się zapisywać)
@@ -1187,14 +1196,34 @@ def rozpakowane(wpis: dict) -> int:
     return int(int(wpis.get("rozmiar") or 0) * ROZPAKOWANIE.get(str(wpis.get("format") or "zip"), 3.0))
 
 
+def modul_kodu(plik: Path, nazwa: str) -> Any:
+    """Moduł z kodu wersji Jarva po ścieżce (infra/node/node_floty.py, jarvo/manimgx.py, infra/bin/agent_browser.py):
+    bez dopisywania czegokolwiek do sys.path, tak jak instalator bierze kod instalowanej wersji."""
+    spec = importlib.util.spec_from_file_location(nazwa, plik)
+    modul = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modul)
+    return modul
+
+
+def modul_node_floty(app: Path) -> Any | None:
+    """infra/node/node_floty.py wersji `app`, gdy ta wersja ma narzędzia npm floty (node_floty.py i package-lock.json
+    w infra/node), inaczej None."""
+    katalog = Path(app) / "infra" / "node"
+    if not ((katalog / "node_floty.py").is_file() and (katalog / "package-lock.json").is_file()):
+        return None
+    return modul_kodu(katalog / "node_floty.py", "jarvo_node_floty")
+
+
 def potrzebne_miejsce(u: Uklad, app: Path, platforma: str, *, wszystko: bool = False) -> list[Potrzeba]:
     """Ile miejsca zajmie instalacja z manifestu tej wersji (vendor/natywne.lock.json) na platformie `platforma`:
     narzędzia z `kiedy: instalacja` (plik w <cache>/pobrane i rozpakowany w <program>), venvy (venvy.miejsce:
     pobranie_mb i venv_mb, koła w cache uv), modele (rozmiary plików), Tesseract (tesseract.miejsce: rozmiary paczek
-    z pixi.lock), Hermes z frontem dla pinu z manifestu (stałe HERMES_MB) i flota (FLOTA_MB, gdy kod ma fleet.yaml).
-    Części, które już są (znacznik sumy narzędzia, venvu, modelu, Tesseracta, Hermesa i frontu tego pinu, źródła
-    skilli w <cache>/build, profile w <dane>), liczą się jako 0, więc drugi przebieg potrzebuje tylko zapasu;
-    `wszystko=True` liczy całość jak na pustym dysku. Bez zapasu (dolicza go bilans_dyskow). Tylko odczyt."""
+    z pixi.lock), narzędzia npm floty (NODE_FLOTY_MB, gdy kod ma infra/node z lockiem, a manifest ma Node.js dla tej
+    platformy), Hermes z frontem dla pinu z manifestu (stałe HERMES_MB) i flota (FLOTA_MB, gdy kod ma fleet.yaml).
+    Części, które już są (znacznik sumy narzędzia, venvu, modelu, Tesseracta, narzędzi npm tego locka, Hermesa
+    i frontu tego pinu, źródła skilli w <cache>/build, profile w <dane>), liczą się jako 0, więc drugi przebieg
+    potrzebuje tylko zapasu; `wszystko=True` liczy całość jak na pustym dysku. Bez zapasu (dolicza go
+    bilans_dyskow). Tylko odczyt."""
     from . import hermes, modele, tesseract, venvy
     narz = manifest.wczytaj(app)
     nazwy = narzedzia_instalacji(narz, platforma)
@@ -1229,6 +1258,11 @@ def potrzebne_miejsce(u: Uklad, app: Path, platforma: str, *, wszystko: bool = F
         cache, srodowisko_pixi, zostaje = tesseract.miejsce(app, platforma)
         wynik += [Potrzeba("cache pixi (Tesseract)", u.cache, cache, 0),
                   Potrzeba("Tesseract", u.program, srodowisko_pixi, zostaje)]
+    nf = modul_node_floty(app) if "node" in nazwy else None
+    if nf is not None and (wszystko or not nf.gotowy(nf.katalog_wersji(u.program, nf.suma_locka()), nf.suma_locka())):
+        wynik += [Potrzeba("narzędzia npm floty", u.program, NODE_FLOTY_MB["katalog"] * MB,
+                           NODE_FLOTY_MB["katalog"] * MB),
+                  Potrzeba("cache npm narzędzi floty", u.cache, NODE_FLOTY_MB["cache"] * MB, 0)]
     try:
         pin = manifest.hermes(app)
     except KeyError:                                # manifest bez przypięcia Hermesa (tylko narzędzia)
@@ -1694,6 +1728,8 @@ class _Instalacja:
         k += [(f"Model {nazwa}", lambda n=nazwa: self.model(n)) for nazwa in modele]
         if "pixi" in nazwy and (self.app / "vendor" / "pixi" / "tesseract" / "pixi.lock").is_file():
             k.append(("Tesseract", self.tesseract))
+        if "node" in nazwy and modul_node_floty(self.app) is not None:      # po Node.js i ffmpeg z manifestu
+            k.append(("Narzędzia npm floty", self.node_floty))
         k += [("Spis narzędzi", self.spis_narzedzi), ("Wersja Jarva", self.wersja_jarva), ("Hermes", self.hermes),
               ("Front panelu", self.front), ("Bezpieczne ustawienia Hermesa", self.konfiguracja),
               ("Klucz API bramy", self.klucz_api), ("Przełączenie wersji", self.przelaczenie),
@@ -1801,14 +1837,15 @@ class _Instalacja:
 
     def sprzatanie(self) -> None:
         """Archiwa z <cache>/pobrane (sprzatnij_pobrane: archiwa tego przebiegu i pliki starsze niż SWIEZE_S, także
-        niedokończone .czesc), cache uv (venvy.sprzatnij_cache), cache pixi (tesseract.sprzatnij_cache) i katalogi
-        `<wersja>.stary-*` narzędzi, które pobieracz zostawił przy zajętym pliku. Cache sprzątamy pod tymi samymi
-        zamkami, które biorą instalatory (przy pierwszym użyciu, venvy, hermes, tesseract), bez czekania: drugi
-        instalator, który właśnie z nich korzysta, zostawia je do następnego sprzątania. Zwolnione miejsce to pliki bez
-        innych twardych dowiązań przed i po (rozmiar_katalogu wlasne=True: plik dzielony ze środowiskiem Tesseracta
-        miejsca nie zwalnia). Cache poniżej PROG_SPRZATANIA (same pliki znaczników) zostaje, więc drugi przebieg nie
-        woła uv. Nic tu nie przerywa udanej instalacji: błąd to uwaga. Na końcu wiersz „Miejsce” (zajęte i wolne, jak
-        w `jarvo doctor`)."""
+        niedokończone .czesc), cache uv (venvy.sprzatnij_cache), cache pixi (tesseract.sprzatnij_cache), cache npm
+        narzędzi floty (`<cache>/npm-floty`: paczki z locka infra/node, które npm ci już rozpakował; nowy lock pobierze
+        je od nowa, jak koła uv) i katalogi `<wersja>.stary-*` narzędzi, które pobieracz zostawił przy zajętym pliku.
+        Cache sprzątamy pod tymi samymi zamkami, które biorą instalatory (przy pierwszym użyciu, venvy, hermes,
+        tesseract), bez czekania: drugi instalator, który właśnie z nich korzysta, zostawia je do następnego sprzątania.
+        Zwolnione miejsce to pliki bez innych twardych dowiązań przed i po (rozmiar_katalogu wlasne=True: plik dzielony
+        ze środowiskiem Tesseracta miejsca nie zwalnia). Cache poniżej PROG_SPRZATANIA (same pliki znaczników) zostaje,
+        więc drugi przebieg nie woła uv. Nic tu nie przerywa udanej instalacji: błąd to uwaga. Na końcu wiersz „Miejsce”
+        (zajęte i wolne, jak w `jarvo doctor`)."""
         zwolnione: list[tuple[str, int]] = []
 
         def rozmiar(katalog: Path) -> int:
@@ -1833,6 +1870,10 @@ class _Instalacja:
         pixi = self._funkcja("tesseract", "sprzatnij_cache")
         if pixi is not None:
             mierz("cache pixi", self.u.cache / "pixi", lambda: pixi(self.u, log=self.podlog))
+        nf = modul_node_floty(self.app)                  # paczki npm narzędzi floty: drugi przebieg ich nie potrzebuje
+        if nf is not None:
+            npm_floty = self.u.cache / nf.CACHE_NPM
+            mierz("cache npm narzędzi floty", npm_floty, lambda: usun_drzewo(npm_floty), prog=1)
         for stary in sorted((self.u.program / "narzedzia").glob("*/*.stary-*")):
             mierz(f"stara wersja {stary.parent.name}", stary, lambda s=stary: usun_drzewo(s), prog=1)
         razem = sum(z for _o, z in zwolnione)
@@ -1982,6 +2023,33 @@ class _Instalacja:
         self.podlog(f"Tesseract {spis.get('wersja')}: {'zainstalowany' if zmiana else 'już jest'}, języki: {opis}")
         if zmiana:
             self.zmiany.append("tesseract")
+
+    def node_floty(self) -> None:
+        """Narzędzia npm floty (P02, I32): infra/node/node_floty.py tej wersji robi `npm ci --ignore-scripts` z
+        package-lock.json (suma integrity każdej paczki z registry.npmjs.org) do `<program>/node-floty/<skrót locka>`
+        npm-em z Node.js z manifestu (nigdy z PATH właściciela), z cache npm w `<cache>/npm-floty`, który sprząta koniec
+        udanego przebiegu. Wpis `node-floty` w narzedzia.json daje procesom Jarva node_modules/.bin w PATH (hyperframes,
+        lighthouse, svgo…), NODE_PATH (playwright-core, three, inspo-mcp dla skryptów floty i serwerów MCP), HyperFrames
+        bez telemetrii i autoaktualizacji, z ffmpeg i ffprobe z manifestu. Katalog gotowy dla tego locka = bez npm
+        i bez sieci (drugi przebieg niczego nie zmienia)."""
+        nf = modul_node_floty(self.app)
+        npm = self._program_narzedzia("node", "npm")
+        if npm is None:
+            katalog = (self.narz.get("node") or {}).get("katalog") or "katalogu Node.js"
+            raise BladInstalacji(f"narzędzia npm floty potrzebują npm z Node.js z manifestu, a w {katalog} go nie ma: "
+                                 "usuń ten katalog i uruchom instalację jeszcze raz")
+        bin_ffmpeg = [Path(k) for nazwa in ("ffmpeg", "ffmpeg-macos", "ffprobe-macos")
+                      for k in (self.narz.get(nazwa) or {}).get("bin") or []]
+        try:
+            spis, zmiana = nf.zainstaluj(self.u.program, npm, cache=self.u.cache, bin_ffmpeg=bin_ffmpeg,
+                                         log=self.podlog)
+        except nf.BladNodeFloty as e:
+            raise BladInstalacji(f"{e}\nPrzy błędzie sieci uruchom instalację jeszcze raz: pobrane już paczki zostają "
+                                 f"w {self.u.cache / nf.CACHE_NPM}.") from None
+        self.narz["node-floty"] = spis
+        self.podlog(f"narzędzia npm floty: {'zainstalowane' if zmiana else 'już są'} ({spis['katalog']})")
+        if zmiana:
+            self.zmiany.append("narzędzia npm floty")
 
     def spis_narzedzi(self) -> None:
         spis = {**srodowisko.narzedzia(self.u), **self.narz}
@@ -2170,7 +2238,7 @@ class _Instalacja:
         zmiany = self.ot.modul("bin_floty").przygotuj(
             self.u, venv_python=Path(venv["python"]), uv=self._bin_narzedzia("uv") if "uv" in self.narz else None,
             tesseract=Path(tess) if tess else None, log=self.podlog)
-        zmiany = list(zmiany or []) + self._agent_browser(narz)
+        zmiany = list(zmiany or []) + self._agent_browser(narz) + self._manimgx()
         self.podlog(f"programy floty w {self.u.bin_floty}: " + ("zapisane" if zmiany else "bez zmian"))
         if zmiany:
             self.zmiany.append("programy floty")
@@ -2180,12 +2248,21 @@ class _Instalacja:
         podglądu demona, C05) dla Pythona z instalacji; na macOS i Linuksie także `chromium` dla chrome-headless-shell."""
         if not isinstance(narz.get("agent-browser"), dict):
             return []
-        zrodlo = self.app / "infra" / "bin" / "agent_browser.py"
-        spec = importlib.util.spec_from_file_location("jarvo_agent_browser", zrodlo)
-        modul = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(modul)
+        modul = modul_kodu(self.app / "infra" / "bin" / "agent_browser.py", "jarvo_agent_browser")
         chrome = ((narz.get("chrome-headless-shell") or {}).get("env") or {}).get("CHROME_PATH")
         return [str(p) for p in modul.zainstaluj(self.u.bin_floty, self._bin_narzedzia("python313"), chrome=chrome)]
+
+    def _manimgx(self) -> list:
+        """Program `manimgx` w bin-floty (jarvo/manimgx.py tej wersji, M04) dla Pythona 3.13 z instalacji, zbudowany
+        jak nakładka agent-browsera: pierwsze wywołanie instaluje venv `manimgx` z locka z sumami (przy pierwszym
+        użyciu, jarvo/przy_uzyciu.py), potem przekazuje argumenty do programu venvu. Skille Wideografa wołają
+        `manimgx inspect|render …` tak jak w obrazie z dodatkiem `manim`."""
+        zrodlo = self.app / "jarvo" / "manimgx.py"
+        if not zrodlo.is_file() or "python313" not in self.narz \
+                or not (self.app / "infra" / "bin" / "agent_browser.py").is_file():
+            return []
+        modul = modul_kodu(zrodlo, "jarvo_manimgx")
+        return [str(p) for p in modul.zainstaluj(self.u.bin_floty, self._bin_narzedzia("python313"))]
 
     def flota(self) -> None:
         """Build profili i instalacja floty (jarvo/flota.py); restart usług zleca krok „Serwis” (nadzorca)."""

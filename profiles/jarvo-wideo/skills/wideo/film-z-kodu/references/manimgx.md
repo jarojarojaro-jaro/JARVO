@@ -6,9 +6,13 @@ https://manimgx.academa.ai/llms.txt): silnik w Ruście, render na CPU (Mesa lava
 bez LaTeX-a, cairo i ffmpeg. Instrukcje z `manim-video` (plan, sceny, kolory, tempo) obowiązują; ten plik mówi,
 co jest inaczej. Gdy się różnią, wygrywa ten plik.
 
-Dostępność: dodatek obrazu `manim` (`JARVO_EXTRAS="manim"`). `manimgx --version` = jest; „brak dodatku obrazu
-manim” = nie ma: powiedz właścicielowi (dodatek + `deploy.sh --rebuild`) i wybierz inny silnik z tabeli
-w `SKILL.md` (wykres, algorytm: HTML z `html_wideo.py`; wzór krok po kroku: gramatyka `3b1b`).
+Dostępność: na serwerze dodatek obrazu `manim` (`JARVO_EXTRAS="manim"`); na komputerze właściciela program `manimgx`
+jest od instalacji Jarva, a pierwsze wywołanie (także `--version`) instaluje ManimGX z sumami (ok. 85 MB na Windows,
+64 MB na macOS, kilkanaście sekund): pierwsze polecenie z limitem czasu terminala ok. 900 s i jedno zdanie do
+właściciela („instaluję raz silnik animacji, ok. pół minuty”). `manimgx --version` = jest; „brak dodatku obrazu manim”
+= nie ma: powiedz właścicielowi (dodatek + `deploy.sh --rebuild`) i wybierz inny silnik z tabeli w `SKILL.md`
+(wykres, algorytm: HTML z `html_wideo.py`; wzór krok po kroku: gramatyka `3b1b`). Błąd instalacji przy pierwszym
+użyciu (brak sieci, inna suma) zgłaszasz właścicielowi, nie obchodzisz go.
 
 ## Kod i polecenia
 - `from manimgx import *` zamiast `from manim import *` (albo `import manimgx as m`). Reszta kodu CE bez zmian.

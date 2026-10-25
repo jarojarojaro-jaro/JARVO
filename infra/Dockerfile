@@ -81,11 +81,12 @@ ENV LIGHTPANDA_DISABLE_TELEMETRY=1 \
     PUPPETEER_SKIP_DOWNLOAD=1 \
     PUPPETEER_EXECUTABLE_PATH=/usr/local/bin/chromium
 
-# --- narzędzia Node (wersje przypięte w infra/node/package.json; playwright-core dembrandta ujednolicony
+# --- narzędzia Node (wersje przypięte w infra/node/package.json, całe drzewo z sumami integrity w package-lock.json:
+#     ten sam lock co w instalacji natywnej, infra/node/node_floty.py; playwright-core dembrandta ujednolicony
 #     przez "overrides" z wersją, której Chromium jest już w obrazie → bez dociągania drugiej przeglądarki)
-COPY infra/node/package.json /opt/jarvo/node/package.json
+COPY infra/node/package.json infra/node/package-lock.json /opt/jarvo/node/
 RUN set -e; cd /opt/jarvo/node && \
-    npm install --omit=dev --no-audit --no-fund && \
+    npm ci --omit=dev --no-audit --no-fund && \
     # dembrandt: model ML tylko dla eksperymentalnej flagi --ai (nie używamy) → bez onnxruntime-node (~0,5 GB)
     rm -rf node_modules/onnxruntime-node node_modules/onnxruntime-common && \
     # agent-browser: zostaje tylko binarka tej platformy (paczka niesie 7 wariantów, ~90 MB)
@@ -108,18 +109,24 @@ RUN set -e; cd /opt/jarvo/node && \
     case "$(readlink -f /usr/local/bin/chromium)" in "$hs"/*) ;; *) echo "/usr/local/bin/chromium nie wskazuje $hs" >&2; exit 1;; esac && \
     node -e "require('playwright-core').chromium.launch().then(b => b.close()).then(() => console.log('playwright-core → Chromium OK'))" && \
     npm cache clean --force && rm -rf /root/.npm/_cacache
-# HyperFrames (wideo z HTML + GSAP; skille Wideografa wołają `npx hyperframes`): globalnie w obrazie, bo npx
-# bierze paczkę z globalnego drzewa bez sieci (inaczej ściągał najnowszą przy pierwszym użyciu, a na świeżej
-# instalacji bez sieci healthcheck padał). puppeteer-core w paczce używa Chromium obrazu (PUPPETEER_EXECUTABLE_PATH).
-# Wersja przejrzana, ta sama co skille z vendor/skills.lock.yaml (commit po v0.8.78).
-ARG HYPERFRAMES_VERSION=0.8.78
-RUN set -e; npm install -g --no-audit --no-fund "hyperframes@${HYPERFRAMES_VERSION}" && \
-    hyperframes --version && npm cache clean --force && rm -rf /root/.npm/_cacache
-# render przez Chromium z obrazu (bez tego hyperframes ściąga własny chrome-headless-shell i pada bez unzip);
-# bez telemetrii (PostHog) i bez sprawdzania nowszej wersji: wersja jest przypięta wyżej
+# HyperFrames (wideo z HTML + GSAP): render przez Chromium z obrazu (bez tego hyperframes ściąga własny
+# chrome-headless-shell i pada bez unzip); bez telemetrii (PostHog) i bez sprawdzania nowszej wersji (przy tym
+# przełączniku nie instaluje też nowszej w tle): wersja jest przypięta w locku
 ENV HYPERFRAMES_BROWSER_PATH=/usr/local/bin/chromium \
     HYPERFRAMES_NO_TELEMETRY=1 \
     HYPERFRAMES_NO_UPDATE_CHECK=1
+# Jedna kopia HyperFrames: ta z locka w /opt/jarvo/node (wyżej; wersja przejrzana, ta sama co skille z
+# vendor/skills.lock.yaml, commit po v0.8.78). Skille HyperFrames wołają `npx hyperframes`, a npx szuka programu
+# w node_modules/.bin katalogu projektu i w globalnym bin npm, nie w PATH: bez wpisu tam ściągałby najnowszą wersję
+# przy pierwszym użyciu (a bez sieci healthcheck padał). Dlatego globalny bin dostaje dowiązania do tej kopii zamiast
+# drugiej instalacji `npm install -g`; `npx --yes=false` spoza /opt/jarvo/node wywraca build, gdyby npx chciał coś
+# pobrać (sprawdzone na npm 11.20: bez wpisu w globalnym bin „npx canceled due to missing packages”, z nim 0.8.78).
+# puppeteer-core w paczce używa Chromium obrazu (PUPPETEER_EXECUTABLE_PATH).
+RUN set -e; g="$(npm prefix -g)/bin"; mkdir -p "$g" && \
+    for b in hyperframes hyperframes-localize-fonts; do ln -sf "/opt/jarvo/node/node_modules/.bin/$b" "$g/$b"; done && \
+    v="$(node -p "require('/opt/jarvo/node/node_modules/hyperframes/package.json').version")" && \
+    test "$(hyperframes --version)" = "$v" && \
+    cd /tmp && test "$(npx --yes=false hyperframes --version)" = "$v" && echo "hyperframes $v: jedna kopia (PATH i npx)"
 ENV NODE_PATH=/opt/jarvo/node/node_modules
 ENV PATH="/opt/jarvo/bin:/opt/jarvo/node/node_modules/.bin:${PATH}:/opt/jarvo/venv/bin"
 

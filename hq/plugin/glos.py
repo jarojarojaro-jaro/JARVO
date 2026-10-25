@@ -119,17 +119,34 @@ def _edytor():
 async def _uruchom(argv: list[str], timeout: float) -> int:
     """Lektor w wątku (przenosne.uruchom: także na Windows, gdzie pętla dashboardu nie ma podprocesów asyncio);
     po limicie czasu program jest zabity i skończony. Na Windows program dostaje od razu własny Job Object
-    (edytor.przypnij_drzewo): padnięty albo zrestartowany dashboard nie zostawia lektora z Pythonem w tle."""
+    (edytor.przypnij_drzewo): padnięty albo zrestartowany dashboard nie zostawia lektora z Pythonem w tle, a limit
+    czasu i przerwane żądanie kończą całe drzewo (edytor.zabij_drzewo), bez czekania na sprzątanie uchwytu."""
     p = _przenosne()
     try:
-        przypnij = _edytor().przypnij_drzewo
+        e = _edytor()
+        przypnij, zabij = e.przypnij_drzewo, e.zabij_drzewo
     except (OSError, ImportError, AttributeError):
-        przypnij = None
+        przypnij = zabij = None
+    uruchomione = []
+
+    def start(proc) -> None:
+        uruchomione.append(proc)
+        if przypnij is not None:
+            przypnij(proc)
+
+    def koniec_drzewa() -> None:
+        for proc in uruchomione:
+            if zabij is not None:
+                zabij(proc)
     try:
         kod, _out, _err = await p.uruchom(argv, timeout=timeout, stdin=p.DEVNULL, stdout=p.DEVNULL, stderr=p.DEVNULL,
-                                          przy_starcie=przypnij)
+                                          przy_starcie=start)
     except asyncio.TimeoutError:
+        koniec_drzewa()
         raise BladGlosu("limit czasu") from None
+    except BaseException:
+        koniec_drzewa()
+        raise
     return kod
 
 
