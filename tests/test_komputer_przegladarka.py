@@ -24,6 +24,10 @@ def test_flagi_proxy_quic_webrtc_i_tryb(tmp_path):
     assert any(x.startswith("--disable-features=") and "MediaRouter" in x for x in f)   # Cast szuka w sieci po UDP
     okno = przegladarka.flagi(profil=tmp_path, port_proxy=19201, okno=True)
     assert "--headless=new" not in okno
+    # GPU tylko bez emulacji: x64 na Windows arm64 bez GPU i bez SwiftShadera (renderer nowej karty nie czeka na JIT)
+    assert "--disable-gpu" not in f
+    emu = przegladarka.flagi(profil=tmp_path, port_proxy=19201, okno=False, emulacja=True)
+    assert "--disable-gpu" in emu and "--disable-software-rasterizer" in emu and emu[-1] == "about:blank"
 
 
 def test_flagi_bez_oslabien_playwrighta_i_portu_cdp(tmp_path):

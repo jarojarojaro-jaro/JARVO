@@ -459,8 +459,10 @@ class Sterownik:
                     "responseHeaders": [{"name": k, "value": v} for k, v in naglowki.items()]}, sesja)
                 return
             self.b.wyslij("Fetch.continueRequest", {"requestId": ident}, sesja)
-        except cdp.BladCDP:
+        except cdp.KoniecPrzegladarki:
             pass
+        except cdp.BladCDP as e:                  # wstrzymane żądanie bez odpowiedzi trzyma nawigację karty
+            self.log(f"sterownik: żądanie {re.sub(r'[?#].*$', '', url)[:120]}: {e.tekst[:120]}")
 
     def _plik_testowy(self, url: str) -> tuple[int, dict, bytes]:
         """Plik strony testowej z katalogu; `pobierz/<nazwa>` to załącznik do pobrania o tej nazwie."""

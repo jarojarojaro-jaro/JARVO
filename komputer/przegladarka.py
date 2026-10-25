@@ -54,8 +54,10 @@ def program(env: dict | None = None, narzedzia: dict | None = None) -> str | Non
 
 
 def flagi(*, profil: Path, port_proxy: int | None, okno: bool, ekran: tuple[int, int] = EKRAN,
-          bez_piaskownicy: bool = False, jezyk: str = "pl") -> list[str]:
-    """Argumenty startu przeglądarki Jarva (bez --remote-debugging-pipe, który dokłada cdp.Przegladarka)."""
+          bez_piaskownicy: bool = False, jezyk: str = "pl", emulacja: bool = False) -> list[str]:
+    """Argumenty startu przeglądarki Jarva (bez --remote-debugging-pipe, który dokłada cdp.Przegladarka).
+    `emulacja`: przeglądarka x64 w emulacji (Windows arm64): bez GPU i bez SwiftShadera, którego JIT x64 w emulacji
+    potrafi zatrzymać renderer nowej karty na dziesiątki sekund (CI natywnie, WARM: Page.enable bez odpowiedzi)."""
     f = [f"--user-data-dir={profil}", "--site-per-process", "--no-first-run", "--no-default-browser-check",
          "--disable-sync",
          "--disable-extensions", "--disable-component-extensions-with-background-pages", "--disable-default-apps",
@@ -69,6 +71,8 @@ def flagi(*, profil: Path, port_proxy: int | None, okno: bool, ekran: tuple[int,
         f += [f"--proxy-server=http://127.0.0.1:{int(port_proxy)}", "--proxy-bypass-list=<-loopback>"]
     if not okno:
         f += ["--headless=new", "--mute-audio"]
+    if emulacja:
+        f += ["--disable-gpu", "--disable-software-rasterizer"]
     if MACOS:
         f.append("--use-mock-keychain")              # bez okna pęku kluczy (hasła i tak są wyłączone)
     if LINUX:
