@@ -19,7 +19,7 @@ skills:
   write_approval: true          # nowy albo zmieniony skill czeka na zgodę właściciela (docs/RSI.md §R1, poczekalnia.py)
 
 web:
-  search_backend: searxng
+  search_backend: searxng        # natywnie build zdejmuje: autodetekcja wyszukiwarki Hermesa (NATYWNIE.md I14)
 
 platform_toolsets:
   cli: [terminal, file, web, browser, delegation, memory, skills, todo, session_search]
@@ -35,6 +35,7 @@ terminal:
   # (multiplex_profiles), więc .env Łowcy nie trafia do środowiska procesu: bez tej listy ceidg.py nie zobaczy tokenu.
   env_passthrough: [CEIDG_TOKEN]
 
+# Przeglądarka: browser_* przez agent-browser (nakładka Jarva) z Lightpandą; Windows: engine chrome z buildu (C06).
 browser:
   backend: "off"
   engine: lightpanda

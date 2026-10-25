@@ -20,7 +20,7 @@ Dla kart typu „słowa kluczowe pod landing / artykuł”. Wynik zasila `jarvo-
 
 ## Kroki
 1. **Ziarno:** 3–5 fraz z briefu (produkt, problem klienta, kategoria), PL + EN, jeśli rynek jest szerszy.
-2. **Rozszerzenie:** podpowiedzi wyszukiwarek (SearXNG z różnymi silnikami), sekcje „podobne wyszukiwania”
+2. **Rozszerzenie:** podpowiedzi wyszukiwarek (`web_search`, `search_fanout.py`), sekcje „podobne wyszukiwania”
    i „ludzie pytają też” (przeglądarka), nagłówki H2/H3 stron z TOP 10, fora i pytania klientów.
 3. **Intencja** każdej frazy: informacyjna / komercyjna / transakcyjna / nawigacyjna, według tego, co jest w TOP 10.
 4. **SERP TOP 10** dla 3–5 fraz głównych: typy stron (landing, artykuł, porównanie, sklep), długość treści,

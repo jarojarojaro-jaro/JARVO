@@ -6,14 +6,16 @@
     ostrozna.py <url> --html -o strona.html   # HTML po wykonaniu JavaScriptu
     ostrozna.py <url> --zrzut strona.png      # zrzut całej strony (PNG)
     ostrozna.py <url> --json                  # wynik i metadane jako JSON
-    ostrozna.py --sprawdz                     # czy przeglądarka jest w obrazie (bez sieci; healthcheck)
+    ostrozna.py --sprawdz                     # czy przeglądarka jest zainstalowana (bez sieci; healthcheck)
 
 Tylko po blokadzie zwykłej drogi (extract.py, strona.py, browser_* z Lightpandą albo Chromium): 403/429,
 „Just a moment…”, „Human Verification”, captcha. Nigdy domyślnie. Camoufox to Firefox z podmienionym odciskiem
-przeglądarki (MPL-2.0, `/opt/jarvo/camoufox`); RAM ok. 800 MB na czas jednej strony.
+przeglądarki (MPL-2.0): w obrazie `/opt/jarvo/camoufox`, natywnie paczka z manifestu instalacji (JARVO_CAMOUFOX,
+pobierana przy pierwszym użyciu, ok. 0,5 GB); RAM ok. 800 MB na czas jednej strony. Odcisk przeglądarki udaje system,
+na którym działa (Windows, macOS, Linux), bo strona widzi fonty tego systemu.
 
 Zasady pilnowane w kodzie, nie tylko w skillu:
-- jedna strona na wywołanie, jedna przeglądarka naraz na serwerze (blokada pliku), co najmniej 20 s między
+- jedna strona na wywołanie, jedna przeglądarka naraz na tym komputerze (blokada pliku), co najmniej 20 s między
   stronami jednej domeny i najwyżej 30 stron jednej domeny na dobę,
 - tylko http(s) i adresy publiczne (bez localhost i sieci prywatnych),
 - robots.txt sprawdzany tą samą przeglądarką: zakaz albo robots.txt niedostępny (401/403/429/5xx) = blokada,
@@ -43,8 +45,24 @@ import urllib.robotparser
 from pathlib import Path
 
 TOOLS_PY = "/opt/jarvo/venv/bin/python"
-EXE = os.environ.get("JARVO_CAMOUFOX", "/opt/jarvo/camoufox/camoufox-bin")
-STAN = Path(os.environ.get("JARVO_OSTROZNA_STAN", str(Path.home() / ".cache" / "jarvo-ostrozna")))
+EXE = os.environ.get("JARVO_CAMOUFOX", "/opt/jarvo/camoufox/camoufox-bin")   # natywnie: wpis camoufox z manifestu
+# system, który udaje odcisk przeglądarki: ten, na którym działa (fonty, które strona zobaczy, są fontami tego systemu)
+SYSTEM = "windows" if os.name == "nt" else "macos" if sys.platform == "darwin" else "linux"
+
+
+def _stan() -> Path:
+    """Blokada „jedna przeglądarka naraz” i limity domen wspólne dla wszystkich agentów: natywnie w danych Jarva
+    (HOME agenta to katalog jego profilu, home_mode: profile), w obrazie ~/.cache (HOME = dane)."""
+    stan = os.environ.get("JARVO_OSTROZNA_STAN")
+    if stan:
+        return Path(stan)
+    dane = os.environ.get("JARVO_DATA_DIR")
+    if dane:
+        return Path(dane) / "state" / "ostrozna"
+    return Path.home() / ".cache" / "jarvo-ostrozna"
+
+
+STAN = _stan()
 ODSTEP_S = 20.0            # minimum między stronami jednej domeny
 DZIENNIE = 30              # stron jednej domeny na dobę
 CZEKAJ_NA_ZAJETA_S = 180   # ile czekać, aż inna kopia skryptu zwolni przeglądarkę
@@ -72,6 +90,10 @@ class Blokada(Exception):
 
 class Limit(Exception):
     """Kod 4."""
+
+
+class BrakPaczki(Exception):
+    """Kod 1: Camoufox nie jest zainstalowany na tym komputerze (natywnie pobierany przy pierwszym użyciu)."""
 
 
 # ------------------------------------------------------------------ adres i robots.txt
@@ -171,7 +193,7 @@ def odblokuj(f) -> None:
 
 @contextlib.contextmanager
 def jedna_naraz(katalog: Path = None, czekaj_s: float = None):
-    """Jedna przeglądarka naraz na serwerze (subagenci Sherlocka nie odpalą trzech Firefoksów po 800 MB)."""
+    """Jedna przeglądarka naraz na tym komputerze (subagenci Sherlocka nie odpalą trzech Firefoksów po 800 MB)."""
     katalog = katalog or STAN
     czekaj_s = CZEKAJ_NA_ZAJETA_S if czekaj_s is None else czekaj_s
     katalog.mkdir(parents=True, exist_ok=True)
@@ -249,9 +271,18 @@ def _przelacz_na_venv_narzedzi() -> None:
         sys.exit(subprocess.run(argv).returncode)
 
 
+def katalog_paczki(exe: str | None = None) -> Path:
+    """Katalog z application.ini i properties.json: obok programu (Linux, Windows), w pakiecie macOS
+    Camoufox.app/Contents/Resources (program w Contents/MacOS)."""
+    katalog = Path(exe or EXE).parent
+    if katalog.name == "MacOS" and (katalog.parent / "Resources").is_dir():
+        return katalog.parent / "Resources"
+    return katalog
+
+
 def wersja_firefoksa(katalog: Path | None = None) -> int:
     """Główna wersja Firefoksa z application.ini paczki (camoufox szuka jej tylko we własnym katalogu pobrań)."""
-    ini = (katalog or Path(EXE).parent) / "application.ini"
+    ini = (katalog or katalog_paczki()) / "application.ini"
     m = re.search(r"^Version=(\d+)\.", ini.read_text(encoding="utf-8", errors="replace"), re.M)
     if not m:
         raise RuntimeError(f"{ini}: brak wersji przeglądarki")
@@ -261,6 +292,12 @@ def wersja_firefoksa(katalog: Path | None = None) -> int:
 ZMIENNE_PRZEGLADARKI = ("PATH", "LANG", "LC_ALL", "TZ", "TMPDIR", "LD_LIBRARY_PATH",
                          "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "ALL_PROXY",
                          "http_proxy", "https_proxy", "no_proxy", "all_proxy")
+# Windows: katalog systemu (Firefox bez SystemRoot nie zainicjuje gniazd ani kryptografii); jawnie, choć Playwright
+# (libuv w Node) dopisuje brakujące zmienne systemowe z otoczenia skryptu
+ZMIENNE_WINDOWS = ("SYSTEMROOT", "WINDIR", "SYSTEMDRIVE")
+# Windows: katalogi tymczasowe i danych aplikacji jak HOME na POSIX, w katalogu skryptu: bez nich libuv dałby
+# przeglądarce TEMP z otoczenia, a pliki tymczasowe i dane Firefoksa trafiłyby do profilu właściciela
+KATALOGI_WINDOWS = {"TEMP": "tmp", "TMP": "tmp", "APPDATA": "AppData/Roaming", "LOCALAPPDATA": "AppData/Local"}
 
 
 def srodowisko_przegladarki(dom: Path) -> dict:
@@ -268,6 +305,11 @@ def srodowisko_przegladarki(dom: Path) -> dict:
     env = {k: v for k in ZMIENNE_PRZEGLADARKI if (v := os.environ.get(k))}
     env["HOME"] = str(dom)
     env["XDG_CACHE_HOME"] = str(dom / ".cache")
+    if os.name == "nt":
+        env.update({k: v for k in ZMIENNE_WINDOWS if (v := os.environ.get(k))})
+        for zmienna, rel in KATALOGI_WINDOWS.items():
+            (dom / rel).mkdir(parents=True, exist_ok=True)
+            env[zmienna] = str(dom / rel)
     return env
 
 
@@ -279,7 +321,7 @@ def opcje_camoufox(zrzut: bool, dom: Path | None = None) -> dict:
         "executable_path": EXE,
         "ff_version": wersja_firefoksa(),     # zgodna z binarką, więc odcisk pasuje do prawdziwej wersji
         "headless": True,                      # bez Xvfb i bez okna
-        "os": "linux",                         # w obrazie są tylko fonty Linuksa z paczki Camoufoxa
+        "os": SYSTEM,                          # odcisk zgodny z fontami systemu (w obrazie fonty Linuksa z paczki)
         "locale": "pl-PL",
         "geoip": False,
         "humanize": False,                     # skrypt nie rusza myszą i niczego nie klika
@@ -294,6 +336,8 @@ def opcje_camoufox(zrzut: bool, dom: Path | None = None) -> dict:
 def otworz(zrzut: bool = False):
     """Przeglądarka z czystym profilem (testy podmieniają tę funkcję)."""
     # pliki przeglądarki (profil Firefoksa, cache fontów, „Downloads”) w katalogu skryptu, nie w katalogu domowym
+    if not jest_paczka():
+        raise BrakPaczki(BRAK_PACZKI)
     dom = STAN / "dom"
     dom.mkdir(parents=True, exist_ok=True)
     from camoufox.sync_api import Camoufox  # type: ignore
@@ -374,21 +418,35 @@ def czytaj(url: str, tryb: str = "markdown", zrzut: str | None = None, czekaj_s:
         return wynik
 
 
+# pliki paczki, bez których Camoufox nie ruszy albo da zły odcisk: na Linuksie także fonty i fontconfig z paczki
+PLIKI_PACZKI = {"linux": ("fontconfig/linux/fonts.conf", "fonts/linux", "properties.json"),
+                "windows": ("application.ini", "properties.json"), "macos": ("application.ini", "properties.json")}
+BRAK_PACZKI = ("Camoufox nie jest zainstalowany na tym komputerze (dodatek pobierany przy pierwszym użyciu, ok. 0,5 GB, "
+               "z sumą z manifestu instalacji): poproś właściciela o jego instalację; do tego czasu odmowa strony "
+               "zostaje blokadą")
+
+
+def jest_paczka() -> bool:
+    return os.path.isfile(EXE)
+
+
 def sprawdz() -> int:
-    """Healthcheck bez sieci i bez uruchamiania przeglądarki: pakiet, binarka, fonty i konfiguracja Linuksa."""
+    """Healthcheck bez sieci i bez uruchamiania przeglądarki: pakiet, binarka i pliki paczki dla tego systemu."""
     braki = []
     if not ma_camoufox():
-        braki.append("pakiet camoufox (venv /opt/jarvo/venv)")
-    katalog = Path(EXE).parent
-    if not os.access(EXE, os.X_OK):
+        braki.append("pakiet camoufox (Python narzędzi Jarva)")
+    katalog = katalog_paczki()
+    if not jest_paczka() or not os.access(EXE, os.X_OK):
         braki.append(f"binarka {EXE}")
-    for p in ("fontconfig/linux/fonts.conf", "fonts/linux", "properties.json"):
+    for p in PLIKI_PACZKI[SYSTEM]:
         if not (katalog / p).exists():
             braki.append(str(katalog / p))
     if braki:
         print("✗ brak: " + ", ".join(braki), file=sys.stderr)
+        if not jest_paczka():
+            print(f"  {BRAK_PACZKI}", file=sys.stderr)
         return 1
-    print(f"✓ Camoufox gotowy: {EXE}")
+    print(f"✓ Camoufox gotowy: {EXE} (odcisk: {SYSTEM})")
     return 0
 
 
@@ -433,8 +491,12 @@ def main(argv: list[str] | None = None) -> int:
     except ConnectionError as e:
         print(f"✗ {a.url}: {e}", file=sys.stderr)
         return 1
+    except BrakPaczki as e:
+        print(f"✗ {e}.", file=sys.stderr)
+        return 1
     except ImportError:
-        print("✗ brak Camoufoxa: działa w obrazie Jarvo (ostrozna.py --sprawdz)", file=sys.stderr)
+        print("✗ brak pakietu camoufox w tym Pythonie (Python narzędzi Jarva): ostrozna.py --sprawdz pokaże, czego "
+              "brakuje", file=sys.stderr)
         return 1
     except Exception as e:  # noqa: BLE001 (awaria przeglądarki: bez śladu stosu w odpowiedzi agenta)
         print(f"✗ przeglądarka: {str(e).splitlines()[0][:300] if str(e) else type(e).__name__}", file=sys.stderr)

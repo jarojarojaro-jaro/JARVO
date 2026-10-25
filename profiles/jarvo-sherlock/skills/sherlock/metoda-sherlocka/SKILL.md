@@ -1,7 +1,7 @@
 ---
 name: metoda-sherlocka
 description: "Śledztwo: plan, wątki, źródła pierwotne, weryfikacja."
-version: 1.3.0
+version: 1.3.1
 author: "Jarvo (metodologia inspirowana: langchain-ai/open_deep_research MIT, dzhng/deep-research MIT, STORM MIT)"
 license: MIT
 metadata:
@@ -40,7 +40,7 @@ Limit: **maks. 5 wątków**. Więcej = źle zdefiniowane pytanie.
 Wątki niezależne → `delegate_task(tasks=[...])`. **Każdy subagent dostaje samowystarczalną instrukcję**
 (nie widzi Twojej rozmowy ani innych wątków), bez skrótów i akronimów, z:
 - dokładnym pytaniem wątku, zakresem czasu i geografii,
-- poleceniem użycia `web_search` (SearXNG) + `"$HERMES_HOME/scripts/extract.py"` do czytania stron,
+- poleceniem użycia `web_search` + `"$HERMES_HOME/scripts/extract.py"` do czytania stron,
 - wspólnym rejestrem źródeł: w każdym wywołaniu `extract.py` i `sources.py` opcja `--rejestr <pełna ścieżka do
   out/zrodla.json>` (każda przeczytana strona dostaje wtedy numer w jednym rejestrze, a nie własne `[1]` w każdym wątku),
 - wymaganiem zwrotu w formacie „learnings” (niżej) + listy URL-i z datami,

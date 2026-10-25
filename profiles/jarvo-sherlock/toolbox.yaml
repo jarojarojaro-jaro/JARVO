@@ -34,12 +34,12 @@ tools:
     source: https://github.com/lightpanda-io/browser
     license: AGPL-3.0 (niezmodyfikowana binarka, osobny program)
     version: "1.0.0"
-    install: {method: image, spec: "COPY z lightpanda/browser (infra/Dockerfile)"}
+    install: {method: image, spec: "obraz: COPY z lightpanda/browser (infra/Dockerfile); natywnie: plik z wydania (vendor/natywne.yaml), na Windows brak wydania"}
     integration: hermes-browser-engine
     used_by_skills: [metoda-sherlocka, blocked-page-recovery]
     healthcheck: "lightpanda version"
     autonomy: A0
-    notes: "Silnik browser_* (browser.engine: lightpanda, ~30 MB RAM na sesję). Zrzuty i trudne strony: Hermes sam przełącza na Chromium. Czysty tekst strony bez przeglądarki: `lightpanda fetch --dump markdown <url>`. Od 1.0.0 CORS jak w Chromium; telemetria wyłączona w obrazie (`LIGHTPANDA_DISABLE_TELEMETRY`)."
+    notes: "Silnik browser_* (browser.engine: lightpanda, ~30 MB RAM na sesję). Zrzuty i trudne strony: Hermes sam przełącza na Chromium. Czysty tekst strony bez przeglądarki: `lightpanda fetch --dump markdown <url>`. Od 1.0.0 CORS jak w Chromium; telemetria wyłączona (`LIGHTPANDA_DISABLE_TELEMETRY`, w obrazie i w manifeście). Windows: Lightpanda nie ma wydania, build wpisuje silnik chrome, a strony z JavaScriptem czyta browser_*."
   - name: agent-browser
     source: https://github.com/vercel-labs/agent-browser
     license: Apache-2.0
@@ -49,11 +49,12 @@ tools:
     used_by_skills: [metoda-sherlocka, blocked-page-recovery]
     healthcheck: "agent-browser --version"
     autonomy: A0
+    notes: "Za nakładką Jarva bez serwera podglądu: obraz infra/bin/agent-browser, natywnie infra/bin/agent_browser.py w bin-floty (binarka z manifestu)."
   - name: camoufox
     source: https://github.com/daijro/camoufox
     license: MPL-2.0 (przeglądarka, niezmodyfikowana binarka), MIT (biblioteka camoufox)
     version: "152.0.4-beta.30 (biblioteka 0.5.6)"
-    install: {method: binary, spec: "infra/Dockerfile: wydanie v152.0.4-beta.30, SHA-256 amd64 i arm64; camoufox==0.5.6 + playwright==1.62.0 w /opt/jarvo/venv"}
+    install: {method: binary, spec: "obraz: infra/Dockerfile, wydanie v152.0.4-beta.30, SHA-256 amd64 i arm64; natywnie: vendor/natywne.yaml (camoufox, przy pierwszym użyciu: Windows, macOS, Linux; JARVO_CAMOUFOX); camoufox==0.5.6 + playwright==1.62.0 w venvie narzędzi"}
     integration: skill-script
     used_by_skills: [ostrozna-przegladarka, metoda-sherlocka]
     healthcheck: "python3 @@REPO_DIR@@/shared/skills/ostrozna-przegladarka/scripts/ostrozna.py --sprawdz"

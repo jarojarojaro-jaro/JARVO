@@ -9,6 +9,9 @@
 # globalnymi: gdy demona jeszcze nie ma, startuje bez serwera podglądu, zanim otworzy jakąkolwiek stronę.
 # Gdy wyłączyć się nie da, polecenie nie idzie dalej. `stream enable`, `dashboard` i `mcp` (otwierają serwery
 # albo demony z pominięciem nakładki) odrzuca. Hermes znajduje nakładkę pierwszą w PATH (/opt/jarvo/bin).
+# Instalacja natywna (Windows, macOS, Linux) ma odpowiednik w Pythonie: infra/bin/agent_browser.py (program
+# w <program>/bin-floty). Te same scenariusze sprawdza dla obu tests/test_agent_browser_nakladka.py; natywnie dochodzą
+# odmowy `install`, `upgrade`, `plugin add` (pobieranie bez sumy) i profilu Chrome właściciela.
 set -uo pipefail
 shopt -s nullglob
 # JARVO_AGENT_BROWSER_BIN tylko dla testów nakładki (tests/test_agent_browser_nakladka.py)

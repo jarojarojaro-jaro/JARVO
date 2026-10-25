@@ -357,10 +357,12 @@ def test_required_service_present_keeps_skills(tmp_path, monkeypatch):
 
 WIN_DANE = "D:/JarvoTest/proba-build/Michał Żółć/dane"
 WIN_PROGRAM = "D:/JarvoTest/proba-build/Michał Żółć/program"
+WIN_CHROME = f"{WIN_PROGRAM}/narzedzia/chrome-headless-shell/153.0.8010.12/chrome-headless-shell-win64/chrome-headless-shell.exe"
 WIN_OPCJE = ["--uklad", "natywny", "--system", "windows", "--dane", WIN_DANE,
              "--runtime-build-dir", "D:/JarvoTest/proba-build/Michał Żółć/build",
              "--repo-dir", f"{WIN_PROGRAM}/app/0123abcd",
-             "--py", f"{WIN_PROGRAM}/venvs/narzedzia/Scripts/python.exe"]
+             "--py", f"{WIN_PROGRAM}/venvs/narzedzia/Scripts/python.exe",
+             "--node-modules", f"{WIN_PROGRAM}/node-floty/node_modules", "--chrome", WIN_CHROME]
 # dzisiejsze napisy kontenera: tokeny, polecenia bramy i zakazy w układzie kontenera muszą zostać bajt w bajt
 KONTENER_TOKENY = {"DATA_DIR": "/opt/data", "JARVO_DIR": "/opt/data/jarvo", "KNOWLEDGE_DIR": "/opt/data/jarvo/knowledge",
                    "MISSIONS_DIR": "/opt/data/jarvo/missions", "WORKSPACES_DIR": "/opt/data/jarvo/workspaces",
@@ -439,8 +441,8 @@ def test_kontener_main_to_dawny_build_bez_wartosci_natywnych(built, kontener_mai
 
 def test_natywny_windows_parsuje_sie_bez_sciezek_obrazu(natywny_win):
     """Build natywny dla katalogu danych ze spacją i polskimi znakami: każdy YAML i JSON się parsuje, a konfiguracja
-    z buildu (profile, host, BUILD.json, srodowisko.json) nie ma ścieżek obrazu /opt. Wyjątek: serwer MCP inspo
-    Weba (node_modules obrazu; natywnie etap E5, docs/NATYWNIE.md P06)."""
+    z buildu (profile, host, BUILD.json, srodowisko.json) nie ma ścieżek obrazu /opt, także serwer MCP inspo Weba
+    (docs/NATYWNIE.md P06)."""
     for p in natywny_win.rglob("*"):
         if p.is_file() and p.suffix in (".yaml", ".yml", ".json") and ".cache" not in p.parts:
             tekst = p.read_text(encoding="utf-8")
@@ -451,8 +453,6 @@ def test_natywny_windows_parsuje_sie_bez_sciezek_obrazu(natywny_win):
     assert len(konfig) == 3 * len(fl.load_fleet().active()) + 3
     for p in konfig:
         dane = json.loads(p.read_text(encoding="utf-8")) if p.suffix == ".json" else fl.load_yaml(p)
-        if p.name == "config.yaml" and p.parent.name == "jarvo-web":
-            assert set(dane.pop("mcp_servers")) == {"inspo"}
         assert "/opt" not in json.dumps(dane, ensure_ascii=False), p.relative_to(natywny_win).as_posix()
     # tokeny w tekstach dla agenta (SOUL, skille) idą za katalogiem danych
     assert f"{WIN_DANE}/jarvo/missions/INDEX.md" in (natywny_win / "profiles/jarvo/SOUL.md").read_text(encoding="utf-8")
@@ -487,9 +487,13 @@ def test_natywny_windows_sciezki_i_wartosci_per_system(natywny_win):
     assert host["plugins"]["enabled"] == [build.ZGODY_PLUGIN] and host["security"]["tirith_enabled"] is False
     assert host["tts"]["providers"]["matcha"]["command"].startswith(f'"{WIN_PROGRAM}/bin-floty/jarvo-tts.exe" --plik ')
     stt = json.loads((natywny_win / "host" / "srodowisko.json").read_text(encoding="utf-8"))
-    assert stt == {"HERMES_LOCAL_STT_COMMAND": f'"{WIN_PROGRAM}/bin-floty/jarvo-stt.exe" {build.STT_ARGUMENTY}'}
+    # C06: silnik chrome każdego profilu dostaje Chromium z instalacji (ścieżka Windows, nie YAML: z „\”)
+    assert stt == {"HERMES_LOCAL_STT_COMMAND": f'"{WIN_PROGRAM}/bin-floty/jarvo-stt.exe" {build.STT_ARGUMENTY}',
+                   "AGENT_BROWSER_EXECUTABLE_PATH": str(PureWindowsPath(WIN_CHROME))}
     manifest = json.loads((natywny_win / "BUILD.json").read_text(encoding="utf-8"))
     assert manifest["plugins"][-1] == build.ZGODY_PLUGIN and manifest["uklad"]["system"] == "windows"
+    assert manifest["uklad"]["node_modules"] == f"{WIN_PROGRAM}/node-floty/node_modules"
+    assert manifest["uklad"]["chrome"] == WIN_CHROME
     assert manifest["uklad"]["sciezki"]["PY"] == f'"{WIN_PROGRAM}/venvs/narzedzia/Scripts/python.exe"'
     for rel in ("plugin.yaml", "__init__.py"):
         assert (natywny_win / "plugins" / build.ZGODY_PLUGIN / rel).read_bytes() == \
@@ -548,7 +552,8 @@ def test_natywny_macos_i_linux_bez_exe_z_lightpanda(tmp_path):
         program = dane.rsplit("/", 1)[0] + "/program"
         u = build.Uklad(nazwa="natywny", system=system, dane=dane, repo=program + "/app/1", build="/tmp/b",
                         narzedzia=program + "/narzedzia-floty", bin=program + "/bin-floty",
-                        py=f"{program}/venvs/n/bin/python", dom=dom)
+                        py=f"{program}/venvs/n/bin/python", dom=dom, node_modules=program + "/node-floty/node_modules",
+                        chrome=program + "/narzedzia/chrome-headless-shell/1/chrome-headless-shell-linux64/chrome")
         out = tmp_path / system
         out.mkdir()
         original = build.build_cron
@@ -561,11 +566,81 @@ def test_natywny_macos_i_linux_bez_exe_z_lightpanda(tmp_path):
             build.build_cron = original
         cfg = fl.load_yaml(out / "jarvo-web" / "config.yaml")
         assert cfg["browser"]["engine"] == "lightpanda" and "search_backend" not in (cfg.get("web") or {})
+        assert cfg["mcp_servers"]["inspo"]["args"] == [f"{program}/node-floty/node_modules/inspo-mcp/inspo-mcp.mjs",
+                                                       "--stdio"]
+        # Lightpanda zostaje, więc brama nie dostaje AGENT_BROWSER_EXECUTABLE_PATH (agent-browser użyłby go też dla niej)
+        build.build_host(fleet, out / "host", ENV, u)
+        assert set(json.loads((out / "host" / "srodowisko.json").read_text(encoding="utf-8"))) == \
+            {"HERMES_LOCAL_STT_COMMAND"}
         assert cfg["tts"]["providers"]["matcha"]["command"].startswith(f'"{program}/bin-floty/jarvo-tts" --plik ')
         deny = cfg["approvals"]["deny"]
         assert _zakazany(f'rm -rf "{dane}/jarvo"', deny) and _zakazany("rm -rf ~/" + dane[len(dom) + 1:], deny)
         assert not any(dane.replace("/", "\\") in w or "Remove-Item" in w for w in deny)
         assert fl.load_yaml(out / fleet.orchestrator / "config.yaml")["approvals"]["mode"] == "manual"
+
+
+def test_natywny_mcp_inspo_przez_node_ze_skryptem_paczki(natywny_win, kontener_main):
+    """P06: serwer MCP inspo natywnie to `node <node_modules>/inspo-mcp/inspo-mcp.mjs --stdio` (bez .bin, na Windows
+    .cmd), certyfikaty z magazynu systemu zamiast pliku z Debiana; reszta wpisu bez zmian. Kontener bez zmian."""
+    zrodlo = fl.load_yaml(fl.REPO_ROOT / "profiles" / "jarvo-web" / "config.yaml")["mcp_servers"]["inspo"]
+    inspo = fl.load_yaml(natywny_win / "profiles" / "jarvo-web" / "config.yaml")["mcp_servers"]["inspo"]
+    assert inspo["command"] == "node"
+    assert inspo["args"] == [f"{WIN_PROGRAM}/node-floty/node_modules/inspo-mcp/inspo-mcp.mjs", *zrodlo["args"]]
+    assert inspo["env"] == {**{k: v for k, v in zrodlo["env"].items() if k != "NODE_EXTRA_CA_CERTS"},
+                            "NODE_USE_SYSTEM_CA": "1"}
+    assert {k: v for k, v in inspo.items() if k not in ("command", "args", "env")} == \
+        {k: v for k, v in zrodlo.items() if k not in ("command", "args", "env")}
+    assert fl.load_yaml(kontener_main / "profiles" / "jarvo-web" / "config.yaml")["mcp_servers"]["inspo"] == zrodlo
+    # program z node_modules obrazu bez odpowiednika natywnego: build staje, zamiast zostawić ścieżkę /opt
+    cfg = {"mcp_servers": {"inny": {"command": build.MCP_BIN_KONTENERA + "inny-mcp", "args": ["--stdio"]}}}
+    with pytest.raises(SystemExit, match="inny-mcp"):
+        build.ustaw_mcp(cfg, build.Uklad(nazwa="natywny", system="windows", node_modules="D:/n"))
+    obcy = {"mcp_servers": {"zewn": {"command": "npx", "args": ["-y", "x"]}}}
+    build.ustaw_mcp(obcy, build.Uklad(nazwa="natywny", system="linux"))
+    assert obcy == {"mcp_servers": {"zewn": {"command": "npx", "args": ["-y", "x"]}}}
+
+
+def test_natywny_node_modules_i_chrome_z_opcji_albo_srodowiska_jarva(tmp_path, monkeypatch):
+    """--node-modules i --chrome jawnie; przy budowie na tym komputerze NODE_PATH (pierwszy katalog) i CHROME_PATH ze
+    środowiska procesów Jarva (jarvo/flota.py); bez nich node_modules w <program>/node-floty, Chromium brak."""
+    system = build.system_tego_komputera()
+    dane = tmp_path / "Jarvo Ż" / "dane"
+
+    def uklad(*opcje):
+        return build.uklad_z_argumentow(build_args("--uklad", "natywny", "--dane", str(dane), *opcje))
+
+    program = build.sciezka_ukladu(tmp_path / "Jarvo Ż" / "program", system, "program")
+    monkeypatch.delenv("NODE_PATH", raising=False)
+    monkeypatch.delenv("CHROME_PATH", raising=False)
+    u = uklad()
+    assert (u.node_modules, u.chrome) == (program + "/node-floty/node_modules", "")
+    nm, chrome = tmp_path / "npm" / "node_modules", tmp_path / "chs" / "chrome-headless-shell"
+    monkeypatch.setenv("NODE_PATH", os.pathsep.join([str(nm), str(tmp_path / "inny")]))
+    monkeypatch.setenv("CHROME_PATH", str(chrome))
+    u = uklad()
+    assert u.node_modules == build.sciezka_ukladu(nm, system, "n") and u.chrome == build.sciezka_ukladu(chrome, system, "c")
+    u = uklad("--node-modules", str(tmp_path / "jawne"), "--chrome", str(tmp_path / "jawny"))
+    assert u.node_modules.endswith("/jawne") and u.chrome.endswith("/jawny")
+    with pytest.raises(SystemExit, match="układu natywnego"):
+        build.uklad_z_argumentow(build_args("--node-modules", str(nm)))
+
+
+def build_args(*argv: str) -> "argparse.Namespace":
+    """Argumenty build.py bez budowania (parser z build.main)."""
+    zlapane = {}
+
+    def zlap(args):
+        zlapane["args"] = args
+        raise _Stop
+
+    class _Stop(Exception):
+        pass
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(build, "uklad_z_argumentow", zlap)
+        with pytest.raises(_Stop):
+            build.main(list(argv))
+    return zlapane["args"]
 
 
 def test_sciezka_z_ukosnikiem_w_cudzyslowie_lamie_yaml_a_build_daje_ukosnik_w_przod():

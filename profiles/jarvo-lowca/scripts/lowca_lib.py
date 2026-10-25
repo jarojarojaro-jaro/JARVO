@@ -21,7 +21,18 @@ UA = "Mozilla/5.0 (compatible; jarvo-lowca/1.0; +https://jarvo.pl)"
 PAUZA_S = float(os.environ.get("LOWCA_PAUZA", "0.25"))        # minimum między zapytaniami do jednego hosta
 PAUZY_HOSTOW = {"ezamowienia.gov.pl": 4.0}                     # ciężkie odpowiedzi (pełny HTML ogłoszeń): wolniej
 OZNAKI_BLOKADY = ("_Incapsula_Resource", "cf-chl", "Dostęp zablokowany", "Access Blocked", "Request unsuccessful")
-CACHE = Path(os.environ.get("LOWCA_CACHE", str(Path.home() / ".cache" / "jarvo-lowca")))
+def _pamiec() -> Path:
+    """Pamięć odpowiedzi HTTP: LOWCA_CACHE, natywnie w danych Jarva (JARVO_DATA_DIR/cache/lowca): HOME agenta to tam
+    katalog profilu (home_mode: profile), a na Windows Path.home() to profil właściciela. W obrazie ~/.cache = dane."""
+    pamiec, dane = os.environ.get("LOWCA_CACHE"), os.environ.get("JARVO_DATA_DIR")
+    if pamiec:
+        return Path(pamiec)
+    if dane:
+        return Path(dane) / "cache" / "lowca"
+    return Path.home() / ".cache" / "jarvo-lowca"
+
+
+CACHE = _pamiec()
 LICZNIK = {"zapytania": 0, "z_pamieci": 0, "bledy": 0}
 
 WOJ = {"PL02": "DOLNOŚLĄSKIE", "PL04": "KUJAWSKO-POMORSKIE", "PL06": "LUBELSKIE", "PL08": "LUBUSKIE",

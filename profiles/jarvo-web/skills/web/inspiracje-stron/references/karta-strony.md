@@ -1,6 +1,6 @@
 # Karta strony referencyjnej (własna baza w skarbcu)
 
-Plik: `@@KNOWLEDGE_DIR@@/inspiracje/strony/<branza>/<domena>.md`, obok katalog `<domena>/` z `brand_extract.sh --kit`
+Plik: `@@KNOWLEDGE_DIR@@/inspiracje/strony/<branza>/<domena>.md`, obok katalog `<domena>/` z `brand_extract.py --kit`
 (`DESIGN.md`, `tokens.json`, `dembrandt.json`, `wcag.json`) i `screenshots.cjs` (`screenshots/`).
 Piszesz tylko to, co widać na stronie i w `DESIGN.md`. Bez cytowania tekstów strony (najwyżej nazwa sekcji),
 bez danych osób, bez ocen firmy. Zrzuty zostają w skarbcu (użytek wewnętrzny), nie trafiają do projektu ani do klienta.

@@ -17,7 +17,7 @@
  *               kotwice, rozwijane sekcje i pisze w polu formularza (bez przechodzenia na inne strony i bez wysyłki),
  *               mierzy czas reakcji każdej interakcji (Event Timing, jak INP) i długie zadania; porażka: INP > 200 ms
  *
- * Używa playwright-core z Chromium z obrazu (jak screenshots.cjs). Wynik: <outdir>/hostile.json + zrzuty.
+ * Używa playwright-core z Chromium z CHROME_PATH (jak screenshots.cjs). Wynik: <outdir>/hostile.json + zrzuty.
  * Strony nie zmienia (longwords podmienia tekst tylko w kopii w przeglądarce).
  */
 const fs = require('fs');
@@ -39,6 +39,17 @@ function browserPath() {
   const f = '/etc/hermes/agent-browser-executable-path';
   if (fs.existsSync(f)) return fs.readFileSync(f, 'utf8').trim();
   return undefined;
+}
+
+// --no-sandbox tylko tam, gdzie piaskownica Chromium nie ruszy (jak audit.py i Hermes): Linux jako root, w kontenerze
+// albo z zakazem przestrzeni nazw użytkownika bez profilu AppArmor (Ubuntu 23.10+). Windows i macOS: z piaskownicą.
+function argsPiaskownicy() {
+  if (process.platform !== 'linux') return [];
+  const czytaj = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch { return ''; } };
+  const bez = (process.getuid && process.getuid() === 0) || fs.existsSync('/.dockerenv')
+    || czytaj('/proc/1/cgroup').includes('docker')
+    || czytaj('/proc/sys/kernel/apparmor_restrict_unprivileged_userns').trim() === '1';
+  return bez ? ['--no-sandbox'] : [];
 }
 
 // elementy wychodzące poza szerokość okna (jak w screenshots.cjs)
@@ -275,7 +286,7 @@ async function run(browser, name, url, outdir) {
   }
   const only = arg('--only', '') ? arg('--only').split(',') : ALL;
   fs.mkdirSync(outdir, { recursive: true });
-  const browser = await chromium.launch({ executablePath: browserPath(), args: ['--no-sandbox'] });
+  const browser = await chromium.launch({ executablePath: browserPath(), args: argsPiaskownicy() });
   const results = [];
   try {
     for (const name of only.filter((n) => ALL.includes(n))) {

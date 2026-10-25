@@ -1,7 +1,7 @@
 ---
 name: audyt-strony
 description: "Audyt strony: Lighthouse, a11y, SEO, linki, obrazy, mobile."
-version: 1.4.0
+version: 1.5.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-web
     autonomy: A0
-    reviewed: "2026-10-14"
+    reviewed: "2026-10-25"
 ---
 
 # Audyt strony
@@ -20,14 +20,16 @@ metadata:
 Wynik: raport priorytetów, który da się od razu zamienić na karty poprawek.
 
 ## Kroki
-1. **Automaty:** `bash "$HERMES_HOME/scripts/audit.sh" <url> out/audyt`
+1. **Automaty:** `@@PY@@ "$HERMES_HOME/scripts/audit.py" <url> out/audyt` (status każdego narzędzia na końcu,
+   na stderr; awaria jednego nie zatrzymuje reszty)
    - Lighthouse mobile + desktop (JSON + HTML); w `summary.json` także waga strony (`strona_kb`) i firmy trzecie
      (`firmy_trzecie`: analityka, czaty, piksele, CDN; KB i czas na wątku głównym),
    - axe-core (pełna lista naruszeń WCAG),
    - linkinator (martwe linki, do 2 poziomów),
    - `seo_check.py` (head, meta, OG, JSON-LD, H1, alt, wymiary obrazów, linki wewnętrzne, czyste adresy, robots,
      sitemap, llms.txt, strona 404, obraz OG, landmarki, hreflang); pełna lista widoczności (23 punkty, llms.txt, 404, linki zewnętrzne): `references/widocznosc.md`,
-   - `security_check.py url` (nagłówki, HTTPS, wycieki, GPS w zdjęciach; szczegóły: skill `bezpieczenstwo-aplikacji`),
+   - `security_check.py url` (nagłówki, HTTPS, wycieki, GPS w zdjęciach; w `summary.json` liczby ustaleń
+     według wagi, całość w `security.json`; szczegóły: skill `bezpieczenstwo-aplikacji`),
    - zrzuty 375/768/1440 + wykrywanie poziomego przewijania.
    - ✅ Punkt kontrolny: `out/audyt/summary.json` istnieje; błędy narzędzi są opisane, nie przemilczane.
 2. **Ocena eksperta:** przejdź checklisty `web-quality-audit` i `seo-technical` z wynikami automatów w ręku.
@@ -59,6 +61,6 @@ Wynik: raport priorytetów, który da się od razu zamienić na karty poprawek.
 
 ## Uwagi
 - Audytujesz **tylko** wskazane strony. Gdy karta prosi o całą witrynę: weź URL-e z `sitemap.xml`, wybierz
-  reprezentatywne (strona główna, po 1–2 z każdego typu, maks. 10) i puść `audit.sh` **po kolei**, nie równolegle
+  reprezentatywne (strona główna, po 1–2 z każdego typu, maks. 10) i puść `audit.py` **po kolei**, nie równolegle
   (jedna Chromium naraz: każda bierze kilkaset MB pamięci, a komputer może mieć tylko 8 GB).
 - Wyniki Lighthouse wahają się: przy wątpliwościach 3 pomiary i mediana.

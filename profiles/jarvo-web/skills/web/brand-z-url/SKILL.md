@@ -21,7 +21,7 @@ Szablon: `@@KNOWLEDGE_DIR@@/brands/_szablon/BRAND.md`.
 
 ## Kroki
 1. **Slug marki:** małe litery, myślniki (np. `nova-kosmetyki`). Sprawdź, czy kit już istnieje. Jeśli tak, aktualizujesz go, nie nadpisujesz w ciemno.
-2. **Ekstrakcja tokenów:** `bash "$HERMES_HOME/scripts/brand_extract.sh" <url> <slug>`. Skrypt uruchamia dembrandt
+2. **Ekstrakcja tokenów:** `@@PY@@ "$HERMES_HOME/scripts/brand_extract.py" <url> <slug>`. Skrypt uruchamia dembrandt
    (`--design-md --dtcg --wcag --crawl 3`), zapisuje `DESIGN.md`, `tokens.json`, raport kontrastu i zrzuty.
    - ✅ Punkt kontrolny: `DESIGN.md` i `tokens.json` istnieją, paleta ma kolor główny i kolor tekstu.
 3. **Logo:** znajdź w `<head>` (favicon, apple-touch-icon, `og:image`) i w nagłówku strony (SVG/PNG).

@@ -28,6 +28,7 @@ import base64
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -338,7 +339,12 @@ def nagraj(url: str, wyjscie: str, czekaj: float = 3.0, przewin: bool = False) -
         print(f"✗ {url}: robots.txt nie pozwala (User-Agent jarvo-lowca); to granica, nie zagadka", file=sys.stderr)
         return 3
     Path(wyjscie).parent.mkdir(parents=True, exist_ok=True)
-    polecenie = ["node", str(Path(__file__).with_name("har.cjs")), url, wyjscie, "--czekaj", str(int(czekaj * 1000))]
+    node = shutil.which("node")              # pełna ścieżka: na Windows bez szukania w katalogu bieżącym
+    if not node:
+        print("✗ brak programu node (Node.js z instalacji Jarva w PATH); nagranie HAR wymaga playwright-core",
+              file=sys.stderr)
+        return 1
+    polecenie = [node, str(Path(__file__).with_name("har.cjs")), url, wyjscie, "--czekaj", str(int(czekaj * 1000))]
     return subprocess.run(polecenie + (["--przewin"] if przewin else []), env={**os.environ, "JARVO_UA": ll.UA}).returncode
 
 

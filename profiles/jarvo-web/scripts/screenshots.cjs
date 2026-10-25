@@ -4,8 +4,8 @@
  *
  *   node screenshots.cjs <url> <outdir> [--widths 375,768,1440] [--full]
  *
- * Używa playwright-core z przeglądarką Chromium z obrazu Hermesa
- * (/etc/hermes/agent-browser-executable-path) albo CHROME_PATH.
+ * Używa playwright-core z Chromium z CHROME_PATH (chrome-headless-shell z instalacji Jarva), w obrazie
+ * Hermesa zapasowo z /etc/hermes/agent-browser-executable-path.
  * Wynik: <outdir>/<szerokość>.png + <outdir>/screenshots.json
  */
 const fs = require('fs');
@@ -24,6 +24,17 @@ function browserPath() {
   return undefined; // playwright-core spróbuje domyślnej instalacji
 }
 
+// --no-sandbox tylko tam, gdzie piaskownica Chromium nie ruszy (jak audit.py i Hermes): Linux jako root, w kontenerze
+// albo z zakazem przestrzeni nazw użytkownika bez profilu AppArmor (Ubuntu 23.10+). Windows i macOS: z piaskownicą.
+function argsPiaskownicy() {
+  if (process.platform !== 'linux') return [];
+  const czytaj = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch { return ''; } };
+  const bez = (process.getuid && process.getuid() === 0) || fs.existsSync('/.dockerenv')
+    || czytaj('/proc/1/cgroup').includes('docker')
+    || czytaj('/proc/sys/kernel/apparmor_restrict_unprivileged_userns').trim() === '1';
+  return bez ? ['--no-sandbox'] : [];
+}
+
 (async () => {
   const [url, outdir] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
   if (!url || !outdir) {
@@ -33,7 +44,7 @@ function browserPath() {
   const widths = arg('--widths', '375,768,1440').split(',').map(Number);
   const full = process.argv.includes('--full');
   fs.mkdirSync(outdir, { recursive: true });
-  const browser = await chromium.launch({ executablePath: browserPath(), args: ['--no-sandbox'] });
+  const browser = await chromium.launch({ executablePath: browserPath(), args: argsPiaskownicy() });
   const report = { url, results: [] };
   try {
     for (const width of widths) {

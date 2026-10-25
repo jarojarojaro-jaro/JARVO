@@ -32,9 +32,10 @@ terminal:
   cwd: "@@WORKSPACES_DIR@@/jarvo-web"
   timeout: 600
 
-# Przeglądarka: wbudowane narzędzia browser_* przez agent-browser z silnikiem Lightpanda (~30 MB RAM
-# na sesję zamiast ~300 MB Chromium). Zrzuty ekranu i strony, których Lightpanda nie obsłuży,
-# Hermes sam przełącza na Chromium z obrazu.
+# Przeglądarka: wbudowane narzędzia browser_* przez agent-browser (nakładka Jarva: bez serwera podglądu) z silnikiem
+# Lightpanda (~30 MB RAM na sesję zamiast ~300 MB Chromium). Zrzuty ekranu i strony, których Lightpanda nie obsłuży,
+# Hermes sam przełącza na Chromium (chrome-headless-shell z instalacji). Windows: Lightpanda nie ma wydania, więc build
+# natywny wpisuje engine: chrome (docs/NATYWNIE.md C06).
 browser:
   backend: "off"                  # bez trybu Browser Use (uvx browser-use pobierany w locie)
   engine: lightpanda
@@ -46,8 +47,10 @@ stt:
   language: pl
 
 # Inspo (Nutlope/inspo, MIT): katalog 832 prawdziwych stron (2320 podstron) jako inspiracja przed projektem,
-# skill inspiracje-stron. Pakiet z obrazu (infra/node/package.json, inspo-mcp 0.1.16), lokalnie po stdio;
-# hostowanego endpointu nie używamy. Katalog pobiera z CDN autorów przy starcie procesu (~2,3 MB, wektory w tle),
+# skill inspiracje-stron. Pakiet z infra/node/package.json (inspo-mcp 0.1.16), lokalnie po stdio; hostowanego
+# endpointu nie używamy. Natywnie build.py wpisuje `node <node_modules>/inspo-mcp/inspo-mcp.mjs --stdio` (bez
+# nakładki z .bin, na Windows .cmd) i NODE_USE_SYSTEM_CA zamiast pliku certyfikatów z Debiana (NATYWNIE.md P06).
+# Katalog pobiera z CDN autorów przy starcie procesu (~2,3 MB, wektory w tle),
 # dlatego lazy: proces startuje przy pierwszym wywołaniu i znika po 15 min bezczynności (~220 MB RAM, gdy żyje).
 # Bez TOGETHER_API_KEY: wyszukiwanie leksykalne (zapytania po angielsku) + filtry. W schemacie modelu tylko
 # 6 narzędzi z tools.include (każde kosztuje tokeny przy każdym zapytaniu); profil serwera full, bo lite nie ma find_similar.

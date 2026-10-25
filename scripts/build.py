@@ -4,19 +4,20 @@
     python scripts/build.py --hermes-src /opt/hermes [--env-file /srv/jarvo/compose/jarvo.env]
     python scripts/build.py --uklad natywny --dane <HERMES_HOME> --hermes-src <checkout Hermesa> --out <root>/build
         [--repo-dir <kod Jarva>] [--bin-dir <program>/bin-floty] [--tools-dir <program>/narzedzia-floty] [--py <python>]
-        [--system windows|macos|linux]
+        [--system windows|macos|linux] [--node-modules <narzędzia npm>] [--chrome <chrome-headless-shell>]
 
 Wynik: build/
   profiles/<agent>/   dystrybucja gotowa do `hermes profile install` / `update`
   host/config.yaml    config profilu hosta (default): gateway, trasy Telegrama, kanban
-  host/srodowisko.json  (tylko natywnie) zmienne bramy z buildu: HERMES_LOCAL_STT_COMMAND
+  host/srodowisko.json  (tylko natywnie) zmienne bramy z buildu: HERMES_LOCAL_STT_COMMAND, na Windows także
+                      AGENT_BROWSER_EXECUTABLE_PATH (Chromium silnika chrome)
   plugins/            jarvo-hq, jarvo-wiedza, jarvo-komputer; natywnie także jarvo-zgody (tryby zgód, zgody/)
   BUILD.json          manifest (commit repo, źródła skilli, agenci; natywnie także układ i ścieżki)
 
 Układ (`--uklad`, docs/NATYWNIE.md S06): `kontener` (domyślny) daje dzisiejsze ścieżki obrazu (/opt/data, /opt/jarvo/…),
 bajt w bajt jak przed układem natywnym; `natywny` bierze ścieżki instalacji (`--dane` i katalogi programu, zawsze z „/”)
 i wartości zależne od systemu: silnik przeglądarki, wyszukiwarka (autodetekcja Hermesa, decyzja I14), polecenia STT i TTS
-bramy, zakazy dla katalogu danych w każdej pisowni, wtyczka zgód i tryb zgód profilu czatu.
+bramy, serwery MCP z Node (P06), zakazy dla katalogu danych w każdej pisowni, wtyczka zgód i tryb zgód profilu czatu.
 
 Kroki dla każdego aktywnego agenta z fleet.yaml:
   1. kopia profiles/<agent>/ (bez plików roboczych),
@@ -124,6 +125,8 @@ class Uklad:
     bin: str = "/opt/jarvo/bin"                    # programy floty (@@BIN_DIR@@)
     py: str = "python3"                            # Python skryptów floty jako słowo polecenia (@@PY@@)
     dom: str = ""                                  # katalog domowy właściciela: zakazy w pisowni „~” (natywnie)
+    node_modules: str = "/opt/jarvo/node/node_modules"   # narzędzia npm floty (infra/node): serwery MCP z Node
+    chrome: str = ""                               # natywnie: Chromium dla silnika chrome (AGENT_BROWSER_EXECUTABLE_PATH)
 
     @property
     def natywny(self) -> bool:
@@ -178,6 +181,8 @@ def uklad_z_argumentow(args: argparse.Namespace) -> Uklad:
     if args.uklad != "natywny":
         if args.system not in (None, "linux"):
             raise SystemExit("--system dotyczy układu natywnego (kontener to zawsze Linux)")
+        if args.node_modules or args.chrome:
+            raise SystemExit("--node-modules i --chrome dotyczą układu natywnego (kontener ma ścieżki obrazu)")
 
         def k(wartosc, domyslna: str, opcja: str) -> str:
             return sciezka_ukladu(wartosc, "linux", opcja) if wartosc else domyslna
@@ -207,11 +212,21 @@ def uklad_z_argumentow(args: argparse.Namespace) -> Uklad:
             dom = sciezka_ukladu(os.path.expanduser("~"), system, "dom")
         except SystemExit:
             dom = ""
+    # Narzędzia npm i Chromium tej instalacji: jawnie z opcji, a przy budowie na tym komputerze ze środowiska procesów
+    # Jarva (jarvo/flota.py woła build w nim: NODE_PATH i CHROME_PATH z narzedzia.json; cudze NODE_PATH właściciela
+    # srodowisko.py odcina). Bez nich node_modules ma domyślne miejsce w <program>, a Chromium nie ma (wtedy build
+    # nie ustawia AGENT_BROWSER_EXECUTABLE_PATH; nakładka agent-browsera i tak bierze CHROME_PATH dla silnika chrome).
+    na_tym = system == system_tego_komputera()
+    node_modules = (args.node_modules or (os.environ.get("NODE_PATH", "").split(os.pathsep)[0] if na_tym else "")
+                    or program + "/node-floty/node_modules")
+    chrome = args.chrome or (os.environ.get("CHROME_PATH", "") if na_tym else "")
     return Uklad(nazwa="natywny", system=system, dane=dane,
                  repo=sciezka_ukladu(args.repo_dir or fl.REPO_ROOT, system, "repo-dir"),
                  build=sciezka_ukladu(args.runtime_build_dir or args.out, system, "runtime-build-dir"),
                  narzedzia=sciezka_ukladu(args.tools_dir or program + "/narzedzia-floty", system, "tools-dir"),
-                 bin=sciezka_ukladu(args.bin_dir or program + "/bin-floty", system, "bin-dir"), py=py, dom=dom)
+                 bin=sciezka_ukladu(args.bin_dir or program + "/bin-floty", system, "bin-dir"), py=py, dom=dom,
+                 node_modules=sciezka_ukladu(node_modules, system, "node-modules"),
+                 chrome=sciezka_ukladu(chrome, system, "chrome") if chrome.strip() else "")
 
 
 def sciezki_floty(fleet: fl.Fleet, u: Uklad) -> dict[str, str]:
@@ -374,11 +389,46 @@ def ustaw_glos(cfg: dict, u: Uklad) -> None:
             dostawca["command"] = polecenie_programu(dostawca["command"], u)
 
 
+# Serwery MCP z node_modules obrazu (`/opt/jarvo/node/node_modules/.bin/<program>`) natywnie (docs/NATYWNIE.md P06):
+# `node <node_modules>/<skrypt paczki>`, bez nakładki z .bin. Na Windows to .cmd: Hermes uruchomiłby cmd.exe, a przy
+# zatrzymaniu bezczynnego serwera zabiłby tylko jego, zostawiając proces node bez rodzica. `node` bez ścieżki: Hermes
+# szuka go w PATH procesu (tools/mcp_tool_config.py, _resolve_stdio_command), gdzie Node z instalacji jest przed
+# programami właściciela. Program bez wpisu tutaj zatrzymuje build natywny (nie zostawiamy w konfiguracji ścieżek /opt).
+MCP_BIN_KONTENERA = "/opt/jarvo/node/node_modules/.bin/"
+MCP_SKRYPTY_NODE = {"inspo-mcp": "inspo-mcp/inspo-mcp.mjs"}     # program z .bin → skrypt `bin` z package.json paczki
+
+
+def ustaw_mcp(cfg: dict, u: Uklad) -> None:
+    """Serwery MCP z Node w układzie natywnym. Certyfikaty: NODE_EXTRA_CA_CERTS z pakietu Debiana w obrazie
+    (/etc/ssl/certs/…) zastępuje NODE_USE_SYSTEM_CA=1: Node 26 bierze wtedy magazyn certyfikatów systemu (proxy
+    z własnym certyfikatem działa jak w przeglądarce właściciela)."""
+    for nazwa, serwer in (cfg.get("mcp_servers") or {}).items():
+        polecenie = str((serwer or {}).get("command") or "") if isinstance(serwer, dict) else ""
+        if not polecenie.startswith(MCP_BIN_KONTENERA):
+            continue
+        program = polecenie[len(MCP_BIN_KONTENERA):]
+        if program not in MCP_SKRYPTY_NODE:
+            raise SystemExit(f"mcp_servers.{nazwa}: {program} z node_modules obrazu nie ma odpowiednika natywnego "
+                             "(MCP_SKRYPTY_NODE w scripts/build.py)")
+        serwer["command"] = "node"
+        serwer["args"] = [f"{u.node_modules.rstrip('/')}/{MCP_SKRYPTY_NODE[program]}", *(serwer.get("args") or [])]
+        env = serwer.get("env") if isinstance(serwer.get("env"), dict) else {}
+        if str(env.get("NODE_EXTRA_CA_CERTS", "")).startswith("/etc/"):
+            del env["NODE_EXTRA_CA_CERTS"]
+            env["NODE_USE_SYSTEM_CA"] = "1"
+        if env:
+            serwer["env"] = env
+
+
 def ustaw_natywnie(cfg: dict, fleet: fl.Fleet, u: Uklad, czat: bool) -> None:
-    """Wartości profilu zależne od systemu w układzie natywnym (docs/NATYWNIE.md C06, U01, V11, F15, (d))."""
+    """Wartości profilu zależne od systemu w układzie natywnym (docs/NATYWNIE.md C06, U01, V11, F15, P06, (d))."""
     browser = cfg.get("browser")
     if u.windows and isinstance(browser, dict) and browser.get("engine") == "lightpanda":
-        browser["engine"] = "chrome"         # Lightpanda nie ma wydania na Windows (Z01); macOS i Linux bez zmian
+        # Lightpanda nie ma wydania na Windows (Z01): Chromium z instalacji (chrome-headless-shell, CHROME_PATH), który
+        # agent-browser dostaje przez AGENT_BROWSER_EXECUTABLE_PATH (host/srodowisko.json i nakładka agent_browser.py);
+        # macOS i Linux bez zmian (Lightpanda z manifestu, zapas Hermesa dla zrzutów: chromium w bin-floty)
+        browser["engine"] = "chrome"
+    ustaw_mcp(cfg, u)
     web = cfg.get("web")
     if isinstance(web, dict) and str(web.get("search_backend", "")).lower() == "searxng":
         # I14: bez wymuszonej wyszukiwarki; autodetekcja Hermesa (tools/web_tools.py:99-135): klucz API, potem
@@ -910,7 +960,8 @@ shutil.copy2(store, out)
 
 def build_host(fleet: fl.Fleet, out: Path, env: dict[str, str], uklad: Uklad | None = None) -> list[str]:
     """Config profilu hosta: gateway + multipleks + trasy Telegrama + dispatcher. Natywnie także program lektora
-    z instalacji, wtyczka zgód, ustawienia bezpieczeństwa i host/srodowisko.json (HERMES_LOCAL_STT_COMMAND bramy)."""
+    z instalacji, wtyczka zgód, ustawienia bezpieczeństwa i host/srodowisko.json (HERMES_LOCAL_STT_COMMAND bramy, na
+    Windows AGENT_BROWSER_EXECUTABLE_PATH)."""
     u = uklad or KONTENER
     notes: list[str] = []
     template = fl.REPO_ROOT / "profiles" / "_host" / "config.yaml"
@@ -957,7 +1008,13 @@ def build_host(fleet: fl.Fleet, out: Path, env: dict[str, str], uklad: Uklad | N
     # Jarva (jarvo/srodowisko.py, docs/NATYWNIE.md S11); bez sekretów
     srodowisko = out / "srodowisko.json"
     if u.natywny:
-        fl.write_json(srodowisko, {"HERMES_LOCAL_STT_COMMAND": polecenie_stt(u)})
+        zmienne = {"HERMES_LOCAL_STT_COMMAND": polecenie_stt(u)}
+        if u.windows and u.chrome:
+            # silnik chrome w każdym profilu (Windows): Hermes pokazuje narzędzia browser_* tylko, gdy widzi Chromium
+            # (tools/browser_tool_install.py, _chromium_installed), a agent-browser bierze tę ścieżkę zamiast szukać
+            # Chrome w systemie. Na macOS i Linuksie nigdy: agent-browser użyłby jej także dla Lightpandy.
+            zmienne["AGENT_BROWSER_EXECUTABLE_PATH"] = str(PureWindowsPath(u.chrome))
+        fl.write_json(srodowisko, zmienne)
     elif srodowisko.exists():
         srodowisko.unlink()                  # resztka buildu natywnego w tym samym katalogu
     return notes
@@ -1115,6 +1172,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--py", default=None,
                     help="Python skryptów floty w poleceniach skilli, @@PY@@ (kontener python3; natywnie pełna ścieżka, "
                          "domyślnie Python tego buildu)")
+    ap.add_argument("--node-modules", default=None,
+                    help="natywnie: narzędzia npm floty (infra/node) dla serwerów MCP z Node (domyślnie pierwszy katalog "
+                         "NODE_PATH przy budowie na tym komputerze, inaczej <root>/program/node-floty/node_modules)")
+    ap.add_argument("--chrome", default=None,
+                    help="natywnie: Chromium dla silnika chrome, AGENT_BROWSER_EXECUTABLE_PATH bramy na Windows "
+                         "(domyślnie CHROME_PATH przy budowie na tym komputerze)")
     ap.add_argument("--agent", action="append", default=[], help="buduj tylko wskazanych agentów")
     args = ap.parse_args(argv)
     uklad = uklad_z_argumentow(args)
@@ -1221,7 +1284,8 @@ def main(argv: list[str] | None = None) -> int:
     }
     if uklad.natywny:
         # dla instalacji i doctor: dla jakiego katalogu danych i systemu powstał ten build (ścieżki tokenów)
-        manifest["uklad"] = {"nazwa": uklad.nazwa, "system": uklad.system, "sciezki": sciezki_floty(fleet, uklad)}
+        manifest["uklad"] = {"nazwa": uklad.nazwa, "system": uklad.system, "sciezki": sciezki_floty(fleet, uklad),
+                             "node_modules": uklad.node_modules, "chrome": uklad.chrome}
     fl.write_json(out / "BUILD.json", manifest)
     print(f"Build gotowy: {out}")
     return 0

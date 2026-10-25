@@ -68,7 +68,7 @@ fonty, opis układu) i własna baza w skarbcu dla branż, których w Inspo prawi
    W PLAN.md zaznacz, kto wskazał stronę.
 2. **Zbieranie** (`<branza>` z kolumny „Katalog” mapy, `<domena>` np. `domy-krakow.pl`):
    ```bash
-   bash "$HERMES_HOME/scripts/brand_extract.sh" https://<domena> <domena> --kit inspiracje/strony/<branza>/<domena> --pages 1
+   @@PY@@ "$HERMES_HOME/scripts/brand_extract.py" https://<domena> <domena> --kit inspiracje/strony/<branza>/<domena> --pages 1
    node "$HERMES_HOME/scripts/screenshots.cjs" https://<domena> "@@KNOWLEDGE_DIR@@/inspiracje/strony/<branza>/<domena>/screenshots" --widths 375,1440
    ```
    Pierwsze daje `DESIGN.md`, `tokens.json` i kontrast z dembrandta (paleta, fonty, odstępy; bez logo i bez BRAND.md),

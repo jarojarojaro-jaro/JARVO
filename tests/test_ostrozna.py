@@ -300,7 +300,7 @@ def test_opcje_bez_proxy_i_dodatkow(tmp_path, monkeypatch):
     fake.DefaultAddons = types.SimpleNamespace(UBO="ubo")
     monkeypatch.setitem(sys.modules, "camoufox", fake)
     o = O.opcje_camoufox(zrzut=False)
-    assert o["headless"] is True and o["os"] == "linux" and o["ff_version"] == 152
+    assert o["headless"] is True and o["os"] == O.SYSTEM and o["ff_version"] == 152
     assert o["exclude_addons"] == ["ubo"] and o["block_images"] is True and o["humanize"] is False
     assert not {"proxy", "user_data_dir", "persistent_context", "addons", "geoip_db"} & set(o) and o["geoip"] is False
     assert O.opcje_camoufox(zrzut=True)["block_images"] is False
@@ -312,11 +312,69 @@ def test_przegladarka_bez_kluczy_agenta(tmp_path, monkeypatch):
     env = O.srodowisko_przegladarki(tmp_path / "dom")
     assert "OPENROUTER_API_KEY" not in env and env["HTTPS_PROXY"] == "http://proxy:3128"
     assert env["HOME"] == str(tmp_path / "dom") and env["XDG_CACHE_HOME"] == str(tmp_path / "dom" / ".cache")
-    assert set(env) <= set(O.ZMIENNE_PRZEGLADARKI) | {"HOME", "XDG_CACHE_HOME"}
+    assert set(env) <= set(O.ZMIENNE_PRZEGLADARKI) | set(O.ZMIENNE_WINDOWS) | set(O.KATALOGI_WINDOWS) | \
+        {"HOME", "XDG_CACHE_HOME"}
+
+
+@pytest.mark.windows_only
+def test_przegladarka_na_windows_z_systemroot_i_katalogami_w_katalogu_skryptu(tmp_path, monkeypatch):
+    """Windows: SystemRoot z systemu, a TEMP, APPDATA i LOCALAPPDATA wskazują katalog skryptu, nie profil właściciela
+    (Playwright dopisałby brakujące TEMP z otoczenia skryptu)."""
+    monkeypatch.setenv("APPDATA", str(tmp_path / "wlasciciel" / "AppData" / "Roaming"))
+    env = O.srodowisko_przegladarki(tmp_path / "dom")
+    assert env["SYSTEMROOT"] == os.environ["SYSTEMROOT"]
+    for zmienna in ("TEMP", "TMP", "APPDATA", "LOCALAPPDATA"):
+        assert env[zmienna].startswith(str(tmp_path / "dom")) and os.path.isdir(env[zmienna]), zmienna
+    assert O.SYSTEM == "windows"
+
+
+def test_stan_wspolny_dla_agentow_w_danych_jarva(tmp_path, monkeypatch):
+    """Blokada i limity domen są wspólne dla agentów: natywnie w JARVO_DATA_DIR (HOME agenta to katalog profilu),
+    zmienna JARVO_OSTROZNA_STAN wygrywa, w obrazie (bez JARVO_DATA_DIR) ~/.cache jak dotąd."""
+    monkeypatch.delenv("JARVO_OSTROZNA_STAN", raising=False)
+    monkeypatch.setenv("JARVO_DATA_DIR", str(tmp_path / "jarvo"))
+    assert O._stan() == tmp_path / "jarvo" / "state" / "ostrozna"
+    monkeypatch.setenv("JARVO_OSTROZNA_STAN", str(tmp_path / "inny"))
+    assert O._stan() == tmp_path / "inny"
+    monkeypatch.delenv("JARVO_OSTROZNA_STAN")
+    monkeypatch.delenv("JARVO_DATA_DIR")
+    assert O._stan().parts[-2:] == (".cache", "jarvo-ostrozna")
+
+
+def test_brak_paczki_camoufox_to_kod_1_z_rada(cli, monkeypatch, tmp_path, capsys):
+    """Natywnie Camoufox jest dodatkiem pobieranym przy pierwszym użyciu: bez paczki kod 1 i rada, bez startu."""
+    monkeypatch.setattr(O, "EXE", str(tmp_path / "nie-ma" / "camoufox.exe"))
+    assert O.main(["https://firma.pl/"]) == 1
+    assert "nie jest zainstalowany" in capsys.readouterr().err
+    assert O.sprawdz() == 1 and "pobierany przy pierwszym użyciu" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("system", ["windows", "macos"])
+def test_sprawdz_paczki_windows_i_macos(tmp_path, monkeypatch, capsys, system):
+    """Paczka Windows: pliki obok camoufox.exe (bez fontconfig Linuksa); macOS: Camoufox.app z programem
+    w Contents/MacOS, a application.ini i properties.json w Contents/Resources (tam też wersja Firefoksa)."""
+    monkeypatch.setattr(O, "ma_camoufox", lambda: True)
+    monkeypatch.setattr(O, "SYSTEM", system)
+    if system == "windows":
+        exe, zasoby = tmp_path / "camoufox.exe", tmp_path
+    else:
+        zasoby = tmp_path / "Camoufox.app" / "Contents" / "Resources"
+        exe = zasoby.parent / "MacOS" / "camoufox"
+    exe.parent.mkdir(parents=True, exist_ok=True)
+    zasoby.mkdir(parents=True, exist_ok=True)
+    exe.write_bytes(b"x")
+    exe.chmod(0o755)
+    monkeypatch.setattr(O, "EXE", str(exe))
+    assert O.sprawdz() == 1 and "application.ini" in capsys.readouterr().err
+    (zasoby / "application.ini").write_text("[App]\nVersion=152.0.4-beta.30\n", encoding="utf-8")
+    (zasoby / "properties.json").write_text("[]", encoding="utf-8")
+    assert O.sprawdz() == 0 and system in capsys.readouterr().out
+    assert O.katalog_paczki() == zasoby and O.wersja_firefoksa() == 152
 
 
 def test_sprawdz(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(O, "ma_camoufox", lambda: True)
+    monkeypatch.setattr(O, "SYSTEM", "linux")
     monkeypatch.setattr(O, "EXE", str(tmp_path / "camoufox-bin"))
     assert O.sprawdz() == 1 and "brak" in capsys.readouterr().err
     (tmp_path / "camoufox-bin").write_text("#!/bin/sh\n", encoding="utf-8")

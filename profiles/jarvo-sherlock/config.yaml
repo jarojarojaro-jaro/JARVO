@@ -19,7 +19,8 @@ skills:
   write_approval: true          # nowy albo zmieniony skill czeka na zgodę właściciela (docs/RSI.md §R1, poczekalnia.py)
 
 web:
-  search_backend: searxng        # SEARXNG_URL ustawia docker-compose (własny SearXNG)
+  search_backend: searxng        # SEARXNG_URL ustawia docker-compose (własny SearXNG); natywnie build zdejmuje
+                                 # ten wpis: autodetekcja Hermesa (klucz API, SearXNG, ddgs, darmowe; I14)
 
 platform_toolsets:
   cli: [web, browser, file, terminal, delegation, memory, skills, todo, vision, session_search]
@@ -32,9 +33,10 @@ terminal:
   cwd: "@@WORKSPACES_DIR@@/jarvo-sherlock"
   timeout: 300
 
-# Przeglądarka: wbudowane narzędzia browser_* przez agent-browser z silnikiem Lightpanda (~30 MB RAM
-# na sesję zamiast ~300 MB Chromium). Zrzuty ekranu i strony, których Lightpanda nie obsłuży,
-# Hermes sam przełącza na Chromium z obrazu.
+# Przeglądarka: wbudowane narzędzia browser_* przez agent-browser (nakładka Jarva: bez serwera podglądu) z silnikiem
+# Lightpanda (~30 MB RAM na sesję zamiast ~300 MB Chromium). Zrzuty ekranu i strony, których Lightpanda nie obsłuży,
+# Hermes sam przełącza na Chromium (chrome-headless-shell z instalacji). Windows: Lightpanda nie ma wydania, więc build
+# natywny wpisuje engine: chrome (docs/NATYWNIE.md C06).
 browser:
   backend: "off"                  # bez trybu Browser Use (uvx browser-use pobierany w locie)
   engine: lightpanda

@@ -6,7 +6,7 @@ scenarios:
     input: "Zrób audyt https://example.com: wydajność, SEO, dostępność, mobile."
     expect:
       should:
-        - "uruchamia audit.sh (Lighthouse mobile+desktop, axe, linki, seo_check, zrzuty)"
+        - "uruchamia audit.py (Lighthouse mobile+desktop, axe, linki, seo_check, security_check, zrzuty)"
         - "raport z priorytetami P0–P3, dowodami i top 3 na górze"
 
   - id: web-favicon
@@ -22,7 +22,7 @@ scenarios:
     input: "Naucz się marki z https://example.com i zapisz brand kit jako 'demo'."
     expect:
       should:
-        - "brand_extract.sh (dembrandt), logo, zrzuty, ton z cytatów, BRAND.md z TODO dla braków"
+        - "brand_extract.py (dembrandt), logo, zrzuty, ton z cytatów, BRAND.md z TODO dla braków"
       should_not:
         - "wymyśla kolory bez ekstrakcji"
 
@@ -167,7 +167,7 @@ scenarios:
       should:
         - "skill inspiracje-stron: wiersz branży z references/branze.md, `wiedza_szukaj(folder=\"inspiracje\")` przed szukaniem"
         - "Inspo (`recommend`, `search_screens`) z zapytaniem po angielsku i filtrami z mapy (vibe calm/luxe, mode light)"
-        - "zauważa słabe pokrycie nieruchomości w Inspo i proponuje albo buduje własną bazę: brand_extract.sh --kit inspiracje/strony/nieruchomosci/<domena>, screenshots.cjs, karta strony"
+        - "zauważa słabe pokrycie nieruchomości w Inspo i proponuje albo buduje własną bazę: brand_extract.py --kit inspiracje/strony/nieruchomosci/<domena>, screenshots.cjs, karta strony"
         - "sekcja „Inspiracje” w out/PLAN.md: 3–5 referencji (co bierzemy, czego nie), kolory i fonty z brand kitu"
       should_not:
         - "kopiuje teksty, zdjęcia, logo albo kod stron referencyjnych"

@@ -15,11 +15,22 @@ function browserPath() {
   return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim() : undefined;
 }
 
+// --no-sandbox tylko tam, gdzie piaskownica Chromium nie ruszy (jak audit.py i Hermes): Linux jako root, w kontenerze
+// albo z zakazem przestrzeni nazw użytkownika bez profilu AppArmor (Ubuntu 23.10+). Windows i macOS: z piaskownicą.
+function argsPiaskownicy() {
+  if (process.platform !== 'linux') return [];
+  const czytaj = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch { return ''; } };
+  const bez = (process.getuid && process.getuid() === 0) || fs.existsSync('/.dockerenv')
+    || czytaj('/proc/1/cgroup').includes('docker')
+    || czytaj('/proc/sys/kernel/apparmor_restrict_unprivileged_userns').trim() === '1';
+  return bez ? ['--no-sandbox'] : [];
+}
+
 (async () => {
   const [url, out] = process.argv.slice(2);
   if (!url || !out) { console.error('Użycie: node a11y.cjs <url> <out.json>'); process.exit(2); }
   const axeSource = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
-  const browser = await chromium.launch({ executablePath: browserPath(), args: ['--no-sandbox'] });
+  const browser = await chromium.launch({ executablePath: browserPath(), args: argsPiaskownicy() });
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });

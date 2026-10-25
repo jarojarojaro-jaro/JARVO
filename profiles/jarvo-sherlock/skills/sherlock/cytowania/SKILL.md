@@ -1,7 +1,7 @@
 ---
 name: cytowania
 description: "Cytaty z rejestru źródeł, dowody, sprawdzenie raportu."
-version: 1.0.0
+version: 1.0.1
 author: "Jarvo (na bazie grounded-citations 1.2.0 z Hermes Agent, Hermes Agent + Teknium, MIT)"
 license: MIT
 metadata:
@@ -94,8 +94,9 @@ Oddajesz razem:
 ## Pułapki
 
 - Pomieszane numery subagentów: każdy wątek bez wspólnego `--rejestr` zaczyna od `[1]` we własnym katalogu.
-- Strona z JavaScriptem, z której `extract.py` nic nie wyciąga: przeczytaj ją przez `lightpanda fetch --dump markdown`
-  albo przeglądarkę, zapisz tekst do pliku i dołącz `add <url> --tekst plik.txt`.
+- Strona z JavaScriptem, z której `extract.py` nic nie wyciąga: przeczytaj ją przeglądarką (`browser_navigate`,
+  `browser_snapshot`) albo, gdzie jest Lightpanda (Linux, macOS), `lightpanda fetch --dump markdown`, zapisz tekst
+  do pliku i dołącz `add <url> --tekst plik.txt`.
 - Ten sam artykuł pod kilkoma adresami (przedruki) to nadal jedno źródło. Przy liczeniu niezależnych źródeł
   patrz na domeny w linii `info:` z `verify`.
 - Blok „Źródła” poprawiony ręcznie: `verify` wykryje inny adres niż w rejestrze. Zawsze `render --replace-in`.

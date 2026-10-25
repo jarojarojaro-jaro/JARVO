@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
-"""Jedno zapytanie → wiele kategorii i języków SearXNG, deduplikacja URL-i, wynik JSON.
+"""Jedno zapytanie → wiele kategorii i języków, deduplikacja URL-i, wynik JSON.
 
     python3 search_fanout.py "zapytanie" [--lang pl] [--lang en] [--category general --category news]
                             [--time day|week|month|year] [--limit 20]
 
-Wymaga SEARXNG_URL (np. http://searxng:8080) z włączonym formatem JSON (infra/searxng/settings.yml).
+Wyszukiwarka (docs/NATYWNIE.md U01, decyzja I14 „najlepsza dostępna”):
+- SearXNG, gdy jest SEARXNG_URL (np. http://searxng:8080 w kontenerze albo na serwerze) z formatem JSON
+  (infra/searxng/settings.yml): wiele silników naraz, kategorie general, news, science, it…;
+- inaczej DuckDuckGo przez paczkę ddgs, gdy jest w Pythonie skryptu (kategorie general i news; inne szukają jak
+  general);
+- bez obu: kod 2 i rada, żeby szukać narzędziem web_search (Hermes sam wybiera najlepszą dostępną wyszukiwarkę).
+Wynik: {"query", "wyszukiwarka", "results": [...], "errors": [...]}.
 """
 
 from __future__ import annotations
@@ -16,8 +22,16 @@ import sys
 import urllib.parse
 import urllib.request
 
+# język → region DuckDuckGo (ddgs); nieznany język: bez regionu
+REGIONY = {"pl": "pl-pl", "en": "us-en", "de": "de-de", "fr": "fr-fr", "es": "es-es", "it": "it-it", "uk": "ua-uk",
+           "cs": "cz-cs", "sk": "sk-sk", "nl": "nl-nl", "pt": "pt-pt", "sv": "se-sv"}
+CZAS_DDGS = {"day": "d", "week": "w", "month": "m", "year": "y"}
+BEZ_WYSZUKIWARKI = ("brak wyszukiwarki dla search_fanout.py: nie ma SEARXNG_URL ani paczki ddgs w tym Pythonie; "
+                    "szukaj narzędziem web_search (Hermes sam wybiera najlepszą dostępną wyszukiwarkę)")
+
 
 def search(base: str, query: str, lang: str | None, category: str, time_range: str | None, page: int = 1) -> list[dict]:
+    """Jedna kategoria i język z SearXNG."""
     params = {"q": query, "format": "json", "categories": category, "pageno": str(page)}
     if lang:
         params["language"] = lang
@@ -41,6 +55,39 @@ def search(base: str, query: str, lang: str | None, category: str, time_range: s
     return out
 
 
+def ma_ddgs() -> bool:
+    try:
+        import ddgs  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def search_ddgs(query: str, lang: str | None, category: str, time_range: str | None, limit: int = 20) -> list[dict]:
+    """Jedna kategoria i język z DuckDuckGo (ddgs): news dla kategorii news, tekst dla pozostałych."""
+    from ddgs import DDGS  # type: ignore
+
+    region = REGIONY.get((lang or "").lower(), "wt-wt")
+    czas = CZAS_DDGS.get(time_range or "")
+    with DDGS(timeout=15) as klient:
+        if category == "news":
+            wyniki = klient.news(query, region=region, timelimit=czas, max_results=limit) or []
+        else:
+            wyniki = klient.text(query, region=region, timelimit=czas, max_results=limit) or []
+    out = []
+    for r in wyniki:
+        out.append({
+            "url": r.get("href") or r.get("url"),
+            "title": r.get("title"),
+            "snippet": (r.get("body") or "")[:400],
+            "engines": ["duckduckgo"] + ([r["source"]] if r.get("source") else []),
+            "published": r.get("date"),
+            "category": category,
+            "lang": lang,
+        })
+    return out
+
+
 def normalize(url: str) -> str:
     p = urllib.parse.urlsplit(url or "")
     query = urllib.parse.urlencode([(k, v) for k, v in urllib.parse.parse_qsl(p.query) if not k.startswith("utm_")])
@@ -57,8 +104,18 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     base = os.environ.get("SEARXNG_URL")
-    if not base:
-        print(json.dumps({"error": "Brak SEARXNG_URL"}))
+    if base:
+        wyszukiwarka = "searxng"
+
+        def szukaj(lang: str, cat: str) -> list[dict]:
+            return search(base, args.query, lang, cat, args.time_range)
+    elif ma_ddgs():
+        wyszukiwarka = "ddgs"
+
+        def szukaj(lang: str, cat: str) -> list[dict]:
+            return search_ddgs(args.query, lang, cat, args.time_range, args.limit)
+    else:
+        print(json.dumps({"query": args.query, "error": BEZ_WYSZUKIWARKI}, ensure_ascii=False))
         return 2
     langs = args.lang or ["pl", "en"]
     cats = args.category or ["general"]
@@ -67,7 +124,7 @@ def main(argv: list[str] | None = None) -> int:
     for lang in langs:
         for cat in cats:
             try:
-                for r in search(base, args.query, lang, cat, args.time_range):
+                for r in szukaj(lang, cat):
                     key = normalize(r["url"])
                     if not key:
                         continue
@@ -79,7 +136,8 @@ def main(argv: list[str] | None = None) -> int:
             except Exception as exc:  # jedna kategoria nie może zatrzymać reszty
                 errors.append(f"{lang}/{cat}: {exc}")
     ranked = sorted(merged.values(), key=lambda r: (-r["hits"], -len(r["engines"] or [])))[: args.limit]
-    print(json.dumps({"query": args.query, "results": ranked, "errors": errors}, ensure_ascii=False, indent=1))
+    print(json.dumps({"query": args.query, "wyszukiwarka": wyszukiwarka, "results": ranked, "errors": errors},
+                     ensure_ascii=False, indent=1))
     return 0 if ranked or not errors else 1
 
 
