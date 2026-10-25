@@ -1,0 +1,230 @@
+# Test migracji ze starej instalacji z Dockerem do instalacji natywnej (docs/NATYWNIE.md: f5, T19, etap E12).
+# Tylko na żądanie. Na ubuntu-24.04 (ma Dockera):
+#   1. prawdziwa stara instalacja: install.sh z wersji `stary_ref` (tag docker-ostatnia, gdy powstanie; do tego czasu
+#      ostatni commit przed przełączeniem), obraz floty z GHCR, flota w kontenerze jarvo-hermes,
+#   2. zasiew przez prawdziwego Hermesa w kontenerze z atrapą modelu (scripts/atrapa_modelu.py): rozmowa, notatka
+#      w skarbcu z commitem gita, karta kanbana z workspace_path /opt/data/…, rutyna z katalogiem roboczym, auth.json
+#      w profilu, dowiązanie bezwzględne, fałszywy token Telegrama w secrets/,
+#   3. stara flota stoi, a rozmowy.db dostaje wpis zapisany tylko w pliku -wal,
+#   4. manifest starych danych z filtrem kopii (jarvo/migracja.py --manifest --filtr),
+#   5. instalacja natywna z tego commitu (jarvo/bootstrap/install.sh),
+#   6. jarvo migruj --tak (sudo tar, rozbrojenie, próba, import, pierwszy start); dopóki polecenie jarvo nie ma
+#      podpolecenia migruj (jarvo/cli.py), ten sam kod woła się wprost Pythonem instalacji,
+#   7. manifest po zgodny z manifestem przed, ścieżki natywne w bazach, natywny Hermes widzi starą rozmowę w nowym
+#      katalogu, stare logowania z nową nazwą, stare kontenery i polecenie jarvo usunięte, obraz i dane starej
+#      instalacji zostają, kopia z dobrą sumą, `jarvo doctor` bez błędów,
+#   8. drugi przebieg niczego nie zmienia (manifest <dane>, stan i dziennik migracji bez zmian).
+# --bez-floty: build i install_fleet natywnie mają własny test (etap E4); gdy będzie zielony, flaga znika.
+name: migracja
+
+on:
+  workflow_dispatch:
+    inputs:
+      stary_ref:
+        description: "Wersja z Dockerem: tag docker-ostatnia (gdy powstanie) albo commit (dziś ostatni przed przełączeniem)"
+        type: string
+        default: "263363677295c40c4874bd141eb8edcf1a307fc2"
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: migracja-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      PYTHONUTF8: "1"
+      JARVO_ROOT: ${{ runner.temp }}/jarvo-natywnie
+      KATALOG: ${{ runner.temp }}/migracja
+      WYNIKI: ${{ runner.temp }}/wyniki
+    steps:
+      - name: Kod tej wersji (instalacja natywna i jarvo migruj)
+        uses: actions/checkout@v4
+      - name: Stara wersja z Dockerem
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.stary_ref }}
+          path: stary-repo
+      # Node z decyzji I04 (npm 11.20.0): front Hermesa ma engine-strict i odrzuca npm 11.10–11.16
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26.12.1"
+      - name: Miejsce na dysku (obraz floty ok. 7 GB po rozpakowaniu)
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
+      - name: Logowanie do GHCR (gotowy obraz starej floty)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: 1/8 Stara instalacja (install.sh z wersji z Dockerem)
+        env:
+          JARVO_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$WYNIKI"
+          git -C stary-repo checkout -q -b docker-ostatnia
+          # install.sh klonuje gałąź z JARVO_REPO do ~/jarvo; JARVO_ROOT należy do instalacji natywnej
+          env -u JARVO_ROOT JARVO_REPO="$GITHUB_WORKSPACE/stary-repo" JARVO_BRANCH=docker-ostatnia JARVO_YES=1 \
+            JARVO_FORCE=1 JARVO_NO_OPEN=1 JARVO_PROVIDER=openrouter bash stary-repo/install.sh
+          docker ps --format '{{.Names}} {{.Status}}'
+          docker ps --format '{{.Names}}' | grep -qx jarvo-hermes
+
+      - name: 2/8 Zasiew przez Hermesa w kontenerze (atrapa modelu)
+        run: |
+          set -euxo pipefail
+          H() { docker exec -u hermes -e HOME=/opt/data -e HERMES_HOME=/opt/data \
+                  -e PATH=/opt/hermes/bin:/opt/hermes/.venv/bin:/usr/local/bin:/usr/bin:/bin "$@"; }
+          W=/opt/data/jarvo/workspaces/migracja-test
+          H -d jarvo-hermes python3 /opt/jarvo/repo/scripts/atrapa_modelu.py --port 9199
+          for _ in $(seq 30); do
+            H jarvo-hermes python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9199/v1/models', timeout=1)" && break
+            sleep 1
+          done
+          H jarvo-hermes hermes profile create migracja-test --no-alias --no-skills
+          H jarvo-hermes hermes -p migracja-test config set model.provider custom
+          H jarvo-hermes hermes -p migracja-test config set model.base_url http://127.0.0.1:9199/v1
+          H jarvo-hermes hermes -p migracja-test config set model.default atrapa
+          H jarvo-hermes mkdir -p "$W"
+          H -w "$W" jarvo-hermes hermes -p migracja-test chat -q "Rozmowa testowa przed migracją"
+          H jarvo-hermes hermes kanban create "Karta migracji" --workspace "dir:$W" --triage
+          H jarvo-hermes hermes -p migracja-test cron create "every 1d" "Rutyna testowa migracji" --name migracja-test \
+            --deliver local --workdir "$W"
+          H jarvo-hermes sh -c 'cd /opt/data/jarvo/knowledge && { [ -d .git ] || git init -q; } && mkdir -p notatki && printf "# Notatka migracji\n" > notatki/migracja-test.md && git add -A && git -c user.name=test -c user.email=test@example.invalid commit -qm "notatka testowa migracji"'
+          H jarvo-hermes sh -c 'printf "{\"test\": \"nie prawdziwe logowanie\"}\n" > /opt/data/profiles/migracja-test/auth.json'
+          H jarvo-hermes ln -sfn /opt/data/jarvo/knowledge "$W/skarbiec"
+          # fałszywy token (7 cyfr: scripts/validate.py nie bierze go za prawdziwy); w kontenerze nie działa
+          printf 'TELEGRAM_BOT_TOKEN=%s\n' "1234567:FALSZYWY-TOKEN-CI" >> "$HOME/jarvo-local/secrets/host.env"
+          for _ in $(seq 60); do sudo test -f "$HOME/jarvo-local/data/hermes/jarvo/state/rozmowy.db" && break; sleep 2; done
+          sudo test -f "$HOME/jarvo-local/data/hermes/jarvo/state/rozmowy.db"
+
+      - name: 3/8 Stara flota stoi, rozmowy.db z wpisem tylko w -wal
+        run: |
+          set -euxo pipefail
+          docker stop -t 70 jarvo-hermes
+          # bez zamknięcia połączenia (os._exit) nie ma punktu kontrolnego, więc wpis zostaje w pliku -wal
+          R="$HOME/jarvo-local/data/hermes/jarvo/state/rozmowy.db"
+          sudo python3 - "$R" <<'PY'
+          import os, sqlite3, sys, time
+          con = sqlite3.connect(sys.argv[1])
+          con.execute("PRAGMA wal_autocheckpoint=0")
+          teraz = time.time()
+          con.execute("INSERT INTO watki (id, utworzony_at, aktywnosc_at) VALUES ('migracja-ci', ?, ?)", (teraz, teraz))
+          con.execute("INSERT INTO wpisy (id, watek_id, seq, rodzaj, tekst, zalaczniki, utworzony_at) VALUES "
+                      "('migracja-ci-1', 'migracja-ci', 1, 'wlasciciel', 'Wpis tylko w WAL', ?, ?)",
+                      ('[{"path":"/opt/data/jarvo/inbox/migracja.txt","nazwa":"migracja.txt"}]', teraz))
+          con.commit()
+          os._exit(0)
+          PY
+          sudo chown 10000:10000 "$R-wal" "$R-shm"          # pliki jak z kontenera (uid hermes)
+          sudo test -s "$R-wal"
+
+      - name: 4/8 Manifest starych danych (filtr kopii)
+        run: |
+          set -euxo pipefail
+          sudo env PYTHONPATH="$GITHUB_WORKSPACE" python3 -m jarvo.migracja --manifest "$HOME/jarvo-local/data/hermes" \
+            --filtr --wyjscie "$WYNIKI/manifest-przed.json"
+          sudo chown "$(id -u):$(id -g)" "$WYNIKI/manifest-przed.json"
+
+      - name: 5/8 Instalacja natywna (jarvo/bootstrap/install.sh z tego commitu)
+        env:
+          JARVO_REF: ${{ github.sha }}
+          JARVO_TOKEN: ${{ github.token }}
+          JARVO_NO_AUTOSTART: "1"
+        run: bash jarvo/bootstrap/install.sh
+
+      - name: 6/8 jarvo migruj
+        run: |
+          set -euxo pipefail
+          # `jarvo migruj`, a dopóki polecenie jarvo go nie zna (w budowie: kod 2), ten sam kod Pythonem instalacji
+          cat > "$RUNNER_TEMP/migruj.sh" <<'SH'
+          set -euo pipefail
+          if ~/.local/bin/jarvo migruj --help >/dev/null 2>&1; then exec ~/.local/bin/jarvo migruj "$@"; fi
+          APP="$(python3 -c 'import json, os; print(json.load(open(os.path.join(os.environ["JARVO_ROOT"], "program", "current.json")))["app"])')"
+          PY="$(python3 -c 'import json, os; print(json.load(open(os.path.join(os.environ["JARVO_ROOT"], "stan", "narzedzia.json")))["python313"]["katalog"])')/bin/python3"
+          exec "$PY" -I -X utf8 -c 'import sys; sys.path.insert(0, sys.argv[1]); from jarvo.migracja import main; sys.exit(main(sys.argv[2:]))' "$APP" "$@"
+          SH
+          bash "$RUNNER_TEMP/migruj.sh" --tak --bez-floty --katalog "$KATALOG" | tee "$WYNIKI/migracja-1.log"
+
+      - name: 7/8 Manifest zgodny, dane natywne, stara flota rozbrojona, doctor bez błędów
+        run: |
+          set -euxo pipefail
+          python3 -m jarvo.migracja --porownaj "$WYNIKI/manifest-przed.json" "$KATALOG/manifest-po.json" \
+            --stan "$JARVO_ROOT/stan/migracja.json"
+          python3 - "$JARVO_ROOT/dane" <<'PY'
+          import json, os, sqlite3, sys
+          from pathlib import Path
+          d = Path(sys.argv[1])
+          w = d / "jarvo/workspaces/migracja-test"
+          def wiersze(db, sql):
+              con = sqlite3.connect(d / db)
+              try:
+                  return con.execute(sql).fetchall()
+              finally:
+                  con.close()
+          cwd = [c for (c,) in wiersze("profiles/migracja-test/state.db", "SELECT cwd FROM sessions") if c]
+          assert str(w) in cwd and not any(c.startswith("/opt/") for c in cwd), cwd
+          assert wiersze("profiles/migracja-test/state.db", "SELECT count(*) FROM messages")[0][0] >= 2
+          karta = wiersze("kanban.db", "SELECT workspace_path FROM tasks WHERE title = 'Karta migracji'")
+          assert karta == [(str(w),)], karta
+          wpis = wiersze("jarvo/state/rozmowy.db", "SELECT tekst, zalaczniki FROM wpisy WHERE id = 'migracja-ci-1'")
+          assert wpis and wpis[0][0] == "Wpis tylko w WAL" and str(d) in wpis[0][1], wpis
+          assert (d / "jarvo/knowledge/notatki/migracja-test.md").is_file()
+          assert (d / "jarvo/knowledge/.git/HEAD").is_file()
+          link = w / "skarbiec"
+          assert link.is_symlink() and os.readlink(link) == str(d / "jarvo/knowledge"), os.readlink(link)
+          assert (d / "profiles/migracja-test/auth.json").is_file()
+          assert "TELEGRAM_BOT_TOKEN=1234567:" in (d / "jarvo/konfig/host.env").read_text(encoding="utf-8")
+          prace = json.loads((d / "profiles/migracja-test/cron/jobs.json").read_text(encoding="utf-8"))["jobs"]
+          assert prace and all(p.get("state") == "paused" for p in prace), prace
+          assert all(p.get("workdir") == str(w) for p in prace if p.get("name") == "migracja-test"), prace
+          print("dane natywne: OK")
+          PY
+          # natywny Hermes (tylko odczyt) widzi starą rozmowę w nowym katalogu roboczym
+          HERMES="$(python3 -c 'import json, os; print(json.load(open(os.path.join(os.environ["JARVO_ROOT"], "program", "current.json")))["hermes"])')"
+          SID="$(python3 -c 'import sqlite3, sys; print(sqlite3.connect(sys.argv[1]).execute("SELECT id FROM sessions WHERE cwd LIKE ? ORDER BY started_at LIMIT 1", ("%migracja-test",)).fetchone()[0])' "$JARVO_ROOT/dane/profiles/migracja-test/state.db")"
+          HERMES_HOME="$JARVO_ROOT/dane" "$HERMES/.venv/bin/python" -P -m hermes_cli.main -p migracja-test sessions list \
+            --workspace "$JARVO_ROOT/dane/jarvo/workspaces/migracja-test" | tee "$WYNIKI/sesje.txt"
+          grep -qF "$SID" "$WYNIKI/sesje.txt"
+          # stara instalacja: logowania z nową nazwą, kontenery i polecenie jarvo usunięte, obraz i dane zostają
+          sudo sh -c 'ls "$1"/auth.json.przeniesione-* >/dev/null' _ "$HOME/jarvo-local/data/hermes/profiles/migracja-test"
+          test -z "$(docker ps -aq --filter 'name=^jarvo-')"
+          test ! -e /usr/local/bin/jarvo
+          docker image inspect jarvo-hermes:local --format '{{.Id}}'
+          sudo test -f "$HOME/jarvo-local/data/hermes/kanban.db"
+          # kopia do wycofania zostaje, z sumą z chwili kopii
+          (cd "$KATALOG" && sha256sum -c kopia.tar.sha256)
+          ~/.local/bin/jarvo doctor --json > "$WYNIKI/doctor.json" || { cat "$WYNIKI/doctor.json"; exit 1; }
+
+      - name: 8/8 Drugi przebieg niczego nie zmienia
+        run: |
+          set -euxo pipefail
+          ~/.local/bin/jarvo down
+          python3 -m jarvo.migracja --manifest "$JARVO_ROOT/dane" --wyjscie "$WYNIKI/dane-a.json"
+          sha256sum "$JARVO_ROOT/stan/migracja.json" "$JARVO_ROOT/stan/migracja.jsonl" > "$WYNIKI/stan.sha256"
+          bash "$RUNNER_TEMP/migruj.sh" --tak --bez-floty --katalog "$KATALOG" | tee "$WYNIKI/migracja-2.log"
+          grep -q "Nic do zrobienia" "$WYNIKI/migracja-2.log"
+          python3 -m jarvo.migracja --manifest "$JARVO_ROOT/dane" --wyjscie "$WYNIKI/dane-b.json"
+          cmp "$WYNIKI/dane-a.json" "$WYNIKI/dane-b.json"
+          sha256sum -c "$WYNIKI/stan.sha256"
+
+      - name: Wyniki (bez kopii danych)
+        if: always()
+        run: |
+          mkdir -p "$WYNIKI"
+          cp "$KATALOG"/raport.json "$KATALOG"/spis.json "$KATALOG"/resztki.json "$KATALOG"/manifest-po.json "$WYNIKI"/ 2>/dev/null || true
+          cp "$JARVO_ROOT"/logi/*.log "$WYNIKI"/ 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: migracja-linux
+          path: ${{ runner.temp }}/wyniki
+          retention-days: 14
