@@ -1041,6 +1041,23 @@ def test_dyski_lokalne_posix_z_katalogiem_domowym(tmp_path):
     assert instalator.punkt_dysku("/nie-ma/jarvo") == "/"
 
 
+def test_wolumin_posix_woli_wolumin_z_zapisem_i_wolumin_danych(tmp_path):
+    """Kilka woluminów z tym samym st_dev (macOS 15 w CI: zapieczętowany „/” i /System/Volumes/Data): wolumin
+    z zapisem, a ścieżka przez firmlink (ta sama pod <punkt danych><ścieżka>) to wolumin „root data”."""
+    (tmp_path / "ro").mkdir()
+    (tmp_path / "rw" / "dom").mkdir(parents=True)
+    ro = instalator.Wolumin("/dev/disk2s1s1", str(tmp_path / "ro"), "apfs", frozenset({"local", "read-only"}))
+    rw = instalator.Wolumin("/dev/disk2s5", str(tmp_path / "rw"), "apfs", frozenset({"local", "journaled"}))
+    assert instalator.wolumin_posix(tmp_path / "rw" / "dom", [ro, rw]) is rw
+    assert instalator.wolumin_posix(tmp_path / "rw" / "dom", [ro]) is ro          # tylko taki: zostaje (nie polecany)
+    if not WINDOWS:
+        dane = tmp_path / "dane"
+        (dane / str(tmp_path / "dom").lstrip("/")).mkdir(parents=True)
+        (tmp_path / "dom").symlink_to(dane / str(tmp_path / "dom").lstrip("/"))   # jak firmlink /Users
+        dw = instalator.Wolumin("/dev/disk2s5", str(dane), "apfs", frozenset({"local", "root data"}))
+        assert instalator.wolumin_posix(tmp_path / "dom", [ro, dw]) is dw
+
+
 @pytest.mark.linux_only
 def test_woluminy_z_prawdziwego_proc_self_mounts():
     woluminy = instalator._woluminy()

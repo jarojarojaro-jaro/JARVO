@@ -427,18 +427,27 @@ def wolumin_posix(sciezka: Path | str, woluminy: list[Wolumin]) -> Wolumin | Non
     ścieżki nie wystarcza). Punktów sieciowych i automatycznych nie dotykamy (stat na martwym NFS potrafi wisieć),
     więc dla nich None = nie wiadomo."""
     try:
-        numer = os.stat(istniejacy(sciezka)).st_dev
+        p = istniejacy(sciezka)
+        numer = os.stat(p).st_dev
     except OSError:
         return None
+    trafione = []
     for w in woluminy:
         if not (w.urzadzenie.startswith("/dev/") or w.typ == "zfs"):
             continue
+        # macOS: ścieżka przez firmlink (/Users → /System/Volumes/Data/Users) leży na woluminie danych, także gdy
+        # st_dev ścieżki wygląda jak st_dev zapieczętowanego „/” tylko do odczytu (macOS 15 w CI)
+        if w.punkt != "/" and "root data" in w.opcje and os.path.isabs(str(p)):
+            with contextlib.suppress(OSError):
+                if os.path.samefile(p, w.punkt.rstrip("/") + str(p)):
+                    return w
         try:
             if os.stat(w.punkt).st_dev == numer:
-                return w
+                trafione.append(w)
         except OSError:
             continue
-    return None
+    # kilka woluminów z tym samym st_dev: najpierw ten z zapisem
+    return next((w for w in trafione if not {"read-only", "ro"} & w.opcje), trafione[0] if trafione else None)
 
 
 def _kernel32() -> Any:
