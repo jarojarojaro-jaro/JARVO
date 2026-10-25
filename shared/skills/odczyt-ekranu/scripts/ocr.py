@@ -109,8 +109,11 @@ def _do_venvu(argv: list[str]) -> None:
     if _indra() is not None:
         return
     py = os.environ.get("JARVO_OCR_PYTHON") or OCR_PYTHON
+    # ten sam venv po katalogu venvu (sys.prefix), nie po pliku: na Linuksie i macOS python każdego venvu to
+    # dowiązanie do tego samego Pythona bazowego, więc po resolve() venv narzędzi i venv OCR wyglądały jednakowo
     if not py or not os.path.isfile(py) or not os.access(py, os.X_OK) \
-            or Path(sys.executable).resolve() == Path(py).resolve():
+            or Path(sys.prefix).resolve() == Path(py).parent.parent.resolve() \
+            or os.path.normcase(os.path.abspath(sys.executable)) == os.path.normcase(os.path.abspath(py)):
         return
     if os.name != "nt":                              # POSIX: jak dotąd ten sam proces
         os.execv(py, [py, "-I", str(Path(__file__).resolve()), *argv])

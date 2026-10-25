@@ -133,6 +133,34 @@ def test_przejscie_do_venvu_ocr_na_posix_przez_execv(tmp_path, monkeypatch):
     assert argv[3:] == ["zrzut.png", "--szukaj", "Zapisz"]
 
 
+@pytest.mark.posix_only
+def test_przejscie_do_venvu_ocr_gdy_oba_venvy_to_dowiazania_do_tego_samego_pythona(tmp_path, monkeypatch):
+    """Linux i macOS: python venvu narzędzi i venvu OCR to dowiązania do jednego Pythona bazowego, więc po resolve()
+    są tym samym plikiem; przeskok ma być, bo to inny venv (CI natywnie: „ocr.py --stan: bez Indry”)."""
+    baza = tmp_path / "python312" / "bin" / "python3.12"
+    baza.parent.mkdir(parents=True)
+    baza.write_text("#!/bin/sh\n", encoding="utf-8")
+    baza.chmod(0o755)
+    for venv in ("narzedzia", "ocr"):
+        (tmp_path / venv / "bin").mkdir(parents=True)
+        (tmp_path / venv / "bin" / "python").symlink_to(baza)
+    monkeypatch.setattr(ocr, "_indra", lambda: None)
+    monkeypatch.setattr(ocr.sys, "prefix", str(tmp_path / "narzedzia"))
+    monkeypatch.setattr(ocr.sys, "executable", str(tmp_path / "narzedzia" / "bin" / "python"))
+    monkeypatch.setenv("JARVO_OCR_PYTHON", str(tmp_path / "ocr" / "bin" / "python"))
+    wolania = []
+
+    def execv(p, argv):
+        wolania.append(p)
+        raise SystemExit(0)
+    monkeypatch.setattr(ocr.os, "execv", execv)
+    with pytest.raises(SystemExit):
+        ocr._do_venvu(["--stan"])
+    assert wolania == [str(tmp_path / "ocr" / "bin" / "python")]
+    monkeypatch.setattr(ocr.sys, "prefix", str(tmp_path / "ocr"))              # już w venvie OCR: bez pętli
+    ocr._do_venvu(["--stan"])
+
+
 @pytest.mark.windows_only
 def test_przejscie_do_venvu_ocr_oddaje_kod_i_wyjscie(tmp_path, monkeypatch, capfd):
     """Windows: ten sam skrypt w venvie OCR w nowym procesie (execv odpina tam proces), z jego kodem wyjścia."""
