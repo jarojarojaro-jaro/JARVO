@@ -575,7 +575,8 @@ def test_pomoc_po_polsku_i_argparse_bez_trwalej_zmiany(capsys, bez_zmian_procesu
     assert cli.main(["--help"]) == 0
     out = capsys.readouterr().out
     for slowo in ("użycie: jarvo", "opcje:", "--korzen", "instaluj", "serwis", "up", "down", "status", "panel",
-                  "chat", "logs", "autostart", "doctor", "version", "help", "update", "uninstall", "migruj"):
+                  "chat", "logs", "autostart", "doctor", "version", "help", "update", "uninstall", "migruj",
+                  "komputer", "android"):
         assert slowo in out
     assert cli.main(["autostart", "wlacz"]) == 2
     assert "błąd:" in capsys.readouterr().err
@@ -617,12 +618,39 @@ def http_panelu(u: sciezki.Uklad, warunek=lambda: True, **pola):
     return zapytaj
 
 
-def test_w_budowie_kod_2(tmp_path, capsys):
-    # update i uninstall działają od obszaru update-uninstall (tests/test_natywne_update.py)
-    for polecenie, etap in (("migruj", "E12"),):
-        assert cli.main([polecenie, "--all"], otoczenie=_ot(tmp_path)) == 2
-        err = capsys.readouterr().err
-        assert "w budowie" in err and f"etap {etap}" in err
+def test_komputer_rece_i_migruj_przekazuja_argumenty(tmp_path, capsys):
+    """`jarvo komputer …` idzie do jarvo/komputer.py, `jarvo komputer rece …` do jarvo/rece.py, `jarvo migruj …` do
+    jarvo/migracja.py: argumenty bez zmian (także nieznane parserowi jarvo), kod wyjścia modułu; brak modułu = 1."""
+    wywolania = []
+
+    class Komputer:
+        @staticmethod
+        def main(argv, *, u=None, ot=None):
+            wywolania.append(("komputer", argv, u is not None, ot is not None))
+            return 3
+
+    class Rece:
+        @staticmethod
+        def main(argv, *, env=None):
+            wywolania.append(("rece", argv, env["JARVO_ROOT"]))
+            return 0
+
+    class Migracja:
+        @staticmethod
+        def main(argv, *, uklad=None, otoczenie=None):
+            wywolania.append(("migruj", argv, str(uklad.root)))
+            return 0
+    ot = _ot(tmp_path, moduly={"komputer": Komputer, "rece": Rece, "migracja": Migracja})
+    assert cli.main(["komputer", "on", "--w-tle"], otoczenie=ot) == 3
+    assert cli.main(["komputer", "rece", "on", "--aplikacje", "notatnik", "--na", "30m"], otoczenie=ot) == 0
+    assert cli.main(["migruj", "--tak", "--katalog", str(tmp_path / "k")], otoczenie=ot) == 0
+    assert wywolania == [("komputer", ["on", "--w-tle"], True, True),
+                         ("rece", ["on", "--aplikacje", "notatnik", "--na", "30m"], str(tmp_path / "j")),
+                         ("migruj", ["--tak", "--katalog", str(tmp_path / "k")], str(tmp_path / "j"))]
+    assert cli.main(["komputer", "status"], otoczenie=_ot(tmp_path)) == 1
+    assert "brak modułu Komputera" in capsys.readouterr().err
+    assert cli.main(["migruj"], otoczenie=_ot(tmp_path)) == 1
+    assert cli.W_BUDOWIE == {}                       # update, uninstall i migruj działają
 
 
 def test_version_i_help(tmp_path, capsys):

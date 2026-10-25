@@ -30,8 +30,14 @@ macOS, Linux   curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JA
 - Na razie potrzebne są w PATH git (na Windows Git for Windows) i Node.js z npm do budowy frontu panelu: Node.js 24.11+,
   22.22+ albo 26+. Bez nich instalator kończy krok radą, skąd je wziąć.
 - Polecenia: `jarvo panel`, `jarvo status`, `jarvo doctor`, `jarvo up`, `jarvo down` (serwis stoi do `jarvo up`),
-  `jarvo logs`, `jarvo autostart on|off|status`, `jarvo chat --profil default` (profil `jarvo` przyjdzie z flotą
-  w etapie E4), `jarvo version`, `jarvo help`; `update`, `uninstall` i `migruj` są w budowie (E4, E13, E12).
+  `jarvo logs`, `jarvo autostart on|off|status`, `jarvo chat` (profil `jarvo`, `--profil`, `--tryb pytaj|projekt|pelny`),
+  `jarvo wiedza`, `jarvo rutyny`, `jarvo telegram`, `jarvo komputer` (Komputer Jarva; `jarvo komputer rece` = ręce na
+  Twoim ekranie, domyślnie wyłączone), `jarvo android`, `jarvo version`, `jarvo help` oraz:
+  - `jarvo update` (`--sprawdz`, `--ref REF`, `--json`): nowa wersja obok starej w `<program>/app/<sha12>`, instalator
+    nowej wersji, `jarvo doctor`, powrót przy błędzie; nie używa HOST_VERSION (zawsze instalator nowej wersji);
+    zmienne JARVO_UPDATE_TIMEOUT (3600 s), JARVO_UPDATE_ROZGRZEWKA (120 s), JARVO_UPDATE_CHECK (3600 s, pomocnik);
+  - `jarvo uninstall` (`--all` z danymi po pytaniu, `--yes` bez pytań, `--json`);
+  - `jarvo migruj`: przeniesienie danych ze starej instalacji z Dockerem i WSL (docs/NATYWNIE.md, sekcja f).
 - Linux: polecenie `jarvo` działa w nowym terminalu dopiero po ponownym zalogowaniu (terminal w GNOME i KDE nie czyta
   `~/.profile`).
 - Starą instalację z WSL albo Dockerem w tym samym katalogu bootstrap rozpoznaje i odmawia (migracja w etapie E12);

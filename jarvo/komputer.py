@@ -18,20 +18,8 @@
 Ekran w HQ (J10) rozmawia z usługą przez ten sam kanał `ster` z tokenem właściciela (klatka podglądu, przejmij,
 wejście właściciela, wznow), opis w komputer/wejscie_natywne.py.
 
-Podpięcie w jarvo/cli.py (nie w tym module): podpolecenie `komputer` bez własnej pomocy argparse, tak jak `serwis`:
-    s = sub.add_parser("komputer", add_help=False, help="Komputer Jarva: przeglądarka Operatora (on, off, status, …)",
-                       description="Argumenty idą do jarvo/komputer.py (jarvo komputer --help).")
-    s.set_defaults(funkcja=polecenie_komputer)
-
-    def polecenie_komputer(u, _a, reszta, ot):
-        try:
-            komputer = ot.modul("komputer")
-        except ImportError as e:
-            print(f"BŁĄD: brak modułu Komputera ({e}).", file=sys.stderr)
-            return 1
-        with _po_polsku():
-            return int(komputer.main(list(reszta), u=u, ot=ot) or 0)
-i "komputer" w liście poleceń, które przyjmują resztę argumentów (`args.polecenie not in ("chat", "serwis", …)`).
+Podpięte w jarvo/cli.py (polecenie_komputer): `jarvo komputer …` woła main(reszta, u=u, ot=ot) bez własnej pomocy
+argparse jarvo, a `jarvo komputer rece …` idzie do jarvo/rece.py (ekran właściciela, K6).
 Autostart przez nadzorcę (usługa `komputer` po bramie i panelu, gdy `<stan>/komputer/ustawienia.json` ma
 `wlaczony: true`) dopisuje jarvo/nadzorca.py; do tego czasu `on` uruchamia usługę sam, w tle.
 """

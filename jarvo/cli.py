@@ -68,9 +68,8 @@ SQLITE_MIN = (3, 51, 3)                      # błąd WAL-reset naprawiony w 3.5
 PORTY = (("panel", None), ("API bramy", None), ("podgląd HQ", 9120), ("ekran telefonu", 9122))
 NASZE_PORTY = {"panel", "API bramy"}         # bez działającego serwisu muszą być wolne
 CZAS_STOPU = instalator.CZAS_STOPU
-W_BUDOWIE = {
-    "migruj": ("E12", "przeniesienie danych ze starej instalacji z Dockerem i WSL (docs/NATYWNIE.md, sekcja f)."),
-}
+W_BUDOWIE: dict[str, tuple[str, str]] = {}     # polecenie → (etap, opis): podpowiedź dla planowanych poleceń
+Z_RESZTA = ("chat", "serwis", "komputer", "migruj")   # argumenty idą dalej (Hermes, nadzorca, Komputer, migracja)
 BOOTSTRAP = "https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/jarvo/bootstrap"
 RADA_INSTALACJI = ("Zainstaluj Jarvo jednym poleceniem: "
                    + (f"irm {BOOTSTRAP}/install.ps1 | iex (PowerShell)" if WINDOWS else
@@ -173,6 +172,17 @@ def _parser() -> argparse.ArgumentParser:
 
     from . import wiedza_cli                # skarbiec, rutyny, Telegram (etap E7): jarvo wiedza|rutyny|telegram
     wiedza_cli.dodaj_polecenia(sub)
+    from . import android                   # telefon testowy Twórcy aplikacji (etap E11): jarvo android status|on|off|ekran
+    android.dodaj_polecenia(sub)
+
+    s = sub.add_parser("komputer", add_help=False, help="Komputer Jarva: przeglądarka Operatora (on, off, status, …) "
+                       "i ręce na Twoim ekranie (komputer rece on|off|status)",
+                       description="Argumenty idą do jarvo/komputer.py (jarvo komputer --help), po słowie rece do "
+                       "jarvo/rece.py (jarvo komputer rece --help).")
+    s.set_defaults(funkcja=polecenie_komputer)
+    s = sub.add_parser("migruj", add_help=False, help="przeniesienie danych ze starej instalacji z Dockerem i WSL",
+                       description="Argumenty idą do jarvo/migracja.py (jarvo migruj --help; docs/NATYWNIE.md, sekcja f).")
+    s.set_defaults(funkcja=polecenie_migruj)
 
     s = sub.add_parser("doctor", help="diagnoza instalacji z radą przy każdym wyniku")
     s.add_argument("--json", action="store_true", help="wynik w JSON (CI)")
@@ -346,7 +356,7 @@ def main(argv: list[str] | None = None, *, otoczenie: Otoczenie | None = None) -
         with _po_polsku():
             parser = _parser()
             args, reszta = parser.parse_known_args(argv)
-            if reszta and args.polecenie not in ("chat", "serwis", *W_BUDOWIE):
+            if reszta and args.polecenie not in (*Z_RESZTA, *W_BUDOWIE):
                 parser.error(f"nieznane argumenty: {' '.join(reszta)}")
     except SystemExit as e:                       # --help albo błąd argumentów: argparse już wypisał komunikat
         return e.code if isinstance(e.code, int) else (0 if e.code is None else 2)
@@ -453,6 +463,36 @@ def polecenie_uninstall(u: Uklad, a, _reszta, ot: Otoczenie) -> int:
               "ręcznie.", file=sys.stderr)
         return 1
     return int(odinstalowanie.polecenie(u, a, ot) or 0)
+
+
+def polecenie_komputer(u: Uklad, _a, reszta, ot: Otoczenie) -> int:
+    """`jarvo komputer …` (jarvo/komputer.py) i `jarvo komputer rece …` (jarvo/rece.py, ekran właściciela K6)."""
+    reszta = list(reszta)
+    try:
+        if reszta[:1] == ["rece"]:
+            rece = ot.modul("rece")
+            with _po_polsku():                    # pomoc i błędy argparse po polsku, jak w samym jarvo
+                return int(rece.main(reszta[1:], env=dict(ot.env)) or 0)
+        komputer = ot.modul("komputer")
+    except ImportError as e:
+        print(f"BŁĄD: brak modułu Komputera ({e}). Uruchom polecenie instalacji ponownie.", file=sys.stderr)
+        return 1
+    try:
+        with _po_polsku():
+            return int(komputer.main(reszta, u=u, ot=ot) or 0)
+    except SystemExit as e:                       # --help i złe argumenty z argparse Komputera
+        return e.code if isinstance(e.code, int) else (0 if e.code is None else 2)
+
+
+def polecenie_migruj(u: Uklad, _a, reszta, ot: Otoczenie) -> int:
+    """`jarvo migruj …` (jarvo/migracja.py): dane starej instalacji z Dockerem i WSL do tej instalacji (sekcja f)."""
+    try:
+        migracja = ot.modul("migracja")
+    except ImportError as e:
+        print(f"BŁĄD: brak modułu migracji ({e}). Uruchom polecenie instalacji ponownie.", file=sys.stderr)
+        return 1
+    with _po_polsku():
+        return int(migracja.main(list(reszta), uklad=u, otoczenie=ot) or 0)
 
 
 def polecenie_w_budowie(_u: Uklad, a, _reszta, _ot: Otoczenie) -> int:
@@ -1144,8 +1184,11 @@ def zbierz_diagnoze(u: Uklad, ot: Otoczenie) -> dict:
               sprawdz_hermesa(u, app), *sprawdz_porty(u, ot, stan), sprawdz_brame(u, ot, stan),
               *sprawdz_narzedzia(u), sprawdz_autostart(u, ot), sprawdz_polecenie(u, ot), sprawdz_git(u, ot)]
     if (u.dane / "profiles").is_dir():          # skarbiec, rutyny i Telegram mają sens dopiero z flotą (K08)
-        from . import wiedza_cli
+        from . import wiedza_cli, zgody_cli
         wyniki += wiedza_cli.sprawdzenia(u, ot)
+        wyniki.append(zgody_cli.sprawdzenie(u))  # wtyczka zgód w każdym profilu bramy (sekcja d, Z39)
+    from . import android                       # telefon testowy i ekran (E11): opcjonalne, brak = „ok” z opisem
+    wyniki += android.sprawdzenia(u, ot)
     return {"root": str(u.root), "czas": time.strftime("%Y-%m-%dT%H:%M:%S"), "serwis": stan is not None,
             "wyniki": wyniki, "bledy": sum(w["stan"] == "blad" for w in wyniki),
             "uwagi": sum(w["stan"] == "uwaga" for w in wyniki)}

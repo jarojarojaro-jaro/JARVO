@@ -1036,7 +1036,10 @@ def test_sprzatanie_po_okresie_przejsciowym(windows):
     assert not any(x[1:2] == ["--unregister"] for x in windows["atrapa"].wywolania)
     windows["s"].teraz = lambda: TERAZ + 15 * 86400
     odpowiedzi = []
-    windows["s"].pytaj = lambda q: (odpowiedzi.append(q), "Jarvo" in q or "Resztki" in q)[1]
+    # zgoda tylko na pytania o pustą dystrybucję i resztki instalatora (po początku pytania: ścieżka testu na
+    # D:\JarvoTest\… też zawiera „Jarvo”, a pytanie o stare dane ma w sobie ścieżkę)
+    windows["s"].pytaj = lambda q: (odpowiedzi.append(q),
+                                    q.startswith(("Wyrejestrować dystrybucję Jarvo", "Resztki starego instalatora")))[1]
     assert mig.main(sprzatanie, uklad=windows["u"], system=windows["s"], natywne=windows["n"].jako()) == 0
     assert ["wsl.exe", "--unregister", "Jarvo"] in windows["atrapa"].wywolania
     assert not any(x[1:2] == ["--unregister"] and x[2] != "Jarvo" for x in windows["atrapa"].wywolania)

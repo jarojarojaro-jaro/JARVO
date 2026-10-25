@@ -807,7 +807,7 @@ def test_cli_update_i_uninstall_nie_sa_juz_w_budowie(tmp_path, capsys):
     assert odin.args[-1].wszystko and odin.args[-1].tak and not odin.args[-1].json
     assert cli.main(["uninstall", "-y"], otoczenie=ot) == 1 and not odin.args[-1].wszystko
     assert cli.main(["update", "--nieznana"], otoczenie=ot) == 2
-    assert cli.main(["migruj"], otoczenie=ot) == 2 and "w budowie" in capsys.readouterr().err
+    assert cli.main(["migruj"], otoczenie=ot) == 1 and "brak modułu migracji" in capsys.readouterr().err  # podpięte
     assert cli.main(["help", "update"], otoczenie=ot) == 0
     out = capsys.readouterr().out
     assert "--sprawdz" in out and "--ref" in out and "--pomocnik" in out
