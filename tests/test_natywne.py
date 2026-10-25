@@ -537,13 +537,12 @@ def test_piaskownica_chromium_czyta_pliki_przegladarki(tmp_path):
     assert przenosne.dla_piaskownicy_chromium(k) is (os.name == "nt")
     assert przenosne.dla_piaskownicy_chromium(k) is False                     # znacznik: drugi raz nic
     if os.name == "nt":
-        # SID-y wpisów (nazwy grup w icacls zależą od języka Windows)
-        sidy = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command",
-                               f"(Get-Acl -LiteralPath '{k / 'chrome-win64' / 'chrome.exe'}').GetAccessRules($true, $true, "
-                               "[System.Security.Principal.SecurityIdentifier]) | ForEach-Object "
-                               "{ $_.IdentityReference.Value + ' ' + $_.FileSystemRights }"],
-                              capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
-        assert re.search(r"^S-1-15-2-2 ReadAndExecute", sidy, re.M), sidy
+        # ACL w SDDL (icacls /save): SID-y zamiast nazw grup, które zależą od języka Windows; RX = 0x1200a9
+        zapis = tmp_path / "acl.txt"
+        subprocess.run(["icacls", str(k / "chrome-win64" / "chrome.exe"), "/save", str(zapis)], capture_output=True,
+                       check=True)
+        sddl = zapis.read_bytes().decode("utf-16-le", errors="replace")
+        assert re.search(r"\(A;[^;]*;0x1200a9;;;S-1-15-2-2\)", sddl), sddl
         assert (k / przenosne.ZNACZNIK_PIASKOWNICY).is_file()
     else:
         assert not (k / przenosne.ZNACZNIK_PIASKOWNICY).exists()
