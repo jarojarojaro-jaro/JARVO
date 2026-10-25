@@ -127,6 +127,11 @@ def test_uklad_domyslny_posix(monkeypatch, tmp_path):
         assert sciezki.uklad({**xdg, "JARVO_ROOT": str(tmp_path / "xd" / "jarvo") + "/"}) == u
         inny = sciezki.uklad({**xdg, "JARVO_ROOT": str(tmp_path / "inny")})
         assert inny.logi == tmp_path / "inny" / "logi" and inny.cache == tmp_path / "inny" / "cache"
+        # otoczenie procesów Jarva (XDG_CACHE_HOME=<cache>/xdg): instalator z aktualizacji w panelu liczy ten sam
+        # <cache> (CI natywnie: przebieg po aktualizacji zmieniał ścieżki cache w srodowisko.json)
+        floty = srodowisko.srodowisko(u, {**xdg, "PATH": ""}, narz={}, biez={}, build={})
+        assert floty["XDG_CACHE_HOME"] == str(u.cache / "xdg")
+        assert sciezki.uklad({**xdg, "XDG_CACHE_HOME": floty["XDG_CACHE_HOME"]}) == u
 
 
 def test_srodowisko_procesow_i_plik_bez_sekretow(tmp_path):

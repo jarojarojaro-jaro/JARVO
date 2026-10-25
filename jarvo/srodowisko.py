@@ -133,8 +133,9 @@ def srodowisko(u: Uklad, baza: dict | None = None, *, biez: dict | None = None,
         # shutil.which i cmd.exe szukają programu najpierw w bieżącym katalogu: obcy git.bat w projekcie wygrałby
         # z prawdziwym gitem; ta zmienna wyłącza to w Pythonie 3.12+ i w cmd.exe
         env["NoDefaultCurrentDirectoryInExePath"] = "1"
-    else:
-        env["XDG_CACHE_HOME"] = str(u.cache / "xdg")
+    # cache narzędzi, które czytają XDG_CACHE_HOME na każdym systemie (np. ezdxf warsztatu 3D pisał na Windows do
+    # ~/.cache, który zostawał po odinstalowaniu): w katalogu Jarva
+    env["XDG_CACHE_HOME"] = str(u.cache / "xdg")
     if biez.get("app"):
         env["JARVO_REPO"] = str(biez["app"])
     if biez.get("hermes"):

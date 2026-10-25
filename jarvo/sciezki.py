@@ -143,7 +143,13 @@ def uklad(env: dict | None = None) -> Uklad:
         logi, cache = root / "logi", root / "cache"
     else:
         logi = Path(env.get("XDG_STATE_HOME") or Path.home() / ".local" / "state") / "jarvo" / "logi"
-        cache = Path(env.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "jarvo"
+        xdg = Path(env["XDG_CACHE_HOME"]) if env.get("XDG_CACHE_HOME") else None
+        # procesy Jarva mają XDG_CACHE_HOME=<cache>/xdg (srodowisko.py, cache narzędzi floty): instalator wołany
+        # z nich (aktualizacja z panelu) liczy ten sam <cache>, a nie <cache>/xdg/jarvo
+        if xdg is not None and xdg.name == "xdg" and xdg.parent.name == "jarvo":
+            cache = xdg.parent
+        else:
+            cache = (xdg or Path.home() / ".cache") / "jarvo"
     if env.get("JARVO_ROOT") and not _ta_sama(root, _korzen({k: v for k, v in env.items() if k != "JARVO_ROOT"})):
         logi, cache = root / "logi", root / "cache"
     program = root / "program"
