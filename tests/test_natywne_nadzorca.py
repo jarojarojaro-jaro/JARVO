@@ -1,9 +1,13 @@
 """Nadzorca procesów Jarva, `jarvo serwis` (docs/NATYWNIE.md: H04, H09, H22, c2, I10, N03), na atrapach usług, bez
-Hermesa: restart po kodzie 75, postój po 78, rosnąca przerwa z sufitem i zerowaniem, kolejność startu z gotowością
-(plik i serwer HTTP na 127.0.0.1:191xx), jedna instancja na korzeń, kanał sterowania (status, restart, stop, zły
-klucz), logi z rotacją „kopiuj i przytnij”, zatrzymanie łagodne i twarde, sprzątanie po poprzednim nadzorcy, usługi
-Jarva (argv i zmienne Hermesa f97608f), pytanie do potoku sterującego bramy, a na Windows launcher z dzieckiem
-(zabity launcher i dziecko, wnuk żyje) i DACL potoku kanału."""
+Hermesa: restart po kodzie 75 (szybkie wyjścia 75 z rosnącą przerwą i powodem z PID-em programu, który trzyma port),
+postój po 78, rosnąca przerwa z sufitem i zerowaniem, kolejność startu z gotowością (plik i serwer HTTP na
+127.0.0.1:191xx), gotowość panelu tylko dla własnego HERMES_HOME, jedna instancja na korzeń, kanał sterowania
+(status, restart, stop, zły klucz, milczący klient i milczący nadzorca, zamknięcie bez zakleszczenia przy klientach
+w trakcie stopu, odpowiedź na stop przed końcem nadzorcy), trwałe zatrzymanie (znacznik, `jarvo serwis` przy znaczniku, --stop, --wznow), logi z rotacją
+„kopiuj i przytnij”, zatrzymanie łagodne i twarde z limitem na usługę, sprzątanie po poprzednim nadzorcy, odcisk
+procesu niezależny od locale i strefy, `jarvo serwis` jako osobny proces (stop z czekaniem, sygnał), usługi Jarva
+(argv, zmienne i limity Hermesa f97608f), pytanie do potoku sterującego bramy, a na Windows launcher z dzieckiem
+(zabity launcher i dziecko, wnuk żyje), CREATE_BREAKAWAY_FROM_JOB i DACL potoku kanału."""
 from __future__ import annotations
 
 import asyncio
@@ -11,6 +15,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -31,6 +36,7 @@ sys.path.insert(0, str(REPO))
 from jarvo import nadzorca, przenosne, sciezki, srodowisko  # noqa: E402
 
 WINDOWS = os.name == "nt"
+MACOS = sys.platform == "darwin"
 # Na Windows `Scripts\python.exe` venvu to launcher z procesem potomnym, a atrapa ma być jednym procesem
 # (test launchera buduje drzewo sam); bazowy interpreter wystarczy, bo atrapy biorą tylko bibliotekę standardową.
 PY = sys.executable
@@ -52,11 +58,11 @@ with open(plik, encoding="utf-8") as f:
     n = len(f.read().splitlines())
 if tryb == "75-raz" and n == 1:
     sys.exit(75)
-if tryb in ("78", "1"):
+if tryb in ("78", "1", "75"):
     sys.exit(int(tryb))
-if tryb == "1-po":
+if tryb in ("1-po", "75-po"):
     time.sleep(float(sys.argv[3]))
-    sys.exit(1)
+    sys.exit(int(tryb.split("-")[0]))
 if tryb == "gotowa-po":
     time.sleep(float(sys.argv[3]))
     open(sys.argv[4], "w").close()
@@ -145,6 +151,12 @@ def usluga(n: nadzorca.Nadzorca, nazwa: str) -> dict:
     return (n.stan().get("uslugi") or {}).get(nazwa) or {}
 
 
+def nazwa_testu(tekst: str) -> bool:
+    """Nazwa procesu tego testu: python (python -m pytest, python.exe, Python z frameworka macOS) albo pytest
+    (Linux nazywa proces skryptu z shebangiem nazwą skryptu)."""
+    return any(x in tekst.lower() for x in ("python", "pytest"))
+
+
 def wolny_port() -> int:
     for port in range(19150, 19200):
         with socket.socket() as s:
@@ -154,6 +166,31 @@ def wolny_port() -> int:
                 continue
             return port
     pytest.skip("brak wolnego portu 19150–19199")
+
+
+@contextmanager
+def serwer_http(odpowiedz: dict):
+    """Serwer HTTP na 127.0.0.1:191xx w tym procesie: GET zwraca 200 i `odpowiedz` jako JSON (jak /api/status)."""
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            tresc = json.dumps(odpowiedz).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(tresc)))
+            self.end_headers()
+            self.wfile.write(tresc)
+
+        def log_message(self, *_a):
+            pass
+
+    port = wolny_port()
+    httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        yield port
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
 
 
 def test_restart_po_kodzie_75(u, tmp_path):
@@ -212,6 +249,35 @@ def test_przerwa_zeruje_sie_po_dlugim_dzialaniu(u, tmp_path):
         assert usluga(n, "a")["bledy_z_rzedu"] == 1
     przerwy = przerwy_z_dziennika(u, "a")
     assert len(przerwy) >= 3 and set(przerwy) == {0.1}                           # zawsze od początku
+
+
+def test_kod_75_na_zajetym_porcie_rosnaca_przerwa_i_kto_trzyma_port(u, tmp_path):
+    """Hermes kończy dashboard kodem 75, gdy port jest zajęty (np. prywatny Hermes właściciela na 9119): bez
+    rosnącej przerwy panel wstawałby co 5 s bez końca. Port trzyma tu ten proces testu."""
+    plik = tmp_path / "p.jsonl"
+    with serwer_http({"hermes_home": str(tmp_path / "prywatny")}) as port:
+        n = nowy(u, [Usluga("panel", atrapa(plik, "75"), port=port)], przerwa_restartu=0.1, przerwa_max=0.4)
+        with dziala(n):
+            czekaj(lambda: len(starty(plik)) >= 5, limit=30, opis="pięć startów")
+            s = czekaj(lambda: (x := usluga(n, "panel")).get("stan") == "ponowienie" and x)
+        assert s["ostatni_kod"] == 75 and s["szybkie_75_z_rzedu"] >= 4 and s["port"] == port
+        assert f"kod 75: port {port} zajęty przez inny program (" in s["powod"]
+        if not (MACOS and not shutil.which("lsof")):
+            assert f"(PID {os.getpid()}, " in s["powod"]
+            assert nazwa_testu(s["powod"].partition(f"(PID {os.getpid()}, ")[2].partition(")")[0])
+        assert "raz z rzędu" in s["powod"]
+    assert przerwy_z_dziennika(u, "panel")[:5] == [0.1, 0.2, 0.4, 0.4, 0.4]
+
+
+def test_kod_75_po_dluzszym_dzialaniu_zawsze_krotka_przerwa(u, tmp_path):
+    plik = tmp_path / "a.jsonl"
+    n = nowy(u, [Usluga("a", atrapa(plik, "75-po", 0.3))], przerwa_restartu=0.1, przerwa_max=5, szybki_restart=0.2)
+    with dziala(n):
+        czekaj(lambda: len(starty(plik)) >= 4, limit=20, opis="cztery starty")
+        s = czekaj(lambda: (x := usluga(n, "a")).get("stan") == "ponowienie" and x, opis="przerwa po 75")
+        assert s["szybkie_75_z_rzedu"] == 0 and "poprosiła o restart" in s["powod"]
+    przerwy = przerwy_z_dziennika(u, "a")
+    assert len(przerwy) >= 3 and set(przerwy) == {0.1}                           # /restart po pracy: zawsze 5 s
 
 
 def test_kolejnosc_startu_czeka_na_gotowosc(u, tmp_path):
@@ -273,6 +339,39 @@ def test_http_gotowa_tylko_200(tmp_path):
     assert nadzorca.http_gotowa(f"http://127.0.0.1:{port}/api/status", limit=0.5) is False
 
 
+def test_panel_gotowy_tylko_dla_wlasnego_hermes_home(tmp_path):
+    """Cudzy dashboard na porcie panelu (200 z innym hermes_home) to nie gotowość panelu Jarva."""
+    dane = tmp_path / "dane"
+    dane.mkdir()
+    odpowiedz = {"version": "0.21.5", "hermes_home": str(dane), "auth_required": False}
+    with serwer_http(odpowiedz) as port:
+        adres = f"http://127.0.0.1:{port}/api/status"
+        assert nadzorca.panel_gotowy(adres, dane) is True
+        odpowiedz["hermes_home"] = str(dane).upper() if WINDOWS else str(dane / ".." / "dane")
+        assert nadzorca.panel_gotowy(adres, dane) is True             # ta sama ścieżka zapisana inaczej
+        odpowiedz["hermes_home"] = str(tmp_path / "prywatny-hermes")
+        assert nadzorca.panel_gotowy(adres, dane) is False            # prywatny Hermes właściciela na tym porcie
+        del odpowiedz["hermes_home"]
+        assert nadzorca.panel_gotowy(adres, dane) is False            # bez ścieżki i bez bramki: nie wiadomo, czyj
+        odpowiedz["auth_required"] = True
+        assert nadzorca.panel_gotowy(adres, dane) is True             # bramka logowania ukrywa ścieżki (tryb LAN)
+    assert nadzorca.panel_gotowy(adres, dane, limit=0.5) is False
+
+
+def test_wlasciciel_portu_pid_i_nazwa():
+    port = wolny_port()
+    assert nadzorca.wlasciciel_portu(port) is None                    # nikt nie słucha
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", port))
+        s.listen(8)
+        kto = nadzorca.wlasciciel_portu(port)
+    assert kto is not None
+    if MACOS and not shutil.which("lsof"):
+        pytest.skip("macOS bez lsof: system nie podaje właściciela portu")
+    pid, nazwa = kto
+    assert pid == os.getpid() and nazwa and nazwa_testu(nazwa)
+
+
 def test_jedna_instancja_na_korzen(u, tmp_path, monkeypatch, capsys):
     pa, pb = tmp_path / "a.jsonl", tmp_path / "b.jsonl"
     n = nowy(u, [Usluga("a", atrapa(pa, "spi"))])
@@ -306,6 +405,8 @@ def test_kanal_status_restart_stop_i_zly_klucz(u, tmp_path):
         stan = czekaj(lambda: (x := k.status())["uslugi"]["a"]["stan"] == "dziala" and starty(plik) and x)
         assert stan["nadzorca"]["pid"] == os.getpid() and stan["nadzorca"]["stan"] == "dziala"
         assert stan["uslugi"]["a"]["pid"] == starty(plik)[0]["pid"]
+        z_pliku = nadzorca.stan_z_pliku(u)
+        assert z_pliku["dziala"] is True and z_pliku["zatrzymanie"] is None
         assert k.restart("a")["ok"] is True
         czekaj(lambda: len(starty(plik)) == 2 and k.status()["uslugi"]["a"]["restarty"] == 1, opis="restart")
         assert k.status()["uslugi"]["a"]["pid"] == starty(plik)[1]["pid"]
@@ -324,7 +425,8 @@ def test_kanal_status_restart_stop_i_zly_klucz(u, tmp_path):
             assert Path(adres).stat().st_mode & 0o777 == 0o600
             assert Path(adres).parent.stat().st_mode & 0o777 == 0o700
         assert ((u.stan / "nadzorca.klucz").stat().st_size == 32)
-        assert k.stop()["ok"] is True
+        odp = k.stop(powod="próba kanału")
+        assert odp["ok"] is True and odp["trwale"] is True
         t.join(30)
         assert not t.is_alive()
     finally:
@@ -335,6 +437,184 @@ def test_kanal_status_restart_stop_i_zly_klucz(u, tmp_path):
         nadzorca.polacz(u)
     log = (u.logi / "nadzorca.log").read_text(encoding="utf-8")
     assert "odrzucone połączenie" in log and "zly-klucz" not in log
+    assert nadzorca.zatrzymany(u)                                        # stop z kanału = trwałe zatrzymanie
+    assert nadzorca.stan_z_pliku(u)["zatrzymanie"]["powod"] == "próba kanału"
+
+
+def test_kanal_zamyka_sie_gdy_watek_kanalu_trzyma_innego_klienta(u, monkeypatch):
+    """Wyścig z recenzji: accept() wrócił z połączeniem prawdziwego klienta i właśnie wtedy przychodzi stop. Budzik
+    z kluczem czekałby wtedy bez końca na wymianę HMAC, której nikt już nie zacznie (nadzorca z blokadą wisi)."""
+    n = nowy(u, [], kanal=True)
+    przyjal = threading.Event()
+    oryginal = nadzorca._Sluchacz.accept
+
+    def accept(self):
+        c = oryginal(self)
+        if not przyjal.is_set():
+            przyjal.set()
+            n._kanal._koniec.wait(15)            # wątek kanału „wywłaszczony” tuż po accept()
+        return c
+
+    monkeypatch.setattr(nadzorca._Sluchacz, "accept", accept)
+
+    def klient():
+        while not przyjal.is_set():
+            try:
+                nadzorca.Klient(u, limit=3).status()
+            except nadzorca.BladNadzorcy:
+                time.sleep(0.02)
+
+    t = threading.Thread(target=n.uruchom, daemon=True)
+    t.start()
+    k = threading.Thread(target=klient, daemon=True)
+    k.start()
+    assert przyjal.wait(20), "kanał nie przyjął klienta"
+    t0 = time.monotonic()
+    n.zatrzymaj()
+    t.join(20)
+    assert not t.is_alive(), "zamknięcie kanału wisi"
+    assert time.monotonic() - t0 < 10
+    k.join(10)
+    assert not k.is_alive(), "klient wisi po zamknięciu kanału"
+
+
+def test_kanal_stop_nie_wisi_przy_klientach_pytajacych_w_trakcie(tmp_path):
+    """Jak pętla `jarvo down` albo instalatora, tylko gęściej: dwóch klientów pyta o status w trakcie zatrzymania.
+    Przed poprawką wisiało ok. 40% zatrzymań; teraz każde kończy się w kilka sekund, a żadne pytanie nie trwa
+    dłużej niż limit klienta."""
+    for i in range(6):
+        u = sciezki.uklad({"JARVO_ROOT": str(tmp_path / f"j{i}")})
+        n = nadzorca.Nadzorca(u, [], {}, kanal=True, takt=0.01)
+        t = threading.Thread(target=n.uruchom, daemon=True)
+        t.start()
+        czekaj(lambda: _klient(u), opis=f"kanał w przebiegu {i}")
+        koniec, najdluzej = threading.Event(), [0.0]
+
+        def pytaj():
+            while not koniec.is_set():
+                t0 = time.monotonic()
+                try:
+                    nadzorca.Klient(u, limit=2).status()
+                except nadzorca.BladNadzorcy:
+                    time.sleep(0.002)
+                najdluzej[0] = max(najdluzej[0], time.monotonic() - t0)
+
+        pytajacy = [threading.Thread(target=pytaj, daemon=True) for _ in range(2)]
+        for w in pytajacy:
+            w.start()
+        time.sleep(0.2)
+        t0 = time.monotonic()
+        n.zatrzymaj()
+        t.join(20)
+        czas = time.monotonic() - t0
+        koniec.set()
+        for w in pytajacy:
+            w.join(10)
+        assert not t.is_alive(), f"przebieg {i}: zatrzymanie wisi"
+        assert czas < 10, f"przebieg {i}: zatrzymanie trwało {czas:.1f} s"
+        assert not any(w.is_alive() for w in pytajacy) and najdluzej[0] < 6, najdluzej[0]
+
+
+def test_kanal_przy_zamykaniu_czeka_na_odpowiedz_na_stop(u, monkeypatch):
+    """Bez usług pętla kończy się zaraz po „stop”, a w procesie `jarvo serwis` wątki w tle giną razem z nim:
+    zamknięcie kanału czeka na trwające odpowiedzi (najdłużej 1 s), więc `jarvo down` dostaje odpowiedź."""
+    oryginal = nadzorca.Nadzorca._obsluz
+    obsluzone: list[float] = []
+
+    def obsluz(self, zadanie):
+        odp = oryginal(self, zadanie)
+        if zadanie.get("polecenie") == "stop":
+            time.sleep(0.5)                               # odpowiedź jeszcze w drodze, gdy pętla już skończyła
+            obsluzone.append(time.monotonic())
+        return odp
+
+    monkeypatch.setattr(nadzorca.Nadzorca, "_obsluz", obsluz)
+    n = nowy(u, [], kanal=True)
+    koniec: list[float] = []
+    t = threading.Thread(target=lambda: (n.uruchom(), koniec.append(time.monotonic())), daemon=True)
+    t.start()
+    k = czekaj(lambda: _klient(u), opis="kanał nadzorcy")
+    assert k.stop(powod="test")["trwale"] is True
+    t.join(20)
+    assert not t.is_alive() and obsluzone and koniec and koniec[0] >= obsluzone[0]
+
+
+def test_klient_nie_wisi_gdy_kanal_milczy(u):
+    """Gniazdo albo potok istnieje, ale nikt nie zaczyna wymiany klucza (nadzorca zawieszony): limit klienta obejmuje
+    połączenie i wymianę klucza, nie tylko czekanie na odpowiedź."""
+    adres, rodzina = nadzorca.adres_kanalu(u)
+    u.stan.mkdir(parents=True)
+    (u.stan / "nadzorca.klucz").write_bytes(b"k" * 32)
+    if rodzina == "AF_PIPE":
+        sluchacz = connection.Listener(adres, "AF_PIPE")               # instancja potoku czeka, nikt jej nie obsłuży
+        zamknij = sluchacz.close
+    else:
+        Path(adres).parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        gniazdo = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        gniazdo.bind(adres)
+        gniazdo.listen(8)                                               # słucha, ale nikt nie przyjmuje połączeń
+
+        def zamknij():
+            gniazdo.close()
+            os.unlink(adres)
+            if Path(adres).parent != u.stan:
+                Path(adres).parent.rmdir()
+    try:
+        t0 = time.monotonic()
+        with pytest.raises(nadzorca.NadzorcaNieDziala, match="nie odpowiedział w 1 s"):
+            nadzorca.Klient(u, limit=1.0).status()
+        assert time.monotonic() - t0 < 5
+    finally:
+        zamknij()
+
+
+def test_znacznik_zatrzymania_api(u):
+    assert not nadzorca.zatrzymany(u) and nadzorca.zdejmij_zatrzymanie(u) is False
+    nadzorca.oznacz_zatrzymanie(u, "jarvo down, token 123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw")
+    assert nadzorca.zatrzymany(u)
+    z = json.loads((u.stan / "zatrzymany.json").read_text(encoding="utf-8"))
+    assert z["powod"].startswith("jarvo down") and "AAHdq" not in z["powod"] and z["kiedy"] and z["pid"] == os.getpid()
+    assert nadzorca.stan_z_pliku(u) == {}                              # nadzorca nigdy nie działał
+    assert nadzorca.zdejmij_zatrzymanie(u) is True and not nadzorca.zatrzymany(u)
+
+
+def test_main_przy_znaczniku_konczy_od_razu_kodem_0(tmp_path, monkeypatch, capsys):
+    """Zapasowy wyzwalacz Harmonogramu (odblokowanie, co 5 minut) po `jarvo down`: `jarvo serwis` nic nie startuje."""
+    monkeypatch.setenv("JARVO_ROOT", str(tmp_path / "j"))
+    u = sciezki.uklad()
+    nadzorca.oznacz_zatrzymanie(u, "jarvo down")
+    assert nadzorca.main([]) == 0                        # bez Hermesa: znacznik sprawdzany przed wszystkim innym
+    out = capsys.readouterr().out
+    assert "zatrzymany (jarvo down, " in out and "jarvo up" in out and "--wznow" in out
+    assert nadzorca.main(["--status"]) == 1
+    assert "jarvo up" in capsys.readouterr().err
+    assert nadzorca.main(["--wznow"]) == 1               # znacznik zdjęty, start trafia na brak Hermesa
+    assert "current.json" in capsys.readouterr().err and not nadzorca.zatrzymany(u)
+    assert nadzorca.main(["--stop"]) == 0                # nadzorca nie działa: znacznik i tak zostaje zapisany
+    assert "nie działał" in capsys.readouterr().out and nadzorca.zatrzymany(u)
+
+
+def test_nadzorca_szanuje_znacznik_przy_starcie_i_w_trakcie(u, tmp_path):
+    plik = tmp_path / "a.jsonl"
+    nadzorca.oznacz_zatrzymanie(u, "jarvo down")
+    n = nowy(u, [Usluga("a", atrapa(plik, "spi"))], szanuj_zatrzymanie=True)
+    with pytest.raises(nadzorca.NadzorcaZatrzymany, match="jarvo up"):
+        n.uruchom()
+    assert not starty(plik) and not (u.stan / "nadzorca.json").exists()      # stan poprzedniego zostaje
+    nadzorca.zdejmij_zatrzymanie(u)
+    n = nowy(u, [Usluga("a", atrapa(plik, "spi"))], szanuj_zatrzymanie=True, co_ile_znacznik=0.05)
+    t = threading.Thread(target=n.uruchom, daemon=True)
+    t.start()
+    try:
+        czekaj(lambda: usluga(n, "a").get("stan") == "dziala", opis="start bez znacznika")
+        nadzorca.oznacz_zatrzymanie(u, "jarvo down bez kanału")        # np. kanał nie odpowiadał
+        t.join(30)
+        assert not t.is_alive(), "nadzorca nie zauważył znacznika"
+    finally:
+        n.zatrzymaj()
+        t.join(30)
+    assert nadzorca.stan_z_pliku(u)["uslugi"]["a"]["stan"] == "zatrzymana"
+    assert "pojawił się znacznik zatrzymania" in (u.logi / "nadzorca.log").read_text(encoding="utf-8")
 
 
 def test_main_bez_nadzorcy(tmp_path, monkeypatch, capsys):
@@ -343,6 +623,91 @@ def test_main_bez_nadzorcy(tmp_path, monkeypatch, capsys):
     assert "nie działa" in capsys.readouterr().err
     assert nadzorca.main([]) == 1                                       # brak instalacji Hermesa
     assert "current.json" in capsys.readouterr().err
+
+
+NAPED = r'''
+import sys
+sys.path.insert(0, sys.argv[1])
+from jarvo import nadzorca
+py, kod, plik = sys.argv[2], sys.argv[3], sys.argv[4]
+nadzorca.uslugi_jarva = lambda u, env: [nadzorca.Usluga("a", [py, "-c", kod, plik, "spi"])]
+sys.exit(nadzorca.main(sys.argv[5:]))
+'''
+
+
+def serwis(root: Path, wyjscie: Path, plik: Path, *argumenty: str) -> subprocess.Popen:
+    """`jarvo serwis` jako osobny proces (jak z autostartu), z atrapą usługi zamiast bramy i panelu."""
+    flagi = {"creationflags": 0x08000000 | 0x00000200} if WINDOWS else {"start_new_session": True}
+    with open(wyjscie, "ab") as out:
+        return subprocess.Popen([PY, "-c", NAPED, str(REPO), PY, ATRAPA, str(plik), *argumenty],
+                                env={**os.environ, "JARVO_ROOT": str(root), "PYTHONUTF8": "1"},
+                                stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT, **flagi)
+
+
+def test_serwis_jako_proces_stop_z_czekaniem_znacznik_i_sygnal(tmp_path):
+    root, wyjscie, plik = tmp_path / "j", tmp_path / "serwis.out", tmp_path / "a.jsonl"
+    u = sciezki.uklad({"JARVO_ROOT": str(root)})
+    p = serwis(root, wyjscie, plik)
+    try:
+        czekaj(lambda: _klient(u) and starty(plik), limit=60, opis="serwis w osobnym procesie")
+        assert nadzorca.stan_z_pliku(u)["dziala"] is True             # odcisk procesu liczony w innym procesie
+        pierwsza = starty(plik)[0]["pid"]
+        odp = nadzorca.polacz(u).stop(czekaj=60, powod="jarvo down")
+        assert odp["trwale"] is True and p.wait(15) == 0               # stop(czekaj) wraca po końcu procesu
+        assert nadzorca._odcisk(pierwsza) is None and nadzorca.zatrzymany(u)
+        assert nadzorca.stan_z_pliku(u)["dziala"] is False
+        p = serwis(root, wyjscie, plik)                                # zapasowy wyzwalacz autostartu
+        assert p.wait(60) == 0 and len(starty(plik)) == 1
+        assert "Serwis Jarva jest zatrzymany (jarvo down" in wyjscie.read_text(encoding="utf-8", errors="replace")
+        p = serwis(root, wyjscie, plik, "--wznow")                     # jawny start zdejmuje znacznik
+        czekaj(lambda: _klient(u) and len(starty(plik)) == 2, limit=60, opis="serwis po --wznow")
+        assert not nadzorca.zatrzymany(u)
+        if WINDOWS:
+            assert nadzorca._lagodnie(p.pid)                           # Ctrl+Break do konsoli serwisu
+        else:
+            p.send_signal(signal.SIGTERM)
+        assert p.wait(60) == 0
+        assert nadzorca._odcisk(starty(plik)[1]["pid"]) is None
+        assert not nadzorca.zatrzymany(u)                              # sygnał nie zapisuje znacznika
+    finally:
+        if p.poll() is None:
+            p.kill()
+
+
+def test_odcisk_nie_zalezy_od_locale_ani_strefy():
+    """Ten sam proces ma ten sam odcisk z launchd (bez LANG) i z terminala z pl_PL albo inną strefą."""
+    kod = ("import sys; sys.path.insert(0, sys.argv[1]); from jarvo import nadzorca; "
+           "print(nadzorca._odcisk(int(sys.argv[2])))")
+    wyniki = set()
+    for zmienne in ({"LANG": "pl_PL.UTF-8", "LC_ALL": "pl_PL.UTF-8", "TZ": "Asia/Tokyo"},
+                    {"LANG": "C", "LC_ALL": "C", "TZ": "UTC"}, {"LANG": "de_DE.UTF-8", "TZ": "America/New_York"}):
+        wynik = subprocess.run([PY, "-c", kod, str(REPO), str(os.getpid())], env={**os.environ, **zmienne},
+                               capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
+        assert wynik.returncode == 0, wynik.stderr
+        wyniki.add(wynik.stdout.strip())
+    assert wyniki == {nadzorca._odcisk(os.getpid())}
+
+
+def test_odcisk_procesu_zakonczonego_i_zombie():
+    p = subprocess.Popen([PY, "-c", "import sys; sys.stdin.read()"], stdin=subprocess.PIPE)
+    try:
+        czekaj(lambda: nadzorca._odcisk(p.pid), opis="odcisk żywego procesu")
+        p.stdin.close()
+        czekaj(lambda: nadzorca._odcisk(p.pid) is None, opis="koniec procesu")
+        assert p.returncode is None                                    # jeszcze niezebrany (POSIX: zombie)
+    finally:
+        p.wait(10)
+
+
+@pytest.mark.skipif(not MACOS, reason="tylko macOS")
+def test_macos_odcisk_z_libproc_i_zapasowo_z_ps(monkeypatch):
+    assert str(nadzorca._odcisk_bsd(os.getpid())).startswith("bsd:")  # libproc działa i ma ten układ struktury
+    pierwszy = nadzorca._odcisk_ps(os.getpid())
+    assert pierwszy and pierwszy.startswith("ps:")
+    for nazwa, wartosc in (("LANG", "pl_PL.UTF-8"), ("LC_ALL", "pl_PL.UTF-8"), ("TZ", "Asia/Tokyo")):
+        monkeypatch.setenv(nazwa, wartosc)
+    assert nadzorca._odcisk_ps(os.getpid()) == pierwszy
+    assert nadzorca._nazwa_procesu(os.getpid())
 
 
 def test_dziennik_kopiuj_i_przytnij_bez_dziury(tmp_path):
@@ -362,6 +727,21 @@ def test_dziennik_kopiuj_i_przytnij_bez_dziury(tmp_path):
         f.close()
     assert sorted(p.name for p in tmp_path.glob("x.log*")) == ["x.log", "x.log.1", "x.log.2"]
     assert (tmp_path / "x.log").read_bytes() == b"d" and (tmp_path / "x.log.2").read_bytes() == b"b" * 10 + b"c" * 95
+
+
+def test_start_mimo_nieudanej_rotacji_dziennika_nadzorcy(u, tmp_path, monkeypatch):
+    """Windows: kopię dziennika trzyma podgląd bez FILE_SHARE_DELETE; rotacja przy starcie nie może zatrzymać floty."""
+    oryginal = nadzorca._Dziennik.rotuj
+
+    def rotuj(self, wymus=False):
+        if self.sciezka.name == "nadzorca.log":
+            raise PermissionError(32, "plik używany przez inny proces")
+        return oryginal(self, wymus)
+
+    monkeypatch.setattr(nadzorca._Dziennik, "rotuj", rotuj)
+    plik = tmp_path / "a.jsonl"
+    with dziala(nowy(u, [Usluga("a", atrapa(plik, "spi"))])):
+        czekaj(lambda: starty(plik), opis="start mimo rotacji")
 
 
 def test_logi_uslugi_rotacja_przy_pracujacym_procesie(u, tmp_path):
@@ -403,6 +783,22 @@ def test_zatrzymanie_lagodne_i_twarde(u, tmp_path):
     assert stan["uslugi"]["a"]["stan"] == stan["uslugi"]["b"]["stan"] == "zatrzymana"
     assert stan["nadzorca"]["stan"] == "zatrzymany" and stan["dziala"] is False
     assert "b: nie skończył się w 0.8 s, zabity" in (u.logi / "nadzorca.log").read_text(encoding="utf-8")
+    assert not nadzorca.zatrzymany(u)                                  # zatrzymaj() bez znacznika
+
+
+def test_limit_zatrzymania_osobno_dla_uslugi(u, tmp_path):
+    """Brama dostaje 70 s (budżet Hermesa), panel 30 s: limit usługi wygrywa z limitem nadzorcy."""
+    pa, pb = tmp_path / "a.jsonl", tmp_path / "b.jsonl"
+    n = nowy(u, [Usluga("a", atrapa(pa, "uparta"), limit_stopu=0.3), Usluga("b", atrapa(pb, "uparta"))],
+             limit_stopu=1.5)
+    with dziala(n):
+        czekaj(lambda: starty(pa) and starty(pb), opis="obie usługi")
+        assert (usluga(n, "a")["limit_stopu"], usluga(n, "b")["limit_stopu"]) == (0.3, 1.5)
+        t0 = time.monotonic()
+    czas = time.monotonic() - t0
+    log = (u.logi / "nadzorca.log").read_text(encoding="utf-8")
+    assert "a: nie skończył się w 0.3 s, zabity" in log and "b: nie skończył się w 1.5 s, zabity" in log
+    assert 1.5 <= czas < 15
 
 
 def test_sprzata_proces_po_poprzednim_nadzorcy(u, tmp_path):
@@ -428,7 +824,7 @@ def test_sprzata_proces_po_poprzednim_nadzorcy(u, tmp_path):
             stary.kill()
 
 
-def test_uslugi_jarva_argv_i_srodowisko_hermesa(tmp_path):
+def test_uslugi_jarva_argv_srodowisko_i_limity_hermesa(tmp_path):
     u = sciezki.uklad({"JARVO_ROOT": str(tmp_path / "j")})
     with pytest.raises(nadzorca.BladNadzorcy, match="current.json"):
         nadzorca.uslugi_jarva(u, {})
@@ -454,7 +850,13 @@ def test_uslugi_jarva_argv_i_srodowisko_hermesa(tmp_path):
     assert panel.env["HERMES_SUPERVISED_CHILD"] == "1" and "HERMES_GATEWAY_DETACHED" not in panel.env
     assert brama.env["HERMES_HOME"] == str(u.dane) and Path(brama.cwd) == u.dane == Path(panel.cwd)
     assert "HERMES_WEB_DIST" not in panel.env                         # dist bez index.html nie istnieje
-    assert panel.gotowa.args == ("http://127.0.0.1:19123/api/status",)
+    # gotowość panelu: /api/status z hermes_home tej instalacji; limity jak TimeoutStopSec Hermesa (70 s) i 30 s
+    assert panel.gotowa.func is nadzorca.panel_gotowy
+    assert panel.gotowa.args == ("http://127.0.0.1:19123/api/status", u.dane)
+    assert (brama.limit_stopu, panel.limit_stopu) == (nadzorca.LIMIT_STOPU_BRAMY, nadzorca.LIMIT_STOPU_PANELU)
+    assert nadzorca.LIMIT_STOPU_BRAMY == 70 and nadzorca.LIMIT_STOPU_PANELU == 30
+    assert nadzorca.CZAS_ZATRZYMANIA >= nadzorca.LIMIT_STOPU_BRAMY + 10
+    assert (brama.port, panel.port) == (None, 19123)
     assert brama.gotowa() is False and brama.przed_stopem is not None and brama.powod_postoju() is None
     (u.dane / "gateway_state.json").write_text(json.dumps({"gateway_state": "startup_failed",
                                                            "exit_reason": "token collision with profile x"}),
@@ -590,6 +992,29 @@ def test_windows_zatrzymanie_launchera_z_dzieckiem_bez_wnukow(u, tmp_path):
     finally:
         if wnuk:
             nadzorca._zabij_pid(wnuk)
+
+
+@pytest.mark.windows_only
+def test_windows_breakaway_wylaczany_dopiero_po_udanym_starcie_bez_flagi(u, monkeypatch):
+    n = nowy(u, [Usluga("a", [PY, "-c", "pass"])])
+    s = n._stany["a"]
+    flagi: list[int] = []
+    zachowanie = {"bez_flagi": "blad"}
+
+    def popen(argv, creationflags=0, **_kw):
+        flagi.append(creationflags)
+        if creationflags & 0x01000000 or zachowanie["bez_flagi"] == "blad":
+            raise PermissionError(5, "Odmowa dostępu")
+        return "proces"
+
+    monkeypatch.setattr(nadzorca.subprocess, "Popen", popen)
+    with pytest.raises(PermissionError):                 # brak dostępu do programu, nie job: flaga zostaje
+        n._popen(s, {}, None)
+    assert n._breakaway is True and len(flagi) == 2
+    zachowanie["bez_flagi"] = "ok"
+    assert n._popen(s, {}, None) == "proces" and n._breakaway is False   # job zabrania BREAKAWAY
+    flagi.clear()
+    assert n._popen(s, {}, None) == "proces" and flagi == [0x08000000 | 0x00000200]
 
 
 def _sddl_potoku(adres: str) -> str:

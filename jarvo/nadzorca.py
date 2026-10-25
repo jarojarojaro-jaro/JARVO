@@ -14,45 +14,66 @@ Usługi (uslugi_jarva; flagi i zmienne sprawdzone w kodzie Hermesa f97608f):
   nie wybiera drogi kodu 75 (Harmonogram Hermesa ustawia go bez polityki restartu). HERMES_GATEWAY_DETACHED=1: na
   Windows brama ignoruje Ctrl+C i Ctrl+Break z konsoli. Dlatego łagodne zatrzymanie bramy to znacznik planowanego
   zatrzymania `<dane>/.gateway-planned-stop.json`, który pisze pomocnik Hermesa `python -m gateway.systemd_stop_mark
-  <pid>` (ten sam co ExecStop jego jednostki systemd). Brama sprawdza znacznik co 0,5 s, drenuje tury i kończy się
-  kodem 0; bez niego SIGTERM wygląda dla niej na awarię. Kod 75 (EX_TEMPFAIL) = restart po ok. 5 s, kod 78
-  (EX_CONFIG, np. ten sam token w dwóch miejscach) = postój z powodem z `<dane>/gateway_state.json`, aż właściciel
-  poprawi konfigurację i zleci restart. Gotowość: odpowiedź na `identify` przez potok sterujący bramy
-  (gateway/control_socket.py: Windows `\\\\.\\pipe\\hermes-gateway-<skrót>`, POSIX `<dane>/gateway.sock`).
+  <pid>` (ten sam co ExecStop jego jednostki systemd). Brama sprawdza znacznik co 0,5 s i kończy się kodem 0: tury
+  czatu przerywa od razu i oznacza do wznowienia (restart_drain_timeout 0), na rutyny cron czeka do 30 s. Bez znacznika
+  SIGTERM wygląda dla niej na awarię. Limit zatrzymania bramy to 70 s, tyle co TimeoutStopSec jednostki Hermesa
+  (gateway/restart.py resolve_systemd_timeout_stop_sec: max(60, cron_drain_timeout 30 + rezerwa 10 + zapas 30)); po
+  60 s brama kończy się sama (watchdog zamknięcia), a zabita w trakcie drenażu zostawiłaby rutynę z `last_status=
+  running` na zawsze. Kod 75 (EX_TEMPFAIL) = restart, kod 78 (EX_CONFIG, np. ten sam token w dwóch miejscach) =
+  postój z powodem z `<dane>/gateway_state.json`, aż właściciel poprawi konfigurację i zleci restart. Gotowość:
+  odpowiedź na `identify` przez potok sterujący bramy (gateway/control_socket.py: Windows
+  `\\\\.\\pipe\\hermes-gateway-<skrót>`, POSIX `<dane>/gateway.sock`).
 - panel (H09): `python -m hermes_cli.main dashboard --host 127.0.0.1 --port <JARVO_PANEL_PORT albo 9119> --no-open
-  --skip-build`, gotowy, gdy GET /api/status zwraca 200. uvicorn kończy się łagodnie na Ctrl+Break i SIGTERM.
+  --skip-build`, gotowy, gdy GET /api/status zwraca 200, a pole `hermes_home` wskazuje HERMES_HOME Jarva: cudzy
+  dashboard na tym porcie (np. prywatny Hermes właściciela na 9119) nie udaje gotowości. uvicorn kończy się łagodnie
+  na Ctrl+Break i SIGTERM; limit zatrzymania 30 s. Zajęty port Hermes zgłasza kodem 75 (web_server_lifecycle.py
+  PORT_IN_USE_EXIT_CODE).
 
 Pętla (c2): start w kolejności (panel czeka na gotowość bramy, najdłużej `limit_kolejnosci`); kod 75 = restart po
-ok. 5 s; kod 78 = postój; inne kody = ponowienie z rosnącą przerwą 5 s → 5 min (zeruje ją 10 min działania).
-Gotową usługę sprawdzamy dalej co 30 s, ale tylko do raportu (własne strażniki ma Hermes). Stan (pid, od kiedy,
-restarty, ostatni kod, gotowość, powód) w `<stan>/nadzorca.json`, zapisywany atomowo. Czyta go `jarvo status`:
-WMIC zniknął z Windows 11, więc PID-y zna tylko nadzorca (N03).
+ok. 5 s, ale kolejne szybkie wyjścia 75 (przed 60 s działania) podwajają przerwę aż do 5 min, a przy usłudze z portem
+powód w stanie mówi, kto go trzyma („port 9119 zajęty przez inny program (PID 1234, python.exe)”); kod 78 = postój;
+inne kody = ponowienie z rosnącą przerwą 5 s → 5 min (zeruje ją 10 min działania). Gotową usługę sprawdzamy dalej
+co 30 s, ale tylko do raportu (własne strażniki ma Hermes). Stan (pid, od kiedy, restarty, ostatni kod, gotowość,
+powód) w `<stan>/nadzorca.json`, zapisywany atomowo przy każdej zmianie i co najmniej co 30 s (pole `zapisano` to
+puls nadzorcy). Czyta go `jarvo status`: WMIC zniknął z Windows 11, więc PID-y zna tylko nadzorca (N03).
+
+Trwałe zatrzymanie: znacznik `<stan>/zatrzymany.json` (oznacz_zatrzymanie, zdejmij_zatrzymanie, zatrzymany).
+Zapisuje go stop z kanału (`jarvo down`, `jarvo serwis --stop`). `jarvo serwis` przy znaczniku kończy się od razu
+kodem 0, więc zapasowe wyzwalacze Harmonogramu (odblokowanie, co 5 minut), LaunchAgent ani systemd nie podnoszą
+floty, a znacznik zapisany w trakcie pracy zatrzymuje działającego nadzorcę. Znacznik przetrwa wylogowanie i restart
+komputera (jak `restart: unless-stopped` w Dockerze); zdejmuje go jawny start: `jarvo up`, `jarvo panel`,
+instalacja albo `jarvo serwis --wznow`. Sygnał (Ctrl+C, SIGTERM, wylogowanie) znacznika nie zapisuje.
 
 Windows: dzieci startują z CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB (bez BREAKAWAY,
 gdy job rodzica go zabrania), bez Job Object z KILL_ON_JOB_CLOSE i nigdy przez `taskkill /T`. `Scripts\\python.exe`
 venvu to launcher: uruchamia bazowy python.exe jako dziecko we własnym jobie (KILL_ON_JOB_CLOSE |
 SILENT_BREAKAWAY_OK) i sam ignoruje zdarzenia konsoli (sprawdzone na Windows 11, sekcja l). Zatrzymanie usługi:
 najpierw łagodnie (Windows: CTRL_BREAK_EVENT do grupy przez krótki proces pomocnika, który dołącza do ukrytej
-konsoli usługi, bo GenerateConsoleCtrlEvent działa tylko w obrębie jednej konsoli; POSIX: SIGTERM), po 30 s
-zabicie launchera i jego BEZPOŚREDNICH dzieci (lista przez CreateToolhelp32Snapshot, bez conhost.exe), bez
+konsoli usługi, bo GenerateConsoleCtrlEvent działa tylko w obrębie jednej konsoli; POSIX: SIGTERM), po limicie
+usługi zabicie launchera i jego BEZPOŚREDNICH dzieci (lista przez CreateToolhelp32Snapshot, bez conhost.exe), bez
 wnuków: pracownicy kanbana i polecenia terminala mają własną ukrytą konsolę i są poza jobem launchera, więc
 kończą swoje karty (H07).
 
 Logi: stdout i stderr usługi w `<logi>/<nazwa>.log` (na Windows uchwyt tylko do dopisywania, z FILE_SHARE_READ,
-WRITE i DELETE), rotacja „kopiuj i przytnij”: do 3 kopii `.1`–`.3` po 10 MB. Dziennik nadzorcy: `<logi>/nadzorca.log`.
-Środowiska, argumentów ani sekretów tam nie piszemy.
+WRITE i DELETE, przez ctypes), rotacja „kopiuj i przytnij”: do 3 kopii `.1`–`.3` po 10 MB. Dziennik nadzorcy:
+`<logi>/nadzorca.log`. Środowiska, argumentów ani sekretów tam nie piszemy.
 
 Kanał sterowania (multiprocessing.connection, wiadomości JSON, nigdy pickle): Windows potok `\\\\.\\pipe\\jarvo-
 nadzorca-<skrót korzenia>` z DACL tylko dla bieżącego użytkownika i bez klientów zdalnych; POSIX gniazdo
 `<stan>/nadzorca.sock` (0600 w katalogu 0700; przy zbyt długiej ścieżce krótkie w katalogu tymczasowym). Klucz
 authkey `<stan>/nadzorca.klucz` (secrets.token_bytes, chron), nowy przy każdym starcie. polacz(u) daje klienta:
-status(), restart(nazwa), stop(). Proces usługi, który przeżył poprzedniego nadzorcę (np. zabitego twardo albo
-z zamkniętym oknem konsoli), nadzorca rozpoznaje po PID-zie i czasie startu ze stanu i zatrzymuje przed startem.
+status(), restart(nazwa), stop(). Połączenie, wymiana klucza (HMAC) i odpowiedź mają limit czasu po obu stronach,
+a połączenie, które przy zamykaniu budzi accept(), idzie bez klucza: zamknięcie kanału nie czeka na żadnego
+klienta. Proces usługi, który przeżył poprzedniego nadzorcę (np. zabitego twardo albo z zamkniętym oknem konsoli),
+nadzorca rozpoznaje po PID-zie i czasie startu ze stanu i zatrzymuje przed startem. Czas startu (odcisk procesu):
+Windows GetProcessTimes, Linux /proc/<pid>/stat, macOS proc_pidinfo z libproc (zapasowo ps w locale C i strefie
+UTC), więc nie zależy od środowiska wołającego (launchd bez LANG kontra terminal z pl_PL).
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import json
 import os
 import queue
@@ -60,7 +81,9 @@ import re
 import secrets
 import shutil
 import signal
+import socket
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
@@ -76,18 +99,26 @@ from pathlib import Path
 from typing import Callable
 
 from . import przenosne, srodowisko
-from .sciezki import LINUX, WINDOWS, BladUkladu, Uklad, uklad
+from .sciezki import LINUX, MACOS, WINDOWS, BladUkladu, Uklad, uklad
 
 KOD_RESTART = 75          # EX_TEMPFAIL: brama (i panel przy zajętym porcie) prosi o restart
 KOD_POSTOJ = 78           # EX_CONFIG: błąd konfiguracji, ponowienie nic nie zmieni
 PORT_PANELU = 9119
 WERSJA_STANU = 1
+LIMIT_STOPU_BRAMY = 70.0  # s: TimeoutStopSec jednostki Hermesa f97608f (drenaż cron 30 s + rezerwa 10 s + zapas 30 s)
+LIMIT_STOPU_PANELU = 30.0
+# Najdłuższe zatrzymanie nadzorcy z usługami Jarva: limit bramy, bezpiecznik 10 s, dobicie i zamknięcie kanału.
+# Autostart (TimeoutStopSec, ExitTimeOut) i `jarvo down` mają czekać co najmniej tyle.
+CZAS_ZATRZYMANIA = LIMIT_STOPU_BRAMY + 40.0
+ZNACZNIK_ZATRZYMANIA = "zatrzymany.json"
 
 _CREATE_NO_WINDOW = 0x08000000
 _CREATE_NEW_PROCESS_GROUP = 0x00000200
 _CREATE_BREAKAWAY_FROM_JOB = 0x01000000
 _MAKS_GNIAZDA = 100                       # sun_path: 104 bajty na macOS, 108 na Linuksie
 _MAKS_WIADOMOSCI = 1 << 20
+_LIMIT_ROZMOWY = 10.0                     # s: wymiana klucza, pytanie i odpowiedź jednego klienta (strona nadzorcy)
+_TAKT_KANALU = 0.5                        # s: POSIX accept() budzi się co tyle i sprawdza, czy kanał się zamyka
 _SEKRETY = re.compile(r"\b\d{6,}:[A-Za-z0-9_-]{25,}|\b(?:sk|ghp|gho|xox[abp])[-_][A-Za-z0-9_-]{12,}"
                       r"|[A-Za-z0-9_-]{32,}")
 
@@ -104,6 +135,10 @@ class NadzorcaNieDziala(BladNadzorcy):
     """Kanał sterowania nie odpowiada: nadzorca nie działa albo dopiero startuje."""
 
 
+class NadzorcaZatrzymany(BladNadzorcy):
+    """Flota jest trwale zatrzymana (`<stan>/zatrzymany.json`): nadzorca nie startuje usług."""
+
+
 @dataclass
 class Usluga:
     """Proces pod nadzorem.
@@ -112,6 +147,8 @@ class Usluga:
     następne czekają na ich gotowość. `przed_stopem(pidy)` dostaje PID-y właściwych procesów (na Windows dzieci
     launchera) tuż przed łagodnym zatrzymaniem. `powod_postoju()` dopowiada powód kodu 78. `launcher`: czy argv[0]
     uruchamia właściwy proces jako swoje dziecko (None: rozpoznaj `Scripts\\python.exe` venvu; tylko Windows).
+    `limit_stopu`: sekundy na łagodne zatrzymanie, potem zabicie (None: limit nadzorcy). `port`: port, na którym
+    usługa słucha; przy kodzie 75 nadzorca sprawdza, kto go trzyma.
     """
     nazwa: str
     argv: list[str]
@@ -122,6 +159,8 @@ class Usluga:
     przed_stopem: Callable[[list[int]], None] | None = None
     powod_postoju: Callable[[], str | None] | None = None
     launcher: bool | None = None
+    limit_stopu: float | None = None
+    port: int | None = None
 
 
 # --- procesy na Windows: ctypes, sama biblioteka standardowa ------------------------------------------------------
@@ -175,6 +214,7 @@ if WINDOWS:
             f.restype, f.argtypes = wynik, argumenty
 
     _sygnatury()
+    _iphlpapi = None                      # GetExtendedTcpTable, ładowane przy pierwszym pytaniu o port
 
     def _czas_startu(uchwyt) -> int | None:
         t = [wintypes.FILETIME() for _ in range(4)]
@@ -206,10 +246,104 @@ if WINDOWS:
         finally:
             _k32.CloseHandle(token)
 
+    def _procesy() -> list[tuple[int, int, str]]:
+        """(pid, pid rodzica, plik .exe) wszystkich procesów z migawki CreateToolhelp32Snapshot."""
+        migawka = _k32.CreateToolhelp32Snapshot(0x2, 0)                             # TH32CS_SNAPPROCESS
+        if not migawka or migawka == _NIEWAZNY:
+            return []
+        wynik = []
+        try:
+            wpis = _WpisProcesu()
+            wpis.dwSize = ctypes.sizeof(_WpisProcesu)
+            jest = _k32.Process32FirstW(migawka, ctypes.byref(wpis))
+            while jest:
+                wynik.append((wpis.th32ProcessID, wpis.th32ParentProcessID, wpis.szExeFile))
+                jest = _k32.Process32NextW(migawka, ctypes.byref(wpis))
+        finally:
+            _k32.CloseHandle(migawka)
+        return wynik
+
+# --- procesy na macOS: libproc przez ctypes -----------------------------------------------------------------------
+
+if MACOS:
+    import ctypes
+
+    class _InfoBsd(ctypes.Structure):                 # struct proc_bsdinfo z <sys/proc_info.h> (PROC_PIDTBSDINFO)
+        _fields_ = ([(n, ctypes.c_uint32) for n in ("pbi_flags", "pbi_status", "pbi_xstatus", "pbi_pid", "pbi_ppid",
+                                                     "pbi_uid", "pbi_gid", "pbi_ruid", "pbi_rgid", "pbi_svuid",
+                                                     "pbi_svgid", "rfu_1")]
+                    + [("pbi_comm", ctypes.c_char * 16), ("pbi_name", ctypes.c_char * 32)]
+                    + [(n, ctypes.c_uint32) for n in ("pbi_nfiles", "pbi_pgid", "pbi_pjobc", "e_tdev", "e_tpgid")]
+                    + [("pbi_nice", ctypes.c_int32), ("pbi_start_tvsec", ctypes.c_uint64),
+                       ("pbi_start_tvusec", ctypes.c_uint64)])
+
+_proc_pidinfo = None                      # macOS: proc_pidinfo z libproc; False = niedostępne (zostaje ps)
+
+
+def _libproc():
+    """proc_pidinfo z libproc po samoteście na własnym procesie (rozmiar i PID muszą się zgadzać z układem
+    struktury), albo False: wtedy odcisk z ps. Symbol eksportuje libSystem (libproc.dylib to jej alias, a od
+    macOS 11 biblioteki systemu są tylko we wspólnej pamięci podręcznej dyld), więc próbujemy też jej i procesu."""
+    global _proc_pidinfo
+    if _proc_pidinfo is None:
+        _proc_pidinfo = False
+        for nazwa in ("/usr/lib/libproc.dylib", "/usr/lib/libSystem.B.dylib", None) if MACOS else ():
+            try:
+                f = ctypes.CDLL(nazwa, use_errno=True).proc_pidinfo
+            except (OSError, AttributeError):
+                continue
+            f.restype = ctypes.c_int
+            f.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_uint64, ctypes.c_void_p, ctypes.c_int]
+            info = _InfoBsd()
+            if (f(os.getpid(), 3, 0, ctypes.byref(info), ctypes.sizeof(info)) == ctypes.sizeof(info)
+                    and info.pbi_pid == os.getpid()):
+                _proc_pidinfo = f
+            break
+    return _proc_pidinfo
+
+
+def _info_bsd(pid: int):
+    """macOS: struct proc_bsdinfo procesu (także zombie); None, gdy procesu nie ma (albo nie jest nasz); False, gdy
+    libproc nie działa."""
+    f = _libproc()
+    if not f:
+        return False
+    info = _InfoBsd()
+    if f(pid, 3, 0, ctypes.byref(info), ctypes.sizeof(info)) != ctypes.sizeof(info) or info.pbi_pid != pid:
+        return None
+    return info
+
+
+def _odcisk_bsd(pid: int) -> str | None | bool:
+    """macOS: czas startu z jądra (sekundy i mikrosekundy), niezależny od locale i strefy; False bez libproc."""
+    info = _info_bsd(pid)
+    if info is None or info is False:
+        return info
+    if info.pbi_status == 5:                                                    # SZOMB
+        return None
+    return f"bsd:{info.pbi_start_tvsec}.{info.pbi_start_tvusec:06d}"
+
+
+def _odcisk_ps(pid: int) -> str | None:
+    """Odcisk z `ps` w locale C i strefie UTC (macOS bez libproc). ps woła setlocale i drukuje lstart w strefie
+    wołającego: bez tego ten sam proces miałby inny odcisk z launchd (bez LANG) i z terminala (pl_PL)."""
+    ps = "/bin/ps" if os.path.exists("/bin/ps") else "ps"
+    try:
+        wynik = subprocess.run([ps, "-o", "stat=", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", timeout=10,
+                               env={**os.environ, "LC_ALL": "C", "TZ": "UTC0"})
+    except (OSError, subprocess.SubprocessError):
+        return None
+    stan, _, start = wynik.stdout.strip().partition(" ")    # osobne -o: tekst po „=” to nagłówek do końca argumentu
+    start = " ".join(start.split())
+    if not stan or stan.startswith("Z") or not start:
+        return None
+    return f"ps:{start}"
+
 
 def _odcisk(pid: int | None) -> str | None:
     """Czas startu działającego procesu jako tekst: odróżnia go od innego procesu, który dostał ten sam PID.
-    None, gdy proces nie działa (także zombie)."""
+    None, gdy proces nie działa (także zombie). Ten sam proces ma ten sam odcisk w każdym środowisku."""
     if not isinstance(pid, int) or pid <= 0:
         return None
     if WINDOWS:
@@ -230,15 +364,24 @@ def _odcisk(pid: int | None) -> str | None:
         except OSError:
             return None
         return pola[19] if len(pola) > 19 and pola[0] not in ("Z", "X") else None    # pole 22: starttime
-    try:                                  # macOS: osobne -o, bo tekst po „=” to nagłówek do końca argumentu
-        wynik = subprocess.run(["ps", "-o", "stat=", "-o", "lstart=", "-p", str(pid)], capture_output=True,
-                               text=True, encoding="utf-8", errors="replace", timeout=10)
-    except (OSError, subprocess.SubprocessError):
+    odcisk = _odcisk_bsd(pid) if MACOS else False
+    return _odcisk_ps(pid) if odcisk is False else odcisk
+
+
+def _nazwa_procesu(pid: int) -> str | None:
+    """Nazwa programu procesu (Windows: plik .exe, Linux: comm, macOS: nazwa z jądra) albo None."""
+    try:
+        if WINDOWS:
+            return next((exe for p, _, exe in _procesy() if p == pid), None) or None
+        if LINUX:
+            return Path(f"/proc/{pid}/comm").read_text(encoding="utf-8", errors="replace").strip() or None
+        if MACOS:
+            info = _info_bsd(pid)
+            if info is not None and info is not False:
+                return (info.pbi_name or info.pbi_comm).decode("utf-8", "replace") or None
+    except OSError:
         return None
-    stan, _, start = wynik.stdout.strip().partition(" ")
-    if not stan or stan.startswith("Z"):
-        return None
-    return start.strip() or None
+    return None
 
 
 def dzieci(pid: int) -> list[tuple[int, str]]:
@@ -249,23 +392,10 @@ def dzieci(pid: int) -> list[tuple[int, str]]:
     rodzic = _odcisk(pid)
     if rodzic is None:
         return []
-    migawka = _k32.CreateToolhelp32Snapshot(0x2, 0)                                 # TH32CS_SNAPPROCESS
-    if not migawka or migawka == _NIEWAZNY:
-        return []
-    kandydaci = []
-    try:
-        wpis = _WpisProcesu()
-        wpis.dwSize = ctypes.sizeof(_WpisProcesu)
-        jest = _k32.Process32FirstW(migawka, ctypes.byref(wpis))
-        while jest:
-            if (wpis.th32ParentProcessID == pid and wpis.th32ProcessID not in (0, pid)
-                    and wpis.szExeFile.lower() != "conhost.exe"):
-                kandydaci.append(wpis.th32ProcessID)
-            jest = _k32.Process32NextW(migawka, ctypes.byref(wpis))
-    finally:
-        _k32.CloseHandle(migawka)
     wynik = []
-    for d in kandydaci:
+    for d, ppid, exe in _procesy():
+        if ppid != pid or d in (0, pid) or exe.lower() == "conhost.exe":
+            continue
         odcisk = _odcisk(d)
         if odcisk is not None and int(odcisk) >= int(rodzic):
             wynik.append((d, odcisk))
@@ -333,6 +463,120 @@ def _czy_launcher(usluga: Usluga) -> bool:
     p = Path(usluga.argv[0]) if usluga.argv else Path()
     return (p.name.lower() in ("python.exe", "pythonw.exe") and p.parent.name.lower() == "scripts"
             and (p.parent.parent / "pyvenv.cfg").is_file())
+
+
+# --- kto trzyma port (powód kodu 75 panelu) -----------------------------------------------------------------------
+
+def _pid_portu_windows(port: int) -> int | None:
+    """PID procesu, który słucha na porcie TCP (IPv4): GetExtendedTcpTable z TCP_TABLE_OWNER_PID_LISTENER."""
+    global _iphlpapi
+    if _iphlpapi is None:
+        biblioteka = ctypes.WinDLL("iphlpapi", use_last_error=True)
+        f = biblioteka.GetExtendedTcpTable
+        f.restype = wintypes.DWORD
+        f.argtypes = [wintypes.LPVOID, ctypes.POINTER(wintypes.DWORD), wintypes.BOOL, wintypes.ULONG, ctypes.c_int,
+                      wintypes.ULONG]
+        _iphlpapi = biblioteka
+    rozmiar = wintypes.DWORD(0)
+    _iphlpapi.GetExtendedTcpTable(None, ctypes.byref(rozmiar), False, 2, 3, 0)          # AF_INET, ..._LISTENER
+    for _ in range(4):
+        bufor = ctypes.create_string_buffer(rozmiar.value + 4096)
+        rozmiar = wintypes.DWORD(len(bufor))
+        kod = _iphlpapi.GetExtendedTcpTable(bufor, ctypes.byref(rozmiar), False, 2, 3, 0)
+        if kod == 0:
+            break
+        if kod != 122:                    # ERROR_INSUFFICIENT_BUFFER: tabela urosła między wywołaniami
+            return None
+    else:
+        return None
+    zgodne = []
+    for i in range(min(struct.unpack_from("<I", bufor, 0)[0], (len(bufor) - 4) // 24)):
+        _, adres, port_sieci, _, _, pid = struct.unpack_from("<6I", bufor, 4 + 24 * i)    # MIB_TCPROW_OWNER_PID
+        if socket.ntohs(port_sieci & 0xFFFF) == port:
+            zgodne.append((adres not in (0, 0x0100007F), pid))           # najpierw 0.0.0.0 i 127.0.0.1
+    return min(zgodne)[1] if zgodne else None
+
+
+def _pid_portu_linux(port: int) -> int | None:
+    """PID procesu, który słucha na porcie: gniazdo LISTEN z /proc/net/tcp(6), potem jego i-węzeł w /proc/*/fd
+    (widać tylko procesy tego użytkownika)."""
+    gniazda = set()
+    for plik in ("/proc/net/tcp", "/proc/net/tcp6"):
+        try:
+            linie = Path(plik).read_text(encoding="ascii", errors="replace").splitlines()[1:]
+        except OSError:
+            continue
+        for linia in linie:
+            pola = linia.split()
+            if (len(pola) > 9 and pola[3] == "0A" and pola[9] != "0"
+                    and pola[1].rpartition(":")[2].upper() == f"{port:04X}"):
+                gniazda.add(f"socket:[{pola[9]}]")
+    if not gniazda:
+        return None
+    with os.scandir("/proc") as procesy:
+        for proces in procesy:
+            if not proces.name.isdigit():
+                continue
+            try:
+                with os.scandir(f"/proc/{proces.name}/fd") as deskryptory:
+                    for fd in deskryptory:
+                        try:
+                            if os.readlink(fd.path) in gniazda:
+                                return int(proces.name)
+                        except OSError:
+                            continue
+            except OSError:
+                continue
+    return None
+
+
+def _pid_portu_macos(port: int) -> tuple[int | None, str | None]:
+    """(PID, nazwa) z `lsof -iTCP:<port> -sTCP:LISTEN` (lsof jest w każdym macOS, wyjście -F nie zależy od locale)."""
+    lsof = "/usr/sbin/lsof" if os.path.exists("/usr/sbin/lsof") else shutil.which("lsof")
+    if not lsof:
+        return None, None
+    try:
+        wynik = subprocess.run([lsof, "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-Fpc"], capture_output=True,
+                               text=True, encoding="utf-8", errors="replace", timeout=5,
+                               env={**os.environ, "LC_ALL": "C"})
+    except (OSError, subprocess.SubprocessError):
+        return None, None
+    pid = nazwa = None
+    for linia in wynik.stdout.splitlines():
+        if linia[:1] == "p" and pid is None and linia[1:].isdigit():
+            pid = int(linia[1:])
+        elif linia[:1] == "c" and pid is not None and nazwa is None:
+            nazwa = linia[1:] or None
+    return pid, nazwa
+
+
+def wlasciciel_portu(port: int) -> tuple[int | None, str | None] | None:
+    """Kto słucha na 127.0.0.1:<port>: (PID, nazwa programu), (None, None), gdy port jest zajęty, ale system nie
+    podaje właściciela (np. proces innego użytkownika), albo None, gdy nikt nie słucha. Tylko odczyt."""
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=1.0):
+            pass
+    except OSError:
+        return None
+    pid = nazwa = None
+    try:
+        if WINDOWS:
+            pid = _pid_portu_windows(port)
+        elif LINUX:
+            pid = _pid_portu_linux(port)
+        elif MACOS:
+            pid, nazwa = _pid_portu_macos(port)
+    except (OSError, ValueError, struct.error):
+        pid = None
+    if pid is not None and nazwa is None:
+        nazwa = _nazwa_procesu(pid)
+    return pid, nazwa
+
+
+def _opis_wlasciciela(pid: int | None, nazwa: str | None) -> str:
+    if pid is None:
+        return "system nie podał, który"
+    return f"PID {pid}" + (f", {nazwa}" if nazwa else "")
 
 
 # --- logi: dopisywanie i rotacja „kopiuj i przytnij” -------------------------------------------------------------
@@ -423,6 +667,56 @@ def _przygotuj_gniazdo(sciezka: Path) -> None:
         os.unlink(sciezka)
 
 
+def _polacz_kanal(adres: str, rodzina: str, limit: float):
+    """Połączenie z kanałem BEZ wymiany klucza (ta idzie potem przez _ZLimitem), najdłużej `limit` sekund. POSIX:
+    connect z limitem, bo pełna kolejka gniazda uniksowego na Linuksie blokuje go bez końca. Windows: jak
+    multiprocessing.connection.PipeClient, ale z naszym limitem zamiast stałych 20 s przy zajętym potoku."""
+    koniec = time.monotonic() + limit
+    if rodzina == "AF_PIPE":
+        import _winapi
+        while True:
+            try:
+                _winapi.WaitNamedPipe(adres, max(1, min(1000, int((koniec - time.monotonic()) * 1000))))
+                h = _winapi.CreateFile(adres, _winapi.GENERIC_READ | _winapi.GENERIC_WRITE, 0, _winapi.NULL,
+                                       _winapi.OPEN_EXISTING, _winapi.FILE_FLAG_OVERLAPPED, _winapi.NULL)
+                break
+            except OSError as e:
+                if e.winerror not in (_winapi.ERROR_SEM_TIMEOUT, _winapi.ERROR_PIPE_BUSY) \
+                        or time.monotonic() >= koniec:
+                    raise
+        try:
+            _winapi.SetNamedPipeHandleState(h, _winapi.PIPE_READMODE_MESSAGE, None, None)
+        except OSError:
+            _winapi.CloseHandle(h)
+            raise
+        return connection.PipeConnection(h)
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        s.settimeout(max(limit, 0.05))
+        s.connect(adres)
+        s.setblocking(True)
+        return connection.Connection(s.detach())
+    finally:
+        s.close()                         # po detach() nic nie robi
+
+
+class _ZLimitem:
+    """Połączenie z terminem: recv_bytes czeka najdłużej do `koniec`, potem TimeoutError. Przez nie idzie wymiana
+    klucza (connection.deliver_challenge / answer_challenge używają tylko send_bytes i recv_bytes), pytanie
+    i odpowiedź: milczący nadzorca albo klient nie zawiesza drugiej strony."""
+
+    def __init__(self, polaczenie, koniec: float):
+        self._c, self._koniec = polaczenie, koniec
+
+    def send_bytes(self, dane: bytes) -> None:
+        self._c.send_bytes(dane)
+
+    def recv_bytes(self, maks: int | None = None) -> bytes:
+        if not self._c.poll(max(0.0, self._koniec - time.monotonic())):
+            raise TimeoutError("kanał nadzorcy: brak odpowiedzi w terminie")
+        return self._c.recv_bytes(maks)
+
+
 if WINDOWS:
     class _PotokWlasciciela(connection.PipeListener):
         """PipeListener z DACL tylko dla bieżącego użytkownika (D:P(A;;GA;;;<SID>)) i bez klientów zdalnych.
@@ -455,34 +749,51 @@ if WINDOWS:
 
 
 class _Sluchacz:
-    """Jak multiprocessing.connection.Listener, ale potok z DACL właściciela, a wymiana HMAC na kluczu (uwierzytelnij)
-    poza accept(): klient, który połączy się i zamilknie, nie blokuje kolejnych."""
+    """Słuchacz kanału: na Windows potok z DACL właściciela, na POSIX gniazdo 0600, którego accept() budzi się co
+    _TAKT_KANALU (pętla kanału zauważa wtedy zamknięcie). Wymiana klucza idzie poza accept(), w wątku połączenia
+    i z limitem czasu: klient, który połączy się i zamilknie, nie blokuje kolejnych."""
 
-    def __init__(self, adres: str, rodzina: str, klucz: bytes):
-        self._klucz = klucz
+    def __init__(self, adres: str, rodzina: str):
+        self.adres = adres
+        self._gniazdo: socket.socket | None = None
         if rodzina == "AF_PIPE":
-            self._l = _PotokWlasciciela(adres)
-            self.dacl = self._l._sa is not None
+            self._potok = _PotokWlasciciela(adres)
+            self.dacl = self._potok._sa is not None
             return
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         stara = os.umask(0o177)            # gniazdo nigdy nie jest dostępne dla innych, nawet przez chwilę
         try:
-            self._l = connection.SocketListener(adres, "AF_UNIX", backlog=8)
+            s.bind(adres)
+            os.chmod(adres, 0o600)
+            s.listen(8)
+            s.settimeout(_TAKT_KANALU)
+        except BaseException:
+            s.close()
+            raise
         finally:
             os.umask(stara)
-        os.chmod(adres, 0o600)
+        self._gniazdo = s
         self.dacl = True
 
     def accept(self):
-        return self._l.accept()
-
-    def uwierzytelnij(self, c) -> None:
-        connection.deliver_challenge(c, self._klucz)
-        connection.answer_challenge(c, self._klucz)
+        if self._gniazdo is None:
+            return self._potok.accept()
+        s, _ = self._gniazdo.accept()     # TimeoutError co _TAKT_KANALU, gdy nikt nie przyszedł
+        s.setblocking(True)
+        return connection.Connection(s.detach())
 
     def close(self) -> None:
-        self._l.close()
-        if WINDOWS:
-            self._l.zwolnij()
+        if self._gniazdo is None:
+            self._potok.close()
+            self._potok.zwolnij()
+            return
+        try:
+            self._gniazdo.close()
+        finally:
+            try:
+                os.unlink(self.adres)
+            except OSError:
+                pass
 
 
 class _Kanal:
@@ -496,6 +807,8 @@ class _Kanal:
         self._sluchacz: _Sluchacz | None = None
         self._watek: threading.Thread | None = None
         self._koniec = threading.Event()
+        self._rozmowy: set[threading.Thread] = set()     # wątki połączeń, które jeszcze odpowiadają
+        self._blokada_rozmow = threading.Lock()
 
     def start(self) -> None:
         self._klucz = secrets.token_bytes(32)
@@ -503,7 +816,7 @@ class _Kanal:
         przenosne.chron(self.plik_klucza)
         if self.rodzina == "AF_UNIX":
             _przygotuj_gniazdo(Path(self.adres))
-        self._sluchacz = _Sluchacz(self.adres, self.rodzina, self._klucz)
+        self._sluchacz = _Sluchacz(self.adres, self.rodzina)
         if not self._sluchacz.dacl:
             self._n._log("kanał: potok bez własnej DACL (system nie podał SID-u), chroni go klucz")
         self._watek = threading.Thread(target=self._petla, name="nadzorca-kanal", daemon=True)
@@ -513,6 +826,8 @@ class _Kanal:
         while not self._koniec.is_set():
             try:
                 polaczenie = self._sluchacz.accept()
+            except TimeoutError:             # POSIX: nikt nie przyszedł, sprawdzamy koniec i czekamy dalej
+                continue
             except Exception as e:           # kanał nie może paść: krótka przerwa i dalej
                 if self._koniec.is_set():
                     break
@@ -523,32 +838,59 @@ class _Kanal:
             if self._koniec.is_set():
                 polaczenie.close()
                 break
-            threading.Thread(target=self._obsluz_polaczenie, args=(polaczenie,), name="nadzorca-klient",
-                             daemon=True).start()
+            rozmowa = threading.Thread(target=self._obsluz_polaczenie, args=(polaczenie,), name="nadzorca-klient",
+                                       daemon=True)
+            with self._blokada_rozmow:
+                self._rozmowy.add(rozmowa)
+            try:
+                rozmowa.start()
+            except RuntimeError:              # brak zasobów na wątek: to połączenie odpada, kanał działa dalej
+                with self._blokada_rozmow:
+                    self._rozmowy.discard(rozmowa)
+                polaczenie.close()
+                time.sleep(0.05)
 
     def _obsluz_polaczenie(self, polaczenie) -> None:
+        try:
+            self._rozmowa(polaczenie)
+        finally:
+            with self._blokada_rozmow:
+                self._rozmowy.discard(threading.current_thread())
+
+    def _rozmowa(self, polaczenie) -> None:
         with polaczenie:
+            z = _ZLimitem(polaczenie, time.monotonic() + _LIMIT_ROZMOWY)
             try:
-                self._sluchacz.uwierzytelnij(polaczenie)
-                zadanie = json.loads(polaczenie.recv_bytes(_MAKS_WIADOMOSCI).decode("utf-8"))
+                connection.deliver_challenge(z, self._klucz)
+                connection.answer_challenge(z, self._klucz)
+                zadanie = json.loads(z.recv_bytes(_MAKS_WIADOMOSCI).decode("utf-8"))
                 odp = self._n._obsluz(zadanie) if isinstance(zadanie, dict) else \
                     {"ok": False, "blad": "Wiadomość musi być obiektem JSON."}
-                polaczenie.send_bytes(json.dumps(odp, ensure_ascii=False).encode("utf-8"))
+                z.send_bytes(json.dumps(odp, ensure_ascii=False).encode("utf-8"))
             except connection.AuthenticationError:
                 if not self._koniec.is_set():
                     self._n._log("kanał: odrzucone połączenie bez właściwego klucza")
-            except (OSError, EOFError, ValueError):
+            except (OSError, EOFError, ValueError):      # także TimeoutError: klient zamilkł
                 pass
 
     def zamknij(self) -> None:
+        """Zamknięcie w ograniczonym czasie, także gdy wątek kanału obsługuje właśnie innego klienta."""
         self._koniec.set()
-        if self._watek is not None and self._watek.is_alive():
-            try:                                     # budzi accept() czekające na następnego klienta
-                with connection.Client(self.adres, self.rodzina, authkey=self._klucz):
-                    pass
-            except (OSError, EOFError, connection.AuthenticationError):
+        for _ in range(3):
+            if self._watek is None or not self._watek.is_alive():
+                break
+            try:          # budzi accept(): połączenie bez klucza, więc nikt nie czeka na wymianę HMAC
+                _polacz_kanal(self.adres, self.rodzina, 1.0).close()
+            except (OSError, EOFError):
                 pass
-            self._watek.join(5)
+            self._watek.join(2.0)
+        if self._watek is not None and self._watek.is_alive():
+            self._n._log("kanał: wątek kanału nie skończył się, zostaje w tle do końca procesu")
+        termin = time.monotonic() + 1.0        # trwające odpowiedzi (np. na „stop”) dochodzą przed końcem procesu;
+        with self._blokada_rozmow:             # milczący klient czeka na swój limit w tle
+            rozmowy = list(self._rozmowy)
+        for rozmowa in rozmowy:
+            rozmowa.join(max(0.0, termin - time.monotonic()))
         if self._sluchacz is not None:
             try:
                 self._sluchacz.close()
@@ -566,7 +908,8 @@ class _Kanal:
 
 
 class Klient:
-    """Klient kanału nadzorcy (dla `jarvo status`, `restart`, `stop`, `update`)."""
+    """Klient kanału nadzorcy (dla `jarvo status`, `restart`, `stop`, `update`). `limit` obejmuje całą rozmowę:
+    połączenie, wymianę klucza i odpowiedź."""
 
     def __init__(self, u: Uklad, limit: float = 15.0):
         self.u, self.limit = u, limit
@@ -577,19 +920,23 @@ class Klient:
             return (self.u.stan / "nadzorca.klucz").read_bytes()
         except OSError:
             raise NadzorcaNieDziala(f"Nadzorca Jarva nie działa dla {self.u.root} (brak klucza kanału). "
-                                    "Uruchom `jarvo serwis` albo `jarvo up`.") from None
+                                    "Uruchom `jarvo up` albo `jarvo serwis`.") from None
 
     def _zapytaj(self, zadanie: dict) -> dict:
         klucz = self._klucz()
+        koniec = time.monotonic() + self.limit
         try:
-            with connection.Client(self.adres, self.rodzina, authkey=klucz) as c:
-                c.send_bytes(json.dumps(zadanie).encode("utf-8"))
-                if not c.poll(self.limit):
-                    raise NadzorcaNieDziala(f"Nadzorca nie odpowiedział w {self.limit:g} s.")
-                odp = json.loads(c.recv_bytes(_MAKS_WIADOMOSCI).decode("utf-8"))
+            with _polacz_kanal(self.adres, self.rodzina, self.limit) as c:
+                z = _ZLimitem(c, koniec)
+                connection.answer_challenge(z, klucz)
+                connection.deliver_challenge(z, klucz)
+                z.send_bytes(json.dumps(zadanie).encode("utf-8"))
+                odp = json.loads(z.recv_bytes(_MAKS_WIADOMOSCI).decode("utf-8"))
         except connection.AuthenticationError:
             raise BladNadzorcy("Kanał nadzorcy odrzucił klucz (nadzorca właśnie startuje od nowa?). "
                                "Spróbuj jeszcze raz.") from None
+        except TimeoutError:
+            raise NadzorcaNieDziala(f"Nadzorca nie odpowiedział w {self.limit:g} s.") from None
         except (OSError, EOFError, ValueError) as e:
             raise NadzorcaNieDziala(f"Nadzorca Jarva nie działa albo dopiero startuje ({type(e).__name__}).") \
                 from None
@@ -606,9 +953,11 @@ class Klient:
         """Zleca restart usługi (łagodnie, potem twardo); wraca od razu, stan pokazuje status()."""
         return self._zapytaj({"polecenie": "restart", "nazwa": nazwa})
 
-    def stop(self, czekaj: float = 0.0) -> dict:
-        """Zatrzymuje nadzorcę i usługi; z `czekaj` czeka, aż proces nadzorcy się skończy."""
-        odp = self._zapytaj({"polecenie": "stop"})
+    def stop(self, czekaj: float = 0.0, powod: str = "") -> dict:
+        """Zatrzymuje nadzorcę i usługi i zapisuje znacznik trwałego zatrzymania (odpowiedź: "trwale"), więc
+        autostart nie podniesie floty, aż ktoś go zdejmie (zdejmij_zatrzymanie). Z `czekaj` czeka, aż proces
+        nadzorcy się skończy (całe zatrzymanie trwa najdłużej CZAS_ZATRZYMANIA)."""
+        odp = self._zapytaj({"polecenie": "stop", "powod": powod or "stop z kanału"})
         if czekaj > 0:
             koniec = time.monotonic() + czekaj
             while _odcisk(odp.get("pid")) == odp.get("odcisk") and odp.get("odcisk"):
@@ -625,15 +974,61 @@ def polacz(u: Uklad, limit: float = 15.0) -> Klient:
     return k
 
 
+# --- trwałe zatrzymanie (`jarvo down`) ----------------------------------------------------------------------------
+
+def _plik_zatrzymania(u: Uklad) -> Path:
+    return u.stan / ZNACZNIK_ZATRZYMANIA
+
+
+def oznacz_zatrzymanie(u: Uklad, powod: str = "") -> None:
+    """Znacznik trwałego zatrzymania `<stan>/zatrzymany.json` (kiedy, powód, PID piszącego). `jarvo serwis` przy nim
+    kończy się od razu kodem 0, a działający nadzorca zatrzymuje usługi. Zdejmuje go zdejmij_zatrzymanie()."""
+    dane = {"wersja": 1, "kiedy": _iso(time.time()), "powod": _bez_sekretow(str(powod or "")).strip()[:200] or None,
+            "pid": os.getpid()}
+    przenosne.zapisz_atomowo(_plik_zatrzymania(u), json.dumps(dane, ensure_ascii=False, indent=2) + "\n")
+
+
+def zdejmij_zatrzymanie(u: Uklad) -> bool:
+    """Jawny start (`jarvo up`, `jarvo panel`, instalacja, `jarvo serwis --wznow`): usuwa znacznik zatrzymania.
+    True, gdy był. OSError, gdy nie da się go usunąć (start i tak by się wtedy od razu zakończył)."""
+    plik = _plik_zatrzymania(u)
+    for proba in range(20):
+        try:
+            plik.unlink()
+            return True
+        except FileNotFoundError:
+            return False
+        except PermissionError:           # Windows: plik chwilowo otwarty (antywirus, indeksowanie)
+            if not WINDOWS or proba == 19:
+                raise
+            time.sleep(0.05 * (proba + 1))
+    return False
+
+
+def zatrzymany(u: Uklad) -> bool:
+    """Czy flota jest trwale zatrzymana (`jarvo down`, `jarvo serwis --stop`, stop z kanału)."""
+    return _plik_zatrzymania(u).is_file()
+
+
+def _komunikat_zatrzymany(u: Uklad) -> str:
+    z = srodowisko.wczytaj_json(_plik_zatrzymania(u))
+    opis = ", ".join(str(z[k]) for k in ("powod", "kiedy") if z.get(k))
+    return ("Serwis Jarva jest zatrzymany" + (f" ({opis})" if opis else "") + ", więc autostart go nie uruchamia. "
+            "Start: `jarvo up` albo `jarvo serwis --wznow`.")
+
+
 def stan_z_pliku(u: Uklad) -> dict:
-    """Ostatni zapisany stan (`<stan>/nadzorca.json`) i pole "dziala": czy proces nadzorcy jeszcze żyje. Pusty
-    słownik, gdy nadzorca nigdy nie działał. Nie dotyka blokady, więc nie przeszkadza startującemu nadzorcy."""
+    """Ostatni zapisany stan (`<stan>/nadzorca.json`), pole "dziala" (czy proces nadzorcy jeszcze żyje) i pole
+    "zatrzymanie" (treść znacznika trwałego zatrzymania albo None). Pusty słownik, gdy nadzorca nigdy nie działał.
+    Nie dotyka blokady, więc nie przeszkadza startującemu nadzorcy."""
     dane = srodowisko.wczytaj_json(u.stan / "nadzorca.json")
     if not dane:
         return {}
     n = dane.get("nadzorca") if isinstance(dane.get("nadzorca"), dict) else {}
     dane["dziala"] = bool(n.get("stan") != "zatrzymany" and n.get("odcisk")
                           and _odcisk(n.get("pid")) == n.get("odcisk"))
+    dane["zatrzymanie"] = (srodowisko.wczytaj_json(_plik_zatrzymania(u)) or {"kiedy": None}) if zatrzymany(u) \
+        else None
     return dane
 
 
@@ -685,7 +1080,6 @@ def _pytanie_potok(nazwa: str, zadanie: bytes, limit: float) -> bytes | None:
 
 
 def _pytanie_gniazdo(dane: Path, zadanie: bytes, limit: float) -> bytes | None:
-    import socket
     sciezka = _gniazdo_bramy(dane)
     if sciezka is None:
         return None
@@ -724,8 +1118,37 @@ def http_gotowa(adres: str, limit: float = 2.0) -> bool:
         with _BEZ_PROXY.open(urllib.request.Request(adres, headers={"User-Agent": "jarvo-nadzorca/1"}),
                              timeout=limit) as odp:
             return odp.status == 200
-    except (urllib.error.URLError, OSError, ValueError):
+    except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError):
         return False
+
+
+def _ta_sama_sciezka(a: str | Path, b: str | Path) -> bool:
+    try:
+        return (os.path.normcase(str(Path(a).expanduser().resolve(strict=False)))
+                == os.path.normcase(str(Path(b).expanduser().resolve(strict=False))))
+    except (OSError, ValueError, RuntimeError):
+        return False
+
+
+def panel_gotowy(adres: str, dane: Path, limit: float = 5.0) -> bool:
+    """Panel TEGO HERMES_HOME odpowiada: GET `adres` (/api/status) zwraca 200, a pole `hermes_home` wskazuje `dane`.
+    Cudzy dashboard na tym samym porcie to nie gotowość. Gdy panel wymaga logowania (tryb LAN), Hermes ukrywa
+    ścieżki (hermes_cli/web_routers/status.py) i wystarcza 200 z `auth_required`. Limit 5 s, bo /api/status zbiera
+    kilka sond Hermesa po 0,75–1 s (sesje, baza stanu); sonda nadzorcy i tak idzie w osobnym wątku."""
+    try:
+        with _BEZ_PROXY.open(urllib.request.Request(adres, headers={"User-Agent": "jarvo-nadzorca/1"}),
+                             timeout=limit) as odp:
+            if odp.status != 200:
+                return False
+            tresc = json.loads(odp.read(_MAKS_WIADOMOSCI).decode("utf-8"))
+    except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError):
+        return False
+    if not isinstance(tresc, dict):
+        return False
+    dom = tresc.get("hermes_home")
+    if dom is None:
+        return tresc.get("auth_required") is True
+    return isinstance(dom, str) and _ta_sama_sciezka(dom, dane)
 
 
 def _bez_sekretow(tekst: str) -> str:
@@ -786,11 +1209,12 @@ def uslugi_jarva(u: Uklad, env: dict[str, str]) -> list[Usluga]:
     brama = Usluga("brama", _argv_hermesa(checkout, "gateway", "run", "--external-supervisor"), cwd=katalog,
                    env=env_bramy, gotowa=partial(brama_gotowa, dane), kolejnosc=0,
                    przed_stopem=partial(_znacznik_planowanego_stopu, python, env_bramy),
-                   powod_postoju=partial(_powod_bramy, dane))
+                   powod_postoju=partial(_powod_bramy, dane), limit_stopu=LIMIT_STOPU_BRAMY)
     panel = Usluga("panel", _argv_hermesa(checkout, "dashboard", "--host", "127.0.0.1", "--port", str(port),
                                           "--no-open", "--skip-build"),
-                   cwd=katalog, env=env_panelu, gotowa=partial(http_gotowa, f"http://127.0.0.1:{port}/api/status"),
-                   kolejnosc=1)
+                   cwd=katalog, env=env_panelu, gotowa=partial(panel_gotowy, f"http://127.0.0.1:{port}/api/status",
+                                                               dane),
+                   kolejnosc=1, limit_stopu=LIMIT_STOPU_PANELU, port=port)
     return [brama, panel]
 
 
@@ -822,6 +1246,7 @@ class _Stan:
         self.generacja = 0
         self.restarty = 0
         self.bledy = 0
+        self.szybkie_75 = 0           # wyjścia 75 z rzędu, każde przed `szybki_restart` sekund działania
         self.ostatni_kod: int | None = None
         self.gotowa: bool | None = None
         self.gotowa_od: float | None = None
@@ -840,14 +1265,17 @@ class _Stan:
 
 class Nadzorca:
     """Pętla nadzoru usług jednego korzenia Jarva. uruchom() blokuje do zatrzymaj() (albo polecenia stop z kanału).
-    Czasy (sekundy) skracają testy; domyślne są z planu (c2)."""
+    Czasy (sekundy) skracają testy; domyślne są z planu (c2). `szanuj_zatrzymanie` (tak robi `jarvo serwis`): przy
+    znaczniku trwałego zatrzymania uruchom() rzuca NadzorcaZatrzymany, a znacznik zapisany w trakcie pracy
+    zatrzymuje usługi."""
 
     def __init__(self, u: Uklad, uslugi: list[Usluga], env: dict[str, str] | None = None, *,
                  przerwa_restartu: float = 5.0, przerwa_min: float = 5.0, przerwa_max: float = 300.0,
-                 reset_po: float = 600.0, limit_stopu: float = 30.0, limit_kolejnosci: float = 60.0,
-                 co_ile_gotowosc: float = 1.0, co_ile_zycie: float = 30.0, co_ile_rotacja: float = 5.0,
-                 takt: float = 0.25, log_max: int = 10 * 2 ** 20, log_kopie: int = 3, kanal: bool = True,
-                 log: Callable[[str], None] | None = None):
+                 reset_po: float = 600.0, szybki_restart: float = 60.0, limit_stopu: float = 30.0,
+                 limit_kolejnosci: float = 60.0, co_ile_gotowosc: float = 1.0, co_ile_zycie: float = 30.0,
+                 co_ile_rotacja: float = 5.0, co_ile_znacznik: float = 1.0, takt: float = 0.25,
+                 log_max: int = 10 * 2 ** 20, log_kopie: int = 3, kanal: bool = True,
+                 szanuj_zatrzymanie: bool = False, log: Callable[[str], None] | None = None):
         nazwy = [x.nazwa for x in uslugi]
         if len(set(nazwy)) != len(nazwy):
             raise ValueError("nazwy usług muszą być różne")
@@ -857,8 +1285,10 @@ class Nadzorca:
         self.u = u
         self.env = dict(os.environ if env is None else env)
         self.przerwa_restartu, self.przerwa_min, self.przerwa_max = przerwa_restartu, przerwa_min, przerwa_max
-        self.reset_po, self.limit_stopu, self.limit_kolejnosci = reset_po, limit_stopu, limit_kolejnosci
+        self.reset_po, self.szybki_restart = reset_po, szybki_restart
+        self.limit_stopu, self.limit_kolejnosci = limit_stopu, limit_kolejnosci
         self.co_ile_gotowosc, self.co_ile_zycie, self.co_ile_rotacja = co_ile_gotowosc, co_ile_zycie, co_ile_rotacja
+        self.co_ile_znacznik = co_ile_znacznik
         self.takt = takt
         self._stany = {x.nazwa: _Stan(x, _Dziennik(u.logi / f"{x.nazwa}.log", log_max, log_kopie))
                        for x in sorted(uslugi, key=lambda x: x.kolejnosc)}
@@ -867,6 +1297,7 @@ class Nadzorca:
         self._blokada_logu = threading.Lock()
         self._log_zewn = log
         self._z_kanalem = kanal
+        self._szanuj_zatrzymanie = szanuj_zatrzymanie
         self._kanal: _Kanal | None = None
         self._plik_stanu = u.stan / "nadzorca.json"
         self._stop = threading.Event()
@@ -884,7 +1315,8 @@ class Nadzorca:
     # --- sterowanie z zewnątrz (wątki, sygnały, kanał) ---
 
     def zatrzymaj(self) -> None:
-        """Zatrzymanie łagodne: usługi w odwrotnej kolejności, potem koniec uruchom(). Bezpieczne z innego wątku."""
+        """Zatrzymanie łagodne: usługi w odwrotnej kolejności, potem koniec uruchom(). Bezpieczne z innego wątku.
+        Bez znacznika trwałego zatrzymania (ten zapisuje stop z kanału albo oznacz_zatrzymanie)."""
         self._stop.set()
         self._budzik.set()
 
@@ -914,8 +1346,16 @@ class Nadzorca:
                 return {"ok": False, "blad": str(e)}
             return {"ok": True, "nazwa": nazwa}
         if polecenie == "stop":
+            powod = _bez_sekretow(str(zadanie.get("powod") or "stop z kanału")).strip()[:200]
+            try:                              # najpierw znacznik: zapasowy wyzwalacz autostartu nie podniesie floty
+                oznacz_zatrzymanie(self.u, powod)
+                trwale = True
+            except OSError as e:
+                trwale = False
+                self._log(f"nadzorca: nie zapisałem znacznika zatrzymania ({e.strerror or e})")
+            self._log(f"nadzorca: stop na polecenie ({powod})")
             self.zatrzymaj()
-            return {"ok": True, "pid": os.getpid(), "odcisk": self._odcisk_wlasny}
+            return {"ok": True, "pid": os.getpid(), "odcisk": self._odcisk_wlasny, "trwale": trwale}
         return {"ok": False, "blad": f"Nieznane polecenie {polecenie!r} (są: status, restart, stop)."}
 
     # --- główna pętla ---
@@ -926,6 +1366,14 @@ class Nadzorca:
             zamek.__enter__()
         except BlockingIOError:
             raise NadzorcaJuzDziala(_komunikat_juz_dziala(self.u)) from None
+        try:
+            if self._szanuj_zatrzymanie and zatrzymany(self.u):   # znacznik zapisany tuż przed startem (wyścig)
+                raise NadzorcaZatrzymany(_komunikat_zatrzymany(self.u))
+            self._uruchom_pod_blokada()
+        finally:
+            zamek.__exit__(None, None, None)
+
+    def _uruchom_pod_blokada(self) -> None:
         try:
             self._przygotuj()
             self._log(f"nadzorca: start (pid {os.getpid()}), usługi: {', '.join(self._stany)}")
@@ -939,16 +1387,16 @@ class Nadzorca:
         finally:
             try:
                 self._sprzatnij_awaryjnie()
-                if self._kanal is not None:
-                    self._kanal.zamknij()
-                self._zapisz_stan(koniec=True)
-                self._log("nadzorca: koniec")
-                with self._blokada_logu:
-                    if self._plik_logu is not None:
-                        self._plik_logu.close()
-                        self._plik_logu = None
-            finally:
-                zamek.__exit__(None, None, None)
+            except Exception as e:            # kanał i stan mimo to zamykamy; blokadę zwalnia uruchom()
+                self._log(f"nadzorca: sprzątanie nie wyszło: {type(e).__name__}: {str(e)[:200]}")
+            if self._kanal is not None:
+                self._kanal.zamknij()
+            self._zapisz_stan(koniec=True)
+            self._log("nadzorca: koniec")
+            with self._blokada_logu:
+                if self._plik_logu is not None:
+                    self._plik_logu.close()
+                    self._plik_logu = None
 
     def _przygotuj(self) -> None:
         self.u.stan.mkdir(parents=True, exist_ok=True)
@@ -956,17 +1404,30 @@ class Nadzorca:
         przenosne.chron(self.u.stan)          # klucz kanału, gniazdo i blokady bramy: tylko właściciel
         if not WINDOWS:
             przenosne.chron(self.u.logi)
-        self._dziennik.rotuj()
-        self._plik_logu = self._dziennik.otworz()
+        try:
+            self._dziennik.rotuj()
+        except OSError:
+            pass                              # kopię trzyma podgląd bez FILE_SHARE_DELETE: spróbuje pętla
+        try:
+            self._plik_logu = self._dziennik.otworz()
+        except OSError as e:                  # nadzorca ważniejszy niż własny dziennik: wpisy idą tylko na ekran
+            self._plik_logu = None
+            self._log(f"nadzorca: nie otworzę dziennika {self._dziennik.sciezka} ({e.strerror or e})")
         self._od, self._odcisk_wlasny = time.time(), _odcisk(os.getpid())
 
     def _petla(self) -> None:
-        ostatnia_rotacja = ostatni_zapis = time.monotonic()
+        ostatnia_rotacja = ostatni_zapis = ostatni_znacznik = time.monotonic()
         while True:
             teraz = time.monotonic()
             if self._calosc and teraz > self._koniec_calosci:
                 return                        # bezpiecznik: resztę zabije _sprzatnij_awaryjnie
             try:
+                if (self._szanuj_zatrzymanie and not self._stop.is_set()
+                        and teraz - ostatni_znacznik >= self.co_ile_znacznik):
+                    ostatni_znacznik = teraz
+                    if zatrzymany(self.u):    # `jarvo down` bez kanału (np. kanał nie odpowiadał)
+                        self._log("nadzorca: pojawił się znacznik zatrzymania, zatrzymuję usługi")
+                        self.zatrzymaj()
                 if self._stop.is_set() and not self._calosc:
                     self._zatrzymaj_wszystko()
                 self._obsluz_polecenia()
@@ -1037,6 +1498,9 @@ class Nadzorca:
 
     # --- start, wyjście, zatrzymanie ---
 
+    def _limit(self, s: _Stan) -> float:
+        return float(self.limit_stopu if s.u.limit_stopu is None else s.u.limit_stopu)
+
     def _popen(self, s: _Stan, env: dict[str, str], plik) -> subprocess.Popen:
         kw = dict(cwd=str(s.u.cwd) if s.u.cwd else None, env=env, stdin=subprocess.DEVNULL, stdout=plik,
                   stderr=subprocess.STDOUT, close_fds=True)
@@ -1047,8 +1511,11 @@ class Nadzorca:
             try:
                 return subprocess.Popen(s.u.argv, creationflags=flagi | _CREATE_BREAKAWAY_FROM_JOB, **kw)
             except PermissionError:
+                # odmowa z innego powodu (np. brak dostępu do programu) padnie też bez flagi i flaga zostaje
+                proces = subprocess.Popen(s.u.argv, creationflags=flagi, **kw)
                 self._breakaway = False
                 self._log("nadzorca: job rodzica nie pozwala na CREATE_BREAKAWAY_FROM_JOB, startuję bez tej flagi")
+                return proces
         return subprocess.Popen(s.u.argv, creationflags=flagi, **kw)
 
     def _start(self, s: _Stan) -> None:
@@ -1101,15 +1568,33 @@ class Nadzorca:
         self._log(f"{s.u.nazwa}: {s.powod}")
         self._brudny = True
 
+    def _zajety_port(self, s: _Stan) -> str | None:
+        """„port N zajęty przez inny program (PID, nazwa)” albo None, gdy port jest wolny."""
+        try:
+            kto = wlasciciel_portu(int(s.u.port))
+        except Exception:                 # diagnostyka nie może zatrzymać pętli
+            return None
+        return None if kto is None else f"port {s.u.port} zajęty przez inny program ({_opis_wlasciciela(*kto)})"
+
     def _po_wyjsciu(self, s: _Stan, kod: int) -> None:
         czas = time.monotonic() - s.start_mono
         s.ostatni_kod, s.proces = kod, None
         s.gotowa = None if s.u.gotowa is None else False
         s.dziennik.dopisz(f"=== {time.strftime('%Y-%m-%d %H:%M:%S')} nadzorca: {s.u.nazwa} zakończony kodem "
                           f"{_kod_tekst(kod)} po {czas:.0f} s ===\n")
+        szybko = czas < self.szybki_restart
+        if not szybko:
+            s.szybkie_75 = 0
         if kod == KOD_RESTART:
-            self._ponow(s, self.przerwa_restartu)
-            s.powod = f"kod 75: usługa poprosiła o restart (za {self.przerwa_restartu:g} s)"
+            # pierwsze 75 to zwykła prośba (/restart, `hermes update`); kolejne szybkie z rzędu (np. panel na
+            # zajętym porcie) podwajają przerwę aż do przerwa_max, zamiast wstawać co 5 s bez końca
+            s.szybkie_75 = s.szybkie_75 + 1 if szybko else 0
+            przerwa = min(self.przerwa_restartu * 2 ** min(max(s.szybkie_75 - 1, 0), 30),
+                          max(self.przerwa_max, self.przerwa_restartu))
+            self._ponow(s, przerwa)
+            prosba = (self._zajety_port(s) if s.u.port else None) or "usługa poprosiła o restart"
+            z_rzedu = f", {s.szybkie_75}. raz z rzędu po {czas:.0f} s działania" if s.szybkie_75 > 1 else ""
+            s.powod = f"kod 75: {prosba}{z_rzedu}; ponowienie za {przerwa:g} s"
         elif kod == KOD_POSTOJ:
             s.stan, s.nastepny_wall = "postoj", None
             try:
@@ -1137,20 +1622,20 @@ class Nadzorca:
         return [s.pid]
 
     def _zatrzymaj_usluge(self, s: _Stan, po: str = "stop") -> None:
-        """Łagodnie (przed_stopem, potem Ctrl+Break albo SIGTERM), twardo po `limit_stopu`; `po`: stop albo restart."""
+        """Łagodnie (przed_stopem, potem Ctrl+Break albo SIGTERM), twardo po limicie usługi; `po`: stop albo
+        restart."""
         if s.stan == "zatrzymywanie":
             s.po_zatrzymaniu = po
             return
         if s.stan != "dziala":
             if po == "restart":
-                s.bledy = 0
+                s.bledy = s.szybkie_75 = 0
                 self._start(s)
             elif s.stan in ("czeka", "ponowienie"):
                 s.stan, s.powod, s.nastepny_wall = "zatrzymana", None, None
                 self._brudny = True
             return
         s.stan, s.po_zatrzymaniu = "zatrzymywanie", po
-        s.termin = time.monotonic() + self.limit_stopu
         self._log(f"{s.u.nazwa}: zatrzymuję (pid {s.pid})")
         if s.u.przed_stopem is not None:
             try:
@@ -1158,6 +1643,7 @@ class Nadzorca:
             except Exception as e:
                 self._log(f"{s.u.nazwa}: przygotowanie zatrzymania nie wyszło ({type(e).__name__})")
         _lagodnie(s.pid)
+        s.termin = time.monotonic() + self._limit(s)   # od prośby o koniec (znacznik bramy już leży)
         self._brudny = True
 
     def _zabij(self, s: _Stan) -> None:
@@ -1172,7 +1658,7 @@ class Nadzorca:
             s.proces.kill()
         except OSError:
             pass
-        self._log(f"{s.u.nazwa}: nie skończył się w {self.limit_stopu:g} s, zabity pid {s.pid}"
+        self._log(f"{s.u.nazwa}: nie skończył się w {self._limit(s):g} s, zabity pid {s.pid}"
                   + (f" i dzieci {', '.join(map(str, zabite))}" if zabite else ""))
 
     def _po_zatrzymaniu(self, s: _Stan, kod: int) -> None:
@@ -1182,7 +1668,7 @@ class Nadzorca:
                           f"(kod {_kod_tekst(kod)}) ===\n")
         self._log(f"{s.u.nazwa}: zatrzymany (kod {_kod_tekst(kod)})")
         if s.po_zatrzymaniu == "restart" and not self._calosc:
-            s.bledy = 0
+            s.bledy = s.szybkie_75 = 0
             self._start(s)
         else:
             s.stan, s.powod, s.nastepny_wall = "zatrzymana", None, None
@@ -1190,10 +1676,11 @@ class Nadzorca:
 
     def _zatrzymaj_wszystko(self) -> None:
         self._calosc = True
-        self._koniec_calosci = time.monotonic() + self.limit_stopu + 10
         self._log("nadzorca: zatrzymuję usługi")
         for s in reversed(list(self._stany.values())):
             self._zatrzymaj_usluge(s, "stop")
+        self._koniec_calosci = max((s.termin for s in self._stany.values() if s.stan == "zatrzymywanie"),
+                                   default=time.monotonic()) + 10
         self._brudny = True
 
     def _sprzatnij_awaryjnie(self) -> None:
@@ -1278,10 +1765,11 @@ class Nadzorca:
         zyje = s.proces is not None
         return {"stan": s.stan, "pid": s.pid if zyje else None, "pidy": list(s.pidy) if zyje else [],
                 "odcisk": s.odcisk if zyje else None, "launcher": s.launcher, "od": _iso(s.od) if zyje else None,
-                "restarty": s.restarty, "bledy_z_rzedu": s.bledy, "ostatni_kod": s.ostatni_kod,
-                "gotowa": s.gotowa, "gotowa_od": _iso(s.gotowa_od), "powod": s.powod,
+                "restarty": s.restarty, "bledy_z_rzedu": s.bledy, "szybkie_75_z_rzedu": s.szybkie_75,
+                "ostatni_kod": s.ostatni_kod, "gotowa": s.gotowa, "gotowa_od": _iso(s.gotowa_od), "powod": s.powod,
                 "nastepny_start": _iso(s.nastepny_wall) if s.stan == "ponowienie" else None,
-                "kolejnosc": s.u.kolejnosc, "log": str(s.dziennik.sciezka)}
+                "kolejnosc": s.u.kolejnosc, "limit_stopu": self._limit(s), "port": s.u.port,
+                "log": str(s.dziennik.sciezka)}
 
     def _zapisz_stan(self, koniec: bool = False) -> None:
         dane = {"wersja": WERSJA_STANU,
@@ -1299,8 +1787,10 @@ class Nadzorca:
             self._log(f"nadzorca: nie zapisałem stanu ({e.strerror or e})")
 
     def _posprzataj_po_poprzednim(self) -> None:
-        """Procesy usług, które przeżyły poprzedniego nadzorcę (ten sam PID i czas startu co w stanie)."""
+        """Procesy usług, które przeżyły poprzedniego nadzorcę (ten sam PID i czas startu co w stanie): wszystkie
+        dostają prośbę o koniec naraz, każdy ma limit swojej usługi, potem zabicie."""
         stary = srodowisko.wczytaj_json(self._plik_stanu).get("uslugi")
+        zywe = []
         for nazwa, wpis in (stary.items() if isinstance(stary, dict) else []):
             if not isinstance(wpis, dict):
                 continue
@@ -1316,15 +1806,24 @@ class Nadzorca:
                 except Exception:
                     pass
             _lagodnie(pid)
-            koniec = time.monotonic() + self.limit_stopu
-            while _odcisk(pid) == odcisk and time.monotonic() < koniec:
-                time.sleep(min(self.takt, 0.2))
-            if _odcisk(pid) == odcisk:
+            limit = self._limit(s) if s is not None else self.limit_stopu
+            zywe.append((nazwa, pid, odcisk, launcher, time.monotonic() + limit, limit))
+        while zywe:
+            dalej = []
+            for nazwa, pid, odcisk, launcher, termin, limit in zywe:
+                if _odcisk(pid) != odcisk:
+                    continue
+                if time.monotonic() < termin:
+                    dalej.append((nazwa, pid, odcisk, launcher, termin, limit))
+                    continue
                 if launcher:
                     for d, o in dzieci(pid):
                         _zabij_pid(d, o)
                 _zabij_pid(pid, odcisk)
-                self._log(f"{nazwa}: proces {pid} nie skończył się w {self.limit_stopu:g} s, zabity")
+                self._log(f"{nazwa}: proces {pid} nie skończył się w {limit:g} s, zabity")
+            zywe = dalej
+            if zywe:
+                time.sleep(min(self.takt, 0.2))
 
 
 def _komunikat_juz_dziala(u: Uklad) -> str:
@@ -1354,42 +1853,77 @@ def _wypisz(tekst: str, blad: bool = False) -> None:
         pass
 
 
+def _stop_z_polecenia(u: Uklad) -> int:
+    """`jarvo serwis --stop`: stop przez kanał (znacznik pisze nadzorca), a gdy nadzorca nie działa, sam znacznik."""
+    powod = "jarvo serwis --stop"
+    try:
+        odp = polacz(u).stop(czekaj=CZAS_ZATRZYMANIA + 10, powod=powod)
+    except NadzorcaNieDziala:
+        odp = None
+    except BladNadzorcy as e:
+        _wypisz(str(e), blad=True)
+        return 1
+    if odp is None or not odp.get("trwale"):
+        try:
+            oznacz_zatrzymanie(u, powod)
+        except OSError as e:
+            _wypisz(f"Nie zapisałem znacznika zatrzymania ({e}): autostart może uruchomić serwis znowu.", blad=True)
+            return 1
+    _wypisz(("Nadzorca Jarva nie działał." if odp is None else "Nadzorca Jarva zatrzymany.") +
+            " Autostart go nie uruchomi, aż do `jarvo up` albo `jarvo serwis --wznow`.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
-    """`jarvo serwis`: nadzorca na pierwszym planie (autostart uruchamia właśnie to). Ctrl+C albo SIGTERM
-    zatrzymuje usługi łagodnie. --status, --restart i --stop rozmawiają z działającym nadzorcą przez kanał."""
+    """`jarvo serwis`: nadzorca na pierwszym planie (autostart uruchamia właśnie to). Przy znaczniku trwałego
+    zatrzymania kończy się od razu kodem 0. Ctrl+C albo SIGTERM zatrzymuje usługi łagodnie (bez znacznika).
+    --status, --restart i --stop rozmawiają z działającym nadzorcą przez kanał; --wznow zdejmuje znacznik."""
     parser = argparse.ArgumentParser(prog="jarvo serwis", description="Nadzorca procesów Jarva: brama i panel "
                                      "Hermesa, restart po awarii, logi i stan dla `jarvo status`.")
     grupa = parser.add_mutually_exclusive_group()
     grupa.add_argument("--status", action="store_true", help="stan działającego nadzorcy (JSON)")
     grupa.add_argument("--restart", metavar="USLUGA", help="uruchom usługę ponownie (brama, panel)")
-    grupa.add_argument("--stop", action="store_true", help="zatrzymaj nadzorcę i jego usługi")
+    grupa.add_argument("--stop", action="store_true",
+                       help="zatrzymaj nadzorcę i usługi; autostart nie uruchomi ich, aż do `jarvo up`")
+    grupa.add_argument("--wznow", action="store_true",
+                       help="zdejmij znacznik zatrzymania (po `jarvo down`) i uruchom nadzorcę")
     args = parser.parse_args(argv)
     try:
         u = uklad()
     except BladUkladu as e:
         _wypisz(str(e), blad=True)
         return 1
-    if args.status or args.restart or args.stop:
+    if args.status or args.restart:
         try:
             klient = polacz(u)
             if args.status:
                 _wypisz(json.dumps(klient.status(), ensure_ascii=False, indent=2))
-            elif args.restart:
+            else:
                 klient.restart(args.restart)
                 _wypisz(f"{args.restart}: restart zlecony.")
-            else:
-                klient.stop(czekaj=120)
-                _wypisz("Nadzorca Jarva zatrzymany.")
         except BladNadzorcy as e:
             _wypisz(str(e), blad=True)
+            if isinstance(e, NadzorcaNieDziala) and zatrzymany(u):
+                _wypisz(_komunikat_zatrzymany(u), blad=True)
             return 1
         return 0
+    if args.stop:
+        return _stop_z_polecenia(u)
+    try:
+        if args.wznow:
+            zdejmij_zatrzymanie(u)
+        elif zatrzymany(u):               # po `jarvo down` zapasowe wyzwalacze autostartu nie podnoszą floty
+            _wypisz(_komunikat_zatrzymany(u))
+            return 0
+    except OSError as e:
+        _wypisz(f"Nie zdjąłem znacznika zatrzymania {_plik_zatrzymania(u)}: {e}", blad=True)
+        return 1
     if _zajety(u):                        # zanim cokolwiek zbudujemy: drugi start = komunikat i kod 1
         _wypisz(_komunikat_juz_dziala(u), blad=True)
         return 1
     try:
         env = srodowisko.srodowisko(u)
-        nadzorca = Nadzorca(u, uslugi_jarva(u, env), env, log=_wypisz)
+        nadzorca = Nadzorca(u, uslugi_jarva(u, env), env, log=_wypisz, szanuj_zatrzymanie=True)
     except BladNadzorcy as e:
         _wypisz(str(e), blad=True)
         return 1
@@ -1403,6 +1937,9 @@ def main(argv: list[str] | None = None) -> int:
                 pass
     try:
         nadzorca.uruchom()
+    except NadzorcaZatrzymany as e:       # znacznik zapisany w chwili startu
+        _wypisz(str(e))
+        return 0
     except BladNadzorcy as e:             # także NadzorcaJuzDziala (wyścig dwóch startów)
         _wypisz(str(e), blad=True)
         return 1
