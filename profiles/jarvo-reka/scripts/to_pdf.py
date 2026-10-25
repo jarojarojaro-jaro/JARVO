@@ -9,15 +9,18 @@
   jest uproszczony).
 - XLSX/PPTX/ODS/ODP/DOC/XLS/PPT: tylko LibreOffice.
 Programy (docs/NATYWNIE.md F05, E07, E09): Chromium z CHROME_PATH (natywnie chrome-headless-shell z instalacji, w obrazie
-/usr/local/bin/chromium), pandoc z PATH procesów Jarva, LibreOffice: JARVO_SOFFICE, dodatek z instalacji Jarva, PATH
-(w obrazie dodatek `office`), a natywnie także LibreOffice właściciela (Program Files, Aplikacje, /opt). Na Windows
-programy bez okna konsoli. Proces Chromium żyje tylko na czas konwersji (~150–250 MB RAM).
+/usr/local/bin/chromium), pandoc z PATH procesów Jarva, LibreOffice: JARVO_SOFFICE i wpis `libreoffice` w narzedzia.json
+(miejsce na dodatek E07, dziś pusty), PATH (w obrazie dodatek `office`; bez snapa, który nie widzi plików Jarva), a
+natywnie LibreOffice właściciela (Program Files, Aplikacje, /opt). Na Windows programy bez okna konsoli. Na Linuksie,
+gdzie piaskownica Chromium nie ruszy mimo wszystko, druga próba bez niej (jak konwertuj.py). Proces Chromium żyje tylko
+na czas konwersji (~150–250 MB RAM).
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -38,15 +41,29 @@ OFFICE_ONLY = {".doc", ".rtf", ".xlsx", ".xls", ".ods", ".pptx", ".ppt", ".odp"}
 TIMEOUT = 180
 WINDOWS = os.name == "nt"
 BEZ_OKNA = getattr(subprocess, "CREATE_NO_WINDOW", 0) if WINDOWS else 0
+# przestrzenie nazw użytkownika, bez których piaskownica Chromium nie ruszy (jak w konwertuj.py): zakaz AppArmor
+# Ubuntu 23.10+ (1), limit 0 i łatka Debiana unprivileged_userns_clone (0)
 USERNS_APPARMOR = Path("/proc/sys/kernel/apparmor_restrict_unprivileged_userns")
+USERNS_LIMIT = Path("/proc/sys/user/max_user_namespaces")
+USERNS_CLONE = Path("/proc/sys/kernel/unprivileged_userns_clone")
+PIASKOWNICA_BLAD = re.compile(r"sandbox|namespace|zygote", re.I)   # Chromium bez działającej piaskownicy
 # LibreOffice w katalogu instalacji: Windows soffice.com (konsolowy, czeka na koniec) i soffice.exe, macOS pakiet .app,
 # Linux program/soffice (pakiet systemu, /opt/libreofficeX.Y z paczek TDF albo dodatek Jarva z deb bez dpkg)
 WZGLEDNE_SOFFICE = ("program/soffice.com", "program/soffice.exe", "LibreOffice.app/Contents/MacOS/soffice",
                     "Contents/MacOS/soffice", "program/soffice")
 
 
+def _linux() -> bool:
+    return sys.platform.startswith("linux")
+
+
+def _w_kontenerze() -> bool:
+    """Kontener Dockera; na Windows zawsze nie (`\\.dockerenv` w głównym katalogu dysku może założyć każdy)."""
+    return not WINDOWS and Path("/.dockerenv").exists()
+
+
 def natywnie() -> bool:
-    return bool(os.environ.get("JARVO_ROOT")) and not Path("/.dockerenv").exists()
+    return bool(os.environ.get("JARVO_ROOT")) and not _w_kontenerze()
 
 
 def chromium() -> str:
@@ -58,17 +75,31 @@ def chromium() -> str:
                      "w obrazie /usr/local/bin/chromium).")
 
 
-def bez_piaskownicy() -> bool:
-    """--no-sandbox tylko tam, gdzie piaskownica Chromium nie ruszy: Linux jako root, w kontenerze albo przy zakazie
-    przestrzeni nazw użytkownika (Ubuntu 23.10+). Windows i macOS: zawsze z piaskownicą."""
-    if not sys.platform.startswith("linux"):
-        return False
-    if os.geteuid() == 0 or Path("/.dockerenv").exists():
-        return True
+def _sysctl(p: Path) -> str | None:
     try:
-        return USERNS_APPARMOR.read_text(encoding="utf-8").strip() == "1"
+        return p.read_text(encoding="utf-8").strip()
     except OSError:
+        return None
+
+
+def bez_piaskownicy() -> bool:
+    """--no-sandbox tylko tam, gdzie piaskownica Chromium nie ruszy: Linux jako root, w kontenerze albo bez przestrzeni
+    nazw użytkownika (zakaz AppArmor w Ubuntu 23.10+, user.max_user_namespaces=0, kernel.unprivileged_userns_clone=0).
+    Windows i macOS: zawsze z piaskownicą."""
+    if not _linux():
         return False
+    if os.geteuid() == 0 or _w_kontenerze():
+        return True
+    return _sysctl(USERNS_APPARMOR) == "1" or _sysctl(USERNS_LIMIT) == "0" or _sysctl(USERNS_CLONE) == "0"
+
+
+def ze_snapa(sciezka: str) -> bool:
+    """LibreOffice ze snapa (/snap/bin/libreoffice → /usr/bin/snap) nie widzi ukrytych katalogów domowych ani /tmp
+    tego procesu (piaskownica snapa): konwersja by padła, więc takiego nie bierzemy."""
+    if not _linux():
+        return False
+    prawdziwa = os.path.realpath(sciezka)
+    return sciezka.startswith("/snap/") or prawdziwa.startswith("/snap/") or os.path.basename(prawdziwa) == "snap"
 
 
 def _soffice_w(katalog: Path) -> str | None:
@@ -80,8 +111,9 @@ def _soffice_w(katalog: Path) -> str | None:
 
 
 def soffice() -> str | None:
-    """LibreOffice: JARVO_SOFFICE, dodatek `libreoffice` z `<JARVO_ROOT>/stan/narzedzia.json`, PATH, a na końcu
-    instalacja właściciela w typowym miejscu (na Windows i macOS LibreOffice nie trafia do PATH)."""
+    """LibreOffice: JARVO_SOFFICE, wpis `libreoffice` w `<JARVO_ROOT>/stan/narzedzia.json` (miejsce na dodatek E07;
+    dziś nic go nie zapisuje), PATH bez snapa, a na końcu instalacja właściciela w typowym miejscu (na Windows
+    i macOS LibreOffice nie trafia do PATH)."""
     jawny = os.environ.get("JARVO_SOFFICE")
     if jawny and os.path.isfile(jawny):
         return jawny
@@ -97,8 +129,9 @@ def soffice() -> str | None:
                 return sciezka
             if wpis.get("katalog") and (p := _soffice_w(Path(wpis["katalog"]))):
                 return p
-    if p := shutil.which("soffice") or shutil.which("libreoffice"):
-        return p
+    for nazwa in ("soffice", "libreoffice"):
+        if (p := shutil.which(nazwa)) and not ze_snapa(p):
+            return p
     kandydaci: list[Path] = []
     if WINDOWS:
         for zm in ("ProgramW6432", "ProgramFiles", "ProgramFiles(x86)"):
@@ -130,11 +163,24 @@ def _uruchom(cmd: list, opis: str, **kw) -> None:
         raise SystemExit(f"{opis} zakończył się błędem ({r.returncode}):\n" + "\n".join(ogon))
 
 
+def polecenie_druku(html: Path, dst: Path, profil: Path, bez: bool) -> list[str]:
+    return [chromium(), "--headless", *(["--no-sandbox"] if bez else []), "--disable-gpu", "--disable-extensions",
+            "--no-first-run", f"--user-data-dir={profil}", "--no-pdf-header-footer", "--print-to-pdf-no-header",
+            "--virtual-time-budget=5000", f"--print-to-pdf={dst}", html.resolve().as_uri()]
+
+
 def print_html(html: Path, dst: Path, tmp: Path) -> None:
-    _uruchom([chromium(), "--headless", *(["--no-sandbox"] if bez_piaskownicy() else []), "--disable-gpu",
-              "--disable-extensions", "--no-first-run", f"--user-data-dir={tmp / 'chrome'}", "--no-pdf-header-footer",
-              "--print-to-pdf-no-header", "--virtual-time-budget=5000", f"--print-to-pdf={dst}",
-              html.resolve().as_uri()], "Chromium")
+    """Druk do PDF. Linux, na którym piaskownica nie ruszyła mimo bez_piaskownicy() (np. przestrzenie nazw wyłączone
+    w sposób, którego nie widać w /proc/sys): druga próba z --no-sandbox, z nowym profilem."""
+    bez = bez_piaskownicy()
+    for proba in (1, 2):
+        try:
+            _uruchom(polecenie_druku(html, dst, tmp / f"chrome-{proba}", bez), "Chromium")
+            return
+        except SystemExit as exc:
+            if bez or not _linux() or not PIASKOWNICA_BLAD.search(str(exc)):
+                raise
+            bez = True
 
 
 def pandoc_html(src: Path, tmp: Path) -> Path:
@@ -158,10 +204,16 @@ def libreoffice(src: Path, dst: Path, tmp: Path, office: str) -> None:
 
 
 def rada_office(ext: str) -> str:
-    if natywnie():
-        return (f"{ext} → PDF wymaga LibreOffice: zainstaluj go na tym komputerze (libreoffice.org; Jarvo znajdzie go "
-                "sam) albo wskaż program zmienną JARVO_SOFFICE; bez niego zapisz plik jako DOCX/HTML.")
-    return f"{ext} → PDF wymaga LibreOffice: zbuduj obraz z JARVO_EXTRAS=\"office\" albo zapisz plik jako DOCX/HTML."
+    """Jedno zdanie dla człowieka (jak rada w konwertuj.py): natywnie zwykła instalacja LibreOffice, którą skrypt
+    znajduje sam, w obrazie dodatek `office`."""
+    if not natywnie():
+        return f"{ext} → PDF wymaga LibreOffice: zbuduj obraz z JARVO_EXTRAS=\"office\" albo zapisz plik jako DOCX/HTML."
+    if any((p := shutil.which(n)) and ze_snapa(p) for n in ("soffice", "libreoffice")):
+        return (f"{ext} → PDF wymaga LibreOffice, a ten ze snapa nie widzi plików Jarva (piaskownica snapa): zainstaluj "
+                "go z pakietów systemu (np. apt install libreoffice) albo z libreoffice.org, albo zapisz plik jako "
+                "DOCX/HTML.")
+    return (f"{ext} → PDF wymaga LibreOffice: zainstaluj go na tym komputerze zwykłym instalatorem z libreoffice.org "
+            "(Jarvo znajdzie go sam, bez żadnych ustawień) albo zapisz plik jako DOCX/HTML.")
 
 
 def convert(src: Path, dst: Path) -> None:

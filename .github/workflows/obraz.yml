@@ -95,6 +95,24 @@ jobs:
             pl.jarvo.klucz=${{ needs.klucz.outputs.klucz }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
           provenance: false
+      # Skrypty dokumentów i OCR z tego commitu w zbudowanym obrazie (kontener VPS, docs/NATYWNIE.md E8):
+      # tests/live/natywnie_dokumenty.py --obraz na próbnych plikach w „Michał Żółć” (md/docx → PDF, PDF → PNG i tekst
+      # przez PDFium, mniejszy PDF, metadane, OCR Indrą i Tesseractem, SVG → PNG, to_pdf.py, pack.py), jako hermes
+      # z PATH jak w kontenerze floty. Obraz pobrany po digeście (build wysyła go bez wczytania do Dockera runnera);
+      # błąd zatrzymuje publikację tagu.
+      - name: Próba skryptów dokumentów i OCR w obrazie
+        timeout-minutes: 20
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          docker buildx prune -af >/dev/null 2>&1 || true
+          docker pull "$IMAGE@$DIGEST"
+          wyniki="$RUNNER_TEMP/obraz-dokumenty"
+          mkdir -p "$wyniki" && chmod 777 "$wyniki"
+          docker run --rm --user hermes --entrypoint /bin/sh -e HOME=/tmp -e PYTHONUTF8=1 \
+            -v "$GITHUB_WORKSPACE:/repo:ro" -v "$wyniki:/wyniki" "$IMAGE@$DIGEST" \
+            -c 'PATH=/opt/hermes/bin:/opt/hermes/.venv/bin:$PATH exec python3 -X utf8 -B /repo/tests/live/natywnie_dokumenty.py --obraz --wyniki /wyniki'
+          docker image rm "$IMAGE@$DIGEST" >/dev/null 2>&1 || true
       - name: Zapisz digest
         env:
           DIGEST: ${{ steps.build.outputs.digest }}

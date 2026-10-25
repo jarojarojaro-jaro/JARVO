@@ -179,11 +179,22 @@ def test_libreoffice_wygrywa_i_odblokowuje_arkusze(silniki):
 def test_rada_libreoffice_obraz_i_natywnie(silniki, monkeypatch):
     silniki(WSZYSTKIE)
     monkeypatch.delenv("JARVO_ROOT", raising=False)
-    assert "JARVO_EXTRAS" in K.podpowiedz("xlsx", "pdf")                  # obraz: dodatek `office`
+    assert K.podpowiedz("xlsx", "pdf") == (" Arkusze, prezentacje i stare pliki Office wymagają LibreOffice: dodatek "
+                                           "obrazu `office` (JARVO_EXTRAS).")
     monkeypatch.setenv("JARVO_ROOT", "/jarvo")
     monkeypatch.setattr(K, "natywnie", lambda: True)
+    monkeypatch.setattr(K, "program", lambda n: None)
     rada = K.podpowiedz("pptx", "pdf")
-    assert "JARVO_EXTRAS" not in rada and "libreoffice.org" in rada and "JARVO_SOFFICE" in rada
+    # całe zdanie: jedno „LibreOffice:”, bez zmiennej, której właściciel i tak nie ustawi procesom Jarva
+    assert rada == (" Arkusze, prezentacje i stare pliki Office wymagają LibreOffice: zainstaluj go na tym komputerze "
+                    "zwykłym instalatorem z libreoffice.org; Jarvo znajdzie go sam (Program Files, Aplikacje, pakiet "
+                    "systemu albo /opt), bez żadnych ustawień.")
+    assert rada.count("LibreOffice:") == 1 and "JARVO_SOFFICE" not in rada
+    # LibreOffice ze snapa w PATH (Ubuntu): skrypt go nie bierze i mówi dlaczego
+    monkeypatch.setattr(K, "program", lambda n: "/snap/bin/libreoffice" if n == "libreoffice" else None)
+    monkeypatch.setattr(K, "ze_snapa", lambda p: p.startswith("/snap/"))
+    rada = K.podpowiedz("xlsx", "pdf")
+    assert "snapa" in rada and "apt install libreoffice" in rada and rada.count("LibreOffice:") == 1
 
 
 def test_bez_silnika_trasa_znika(silniki):
@@ -212,7 +223,11 @@ def test_ffmpeg_bez_vp9_i_mp3(silniki, monkeypatch):
     monkeypatch.setitem(K.silnik("ffmpeg").__dict__, "_kodeki", (" A..... aac  AAC\n", ""))
     silniki(WSZYSTKIE)
     assert K.trasa("mp4", "webm") is None and K.trasa("mp4", "mp3") is None
-    assert K.trasa("mp4", "m4a") and K.trasa("svg", "png") is None
+    # FFmpeg bez librsvg (macOS: Martin Riedl, E09): SVG → PNG robi Chromium, a bez niego trasy nie ma
+    assert K.trasa("mp4", "m4a") and K.trasa("svg", "png") == [("svg", "png", "chromium")]
+    assert K.trasa("svg", "jpg") == [("svg", "png", "chromium"), ("png", "jpg", "pillow")]
+    silniki(WSZYSTKIE - {"chromium"})
+    assert K.trasa("svg", "png") is None
 
 
 # --------------------------------------------------------------------------- polecenia silników
@@ -784,6 +799,31 @@ def pdf_z_tekstem(p: Path, tekst: str = "Faktura 2026 Zolc", stron: int = 1) -> 
     return p
 
 
+def pdf_z_obrazem(p: Path, w: int = 600, h: int = 400) -> Path:
+    """PDF A4 z jednym obrazem RGB w Flate (szum: Flate prawie nie zmniejsza, JPEG tak), bez narzędzi."""
+    import random
+    import zlib
+    obraz = zlib.compress(random.Random(2026).randbytes(w * h * 3), 6)
+    tresc = b"q 500 0 0 333 40 400 cm /Im0 Do Q"
+    obiekty = [b"<< /Type /Catalog /Pages 2 0 R >>", b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+               b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 5 0 R "
+               b"/Resources << /XObject << /Im0 4 0 R >> >> >>",
+               b"<< /Type /XObject /Subtype /Image /Width %d /Height %d /ColorSpace /DeviceRGB /BitsPerComponent 8 "
+               b"/Filter /FlateDecode /Length %d >>\nstream\n" % (w, h, len(obraz)) + obraz + b"\nendstream",
+               b"<< /Length %d >>\nstream\n" % len(tresc) + tresc + b"\nendstream"]
+    out, offsety = bytearray(b"%PDF-1.4\n"), []
+    for i, o in enumerate(obiekty, 1):
+        offsety.append(len(out))
+        out += b"%d 0 obj\n" % i + o + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(obiekty) + 1)
+    out += b"".join(b"%010d 00000 n \n" % off for off in offsety)
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(obiekty) + 1, xref)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_bytes(bytes(out))
+    return p
+
+
 def test_programy_pelna_sciezka_bez_okna_i_w_utf8(monkeypatch, tmp_path):
     """Goła nazwa → pełna ścieżka z PATH (CreateProcess szukałby jej w katalogu Pythona i w System32), na Windows
     CREATE_NO_WINDOW (konwerter działa też w panelu bez konsoli), wyjście w UTF-8."""
@@ -864,6 +904,237 @@ def test_qpdf_mniejszy_pdf_bez_ghostscriptu(monkeypatch, tmp_path):
     assert "--object-streams=generate" in cmd and kw["ok"] == (0, 3)
     assert cmd[-2:] == [os.path.abspath(tmp_path / "a.pdf"), os.path.abspath(tmp_path / "b.pdf")]
     assert [K._dpi_jakosci(q) for q in (30, 75, 95)] == [72, 150, 300]   # jak /screen, /ebook, /printer
+    # qpdf 12 przelicza też obrazy już w JPEG (sprawdzone na skanie): dokumentacja nie może mówić, że ich nie rusza
+    assert "także już w JPEG" in K.Qpdf.__doc__ and "Liczby pikseli qpdf" in K.Qpdf.__doc__
+
+
+# --------------------------------------------------------------------------- SVG → PNG przez Chromium (E09, macOS)
+
+def _svg(p: Path, korzen: str, tresc: str = '<rect width="40" height="20" fill="#d4213d"/>') -> Path:
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(f'<?xml version="1.0"?>\n<!-- logo -->\n<svg xmlns="http://www.w3.org/2000/svg" {korzen}>{tresc}'
+                 "</svg>\n", encoding="utf-8")
+    return p
+
+
+def test_rozmiar_svg_z_atrybutow_i_viewbox(tmp_path):
+    assert K.rozmiar_svg(_svg(tmp_path / "a.svg", 'width="40" height="20"')) == (40, 20)
+    assert K.rozmiar_svg(_svg(tmp_path / "b.svg", "width='210mm' height='99mm'")) == pytest.approx((793.7, 374.2), 0.01)
+    assert K.rozmiar_svg(_svg(tmp_path / "c.svg", 'viewBox="0 0 120 60"')) == (120, 60)
+    assert K.rozmiar_svg(_svg(tmp_path / "d.svg", 'width="300" viewBox="0,0,120,60"')) == (300, 150)
+    assert K.rozmiar_svg(_svg(tmp_path / "e.svg", 'width="100%" height="100%" viewBox="0 0 64 32"')) == (64, 32)
+    assert K.rozmiar_svg(_svg(tmp_path / "f.svg", "")) == K.SVG_DOMYSLNY        # bez wymiarów: jak <img>
+    assert K.rozmiar_svg(_svg(tmp_path / "j.svg", 'viewBox="0 0 1.2.3 x"')) == K.SVG_DOMYSLNY   # zły viewBox: bez błędu
+    (tmp_path / "g.svg").write_text("<html>nie svg</html>", encoding="utf-8")
+    with pytest.raises(K.Blad, match="nie wygląda na SVG"):
+        K.rozmiar_svg(tmp_path / "g.svg")
+    duzy = _svg(tmp_path / "h.svg", 'width="100000" height="50000"')
+    w, h = K.wymiary_zrzutu(duzy, K.Opcje())                              # plakat: w granicach okna Chromium
+    assert max(w, h) <= K.MAX_BOK_SVG and w * h <= K.MAX_PIKSELI_SVG * 1.001 and abs(w / h - 2) < 0.01
+    assert K.wymiary_zrzutu(_svg(tmp_path / "i.svg", 'width="800" height="400"'), K.Opcje(rozmiar="50%")) == (400, 200)
+    assert K.wymiary_zrzutu(tmp_path / "a.svg", K.Opcje(rozmiar="1080")) == (40, 20)   # nie powiększa
+
+
+def test_svg_przez_chromium_polecenie_i_strona(monkeypatch, tmp_path):
+    """Zrzut okna w wymiarach SVG, przezroczyste tło, bez sieci (martwe proxy), SVG jako <img> ze strony serwera."""
+    monkeypatch.setattr(K, "chromium", lambda: "/x/chrome-headless-shell")
+    monkeypatch.setattr(K, "bez_piaskownicy", lambda: False)
+    src = _svg(tmp_path / "Michał Żółć" / "logo_ż.svg", 'width="400" height="200"')
+    strony, wolane = [], []
+
+    def run(cmd, silnik, timeout, **kw):
+        wolane.append(cmd)
+        adres = cmd[-1]
+        import urllib.request
+        with urllib.request.urlopen(adres, timeout=10) as r:            # noqa: S310 (127.0.0.1)
+            strony.append(r.read().decode("utf-8"))
+        obraz = adres.rsplit("/", 1)[0] + "/" + strony[-1].split('src="/', 1)[1].split('"', 1)[0]
+        with urllib.request.urlopen(obraz, timeout=10) as r:            # noqa: S310
+            strony.append((r.headers["Content-Type"], r.read()))
+        dst = Path(next(x for x in cmd if x.startswith("--screenshot=")).split("=", 1)[1])
+        dst.write_bytes(K.PNG + b"reszta")
+    monkeypatch.setattr(K, "_run", run)
+    dst = tmp_path / "out" / "logo_ż.png"
+    dst.parent.mkdir()
+    assert K.silnik("chromium").zamien(src, dst, "svg", "png", K.Opcje(rozmiar="50%"), tmp_path) == [dst]
+    cmd = wolane[0]
+    assert cmd[0] == "/x/chrome-headless-shell" and "--no-sandbox" not in cmd
+    assert "--window-size=200,100" in cmd and "--default-background-color=00000000" in cmd
+    assert "--proxy-server=127.0.0.1:9" in cmd and "--force-device-scale-factor=1" in cmd
+    assert "width:200px;height:100px" in strony[0] and "<img" in strony[0]
+    assert strony[1] == ("image/svg+xml", src.read_bytes())               # polska nazwa w adresie, typ SVG
+    # Chromium nie zrobił PNG: błąd po polsku i bez pliku
+    monkeypatch.setattr(K, "_run", lambda cmd, *a, **k: Path(cmd[-2].split("=", 1)[1]).write_bytes(b"nie png"))
+    with pytest.raises(K.Blad, match="nie utworzył PNG"):
+        K.silnik("chromium").zamien(src, tmp_path / "zly.png", "svg", "png", K.Opcje(), tmp_path)
+    assert not (tmp_path / "zly.png").exists()
+
+
+def test_svg_ffmpeg_z_rozmiarem(silniki):
+    silniki(WSZYSTKIE)
+    ff = K.silnik("ffmpeg")
+    bez = ff.polecenia(Path("a.svg"), Path("a.png"), "svg", "png", K.Opcje(), {})[0]
+    assert "-vf" not in bez and bez[-1] == "a.png"
+    z = ff.polecenia(Path("a.svg"), Path("a.png"), "svg", "png", K.Opcje(rozmiar="50%"), {})[0]
+    assert "iw*0.5" in z[z.index("-vf") + 1]                            # ten sam --rozmiar co w Chromium
+    assert K.trasa("svg", "png") == [("svg", "png", "ffmpeg")]           # z librsvg FFmpeg wygrywa (taniej)
+
+
+def _png_wymiary(p: Path) -> tuple[int, int]:
+    dane = p.read_bytes()[:24]
+    assert dane[:8] == K.PNG, dane
+    return int.from_bytes(dane[16:20], "big"), int.from_bytes(dane[20:24], "big")
+
+
+@pytest.mark.skipif(K.chromium() is None, reason="brak Chromium (CHROME_PATH)")
+def test_prawdziwy_chromium_svg_w_polskim_katalogu(tmp_path):
+    src = _svg(tmp_path / "Michał Żółć" / "logo_październik.svg", 'width="40" height="20" viewBox="0 0 40 20"')
+    dst = tmp_path / "Michał Żółć" / "logo.png"
+    K.silnik("chromium").zamien(src, dst, "svg", "png", K.Opcje(), tmp_path)
+    assert _png_wymiary(dst) == (40, 20)
+    mniejszy = tmp_path / "logo-maly.png"
+    K.silnik("chromium").zamien(_svg(tmp_path / "duzy.svg", 'viewBox="0 0 800 400"'), mniejszy, "svg", "png",
+                                K.Opcje(rozmiar="200"), tmp_path)
+    assert _png_wymiary(mniejszy) == (200, 100)
+
+
+# --------------------------------------------------------------------------- pikepdf w Pythonie venvu narzędzi (panel)
+
+def _atrapa_pikepdf(tmp_path: Path, wynik: dict, nazwa: str = "tools-python") -> Path:
+    """Python venvu narzędzi: `-c "import pikepdf, PIL"` kończy się kodem 0, zadanie JSON z wejścia → `wynik`."""
+    import atrapy
+    kod = ("import json, sys\nif '-c' in sys.argv:\n    raise SystemExit(0)\nz = json.loads(sys.stdin.read())\n"
+           f"w = {wynik!r}\nw['argv'] = sys.argv[1:]\nw['zadanie'] = z\nprint('log')\nprint(json.dumps(w))\n"
+           "raise SystemExit(1 if w.get('blad') else 0)\n")
+    return atrapy.program(tmp_path, nazwa, kod)
+
+
+def test_pikepdf_tutaj_w_venvie_narzedzi_albo_brak(monkeypatch, tmp_path):
+    K._ma_pikepdf.cache_clear()
+    monkeypatch.setattr(K, "_jest_modul", lambda *n: True)
+    assert K.python_pikepdf() == ""                                      # CLI natywnie: venv narzędzi ma pikepdf
+    monkeypatch.setattr(K, "_jest_modul", lambda *n: False)
+    monkeypatch.delenv("JARVO_TOOLS_PYTHON", raising=False)
+    assert K.python_pikepdf() is None and K.Pikepdf().dostepny() is False
+    py = _atrapa_pikepdf(tmp_path, {"obrazy": 1})
+    monkeypatch.setenv("JARVO_TOOLS_PYTHON", str(py))
+    assert K.python_pikepdf() == str(py)                                 # panel w Pythonie Hermesa: venv narzędzi
+    bez = __import__("atrapy").program(tmp_path, "bez-pikepdf", "raise SystemExit(1)\n")
+    monkeypatch.setenv("JARVO_TOOLS_PYTHON", str(bez))
+    assert K.python_pikepdf() is None                                    # Python bez pikepdf się nie liczy
+    K._ma_pikepdf.cache_clear()
+
+
+def test_pikepdf_przez_pythona_venvu_narzedzi(monkeypatch, tmp_path):
+    K._ma_pikepdf.cache_clear()
+    monkeypatch.setattr(K, "_jest_modul", lambda *n: False)
+    monkeypatch.setenv("JARVO_TOOLS_PYTHON", str(_atrapa_pikepdf(tmp_path, {"obrazy": 2})))
+    src, dst = tmp_path / "Michał" / "skan_ż.pdf", tmp_path / "Michał" / "mniejszy.pdf"
+    assert K.silnik("pikepdf").zamien(src, dst, "pdf", "pdf", K.Opcje(jakosc=40), tmp_path) == [dst]
+    zly = _atrapa_pikepdf(tmp_path, {"blad": "PDF jest zabezpieczony hasłem: zdejmij zabezpieczenie"}, "zly-python")
+    monkeypatch.setenv("JARVO_TOOLS_PYTHON", str(zly))
+    with pytest.raises(K.Blad, match="zabezpieczony hasłem"):
+        K.silnik("pikepdf").zamien(src, dst, "pdf", "pdf", K.Opcje(), tmp_path)
+    w = K._zadanie_w(str(zly), "--pikepdf-zadanie", {"pdf": str(src)}, "pikepdf", "venvu narzędzi")
+    assert w["argv"][:3] == ["-I", "-X", "utf8"] and w["argv"][3].endswith("konwertuj.py")
+    assert w["argv"][4] == "--pikepdf-zadanie" and w["zadanie"]["pdf"] == str(src)
+    K._ma_pikepdf.cache_clear()
+
+
+def test_main_pikepdf_zadanie_i_bledy_po_polsku(monkeypatch, capsys):
+    import io
+    monkeypatch.setattr(K.sys, "stdin", io.StringIO(json.dumps({"pdf": "a.pdf", "wyjscie": "b.pdf", "jakosc": 40})))
+    monkeypatch.setattr(K, "mniejszy_pdf", lambda src, dst, q: 3)
+    assert K.main(["--pikepdf-zadanie"]) == 0
+    assert json.loads(capsys.readouterr().out.strip().splitlines()[-1]) == {"obrazy": 3}
+
+    class PasswordError(Exception):
+        pass
+
+    def haslo(src, dst, q):
+        raise PasswordError("encrypted")
+    monkeypatch.setattr(K, "mniejszy_pdf", haslo)
+    assert K.wykonaj_pikepdf({"pdf": "a.pdf", "wyjscie": "b.pdf"}) == {
+        "blad": "PDF jest zabezpieczony hasłem: zdejmij zabezpieczenie i spróbuj jeszcze raz."}
+    monkeypatch.setattr(K, "mniejszy_pdf", lambda *a: (_ for _ in ()).throw(ValueError("zły xref")))
+    assert K.wykonaj_pikepdf({"pdf": "a.pdf", "wyjscie": "b.pdf"})["blad"].startswith("pikepdf: nie zmniejszę")
+    K._do_pythona_z_pillow(["--pikepdf-zadanie"])                         # pomocnik zostaje w swoim Pythonie
+
+
+def test_formaty_mowia_gdzie_biegna_pomocnicy(silniki, monkeypatch):
+    silniki(WSZYSTKIE)
+    monkeypatch.setattr(K, "python_pdfium", lambda: "")
+    monkeypatch.setattr(K, "python_pikepdf", lambda: "C:/Jarvo/program/venvs/narzedzia/Scripts/python.exe")
+    fm = K.formaty()
+    assert fm["pomocnicy"] == {"pdfium": "ten Python", "pikepdf": "C:/Jarvo/program/venvs/narzedzia/Scripts/python.exe"}
+    assert fm["python"] == Path(sys.executable).as_posix()
+
+
+# --------------------------------------------------------------------------- LibreOffice: snap, graf po instalacji
+
+def test_libreoffice_ze_snapa_pomijany(monkeypatch, tmp_path):
+    monkeypatch.setattr(K, "_linux", lambda: True)
+    prawdziwa = os.path.realpath
+    monkeypatch.setattr(K.os.path, "realpath",
+                        lambda p, *a, **k: "/usr/bin/snap" if str(p).startswith("/snap/") else prawdziwa(p, *a, **k))
+    assert K.ze_snapa("/snap/bin/libreoffice") and not K.ze_snapa("/usr/bin/soffice")
+    monkeypatch.setattr(K, "program", lambda n: "/snap/bin/libreoffice" if n == "libreoffice" else None)
+    assert K._soffice_z_path() is None
+    monkeypatch.setattr(K, "program", lambda n: {"soffice": "/snap/bin/soffice", "libreoffice": "/usr/bin/libreoffice"}[n])
+    assert K._soffice_z_path() == "/usr/bin/libreoffice"
+    monkeypatch.setattr(K, "_linux", lambda: False)
+    assert not K.ze_snapa("/snap/bin/libreoffice")                       # poza Linuksem snapów nie ma
+
+
+def test_graf_od_nowa_gdy_pojawi_sie_libreoffice(silniki, monkeypatch):
+    """Konwerter panelu żyje długo: LibreOffice zainstalowany po radzie z komunikatu działa bez restartu."""
+    silniki(WSZYSTKIE)
+    jest = {"lo": None}
+    monkeypatch.setattr(K, "soffice", lambda: jest["lo"])
+    monkeypatch.setattr(K.silnik("libreoffice"), "dostepny", lambda: jest["lo"] is not None)
+    assert K.trasa("xlsx", "pdf") is None
+    jest["lo"] = "C:/Program Files/LibreOffice/program/soffice.com"
+    assert K.trasa("xlsx", "pdf") == [("xlsx", "pdf", "libreoffice")]    # bez K._graf.cache_clear()
+
+
+# --------------------------------------------------------------------------- piaskownica Chromium i ścieżki obrazu
+
+def test_bez_piaskownicy_bez_przestrzeni_nazw(monkeypatch, tmp_path):
+    monkeypatch.setattr(K, "_linux", lambda: True)
+    monkeypatch.setattr(K, "_w_kontenerze", lambda: False)
+    monkeypatch.setattr(K.os, "geteuid", lambda: 1000, raising=False)
+    pliki = {n: tmp_path / n for n in ("apparmor", "limit", "clone")}
+    monkeypatch.setattr(K, "USERNS_APPARMOR", pliki["apparmor"])
+    monkeypatch.setattr(K, "USERNS_LIMIT", pliki["limit"])
+    monkeypatch.setattr(K, "USERNS_CLONE", pliki["clone"])
+    assert K.bez_piaskownicy() is False                                   # nic nie wiadomo: z piaskownicą
+    for nazwa, zla in (("apparmor", "1"), ("limit", "0"), ("clone", "0")):
+        for p in pliki.values():
+            p.unlink(missing_ok=True)
+        pliki[nazwa].write_text(zla + "\n", encoding="utf-8")
+        assert K.bez_piaskownicy() is True, nazwa
+    pliki["clone"].write_text("1\n", encoding="utf-8")
+    pliki["limit"].write_text("63000\n", encoding="utf-8")
+    pliki["apparmor"].write_text("0\n", encoding="utf-8")
+    assert K.bez_piaskownicy() is False
+    monkeypatch.setattr(K.os, "geteuid", lambda: 0, raising=False)
+    assert K.bez_piaskownicy() is True                                    # root
+
+
+@pytest.mark.windows_only
+def test_windows_bez_sciezek_obrazu(monkeypatch, tmp_path):
+    """`\\opt\\jarvo\\venvs\\ocr\\bin\\python` i `\\.dockerenv` na bieżącym dysku może założyć każdy użytkownik."""
+    assert K.OCR_PYTHON_OBRAZU is None and K._w_kontenerze() is False
+    monkeypatch.setattr(K, "_pdfium_tutaj", lambda: False)
+    monkeypatch.delenv("JARVO_OCR_PYTHON", raising=False)
+    assert K.python_pdfium() is None
+    monkeypatch.setenv("JARVO_ROOT", str(tmp_path))
+    assert K.natywnie() is True
+
+
+@pytest.mark.posix_only
+def test_posix_sciezki_obrazu():
+    assert K.OCR_PYTHON_OBRAZU == "/opt/jarvo/venvs/ocr/bin/python"
 
 
 def test_python_pdfium_tutaj_venv_ocr_albo_brak(monkeypatch, tmp_path):
@@ -1078,10 +1349,16 @@ def test_prawdziwy_pdfium_strony_i_tekst_w_polskim_katalogu(tmp_path):
 
 @pytest.mark.skipif(not shutil.which("qpdf"), reason="brak qpdf")
 def test_prawdziwy_qpdf_mniejszy_pdf_i_laczenie(tmp_path):
+    """Sam silnik qpdf (tam, gdzie są też pikepdf albo Ghostscript, trasa poszłaby nimi): obraz w Flate → JPEG."""
     K._graf.cache_clear()
+    skan = pdf_z_obrazem(tmp_path / "Michał Żółć" / "skan_ż.pdf")
+    dst = tmp_path / "Michał Żółć" / "mniejszy.pdf"
+    K.silnik("qpdf").zamien(skan, dst, "pdf", "pdf", K.Opcje(jakosc=50), tmp_path)
+    assert dst.read_bytes()[:5] == b"%PDF-" and K.liczba_stron(dst) == 1
+    assert dst.stat().st_size < skan.stat().st_size / 2 and b"/DCTDecode" in dst.read_bytes()
     a = pdf_z_tekstem(tmp_path / "Michał" / "umowa_ż.pdf", stron=2)
     b = pdf_z_tekstem(tmp_path / "Michał" / "aneks.pdf")
-    r = K.konwertuj(a, "pdf", dst=tmp_path / "mniejszy.pdf", opt=K.Opcje(jakosc=50))
+    r = K.konwertuj(a, "pdf", dst=tmp_path / "mniejszy-tekst.pdf", opt=K.Opcje(jakosc=50))
     assert Path(r["pliki"][0]).read_bytes()[:5] == b"%PDF-" and K.liczba_stron(Path(r["pliki"][0])) == 2
     w = K.polacz([a, b], tmp_path / "razem.pdf")
     assert K.liczba_stron(Path(w["pliki"][0])) == 3
@@ -1135,6 +1412,22 @@ def test_prawdziwy_pikepdf_przelicza_duzy_obraz(tmp_path):
         assert im.Filter == pikepdf.Name.DCTDecode and im.Width <= 595
 
 
+def _pikepdf_w_venvie() -> bool:
+    K._ma_pikepdf.cache_clear()
+    return bool(K.python_pikepdf())
+
+
+@pytest.mark.skipif(not _pikepdf_w_venvie(), reason="brak Pythona venvu narzędzi z pikepdf (JARVO_TOOLS_PYTHON)")
+def test_prawdziwy_pikepdf_przez_venv_narzedzi(tmp_path):
+    """Natywnie: pytest w Pythonie bez pikepdf, mniejszy PDF robi Python venvu narzędzi (jak Konwerter panelu)."""
+    skan = pdf_z_obrazem(tmp_path / "Michał Żółć" / "skan_październik.pdf", 1600, 1200)
+    dst = tmp_path / "Michał Żółć" / "mniejszy.pdf"
+    K.silnik("pikepdf").zamien(skan, dst, "pdf", "pdf", K.Opcje(jakosc=30), tmp_path)
+    dane = dst.read_bytes()
+    assert dane[:5] == b"%PDF-" and len(dane) < skan.stat().st_size / 8 and b"/DCTDecode" in dane
+    assert b"/Width 1600" not in dane                                     # obraz zmniejszony do 72 dpi strony
+
+
 # --------------------------------------------------------------------------- test na żywo: tests/live/natywnie_dokumenty.py
 
 def test_test_na_zywo_bez_instalacji_konczy_sie_raportem(tmp_path, capsys):
@@ -1143,15 +1436,51 @@ def test_test_na_zywo_bez_instalacji_konczy_sie_raportem(tmp_path, capsys):
     korzen.mkdir()
     assert live.main(["--wyniki", str(tmp_path / "wyniki"), "--korzen", str(korzen)]) == 1
     raport = json.loads((tmp_path / "wyniki" / "raport.json").read_text(encoding="utf-8"))
-    assert "current.json" in raport["blad"] and raport["punkty"] == []
+    assert "current.json" in raport["blad"] and raport["punkty"] == [] and raport["ok"] is False
+    assert raport["tryb"] == "natywnie" and isinstance(raport["sek"], float)
+    assert json.loads(capsys.readouterr().out) == raport                  # ten sam raport na stdout
     assert live.bez_ogonkow("Zażółć  Gęślą JAŹŃ") == "zazolc gesla jazn"
-    assert [nr for nr, *_ in live.PUNKTY] == list(range(1, 10))
+    assert [nr for nr, *_ in live.PUNKTY] == list(range(1, 12)) and live.DOMYSLNE == set(range(1, 11))
+    # złe argumenty: kod 2 (argparse); pytest tylko natywnie
+    for zle in (["--wyniki", str(tmp_path), "--punkty", "1,x"], ["--wyniki", str(tmp_path), "--obraz", "--pytest"],
+                ["--punkty", "1"]):
+        with pytest.raises(SystemExit) as e:
+            live._argumenty(zle)
+        assert e.value.code == 2, zle
+    assert live._argumenty(["--wyniki", "w", "--punkty", "7, 11"]).wybrane == {7, 11}
+    png = tmp_path / "a.png"
+    png.write_bytes(K.PNG + b"\0\0\0\rIHDR" + (40).to_bytes(4, "big") + (20).to_bytes(4, "big") + b"\x08\x06")
+    assert live.png_wymiary(png) == (40, 20, 6)
+    # obraz Jarva: skrypty z repo, python3 z PATH, pliki próby w katalogu wyników
+    obraz = live.Obraz(live._argumenty(["--wyniki", str(tmp_path / "w"), "--obraz"])) if shutil.which("python3") \
+        else None
+    if obraz is not None:
+        assert obraz.konwertuj == SKRYPT.resolve() and obraz.port is None and obraz.skrzynka is None
+        assert obraz.korzen_proby == (tmp_path / "w").resolve()
     # sprzątanie: pliki próby i puste katalogi wyników panelu w skrzynce, sama skrzynka zostaje
     skrzynka = tmp_path / "inbox"
     wynik = skrzynka / "2026-10-25" / "konwerter" / "a.jpg"
     wynik.parent.mkdir(parents=True)
     wynik.write_bytes(b"x")
     assert live._sprzatnij([wynik], skrzynka) == [] and skrzynka.is_dir() and not any(skrzynka.iterdir())
+
+
+def test_obraz_yml_probuje_skryptow_w_zbudowanym_obrazie():
+    """Kontener VPS: po budowie każdej architektury skrypty dokumentów i OCR biegną w tym obrazie (jako hermes),
+    zanim digest trafi do publikacji tagu."""
+    import yaml
+    wf = yaml.safe_load((Path(__file__).resolve().parents[1] / ".github" / "workflows" / "obraz.yml")
+                        .read_text(encoding="utf-8"))
+    kroki = wf["jobs"]["budowa"]["steps"]
+    nazwy = [k.get("name") or k.get("uses") or k.get("id") for k in kroki]
+    i = nazwy.index("Próba skryptów dokumentów i OCR w obrazie")
+    assert kroki[i - 1].get("id") == "build" and nazwy[i + 1] == "Zapisz digest"
+    krok = kroki[i]
+    assert krok["env"]["DIGEST"] == "${{ steps.build.outputs.digest }}" and "continue-on-error" not in krok
+    run = krok["run"]
+    for kawalek in ('docker pull "$IMAGE@$DIGEST"', "--user hermes", "/repo:ro", "PATH=/opt/hermes/bin:/opt/hermes/.venv/bin",
+                    "tests/live/natywnie_dokumenty.py --obraz --wyniki /wyniki"):
+        assert kawalek in run, kawalek
 
 
 # --------------------------------------------------------------------------- jarvo-reka: to_pdf.py i pack.py natywnie (F05)
@@ -1191,10 +1520,57 @@ def test_to_pdf_blad_programu_jednym_zdaniem_i_rada_natywnie(monkeypatch, tmp_pa
     with pytest.raises(SystemExit, match=r"pandoc zakończył się błędem \(64\):\npandoc: Unknown extension"):
         TO_PDF._uruchom(["pandoc", "x"], "pandoc")
     monkeypatch.setattr(TO_PDF, "natywnie", lambda: True)
+    monkeypatch.setattr(TO_PDF.shutil, "which", lambda n: None)
     rada = TO_PDF.rada_office(".xlsx")
-    assert "JARVO_EXTRAS" not in rada and "libreoffice.org" in rada and "JARVO_SOFFICE" in rada
+    assert rada == (".xlsx → PDF wymaga LibreOffice: zainstaluj go na tym komputerze zwykłym instalatorem z "
+                    "libreoffice.org (Jarvo znajdzie go sam, bez żadnych ustawień) albo zapisz plik jako DOCX/HTML.")
+    monkeypatch.setattr(TO_PDF.shutil, "which", lambda n: "/snap/bin/libreoffice" if n == "libreoffice" else None)
+    monkeypatch.setattr(TO_PDF, "ze_snapa", lambda p: p.startswith("/snap/"))
+    assert "snapa" in TO_PDF.rada_office(".pptx")
+    assert TO_PDF.soffice() != "/snap/bin/libreoffice"                   # snapa nie bierze
     monkeypatch.setattr(TO_PDF, "natywnie", lambda: False)
     assert 'JARVO_EXTRAS="office"' in TO_PDF.rada_office(".xlsx")
+
+
+def test_to_pdf_druga_proba_bez_piaskownicy_na_linuksie(monkeypatch, tmp_path):
+    """Jak konwertuj.py: piaskownica nie ruszyła mimo bez_piaskownicy() (np. przestrzenie nazw wyłączone inaczej)."""
+    wolane = []
+
+    def run(cmd, **kw):
+        wolane.append(list(cmd))
+        if "--no-sandbox" not in cmd:
+            return subprocess.CompletedProcess(cmd, 1, "", "FATAL:zygote_host_impl_linux.cc No usable sandbox!\n")
+        Path(next(c for c in cmd if c.startswith("--print-to-pdf=")).split("=", 1)[1]).write_bytes(b"%PDF-1.7")
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+    monkeypatch.setattr(TO_PDF.subprocess, "run", run)
+    monkeypatch.setattr(TO_PDF, "chromium", lambda: "/x/chrome-headless-shell")
+    monkeypatch.setattr(TO_PDF, "bez_piaskownicy", lambda: False)
+    monkeypatch.setattr(TO_PDF, "_linux", lambda: True)
+    html = tmp_path / "a.html"
+    html.write_text("<p>x</p>", encoding="utf-8")
+    TO_PDF.print_html(html, tmp_path / "a.pdf", tmp_path)
+    assert ["--no-sandbox" in c for c in wolane] == [False, True] and (tmp_path / "a.pdf").is_file()
+    profile = [next(x for x in c if x.startswith("--user-data-dir=")) for c in wolane]
+    assert profile[0] != profile[1]                                       # druga próba z nowym profilem
+    wolane.clear()
+    monkeypatch.setattr(TO_PDF, "_linux", lambda: False)                  # Windows i macOS: błąd idzie dalej
+    with pytest.raises(SystemExit, match="No usable sandbox"):
+        TO_PDF.print_html(html, tmp_path / "b.pdf", tmp_path)
+    assert len(wolane) == 1
+
+
+def test_to_pdf_piaskownica_i_windows_bez_dockerenv(monkeypatch, tmp_path):
+    monkeypatch.setattr(TO_PDF, "_linux", lambda: True)
+    monkeypatch.setattr(TO_PDF, "_w_kontenerze", lambda: False)
+    monkeypatch.setattr(TO_PDF.os, "geteuid", lambda: 1000, raising=False)
+    for zm in ("USERNS_APPARMOR", "USERNS_LIMIT", "USERNS_CLONE"):
+        monkeypatch.setattr(TO_PDF, zm, tmp_path / zm)
+    assert TO_PDF.bez_piaskownicy() is False
+    (tmp_path / "USERNS_LIMIT").write_text("0\n", encoding="utf-8")
+    assert TO_PDF.bez_piaskownicy() is True
+    if os.name == "nt":
+        monkeypatch.undo()
+        assert TO_PDF._w_kontenerze() is False                            # `\.dockerenv` może założyć każdy
 
 
 def test_to_pdf_soffice_z_dodatku_i_wlasciciela(monkeypatch, tmp_path):

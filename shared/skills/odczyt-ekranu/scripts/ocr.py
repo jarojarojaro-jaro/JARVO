@@ -14,11 +14,13 @@ natywnie <dane>/jarvo/models/indra-ocr) jest główny: zrzut ekranu w ~0,3–0,5
 tabele i chińskie znaki. Tesseract (pol+eng) jest zapasem: gdy Indry brak, gdy padnie albo na życzenie
 (--silnik tesseract). Bez sieci: modele leżą w instalacji, a paczki do pobierania modeli nie ma; gniazda są
 dodatkowo zablokowane w czasie odczytu.
-Skrypt uruchomiony zwykłym python3 sam przechodzi do venvu OCR (JARVO_OCR_PYTHON, w obrazie /opt/jarvo/venvs/ocr).
+Skrypt uruchomiony zwykłym python3 sam przechodzi do venvu OCR (JARVO_OCR_PYTHON, w obrazie /opt/jarvo/venvs/ocr;
+domyślne ścieżki obrazu tylko na Linuksie i macOS: na Windows `\\opt\\…` na bieżącym dysku mógłby założyć każdy).
 Natywnie (docs/NATYWNIE.md E05, E10, B13): obraz z polskimi znakami w ścieżce Indra dostaje przez np.fromfile
 i cv2.imdecode (cv2.imread go nie otworzy), Tesseract przez wejście (stdin), a strony PDF renderuje mu pypdfium2
 (bez Ghostscriptu); Tesseract z PATH floty (natywnie bin-floty), języki z TESSDATA_PREFIX, TSV przez
-`-c tessedit_create_tsv=1`.
+`-c tessedit_create_tsv=1`. PDF poznaje po „%PDF-” w pierwszych 1024 bajtach (jak Indra i PDFium: przed nagłówkiem
+bywają śmieci, np. puste linie z poczty), a nie po rozszerzeniu.
 Ramki są w pikselach pliku (PDF: strona wyrenderowana w --dpi); zrzut ekranu 2× → podziel przez 2 przed kliknięciem.
 --szukaj: bez wielkości liter i polskich znaków („zrodlo” znajdzie „Źródło”); ramka napisu wyliczona z ramki linii.
 Wynik --szukaj i --format json: JSON; kod 1 = błąd z opisem po polsku.
@@ -39,13 +41,17 @@ import time
 import unicodedata
 from pathlib import Path
 
-OCR_PYTHON = "/opt/jarvo/venvs/ocr/bin/python"     # obraz Jarva; natywnie JARVO_OCR_PYTHON (jarvo/srodowisko.py)
-MODELE = "/opt/jarvo/models/indra-ocr"             # obraz Jarva; natywnie INDRA_OCR_MODEL_DIR
+WINDOWS = os.name == "nt"
+BEZ_OKNA = getattr(subprocess, "CREATE_NO_WINDOW", 0) if WINDOWS else 0   # programy bez okna konsoli (Windows)
+# ścieżki obrazu Jarva (natywnie JARVO_OCR_PYTHON i INDRA_OCR_MODEL_DIR z jarvo/srodowisko.py); na Windows żadnych:
+# katalog `\opt` w głównym katalogu dysku może założyć każdy zalogowany użytkownik, a CreateProcess uruchomi plik PE
+# o nazwie `python` bez rozszerzenia
+OCR_PYTHON = None if WINDOWS else "/opt/jarvo/venvs/ocr/bin/python"
+MODELE = None if WINDOWS else "/opt/jarvo/models/indra-ocr"
 FILMY = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".gif"}
 MAKS_STRON = 50
 MAKS_PIKSELI = 100e6        # strona PDF większa niż tyle pikseli w --dpi renderuje się w niższym (jak w Indrze)
-WINDOWS = os.name == "nt"
-BEZ_OKNA = getattr(subprocess, "CREATE_NO_WINDOW", 0) if WINDOWS else 0   # programy bez okna konsoli (Windows)
+NAGLOWEK_PDF = 1024         # „%PDF-” gdzieś w pierwszych 1024 bajtach = PDF (Indra is_pdf, PDFium, Acrobat)
 
 
 class Blad(Exception):
@@ -86,6 +92,16 @@ def _indra():
         return None
 
 
+def bez_telemetrii() -> None:
+    """onnxruntime (silnik Indry) bez zdarzeń telemetrii: oficjalne koło Windows ma dostawcę ETW Microsoft.ML.ONNXRuntime
+    (przegląd źródła w vendor/zrodla.yaml); na Linuksie i macOS to nic nie zmienia."""
+    try:
+        import onnxruntime  # type: ignore[import-not-found]
+        onnxruntime.disable_telemetry_events()
+    except Exception:  # noqa: BLE001  (bez onnxruntime albo starsze API: odczyt i tak działa)
+        pass
+
+
 def _do_venvu(argv: list[str]) -> None:
     """Zwykły python3 bez Indry → ten sam skrypt w venvie OCR (w venvie już bez przeskoku, więc bez pętli).
     Nowy proces z tym samym wyjściem i kodem wyjścia (os.execv na Windows odpina proces od rodzica); na Windows
@@ -93,7 +109,8 @@ def _do_venvu(argv: list[str]) -> None:
     if _indra() is not None:
         return
     py = os.environ.get("JARVO_OCR_PYTHON") or OCR_PYTHON
-    if not os.access(py, os.X_OK) or Path(sys.executable).resolve() == Path(py).resolve():
+    if not py or not os.path.isfile(py) or not os.access(py, os.X_OK) \
+            or Path(sys.executable).resolve() == Path(py).resolve():
         return
     if os.name != "nt":                              # POSIX: jak dotąd ten sam proces
         os.execv(py, [py, "-I", str(Path(__file__).resolve()), *argv])
@@ -169,9 +186,18 @@ def klatka(film: Path, czas: float, tmp: Path) -> Path:
     return out
 
 
+OBRAZY_NA_POCZATKU = (b"\x89PNG", b"\xff\xd8\xff", b"GIF8", b"II*\x00", b"MM\x00*", b"BM")   # sygnatury obrazów
+
+
 def _pdf(plik: Path) -> bool:
+    """PDF po treści: „%PDF-” w pierwszych 1024 bajtach (jak `is_pdf` Indry i PDFium, które czytają też PDF z bajtami
+    przed nagłówkiem, np. z pustymi liniami albo nagłówkiem MIME z poczty), chyba że plik zaczyna się sygnaturą obrazu
+    (napis „%PDF-” w metadanych PNG to dalej obraz)."""
     with open(plik, "rb") as f:
-        return f.read(5) == b"%PDF-"
+        poczatek = f.read(NAGLOWEK_PDF)
+    if poczatek.startswith(OBRAZY_NA_POCZATKU) or poczatek[:4] == b"RIFF" and poczatek[8:12] == b"WEBP":
+        return False
+    return b"%PDF-" in poczatek
 
 
 def obrazy_pliku(plik: Path) -> list:
@@ -214,6 +240,7 @@ def czytaj_indra(plik: Path, strony: str | None, dpi: float, watki: int, wzory: 
     if md is None:
         raise Blad("brak modeli Indry (INDRA_OCR_MODEL_DIR; w obrazie /opt/jarvo/models/indra-ocr)")
     zablokuj_siec()
+    bez_telemetrii()
     conv = ind.load(str(md), threads=watki, dpi=dpi, mode="auto", math=wzory)
     if _pdf(plik):
         if strony:

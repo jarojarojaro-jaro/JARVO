@@ -26,6 +26,7 @@ metadata:
 | skan → tekst | skill `odczyt-ekranu` (Indra OCR, Tesseract) | `@@PY@@ "$HERMES_HOME/skills/pliki/odczyt-ekranu/scripts/ocr.py" skan.pdf --format md` |
 | skan → PDF z tekstem | OCRmyPDF (jest w obrazie; w instalacji natywnej jeszcze nie: oddaj tekst z `odczyt-ekranu`) | `ocrmypdf -l pol+eng skan.pdf out.pdf` |
 | łączenie/dzielenie/obracanie PDF | qpdf | `qpdf --empty --pages a.pdf b.pdf -- out.pdf` |
+| mniejszy PDF (skan, zdjęcia w środku) | skill `konwersja-plikow` (pikepdf; w obrazie bez niego Ghostscript) | `@@PY@@ "$HERMES_HOME/skills/pliki/konwersja-plikow/scripts/konwertuj.py" skan.pdf --na pdf --jakosc 40` |
 | tabele z PDF | Docling (dodatek `docling`); bez niego vision na podglądzie strony | |
 
 ## Zasady

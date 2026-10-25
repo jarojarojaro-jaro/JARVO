@@ -9,5 +9,12 @@ phonemizer-fork==3.3.2
 num2words==0.5.14
 camoufox==0.5.6
 playwright==1.62.0
+# PDF i obrazy dla konwertuj.py w tym venvie (docs/NATYWNIE.md E04, E09): pikepdf (mniejszy PDF z przeliczonymi
+# obrazami zamiast Ghostscriptu), Pillow i pillow-heif (zdjęcia, HEIC; wersje jak w venvie Hermesa f97608f, w którym
+# działa Konwerter panelu), pypdfium2 (strony i tekst PDF; wersja jak w venvie OCR)
+pikepdf==10.17.0
+pillow==12.3.0
+pillow-heif==1.5.0
+pypdfium2==5.14.0
 # model spaCy dla G2P misaki (V03): koło z wydania explosion/spacy-models, suma jak w infra/Dockerfile
 en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl

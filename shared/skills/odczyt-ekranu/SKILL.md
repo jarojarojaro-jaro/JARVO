@@ -54,12 +54,14 @@ O="$HERMES_HOME/skills/pliki/odczyt-ekranu/scripts/ocr.py"
 - Pewność linii poniżej ~0,8 albo dziwne znaki w kwocie, numerze konta czy NIP: nie zgaduj. Powiększ wycinek
   (`konwertuj.py … --rozmiar`), przeczytaj jeszcze raz albo zapytaj człowieka; liczb z OCR nie poprawiasz „na oko”.
 - PDF z warstwą tekstu Indra czyta wprost z tej warstwy (pole `zrodlo`: `text` albo `hybrid`), skan przez OCR;
-  Tesseract dostaje strony PDF wyrenderowane przez pypdfium2 (`--stan`: pole `pdf_dla_tesseracta`).
+  Tesseract dostaje strony PDF wyrenderowane przez pypdfium2 (`--stan`: pole `pdf_dla_tesseracta`). PDF poznaje
+  po treści, a nie po nazwie: także zapisany z poczty, z pustymi liniami przed nagłówkiem `%PDF-`.
   PDF, w którym da się zaznaczać i wyszukiwać tekst (dla człowieka), robi `ocrmypdf` tam, gdzie jest (obraz Jarva;
   w instalacji natywnej jeszcze nie): bez niego oddaj tekst z tego skryptu.
 - Wzory matematyczne jako LaTeX: `--wzory` (wolniej, tylko gdy na stronie są wzory).
-- Bez sieci: modele leżą w instalacji Jarva, skrypt blokuje gniazda w czasie odczytu. Licencja modeli Indry
-  (OpenRAIL-M) wyklucza produkt konkurujący z Datalab: OCR służy pracy floty, nie sprzedajemy go jako usługi.
+- Bez sieci: modele leżą w instalacji Jarva, skrypt blokuje gniazda w czasie odczytu i wyłącza zdarzenia telemetrii
+  onnxruntime (silnika Indry). Licencja modeli Indry (OpenRAIL-M) wyklucza produkt konkurujący z Datalab: OCR służy
+  pracy floty, nie sprzedajemy go jako usługi.
 - Kod wyjścia 1 = opis błędu po polsku (brak pliku, PDF z hasłem, zły zakres stron): powiedz go prosto.
 
 ## Definition of Done

@@ -9,16 +9,19 @@
     python3 konwertuj.py --formaty              # formaty i silniki dostępne tutaj (JSON)
 
 Silniki (co jest w instalacji, to działa; bez silnika trasa znika): Pillow (zdjęcia, HEIC z iPhone'a, AVIF, PSD,
-zdjęcia → PDF), FFmpeg (wideo, audio, GIF, SVG → PNG), PDFium przez pypdfium2 (PDF → obrazy stron i tekst), qpdf
-(łączenie PDF, mniejszy PDF bez przeliczania obrazów), pikepdf (mniejszy PDF z przeliczonymi obrazami, gdy jest),
-Ghostscript tylko tam, gdzie już jest (obraz Jarva: mniejszy PDF), pandoc (Word, ODT, Markdown, HTML, EPUB, RTF),
-Chromium (HTML → PDF, bez sieci), LibreOffice (Excel, PowerPoint, stare .doc/.xls/.ppt: w obrazie dodatek `office`,
-natywnie LibreOffice z tego komputera albo dodatek Jarva).
+zdjęcia → PDF), FFmpeg (wideo, audio, GIF, SVG → PNG z librsvg), PDFium przez pypdfium2 (PDF → obrazy stron i tekst),
+pikepdf (mniejszy PDF: obrazy zmniejszone do dpi jakości i przeliczone na JPEG), qpdf (łączenie PDF, mniejszy PDF:
+obrazy przeliczone na JPEG w jakości --jakosc, gdy wychodzi mniej, bez zmiany liczby pikseli), Ghostscript tylko
+tam, gdzie już jest (obraz Jarva: mniejszy PDF), pandoc (Word, ODT, Markdown, HTML, EPUB, RTF), Chromium (HTML → PDF
+i SVG → PNG, bez sieci), LibreOffice (Excel, PowerPoint, stare .doc/.xls/.ppt: w obrazie dodatek `office`, natywnie
+LibreOffice zainstalowany na tym komputerze).
 Trasa: najtańsza przez najwyżej 3 kroki (np. DOCX → HTML → PDF, XLSX → PDF → PNG).
-Natywnie (docs/NATYWNIE.md E04, E09): programy z instalacji Jarva pełną ścieżką z PATH procesów Jarva (pandoc, qpdf,
-exiftool, ffmpeg; Chromium z CHROME_PATH), na Windows bez okna konsoli. Bez Pillow w tym Pythonie (venv narzędzi)
-skrypt sam przechodzi do Pythona Hermesa z instalacji (Pillow i pillow-heif, jak `python3` w obrazie); bez pypdfium2
-strony PDF renderuje Python venvu OCR (JARVO_OCR_PYTHON, w obrazie /opt/jarvo/venvs/ocr).
+Natywnie (docs/NATYWNIE.md E04, E07, E09): programy z instalacji Jarva pełną ścieżką z PATH procesów Jarva (pandoc,
+qpdf, exiftool, ffmpeg; Chromium z CHROME_PATH), na Windows bez okna konsoli. Venv narzędzi floty ma Pillow,
+pillow-heif, pypdfium2 i pikepdf; w Pythonie bez Pillow (np. starszy venv) skrypt sam przechodzi do Pythona Hermesa
+z instalacji, a gdzie brak pypdfium2 albo pikepdf (Konwerter panelu w Pythonie Hermesa), strony PDF renderuje Python
+venvu OCR (JARVO_OCR_PYTHON, w obrazie /opt/jarvo/venvs/ocr), a mniejszy PDF robi Python venvu narzędzi
+(JARVO_TOOLS_PYTHON), ten sam skrypt z zadaniem JSON na wejściu. Domyślne ścieżki obrazu tylko na Linuksie i macOS.
 Wynik obok pliku (albo -o / --katalog); istniejącego pliku nie nadpisuje: nazwa-2.ext.
 --rozmiar: 1080 = dłuższy bok najwyżej 1080 px, 720p = krótszy bok 720, 50% = połowa, 1920x1080 = zmieść w polu;
 nigdy nie powiększa. --jakosc: zdjęcia (domyślnie 85), film (domyślnie 75), audio (kb/s ≈ 3,2 × jakość),
@@ -54,13 +57,15 @@ import zipfile
 import zlib
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import unquote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 WINDOWS = os.name == "nt"
 # programy bez okna konsoli: konwerter działa też w procesie panelu, który na Windows nie ma konsoli (każdy
 # program konsolowy otworzyłby wtedy własne okno)
 BEZ_OKNA = getattr(subprocess, "CREATE_NO_WINDOW", 0) if WINDOWS else 0
-OCR_PYTHON_OBRAZU = "/opt/jarvo/venvs/ocr/bin/python"      # venv OCR w obrazie (pypdfium2, numpy, opencv)
+# venv OCR w obrazie (pypdfium2, numpy, opencv); na Windows żadnej domyślnej ścieżki: `\opt\…` w głównym katalogu dysku
+# może założyć każdy zalogowany użytkownik, a CreateProcess uruchomi plik PE o nazwie `python` bez rozszerzenia
+OCR_PYTHON_OBRAZU = None if WINDOWS else "/opt/jarvo/venvs/ocr/bin/python"
 
 # --------------------------------------------------------------------------- formaty
 
@@ -247,9 +252,15 @@ def _run(cmd: list, silnik: str, timeout: int, cwd: Path | None = None,
     return r
 
 
+def _w_kontenerze() -> bool:
+    """Kontener Dockera (obraz Jarva). Na Windows zawsze nie: `\\.dockerenv` w głównym katalogu dysku może założyć
+    każdy."""
+    return not WINDOWS and Path("/.dockerenv").exists()
+
+
 def natywnie() -> bool:
     """Instalacja natywna (JARVO_ROOT w procesach Jarva), a nie obraz Jarva: inne rady w komunikatach."""
-    return bool(os.environ.get("JARVO_ROOT")) and not Path("/.dockerenv").exists()
+    return bool(os.environ.get("JARVO_ROOT")) and not _w_kontenerze()
 
 
 def chromium() -> str | None:
@@ -262,7 +273,12 @@ def chromium() -> str | None:
     return None
 
 
+# przestrzenie nazw użytkownika, bez których piaskownica Chromium nie ruszy (chrome-headless-shell nie ma programu
+# chrome-sandbox): AppArmor Ubuntu 23.10+ (1 = zakaz bez profilu), limit 0 i łatka Debiana unprivileged_userns_clone
+# (0 = zakaz)
 USERNS_APPARMOR = Path("/proc/sys/kernel/apparmor_restrict_unprivileged_userns")
+USERNS_LIMIT = Path("/proc/sys/user/max_user_namespaces")
+USERNS_CLONE = Path("/proc/sys/kernel/unprivileged_userns_clone")
 PIASKOWNICA_BLAD = re.compile(r"sandbox|namespace|zygote", re.I)   # Chromium bez działającej piaskownicy
 
 
@@ -270,23 +286,30 @@ def _linux() -> bool:
     return sys.platform.startswith("linux")
 
 
+def _sysctl(p: Path) -> str | None:
+    try:
+        return p.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+
+
 def bez_piaskownicy() -> bool:
-    """Czy Chromium potrzebuje --no-sandbox (jak audit.py Weba): tylko Linux jako root, w kontenerze albo przy zakazie
-    przestrzeni nazw użytkownika (Ubuntu 23.10+ bez profilu AppArmor). Windows i macOS: piaskownica zawsze działa.
-    Na innym Linuksie, gdzie piaskownica jednak nie ruszy, Chromium.zamien próbuje drugi raz bez niej."""
+    """Czy Chromium potrzebuje --no-sandbox (jak audit.py Weba): tylko Linux jako root, w kontenerze albo bez przestrzeni
+    nazw użytkownika (zakaz AppArmor w Ubuntu 23.10+, user.max_user_namespaces=0, kernel.unprivileged_userns_clone=0).
+    Windows i macOS: piaskownica zawsze działa. Na innym Linuksie, gdzie piaskownica jednak nie ruszy, Chromium.zamien
+    próbuje drugi raz bez niej."""
     if not _linux():
         return False
-    if os.geteuid() == 0 or Path("/.dockerenv").exists():
+    if os.geteuid() == 0 or _w_kontenerze():
         return True
-    try:
-        return USERNS_APPARMOR.read_text(encoding="utf-8").strip() == "1"
-    except OSError:
-        return False
+    return _sysctl(USERNS_APPARMOR) == "1" or _sysctl(USERNS_LIMIT) == "0" or _sysctl(USERNS_CLONE) == "0"
 
 
-# LibreOffice (E07): dodatek Jarva albo program właściciela. W katalogu programu Windows ma soffice.com (konsolowy:
-# czeka na koniec i oddaje wyjście) i soffice.exe; macOS w pakiecie .app; Linux soffice z pakietu systemu albo
-# z /opt/libreofficeX.Y (paczki TDF). Pierwszy istniejący wygrywa.
+# LibreOffice (E07): dziś program właściciela; dodatek Jarva `libreoffice` (MSI, DMG i paczki deb TDF przy pierwszym
+# użyciu) czeka na pobieracz z tymi formatami i `jarvo narzedzia dodaj` (M08), a kod już czyta jego wpis w
+# narzedzia.json. W katalogu programu Windows ma soffice.com (konsolowy: czeka na koniec i oddaje wyjście)
+# i soffice.exe; macOS w pakiecie .app; Linux soffice z pakietu systemu albo z /opt/libreofficeX.Y (paczki TDF).
+# Pierwszy istniejący wygrywa.
 WZGLEDNE_SOFFICE = ("program/soffice.com", "program/soffice.exe", "LibreOffice.app/Contents/MacOS/soffice",
                     "Contents/MacOS/soffice", "program/soffice")
 WZOR_SOFFICE_DEB = "opt/libreoffice*/program/soffice"       # paczki deb TDF rozpakowane bez dpkg (dodatek na Linuksie)
@@ -300,9 +323,26 @@ def _soffice_w(katalog: Path) -> str | None:
     return next((str(p) for p in sorted(katalog.glob(WZOR_SOFFICE_DEB), reverse=True) if p.is_file()), None)
 
 
+def ze_snapa(sciezka: str) -> bool:
+    """LibreOffice ze snapa (Ubuntu: /snap/bin/libreoffice → /usr/bin/snap). Piaskownica snapa nie widzi ukrytych
+    katalogów domowych (~/.local/share/jarvo) ani /tmp tego procesu, więc konwersja by padła: takiego nie bierzemy."""
+    if not _linux():
+        return False
+    prawdziwa = os.path.realpath(sciezka)
+    return sciezka.startswith("/snap/") or prawdziwa.startswith("/snap/") or os.path.basename(prawdziwa) == "snap"
+
+
+def _soffice_z_path() -> str | None:
+    for nazwa in ("soffice", "libreoffice"):
+        if (p := program(nazwa)) and not ze_snapa(p):
+            return p
+    return None
+
+
 def _soffice_dodatku() -> str | None:
-    """Dodatek `libreoffice` z instalacji Jarva (`<JARVO_ROOT>/stan/narzedzia.json`: zmienna JARVO_SOFFICE wpisu albo
-    jego katalog), także gdy proces wystartował przed instalacją dodatku (jego środowisko nie ma jeszcze zmiennej)."""
+    """Wpis `libreoffice` w `<JARVO_ROOT>/stan/narzedzia.json` (zmienna JARVO_SOFFICE wpisu albo jego katalog), także
+    gdy proces wystartował przed instalacją dodatku (jego środowisko nie ma jeszcze zmiennej). Dziś nic go nie zapisuje:
+    to miejsce na dodatek E07 (vendor/natywne.yaml, `kiedy: dodatek`)."""
     root = os.environ.get("JARVO_ROOT")
     if not root:
         return None
@@ -340,12 +380,21 @@ def _soffice_systemu() -> str | None:
 
 
 def soffice() -> str | None:
-    """Program LibreOffice: JARVO_SOFFICE (dodatek Jarva albo wskazanie właściciela), dodatek z narzedzia.json,
-    PATH (obraz z dodatkiem `office`, pakiet systemu), na końcu instalacja właściciela w typowym miejscu."""
+    """Program LibreOffice: JARVO_SOFFICE (zmienna procesów Jarva z wpisu dodatku; testy), dodatek z narzedzia.json,
+    PATH (obraz z dodatkiem `office`, pakiet systemu; bez snapa), na końcu instalacja właściciela w typowym miejscu."""
     jawny = os.environ.get("JARVO_SOFFICE")
     if jawny and os.path.isfile(jawny):
         return jawny
-    return _soffice_dodatku() or program("soffice") or program("libreoffice") or _soffice_systemu()
+    return _soffice_dodatku() or _soffice_z_path() or _soffice_systemu()
+
+
+def _poczatek(p: Path, n: int) -> bytes:
+    """Pierwsze `n` bajtów pliku (b"" bez pliku)."""
+    try:
+        with open(p, "rb") as f:
+            return f.read(n)
+    except OSError:
+        return b""
 
 
 def wolna_sciezka(p: Path) -> Path:
@@ -584,8 +633,9 @@ class FFmpeg(Silnik):
         v, a = info.get("v"), info.get("a")
         spec = parse_rozmiar(opt.rozmiar)
         wej = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src)]
-        if z == "svg":
-            return [[*wej, "-frames:v", "1", "-update", "1", str(dst)]]
+        if z == "svg":   # librsvg rysuje SVG w jego wymiarach; --rozmiar zmniejsza (bez powiększania, jak w Chromium)
+            sk = skala_ffmpeg(spec, parzyste=False)
+            return [[*wej, "-frames:v", "1", *(["-vf", sk] if sk else []), "-update", "1", str(dst)]]
         wej += FF_BEZ_METADANYCH
         if na in AUDIO:
             if info.get("ok") and a is None:
@@ -678,9 +728,12 @@ def _strony_do_wyniku(pary: list[tuple[int, Path]], dst: Path) -> list[Path]:
 
 
 # --- PDF bez Ghostscriptu (docs/NATYWNIE.md E04): strony i tekst przez PDFium (pypdfium2), mniejszy PDF przez pikepdf
-# z Pillow (obrazy przeliczone) albo qpdf (bez strat w obrazach JPEG). Ghostscript (AGPL) zostaje tylko tam, gdzie już
-# jest (obraz Jarva z OCRmyPDF), jako zapas i do mniejszego PDF, gdy pikepdf brak.
+# z Pillow (obrazy zmniejszone do dpi jakości i przeliczone) albo qpdf (obrazy przeliczone na JPEG bez zmiany liczby
+# pikseli). Ghostscript (AGPL) zostaje tylko tam, gdzie już jest (obraz Jarva z OCRmyPDF), jako zapas i do mniejszego
+# PDF, gdy pikepdf brak. Gdy biblioteki nie ma w tym Pythonie (Konwerter panelu w Pythonie Hermesa), zadanie robi ten
+# sam skrypt w Pythonie venvu, który ją ma (_zadanie_w): pypdfium2 w venvie OCR, pikepdf w venvie narzędzi.
 MAX_PIKSELI = 100e6     # strona większa niż tyle pikseli w podanym dpi renderuje się w niższym (plakaty, plany)
+CZAS_ZADANIA = 1800     # s na zadanie w Pythonie venvu (duży PDF)
 
 
 def _jest_modul(*nazwy: str) -> bool:
@@ -783,31 +836,38 @@ def wykonaj_pdfium(z: dict) -> dict:
         doc.close()
 
 
+def _zadanie_w(py: str, flaga: str, zadanie: dict, silnik: str, venv: str) -> dict:
+    """Ten skrypt w Pythonie `py` z flagą pomocnika (--pdfium-zadanie, --pikepdf-zadanie): zadanie JSON na wejściu,
+    wynik JSON w ostatniej linii wyjścia, -I -X utf8 (bez PYTHONPATH, wyjście w UTF-8 także na Windows), bez okna
+    konsoli. Blad z opisem, gdy pomocnik nie ruszy albo padnie bez opisu."""
+    try:
+        r = subprocess.run([py, "-I", "-X", "utf8", os.path.abspath(__file__), flaga],
+                           input=json.dumps(zadanie, ensure_ascii=False), capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=CZAS_ZADANIA, creationflags=BEZ_OKNA)
+    except subprocess.TimeoutExpired:
+        raise Blad(f"{silnik}: przekroczony czas ({CZAS_ZADANIA // 60} min)") from None
+    except OSError as exc:
+        raise Blad(f"{silnik}: nie da się uruchomić Pythona {venv} ({exc})") from None
+    linie = (r.stdout or "").strip().splitlines()
+    try:
+        wynik = json.loads(linie[-1]) if linie else {}
+    except ValueError:
+        wynik = {}
+    wynik = wynik if isinstance(wynik, dict) else {}
+    if r.returncode != 0 and not wynik.get("blad"):
+        ogon = [x for x in (r.stderr or "").strip().splitlines() if x.strip()][-4:]
+        raise Blad(f"{silnik} zakończył się błędem ({r.returncode}):\n" + "\n".join(ogon))
+    return wynik
+
+
 def _pdfium(zadanie: dict) -> dict:
-    """Zadanie PDFium tutaj albo w Pythonie venvu OCR (ten sam skrypt z --pdfium-zadanie, JSON przez wejście
-    i wyjście, bez okna konsoli). Blad z opisem, gdy się nie da."""
+    """Zadanie PDFium tutaj albo w Pythonie venvu OCR (ten sam skrypt z --pdfium-zadanie). Blad z opisem, gdy się nie
+    da."""
     py = python_pdfium()
     if py is None:
         raise Blad("Strony i tekst z PDF czyta PDFium (pypdfium2 z venvu OCR instalacji Jarva), a tu go nie ma.")
-    if py == "":
-        wynik = wykonaj_pdfium(zadanie)
-    else:
-        try:
-            r = subprocess.run([py, "-I", "-X", "utf8", os.path.abspath(__file__), "--pdfium-zadanie"],
-                               input=json.dumps(zadanie, ensure_ascii=False), capture_output=True, text=True,
-                               encoding="utf-8", errors="replace", timeout=1800, creationflags=BEZ_OKNA)
-        except subprocess.TimeoutExpired:
-            raise Blad("PDFium: przekroczony czas (30 min)") from None
-        except OSError as exc:
-            raise Blad(f"PDFium: nie da się uruchomić Pythona venvu OCR ({exc})") from None
-        linie = (r.stdout or "").strip().splitlines()
-        try:
-            wynik = json.loads(linie[-1]) if linie else {}
-        except ValueError:
-            wynik = {}
-        if r.returncode != 0 and not wynik.get("blad"):
-            ogon = [x for x in (r.stderr or "").strip().splitlines() if x.strip()][-4:]
-            raise Blad(f"PDFium zakończył się błędem ({r.returncode}):\n" + "\n".join(ogon))
+    wynik = wykonaj_pdfium(zadanie) if py == "" else _zadanie_w(py, "--pdfium-zadanie", zadanie, "PDFium",
+                                                                "venvu OCR")
     if wynik.get("blad"):
         raise Blad(wynik["blad"])
     return wynik
@@ -835,9 +895,10 @@ class Pdfium(Silnik):
 
 
 class Qpdf(Silnik):
-    """Mniejszy PDF bez Ghostscriptu i bez pikepdf: strumienie od nowa (Flate 9, strumienie obiektów), obrazy
-    zapisane bez strat (Flate) zamieniane na JPEG w jakości --jakosc, gdy wychodzi mniej (qpdf --optimize-images).
-    Obrazy już w JPEG zostają, więc skan zmniejsza się mało; liczby pikseli qpdf nie zmienia."""
+    """Mniejszy PDF bez Ghostscriptu i bez pikepdf: strumienie od nowa (Flate 9, strumienie obiektów), a obrazy
+    (także już w JPEG) przeliczone na JPEG w jakości --jakosc, gdy wychodzi mniej (qpdf 12 --optimize-images
+    --jpeg-quality; sprawdzone: skan A4 300 dpi w JPEG 95 przy --jakosc 30 z 1,5 MB do 0,34 MB). Liczby pikseli qpdf
+    nie zmienia, więc skan w dużej rozdzielczości zmniejsza bardziej pikepdf albo Ghostscript."""
     nazwa = "qpdf"
 
     def dostepny(self) -> bool:
@@ -912,24 +973,59 @@ def mniejszy_pdf(src: Path, dst: Path, jakosc: int | None) -> int:
     return zmienione
 
 
+def wykonaj_pikepdf(z: dict) -> dict:
+    """Zadanie pikepdf w tym procesie: {"pdf", "wyjscie", "jakosc"} → {"obrazy": liczba przeliczonych obrazów} albo
+    {"blad": opis po polsku}."""
+    try:
+        return {"obrazy": mniejszy_pdf(Path(z["pdf"]), Path(z["wyjscie"]), z.get("jakosc"))}
+    except Blad as exc:
+        return {"blad": str(exc)}
+    except Exception as exc:          # pikepdf.PasswordError, PdfError: opis po polsku zamiast śladu
+        if "password" in type(exc).__name__.lower() or "password" in str(exc).lower():
+            return {"blad": "PDF jest zabezpieczony hasłem: zdejmij zabezpieczenie i spróbuj jeszcze raz."}
+        return {"blad": f"pikepdf: nie zmniejszę tego PDF ({exc})"}
+
+
+@functools.lru_cache(maxsize=4)
+def _ma_pikepdf(py: str) -> bool:
+    """Czy Python `py` importuje pikepdf i Pillow (raz na proces: Konwerter panelu pyta przy każdej trasie)."""
+    try:
+        return subprocess.run([py, "-I", "-c", "import pikepdf, PIL"], capture_output=True, timeout=60,
+                              stdin=subprocess.DEVNULL, creationflags=BEZ_OKNA).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def python_pikepdf() -> str | None:
+    """Python z pikepdf i Pillow: "" = ten proces (natywnie venv narzędzi floty), ścieżka = Python venvu narzędzi
+    (JARVO_TOOLS_PYTHON; Konwerter panelu działa w Pythonie Hermesa, który pikepdf nie ma), None = nie ma czym (wtedy
+    mniejszy PDF robi Ghostscript albo qpdf)."""
+    if _jest_modul("pikepdf", "PIL"):
+        return ""
+    k = os.environ.get("JARVO_TOOLS_PYTHON")
+    if k and os.path.isfile(k) and not _ten_python(k) and _ma_pikepdf(os.path.abspath(k)):
+        return k
+    return None
+
+
 class Pikepdf(Silnik):
     nazwa = "pikepdf"
 
     def dostepny(self) -> bool:
-        return _jest_modul("pikepdf", "PIL")
+        return python_pikepdf() is not None
 
     def krawedzie(self):
         return [("pdf", "pdf", 1.0)]
 
     def zamien(self, src, dst, z, na, opt, tmp):
-        try:
-            mniejszy_pdf(src, dst, opt.jakosc)
-        except Blad:
-            raise
-        except Exception as exc:          # pikepdf.PasswordError, PdfError: opis po polsku zamiast śladu
-            if "password" in type(exc).__name__.lower() or "password" in str(exc).lower():
-                raise Blad("PDF jest zabezpieczony hasłem: zdejmij zabezpieczenie i spróbuj jeszcze raz.") from None
-            raise Blad(f"pikepdf: nie zmniejszę tego PDF ({exc})") from None
+        py = python_pikepdf()
+        if py is None:
+            raise Blad("Mniejszy PDF z przeliczonymi obrazami robi pikepdf (venv narzędzi Jarva), a tu go nie ma.")
+        zadanie = {"pdf": os.path.abspath(src), "wyjscie": os.path.abspath(dst), "jakosc": opt.jakosc}
+        wynik = wykonaj_pikepdf(zadanie) if py == "" else _zadanie_w(py, "--pikepdf-zadanie", zadanie, "pikepdf",
+                                                                     "venvu narzędzi")
+        if wynik.get("blad"):
+            raise Blad(wynik["blad"])
         return [dst]
 
 
@@ -1053,6 +1149,8 @@ class _Zasoby(http.server.SimpleHTTPRequestHandler):
     źródłowego), więc strona nie sięga po resztę dysku."""
     strona: Path
     korzenie: tuple[Path, ...] = ()
+    # SVG zawsze jako image/svg+xml: <img> bez tego typu go nie pokaże, a na Windows mimetypes bierze typy z rejestru
+    extensions_map = {**http.server.SimpleHTTPRequestHandler.extensions_map, ".svg": "image/svg+xml"}
 
     def translate_path(self, path: str) -> str:
         rel = unquote(urlsplit(path).path).lstrip("/")
@@ -1072,6 +1170,61 @@ class _Zasoby(http.server.SimpleHTTPRequestHandler):
         pass
 
 
+# SVG → PNG w Chromium (docs/NATYWNIE.md E09: FFmpeg z macOS, Martin Riedl, nie ma librsvg): SVG jako <img>, więc bez
+# skryptów i bez zasobów spoza pliku (tryb statyczny przeglądarki), zrzut okna w wymiarach SVG
+SVG_JEDNOSTKI = {"": 1.0, "px": 1.0, "pt": 4 / 3, "pc": 16.0, "mm": 96 / 25.4, "cm": 96 / 2.54, "in": 96.0,
+                 "q": 96 / 101.6}
+SVG_DOMYSLNY = (300, 150)        # <img> z SVG bez wymiarów i bez viewBox (jak w przeglądarce)
+PNG = b"\x89PNG\r\n\x1a\n"
+# PNG z SVG najwyżej tyle pikseli na bok i w sumie: „plakat” z width="100000" nie zajmie gigabajtów pamięci
+MAX_BOK_SVG = 16384
+MAX_PIKSELI_SVG = 64e6
+_SVG_KORZEN = re.compile(r"<svg\b([^>]*)>", re.I | re.S)
+_ATRYBUT = re.compile(r"([\w:.-]+)\s*=\s*(?:\"([^\"]*)\"|'([^']*)')")
+
+
+def _dlugosc_svg(v: str | None) -> float | None:
+    """„210mm”, „800”, „12.5pt” → piksele CSS; procenty, em i „auto” → None (wymiar z viewBox)."""
+    m = re.fullmatch(r"\s*([0-9]*\.?[0-9]+(?:e[-+]?\d+)?)\s*(px|pt|pc|mm|cm|in|q)?\s*", v or "", re.I)
+    if not m:
+        return None
+    x = float(m[1]) * SVG_JEDNOSTKI[(m[2] or "").lower()]
+    return x if x > 0 else None
+
+
+def rozmiar_svg(src: Path) -> tuple[float, float]:
+    """Wymiary SVG w pikselach CSS z atrybutów width i height korzenia, brakujący z proporcji viewBox, bez obu:
+    viewBox, a bez niczego 300×150. Czyta tylko początek pliku (do znacznika <svg>), bez parsera XML."""
+    with open(src, "rb") as f:
+        poczatek = f.read(1 << 16).decode("utf-8", "replace")
+    m = _SVG_KORZEN.search(poczatek)
+    if not m:
+        raise Blad(f"{src.name}: to nie wygląda na SVG (brak znacznika <svg>).")
+    atr = {k.lower(): a if a or not b else b for k, a, b in _ATRYBUT.findall(m[1])}
+    w, h = _dlugosc_svg(atr.get("width")), _dlugosc_svg(atr.get("height"))
+    vb = [float(x) for x in re.split(r"[\s,]+", atr.get("viewbox", "").strip())
+          if re.fullmatch(r"-?(?:\d+\.?\d*|\.\d+)", x)]
+    proporcja = vb[2] / vb[3] if len(vb) == 4 and vb[2] > 0 and vb[3] > 0 else None
+    if w and h:
+        return w, h
+    if proporcja:
+        if w:
+            return w, w / proporcja
+        if h:
+            return h * proporcja, h
+        return vb[2], vb[3]
+    return w or SVG_DOMYSLNY[0], h or SVG_DOMYSLNY[1]
+
+
+def wymiary_zrzutu(src: Path, opt: Opcje) -> tuple[int, int]:
+    """Piksele PNG z SVG: wymiary SVG, --rozmiar (bez powiększania, jak dla zdjęć), najwyżej MAX_BOK_SVG
+    i MAX_PIKSELI_SVG."""
+    w, h = rozmiar_svg(src)
+    w, h = nowy_rozmiar(max(1, round(w)), max(1, round(h)), parse_rozmiar(opt.rozmiar))
+    k = min(1.0, MAX_BOK_SVG / max(w, h), (MAX_PIKSELI_SVG / (w * h)) ** 0.5)
+    return max(1, round(w * k)), max(1, round(h * k))
+
+
 class Chromium(Silnik):
     nazwa = "chromium"
 
@@ -1079,40 +1232,76 @@ class Chromium(Silnik):
         return chromium() is not None
 
     def krawedzie(self):
-        return [("html", "pdf", 1.0)]
+        # SVG → PNG drożej niż FFmpeg z librsvg (obraz, Windows, Linux): Chromium tylko tam, gdzie librsvg brak (macOS)
+        return [("html", "pdf", 1.0), ("svg", "png", 1.2)]
+
+    @staticmethod
+    def _wspolne(profil: str, bez: bool) -> list[str]:
+        """Strona z http://127.0.0.1 nie sięga po file://, a martwe proxy odcina internet (127.0.0.1 omija proxy);
+        --no-sandbox tylko tam, gdzie piaskownica nie ruszy (bez_piaskownicy)."""
+        return [chromium() or "chromium", "--headless", *(["--no-sandbox"] if bez else []), "--disable-gpu",
+                "--disable-extensions", "--no-first-run", f"--user-data-dir={profil}", "--proxy-server=127.0.0.1:9"]
 
     @staticmethod
     def polecenie(dst: Path, adres: str, profil: str, bez: bool) -> list[str]:
-        """Druk strony do PDF: strona z http://127.0.0.1 nie sięga po file://, a martwe proxy odcina internet
-        (127.0.0.1 omija proxy); --no-sandbox tylko tam, gdzie piaskownica nie ruszy (bez_piaskownicy)."""
-        return [chromium() or "chromium", "--headless", *(["--no-sandbox"] if bez else []), "--disable-gpu",
-                "--disable-extensions", "--no-first-run", f"--user-data-dir={profil}", "--proxy-server=127.0.0.1:9",
-                "--no-pdf-header-footer", "--virtual-time-budget=5000", f"--print-to-pdf={dst.resolve()}", adres]
+        """Druk strony do PDF."""
+        return [*Chromium._wspolne(profil, bez), "--no-pdf-header-footer", "--virtual-time-budget=5000",
+                f"--print-to-pdf={dst.resolve()}", adres]
+
+    @staticmethod
+    def polecenie_zrzutu(dst: Path, adres: str, profil: str, bez: bool, w: int, h: int) -> list[str]:
+        """Zrzut okna w × h px z przezroczystym tłem (SVG → PNG)."""
+        return [*Chromium._wspolne(profil, bez), "--hide-scrollbars", "--force-device-scale-factor=1",
+                "--default-background-color=00000000", f"--window-size={w},{h}", "--virtual-time-budget=5000",
+                f"--screenshot={dst.resolve()}", adres]
 
     def _drukuj(self, dst: Path, adres: str, bez: bool) -> None:
         with tempfile.TemporaryDirectory(prefix="konwertuj-chrome-", ignore_cleanup_errors=True) as profil:
             _run(self.polecenie(dst, adres, profil, bez), "Chromium", 300)
 
-    def zamien(self, src, dst, z, na, opt, tmp):
-        korzenie = tuple(dict.fromkeys(x.resolve() for x in (src.parent, opt.zasoby or src.parent)))
-        handler = type("H", (_Zasoby,), {"strona": src.resolve(), "korzenie": korzenie})
+    def _zrzut(self, dst: Path, adres: str, bez: bool, w: int, h: int) -> None:
+        with tempfile.TemporaryDirectory(prefix="konwertuj-chrome-", ignore_cleanup_errors=True) as profil:
+            _run(self.polecenie_zrzutu(dst, adres, profil, bez, w, h), "Chromium", 300)
+
+    @staticmethod
+    def _z_serwerem(strona: Path, korzenie: tuple[Path, ...], wykonaj) -> None:
+        """`wykonaj(adres, bez)` ze stroną z lokalnego serwera (tylko `korzenie`). Linux, na którym piaskownica jednak
+        nie ruszyła (np. przestrzenie nazw wyłączone inaczej, niż widzi bez_piaskownicy): drugi raz bez niej."""
+        handler = type("H", (_Zasoby,), {"strona": strona, "korzenie": korzenie})
         srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         bez = bez_piaskownicy()
         try:
             while True:
                 try:
-                    self._drukuj(dst, f"http://127.0.0.1:{srv.server_address[1]}/__strona.html", bez)
+                    wykonaj(f"http://127.0.0.1:{srv.server_address[1]}/__strona.html", bez)
                     break
                 except Blad as exc:
-                    # Linux, na którym piaskownica jednak nie ruszyła (np. przestrzenie nazw wyłączone inaczej niż
-                    # przez AppArmor): drugi raz bez niej, jak w obrazie
                     if bez or not _linux() or not PIASKOWNICA_BLAD.search(str(exc)):
                         raise
                     bez = True
         finally:
             srv.shutdown()
             srv.server_close()
+
+    def _svg(self, src: Path, dst: Path, opt: Opcje, tmp: Path) -> list[Path]:
+        w, h = wymiary_zrzutu(src, opt)
+        strona = tmp / f"svg-{dst.stem}.html"
+        strona.write_text('<!doctype html><meta charset="utf-8"><style>html,body{margin:0;padding:0;'
+                          'background:transparent;overflow:hidden}img{display:block;width:%dpx;height:%dpx}</style>'
+                          '<img alt="" src="/%s">' % (w, h, quote(src.name)), encoding="utf-8")
+        self._z_serwerem(strona.resolve(), (src.parent.resolve(),),
+                         lambda adres, bez: self._zrzut(dst, adres, bez, w, h))
+        if _poczatek(dst, 8) != PNG:
+            dst.unlink(missing_ok=True)
+            raise Blad("Chromium nie utworzył PNG z tego SVG.")
+        return [dst]
+
+    def zamien(self, src, dst, z, na, opt, tmp):
+        if z == "svg":
+            return self._svg(src, dst, opt, tmp)
+        korzenie = tuple(dict.fromkeys(x.resolve() for x in (src.parent, opt.zasoby or src.parent)))
+        self._z_serwerem(src.resolve(), korzenie, lambda adres, bez: self._drukuj(dst, adres, bez))
         if not dst.exists() or dst.stat().st_size == 0:
             raise Blad("Chromium nie utworzył PDF.")
         return [dst]
@@ -1155,8 +1344,8 @@ SILNIKI: list[Silnik] = [Pillow(), FFmpeg(), Pdfium(), Pikepdf(), Ghostscript(),
 
 # --------------------------------------------------------------------------- trasy
 
-@functools.lru_cache(maxsize=1)
-def _graf() -> dict[str, list[tuple[str, float, str]]]:
+@functools.lru_cache(maxsize=4)
+def _graf_z(libreoffice: bool) -> dict[str, list[tuple[str, float, str]]]:
     g: dict[str, list[tuple[str, float, str]]] = {}
     for s in SILNIKI:
         if not s.dostepny():
@@ -1164,6 +1353,15 @@ def _graf() -> dict[str, list[tuple[str, float, str]]]:
         for a, b, koszt in s.krawedzie():
             g.setdefault(a, []).append((b, koszt, s.nazwa))
     return g
+
+
+def _graf() -> dict[str, list[tuple[str, float, str]]]:
+    """Krawędzie dostępnych silników, liczone raz na proces, ale od nowa, gdy pojawi się albo zniknie LibreOffice:
+    Konwerter panelu żyje długo, a właściciel instaluje LibreOffice po radzie z komunikatu."""
+    return _graf_z(soffice() is not None)
+
+
+_graf.cache_clear = _graf_z.cache_clear       # type: ignore[attr-defined]  (testy i proces panelu po zmianie silników)
 
 
 def silnik(nazwa: str) -> Silnik:
@@ -1205,11 +1403,15 @@ def trasa(z: str, na: str, opt: Opcje | None = None) -> list[tuple[str, str, str
 
 
 def rada_libreoffice() -> str:
-    """Skąd wziąć LibreOffice: w obrazie dodatek `office`, natywnie program z tego komputera (Jarvo znajdzie go sam)."""
-    if natywnie():
-        return ("LibreOffice: zainstaluj go na tym komputerze (libreoffice.org; Jarvo znajdzie go sam w Program "
-                "Files, w Aplikacjach albo w /opt) albo wskaż program zmienną JARVO_SOFFICE.")
-    return "dodatek obrazu `office` (JARVO_EXTRAS)."
+    """Skąd wziąć LibreOffice (dokończenie zdania „… wymagają LibreOffice: ”): w obrazie dodatek `office`, natywnie
+    zwykła instalacja na tym komputerze, którą Jarvo znajduje sam (bez zmiennych i bez restartu)."""
+    if not natywnie():
+        return "dodatek obrazu `office` (JARVO_EXTRAS)."
+    if any((p := program(n)) and ze_snapa(p) for n in ("soffice", "libreoffice")):
+        return ("ten ze snapa nie widzi plików Jarva (piaskownica snapa), więc zainstaluj LibreOffice z pakietów "
+                "systemu (np. apt install libreoffice) albo z libreoffice.org.")
+    return ("zainstaluj go na tym komputerze zwykłym instalatorem z libreoffice.org; Jarvo znajdzie go sam "
+            "(Program Files, Aplikacje, pakiet systemu albo /opt), bez żadnych ustawień.")
 
 
 def podpowiedz(z: str, na: str) -> str:
@@ -1336,11 +1538,18 @@ def cele(src_fmt: str) -> list[dict]:
     return out
 
 
+def _gdzie(py: str | None) -> str | None:
+    return None if py is None else "ten Python" if py == "" else Path(py).as_posix()
+
+
 def formaty() -> dict:
+    """Silniki i formaty dostępne tutaj; `pomocnicy`: gdzie biegną PDFium i pikepdf (ten Python albo Python venvu)."""
     g = _graf()
     wej = {a for a in g}
     wyj = {b for kr in g.values() for b, _, _ in kr}
     return {"silniki": {s.nazwa: s.dostepny() for s in SILNIKI},
+            "python": Path(sys.executable).as_posix(),
+            "pomocnicy": {"pdfium": _gdzie(python_pdfium()), "pikepdf": _gdzie(python_pikepdf())},
             "formaty": [{"format": f, "grupa": g_, "nazwa": n, "opis": o, "odczyt": f in wej, "zapis": f in wyj}
                         for f, (g_, n, o) in FORMATY.items()],
             "rozszerzenia": sorted({*FORMATY, *ALIASY})}
@@ -1743,12 +1952,15 @@ def python_z_pillow() -> str | None:
     return None
 
 
+POMOCNICY = ("--pdfium-zadanie", "--pikepdf-zadanie")     # zadania JSON w Pythonie venvu (_zadanie_w)
+
+
 def _do_pythona_z_pillow(argv: list[str]) -> None:
-    """Bez Pillow w tym Pythonie (natywnie venv narzędzi floty, @@PY@@) ten sam skrypt w Pythonie Hermesa z instalacji:
-    zdjęcia, HEIC i zdjęcia → PDF działają jak w obrazie. Ten sam kod wyjścia i wyjście. Bez pętli: python_z_pillow()
-    nie zwraca tego samego Pythona. POSIX: execv (ten sam proces), Windows: nowy proces (execv odpina tam proces od
-    rodzica) z -X utf8, bo -I pomija PYTHONUTF8."""
-    if argv[:1] == ["--pdfium-zadanie"] or _jest_modul("PIL"):
+    """Bez Pillow w tym Pythonie (np. venv narzędzi floty sprzed E8, @@PY@@) ten sam skrypt w Pythonie Hermesa
+    z instalacji: zdjęcia, HEIC i zdjęcia → PDF działają jak w obrazie. Ten sam kod wyjścia i wyjście. Bez pętli:
+    python_z_pillow() nie zwraca tego samego Pythona. POSIX: execv (ten sam proces), Windows: nowy proces (execv odpina
+    tam proces od rodzica) z -X utf8, bo -I pomija PYTHONUTF8."""
+    if argv[:1] and argv[0] in POMOCNICY or _jest_modul("PIL"):
         return
     py = python_z_pillow()
     if py is None:
@@ -1759,14 +1971,16 @@ def _do_pythona_z_pillow(argv: list[str]) -> None:
     sys.exit(subprocess.run([py, "-I", "-X", "utf8", skrypt, *argv]).returncode)
 
 
-def _main_pdfium() -> int:
-    """Pomocnik w Pythonie z pypdfium2 (venv OCR): zadanie JSON z wejścia, wynik JSON w ostatniej linii wyjścia."""
+def _main_zadanie(flaga: str) -> int:
+    """Pomocnik w Pythonie venvu (--pdfium-zadanie: venv OCR z pypdfium2, --pikepdf-zadanie: venv narzędzi
+    z pikepdf): zadanie JSON z wejścia, wynik JSON w ostatniej linii wyjścia."""
+    wykonaj, silnik_ = (wykonaj_pdfium, "PDFium") if flaga == "--pdfium-zadanie" else (wykonaj_pikepdf, "pikepdf")
     try:
-        wynik = wykonaj_pdfium(json.loads(sys.stdin.read()))
+        wynik = wykonaj(json.loads(sys.stdin.read()))
     except Blad as exc:
         wynik = {"blad": str(exc)}
     except Exception as exc:   # noqa: BLE001  (każdy błąd pomocnika wraca jako opis, nie ślad stosu)
-        wynik = {"blad": f"PDFium: {type(exc).__name__}: {exc}"}
+        wynik = {"blad": f"{silnik_}: {type(exc).__name__}: {exc}"}
     print(json.dumps(wynik, ensure_ascii=False))
     return 1 if wynik.get("blad") else 0
 
@@ -1784,8 +1998,9 @@ def _pliki(wejscia: list[str], rekursywnie: bool) -> list[Path]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    if (sys.argv[1:] if argv is None else list(argv))[:1] == ["--pdfium-zadanie"]:
-        return _main_pdfium()
+    pierwszy = (sys.argv[1:] if argv is None else list(argv))[:1]
+    if pierwszy and pierwszy[0] in POMOCNICY:
+        return _main_zadanie(pierwszy[0])
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("pliki", nargs="*")
     ap.add_argument("--na", help="format wyniku, np. pdf, jpg, mp4, mp3, docx")

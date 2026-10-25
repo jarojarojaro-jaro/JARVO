@@ -35,6 +35,8 @@ K="$HERMES_HOME/skills/pliki/konwersja-plikow/scripts/konwertuj.py"
 @@PY@@ "$K" film.mp4 --na mp3                   # dźwięk z filmu
 @@PY@@ "$K" film.mp4 --na mp4 --rozmiar 720p    # mniejszy film (ten sam format + rozmiar/jakość)
 @@PY@@ "$K" dokument.pdf --na png --strony 1-3 --dpi 200
+@@PY@@ "$K" skan.pdf --na pdf --jakosc 40           # mniejszy PDF (zdjęcia w środku zmniejszone)
+@@PY@@ "$K" logo.svg --na png                       # SVG → PNG w wymiarach z SVG
 @@PY@@ "$K" skan1.jpg skan2.jpg umowa.pdf --polacz -o razem.pdf
 @@PY@@ "$K" katalog/ --na webp --katalog out/webp   # cały katalog (-r z podkatalogami)
 @@PY@@ "$K" IMG_2041.heic film.mov --metadane   # co plik mówi o człowieku: miejsce GPS, telefon, data, autor, opis
@@ -55,7 +57,10 @@ K="$HERMES_HOME/skills/pliki/konwersja-plikow/scripts/konwertuj.py"
 - `--rozmiar`: `1080` = dłuższy bok najwyżej 1080 px, `720p` = krótszy bok 720 (film 720p), `50%`, `1920x1080`
   = zmieść w polu. Nigdy nie powiększa.
 - `--jakosc 1–100`: zdjęcia (domyślnie 85), film (domyślnie 75; mniej = mniejszy plik), audio (kb/s ≈ 3,2 × jakość),
-  PDF → PDF (mniejszy plik: ≤ 40 ekran, ≤ 80 e-book, więcej druk).
+  PDF → PDF (mniejszy plik: pikepdf i Ghostscript zmniejszają zdjęcia w środku do ≤ 40: 72 dpi ekran, ≤ 80: 150 dpi
+  e-book, więcej: 300 dpi druk, i zapisują je jako JPEG w tej jakości; qpdf, gdy nie ma ich obu, tylko przelicza
+  zdjęcia na JPEG w tej jakości, bez zmiany liczby pikseli). Trasa w wyniku mówi, który silnik to zrobił.
+- SVG → PNG (także → JPG, WebP przez PNG) w wymiarach z SVG; `--rozmiar` zmniejsza (nie powiększa).
 - `--strony 1-3,5` i `--dpi`: PDF → obrazy (bez `--strony` najwyżej 200 stron) i PDF → tekst. `--dpi` też dla
   zdjęć → PDF.
 - Film → GIF: 12 klatek/s, dłuższy bok 480 px (inny przez `--rozmiar`). Film z telefonu w HDR wychodzi
@@ -79,13 +84,15 @@ K="$HERMES_HOME/skills/pliki/konwersja-plikow/scripts/konwertuj.py"
 - Pole `uwagi`: komentarze albo śledzone zmiany z nazwiskami w treści dokumentu. Skrypt ich nie usuwa (to treść),
   a Ty mówisz to człowiekowi przed wysyłką.
 - Obrazki w Markdown/HTML/Word tylko z katalogu dokumentu: ścieżki absolutne, z „..” i z internetu wypadają
-  (ochrona przed wyciekiem plików z serwera). PDF z HTML drukuje Chromium bez dostępu do sieci.
+  (ochrona przed wyciekiem plików z serwera). PDF z HTML drukuje Chromium bez dostępu do sieci; SVG rysuje FFmpeg
+  (librsvg) albo Chromium jako obraz, bez skryptów i bez plików spoza SVG.
 - Excel, PowerPoint, stare .doc/.xls/.ppt i CSV ↔ XLSX wymagają LibreOffice: w obrazie Jarva dodatek `office`,
-  w instalacji natywnej LibreOffice z tego komputera (skrypt znajdzie go sam) albo program wskazany w JARVO_SOFFICE.
-  Bez niego skrypt mówi to wprost: przekaż człowiekowi, nie obchodź tego i nie instaluj niczego sam. Z PDF nie
-  zrobisz Worda (tekst: `--na txt`; skan bez tekstu: skill `odczyt-ekranu`).
-- PDF → obrazy stron i tekst robi PDFium (pypdfium2), mniejszy PDF pikepdf albo qpdf, bez Ghostscriptu (jest tylko
-  w obrazie). qpdf nie przelicza zdjęć zapisanych już jako JPEG, więc skan zmniejsza się mało: wtedy pole `uwaga`.
+  w instalacji natywnej LibreOffice zainstalowany na tym komputerze zwykłym instalatorem (skrypt znajdzie go sam:
+  Program Files, Aplikacje, pakiet systemu, /opt; LibreOffice ze snapa nie widzi plików Jarva, więc go pomija).
+  Bez niego skrypt mówi to wprost: przekaż człowiekowi jego radę, nie obchodź tego i nie instaluj niczego sam. Z PDF
+  nie zrobisz Worda (tekst: `--na txt`; skan bez tekstu: skill `odczyt-ekranu`).
+- PDF → obrazy stron i tekst robi PDFium (pypdfium2), mniejszy PDF pikepdf (zdjęcia zmniejszone i przeliczone),
+  a bez niego qpdf; Ghostscript jest tylko w obrazie Jarva. Gdy wynik nie jest mniejszy, pole `uwaga`: oddaj oryginał.
 - Kod wyjścia 1 = opis błędu po polsku: powiedz go prosto i zaproponuj inny format, jeśli `--cele` go ma.
 
 ## Definition of Done
