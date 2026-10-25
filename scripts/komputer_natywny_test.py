@@ -121,14 +121,18 @@ def inicjuj(k: Klient, nazwa: str = "komputer-natywny-test") -> dict:
     return init
 
 
-def okno_o_tytule(k: Klient, tytul: str, poza: int | None = None) -> dict | None:
-    for _ in range(40):
+def okno_o_tytule(k: Klient, tytul: str, poza: int | None = None, czas: float = 45.0) -> dict | None:
+    """Okno (karta) o tytule; do `czas` sekund: Windows arm64 uruchamia przeglądarkę x64 w emulacji i nowa karta
+    z tytułem bywa gotowa po kilkunastu sekundach (CI natywnie, WARM: 10 s nie wystarczało)."""
+    koniec = time.monotonic() + czas
+    while True:
         for o in (k.narzedzie("list_windows", {"on_screen_only": True}).get("structuredContent") or {}).get(
                 "windows", []):
             if tytul in str(o.get("title")) and o.get("window_id") != poza:
                 return o
+        if time.monotonic() >= koniec:
+            return None
         time.sleep(0.25)
-    return None
 
 
 def przebieg(root: str) -> int:

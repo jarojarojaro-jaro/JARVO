@@ -1624,7 +1624,9 @@ class Sterownik:
         for url in [str(u) for u in args.get("urls") or []][:8]:
             przed = {o.nr for o in self.okna()}
             cel = self.b.wyslij("Target.createTarget", {"url": url})
-            koniec = time.monotonic() + 10
+            # podpięcie nowej karty (Fetch, Network, zasady) na Windows arm64 z przeglądarką x64 w emulacji trwa
+            # dłużej niż 10 s (CI natywnie, WARM): bez niej wynik nie miał nowej karty
+            koniec = time.monotonic() + 30
             with self._lock:
                 while cel.get("targetId") not in self._po_celu and time.monotonic() < koniec:
                     self._nowe_okno.wait(0.2)

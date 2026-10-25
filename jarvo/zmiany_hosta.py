@@ -227,7 +227,7 @@ def _cofnij_jeden(u: Uklad, w: dict, wykonaj: Wykonaj, rejestr) -> tuple[str, st
     if rodzaj == "katalog":
         return _cofnij_katalog(Path(s["sciezka"]), list(s.get("dozwolone") or []))
     if rodzaj == "path-uzytkownika":
-        return _cofnij_path(s["wartosc"], rejestr)
+        return _cofnij_path(s["wartosc"], rejestr, bool(s.get("srednik")))
     if rodzaj in _AUTOSTART:
         from . import autostart              # autostart importuje ten moduł, więc import dopiero tutaj
         return autostart.cofnij_wpis(u, w, wykonaj, rejestr=rejestr)
@@ -402,16 +402,21 @@ def dodaj_do_path(u: Uklad, katalog: Path | str, *, rejestr=None) -> bool:
     if not wartosc.strip() or ";" in wartosc:
         raise ValueError(f"katalog do PATH: {wartosc!r}")
     r = rejestr or Rejestr()
-    dopisz(u, "path-uzytkownika", wartosc=wartosc)
     tekst, typ = r.czytaj(ENV, "Path") or ("", REG_EXPAND_SZ)
-    if any(_klucz_path(c) == _klucz_path(wartosc) for c in tekst.split(";")):
+    jest = any(_klucz_path(c) == _klucz_path(wartosc) for c in tekst.split(";"))
+    if not any(w["rodzaj"] == "path-uzytkownika" and w["szczegoly"].get("wartosc") == wartosc for w in wpisy(u)):
+        # PATH właściciela kończący się średnikiem (np. obraz windows-2025) wraca po odinstalowaniu bajt w bajt
+        dopisz(u, "path-uzytkownika", wartosc=wartosc, **({"srednik": True} if tekst.endswith(";") and not jest else {}))
+    if jest:
         return False
-    r.zapisz(ENV, "Path", f"{tekst.rstrip(';')};{wartosc}" if tekst.strip(";") else wartosc, typ)
+    # oryginał zostaje bez zmian na początku (także końcowy średnik), nasz katalog dochodzi na końcu
+    r.zapisz(ENV, "Path", (tekst + wartosc) if (not tekst.strip(";") or tekst.endswith(";")) else f"{tekst};{wartosc}",
+             typ)
     r.oglos()
     return True
 
 
-def _cofnij_path(wartosc: str, rejestr) -> tuple[str, str]:
+def _cofnij_path(wartosc: str, rejestr, srednik: bool = False) -> tuple[str, str]:
     if rejestr is None and not WINDOWS:
         return "pominiete", f"PATH użytkownika ({wartosc}): zmieniamy go tylko na Windows"
     r = rejestr or Rejestr()
@@ -421,6 +426,8 @@ def _cofnij_path(wartosc: str, rejestr) -> tuple[str, str]:
     if not obecna or len(zostaja) == len(czesci):
         return "brak", f"PATH użytkownika: nie ma już {wartosc}"
     nowa = ";".join(zostaja)
+    if srednik and nowa.strip(";") and not nowa.endswith(";"):
+        nowa += ";"                                  # PATH sprzed instalacji kończył się średnikiem
     if nowa.strip(";"):
         r.zapisz(ENV, "Path", nowa, obecna[1])
     else:

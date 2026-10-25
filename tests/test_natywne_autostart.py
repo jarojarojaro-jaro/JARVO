@@ -411,6 +411,19 @@ def test_path_uzytkownika_tylko_nasz_wpis(u):
         zmiany_hosta.dodaj_do_path(u, "C:\\a;C:\\b", rejestr=pusty)
 
 
+def test_path_ze_srednikiem_na_koncu_wraca_bajt_w_bajt(u):
+    """CI natywnie (windows-2025): PATH użytkownika „…\\WindowsApps;” po odinstalowaniu tracił końcowy średnik."""
+    przed = r"%USERPROFILE%\.dotnet\tools;%USERPROFILE%\AppData\Local\Microsoft\WindowsApps;"
+    r = Rejestr({("Environment", "Path"): (przed, 2)})
+    kat = r"C:\Users\runneradmin\AppData\Local\Jarvo\bin"
+    assert zmiany_hosta.dodaj_do_path(u, kat, rejestr=r)
+    assert r.czytaj("Environment", "Path") == (przed + kat, 2)
+    assert not zmiany_hosta.dodaj_do_path(u, kat, rejestr=r)       # drugi przebieg: ten sam dziennik
+    assert [w["szczegoly"] for w in zmiany_hosta.wpisy(u)] == [{"wartosc": kat, "srednik": True}]
+    assert [x["wynik"] for x in zmiany_hosta.cofnij(u, rejestr=r, log=None)] == ["cofniete"]
+    assert r.czytaj("Environment", "Path") == (przed, 2)
+
+
 def test_cofnij_od_konca_filtr_i_bledy_zostaja(u, host):
     dom = host.dom
     zmiany_hosta.zapisz_plik(u, dom / "a.txt", "a")

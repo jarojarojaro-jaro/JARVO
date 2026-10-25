@@ -2052,7 +2052,8 @@ def test_instaluj_z_prawdziwym_dziennikiem_zmian_i_nadzorca(tmp_path, stanowisko
     assert {r["wynik"] for r in raport} == {"cofniete"}, raport
     assert _migawka(s["dom"]) == dom_przed
     if WINDOWS:
-        assert s["rejestr"].czytaj("Environment", "Path")[0] == r"C:\Narzedzia;%USERPROFILE%\bin;".rstrip(";")
+        # PATH sprzed instalacji wraca bajt w bajt, także z końcowym średnikiem (CI natywnie, windows-2025)
+        assert s["rejestr"].czytaj("Environment", "Path")[0] == r"C:\Narzedzia;%USERPROFILE%\bin;"
     # prawdziwy klient nadzorcy bez działającego nadzorcy: status mówi „nie działa”, nic nie startuje; znacznik
     # zatrzymania przez ten moduł (albo plik, gdy moduł go jeszcze nie zna) w tym samym miejscu
     s["moduly"].update({"nadzorca": nadzorca})
