@@ -11,16 +11,20 @@ tylko z plikiem), klucze configu profili z install_fleet.py --ustawienia-profili
 i port API w <dane>/.env oraz doctor bramy. Pełny przebieg instalatora z gitem i Node z manifestu, venvem, modelem
 i Tesseractem na atrapach modułów, z restartem usług przez nadzorcę, gdy zmieniła się tylko flota.
 
-Miejsce (c3 pkt 11, Z31): potrzeba liczona z manifestu (rozmiary plików, pobranie_mb i venv_mb, pixi.lock, modele,
-Hermes, flota) tylko dla brakujących części, bilans na każdym dysku, odmowa przed zapisaniem czegokolwiek z innymi
-dyskami i gotowym poleceniem (PowerShell i bash), punkty montowania Linuksa i macOS, dyski stałe Windows; sprzątanie
-po udanej instalacji (archiwa, cache uv przez `uv cache clean`, cache pixi, stare wersje narzędzi, node_modules frontu
-zaraz po budowie, bez wchodzenia w junction workspace'u npm) i drugi przebieg bez sieci bez zmian; zajęte miejsce
-bez liczenia dowiązań dwa razy.
+Miejsce (c3 pkt 11, Z31): potrzeba liczona z manifestu (rozmiary plików, pobranie_mb i venv_mb, pixi.lock, modele;
+Hermes i flota ze stałych) tylko dla brakujących części, bilans na każdym dysku, odmowa przed zapisaniem czegokolwiek
+z innymi dyskami i gotowym poleceniem (PowerShell i bash); system plików: polecane tylko dyski z ochroną dostępu
+(punkty montowania Linuksa i macOS bez FAT, exFAT, NTFS i noowners, dyski stałe Windows z NTFS), a korzeń na
+woluminie bez niej = odmowa w kroku 1 (działająca instalacja: uwaga); sprzątanie po udanej instalacji (archiwa tego
+przebiegu i stare, świeże pliki innych procesów zostają, cache uv przez `uv cache clean`, cache pixi, stare wersje
+narzędzi, node_modules frontu zaraz po budowie, bez wchodzenia w junction workspace'u npm) pod zamkami instalatorów
+trzymanymi przez drugi proces, i drugi przebieg bez sieci bez zmian; zajęte miejsce bez liczenia dowiązań dwa razy.
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import inspect
 import json
 import os
 import re
@@ -28,6 +32,7 @@ import stat
 import subprocess
 import sys
 import threading
+import time
 import zipfile
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -40,7 +45,7 @@ from conftest import REPO, WINDOWS
 
 sys.path.insert(0, str(REPO))
 from jarvo import bin_floty, cli, flota, instalator, manifest, modele, programy_floty, sciezki  # noqa: E402
-from jarvo import hermes, srodowisko, tesseract, venvy  # noqa: E402
+from jarvo import hermes, przy_uzyciu, srodowisko, tesseract, venvy  # noqa: E402
 import install_fleet  # noqa: E402  (scripts/ w sys.path z conftest)
 
 import test_natywne_cli as tc  # noqa: E402  (atrapy modułów i stanowisko instalatora)
@@ -730,9 +735,9 @@ def test_ten_sam_port_panelu_i_api_odmowa(tmp_path, stanowisko):
 # ---------------------------------------------------------------- miejsce: potrzeba z manifestu, dyski, sprzątanie
 
 def _app_miejsca(tmp_path: Path) -> Path:
-    """Kod Jarva z manifestem do liczenia miejsca: trzy narzędzia instalacji (zip, tar.xz i pixi z polem
-    `rozpakowany`), Camoufox przy pierwszym użyciu, Lightpanda `brak`, venv, model, prawdziwy projekt pixi Tesseracta
-    (rozmiary paczek z pixi.lock), pin Hermesa i fleet.yaml."""
+    """Kod Jarva z manifestem do liczenia miejsca: trzy narzędzia instalacji (zip, tar.xz i pixi), Camoufox przy
+    pierwszym użyciu, Lightpanda `brak`, venv, model, prawdziwy projekt pixi Tesseracta (rozmiary paczek z pixi.lock),
+    pin Hermesa i fleet.yaml."""
     app = tmp_path / "app-miejsce"
 
     def plik(rozmiar: int, format: str, **dodatki) -> dict:
@@ -741,7 +746,7 @@ def _app_miejsca(tmp_path: Path) -> Path:
     narz = {
         "uv": {"wersja": "0.12.13", "pliki": {p: plik(10 * MB, "zip") for p in sciezki.PLATFORMY}},
         "node": {"wersja": "26.12.1", "pliki": {p: plik(20 * MB, "tar.xz") for p in sciezki.PLATFORMY}},
-        "pixi": {"wersja": "0.83.0", "pliki": {p: plik(5 * MB, "zip", rozpakowany=7 * MB) for p in sciezki.PLATFORMY}},
+        "pixi": {"wersja": "0.83.0", "pliki": {p: plik(5 * MB, "zip") for p in sciezki.PLATFORMY}},
         "camoufox": {"wersja": "152", "kiedy": "przy-uzyciu",
                      "pliki": {p: plik(100 * MB, "zip") for p in sciezki.PLATFORMY}},
         "lightpanda": {"wersja": "1.0.0", "pliki": {p: {"brak": "nie ma wydania"} for p in sciezki.PLATFORMY}},
@@ -776,14 +781,18 @@ def test_potrzebne_miejsce_z_manifestu_tylko_brakujace_czesci(tmp_path):
     u = uklad(tmp_path / "j")
     p = instalator.potrzebne_miejsce(u, app, "linux-x64")
     assert _mb(p, "archiwa narzędzi (3)") == (35, 0)                         # pobrane pliki: tylko w trakcie
-    assert _mb(p, "narzędzia (3)") == (10 * 3.0 + 20 * 4.5 + 7,) * 2        # zip × 3, tar.xz × 4,5, pole rozpakowany
+    assert _mb(p, "narzędzia (3)") == (10 * 3.0 + 20 * 4.5 + 5 * 3.0,) * 2   # zip × 3, tar.xz × 4,5
     assert _mb(p, "venvy (1)") == (800, 800)                                 # venv_mb 400 × pobranie 200/100 (Windows)
     assert _mb(p, "cache uv venvów") == (pytest.approx(800 * venvy.WSP_CACHE), 0)
     assert _mb(p, "modele (1)") == (3, 3)                                    # parakeet: przy pierwszym użyciu
     cache, srod, zostaje = tesseract.miejsce(app, "linux-x64")
     assert _mb(p, "cache pixi") == (round(cache / MB, 3), 0) and _mb(p, "Tesseract") == (round(srod / MB, 3),
                                                                                          round(zostaje / MB, 3))
+    # Hermes i flota ze stałych w kodzie: prawdziwy manifest nie ma pól miejsca (gdy dojdą, potrzebne_miejsce ma je
+    # czytać, a ten warunek trzeba zmienić razem z nim)
     h, f = instalator.HERMES_MB, instalator.FLOTA_MB
+    assert not [k for k in LOCK["hermes"] if "miejsce" in k] and not [
+        k for w in LOCK["narzedzia"].values() for pl in (w.get("pliki") or {}).values() for k in pl if "rozpak" in k]
     assert _mb(p, "Hermes") == (h["checkout"],) * 2 and _mb(p, "cache uv Hermesa") == (h["cache_uv"], 0)
     assert _mb(p, "node_modules frontu") == (h["node_modules"], 0) and _mb(p, "front panelu") == (h["front"],) * 2
     assert _mb(p, "źródła skilli") == (f["zrodla"],) * 2 and _mb(p, "build floty") == (f["build"],) * 2
@@ -927,39 +936,153 @@ def test_polecenie_instalacji_powershell_i_bash():
                                                                                          windows=False)
 
 
-def test_punkty_montowania_linuksa_i_macos():
-    proc = ("/dev/nvme0n1p2 / ext4 rw,relatime 0 0\n"
-            "/dev/nvme0n1p1 /boot/efi vfat rw,relatime 0 0\n"
+def test_punkty_montowania_linuksa_i_macos_tylko_z_ochrona_dostepu():
+    proc = ("/dev/nvme0n1p2 / ext4 rw,relatime,errors=remount-ro 0 0\n"
+            "/dev/nvme0n1p1 /boot/efi vfat rw,relatime,fmask=0077 0 0\n"           # FAT: bez uprawnień właściciela
             "/dev/sda1 /media/ola/Dysk\\040Dane ext4 rw,nosuid 0 0\n"
+            "/dev/sdc1 /media/ola/PENDRIVE vfat rw,nosuid,nodev,uid=1000 0 0\n"
+            "/dev/sdd1 /media/ola/USB exfat rw,nosuid,nodev 0 0\n"
+            "/dev/sde2 /mnt/windows ntfs3 rw,relatime,uid=1000 0 0\n"
+            "/dev/sdf1 /media/ola/WD fuseblk rw,nosuid,nodev,user_id=0,allow_other 0 0\n"   # ntfs-3g i exfat-fuse
             "/dev/sdb1 /mnt/archiwum xfs ro,relatime 0 0\n"
+            "/dev/sdg1 /mnt/dane btrfs rw,relatime,subvol=/ 0 0\n"
             "/dev/loop3 /snap/core/17 squashfs ro,nodev 0 0\n"
             "tmpfs /tmp tmpfs rw 0 0\n"
             "server:/eksport /mnt/nfs nfs4 rw 0 0\n"
             "dane/jarvo /tank zfs rw,xattr 0 0\n")
-    assert instalator.punkty_linux(proc) == ["/", "/boot/efi", "/media/ola/Dysk Dane", "/tank"]
+    assert instalator.punkty_linux(proc) == ["/", "/media/ola/Dysk Dane", "/mnt/dane", "/tank"]
+    w = {x.punkt: x for x in instalator.woluminy_linux(proc)}
+    assert w["/media/ola/Dysk Dane"].typ == "ext4" and "nosuid" in w["/media/ola/Dysk Dane"].opcje
     mount = ("/dev/disk3s1s1 on / (apfs, sealed, local, read-only, journaled)\n"
              "/dev/disk3s5 on /System/Volumes/Data (apfs, local, journaled, nobrowse, protect, root data)\n"
              "devfs on /dev (devfs, local, nobrowse)\n"
-             "/dev/disk5s1 on /Volumes/Dane (apfs, local, nodev, nosuid, journaled, noowners)\n"
+             "map auto_home on /System/Volumes/Data/home (autofs, automounted, nobrowse)\n"
+             "/dev/disk5s1 on /Volumes/Dane (apfs, local, nodev, nosuid, journaled, noowners)\n"   # dysk zewnętrzny
              "/dev/disk6s1 on /Volumes/Moje Zdjęcia (exfat, local, nodev, nosuid, noowners)\n"
+             "/dev/disk7s1 on /Volumes/Projekty (apfs, local, nodev, nosuid, journaled)\n"   # właściciele włączeni
+             "/dev/disk8s2 on /Volumes/Stary (hfs, local, journaled)\n"
+             "/dev/disk9s1 on /Volumes/KARTA (msdos, local, nodev, nosuid)\n"
              "//ola@nas/wspolne on /Volumes/wspolne (smbfs, nodev, nosuid, mounted by ola)\n")
-    assert instalator.punkty_macos(mount) == ["/Volumes/Dane", "/Volumes/Moje Zdjęcia"]
+    assert instalator.punkty_macos(mount) == ["/Volumes/Projekty", "/Volumes/Stary"]
+    w = {x.punkt: x for x in instalator.woluminy_macos(mount)}
+    assert w["/Volumes/Dane"].typ == "apfs" and "noowners" in w["/Volumes/Dane"].opcje
+    assert "/System/Volumes/Data/home" not in w                             # urządzenie ze spacją (autofs)
+
+
+def test_bez_ochrony_i_polecany_na_trzech_systemach():
+    W = instalator.Wolumin
+    # Windows: NTFS i ReFS na dysku stałym; FAT32 i exFAT bez ACL (także dysk USB, który zgłasza się jako stały)
+    assert instalator.bez_ochrony(W("C:\\", "C:\\", "NTFS", frozenset({"staly", "acl"})), "windows") is None
+    for typ in ("NTFS", "ReFS"):
+        assert instalator.polecany(W("D:\\", "D:\\", typ, frozenset({"staly", "acl"})), "windows")
+    for typ in ("exFAT", "FAT32"):
+        usb = W("F:\\", "F:\\", typ, frozenset({"staly"}))
+        assert "nie przechowuje uprawnień (ACL)" in instalator.bez_ochrony(usb, "windows")
+        assert not instalator.polecany(usb, "windows")
+    for opcje in ({"sieciowy", "acl"}, {"wymienny", "acl"}):               # NTFS na serwerze albo na pendrivie
+        w = W("Z:\\", "Z:\\", "NTFS", frozenset(opcje))
+        assert instalator.bez_ochrony(w, "windows") is None and not instalator.polecany(w, "windows")
+    # macOS: wolumin danych z katalogiem domowym (nobrowse) tylko jako katalog domowy; noowners, exfat i msdos nigdy
+    dane = W("/dev/disk3s5", "/System/Volumes/Data", "apfs", frozenset({"local", "journaled", "nobrowse"}))
+    assert instalator.bez_ochrony(dane, "macos") is None and not instalator.polecany(dane, "macos")
+    assert instalator.polecany(dane, "macos", systemowy=True)
+    zewn = W("/dev/disk5s1", "/Volumes/Dane", "apfs", frozenset({"local", "nodev", "journaled", "noowners"}))
+    assert "noowners" in instalator.bez_ochrony(zewn, "macos") and not instalator.polecany(zewn, "macos")
+    for typ in ("exfat", "msdos"):
+        assert "nie przechowuje uprawnień właściciela" in instalator.bez_ochrony(W("/dev/disk6s1", "/Volumes/X", typ),
+                                                                                "macos")
+    smb = W("//ola@nas/x", "/Volumes/x", "smbfs", frozenset({"nodev"}))
+    assert instalator.bez_ochrony(smb, "macos") is None and not instalator.polecany(smb, "macos")
+    # Linux: ext4 i inne z LOKALNE_FS na /dev/…; FAT, exFAT i NTFS bez uprawnień; sieciowe i w pamięci nie do polecenia
+    assert instalator.polecany(W("/dev/sda1", "/mnt/d", "ext4", frozenset({"rw"})), "linux")
+    for typ in ("vfat", "exfat", "ntfs3", "ntfs", "fuseblk", "msdos"):
+        w = W("/dev/sdb1", "/media/x", typ, frozenset({"rw"}))
+        assert "nie przechowuje uprawnień właściciela" in instalator.bez_ochrony(w, "linux") and \
+            not instalator.polecany(w, "linux")
+    for w in (W("srv:/e", "/mnt/nfs", "nfs4", frozenset({"rw"})), W("tmpfs", "/tmp", "tmpfs", frozenset({"rw"})),
+              W("/dev/sdc1", "/mnt/ro", "xfs", frozenset({"ro"}))):
+        assert instalator.bez_ochrony(w, "linux") is None and not instalator.polecany(w, "linux")
 
 
 @pytest.mark.windows_only
-def test_dyski_lokalne_windows_to_dyski_stale():
+def test_dyski_lokalne_windows_to_dyski_stale_z_ntfs(tmp_path):
     dyski = instalator.dyski_lokalne()
     systemowy = os.environ.get("SystemDrive", "C:").upper()
     assert all(re.fullmatch(r"[A-Z]:\\", str(d)) for d in dyski) and Path(systemowy + "\\") in dyski
+    for d in dyski:
+        w = instalator.wolumin_windows(d)
+        assert w.typ.lower() in instalator.WINDOWS_FS and {"staly", "acl"} <= w.opcje, w
+    w = instalator.wolumin(tmp_path / "nie-ma" / "jarvo")              # korzeń, którego jeszcze nie ma
+    assert w is not None and instalator.bez_ochrony(w) is None and instalator.polecany(w)
+    brak = next((f"{c}:\\" for c in "QRSTUVWXYZ" if not os.path.exists(f"{c}:\\")), None)
+    assert brak is None or instalator.wolumin(Path(brak) / "jarvo") is None   # dysku nie ma: nie wiadomo
     assert instalator.punkt_dysku(Path(systemowy + "\\") / "nie-ma" / "jarvo") == systemowy + "\\"
 
 
 @pytest.mark.posix_only
-def test_dyski_lokalne_posix_z_katalogiem_domowym():
+def test_dyski_lokalne_posix_z_katalogiem_domowym(tmp_path):
+    woluminy = instalator._woluminy()
     dyski = instalator.dyski_lokalne()
-    assert dyski and dyski[0] == Path.home()
-    assert all(not any(z.isspace() for z in str(d)) for d in dyski[1:])
+    dom = instalator.wolumin_posix(Path.home(), woluminy)
+    # katalog domowy, gdy jego wolumin jest lokalny i z ochroną dostępu (w kontenerze z overlay: nie wiadomo, więc nie)
+    assert (Path.home() in dyski) == (dom is not None and instalator.polecany(dom, systemowy=True))
+    if sys.platform == "darwin":
+        assert dyski and dyski[0] == Path.home()                         # APFS bez noowners (/System/Volumes/Data)
+    punkty = {w.punkt: w for w in woluminy}                               # ostatnie montowanie w punkcie
+    for d in dyski:
+        if d != Path.home():
+            assert instalator.polecany(punkty[str(d)]) and not any(z.isspace() for z in str(d))
+    assert len(set(dyski)) == len(dyski)
+    w = instalator.wolumin(tmp_path)
+    assert w is None or instalator.bez_ochrony(w) is None                  # testy nie biegną na FAT ani noowners
     assert instalator.punkt_dysku("/nie-ma/jarvo") == "/"
+
+
+@pytest.mark.linux_only
+def test_woluminy_z_prawdziwego_proc_self_mounts():
+    woluminy = instalator._woluminy()
+    korzen = next(w for w in woluminy if w.punkt == "/")                      # każdy Linux ma wpis dla „/”
+    w = instalator.wolumin("/")
+    if korzen.urzadzenie.startswith("/dev/"):                                  # dysk; w kontenerze overlay: None
+        assert w is not None and os.stat(w.punkt).st_dev == os.stat("/").st_dev
+    else:
+        assert w is None or os.stat(w.punkt).st_dev == os.stat("/").st_dev
+    assert all(isinstance(x.opcje, frozenset) and x.typ for x in woluminy)
+
+
+def test_dysk_bez_ochrony_odmowa_przed_zapisem_a_dzialajaca_instalacja_z_uwaga(tmp_path, stanowisko):
+    s, u = stanowisko, stanowisko["u"]
+    app = tc._aplikacja(tmp_path, s["adres"], s["www"])
+    exfat = (instalator.Wolumin("E:\\", "E:\\", "exFAT", frozenset({"staly"})) if WINDOWS else
+             instalator.Wolumin("/dev/sdb1", "/media/ola/USB", "exfat", frozenset({"rw"})))
+    log: list[str] = []
+    ot = s["otoczenie"](wolumin=lambda p: exfat, **_dyski_atrapa(tmp_path, {"korzen": 500 * GB, "duzy": 400 * GB}))
+    assert instalator.instaluj(u, app, log=log.append, otoczenie=ot) == 1
+    tekst = "\n".join(log)
+    assert re.search(r"BŁĄD w kroku „Sprawdzenie komputera”: korzeń .+ leży na dysku .+ \(exFAT\), a tam system "
+                     r"plików exFAT nie przechowuje uprawnień", tekst, re.I), tekst
+    assert "Niczego nie zainstalowałem." in tekst and "Instalację można uruchomić ponownie" not in tekst
+    assert f"Wystarczy miejsca na: {tmp_path / 'duzy'} (400,0 GB wolnego)." in tekst
+    assert instalator.polecenie_instalacji(str(tmp_path / "duzy" / ("Jarvo" if WINDOWS else "jarvo"))) in tekst
+    assert not u.root.exists() and s["hermes"].wywolania == [] and not s["w_tle"]
+    # działająca instalacja na takim woluminie (sprzed tej kontroli): aktualizacja idzie dalej, z uwagą
+    assert tc._instaluj(s, app) == 0, "\n".join(s["log"])
+    log.clear()
+    assert instalator.instaluj(u, app, log=log.append, otoczenie=ot) == 0, "\n".join(log)
+    assert any(x.startswith("Uwaga: korzeń") and "ochrona dostępu do plików Jarva nie działa" in x for x in log), log
+    # wolumin nieznany (np. katalog domowy na NFS): instalator nie odmawia
+    assert instalator.instaluj(u, app, log=log.append, otoczenie=s["otoczenie"](wolumin=lambda p: None)) == 0
+
+
+def test_komunikat_dysku_bez_ochrony_macos_noowners_i_bez_innego_dysku(tmp_path):
+    u = uklad(tmp_path / "j")
+    w = instalator.Wolumin("/dev/disk5s1", "/Volumes/Dane", "apfs", frozenset({"local", "journaled", "noowners"}))
+    ot = instalator.Otoczenie(**_dyski_atrapa(tmp_path, {"korzen": 500 * GB, "maly": GB}))
+    tekst = instalator.komunikat_dysku_bez_ochrony(u, _app_miejsca(tmp_path), "macos-arm64", w,
+                                                   instalator.bez_ochrony(w, "macos"), ot)
+    assert "opcja noowners" in tekst and "sudo diskutil enableOwnership /Volumes/Dane" in tekst
+    assert "Nie znalazłem innego dysku lokalnego z ok." in tekst and "na którym Jarvo zachowa ochronę dostępu" in tekst
+    assert "JARVO_ROOT" in tekst and "co najmniej" not in tekst                # zwalnianie miejsca tu nie pomoże
 
 
 def test_gb_po_polsku_i_opis_zajetego():
@@ -996,6 +1119,59 @@ def test_zajete_miejsce_czesci_bez_wchodzenia_w_dowiazania(tmp_path):
     assert instalator.rozmiar_katalogu(u.cache, wlasne=True) == 2000
 
 
+@contextlib.contextmanager
+def _zamki_drugiego_procesu(*sciezki: Path):
+    """Zamki instalatorów (przenosne.Zamek) trzymane przez drugi proces, jak przez drugi instalator, aż do końca
+    bloku."""
+    kod = ("import sys; sys.path.insert(0, sys.argv[1]); from jarvo.przenosne import Zamek\n"
+           "zamki = [Zamek(p) for p in sys.argv[2:]]   # odwołania zostają: zamknięty plik zwolniłby zamek\n"
+           "for z in zamki:\n    z.__enter__()\nprint('trzymam', flush=True)\nsys.stdin.read()\n")
+    proc = subprocess.Popen([sys.executable, "-I", "-c", kod, str(REPO), *map(str, sciezki)], stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE, text=True)
+    try:
+        assert proc.stdout.readline().strip() == "trzymam"
+        yield
+    finally:
+        proc.stdin.close()
+        proc.wait(timeout=30)
+
+
+def test_sprzatnij_pobrane_zostawia_swieze_pliki_innych_procesow(tmp_path):
+    u = uklad(tmp_path / "j")
+    pobrane = u.cache / "pobrane"
+    pobrane.mkdir()
+    teraz = time.time()
+    stare = teraz - instalator.SWIEZE_S - 60
+    pliki = {"a" * 16 + "-uv.zip": teraz,                    # archiwum tego przebiegu: od razu, choć świeże
+             "a" * 16 + "-uv.zip.czesc": teraz,              # świeże .czesc zostaje zawsze (pobieranie w toku)
+             "b" * 16 + "-chrome-win64.zip": teraz,          # świeże archiwum innego procesu: zaraz je rozpakuje
+             "b" * 16 + "-chrome-win64.zip.czesc": teraz,
+             "c" * 16 + "-stara-wersja.zip": stare,          # archiwum starej wersji
+             "d" * 16 + "-przerwane.tar.gz.czesc": stare,    # resztka przerwanego pobrania
+             "jarvo-" + "e" * 40 + ".tar.gz": stare}         # kod Jarva z przerwanej aktualizacji
+    for nazwa, t in pliki.items():
+        (pobrane / nazwa).write_bytes(b"x")
+        os.utime(pobrane / nazwa, (t, t))
+    (pobrane / "katalog").mkdir()
+    os.utime(pobrane / "katalog", (stare, stare))
+    logi: list[str] = []
+    # drugi proces właśnie instaluje narzędzie przy pierwszym użyciu: nic nie znika, bez czekania na zamek
+    with _zamki_drugiego_procesu(u.stan / przy_uzyciu.ZAMEK):
+        assert instalator.sprzatnij_pobrane(u, {"a" * 16}, logi.append, teraz=teraz) is False
+    assert len(list(pobrane.iterdir())) == len(pliki) + 1
+    assert logi == ["archiwa w <cache>/pobrane zostają do następnej instalacji: trwa instalacja narzędzia przy "
+                    "pierwszym użyciu"]
+    logi.clear()
+    assert instalator.sprzatnij_pobrane(u, {"a" * 16}, logi.append, teraz=teraz) is True
+    assert sorted(p.name for p in pobrane.iterdir()) == ["a" * 16 + "-uv.zip.czesc", "b" * 16 + "-chrome-win64.zip",
+                                                         "b" * 16 + "-chrome-win64.zip.czesc"]
+    assert logi == [f"w {pobrane} zostają świeże pliki, które pobiera albo rozpakowuje inny proces (3): usunie je "
+                    "następne sprzątanie"]
+    # po SWIEZE_S następne sprzątanie usuwa resztę
+    assert instalator.sprzatnij_pobrane(u, set(), logi.append, teraz=teraz + instalator.SWIEZE_S + 1) is True
+    assert list(pobrane.iterdir()) == []
+
+
 class AtrapaCacheUv:
     """venvy.sprzatnij_cache bez prawdziwego uv: czyści <cache>/uv jak `uv cache clean`."""
 
@@ -1014,18 +1190,21 @@ def test_sprzatanie_po_udanej_instalacji_i_drugi_przebieg_bez_sieci(tmp_path, st
     cache_uv = AtrapaCacheUv()
     s["moduly"].update({"venvy": cache_uv, "tesseract": tesseract})       # prawdziwe sprzątanie cache pixi
     app = tc._aplikacja(tmp_path, s["adres"], s["www"])
-    # z poprzedniej próby: koła w cache uv i paczki w cache pixi (znikają), źródła skilli i cache npm (zostają)
-    # i resztka starej wersji uv, której pobieracz nie usunął (zajęty plik)
+    # z poprzedniej próby: koła w cache uv i paczki w cache pixi (znikają), źródła skilli i cache npm (zostają),
+    # resztka starej wersji uv, której pobieracz nie usunął (zajęty plik), i świeże pobieranie innego procesu
+    # (przeglądarka komputera Jarva przy starcie usługi: zostaje do następnego sprzątania)
+    obce = "f" * 16 + "-chrome-win64.zip.czesc"
     pliki = {"cache/uv/archive-v0/a/kolo.bin": 2 * MB, "cache/pixi/pkgs/tesseract/eng.traineddata": 2 * MB,
              "cache/build/skille@0123456789ab/SKILL.md": 10, "cache/npm/_cacache/index": 10,
-             "program/narzedzia/uv/0.12.12.stary-1/uv.exe": 10}
+             "program/narzedzia/uv/0.12.12.stary-1/uv.exe": 10, f"cache/pobrane/{obce}": 10}
     for rel, n in pliki.items():
         (u.root / rel).parent.mkdir(parents=True, exist_ok=True)
         (u.root / rel).write_bytes(b"x" * n)
     os.chmod(u.root / "cache/pixi/pkgs/tesseract/eng.traineddata", stat.S_IREAD)
     assert tc._instaluj(s, app) == 0, "\n".join(s["log"])
     log = "\n".join(s["log"])
-    assert list((u.cache / "pobrane").iterdir()) == []                      # archiwa uv i obu Pythonów
+    assert [p.name for p in (u.cache / "pobrane").iterdir()] == [obce]      # archiwa uv i obu Pythonów znikają
+    assert f"w {u.cache / 'pobrane'} zostają świeże pliki, które pobiera albo rozpakowuje inny proces (1)" in log
     assert not list((u.cache / "uv").rglob("*.bin")) and not (u.cache / "pixi").exists()
     assert not (u.program / "narzedzia" / "uv" / "0.12.12.stary-1").exists()
     assert (u.root / "cache/build/skille@0123456789ab/SKILL.md").is_file()
@@ -1071,6 +1250,40 @@ def test_front_bez_node_modules_po_budowie_a_zrodla_web_zostaja(atrapa, tmp_path
     assert not [x for x in logi if "usunięte" in x]
 
 
+def test_front_przy_drugim_instalatorze_bez_czekania_i_z_latkami_jarva(atrapa, tmp_path, monkeypatch):
+    u = th._uklad(tmp_path)
+    checkout = atrapa.instaluj(u)
+    dist = hermes.web_dist(u, checkout, npm=atrapa.npm, log=lambda _t: None, jarva=False)
+    # resztki node_modules przy gotowym froncie, a hermes.lock trzyma drugi instalator: zostają, bez czekania
+    (checkout / "node_modules" / "react").mkdir(parents=True)
+    logi: list[str] = []
+    with _zamki_drugiego_procesu(u.stan / "hermes.lock"):
+        assert hermes.web_dist(u, checkout, npm=tmp_path / "nie-ma-npm", log=logi.append, jarva=False) == dist
+    assert (checkout / "node_modules" / "react").is_dir()
+    assert "Hermes: node_modules zostają do następnego przebiegu (drugi instalator właśnie używa checkoutu)" in logi
+    # front zbudował drugi instalator, gdy ten czekał na zamek: wynik to i tak kopia z łatkami Jarva, nie goły dist
+    latane = tmp_path / "web-dist-z-latkami"
+    monkeypatch.setattr(hermes, "dist_jarva", lambda u_, d, log=print, **kw: latane if d == dist else None)
+    sprawdzil = threading.Event()
+    prawdziwy = hermes._program
+
+    def program(sciezka, nazwa):                     # web_dist sprawdził znacznik i szuka npm, zaraz weźmie zamek
+        sprawdzil.set()
+        return prawdziwy(sciezka, nazwa)
+    monkeypatch.setattr(hermes, "_program", program)
+    (checkout / hermes.ZNACZNIK_WEB).unlink()
+    atrapa.wyczysc()
+    wynik: list = []
+    with _zamki_drugiego_procesu(u.stan / "hermes.lock"):
+        watek = threading.Thread(target=lambda: wynik.append(hermes.web_dist(u, checkout, npm=atrapa.npm,
+                                                                             log=lambda _t: None)))
+        watek.start()
+        assert sprawdzil.wait(30)
+        (checkout / hermes.ZNACZNIK_WEB).write_text(json.dumps({"commit": th.COMMIT}), encoding="utf-8")
+    watek.join(60)
+    assert wynik == [latane] and atrapa.wpisy("npm") == []
+
+
 def test_venvy_miejsce_z_manifestu():
     wpis = {"pobranie_mb": {"windows-x64": 100, "linux-x64": 150}, "venv_mb": 400}
     assert venvy.miejsce(wpis, "windows-x64") == (400 * MB, pytest.approx(400 * venvy.WSP_CACHE * MB, abs=10))
@@ -1108,6 +1321,18 @@ def test_venvy_sprzatnij_cache_to_uv_cache_clean(tmp_path, monkeypatch):
     (u.cache / "uv" / "archive-v0").mkdir(parents=True)
     (u.cache / "uv" / "archive-v0" / "a.bin").write_bytes(b"x" * 100)
     logi: list[str] = []
+    # drugi instalator buduje venv albo instaluje Hermesa (trzeci krok uv sync --offline bierze koła z cache): uv nie
+    # rusza, cache zostaje, bez czekania; zamki to te same pliki, które biorą venvy.zainstaluj i hermes.zainstaluj
+    assert venvy.ZAMKI_CACHE == (venvy.ZAMEK, "hermes.lock")
+    assert "u.stan / ZAMEK" in inspect.getsource(venvy.zainstaluj)
+    assert 'u.stan / "hermes.lock"' in inspect.getsource(hermes.zainstaluj)
+    for zamek in venvy.ZAMKI_CACHE:
+        with _zamki_drugiego_procesu(u.stan / zamek):
+            assert venvy.sprzatnij_cache(u, uv, log=logi.append) is False
+        assert logi[-1] == ("cache uv zostaje do następnej instalacji (drugi instalator właśnie buduje venv albo "
+                            "instaluje Hermesa)")
+        assert not dziennik.exists() and (u.cache / "uv" / "archive-v0" / "a.bin").is_file()
+    logi.clear()
     assert venvy.sprzatnij_cache(u, uv, log=logi.append) is True
     w = json.loads(dziennik.read_text(encoding="utf-8").splitlines()[-1])
     assert w["argv"] == ["cache", "clean", "--no-config"] and w["python"] is None
@@ -1139,6 +1364,13 @@ def test_tesseract_sprzatnij_cache_pixi(tmp_path):
     plik.write_bytes(b"x")
     os.chmod(plik, stat.S_IREAD)                                               # tylko do odczytu, jak w paczkach
     logi: list[str] = []
+    # drugi instalator właśnie robi `pixi install` (ten sam zamek co tesseract.zainstaluj): cache zostaje, bez czekania
+    assert "u.stan / ZAMEK" in inspect.getsource(tesseract.zainstaluj)
+    with _zamki_drugiego_procesu(u.stan / tesseract.ZAMEK):
+        assert tesseract.sprzatnij_cache(u, log=logi.append) is False
+    assert plik.is_file() and logi == ["Tesseract: cache paczek pixi zostaje do następnej instalacji (drugi instalator "
+                                       "właśnie instaluje Tesseracta)"]
+    logi.clear()
     assert tesseract.sprzatnij_cache(u, log=logi.append) is True and not (u.cache / "pixi").exists()
     assert logi == ["Tesseract: cache paczek pixi usunięty (środowisko zostaje, znacznik pomija pixi w kolejnym "
                     "przebiegu)"]

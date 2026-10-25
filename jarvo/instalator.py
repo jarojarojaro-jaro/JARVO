@@ -7,11 +7,14 @@ JARVO_TOKEN: klucz był potrzebny tylko do pobrania kodu). Po jednym poleceniu J
 z paskiem i nazwą kroku:
 
    1. sprawdzenie: platforma (bez Maca z Intelem, I06), stara instalacja z WSL/Dockerem w tym miejscu, korzeń jako
-      osobny katalog (same katalogi Jarva: ochrona dostępu obejmuje całe drzewo), porty panelu i API, miejsce na
-      dysku: potrzeba liczona z manifestu (potrzebne_miejsce: rozmiary plików narzędzi, pobranie_mb i venv_mb venvów,
-      rozmiary paczek z pixi.lock, modele, Hermes z frontem i flota; tylko części, których jeszcze nie ma) wobec
-      wolnego miejsca na każdym dysku instalacji; za mało = koniec przed zapisaniem czegokolwiek, z listą innych
-      dysków lokalnych z miejscem i gotowym poleceniem z JARVO_ROOT (Z31),
+      osobny katalog (same katalogi Jarva: ochrona dostępu obejmuje całe drzewo), porty panelu i API, system plików
+      korzenia (bez_ochrony: FAT, exFAT, NTFS na Linuksie i wolumin macOS z noowners nie trzymają uprawnień
+      właściciela), miejsce na dysku: potrzeba liczona z manifestu (potrzebne_miejsce: rozmiary plików narzędzi,
+      pobranie_mb i venv_mb venvów, rozmiary paczek z pixi.lock, modele, Hermes z frontem i flota; tylko części,
+      których jeszcze nie ma) wobec wolnego miejsca na każdym dysku instalacji; zły system plików albo za mało miejsca
+      = koniec przed zapisaniem czegokolwiek, z listą innych dysków lokalnych z ochroną dostępu i miejscem (polecany:
+      Windows NTFS albo ReFS na dysku stałym, macOS APFS bez noowners, Linux ext4, xfs, btrfs…) i gotowym poleceniem
+      z JARVO_ROOT (Z31),
    2. katalogi z c1; cały korzeń tylko dla właściciela (przenosne.chron z dziedziczeniem w dół: korzeń na innym
       dysku dziedziczyłby zapis dla Użytkowników uwierzytelnionych, a autostart uruchamia kod z `<program>` jako
       właściciel), `<dane>` i `<stan>` jeszcze osobno,
@@ -58,6 +61,9 @@ z paskiem i nazwą kroku:
 
 Po udanym przebiegu sprzątanie (c3 pkt 11, Z31): pobrane archiwa (`<cache>/pobrane`), cache uv (`uv cache clean`),
 cache pixi i resztki starych wersji narzędzi; node_modules frontu Hermesa znika już zaraz po budowie (hermes.web_dist).
+Cache sprzątamy pod zamkami, które biorą instalatory (przy pierwszym użyciu, venvy, hermes, tesseract), bez czekania:
+drugi instalator, który właśnie z nich korzysta, zostawia je do następnego sprzątania; świeży plik innego procesu
+w `<cache>/pobrane` (np. pobieranie przeglądarki komputera Jarva przy starcie usługi) też zostaje.
 Gotowe części mają znaczniki (suma narzędzia, venvu, modelu, Tesseracta, Hermesa, frontu), więc kolejny przebieg ich
 nie pobiera ani nie buduje i działa bez sieci. Kompromis: część uszkodzona albo usunięta ręcznie (np. venv bez
 znacznika, narzędzie bez katalogu) potrzebuje wtedy sieci, bo jej kół, paczek ani archiwów nie ma już w cache, a nowy
@@ -264,13 +270,33 @@ def uruchom_w_tle(argv: list[str], env: dict, log: Path) -> int:
             return subprocess.Popen(argv, creationflags=flagi, **kw).pid
 
 
-# ---------------------------------------------------------------- dyski: wolne miejsce, ten sam dysk, dyski lokalne
+# ---------------------------------------------------------------- dyski: wolne miejsce, system plików, dyski lokalne
 
-# systemy plików dysków lokalnych w /proc/self/mounts (Linux) i w `mount` (macOS); sieciowe (nfs, cifs, smbfs),
-# obrazy (squashfs snapów, iso9660) i systemy w pamięci (tmpfs, overlay) odpadają
-LOKALNE_FS = frozenset({"ext2", "ext3", "ext4", "xfs", "btrfs", "f2fs", "jfs", "reiserfs", "bcachefs", "zfs", "ntfs",
-                        "ntfs3", "exfat", "vfat", "fuseblk", "apfs", "hfs"})
+# Linux: systemy plików dysków lokalnych z /proc/self/mounts, które instalator poleca na korzeń (polecany): trzymają
+# uprawnienia właściciela, dowiązania (archiwa Node, workspace'y npm) i blokady plików; sieciowe (nfs, cifs), obrazy
+# (squashfs snapów, iso9660), systemy w pamięci (tmpfs, overlay) i BEZ_UPRAWNIEN odpadają
+LOKALNE_FS = frozenset({"ext2", "ext3", "ext4", "xfs", "btrfs", "f2fs", "jfs", "reiserfs", "bcachefs", "zfs"})
+MACOS_FS = frozenset({"apfs", "hfs"})              # macOS (`mount`): tylko z opcją local i bez noowners
+WINDOWS_FS = frozenset({"ntfs", "refs"})           # Windows (GetVolumeInformationW): tylko na dysku stałym
+# bez uprawnień właściciela: chmod 0700 z przenosne.chron nic nie zmienia albo kończy się EPERM (Linux: FAT, exFAT,
+# NTFS przez ntfs3 i ntfs-3g, który montuje się jako fuseblk, tak jak exfat-fuse; macOS: msdos, exfat i ntfs tylko do
+# odczytu), więc korzeń nie byłby tylko dla właściciela (c1): instalator go tam nie zakłada (DyskBezOchrony, krok 1)
+BEZ_UPRAWNIEN = frozenset({"vfat", "msdos", "exfat", "ntfs", "ntfs3", "fuseblk"})
+FILE_PERSISTENT_ACLS = 0x8         # flaga GetVolumeInformationW: wolumin trzyma ACL (NTFS, ReFS; FAT32 i exFAT nie)
+_TYPY_NAPEDU = {2: "wymienny", 3: "staly", 4: "sieciowy", 5: "cd", 6: "ramdysk"}       # GetDriveTypeW
+SYSTEM = "windows" if WINDOWS else "macos" if MACOS else "linux"
 _MOUNT_MACOS = re.compile(r"^(?P<urzadzenie>\S+) on (?P<punkt>.+) \((?P<opcje>[^)]*)\)\s*$")
+
+
+@dataclass(frozen=True)
+class Wolumin:
+    """System plików, na którym leży ścieżka: urządzenie, punkt montowania, typ (ext4, apfs, NTFS…) i opcje montowania
+    z /proc/self/mounts albo z `mount` na macOS; na Windows opcje to rodzaj dysku z GetDriveTypeW („staly”,
+    „wymienny”, „sieciowy”…) i „acl”, gdy wolumin trzyma uprawnienia (FILE_PERSISTENT_ACLS)."""
+    urzadzenie: str
+    punkt: str
+    typ: str
+    opcje: frozenset = frozenset()
 
 
 def istniejacy(sciezka: Path | str) -> Path:
@@ -312,63 +338,177 @@ def _bez_ucieczek(tekst: str) -> str:
     return re.sub(r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)), tekst)
 
 
-def punkty_linux(tekst: str) -> list[str]:
-    """Punkty montowania dysków lokalnych z zapisem z treści /proc/self/mounts (urządzenie /dev/…, system plików
-    z LOKALNE_FS, bez `ro`)."""
+def woluminy_linux(tekst: str) -> list[Wolumin]:
+    """Wpisy treści /proc/self/mounts (punkt montowania bez ucieczek \\040)."""
     wynik = []
     for linia in tekst.splitlines():
         cz = linia.split()
-        if len(cz) < 4:
-            continue
-        urzadzenie, punkt, typ, opcje = cz[0], _bez_ucieczek(cz[1]), cz[2], cz[3].split(",")
-        if typ in LOKALNE_FS and "ro" not in opcje and (urzadzenie.startswith("/dev/") or typ == "zfs"):
-            wynik.append(punkt)
+        if len(cz) >= 4:
+            wynik.append(Wolumin(cz[0], _bez_ucieczek(cz[1]), cz[2], frozenset(cz[3].split(","))))
     return wynik
 
 
-def punkty_macos(tekst: str) -> list[str]:
-    """Punkty montowania dysków lokalnych z zapisem z wyjścia `mount` na macOS: `local`, bez `read-only` i bez
-    `nobrowse` (woluminy systemu; katalog domowy liczy dyski_lokalne osobno)."""
+def woluminy_macos(tekst: str) -> list[Wolumin]:
+    """Wpisy wyjścia `mount` na macOS: typ to pierwsza pozycja w nawiasie, reszta to opcje."""
     wynik = []
     for linia in tekst.splitlines():
         m = _MOUNT_MACOS.match(linia.strip())
-        if not m:
-            continue
-        opcje = {o.strip() for o in m["opcje"].split(",")}
-        if m["urzadzenie"].startswith("/dev/") and "local" in opcje and not opcje & {"read-only", "nobrowse"}:
-            wynik.append(m["punkt"])
+        if m:
+            opcje = [o.strip() for o in m["opcje"].split(",")]
+            wynik.append(Wolumin(m["urzadzenie"], m["punkt"], opcje[0], frozenset(opcje[1:])))
     return wynik
 
 
-def _dyski_windows() -> list[Path]:
-    """Dyski stałe Windows (GetDriveTypeW = DRIVE_FIXED): bez wymiennych, sieciowych, CD i RAM-dysków."""
+def bez_ochrony(w: Wolumin, system: str = SYSTEM) -> str | None:
+    """Czemu na woluminie `w` korzeń Jarva nie byłby tylko dla właściciela (c1), albo None: Windows bez ACL (FAT32,
+    exFAT: icacls w kroku „Katalogi” zawiedzie), macOS z opcją noowners (domyślna dla dysków zewnętrznych: każde konto
+    jest tam właścicielem każdego pliku, więc chmod 0700 nikogo nie zatrzyma), system plików z BEZ_UPRAWNIEN."""
+    if system == "windows":
+        return None if "acl" in w.opcje else f"system plików {w.typ or '?'} nie przechowuje uprawnień (ACL)"
+    if system == "macos" and "noowners" in w.opcje:
+        return ("wolumin ignoruje właścicieli plików (opcja noowners, domyślna dla dysków zewnętrznych): każde konto "
+                "na tym Macu jest tam właścicielem każdego pliku")
+    if w.typ.lower() in BEZ_UPRAWNIEN:
+        return f"system plików {w.typ} nie przechowuje uprawnień właściciela plików"
+    return None
+
+
+def polecany(w: Wolumin, system: str = SYSTEM, *, systemowy: bool = False) -> bool:
+    """Czy instalator może polecić wolumin `w` na korzeń (inne_dyski): dysk lokalny z zapisem i ochroną dostępu
+    (bez_ochrony). Windows: dysk stały z NTFS albo ReFS; macOS: apfs albo hfs z opcją local na urządzeniu /dev/…, bez
+    read-only i bez nobrowse (woluminy systemu; `systemowy=True` dla woluminu katalogu domowego, który ma nobrowse);
+    Linux: system plików z LOKALNE_FS na urządzeniu /dev/… (zfs: zbiór danych), bez ro. Sieciowe, wymienne, obrazy
+    i systemy w pamięci odpadają."""
+    if bez_ochrony(w, system):
+        return False
+    typ = w.typ.lower()
+    if system == "windows":
+        return typ in WINDOWS_FS and "staly" in w.opcje
+    if system == "macos":
+        return (typ in MACOS_FS and w.urzadzenie.startswith("/dev/") and "local" in w.opcje
+                and "read-only" not in w.opcje and (systemowy or "nobrowse" not in w.opcje))
+    return typ in LOKALNE_FS and "ro" not in w.opcje and (w.urzadzenie.startswith("/dev/") or typ == "zfs")
+
+
+def punkty_linux(tekst: str) -> list[str]:
+    """Punkty montowania z treści /proc/self/mounts, które instalator może polecić (polecany)."""
+    return [w.punkt for w in woluminy_linux(tekst) if polecany(w, "linux")]
+
+
+def punkty_macos(tekst: str) -> list[str]:
+    """Punkty montowania z wyjścia `mount` na macOS, które instalator może polecić (polecany; katalog domowy liczy
+    dyski_lokalne osobno)."""
+    return [w.punkt for w in woluminy_macos(tekst) if polecany(w, "macos")]
+
+
+def _woluminy() -> list[Wolumin]:
+    """Woluminy macOS (`mount` z /sbin) albo Linuksa (/proc/self/mounts); OSError, gdy system nie odpowie."""
+    if MACOS:
+        mount = systemowy("mount")
+        return woluminy_macos(_uruchom([mount]).stdout) if mount else []
+    return woluminy_linux(Path("/proc/self/mounts").read_text(encoding="utf-8", errors="replace"))
+
+
+def wolumin_posix(sciezka: Path | str, woluminy: list[Wolumin]) -> Wolumin | None:
+    """Wolumin lokalny (urządzenie /dev/… albo zbiór zfs) z `woluminy`, na którym leży `sciezka`: ten sam st_dev co
+    jego punkt montowania (na macOS katalog domowy leży na /System/Volumes/Data przez firmlink, więc sam przedrostek
+    ścieżki nie wystarcza). Punktów sieciowych i automatycznych nie dotykamy (stat na martwym NFS potrafi wisieć),
+    więc dla nich None = nie wiadomo."""
+    try:
+        numer = os.stat(istniejacy(sciezka)).st_dev
+    except OSError:
+        return None
+    for w in woluminy:
+        if not (w.urzadzenie.startswith("/dev/") or w.typ == "zfs"):
+            continue
+        try:
+            if os.stat(w.punkt).st_dev == numer:
+                return w
+        except OSError:
+            continue
+    return None
+
+
+def _kernel32() -> Any:
+    """Własna kopia kernel32 (argtypes nie zmienia innym modułom) z typami funkcji woluminów."""
     import ctypes
-    k32 = ctypes.WinDLL("kernel32", use_last_error=True)       # własna kopia: argtypes nie zmienia innym modułom
-    k32.GetLogicalDrives.restype = ctypes.c_uint32
-    k32.GetDriveTypeW.argtypes = [ctypes.c_wchar_p]
-    k32.GetDriveTypeW.restype = ctypes.c_uint
+    from ctypes import wintypes
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.GetLogicalDrives.restype = wintypes.DWORD
+    k32.GetDriveTypeW.argtypes = [wintypes.LPCWSTR]
+    k32.GetDriveTypeW.restype = wintypes.UINT
+    k32.GetVolumePathNameW.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD]
+    k32.GetVolumePathNameW.restype = wintypes.BOOL
+    k32.GetVolumeInformationW.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD,
+                                          ctypes.POINTER(wintypes.DWORD), ctypes.POINTER(wintypes.DWORD),
+                                          ctypes.POINTER(wintypes.DWORD), wintypes.LPWSTR, wintypes.DWORD]
+    k32.GetVolumeInformationW.restype = wintypes.BOOL
+    return k32
+
+
+def wolumin_windows(sciezka: Path | str, k32: Any = None) -> Wolumin | None:
+    """Wolumin Windows ścieżki: GetVolumePathNameW (litera dysku albo katalog montowania), GetDriveTypeW
+    i GetVolumeInformationW (system plików i flaga FILE_PERSISTENT_ACLS). None = system nie odpowie (np. pusty czytnik
+    kart, dysk sieciowy bez połączenia)."""
+    import ctypes
+    from ctypes import wintypes
+    k32 = k32 or _kernel32()
+    sciezka = str(sciezka)
+    bufor = ctypes.create_unicode_buffer(max(len(sciezka) + 2, 1024))
+    if not k32.GetVolumePathNameW(sciezka, bufor, len(bufor)):
+        return None
+    punkt = bufor.value
+    typ, flagi = ctypes.create_unicode_buffer(64), wintypes.DWORD()
+    if not k32.GetVolumeInformationW(punkt, None, 0, None, None, ctypes.byref(flagi), typ, len(typ)):
+        return None
+    opcje = {_TYPY_NAPEDU.get(k32.GetDriveTypeW(punkt), "inny")} | ({"acl"} if flagi.value & FILE_PERSISTENT_ACLS
+                                                                    else set())
+    return Wolumin(punkt, punkt, typ.value, frozenset(opcje))
+
+
+def wolumin(sciezka: Path | str) -> Wolumin | None:
+    """Wolumin, na którym leży (albo powstanie) `sciezka` (wolumin_windows, wolumin_posix); None = nie wiadomo, a wtedy
+    instalator nie odmawia (np. katalog domowy na NFS albo kontener z overlay)."""
+    try:
+        if WINDOWS:
+            return wolumin_windows(istniejacy(sciezka))
+        return wolumin_posix(sciezka, _woluminy())
+    except (OSError, subprocess.SubprocessError, AttributeError, ValueError):
+        return None
+
+
+def _dyski_windows() -> list[Path]:
+    """Dyski stałe Windows z NTFS albo ReFS (GetDriveTypeW = DRIVE_FIXED, potem polecany): bez wymiennych, sieciowych,
+    CD, RAM-dysków i bez dysków USB z FAT32 albo exFAT, które zgłaszają się jako stałe."""
+    k32 = _kernel32()
     maska = k32.GetLogicalDrives()
-    return [Path(f"{chr(65 + i)}:\\") for i in range(26)
-            if maska >> i & 1 and k32.GetDriveTypeW(f"{chr(65 + i)}:\\") == 3]
+    wynik = []
+    for i in range(26):
+        litera = f"{chr(65 + i)}:\\"
+        if maska >> i & 1 and k32.GetDriveTypeW(litera) == 3:
+            w = wolumin_windows(litera, k32)
+            if w is not None and polecany(w, "windows"):
+                wynik.append(Path(litera))
+    return wynik
 
 
 def dyski_lokalne() -> list[Path]:
-    """Katalogi na dyskach lokalnych, w których właściciel może założyć korzeń Jarva: Windows dyski stałe, macOS
-    i Linux katalog domowy i punkty montowania dysków lokalnych z zapisem dla właściciela, bez spacji w ścieżce
-    (psuje polecenia skilli, c1). Pusta lista, gdy system nie odpowie."""
+    """Katalogi, w których instalator może polecić korzeń Jarva (polecany: dysk lokalny z ochroną dostępu): Windows
+    dyski stałe z NTFS albo ReFS, macOS i Linux katalog domowy (gdy jego wolumin jest lokalny i z ochroną dostępu)
+    i punkty montowania z zapisem dla właściciela, bez spacji w ścieżce (psuje polecenia skilli, c1). Pusta lista, gdy
+    system nie odpowie."""
     try:
         if WINDOWS:
             return _dyski_windows()
-        if MACOS:
-            mount = systemowy("mount")
-            punkty = punkty_macos(_uruchom([mount]).stdout) if mount else []
-        else:
-            punkty = punkty_linux(Path("/proc/self/mounts").read_text(encoding="utf-8", errors="replace"))
+        woluminy = _woluminy()
     except (OSError, subprocess.SubprocessError, AttributeError, ValueError):
         return []
-    wynik = [Path.home()]
-    for punkt in punkty:
-        if not any(z.isspace() for z in punkt) and os.path.isdir(punkt) and os.access(punkt, os.W_OK | os.X_OK):
+    dom = wolumin_posix(Path.home(), woluminy)
+    wynik = [Path.home()] if dom is not None and polecany(dom, SYSTEM, systemowy=True) else []
+    gorne = {w.punkt: w for w in woluminy}          # ten sam punkt dwa razy: widać ostatnie montowanie (na wierzchu)
+    for punkt, w in gorne.items():
+        if (polecany(w, SYSTEM) and Path(punkt) not in wynik and not any(z.isspace() for z in punkt)
+                and os.path.isdir(punkt) and os.access(punkt, os.W_OK | os.X_OK)):
             wynik.append(Path(punkt))
     return wynik
 
@@ -377,8 +517,8 @@ def dyski_lokalne() -> list[Path]:
 class Otoczenie:
     """Wszystko, czego instalator i polecenia używają poza własnymi plikami: moduły Jarva ładowane przy użyciu,
     zmienne procesu, rejestr Windows (atrapa z interfejsem zmiany_hosta.Rejestr), programy z PATH, procesy w tle,
-    sieć lokalna (zapytanie HTTP, kto słucha na porcie), dyski (wolne miejsce, który dysk, dyski lokalne),
-    przeglądarka i zegar. Testy podstawiają atrapy, więc nie dotykają komputera."""
+    sieć lokalna (zapytanie HTTP, kto słucha na porcie), dyski (wolne miejsce, który dysk, system plików, dyski
+    lokalne), przeglądarka i zegar. Testy podstawiają atrapy, więc nie dotykają komputera."""
     modul: Callable[[str], Any] = modul
     env: dict = field(default_factory=lambda: dict(os.environ))
     rejestr: Any = None                                  # None = winreg (zmiany_hosta.Rejestr)
@@ -388,6 +528,7 @@ class Otoczenie:
     sluchacz: Callable[[int], tuple[int, str] | None] = sluchacz
     wolne_miejsce: Callable[[Path], int] = wolne_miejsce
     dysk: Callable[[Path], Any] = dysk
+    wolumin: Callable[[Path], Wolumin | None] = wolumin
     dyski: Callable[[], list[Path]] = dyski_lokalne
     otworz: Callable[[str], bool] | None = None          # przeglądarka; None = webbrowser.open
     na_pierwszym_planie: Callable[[list[str], dict], int] | None = None   # None = cli.uruchom_na_pierwszym_planie
@@ -978,17 +1119,19 @@ def rada_autostartu(start: bool) -> str:
 MB, GB = 10 ** 6, 10 ** 9
 # rozpakowane narzędzie ≈ rozmiar pliku z manifestu × współczynnik formatu, z zapasem na całość (zmierzone 2026-10-25
 # na Windows 11 x64: 17 narzędzi, archiwa 0,72 GB → 2,06 GB po rozpakowaniu, szacunek 2,24 GB; zip zwykle × 1,8–3,1,
-# ale pandoc × 5,6, tar.gz Pythonów × 2,9, tar.bz2 Gita × 3,5); pole `rozpakowany` (B) wpisu platformy, gdy manifest
-# je poda, ma pierwszeństwo
+# ale pandoc × 5,6, tar.gz Pythonów × 2,9, tar.bz2 Gita × 3,5)
 ROZPAKOWANIE = {"zip": 3.0, "tar.gz": 3.0, "tgz": 3.0, "tar.xz": 4.5, "tar.bz2": 4.0, "tar": 1.0, "plik": 1.0}
-# Hermes w MB (zmierzone 2026-10-25 na Windows 11 x64, f97608f z dodatkami pinu): checkout 753 MB z .git bez blobów
-# historii (235) i .venv (322) plus pliki .pyc, które Python dopisze przy pracy (zostaje), cache uv z kołami .venv
-# (317 MB, znika po instalacji), node_modules frontu (280 MB, znika zaraz po budowie), front: dist, kopia z łatkami
-# Jarva i cache npm (72 MB, zostaje). Pole `miejsce_mb` przypięcia w manifeście (te same klucze) ma pierwszeństwo;
-# do przeniesienia do vendor/natywne.yaml (koordynator)
+# Hermes i flota: stałe w MB, zmierzone 2026-10-25 na Windows 11 x64 i te same dla każdej platformy. Manifest ich nie
+# podaje i podać nie może bez zmiany scripts/natywne.py (lock przepisuje z sekcji hermes tylko repo, tag, commit, wersję
+# i dodatki), a przed instalacją nie ma skąd wziąć rozmiaru checkoutu ani .venv przypiętego commitu (uv.lock Hermesa
+# przychodzi dopiero z checkoutem). Po zmianie pinu Hermesa albo floty pilnuje ich test na żywo
+# tests/live/natywnie_miejsce.py (tryb sprawdz: każda część zmierzona na dysku nie większa niż jej szacunek z zapasem).
+# Hermes f97608f z dodatkami pinu: checkout 753 MB z .git bez blobów historii (235) i .venv (322) plus pliki .pyc, które
+# Python dopisze przy pracy (zostaje), cache uv z kołami .venv (317 MB, znika po instalacji), node_modules frontu
+# (280 MB, znika zaraz po budowie), front: dist, kopia z łatkami Jarva i cache npm (72 MB, zostaje)
 HERMES_MB = {"checkout": 850, "cache_uv": 350, "node_modules": 300, "front": 80}
-# flota w MB (zmierzone 2026-10-25 na Windows 11 x64): źródła skilli buildu w <cache>/build (34 repo; zostają, bo
-# aktualizacja buduje flotę), build w <root>/build i profile z wtyczkami w <dane>
+# flota: źródła skilli buildu w <cache>/build (31 repo, 0,94 GB; zostają, bo aktualizacja buduje flotę), build
+# w <root>/build i profile z wtyczkami w <dane>
 FLOTA_MB = {"zrodla": 1000, "build": 100, "profile": 150}
 ZAPAS = 0.1                     # do potrzeby z manifestu +10 % (pliki tymczasowe, różnice archiwów między systemami)
 ZAPAS_MB = 500                  # i 0,5 GB na dysku korzenia zawsze: dziennik, bazy, build floty w każdym przebiegu
@@ -996,10 +1139,20 @@ MIN_WOLNEGO_GB = 2              # doctor: mniej = błąd (bazy SQLite, logi i re
 ZALECANE_WOLNE_GB = 10          # doctor i instalacja: mniej = uwaga (aktualizacja, narzędzia przy pierwszym użyciu)
 CZESCI = ("program", "dane", "cache", "build")     # części korzenia w opisie zajętego miejsca; reszta to „inne”
 PROG_SPRZATANIA = MB            # cache mniejszy (same znaczniki programu) zostaje: drugi przebieg nie woła uv ani pixi
+# plik w <cache>/pobrane zmieniony w ostatnich 15 min może być w użyciu: pobieracz dopisuje do `.czesc` co porcję (próba
+# czeka najwyżej 60 s na dane i 15 s między próbami), a gotowe archiwum rozpakowuje zaraz po pobraniu
+SWIEZE_S = 15 * 60
 
 
 class BrakMiejsca(BladInstalacji):
-    """Za mało miejsca na dysku instalacji: komunikat z potrzebą, innymi dyskami i gotowym poleceniem."""
+    """Instalacja nie zmieści się na tym dysku (albo, DyskBezOchrony, nie może na nim stanąć): komunikat z potrzebą,
+    innymi dyskami i gotowym poleceniem. Krok 1 kończy się bez śladu błędu w dzienniku, bo niczego jeszcze nie
+    zapisał."""
+
+
+class DyskBezOchrony(BrakMiejsca):
+    """Korzeń na woluminie bez ochrony dostępu (bez_ochrony: FAT, exFAT, NTFS na Linuksie, macOS z noowners):
+    komunikat z innymi dyskami i gotowym poleceniem."""
 
 
 @dataclass(frozen=True)
@@ -1030,9 +1183,7 @@ def _do_instalacji(wpis: Any) -> bool:
 
 
 def rozpakowane(wpis: dict) -> int:
-    """Bajty narzędzia po rozpakowaniu: `rozpakowany` z wpisu platformy albo rozmiar pliku × ROZPAKOWANIE formatu."""
-    if wpis.get("rozpakowany"):
-        return int(wpis["rozpakowany"])
+    """Bajty narzędzia po rozpakowaniu: rozmiar pliku z wpisu platformy × ROZPAKOWANIE formatu."""
     return int(int(wpis.get("rozmiar") or 0) * ROZPAKOWANIE.get(str(wpis.get("format") or "zip"), 3.0))
 
 
@@ -1040,7 +1191,7 @@ def potrzebne_miejsce(u: Uklad, app: Path, platforma: str, *, wszystko: bool = F
     """Ile miejsca zajmie instalacja z manifestu tej wersji (vendor/natywne.lock.json) na platformie `platforma`:
     narzędzia z `kiedy: instalacja` (plik w <cache>/pobrane i rozpakowany w <program>), venvy (venvy.miejsce:
     pobranie_mb i venv_mb, koła w cache uv), modele (rozmiary plików), Tesseract (tesseract.miejsce: rozmiary paczek
-    z pixi.lock), Hermes z frontem (HERMES_MB albo `miejsce_mb` przypięcia) i flota (FLOTA_MB, gdy kod ma fleet.yaml).
+    z pixi.lock), Hermes z frontem dla pinu z manifestu (stałe HERMES_MB) i flota (FLOTA_MB, gdy kod ma fleet.yaml).
     Części, które już są (znacznik sumy narzędzia, venvu, modelu, Tesseracta, Hermesa i frontu tego pinu, źródła
     skilli w <cache>/build, profile w <dane>), liczą się jako 0, więc drugi przebieg potrzebuje tylko zapasu;
     `wszystko=True` liczy całość jak na pustym dysku. Bez zapasu (dolicza go bilans_dyskow). Tylko odczyt."""
@@ -1084,8 +1235,7 @@ def potrzebne_miejsce(u: Uklad, app: Path, platforma: str, *, wszystko: bool = F
         pin = {}
     commit = str(pin.get("commit") or "").lower() if isinstance(pin, dict) else ""
     if commit:
-        wlasne = pin.get("miejsce_mb") if isinstance(pin.get("miejsce_mb"), dict) else {}
-        mb = {**HERMES_MB, **{k: v for k, v in wlasne.items() if k in HERMES_MB and isinstance(v, (int, float))}}
+        mb = HERMES_MB
         checkout = hermes.katalog_checkoutu(u, commit)
         jest = not wszystko and srodowisko.wczytaj_json(checkout / hermes.ZNACZNIK).get("commit") == commit
         if not jest:
@@ -1155,10 +1305,10 @@ def bilans_dyskow(u: Uklad, potrzeby: list[Potrzeba], ot: Otoczenie) -> list[dic
 
 
 def inne_dyski(u: Uklad, potrzeba: int, ot: Otoczenie, pelne: set | None = None) -> list[dict]:
-    """Dyski lokalne (ot.dyski) poza dyskami `pelne` (domyślnie dysk korzenia i cache) z co najmniej `potrzeba`
-    B wolnego, od największego wolnego miejsca: [{"punkt", "wolne", "korzen"}], gdzie `korzen` to proponowany
-    JARVO_ROOT (Windows `<dysk>\\Jarvo`, macOS i Linux `<katalog>/jarvo`; JARVO_ROOT przenosi pod korzeń także cache
-    i logi, więc dysk musi pomieścić całość)."""
+    """Dyski lokalne z ochroną dostępu (ot.dyski = dyski_lokalne: tylko woluminy, które przechodzą polecany) poza
+    dyskami `pelne` (domyślnie dysk korzenia i cache) z co najmniej `potrzeba` B wolnego, od największego wolnego
+    miejsca: [{"punkt", "wolne", "korzen"}], gdzie `korzen` to proponowany JARVO_ROOT (Windows `<dysk>\\Jarvo`, macOS
+    i Linux `<katalog>/jarvo`; JARVO_ROOT przenosi pod korzeń także cache i logi, więc dysk musi pomieścić całość)."""
     zajete = set(pelne or ())
     for k in (() if pelne is not None else (u.root, u.cache)):
         with contextlib.suppress(OSError):
@@ -1190,12 +1340,43 @@ def polecenie_instalacji(korzen: str, *, windows: bool = WINDOWS) -> str:
     return f"curl -fsSL {BOOTSTRAP}/install.sh | JARVO_ROOT={shlex.quote(korzen)} bash"
 
 
+def _gdzie_indziej(u: Uklad, app: Path, platforma: str, pelne: set, ot: Otoczenie, punkt: str, *, zwolnij: str,
+                   instalacja: bool) -> str:
+    """Druga część komunikatu nowej instalacji, która nie może stanąć na dysku `punkt`: inne dyski lokalne z ochroną
+    dostępu i miejscem na całą instalację (inne_dyski poza `pelne`) i gotowe polecenie z JARVO_ROOT na pierwszym z nich,
+    a bez takiego dysku `zwolnij` (co zrobić na tym dysku, z „albo” na końcu) lub inny dysk z przykładem polecenia.
+    `instalacja=True`: na końcu pliki programu startowego, które bootstrap zostawił w korzeniu."""
+    calosc = int(sum(p.szczyt for p in potrzebne_miejsce(u, app, platforma, wszystko=True)) * (1 + ZAPAS))
+    calosc += ZAPAS_MB * MB
+    kandydaci = inne_dyski(u, calosc, ot, pelne=pelne)
+    if kandydaci:
+        tekst = ("Wystarczy miejsca na: " + ", ".join(f"{k['punkt']} ({gb(k['wolne'])} GB wolnego)"
+                                                      for k in kandydaci)
+                 + f". Zainstaluj Jarvo tam jednym poleceniem{' w PowerShellu' if WINDOWS else ''}:\n    "
+                 + polecenie_instalacji(kandydaci[0]["korzen"]))
+    else:
+        if WINDOWS:
+            przyklad, dysk_ok = ("E:\\Jarvo" if punkt.upper().startswith("D:") else "D:\\Jarvo"), "z NTFS"
+        elif MACOS:
+            przyklad, dysk_ok = "/Volumes/Dysk/jarvo", "z APFS, bez „Ignoruj prawa własności na tym woluminie”"
+        else:
+            przyklad, dysk_ok = "/mnt/dysk/jarvo", "np. z ext4, xfs albo btrfs (nie FAT, exFAT ani NTFS)"
+        tekst = (f"Nie znalazłem innego dysku lokalnego z ok. {gb(calosc)} GB wolnego, na którym Jarvo zachowa ochronę "
+                 f"dostępu: {zwolnij}podłącz inny dysk ({dysk_ok}) i uruchom polecenie instalacji jeszcze raz "
+                 f"z JARVO_ROOT na katalogu na nim, np.:\n    {polecenie_instalacji(przyklad)}")
+    startowe = rozmiar_katalogu(u.root) if instalacja and u.root.is_dir() else 0
+    if startowe:
+        tekst += (f"\nPliki programu startowego ({gb(startowe)} GB: uv, Python i kod Jarva) są w {u.root}: po "
+                  "instalacji w innym miejscu możesz usunąć ten katalog.")
+    return tekst
+
+
 def komunikat_braku_miejsca(u: Uklad, app: Path, platforma: str, brak: list[dict], ot: Otoczenie, *,
                             instalacja: bool = True) -> str:
     """Komunikat, gdy na dysku z `brak` (bilans_dyskow) zabraknie miejsca. Aktualizacja (jest current.json): działająca
-    wersja zostaje, rada to zwolnić miejsce. Nowa instalacja: inne dyski lokalne z miejscem na całość (inne_dyski)
-    i gotowe polecenie z JARVO_ROOT na pierwszym z nich, a bez takiego dysku: ile zwolnić. `instalacja=False`
-    (doctor): bez zdań o tym, co zrobił instalator."""
+    wersja zostaje, rada to zwolnić miejsce. Nowa instalacja: inne dyski lokalne z ochroną dostępu i miejscem na
+    całość (_gdzie_indziej) i gotowe polecenie z JARVO_ROOT na pierwszym z nich, a bez takiego dysku: ile zwolnić.
+    `instalacja=False` (doctor): bez zdań o tym, co zrobił instalator."""
     b = brak[0]
     nowa = not (u.program / "current.json").is_file()
     tekst = (f"na dysku {b['punkt']} jest {gb(b['wolne'])} GB wolnego miejsca, a "
@@ -1208,25 +1389,28 @@ def komunikat_braku_miejsca(u: Uklad, app: Path, platforma: str, brak: list[dict
                         "i uruchom polecenie instalacji jeszcze raz.")
     if instalacja:
         tekst += "Niczego nie zainstalowałem. "
-    calosc = int(sum(p.szczyt for p in potrzebne_miejsce(u, app, platforma, wszystko=True)) * (1 + ZAPAS))
-    calosc += ZAPAS_MB * MB
-    kandydaci = inne_dyski(u, calosc, ot, pelne={x["dysk"] for x in brak})
-    if kandydaci:
-        tekst += ("Wystarczy miejsca na: " + ", ".join(f"{k['punkt']} ({gb(k['wolne'])} GB wolnego)"
-                                                       for k in kandydaci)
-                  + f". Zainstaluj Jarvo tam jednym poleceniem{' w PowerShellu' if WINDOWS else ''}:\n    "
-                  + polecenie_instalacji(kandydaci[0]["korzen"]))
-    else:
-        przyklad = ("E:\\Jarvo" if b["punkt"].upper().startswith("D:") else "D:\\Jarvo") if WINDOWS else (
-            "/Volumes/Dysk/jarvo" if MACOS else "/mnt/dysk/jarvo")
-        tekst += (f"Nie znalazłem innego dysku lokalnego z ok. {gb(calosc)} GB wolnego: zwolnij na dysku "
-                  f"{b['punkt']} co najmniej {brakuje} GB albo podłącz inny dysk i uruchom polecenie instalacji "
-                  f"jeszcze raz z JARVO_ROOT na katalogu na nim, np.:\n    {polecenie_instalacji(przyklad)}")
-    startowe = rozmiar_katalogu(u.root) if instalacja and u.root.is_dir() else 0
-    if startowe:
-        tekst += (f"\nPliki programu startowego ({gb(startowe)} GB: uv, Python i kod Jarva) są w {u.root}: po "
-                  "instalacji w innym miejscu możesz usunąć ten katalog.")
-    return tekst
+    return tekst + _gdzie_indziej(u, app, platforma, {x["dysk"] for x in brak}, ot, b["punkt"],
+                                  zwolnij=f"zwolnij na dysku {b['punkt']} co najmniej {brakuje} GB albo ",
+                                  instalacja=instalacja)
+
+
+def komunikat_dysku_bez_ochrony(u: Uklad, app: Path, platforma: str, w: Wolumin, powod: str, ot: Otoczenie) -> str:
+    """Komunikat, gdy nowa instalacja miałaby stanąć na woluminie bez ochrony dostępu (bez_ochrony): krok 1 kończy się,
+    zanim cokolwiek zapisze, z innymi dyskami (_gdzie_indziej) i gotowym poleceniem; na macOS z noowners także rada,
+    jak włączyć właścicieli plików na tym woluminie."""
+    punkt = punkt_dysku(u.root)
+    tekst = (f"korzeń {u.root} leży na dysku {punkt} ({w.typ}), a tam {powod}. Jarvo nie ograniczyłby dostępu do "
+             "swoich plików (klucze API, sekrety, kod uruchamiany przez autostart) do Twojego konta. Niczego nie "
+             "zainstalowałem. ")
+    if "noowners" in w.opcje:
+        tekst += ("Możesz włączyć właścicieli plików na tym woluminie (Finder → Informacje → odznacz „Ignoruj prawa "
+                  f"własności na tym woluminie” albo `sudo diskutil enableOwnership {w.punkt}`) i uruchomić polecenie "
+                  "instalacji jeszcze raz. ")
+    try:
+        pelne = {ot.dysk(u.root)}
+    except OSError:
+        pelne = set()
+    return tekst + _gdzie_indziej(u, app, platforma, pelne, ot, punkt, zwolnij="", instalacja=True)
 
 
 def rozmiar_katalogu(katalog: Path | str, widziane: set | None = None, *, wlasne: bool = False) -> int:
@@ -1281,16 +1465,21 @@ def usun_drzewo(p: Path) -> None:
     shutil.rmtree(p, onexc=ponow)
 
 
-def usun_zawartosc(katalog: Path) -> None:
-    """Pliki i podkatalogi `katalog` (sam katalog zostaje, dowiązań nie ruszamy); zajęty plik zostaje."""
+def usun_zawartosc(katalog: Path, zostaw: Callable[[os.DirEntry], bool] | None = None) -> int:
+    """Pliki i podkatalogi `katalog` (sam katalog zostaje, dowiązań nie ruszamy) poza tymi, dla których `zostaw(wpis)`
+    mówi True; zajęty plik zostaje. Zwraca liczbę wpisów, które zostały na prośbę `zostaw`."""
     try:
         with os.scandir(katalog) as it:
             wpisy = list(it)
     except OSError:
-        return
+        return 0
+    zostalo = 0
     for e in wpisy:
         try:
             if e.is_symlink() or (hasattr(e, "is_junction") and e.is_junction()):
+                continue
+            if zostaw is not None and zostaw(e):
+                zostalo += 1
                 continue
             if e.is_dir(follow_symlinks=False):
                 usun_drzewo(Path(e.path))
@@ -1299,6 +1488,40 @@ def usun_zawartosc(katalog: Path) -> None:
                 os.unlink(e.path)
         except OSError:
             continue
+    return zostalo
+
+
+def sprzatnij_pobrane(u: Uklad, nasze: set[str], log: Callable[[str], None], *, teraz: float | None = None) -> bool:
+    """Archiwa w `<cache>/pobrane` po udanym przebiegu: pliki `<16 znaków sumy>-…` z `nasze` (archiwa narzędzi tego
+    przebiegu, już rozpakowane) i wszystko, czego nikt nie zmieniał od SWIEZE_S s (resztki przerwanych pobrań
+    `.czesc`, archiwa starych wersji). Świeży plik spoza tego przebiegu zostaje do następnego sprzątania: pobiera go
+    albo rozpakowuje inny proces (drugi instalator, przeglądarka komputera Jarva przy starcie usługi, sterownik rąk),
+    a pobieracz nie bierze blokady; usunięty na macOS i Linuksie w trakcie pobierania psułby je (dopisywanie do
+    odłączonego pliku, potem zła suma). Całość pod zamkiem instalacji przy pierwszym użyciu (przy_uzyciu.ZAMEK, ten sam
+    co pobieranie narzędzia przy pierwszym użyciu), bez czekania: zajęty = takie pobranie właśnie trwa, więc archiwa
+    zostają. True = sprzątanie przeszło."""
+    from . import przy_uzyciu
+    teraz = time.time() if teraz is None else teraz
+
+    def zostaw(e: os.DirEntry) -> bool:
+        nasz = not e.name.endswith(".czesc") and e.name[16:17] == "-" and e.name[:16] in nasze
+        return not nasz and teraz - e.stat(follow_symlinks=False).st_mtime < SWIEZE_S
+
+    try:
+        zamek = przenosne.Zamek(u.stan / przy_uzyciu.ZAMEK, czekaj=False)
+        zamek.__enter__()
+    except BlockingIOError:
+        log("archiwa w <cache>/pobrane zostają do następnej instalacji: trwa instalacja narzędzia przy pierwszym "
+            "użyciu")
+        return False
+    try:
+        zostalo = usun_zawartosc(u.cache / "pobrane", zostaw)
+    finally:
+        zamek.__exit__(None, None, None)
+    if zostalo:
+        log(f"w {u.cache / 'pobrane'} zostają świeże pliki, które pobiera albo rozpakowuje inny proces ({zostalo}): "
+            "usunie je następne sprzątanie")
+    return True
 
 
 def zajete_miejsce(u: Uklad) -> dict[str, int]:
@@ -1562,13 +1785,30 @@ class _Instalacja:
             return None
         return f if callable(f) else None
 
+    def _archiwa_przebiegu(self) -> set[str]:
+        """16 znaków sumy archiwów narzędzi z manifestu, które ten przebieg zainstalował albo zastał (self.narz):
+        są już rozpakowane, więc sprzątanie usuwa je od razu, także świeże."""
+        try:
+            narz = manifest.wczytaj(self.app)
+        except (OSError, ValueError, KeyError):
+            return set()
+        wynik = set()
+        for nazwa in self.narz:
+            with contextlib.suppress(manifest.BrakNarzedzia, KeyError, TypeError, AttributeError):
+                if isinstance(narz.get(nazwa), dict):
+                    wynik.add(str(manifest.plik(narz, nazwa, self.platforma).get("sha256") or "")[:16])
+        return wynik - {""}
+
     def sprzatanie(self) -> None:
-        """Archiwa z <cache>/pobrane (także niedokończone .czesc), cache uv (venvy.sprzatnij_cache), cache pixi
-        (tesseract.sprzatnij_cache) i katalogi `<wersja>.stary-*` narzędzi, które pobieracz zostawił przy zajętym
-        pliku; zwolnione miejsce to pliki bez innych twardych dowiązań przed i po (rozmiar_katalogu wlasne=True: plik
-        dzielony ze środowiskiem Tesseracta miejsca nie zwalnia). Cache poniżej PROG_SPRZATANIA (same pliki znaczników)
-        zostaje, więc drugi przebieg nie woła uv. Nic tu nie przerywa udanej instalacji: błąd to uwaga. Na końcu
-        wiersz „Miejsce” (zajęte i wolne, jak w `jarvo doctor`)."""
+        """Archiwa z <cache>/pobrane (sprzatnij_pobrane: archiwa tego przebiegu i pliki starsze niż SWIEZE_S, także
+        niedokończone .czesc), cache uv (venvy.sprzatnij_cache), cache pixi (tesseract.sprzatnij_cache) i katalogi
+        `<wersja>.stary-*` narzędzi, które pobieracz zostawił przy zajętym pliku. Cache sprzątamy pod tymi samymi
+        zamkami, które biorą instalatory (przy pierwszym użyciu, venvy, hermes, tesseract), bez czekania: drugi
+        instalator, który właśnie z nich korzysta, zostawia je do następnego sprzątania. Zwolnione miejsce to pliki bez
+        innych twardych dowiązań przed i po (rozmiar_katalogu wlasne=True: plik dzielony ze środowiskiem Tesseracta
+        miejsca nie zwalnia). Cache poniżej PROG_SPRZATANIA (same pliki znaczników) zostaje, więc drugi przebieg nie
+        woła uv. Nic tu nie przerywa udanej instalacji: błąd to uwaga. Na końcu wiersz „Miejsce” (zajęte i wolne, jak
+        w `jarvo doctor`)."""
         zwolnione: list[tuple[str, int]] = []
 
         def rozmiar(katalog: Path) -> int:
@@ -1584,7 +1824,9 @@ class _Instalacja:
                 self.uwagi.append(f"sprzątanie ({opis}) nie przeszło: {type(e).__name__}: {str(e)[:200]}")
             zwolnione.append((opis, max(przed - rozmiar(katalog), 0)))
 
-        mierz("archiwa narzędzi", self.u.cache / "pobrane", lambda: usun_zawartosc(self.u.cache / "pobrane"), prog=1)
+        nasze = self._archiwa_przebiegu()
+        mierz("archiwa narzędzi", self.u.cache / "pobrane", lambda: sprzatnij_pobrane(self.u, nasze, self.podlog),
+              prog=1)
         uv = self._funkcja("venvy", "sprzatnij_cache")
         if uv is not None and "uv" in self.narz:
             mierz("cache uv", self.u.cache / "uv", lambda: uv(self.u, self._bin_narzedzia("uv"), log=self.podlog))
@@ -1628,9 +1870,27 @@ class _Instalacja:
         self.bilans_miejsca()
 
     def bilans_miejsca(self) -> None:
-        """Potrzeba z manifestu (potrzebne_miejsce: tylko części, których jeszcze nie ma) wobec wolnego miejsca na
-        każdym dysku instalacji (bilans_dyskow). Za mało = BrakMiejsca jeszcze w kroku 1, czyli zanim instalator
-        cokolwiek zapisze (katalogi zakłada krok 2). Mało miejsca po instalacji = uwaga."""
+        """Najpierw wolumin korzenia (Otoczenie.wolumin, bez_ochrony): na FAT, exFAT, NTFS na Linuksie albo woluminie
+        macOS z noowners korzeń nie byłby tylko dla właściciela, więc nowa instalacja kończy się DyskBezOchrony
+        (z innymi dyskami i poleceniem), a działająca instalacja dostaje uwagę (aktualizacji nie blokujemy). Wolumin
+        nieznany (None) nie zatrzymuje. Potem potrzeba z manifestu (potrzebne_miejsce: tylko części, których jeszcze
+        nie ma) wobec wolnego miejsca na każdym dysku instalacji (bilans_dyskow). Za mało = BrakMiejsca. Obie odmowy
+        są jeszcze w kroku 1, czyli zanim instalator cokolwiek zapisze (katalogi zakłada krok 2). Mało miejsca po
+        instalacji = uwaga."""
+        try:
+            w = self.ot.wolumin(self.u.root)
+        except OSError:
+            w = None
+        powod = bez_ochrony(w) if w is not None else None
+        if powod and not (self.u.program / "current.json").is_file():
+            raise DyskBezOchrony(komunikat_dysku_bez_ochrony(self.u, self.app, self.platforma, w, powod, self.ot))
+        if powod:
+            uwaga = (f"korzeń {self.u.root} leży na dysku {punkt_dysku(self.u.root)} ({w.typ}), a tam {powod}: "
+                     "ochrona dostępu do plików Jarva nie działa. Zainstaluj Jarvo od nowa na dysku z ochroną "
+                     "dostępu (JARVO_ROOT)" + (" albo włącz właścicieli plików na tym woluminie (sudo diskutil "
+                                               f"enableOwnership {w.punkt})" if "noowners" in w.opcje else ""))
+            self.podlog(f"uwaga: {uwaga}")
+            self.uwagi.append(uwaga)
         potrzeby = potrzebne_miejsce(self.u, self.app, self.platforma)
         bilans = bilans_dyskow(self.u, potrzeby, self.ot)
         for b in bilans:

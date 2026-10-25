@@ -23,10 +23,14 @@ w obrazie. Python venvu narzędzi to też @@PY@@ skilli i shim python3 (jarvo/fl
 Miejsce (c3 pkt 11, Z31): `miejsce(wpis, platforma)` liczy venv i koła w cache uv z manifestu (pobranie_mb platformy,
 venv_mb zmierzone na Windows 11 x64), a `sprzatnij_cache` po udanej instalacji robi `uv cache clean` w <cache>/uv:
 venvy i .venv Hermesa mają własne kopie plików (UV_LINK_MODE=copy), a znaczniki sprawiają, że kolejny przebieg nie
-woła uv, więc cache nie jest już potrzebny (nowy lock przy aktualizacji pobierze koła od nowa).
+woła uv, więc cache nie jest już potrzebny (nowy lock przy aktualizacji pobierze koła od nowa). Sprzątanie bierze
+zamki instalatorów, które korzystają z tego cache (ZAMKI_CACHE: venvy, także przy pierwszym użyciu, i Hermes, którego
+trzeci krok `uv sync --offline` bierze koła z cache), bez czekania: zajęty = drugi instalator właśnie z niego
+korzysta, więc cache zostaje do następnej instalacji.
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -42,6 +46,10 @@ from .sciezki import WINDOWS, Uklad
 
 ZNACZNIK = ".jarvo-venv.json"
 KATALOG = "venvs"
+ZAMEK = "venvy.lock"                     # w <stan>: budowa venvu (instalator i pierwsze użycie)
+# zamki w <stan> instalatorów, które czytają i piszą cache uv (zainstaluj i hermes.zainstaluj): sprzątanie bierze
+# oba, zawsze w tej kolejności i bez czekania, więc nie zakleszczy się z żadnym z nich
+ZAMKI_CACHE = (ZAMEK, "hermes.lock")
 # zmienna procesów floty z interpreterem venvu (skrypty i skille: ocr.py, cad.py, claude-seo, @@PY@@ z JARVO_TOOLS)
 ZMIENNE = {"narzedzia": "JARVO_TOOLS_PYTHON", "ocr": "JARVO_OCR_PYTHON", "claude-seo": "CLAUDE_SEO_PYTHON",
            "cad": "JARVO_CAD_PYTHON", "manimgx": "JARVO_MANIMGX_PYTHON", "rembg": "JARVO_REMBG_PYTHON",
@@ -155,18 +163,27 @@ def miejsce(wpis: dict, platforma: str) -> tuple[int, int]:
 
 def sprzatnij_cache(u: Uklad, uv: Path, *, log: Callable[[str], None] = print, czas: float = CZAS_SPRZATANIA) -> bool:
     """`uv cache clean` w <cache>/uv po udanej instalacji (docstring modułu), w środowisku uv instalacji (bez
-    konfiguracji właściciela, UV_CACHE_DIR Jarva). `uv cache prune` usunąłby tylko wpisy nieosiągalne, czyli prawie
-    nic, bo wszystkie koła z locków są w indeksie. True = uv skończył bez błędu; cache w użyciu przez inny proces uv
+    konfiguracji właściciela, UV_CACHE_DIR Jarva), pod zamkami ZAMKI_CACHE bez czekania. `uv cache prune` usunąłby
+    tylko wpisy nieosiągalne, czyli prawie nic, bo wszystkie koła z locków są w indeksie. True = uv skończył bez
+    błędu; zajęty zamek (drugi instalator buduje venv albo instaluje Hermesa), cache w użyciu przez inny proces uv
     (uv czeka wtedy na niego) albo limit czasu = False i wiersz w logu: cache zostaje do następnej instalacji."""
     from .hermes import BladHermesa, _wywolaj
-    env = env_uv(u, Path(uv))
-    env.pop("UV_PYTHON", None)                    # `cache clean` nie szuka Pythona
-    try:
-        w = _wywolaj([str(uv), "cache", "clean", "--no-config"], env=env, cwd=u.stan, opis="uv cache clean",
-                     czas=int(czas))
-    except BladHermesa as e:
-        log(f"cache uv zostaje do następnej instalacji ({e})")
-        return False
+    with contextlib.ExitStack() as zamki:
+        try:
+            for nazwa in ZAMKI_CACHE:
+                zamki.enter_context(przenosne.Zamek(u.stan / nazwa, czekaj=False))
+        except BlockingIOError:
+            log("cache uv zostaje do następnej instalacji (drugi instalator właśnie buduje venv albo instaluje "
+                "Hermesa)")
+            return False
+        env = env_uv(u, Path(uv))
+        env.pop("UV_PYTHON", None)                # `cache clean` nie szuka Pythona
+        try:
+            w = _wywolaj([str(uv), "cache", "clean", "--no-config"], env=env, cwd=u.stan, opis="uv cache clean",
+                         czas=int(czas))
+        except BladHermesa as e:
+            log(f"cache uv zostaje do następnej instalacji ({e})")
+            return False
     linie = [x.strip() for x in f"{w.stdout}\n{w.stderr}".splitlines() if x.strip()]
     if w.returncode:
         log(f"cache uv zostaje do następnej instalacji (uv cache clean: kod {w.returncode}"
@@ -193,7 +210,7 @@ def zainstaluj(u: Uklad, app: Path, nazwa: str, wpis: dict, *, uv: Path, python:
     if not Path(python).is_file() or not Path(uv).is_file():
         raise BladVenvu(f"venv {nazwa}: brak {python if not Path(python).is_file() else uv} (krok narzędzi się nie "
                         "wykonał)")
-    with przenosne.Zamek(u.stan / "venvy.lock"):
+    with przenosne.Zamek(u.stan / ZAMEK):
         if gotowy(kat, wpis, python):                         # drugi instalator skończył, gdy czekaliśmy
             return wpis_spisu(nazwa, wpis, kat), False
         if kat.exists():

@@ -17,7 +17,9 @@ Miejsce (c3 pkt 11, Z31): `miejsce(app, platforma)` liczy cache i środowisko z 
 `size` każdej paczki środowiska default tej platformy), a `sprzatnij_cache` po udanej instalacji usuwa cache paczek
 (`<cache>/pixi`): środowisko w `<program>` zostaje (twarde dowiązania z cache albo kopie), a języki paczki usunięte
 przez porządki zwalniają miejsce dopiero wtedy, bo cache trzymał ich drugie dowiązanie (zmierzone 2026-10-25 na
-Windows 11: cache 527 MB, z tego 364 MB tylko w cache).
+Windows 11: cache 527 MB, z tego 364 MB tylko w cache). Sprzątanie bierze ten sam zamek co `pixi install`
+(ZAMEK w <stan>), bez czekania: gdy drugi instalator właśnie instaluje Tesseracta, cache zostaje do następnej
+instalacji.
 """
 from __future__ import annotations
 
@@ -37,6 +39,7 @@ from .sciezki import WINDOWS, Uklad
 PROJEKT = Path("vendor") / "pixi" / "tesseract"
 PLIKI_PROJEKTU = ("pixi.toml", "pixi.lock", ".pixi/config.toml")
 ZNACZNIK = ".jarvo-tesseract.json"
+ZAMEK = "tesseract.lock"                                   # w <stan>: `pixi install` i sprzątanie cache pixi
 KONFIGURACJE = ("configs", "tessconfigs", "pdf.ttf")       # z share/tessdata paczki do katalogu TESSDATA_PREFIX
 MODEL = "tessdata-fast"                                    # katalog modelu języków w <dane>/jarvo/models
 CZAS_PIXI = 3600
@@ -185,8 +188,9 @@ def miejsce(app: Path, platforma: str) -> tuple[int, int, int]:
 
 def sprzatnij_cache(u: Uklad, *, log: Callable[[str], None] = print) -> bool:
     """Cache paczek pixi (`<cache>/pixi`, PIXI_CACHE_DIR i RATTLER_CACHE_DIR z env_pixi) po udanej instalacji
-    (docstring modułu). Plik, którego nie da się usunąć (zajęty na Windows), zostaje do następnej instalacji.
-    True = cache usunięty cały."""
+    (docstring modułu), pod zamkiem ZAMEK bez czekania: zajęty = drugi instalator właśnie robi `pixi install`, więc
+    cache zostaje. Plik, którego nie da się usunąć (zajęty na Windows), zostaje do następnej instalacji. True = cache
+    usunięty cały."""
     kat = u.cache / "pixi"
     if not kat.is_dir():
         return False
@@ -198,7 +202,17 @@ def sprzatnij_cache(u: Uklad, *, log: Callable[[str], None] = print) -> bool:
             funkcja(sciezka)
         except OSError:
             zostaly.append(str(sciezka))
-    shutil.rmtree(kat, onexc=ponow)
+    try:
+        zamek = przenosne.Zamek(u.stan / ZAMEK, czekaj=False)
+        zamek.__enter__()
+    except BlockingIOError:
+        log("Tesseract: cache paczek pixi zostaje do następnej instalacji (drugi instalator właśnie instaluje "
+            "Tesseracta)")
+        return False
+    try:
+        shutil.rmtree(kat, onexc=ponow)
+    finally:
+        zamek.__exit__(None, None, None)
     if zostaly:
         log(f"Tesseract: {len(zostaly)} plików cache pixi zostaje (zajęte), usunie je następna instalacja")
     else:
@@ -250,7 +264,7 @@ def zainstaluj(u: Uklad, app: Path, *, pixi: Path, env_narzedzia: dict, platform
         return wpis_spisu(app, kat, modele), _porzadki(kat, modele, log)
     if not Path(pixi).is_file():
         raise BladTesseracta(f"brak programu pixi ({pixi}): krok narzędzi się nie wykonał")
-    with przenosne.Zamek(u.stan / "tesseract.lock"):
+    with przenosne.Zamek(u.stan / ZAMEK):
         if kat.exists() and not gotowy(kat, suma):
             log("Tesseract: resztka przerwanej instalacji, instaluję od nowa")
             shutil.rmtree(kat, onexc=lambda f, p, _e: (os.chmod(p, stat.S_IWRITE | stat.S_IREAD), f(p)))

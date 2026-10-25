@@ -33,8 +33,11 @@ vendor/natywne.yaml, czytany przez `manifest.hermes(app)`.
               z sumami integrity; --include=dev, bo odziedziczone NODE_ENV=production pomija tsc i vite, por.
               hermes_cli/main_web_build.py:317) i `npm run build` do hermes_cli/web_dist, cache npm w <cache>/npm.
               Po zbudowaniu node_modules (ok. 0,3 GB: korzeń checkoutu i web/, bo web jest workspace'em npm
-              z package-lock.json korzenia) znika: znacznik ZNACZNIK_WEB sprawia, że kolejny przebieg frontu nie
-              buduje, a `--web-lokalnie` robi `npm ci` od nowa (z cache npm, który zostaje).
+              z package-lock.json korzenia) znika pod zamkiem hermes.lock: znacznik ZNACZNIK_WEB sprawia, że kolejny
+              przebieg frontu nie buduje, a `--web-lokalnie` robi `npm ci` od nowa (z cache npm, który zostaje).
+              Resztki node_modules ze starszej wersji przy gotowym froncie usuwamy bez czekania na zamek (trzyma
+              go drugi instalator: zostają do następnego przebiegu). Gdy na zamek czekaliśmy, a front zbudował
+              w tym czasie drugi instalator, dostajemy i tak kopię z łatkami Jarva (dist_jarva), nie gołego dista.
               Potem `dist_jarva`: kopia w <program>/web-dist/<skrót> z łatkami Jarva (branding/patch_dashboard.py
               --web --natywnie: tytuł i marka, powłoka /jarvo z przekierowaniem z „/”, polski, bez przycisku
               „Update Hermes” i bez sprawdzania aktualizacji, H16) i to ją web_dist zwraca (HERMES_WEB_DIST panelu,
@@ -90,6 +93,7 @@ zamek hermes.lock.
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -734,17 +738,22 @@ def web_dist(u: Uklad, checkout: Path, *, npm=None, log: Callable[[str], None] =
     if _web_gotowy(checkout, dist, commit):
         log(f"Hermes: front dashboardu już zbudowany ({dist})")
         if any((k / "node_modules").is_dir() for k in (checkout, checkout / "web")):   # z wersji przed sprzątaniem
-            with przenosne.Zamek(u.stan / "hermes.lock"):
-                if _web_gotowy(checkout, dist, commit):
-                    _usun_node_modules(checkout, log)
+            try:                    # bez czekania: drugi instalator, który trzyma zamek, usunie je sam po budowie
+                with przenosne.Zamek(u.stan / "hermes.lock", czekaj=False):
+                    if _web_gotowy(checkout, dist, commit):
+                        _usun_node_modules(checkout, log)
+            except BlockingIOError:
+                log("Hermes: node_modules zostają do następnego przebiegu (drugi instalator właśnie używa checkoutu)")
         return dist_jarva(u, dist, log=log) if jarva else dist
     web = checkout / "web"
     if not (web / "package.json").is_file():
         raise BladHermesa(f"{checkout}: brak web/package.json, nie ma z czego zbudować frontu.")
     npm = _program(npm or _znajdz_npm(u), "npm")
-    with przenosne.Zamek(u.stan / "hermes.lock"):
-        if _web_gotowy(checkout, dist, commit):
-            return dist
+    with contextlib.ExitStack() as zamek:
+        zamek.enter_context(przenosne.Zamek(u.stan / "hermes.lock"))
+        if _web_gotowy(checkout, dist, commit):         # drugi instalator zbudował front, gdy czekaliśmy
+            zamek.close()                               # dist_jarva bierze ten sam zamek
+            return dist_jarva(u, dist, log=log) if jarva else dist
         (checkout / ZNACZNIK_WEB).unlink(missing_ok=True)
         env = _env_npm(u, npm)
         log("Hermes: zależności frontu (npm ci z package-lock.json, bez skryptów instalacyjnych)…")
