@@ -33,15 +33,14 @@ jobs:
         run: |
           for f in scripts/*.sh profiles/*/scripts/*.sh; do bash -n "$f"; done
 
-  # Jarvo natywnie (docs/NATYWNIE.md, etap E1): te same testy na Windows i macOS. Na razie tylko pomiar
-  # (continue-on-error), dopóki kod przenośny nie przejdzie; potem ta noga staje się wymagana.
+  # Jarvo natywnie (docs/NATYWNIE.md, etap E1): te same testy na Windows i macOS, wymagane (pierwszy pełny zielony
+  # przebieg na trzech systemach: 743fb81).
   testy-systemy:
     strategy:
       fail-fast: false
       matrix:
         os: [windows-2025, macos-15]
     runs-on: ${{ matrix.os }}
-    continue-on-error: true
     timeout-minutes: 30
     env:
       PYTHONUTF8: "1"

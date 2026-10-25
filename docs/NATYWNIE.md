@@ -578,8 +578,7 @@ Stan (2026-10-25): wtyczka jest w `zgody/plugin` (jarvo-zgody, opis w [zgody/REA
 
 **Stan (2026-10-25):**
 - E0 🟡: adres Matcha ✅, `.gitattributes` ✅, reszta ⬜.
-- E1 🟡 w toku: znaczniki systemów i atrapy w testach, bash tylko z Git Bash, przenośny kod lektora, STT, HQ, skarbca,
-  floty i skryptów repo ✅; testy na Windows i macOS biegną w CI tylko jako pomiar (`continue-on-error`) ⬜.
+- E1 ✅ (pytest zielony na Linuksie, Windows i macOS w CI od 743fb81: 2407, 2343 i 2354 testów; noga Windows i macOS wymagana w ci.yml): znaczniki systemów i atrapy w testach, bash tylko z Git Bash, przenośny kod lektora, STT, HQ, skarbca, floty i skryptów repo; testy na Windows i macOS biegną w CI tylko jako pomiar (`continue-on-error`) ⬜.
 - E2 🟡: manifest `vendor/natywne.yaml` z 23 narzędziami, 10 modelami i 9 venvami (locki w `infra/python/natywne/`,
   Tesseract w `vendor/pixi/tesseract`), każde źródło przejrzane 2026-10-24 z wpisem w `vendor/zrodla.yaml`; pobieracz
   `jarvo/pobieracz.py` z dowiązaniami z archiwów, `usun` i `zmien_nazwe`; spis źródeł przyjmuje też paczkę zip
