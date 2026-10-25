@@ -40,6 +40,7 @@ obejrzenia). Kod 0 = wszystkie punkty przeszły; raport JSON na stdout i w <wyni
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
 import os
 import re
@@ -48,6 +49,7 @@ import socket
 import sqlite3
 import subprocess
 import sys
+import tempfile
 import time
 import traceback
 import urllib.error
@@ -267,19 +269,33 @@ def mozg_z_atrapy(u: sciezki.Uklad, atrapa: Atrapa) -> None:
 
 # ----------------------------------------------------------------------------------------------- przeglądarka
 
+def _env_przegladarki_testu() -> dict | None:
+    """Linux: przeglądarka TESTU (nie Jarva) z katalogami XDG w katalogu tymczasowym, usuwanym na końcu. Chromium
+    zakłada w XDG cache fontconfig, bazę NSS i raporty awarii: bez tego migawka po odinstalowaniu (CI natywnie)
+    widziałaby ślady narzędzia testowego jako ślady Jarva. Tylko proces przeglądarki: reszta testu (jarvo, Hermes)
+    widzi prawdziwe XDG, więc korzeń i układ katalogów instalacji się nie zmieniają."""
+    if not sys.platform.startswith("linux"):
+        return None
+    tmp = tempfile.mkdtemp(prefix="jarvo-e2e-chromium-")
+    atexit.register(shutil.rmtree, tmp, True)
+    return {**os.environ, "XDG_CONFIG_HOME": os.path.join(tmp, "config"), "XDG_CACHE_HOME": os.path.join(tmp, "cache"),
+            "XDG_DATA_HOME": os.path.join(tmp, "data")}
+
+
 def przegladarka(p, a, u):
     """Chromium do testu: --przegladarka, CHROME_PATH instalacji, Chromium Playwrighta, Chrome albo Edge systemu."""
     plik = a.przegladarka or os.environ.get("JARVO_E2E_PRZEGLADARKA") or przegladarka_instalacji(u)
+    env = _env_przegladarki_testu()
     if plik:
-        return p.chromium.launch(executable_path=plik, headless=True), plik
+        return p.chromium.launch(executable_path=plik, headless=True, env=env), plik
     if not a.kanal:
         try:
-            return p.chromium.launch(headless=True), "chromium Playwrighta"
+            return p.chromium.launch(headless=True, env=env), "chromium Playwrighta"
         except Exception:                      # noqa: BLE001 - brak pobranej przeglądarki Playwrighta
             pass
     for kanal in [a.kanal] if a.kanal else ["chrome", "msedge"]:
         try:
-            return p.chromium.launch(channel=kanal, headless=True), f"kanał {kanal}"
+            return p.chromium.launch(channel=kanal, headless=True, env=env), f"kanał {kanal}"
         except Exception:                      # noqa: BLE001
             continue
     raise Niepowodzenie("nie ma przeglądarki: podaj --przegladarka albo zainstaluj Chrome")

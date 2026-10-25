@@ -55,18 +55,29 @@ def test_obcy_profil_bez_wtyczki_to_uwaga_a_katalog_bez_configu_pomijany(u):
     assert w["stan"] == "uwaga" and "moj-wlasny" in w["opis"] and "po-usunieciu" not in w["opis"]
 
 
+def _lacze(cel: Path, wpis: Path) -> None:
+    """Wtyczka profilu jak z instalatora floty: dowiązanie (POSIX) albo junction (Windows, bez administratora)."""
+    if os.name == "nt":
+        import _winapi
+        _winapi.CreateJunction(str(cel), str(wpis))
+    else:
+        wpis.symlink_to(cel, target_is_directory=True)
+
+
 def test_wtyczka_dodana_po_starcie_bramy(u):
-    """Z39: brama wczytała profil przed wtyczką: uwaga z radą restartu; po restarcie (późniejszy start) ok."""
+    """Z39: dowiązanie wtyczki powstałe po starcie bramy = uwaga z radą restartu; po restarcie (późniejszy start) ok.
+    Kopia katalogu (host) i import w bramie (__pycache__) nie dają uwagi: data kopii nie mówi, kiedy doszła."""
+    import shutil
+    web = u.dane / "profiles" / "jarvo-web" / "plugins"
+    shutil.rmtree(web / zc.NAZWA)
+    _lacze(u.dane / "plugins" / zc.NAZWA, web / zc.NAZWA)
+    (u.dane / "plugins" / zc.NAZWA / "__pycache__").mkdir()          # import w bramie po jej starcie
     start = time.time() - 60
-    stara = start - 3600
-    for dom in (u.dane, u.dane / "profiles" / "jarvo"):
-        os.utime(dom / "plugins", (stara, stara))
-        # import w bramie zakłada __pycache__ w katalogu wtyczki: świeży mtime katalogu wtyczki to nie nowa wtyczka
-        (dom / "plugins" / zc.NAZWA / "__pycache__").mkdir()
     w = zc.sprawdzenie(u, flota_agenci=["jarvo", "jarvo-web"], start=start)
     assert w["stan"] == "uwaga" and "jarvo-web" in w["opis"] and w["rada"] == "jarvo serwis --restart brama"
-    assert "jarvo," not in w["opis"] and "host" not in w["opis"]
+    assert "host" not in w["opis"] and "jarvo," not in w["opis"]
     assert zc.sprawdzenie(u, flota_agenci=["jarvo", "jarvo-web"], start=time.time() + 5)["stan"] == "ok"
+
 
 
 def test_config_nieczytelny_to_brak_wtyczki(u):

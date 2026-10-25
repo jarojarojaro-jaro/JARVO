@@ -1474,7 +1474,10 @@ def polecenie_komputer(a) -> int:
     except BladE2E as e:
         rap.punkt("komputer", nazwa, False, str(e))
         return 1
-    env = inst.env_terminala()          # JARVO_ROOT tylko z --korzen (Instalacja ustawia go wtedy w os.environ)
+    env = inst.env_terminala()
+    # skrypt wymaga JARVO_ROOT; równy domyślnemu korzeniowi niczego nie przenosi (jarvo/sciezki.py), więc logi
+    # i cache Komputera zostają tam, gdzie w każdej instalacji
+    env["JARVO_ROOT"] = str(inst.u.root)
     r = uruchom([python, "-I", "-X", "utf8", REPO / "scripts" / "komputer_natywny_test.py", "--uruchom"],
                 czas=a.czas, env=env)
     (art / "komputer.txt").write_text(bez_sekretow(bez_ansi(r.tekst)), encoding="utf-8")
