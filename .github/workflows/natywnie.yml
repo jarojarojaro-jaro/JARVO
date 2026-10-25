@@ -50,27 +50,35 @@ jobs:
           - noga: W64
             os: windows-2025
             bez_autostartu: ""
-            dopusc: "wolne miejsce=uwaga:dysk runnera bywa mniejszy niż 10 GB wolnego"
+            dopusc: >-
+              wolne miejsce=uwaga:dysk runnera bywa mniejszy niż 10 GB wolnego;
+              rutyny=uwaga:świeża instalacja bez Telegrama, rutyny czekają na jarvo telegram test albo jarvo rutyny on; Telegram=uwaga:CI bez bota, jarvo telegram ustaw robi właściciel
           - noga: WARM
             os: windows-11-arm
             bez_autostartu: ""
-            dopusc: "wolne miejsce=uwaga:dysk runnera bywa mniejszy niż 10 GB wolnego"
+            dopusc: >-
+              wolne miejsce=uwaga:dysk runnera bywa mniejszy niż 10 GB wolnego;
+              rutyny=uwaga:świeża instalacja bez Telegrama, rutyny czekają na jarvo telegram test albo jarvo rutyny on; Telegram=uwaga:CI bez bota, jarvo telegram ustaw robi właściciel
           - noga: MARM
             os: macos-15
             bez_autostartu: ""
-            dopusc: "wolne miejsce=uwaga:dysk runnera bywa mniejszy niż 10 GB wolnego"
+            dopusc: >-
+              wolne miejsce=uwaga:dysk runnera bywa mniejszy niż 10 GB wolnego;
+              rutyny=uwaga:świeża instalacja bez Telegrama, rutyny czekają na jarvo telegram test albo jarvo rutyny on; Telegram=uwaga:CI bez bota, jarvo telegram ustaw robi właściciel
           - noga: L64
             os: ubuntu-24.04
             bez_autostartu: "1"
             dopusc: >-
               wolne miejsce=uwaga:dysk runnera bywa mniejszy niż 10 GB wolnego;
-              autostart=uwaga:runner bez user busa systemd, instalacja z JARVO_NO_AUTOSTART=1
+              autostart=uwaga:runner bez user busa systemd, instalacja z JARVO_NO_AUTOSTART=1;
+              rutyny=uwaga:świeża instalacja bez Telegrama, rutyny czekają na jarvo telegram test albo jarvo rutyny on; Telegram=uwaga:CI bez bota, jarvo telegram ustaw robi właściciel
           - noga: LARM
             os: ubuntu-24.04-arm
             bez_autostartu: "1"
             dopusc: >-
               wolne miejsce=uwaga:dysk runnera bywa mniejszy niż 10 GB wolnego;
-              autostart=uwaga:runner bez user busa systemd, instalacja z JARVO_NO_AUTOSTART=1
+              autostart=uwaga:runner bez user busa systemd, instalacja z JARVO_NO_AUTOSTART=1;
+              rutyny=uwaga:świeża instalacja bez Telegrama, rutyny czekają na jarvo telegram test albo jarvo rutyny on; Telegram=uwaga:CI bez bota, jarvo telegram ustaw robi właściciel
     env:
       JARVO_E2E_NOGA: ${{ matrix.noga }} (${{ matrix.os }})
       # tylko „tak” albo „nie”: sama wartość sekretu nie trafia do otoczenia zadania (instalatora, usług, kroków)

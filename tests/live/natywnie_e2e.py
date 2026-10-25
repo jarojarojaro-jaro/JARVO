@@ -971,6 +971,25 @@ def bezpieczne_ustawienia() -> dict:
             "terminal": {"home_mode": "profile", "auto_source_bashrc": False}}
 
 
+def stan_bramy(inst: Instalacja) -> dict:
+    """Usługa bramy z `jarvo status --json` (nadzorca: pid, gotowa, restarty); {} bez odpowiedzi."""
+    s = json_z_wyjscia(inst.jarvo_cmd("status", "--json", czas=60).out) or {}
+    return (((s.get("serwis") or {}).get("stan") or {}).get("uslugi") or {}).get("brama") or {}
+
+
+def czekaj_na_brame(inst: Instalacja, *, inny_pid: int | None = None, czas: float = 120) -> dict:
+    """Aż nadzorca zgłosi bramę gotową (identify i /health API), po restarcie: z innym pid niż `inny_pid`
+    (stara brama odpowiada jeszcze chwilę po zleceniu restartu). Zwraca ostatni stan bramy."""
+    koniec = time.monotonic() + czas
+    b: dict = {}
+    while time.monotonic() < koniec:
+        b = stan_bramy(inst)
+        if b.get("gotowa") and (inny_pid is None or (b.get("pid") and b.get("pid") != inny_pid)):
+            return b
+        time.sleep(3)
+    return b
+
+
 def usun_profil(inst: Instalacja, nazwa: str) -> str | None:
     """`hermes profile delete -y`; None = usunięty albo go nie było, inaczej opis (sprzątanie nie zatrzymuje testu)."""
     if not (inst.u.dane / "profiles" / nazwa).exists():
@@ -1154,13 +1173,7 @@ def _doctor_status_panel(inst: Instalacja, rap: Raport, art: Path, dopusc: list,
     rap.punkt("wersja", "jarvo version", r.kod == 0, skrot(r.tekst, 300))
     # po instalacji brama restartuje się z flotą i łączy platformy: doctor dopiero, gdy nadzorca widzi ją gotową
     # (brama_gotowa: identify i /health API), najwyżej 120 s
-    koniec = time.monotonic() + 120
-    while time.monotonic() < koniec:
-        s = json_z_wyjscia(inst.jarvo_cmd("status", "--json", czas=60).out) or {}
-        brama = (((s.get("serwis") or {}).get("stan") or {}).get("uslugi") or {}).get("brama") or {}
-        if brama.get("gotowa"):
-            break
-        time.sleep(3)
+    czekaj_na_brame(inst)
     r = inst.jarvo_cmd("doctor", "--json", czas=300)
     d = json_z_wyjscia(r.out)
     if d is not None:
@@ -1212,9 +1225,21 @@ def _test_czatu_i_floty(inst: Instalacja, rap: Raport, art: Path, czas_karty: fl
         except BladE2E as e:
             rap.punkt("profile-testowe", "profile testowe na atrapie modelu", False, str(e))
             return
-        rap.punkt("profile-testowe", "profile testowe na atrapie modelu", True,
+        # Hermes trzyma menedżera wtyczek dla każdego katalogu profilu i wypełnia go, gdy działająca brama zobaczy
+        # nowy profil (zaraz po `hermes profile create`, zanim dojdzie wtyczka i config): bez restartu profil nie ma
+        # jarvo-zgody i zapis przechodzi bez pytania (CI natywnie 14822a9). Flota tak samo: instalator restartuje
+        # bramę po zmianach profili (install_fleet: restart_bramy), więc test robi to samo (ryzyko Z39).
+        przed = stan_bramy(inst).get("pid")
+        r = inst.jarvo_cmd("serwis", "--restart", "brama", czas=180)
+        po = czekaj_na_brame(inst, inny_pid=przed) if r.kod == 0 else {}
+        ok = r.kod == 0 and bool(po.get("gotowa")) and po.get("pid") != przed
+        rap.punkt("profile-testowe", "profile testowe na atrapie modelu", ok,
                   f"{PROFIL_CZAT} (wtyczka {WTYCZKA_ZGOD}, tryb pytaj), {PROFIL_SPEC}; atrapa na "
-                  f"127.0.0.1:{atrapa.port}")
+                  f"127.0.0.1:{atrapa.port}; restart bramy: kod {r.kod}, "
+                  + (f"nowa brama gotowa (pid {po.get('pid')})" if ok else
+                     f"brama niegotowa: {json.dumps(po, ensure_ascii=False)[:200]} {skrot(r.tekst, 200)}"))
+        if not ok:
+            return
 
         # 1. jarvo chat -q: launcher (jarvo.cmd albo ~/.local/bin/jarvo) → Hermes → atrapa
         znak = "e2e-" + secrets.token_hex(4)
