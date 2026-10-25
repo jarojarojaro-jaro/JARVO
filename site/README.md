@@ -17,8 +17,8 @@ i `assets/` (bez `*.json`), bez `tools/` i README.
   Nagłówek „FROM IDEA TO REALITY.” to wektor obrysowany z tej samej grafiki.
 - **Kontakt:** stała `CONTACT` na górze `app.js` (e-mail albo adres strony; pusto = zgłoszenia na GitHubie).
 - **„Start building”** pyta o system (macOS / Linux / Windows, wykrywa go sam) i daje polecenie:
-  `curl … | bash` (macOS, Linux, WSL) albo `irm … | iex` (PowerShell). Instalatory to `install.sh`
-  i `install.ps1` w katalogu głównym repo. Adres instalatorów to `BASE` na górze `app.js` (`https://jarvo.pl`);
-  `.htaccess` przekierowuje `install.sh` i `install.ps1` na najnowsze wersje z publicznego repo (gałąź `main`),
+  `curl … | bash` (macOS, Linux) albo `irm … | iex` (PowerShell), instalacja natywna bez Dockera i WSL. Instalatory
+  to `jarvo/bootstrap/install.sh` i `install.ps1` w repo. Adres instalatorów to `BASE` na górze `app.js`
+  (`https://jarvo.pl`); `.htaccess` przekierowuje `install.sh` i `install.ps1` na bootstrap z publicznego repo (gałąź `main`),
   więc `scripts/deploy-site.sh` ich nie wysyła i po zmianie instalatora nic nie trzeba wgrywać.
 - Czcionki: DM Sans i JetBrains Mono (SIL OFL 1.1), serwowane lokalnie.

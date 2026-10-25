@@ -8,7 +8,8 @@
 # (tests/test_natywne_cli.py pilnuje zgodności). Kroki jak w install.ps1:
 #   1. platforma: macOS arm64 (Mac z Intelem: odmowa, decyzja I06; Terminal pod Rosettą nie myli wykrycia), Linux
 #      x64 i arm64 z glibc; korzeń: $JARVO_ROOT albo ~/.jarvo (macOS), ${XDG_DATA_HOME:-~/.local/share}/jarvo
-#      (Linux), jak jarvo/sciezki.py; cudze polecenie ~/.local/bin/jarvo (stara instalacja) = odmowa (migracja E12),
+#      (Linux), jak jarvo/sciezki.py; stara instalacja z Dockerem: instalator w Pythonie przenosi jej dane
+#      (jarvo migruj, zgoda przed każdą zmianą) przed startem; bez zgody kod 3 = stara flota pracuje dalej,
 #   2. uv i Python do <root>/program/narzedzia/<nazwa>/<wersja>: curl -fL#, suma (sha256sum albo shasum -a 256)
 #      przed rozpakowaniem, tar; znacznik .jarvo-suma jak w jarvo/pobieracz.py, więc instalator w Pythonie
 #      niczego nie pobiera drugi raz,
@@ -104,14 +105,6 @@ katalogi() {   # ROOT, PROGRAM, POBRANE jak jarvo/sciezki.py
   fi
   PROGRAM="$ROOT/program"
   POBRANE="$cache/pobrane"
-}
-
-stara_instalacja() {   # cudze ~/.local/bin/jarvo (np. dowiązanie starej instalacji z Dockerem): nie nadpisujemy
-  local cel="$HOME/.local/bin/jarvo"
-  if [ "${JARVO_BEZ_PATH:-}" = 1 ]; then return 0; fi     # polecenie idzie wtedy do <root>/bin
-  if [ -L "$cel" ] || { [ -e "$cel" ] && ! grep -qsF "$ZNACZNIK" "$cel"; }; then
-    die "$cel należy do innej instalacji Jarvo (np. starej z Dockerem). Migracja (jarvo migruj) przyjdzie w etapie E12; do tego czasu przenieś stare polecenie (np. mv $cel ${cel}-docker) i uruchom instalację ponownie."
-  fi
 }
 
 suma() {
@@ -233,37 +226,43 @@ instalator() {   # python -I -X utf8 <app>/jarvo/start.py instaluj [opcje]
   # npm i serwisu Jarva (skrypt działa we własnym procesie, więc powłoka właściciela go nie traci)
   unset JARVO_TOKEN
   # przy `curl | bash` wejściem jest sam skrypt: pytania instalatora czytają z terminala, a bez niego z /dev/null
+  KOD=0
   if [ -t 0 ]; then
-    "$py" "$@" || die "Instalator Jarva zakończył się błędem (opis wyżej)."
+    "$py" "$@" || KOD=$?
   elif (: < /dev/tty) 2>/dev/null; then
-    "$py" "$@" < /dev/tty || die "Instalator Jarva zakończył się błędem (opis wyżej)."
+    "$py" "$@" < /dev/tty || KOD=$?
   else
-    "$py" "$@" < /dev/null || die "Instalator Jarva zakończył się błędem (opis wyżej)."
+    "$py" "$@" < /dev/null || KOD=$?
   fi
+  # kod 3: gotowe bez przeniesienia danych starej instalacji z Dockerem (brak zgody), to nie błąd
+  case "$KOD" in
+    0|3) ;;
+    *) die "Instalator Jarva zakończył się błędem (opis wyżej)." ;;
+  esac
 }
 
 main() {
   DRY="${JARVO_DRY_RUN:-0}"
+  KOD=0
   say "Jarvo natywnie: instalacja bez Dockera i bez Homebrew"
   command -v curl >/dev/null 2>&1 || die "Brak programu curl: zainstaluj go menedżerem pakietów i uruchom polecenie ponownie."
   command -v tar >/dev/null 2>&1 || die "Brak programu tar: zainstaluj go menedżerem pakietów i uruchom polecenie ponownie."
   platforma
   katalogi
   say "platforma $PLATFORMA, katalog $ROOT"
-  stara_instalacja
   narzedzie uv
   narzedzie python313
   PY_KAT="$KAT"
   wersja
   kod
   instalator ${1+"$@"}
-  if [ "$DRY" = 1 ]; then return 0; fi
+  if [ "$DRY" = 1 ] || [ "$KOD" = 3 ]; then return 0; fi     # 3: stara flota pracuje dalej (opis wyżej)
   if [ "${JARVO_BEZ_PATH:-}" = 1 ]; then
     say "Gotowe. Polecenie: $ROOT/bin/jarvo (PATH bez zmian: JARVO_BEZ_PATH=1), np. $ROOT/bin/jarvo panel."
     return 0
   fi
   case ":$PATH:" in
-    *":$HOME/.local/bin:"*) say "Gotowe. Polecenia: jarvo panel, jarvo status, jarvo chat --profil default (profil jarvo przyjdzie z flotą w etapie E4)." ;;
+    *":$HOME/.local/bin:"*) say "Gotowe. Polecenia: jarvo (rozmowa w terminalu), jarvo panel, jarvo status, jarvo doctor." ;;
     *) if [ "$PLATFORMA" = macos-arm64 ]; then kiedy="w nowym oknie Terminala"
        else kiedy="po ponownym zalogowaniu (terminal w GNOME i KDE nie czyta ~/.profile)"; fi
        say "Gotowe. Polecenie jarvo zadziała $kiedy; od razu: pełną ścieżką z wiersza „Polecenia” wyżej albo po export PATH=\"\$HOME/.local/bin:\$PATH\"." ;;

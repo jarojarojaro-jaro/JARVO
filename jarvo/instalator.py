@@ -6,7 +6,7 @@ Jarva z GitHuba do `<program>/app/<sha12>` i woła `python -I -X utf8 <app>/jarv
 JARVO_TOKEN: klucz był potrzebny tylko do pobrania kodu). Po jednym poleceniu Jarvo działa z flotą. Krok po kroku,
 z paskiem i nazwą kroku:
 
-   1. sprawdzenie: platforma (bez Maca z Intelem, I06), stara instalacja z WSL/Dockerem w tym miejscu, korzeń jako
+   1. sprawdzenie: platforma (bez Maca z Intelem, I06), stara instalacja z WSL/Dockerem (wykryj_stara), korzeń jako
       osobny katalog (same katalogi Jarva: ochrona dostępu obejmuje całe drzewo), porty panelu i API, system plików
       korzenia (bez_ochrony: FAT, exFAT, NTFS na Linuksie i wolumin macOS z noowners nie trzymają uprawnień
       właściciela), miejsce na dysku: potrzeba liczona z manifestu (potrzebne_miejsce: rozmiary plików narzędzi,
@@ -48,6 +48,8 @@ z paskiem i nazwą kroku:
       przebieg z innego okna niczego nie zmienia; ze zmiennymi narzędzi i bramy z buildu) i `<stan>/ustawienia.json`
       (JARVO_PANEL_PORT, JARVO_API_PORT: zadanie Harmonogramu nie przekazuje zmiennych sesji, więc porty pamięta
       instalacja),
+      stara instalacja z Dockerem (migracja.wykryj, tylko odczyt): przeniesienie danych `jarvo migruj` za zgodą
+      przed poleceniem, autostartem i startem (nigdy dwie floty naraz); bez zgody kod 3 i stara flota pracuje dalej,
   16. polecenie `jarvo` dla właściciela: Windows `<root>\\bin\\jarvo.cmd` i wpis w PATH użytkownika (HKCU\\Environment,
       rozgłoszenie WM_SETTINGCHANGE), macOS i Linux `~/.local/bin/jarvo` i oznaczony blok PATH w ~/.zprofile albo
       ~/.profile, gdy trzeba; `--bez-path`: tylko `<root>/bin/jarvo`, bez zmian poza katalogiem Jarva (próby),
@@ -146,6 +148,11 @@ MAKS_LOGU_STARTU = 5 * 2 ** 20  # większy przy starcie serwisu idzie do .1
 
 class BladInstalacji(RuntimeError):
     """Krok instalacji się nie udał: komunikat po polsku z radą, bez sekretów."""
+
+
+class PrzeniesienieOdlozone(BladInstalacji):
+    """Właściciel nie zgodził się (jeszcze) na przeniesienie danych starej instalacji: wersja natywna jest gotowa,
+    ale stoi, a stara flota pracuje dalej. Instalacja kończy się kodem 3 (bootstrap: to nie błąd)."""
 
 
 # ---------------------------------------------------------------- programy systemu, sieć lokalna, procesy w tle
@@ -537,6 +544,7 @@ class Otoczenie:
     dyski: Callable[[], list[Path]] = dyski_lokalne
     otworz: Callable[[str], bool] | None = None          # przeglądarka; None = webbrowser.open
     na_pierwszym_planie: Callable[[list[str], dict], int] | None = None   # None = cli.uruchom_na_pierwszym_planie
+    stara: Callable[[Uklad, Any], Any] | None = None    # stara instalacja z Dockerem; None = wykryj_stara
     czekaj: Callable[[float], None] = time.sleep
     zegar: Callable[[], float] = time.monotonic
 
@@ -1062,10 +1070,37 @@ def kiedy_dziala_path() -> str:
     return "po ponownym zalogowaniu (terminal w GNOME i KDE nie czyta ~/.profile)"
 
 
+ZMIENNA_MIGRACJI = "JARVO_MIGRACJA"      # "nie": instalacja obok starej floty bez propozycji przeniesienia (próby)
+
+
+def migracja_zakonczona(u: Uklad) -> bool:
+    """`jarvo migruj` przeniósł już starą instalację (<stan>/migracja.json: zakończona i niewycofana)."""
+    try:
+        d = json.loads((u.stan / "migracja.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return isinstance(d, dict) and bool(d.get("zakonczona")) and not d.get("wycofana")
+
+
+def wykryj_stara(u: Uklad, ot: Otoczenie) -> Any:
+    """Stara instalacja z Dockerem i WSL do przeniesienia (migracja.wykryj: tylko odczyt, bez startu WSL i Dockera)
+    albo None: nie ma jej, migracja już się zakończyła albo JARVO_MIGRACJA=nie."""
+    if str(ot.env.get(ZMIENNA_MIGRACJI) or "").strip().lower() in ("nie", "0", "no") or migracja_zakonczona(u):
+        return None
+    try:
+        m = ot.modul("migracja")
+        w = m.wykryj(m.SystemMigracji(env=dict(ot.env)), u)
+    except (ImportError, OSError, ValueError, RuntimeError):
+        return None
+    return w if getattr(w, "jest", False) else None
+
+
 def obca_instalacja(u: Uklad, dom: Path | None = None, *, polecenie_w_domu: bool = True) -> str | None:
-    """Powód odmowy, gdy w miejscu instalacji jest stara instalacja (WSL i Docker) albo cudze polecenie jarvo
-    (`polecenie_w_domu=False`: ~/.local/bin nas nie obchodzi, bo polecenie idzie do `<root>/bin`). Migracja
-    przyjdzie w etapie E12 (`jarvo migruj`); do tego czasu niczego z niej nie nadpisujemy."""
+    """Powód, dla którego nie nadpisujemy miejsca instalacji: stara instalacja (WSL i Docker) albo cudze polecenie
+    jarvo (`polecenie_w_domu=False`: ~/.local/bin nas nie obchodzi, bo polecenie idzie do `<root>/bin`). Po
+    zakończonej migracji (`jarvo migruj`) stara instalacja już nie przeszkadza (zostaje do sprzątania)."""
+    if migracja_zakonczona(u):
+        return None
     if WINDOWS:
         if (u.root / "wsl").is_dir():
             return f"w {u.root} jest stara instalacja Jarvo z WSL (katalog wsl)"
@@ -1696,6 +1731,7 @@ class _Instalacja:
         self._bufor: list[str] = []
         self.wynik_floty: dict | None = None  # podsumowanie install_fleet.py z tego przebiegu
         self.panel_po_flocie = False         # panel wstał (albo wstał od nowa) po instalacji floty w tym przebiegu
+        self.stara: Any = None               # stara instalacja z Dockerem (migracja.Wykrycie): najpierw przeniesienie
 
     # dziennik instalacji: ekran + <logi>/instalacja.log (bez sekretów: komunikaty ich nie zawierają)
     def log(self, tekst: str) -> None:
@@ -1734,7 +1770,13 @@ class _Instalacja:
               ("Front panelu", self.front), ("Bezpieczne ustawienia Hermesa", self.konfiguracja),
               ("Klucz API bramy", self.klucz_api), ("Przełączenie wersji", self.przelaczenie),
               ("Programy floty", self.programy_floty), ("Flota", self.flota),
-              ("Środowisko procesów", self.zapis_srodowiska), ("Polecenie jarvo", self.polecenie)]
+              ("Środowisko procesów", self.zapis_srodowiska)]
+        # stara flota z Dockerem: polecenie jarvo, autostart i start dopiero po przeniesieniu danych (nigdy dwie
+        # floty naraz: jeden token Telegrama to jedna brama)
+        self.stara = (self.ot.stara or wykryj_stara)(self.u, self.ot)
+        if self.stara is not None:
+            k.append(("Przeniesienie ze starej instalacji", self.przeniesienie))
+        k.append(("Polecenie jarvo", self.polecenie))
         if self.autostart:
             k.append(("Autostart", self.wlacz_autostart))
         if self.start:
@@ -1754,6 +1796,9 @@ class _Instalacja:
             self.log(f"{_pasek(i, len(kroki))}  {nazwa}")
             try:
                 krok()
+            except PrzeniesienieOdlozone as e:
+                self.log(str(e))
+                return 3
             except Exception as e:    # noqa: BLE001 - każdy błąd kroku kończy instalację czytelnym komunikatem
                 self.log(f"BŁĄD w kroku „{nazwa}”: {e}")
                 if isinstance(e, BrakMiejsca):       # komunikat ma już polecenie z JARVO_ROOT albo radę
@@ -1892,10 +1937,14 @@ class _Instalacja:
         self.platforma = self.platforma or sciezki.platforma()
         self.podlog(f"platforma {self.platforma}, Python {sys.version.split()[0]}")
         powod = obca_instalacja(self.u, polecenie_w_domu=not self.bez_path)
-        if powod:
-            raise BladInstalacji(f"{powod}. Migracja (jarvo migruj) przyjdzie w etapie E12; do tego czasu zainstaluj "
-                                 "Jarvo natywnie w osobnym katalogu: ustaw JARVO_ROOT (np. D:\\Jarvo albo ~/jarvo-"
-                                 "natywnie) i uruchom polecenie instalacji ponownie.")
+        if self.stara is not None:
+            self.podlog("stara instalacja z Dockerem: najpierw wersja natywna (bez startu), potem przeniesienie "
+                        "danych za zgodą" + (f" ({powod})" if powod else ""))
+        elif powod:
+            obok = (f"ustaw JARVO_ROOT na osobny katalog (np. {PRZYKLAD_KORZENIA})" if WINDOWS else
+                    "uruchom polecenie z JARVO_BEZ_PATH=1 (polecenie jarvo tylko w <korzeń>/bin)")
+            raise BladInstalacji(f"{powod}. Uruchom polecenie instalacji bez JARVO_MIGRACJA=nie: przeniesie dane do "
+                                 f"wersji natywnej (pyta o zgodę przed każdą zmianą). Obok starej instalacji: {obok}.")
         powod = korzen_nieosobny(self.u)
         if powod:
             raise BladInstalacji(f"{powod}. Jarvo potrzebuje osobnego katalogu, bo dostęp do całego korzenia dostaje "
@@ -2288,6 +2337,28 @@ class _Instalacja:
         except ImportError:
             return []
 
+    def przeniesienie(self) -> None:
+        """Dane starej instalacji z Dockerem do tej (jarvo/migracja.py: rozbrojenie starej floty, kopia z sumą, próba,
+        import; każda zmiana za zgodą, JARVO_YES=1 = zgoda). Start robią następne kroki tej instalacji. Bez zgody:
+        PrzeniesienieOdlozone, a stara flota pracuje dalej; przerwana migracja rusza przy następnym przebiegu od
+        pierwszego niezrobionego etapu."""
+        migracja = self.ot.modul("migracja")
+        argv = ["--bez-startu", *(["--tak"] if self.ot.env.get("JARVO_YES") == "1" else [])]
+        self.log("")
+        kod = migracja.main(argv, uklad=self.u, otoczenie=self.ot)
+        self.log("")
+        if kod == 3:
+            raise PrzeniesienieOdlozone(
+                "Bez zgody na przeniesienie: stara flota pracuje dalej i niczego w niej nie zmieniłem. Wersja natywna "
+                f"jest zainstalowana w {self.u.root}, ale nie działa (nigdy dwie floty naraz). Przeniesienie danych: "
+                "uruchom to samo polecenie instalacji jeszcze raz.")
+        if kod != 0:
+            raise BladInstalacji("przeniesienie danych przerwane (opis wyżej; dziennik "
+                                 f"{self.u.logi / 'migracja.log'}). Dane starej instalacji są nietknięte albo w kopii, "
+                                 "a ponowne polecenie instalacji rusza od pierwszego niezrobionego etapu.")
+        self.zmiany.append("przeniesienie ze starej instalacji")
+        self.stara = None
+
     def polecenie(self) -> None:
         python = python_jarva(self.u)
         start = self.app / "jarvo" / "start.py"
@@ -2320,6 +2391,12 @@ class _Instalacja:
         zm = self.ot.modul("zmiany_hosta")
         tresc = tresc_jarvo_sh(python, start, korzen)
         cel = dom / ".local" / "bin" / "jarvo"
+        if not self.bez_path and (cel.is_symlink() or (cel.is_file() and ZNACZNIK not in cel.read_text(
+                encoding="utf-8", errors="replace"))):
+            # stare polecenie (np. dowiązanie do ~/jarvo/bin/jarvo), którego migracja nie dostała zgody usunąć
+            self.uwagi.append(f"{cel} należy do innej instalacji Jarvo i zostaje; polecenie tej: "
+                              f"{self.u.root / 'bin' / 'jarvo'}")
+            self.bez_path = True
         if not self.bez_path and cel.is_file():
             # nasze polecenie innej instalacji Jarva (np. domyślnej, a ta jest spod JARVO_ROOT): zostaje jej
             stary = korzen_polecenia(cel.read_text(encoding="utf-8", errors="replace"))
@@ -2439,7 +2516,8 @@ def wypisz(tekst: str) -> None:
 def instaluj(u: Uklad, app: Path, *, autostart: bool = True, web_lokalnie: bool = False, start: bool = True,
              bez_path: bool = False, log: Callable[[str], None] = wypisz, otoczenie: Otoczenie | None = None,
              platforma: str | None = None) -> int:
-    """Instalacja albo naprawa Jarva w układzie `u` z kodu w `app`; 0 = gotowe, 1 = błąd (komunikat wypisany).
+    """Instalacja albo naprawa Jarva w układzie `u` z kodu w `app`; 0 = gotowe, 1 = błąd (komunikat wypisany), 3 =
+    gotowe bez przeniesienia danych starej instalacji z Dockerem (brak zgody: stara flota pracuje dalej, ta stoi).
     `start=False` kończy po poleceniu jarvo i autostarcie (bez startu serwisu); `bez_path=True`: polecenie tylko
     w `<root>/bin`, bez PATH i plików startowych powłoki (próby na komputerze właściciela)."""
     inst = _Instalacja(bezwzgledny(u), app, otoczenie or Otoczenie(), log, autostart=autostart,

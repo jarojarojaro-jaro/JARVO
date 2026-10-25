@@ -8,31 +8,35 @@ Stan: plan z 2026-09-30; **etap 1 (Linux) zbudowany i przetestowany 2026-09-30**
 i etap 3 (macOS) zbudowane 2026-10-09** (§4b; macOS czeka na próbę na prawdziwym Macu), **etap 4 (Windows)
 zbudowany 2026-10-09** (§4c; czeka na próbę na prawdziwym Windowsie), etap 5 w toku.
 
-**Kierunek od 2026-10-24:** instalacja natywna bez Dockera i bez WSL na trzech systemach. Plan przejścia (mapa
-kontener → natywnie, etapy, ryzyka, decyzje) jest w [NATYWNIE.md](NATYWNIE.md). Do przełączenia (etap E13) ten
-dokument opisuje dzisiejszą instalację.
-
-**Bootstrap natywny (etap E3, na razie obok tej instalacji).** Osobny adres, domyślnym stanie się w etapie E13:
+**Od 2026-10-25 (etap E13): domyślna jest instalacja natywna** bez Dockera i bez WSL na trzech systemach (plan,
+mapa kontener → natywnie i decyzje: [NATYWNIE.md](NATYWNIE.md)). To samo polecenie testuje CI na czystych maszynach
+(`.github/workflows/natywnie.yml`: Windows x64 i arm64, macOS arm64, Linux x64 i arm64):
 
 ```
 Windows        irm https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/jarvo/bootstrap/install.ps1 | iex
 macOS, Linux   curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/jarvo/bootstrap/install.sh | bash
 ```
 
+Krótszy adres po wgraniu strony: `curl -fsSL https://jarvo.pl/install.sh | bash` i `irm https://jarvo.pl/install.ps1 | iex`
+(`site/.htaccess` przekierowuje na ten sam bootstrap z gałęzi `main`).
+
 - Bez Dockera, WSL, admina i sudo. Bootstrap (`jarvo/bootstrap/install.ps1`, `install.sh`) pobiera uv i Pythona 3.13
-  z sumami wpisanymi w skrypt oraz kod Jarva z GitHuba, potem woła `jarvo instaluj` (16 kroków, [NATYWNIE.md](NATYWNIE.md)
-  c3). macOS tylko na Apple Silicon, od macOS 15.
-- Zmienne (opcjonalne): `JARVO_ROOT` (katalog instalacji; względny i z `~` zamieniany na pełną ścieżkę), `JARVO_REF`
-  (gałąź, tag albo pełny SHA), `JARVO_TOKEN` (klucz do prywatnej kopii repo: tylko w nagłówku do api.github.com,
-  instalator w Pythonie go nie dostaje), `JARVO_NO_AUTOSTART=1`, `JARVO_WEB_LOKALNIE=1` (front panelu od nowa),
-  `JARVO_BEZ_PATH=1` (polecenie `jarvo` tylko w `<root>/bin`), `JARVO_DRY_RUN=1` (sam plan; w install.ps1 razem
-  z `JARVO_FAKE_ARCH`).
-- Na razie potrzebne są w PATH git (na Windows Git for Windows) i Node.js z npm do budowy frontu panelu: Node.js 24.11+,
-  22.22+ albo 26+. Bez nich instalator kończy krok radą, skąd je wziąć.
-- Polecenia: `jarvo panel`, `jarvo status`, `jarvo doctor`, `jarvo up`, `jarvo down` (serwis stoi do `jarvo up`),
-  `jarvo logs`, `jarvo autostart on|off|status`, `jarvo chat` (profil `jarvo`, `--profil`, `--tryb pytaj|projekt|pelny`),
-  `jarvo wiedza`, `jarvo rutyny`, `jarvo telegram`, `jarvo komputer` (Komputer Jarva; `jarvo komputer rece` = ręce na
-  Twoim ekranie, domyślnie wyłączone), `jarvo android`, `jarvo version`, `jarvo help` oraz:
+  z sumami wpisanymi w skrypt oraz kod Jarva z GitHuba, potem woła `jarvo instaluj` (kroki: [NATYWNIE.md](NATYWNIE.md)
+  c3; lista składa się z manifestu dla danej platformy). macOS tylko na Apple Silicon, od macOS 15.
+- Zmienne (opcjonalne): `JARVO_ROOT` (katalog instalacji, np. inny dysk; względny i z `~` zamieniany na pełną ścieżkę),
+  `JARVO_REF` (gałąź, tag albo pełny SHA), `JARVO_TOKEN` (klucz do prywatnej kopii repo: tylko w nagłówku do
+  api.github.com, instalator w Pythonie go nie dostaje), `JARVO_YES=1` (zgoda na przeniesienie danych starej
+  instalacji bez pytań), `JARVO_MIGRACJA=nie` (bez propozycji przeniesienia: próby obok starej floty),
+  `JARVO_NO_AUTOSTART=1`, `JARVO_WEB_LOKALNIE=1` (front panelu od nowa), `JARVO_BEZ_PATH=1` (polecenie `jarvo` tylko
+  w `<root>/bin`), `JARVO_DRY_RUN=1` (sam plan; w install.ps1 razem z `JARVO_FAKE_ARCH`).
+- Programy przypięte w manifeście (`vendor/natywne.yaml`) instalator pobiera sam, z sumą sha256: uv, Python, Node.js,
+  git (Windows), ffmpeg, przeglądarki, lektory, OCR i inne. Na macOS i Linuksie potrzebny jest systemowy git (bez niego
+  krok kończy się radą: `xcode-select --install` albo menedżer pakietów).
+- Polecenia: `jarvo` (rozmowa w terminalu, jak `jarvo chat`), `jarvo panel`, `jarvo status`, `jarvo doctor`, `jarvo up`,
+  `jarvo down` (serwis stoi do `jarvo up`), `jarvo logs`, `jarvo autostart on|off|status`, `jarvo chat` (profil `jarvo`,
+  `--profil`, `--tryb pytaj|projekt|pelny`), `jarvo wiedza`, `jarvo rutyny`, `jarvo telegram`, `jarvo komputer`
+  (Komputer Jarva; `jarvo komputer rece` = ręce na Twoim ekranie, domyślnie wyłączone), `jarvo android`,
+  `jarvo version`, `jarvo help` oraz:
   - `jarvo update` (`--sprawdz`, `--ref REF`, `--json`): nowa wersja obok starej w `<program>/app/<sha12>`, instalator
     nowej wersji, `jarvo doctor`, powrót przy błędzie; nie używa HOST_VERSION (zawsze instalator nowej wersji);
     zmienne JARVO_UPDATE_TIMEOUT (3600 s), JARVO_UPDATE_ROZGRZEWKA (120 s), JARVO_UPDATE_CHECK (3600 s, pomocnik);
@@ -40,8 +44,18 @@ macOS, Linux   curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JA
   - `jarvo migruj`: przeniesienie danych ze starej instalacji z Dockerem i WSL (docs/NATYWNIE.md, sekcja f).
 - Linux: polecenie `jarvo` działa w nowym terminalu dopiero po ponownym zalogowaniu (terminal w GNOME i KDE nie czyta
   `~/.profile`).
-- Starą instalację z WSL albo Dockerem w tym samym katalogu bootstrap rozpoznaje i odmawia (migracja w etapie E12);
-  wtedy natywnie tylko w osobnym katalogu (`JARVO_ROOT`).
+- **Stara instalacja z Dockerem albo WSL** (jarvo/migracja.py `wykryj`, tylko odczyt, bez startu WSL i Dockera): to samo
+  polecenie instaluje wersję natywną bez startu, autostartu i polecenia `jarvo`, potem przenosi dane (`jarvo migruj
+  --bez-startu`: rozbrojenie starej floty, kopia z sumą, próba bez sekretów, import, flota; pytanie o zgodę przed każdą
+  zmianą, `JARVO_YES=1` = zgoda), a dopiero wtedy zapisuje polecenie `jarvo`, autostart i uruchamia serwis. Nigdy dwie
+  floty naraz (jeden token Telegrama to jedna brama). Bez zgody instalator kończy się kodem 3: stara flota pracuje dalej,
+  wersja natywna stoi, a ponowne polecenie instalacji rusza przeniesienie od pierwszego niezrobionego etapu. Na Windowsie
+  stara instalacja zajmuje `%LOCALAPPDATA%\Jarvo` (dysk WSL w `wsl\`), więc bootstrap stawia natywną obok, w
+  `%LOCALAPPDATA%\Jarvo-natywnie` (uprawnienia starego katalogu bez zmian), a migracja podmienia stare `jarvo.cmd` na
+  polecenie tej instalacji. Po zakończonej migracji (`<stan>/migracja.json`) stara instalacja niczego już nie blokuje;
+  usuwa ją dopiero `jarvo migruj --sprzatanie` po okresie przejściowym.
+- Stara droga z Dockerem (sekcje niżej: `install.sh`, `install.ps1`, `bin/jarvo` w katalogu głównym repo) zostaje do
+  usunięcia w następnym kroku etapu E13; serwer (VPS) dalej działa na obrazie (RUNBOOK.md).
 
 ---
 

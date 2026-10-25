@@ -495,7 +495,7 @@ Proxy wymagające `HTTPS_PROXY` dalej blokuje pobór. Healthcheck (`toolbox.yaml
 
 ## Stan instalacji natywnej (Windows, macOS, Linux)
 
-Instalacja bez Dockera i WSL ([NATYWNIE.md](NATYWNIE.md), etap E2; do etapu E13 pod osobnym adresem `jarvo/bootstrap/`).
+Instalacja bez Dockera i WSL ([NATYWNIE.md](NATYWNIE.md), etap E2; bootstrap `jarvo/bootstrap/`, domyślny od etapu E13).
 Źródło prawdy: [`vendor/natywne.yaml`](../vendor/natywne.yaml), czyli adres, SHA-256 i rozmiar pliku dla każdej
 platformy albo `brak:` z powodem. Z niego `scripts/natywne.py generuj` robi `vendor/natywne.lock.json`, który czyta
 instalator. Pliki pobiera u źródła [`jarvo/pobieracz.py`](../jarvo/pobieracz.py): sprawdza sumę przed rozpakowaniem

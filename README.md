@@ -35,30 +35,27 @@ Demo bez serwera: `python3 scripts/hqbuild.py --demo build/hq-demo`.
 
 ## Szybki start
 
-Instalacja lokalna jednym poleceniem (Linux, macOS, Windows; repo do `~/jarvo`, flota w `~/jarvo-local`,
-potem http://localhost:9119/jarvo). Instalator sam doinstalowuje wszystko, czego brakuje: na Linuksie
-i w WSL pakiety i Docker Engine, na macOS Homebrew, bash, git, Pythona i Dockera w darmowej Colimie
-(działający Docker Desktop albo OrbStack zostaje), na Windowsie WSL2 (jeden restart, potem dalej sam),
-własną dystrybucję Linuksa `Jarvo` i Dockera w niej. Obraz floty pobiera gotowy z GHCR. Repo jest publiczne,
-więc nie trzeba żadnego klucza. Szczegóły: [docs/INSTALER.md](docs/INSTALER.md):
+Instalacja jednym poleceniem, bez Dockera i bez WSL (Windows 10/11, macOS 15+ na Apple Silicon, Linux x64 i arm64).
+Bez administratora i sudo: instalator pobiera przypięte programy (uv, Python, Node.js, git na Windows, ffmpeg,
+przeglądarka, modele) ze sprawdzeniem sum sha256 i stawia całą flotę z panelem. Na macOS i Linuksie potrzebny jest
+systemowy git (bez niego instalator mówi, jak go dodać):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh | bash   # Linux, macOS (Terminal)
 # Windows (PowerShell, zwykły użytkownik):
-#   irm https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.ps1 | iex
-# krótszy adres po wgraniu strony (scripts/deploy-site.sh): https://jarvo.pl/install.sh i https://jarvo.pl/install.ps1
-# bez pytań:  curl -fsSL …/install.sh | JARVO_PROVIDER=openrouter JARVO_KEY=sk-… JARVO_YES=1 bash
-# potem:      jarvo open (wejście bez hasła) | haslo | status | logs | chat | update | down   (jarvo help: wszystkie)
-# jarvo update = git pull + ten sam instalator (nowe programy hosta, gdy wersja Jarvo ich wymaga)
-# Windows: jarvo działa wprost w PowerShellu (jarvo.cmd przekazuje do Linuksa); nowy install.ps1 = ten sam irm … | iex
-# z klonu:    bash bin/jarvo up   (stop: bash bin/jarvo down)
+irm https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/jarvo/bootstrap/install.ps1 | iex
+# macOS i Linux (Terminal):
+curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/jarvo/bootstrap/install.sh | bash
 ```
 
-**Instalacja natywna (w budowie, bez Dockera i WSL):** do przełączenia w etapie E13 osobny adres, plan i stan
-w [docs/NATYWNIE.md](docs/NATYWNIE.md). Windows: `irm https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/jarvo/bootstrap/install.ps1 | iex`,
-macOS 15+ (Apple Silicon) i Linux: `curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/jarvo/bootstrap/install.sh | bash`
-(na razie z gitem i Node.js w PATH). Potem `jarvo panel`, `jarvo status`, `jarvo doctor`, `jarvo down` i `jarvo up`, a rozmowa w terminalu przez
-`jarvo chat --profil default` (profil `jarvo` przyjdzie z flotą w etapie E4). Szczegóły: [docs/INSTALER.md](docs/INSTALER.md).
+Krótszy adres po wgraniu strony (`scripts/deploy-site.sh`): `curl -fsSL https://jarvo.pl/install.sh | bash` i
+`irm https://jarvo.pl/install.ps1 | iex` (przekierowanie na ten sam bootstrap, `site/.htaccess`).
+
+Potem `jarvo` (rozmowa w terminalu, tryby zgód `--tryb pytaj|projekt|pelny`), `jarvo panel`, `jarvo status`,
+`jarvo doctor`, `jarvo update`, `jarvo down` / `jarvo up`, `jarvo uninstall` (`jarvo help`: wszystkie). Inny dysk:
+przed poleceniem `$env:JARVO_ROOT = 'D:\Jarvo'` (Windows) albo `JARVO_ROOT=/sciezka` (macOS, Linux). Stara
+instalacja z Dockerem albo WSL: to samo polecenie ją wykrywa, stawia wersję natywną i przenosi dane (`jarvo migruj`,
+pytanie o zgodę przed każdą zmianą); bez zgody stara flota pracuje dalej. Szczegóły: [docs/INSTALER.md](docs/INSTALER.md),
+plan i stan: [docs/NATYWNIE.md](docs/NATYWNIE.md).
 
 Praca z repo:
 
@@ -101,7 +98,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [`branding/`](branding) | skórka Jarvo: terminal, favicon, motyw i tłumaczenie dashboardu, łatka powłoki `/jarvo` (`powloka.json`, `powloka.js`) |
 | [`site/`](site) | landing jarvo.pl (`scripts/deploy-site.sh`) |
 | [`install.sh`](install.sh), [`install.ps1`](install.ps1) | instalator jednym poleceniem: Linux/WSL2 (pakiety, Docker Engine), macOS (Homebrew, Colima), Windows (WSL2, dystrybucja `Jarvo`, Docker w niej) |
-| [`jarvo/`](jarvo) | Jarvo natywnie, w budowie ([docs/NATYWNIE.md](docs/NATYWNIE.md)): `sciezki.py` (katalogi i platforma na trzy systemy), `srodowisko.py` (zmienne procesów Jarva z narzędziami i modelami, bez sekretów i zmiennych obcych), `przenosne.py` (przenośne blokady, zapisy atomowe i ochrona dostępu), `manifest.py` (odczyt `vendor/natywne.lock.json`), `pobieracz.py` (pobieranie z sumą sha256, paskiem i wznawianiem, rozpakowanie z dowiązaniami, `usun` i `zmien_nazwe`), `hermes.py` (Hermes z przypięcia: checkout, uv z sumami także dla zależności budowy, front, bezpieczna konfiguracja), `nadzorca.py` (`jarvo serwis`: brama i panel Hermesa, restart, logi z rotacją, kanał sterowania, trwałe zatrzymanie), `autostart.py` (zadanie Harmonogramu `Jarvo-<SID>`, LaunchAgent `pl.jarvo.nadzorca`, `jarvo.service` w systemd --user), `zmiany_hosta.py` (dziennik `<stan>/zmiany-hosta.jsonl`, cofany od końca przy odinstalowaniu), `cli.py` (polecenie `jarvo`: instaluj, serwis, up, down, status, panel, chat, logs, autostart, doctor, wiedza, rutyny, telegram, update, uninstall, migruj, komputer (także `komputer rece`), android, version, help), `instalator.py` (`jarvo instaluj` z paskiem: kroki składane z manifestu, na Windows dziś 42), `aktualizacja.py` (`jarvo update`: nowa wersja z GitHuba obok starej w `<program>/app/<sha12>`, jej instalator, doctor z rozgrzewką, powrót przy błędzie, sprzątanie starych wersji, pomocnik przycisku w panelu), `odinstalowanie.py` (`jarvo uninstall`: stop, autostart off, cofnięcie dziennika zmian hosta, usunięcie katalogów, dane tylko z `--all`, skan śladów), `migracja.py` (`jarvo migruj`: dane starej instalacji z Dockerem i WSL), `komputer.py` i `rece.py` (Komputer Jarva i ręce na ekranie właściciela), `android.py` (telefon testowy przez adb i scrcpy), `przy_uzyciu.py` i `manimgx.py` (narzędzia przy pierwszym użyciu), `wiedza_cli.py` (skarbiec, rutyny i Telegram w `jarvo` i `doctor`), `zgody_cli.py` (doctor: wtyczka zgód w każdym profilu bramy), `start.py` (launcher `python -I -X utf8` dla polecenia i autostartu), `bootstrap/` (instalacja jednym poleceniem: `install.ps1` i `install.sh`, do etapu E13 obok starego instalatora) |
+| [`jarvo/`](jarvo) | Jarvo natywnie, w budowie ([docs/NATYWNIE.md](docs/NATYWNIE.md)): `sciezki.py` (katalogi i platforma na trzy systemy), `srodowisko.py` (zmienne procesów Jarva z narzędziami i modelami, bez sekretów i zmiennych obcych), `przenosne.py` (przenośne blokady, zapisy atomowe i ochrona dostępu), `manifest.py` (odczyt `vendor/natywne.lock.json`), `pobieracz.py` (pobieranie z sumą sha256, paskiem i wznawianiem, rozpakowanie z dowiązaniami, `usun` i `zmien_nazwe`), `hermes.py` (Hermes z przypięcia: checkout, uv z sumami także dla zależności budowy, front, bezpieczna konfiguracja), `nadzorca.py` (`jarvo serwis`: brama i panel Hermesa, restart, logi z rotacją, kanał sterowania, trwałe zatrzymanie), `autostart.py` (zadanie Harmonogramu `Jarvo-<SID>`, LaunchAgent `pl.jarvo.nadzorca`, `jarvo.service` w systemd --user), `zmiany_hosta.py` (dziennik `<stan>/zmiany-hosta.jsonl`, cofany od końca przy odinstalowaniu), `cli.py` (polecenie `jarvo`: instaluj, serwis, up, down, status, panel, chat, logs, autostart, doctor, wiedza, rutyny, telegram, update, uninstall, migruj, komputer (także `komputer rece`), android, version, help), `instalator.py` (`jarvo instaluj` z paskiem: kroki składane z manifestu, na Windows dziś 42), `aktualizacja.py` (`jarvo update`: nowa wersja z GitHuba obok starej w `<program>/app/<sha12>`, jej instalator, doctor z rozgrzewką, powrót przy błędzie, sprzątanie starych wersji, pomocnik przycisku w panelu), `odinstalowanie.py` (`jarvo uninstall`: stop, autostart off, cofnięcie dziennika zmian hosta, usunięcie katalogów, dane tylko z `--all`, skan śladów), `migracja.py` (`jarvo migruj`: dane starej instalacji z Dockerem i WSL), `komputer.py` i `rece.py` (Komputer Jarva i ręce na ekranie właściciela), `android.py` (telefon testowy przez adb i scrcpy), `przy_uzyciu.py` i `manimgx.py` (narzędzia przy pierwszym użyciu), `wiedza_cli.py` (skarbiec, rutyny i Telegram w `jarvo` i `doctor`), `zgody_cli.py` (doctor: wtyczka zgód w każdym profilu bramy), `start.py` (launcher `python -I -X utf8` dla polecenia i autostartu), `bootstrap/` (instalacja jednym poleceniem: `install.ps1` i `install.sh`, domyślna od etapu E13; stara instalacja z Dockerem jest przenoszona tym samym poleceniem) |
 | [`zgody/`](zgody) | wtyczka zgód `jarvo-zgody` dla instalacji natywnej: tryby pytaj, projekt (domyślny) i pełny jak w Claude Code (hak `pre_tool_call`, polecenie `/tryb`); opis w [zgody/README.md](zgody/README.md), budowa i instalacja we flocie w etapie E4 |
 | [`bin/jarvo`](bin/jarvo) | polecenie użytkownika po instalacji: `up`, `down`, `status`, `logs`, `update`, `chat`, `open`, `pliki`, `autostart`, `uninstall` |
 | [`requirements-dev.txt`](requirements-dev.txt) | zależności testów i walidacji (`make dev-deps`) |

@@ -7,7 +7,8 @@
 # w vendor/natywne.lock.json (tests/test_natywne_cli.py pilnuje zgodnosci). Kroki:
 #   1. korzen: $env:JARVO_ROOT (wzgledny albo z ~ liczony od biezacego katalogu, pelny wraca do zmiennej) albo
 #      %LOCALAPPDATA%\Jarvo; katalog programu ma sciezke ASCII (przy polskich znakach
-#      krotka nazwa 8.3 korzenia, jak jarvo/sciezki.py); stara instalacja z WSL w tym miejscu = odmowa (migracja E12),
+#      krotka nazwa 8.3 korzenia, jak jarvo/sciezki.py); stara instalacja z WSL i Dockerem: instalator w Pythonie
+#      przenosi jej dane (jarvo migruj, zgoda przed kazda zmiana) przed startem; bez zgody kod 3 = stara zostaje,
 #   2. uv i Python do <root>\program\narzedzia\<nazwa>\<wersja>: suma przed rozpakowaniem (SHA-256 z .NET), tar.exe
 #      dla tar.gz, Expand-Archive dla zip; znacznik .jarvo-suma jak w jarvo/pobieracz.py, wiec instalator
 #      w Pythonie niczego nie pobiera drugi raz,
@@ -21,7 +22,7 @@
 # repo: idzie tylko w naglowku do api.github.com, nigdy na ekran), JARVO_NO_AUTOSTART=1, JARVO_WEB_LOKALNIE=1,
 # JARVO_BEZ_PATH=1 (polecenie jarvo tylko w <root>\bin, PATH uzytkownika bez zmian: proby),
 # JARVO_DRY_RUN=1 (tylko plan, bez pobierania i zapisu; JARVO_FAKE_ARCH udaje wtedy architekture).
-# Do etapu E13 to osobny adres: domyslny zostaje stary install.ps1 z katalogu glownego repo.
+# Ten sam skrypt pod krotszym adresem: install.ps1 z katalogu glownego repo przekazuje tutaj (stare linki).
 #
 # Plik tylko ASCII i bez BOM: Windows PowerShell 5.1 czyta skrypt bez BOM w stronie kodowej ANSI, a `irm | iex`
 # zostawia BOM w tekscie. Calosc dziala w bloku `& { }`: funkcje i ustawienia (ErrorActionPreference) nie zostaja
@@ -62,7 +63,7 @@
   # Program spoza PowerShella. W Windows PowerShell 5.1 wiersz na stderr przy przekierowaniu staje sie bledem,
   # a przy ErrorActionPreference=Stop przerywa skrypt (curl.exe pisze tam pasek postepu): decyduje kod wyjscia.
   # Wywolanie bez przechwycenia, wiec program pisze wprost do konsoli (pasek, kolory, polskie znaki).
-  function JarvoProgram([string]$Plik, [string[]]$Argumenty, [string]$Blad) {
+  function JarvoProgram([string]$Plik, [string[]]$Argumenty, [string]$Blad, [int[]]$Dozwolone = @(0)) {
     $stary = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
@@ -71,7 +72,7 @@
     } finally {
       $ErrorActionPreference = $stary
     }
-    if ($kod -ne 0) { JarvoBlad "$Blad (kod $kod)" }
+    if ($Dozwolone -notcontains $kod) { JarvoBlad "$Blad (kod $kod)" }
   }
 
   function JarvoSuma([string]$Plik) {
@@ -112,11 +113,26 @@
   # JARVO_ROOT wzgledny albo z ~ liczymy od biezacego katalogu PowerShella (GetFullPath liczylby od katalogu procesu
   # .NET, ktory po cd w PowerShellu jest inny), a pelna sciezka wraca do $env:JARVO_ROOT: instalator w Pythonie,
   # jarvo.cmd (--korzen) i autostart dostaja ten sam korzen
+  # stara instalacja z WSL w tym katalogu: dysk dystrybucji w wsl\ albo polecenie jarvo.cmd wolajace wsl.exe
+  function JarvoStaryKatalog([string]$Korzen) {
+    if (Test-Path -LiteralPath (Join-Path $Korzen 'wsl')) { return $true }
+    $cmd = Join-Path $Korzen 'bin\jarvo.cmd'
+    return (Test-Path -LiteralPath $cmd) -and -not ((Get-Content -LiteralPath $cmd -Raw) -match 'Jarvo natywnie')
+  }
+
   function JarvoKorzen {
     $r = $env:JARVO_ROOT
     if (-not $r) {
       if (-not $env:LOCALAPPDATA) { JarvoBlad 'brak zmiennej LOCALAPPDATA: ustaw JARVO_ROOT na katalog instalacji.' }
-      return [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Jarvo'))
+      $domyslny = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Jarvo'))
+      # stara instalacja z WSL zajmuje domyslny katalog: wersja natywna obok, w Jarvo-natywnie (uprawnienia starego
+      # katalogu i dysku WSL bez zmian); jarvo migruj kieruje potem stare polecenie jarvo na nia
+      $obok = $domyslny + '-natywnie'
+      if ((Test-Path -LiteralPath (Join-Path $obok 'program')) -or (JarvoStaryKatalog $domyslny)) {
+        $env:JARVO_ROOT = $obok
+        return $obok
+      }
+      return $domyslny
     }
     try {
       $pelna = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($r)
@@ -144,19 +160,6 @@
       JarvoBlad "sciezka $Korzen ma znaki spoza ASCII, a system nie podal krotkiej nazwy. Ustaw JARVO_ROOT na katalog z samymi literami ASCII (np. C:\Jarvo) i uruchom polecenie ponownie."
     }
     return $p
-  }
-
-  function JarvoStaraInstalacja([string]$Korzen) {
-    $cmd = Join-Path $Korzen 'bin\jarvo.cmd'
-    $stara = Test-Path -LiteralPath (Join-Path $Korzen 'wsl')
-    if (-not $stara -and (Test-Path -LiteralPath $cmd)) {
-      $stara = -not ((Get-Content -LiteralPath $cmd -Raw) -match 'Jarvo natywnie')
-    }
-    if ($stara) {
-      JarvoBlad ("w $Korzen jest stara instalacja Jarvo (WSL i Docker). Migracja (jarvo migruj) przyjdzie w etapie E12; " +
-                 "do tego czasu zainstaluj Jarvo natywnie w osobnym katalogu, np.: `$env:JARVO_ROOT = 'D:\Jarvo'; " +
-                 "irm https://raw.githubusercontent.com/$JarvoRepo/main/jarvo/bootstrap/install.ps1 | iex")
-    }
   }
 
   # Pobranie z suma sprawdzana przed uzyciem; plik juz obecny z dobra suma = bez sieci
@@ -300,7 +303,8 @@
     $klucz = $env:JARVO_TOKEN
     Remove-Item -LiteralPath 'Env:JARVO_TOKEN' -ErrorAction SilentlyContinue
     try {
-      JarvoProgram $Python $Argumenty 'instalator Jarva zakonczyl sie bledem (opis wyzej)'
+      # kod 3: gotowe bez przeniesienia danych starej instalacji (brak zgody), to nie blad
+      JarvoProgram $Python $Argumenty 'instalator Jarva zakonczyl sie bledem (opis wyzej)' @(0, 3)
     } finally {
       if ($klucz) { $env:JARVO_TOKEN = $klucz }
     }
@@ -313,7 +317,6 @@
     $program = JarvoKatalogProgramu $korzen
     $pobrane = Join-Path $korzen 'cache\pobrane'
     JarvoKrok "platforma $platforma, katalog $korzen"
-    JarvoStaraInstalacja $korzen
     $python = $null
     foreach ($wpis in @($JarvoPliki | Where-Object { $_.platforma -eq $platforma })) {
       $cel = JarvoKatalogNarzedzia $program $wpis
@@ -335,14 +338,15 @@
       return
     }
     JarvoUruchomInstalator $python $argumenty
+    if ($LASTEXITCODE -eq 3) { return }        # stara flota pracuje dalej; instalator napisal, co dalej
     $bin = Join-Path $korzen 'bin'
     if ($env:JARVO_BEZ_PATH -eq '1') {
       JarvoKrok "Gotowe. Polecenie: $bin\jarvo.cmd (PATH bez zmian: JARVO_BEZ_PATH=1), np. $bin\jarvo.cmd panel."
       return
     }
     if (-not (@($env:Path -split ';') -contains $bin)) { $env:Path = "$env:Path;$bin" }   # to okno tez
-    JarvoKrok ('Gotowe. Polecenie jarvo dziala w tym oknie i w kazdym nowym: jarvo panel, jarvo status, ' +
-               'jarvo chat --profil default (profil jarvo przyjdzie z flota w etapie E4).')
+    JarvoKrok ('Gotowe. Polecenie jarvo dziala w tym oknie i w kazdym nowym: jarvo (rozmowa w terminalu), ' +
+               'jarvo panel, jarvo status, jarvo doctor.')
   }
 
   JarvoInstaluj

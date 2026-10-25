@@ -123,6 +123,16 @@ def load_script(rel: str, name: str | None = None):
     return module
 
 
+@pytest.fixture(autouse=True)
+def _bez_starej_instalacji(monkeypatch):
+    """Instalator w testach nie szuka starej instalacji właściciela (rejestr, `wsl -l`, `docker ps`): atrapa mówi
+    „nie ma”. Testy przeniesienia podają własne `Otoczenie(stara=...)`."""
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    from jarvo import instalator
+    monkeypatch.setattr(instalator, "wykryj_stara", lambda u, ot: None)
+
+
 @pytest.fixture
 def repo_copy(tmp_path, monkeypatch):
     """Kopia części repo, na której walidator i build działają jak na oryginale.

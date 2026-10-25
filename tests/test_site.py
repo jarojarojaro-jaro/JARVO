@@ -35,9 +35,10 @@ def test_install_commands_point_at_repo_installers():
     base = re.search(r'const BASE = "([^"]+)"', js).group(1)
     assert base.startswith("https://")
     assert "${BASE}/install.sh | bash" in js and "${BASE}/install.ps1 | iex" in js
-    assert (REPO / "install.sh").is_file() and (REPO / "install.ps1").is_file()
-    # PowerShell pobiera ten sam install.sh w WSL
-    assert "install.sh" in (REPO / "install.ps1").read_text(encoding="utf-8")
+    assert (REPO / "jarvo/bootstrap/install.sh").is_file() and (REPO / "jarvo/bootstrap/install.ps1").is_file()
+    # instalacja natywna: bez kroków z Dockerem i WSL na stronie
+    kroki = js.split("const OS = {")[1].split("function detect()")[0]
+    assert "Docker Desktop" not in kroki and "WSL integration" not in kroki and "WSL:" not in kroki
 
 
 def test_domain_installers_redirect_to_public_repo():
@@ -46,13 +47,14 @@ def test_domain_installers_redirect_to_public_repo():
     assert 'const BASE = "https://jarvo.pl"' in js
     ht = (SITE / ".htaccess").read_text(encoding="utf-8")
     assert re.search(r"RewriteRule \^install\\\.\(sh\|ps1\)\$ "
-                     r"https://raw\.githubusercontent\.com/jarojarojaro-jaro/JARVO/main/install\.\$1 \[R=302,L\]", ht)
+                     r"https://raw\.githubusercontent\.com/jarojarojaro-jaro/JARVO/main/jarvo/bootstrap/install\.\$1 "
+                     r"\[R=302,L\]", ht)
     # przekierowanie jest w bloku mod_rewrite (RewriteEngine On), a instalatorów nie wgrywamy na FTP
     blok = ht.split("<IfModule mod_rewrite.c>")[1].split("</IfModule>")[0]
     assert "RewriteEngine On" in blok and "install" in blok
     assert '"$ROOT/$f"' not in (REPO / "scripts" / "deploy-site.sh").read_text(encoding="utf-8")
     # README podaje pełny adres (działa też przed wgraniem strony), INSTALER.md docelowy krótki
-    raw = "https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install"
+    raw = "https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/jarvo/bootstrap/install"
     readme = (REPO / "README.md").read_text(encoding="utf-8")
     assert f"curl -fsSL {raw}.sh | bash" in readme and f"irm {raw}.ps1 | iex" in readme
     assert "jarvo.pl/install.sh" in readme

@@ -2,7 +2,7 @@
 (() => {
   // Kontakt: adres e-mail (mailto:) albo strona; pusto = zgłoszenia na GitHubie.
   const CONTACT = "";
-  // Skąd instalatory: domena, a .htaccess przekierowuje install.sh i install.ps1 na najnowsze z publicznego repo.
+  // Skąd instalatory: domena, a .htaccess przekierowuje install.sh i install.ps1 na bootstrap natywny z publicznego repo.
   const BASE = "https://jarvo.pl";
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const $ = (s, el = document) => el.querySelector(s);
@@ -141,30 +141,27 @@
   const OS = {
     macos: { label: "MACOS", tabs: {
       CURL: `curl -fsSL ${BASE}/install.sh | bash`,
-      WGET: `wget -qO- ${BASE}/install.sh | bash`,
     }, steps: [
-      `Install and start <a href="https://www.docker.com/products/docker-desktop/" target="_blank" rel="noopener">Docker Desktop</a>.`,
-      `Open <b>Terminal</b>, paste the command and press Enter.`,
-      `Pick your model provider and paste its key when asked.`,
-      `Open <a href="http://localhost:9119/jarvo">localhost:9119</a>. Your team is ready.`,
+      `Open <b>Terminal</b>, paste the command and press Enter. No Docker, no Homebrew, no admin password (Apple Silicon, macOS 15+).`,
+      `Jarvo downloads its own pinned tools with checksums and sets up the whole team.`,
+      `Connect your model on first start: ChatGPT sign-in or an API key.`,
+      `Type <code>jarvo</code> to chat in the terminal, or open <a href="http://localhost:9119/jarvo">localhost:9119</a>.`,
     ] },
     linux: { label: "LINUX", tabs: {
       CURL: `curl -fsSL ${BASE}/install.sh | bash`,
-      WGET: `wget -qO- ${BASE}/install.sh | bash`,
     }, steps: [
-      `Install <a href="https://docs.docker.com/engine/install/" target="_blank" rel="noopener">Docker Engine</a> with the compose plugin, plus <code>git</code>.`,
-      `Paste the command into your terminal and press Enter.`,
-      `Pick your model provider and paste its key when asked.`,
-      `Open <a href="http://localhost:9119/jarvo">localhost:9119</a>. Your team is ready.`,
+      `Paste the command into your terminal and press Enter. No Docker and no sudo; only <code>git</code> is needed.`,
+      `Jarvo downloads its own pinned tools with checksums and sets up the whole team.`,
+      `Connect your model on first start: ChatGPT sign-in or an API key.`,
+      `Type <code>jarvo</code> to chat in the terminal, or open <a href="http://localhost:9119/jarvo">localhost:9119</a>.`,
     ] },
     windows: { label: "WINDOWS", tabs: {
       PS1: `irm ${BASE}/install.ps1 | iex`,
-      WSL: `curl -fsSL ${BASE}/install.sh | bash`,
     }, steps: [
-      `Install <a href="https://www.docker.com/products/docker-desktop/" target="_blank" rel="noopener">Docker Desktop</a> and turn on <b>Settings → Resources → WSL integration</b>.`,
-      `PS1: open <b>PowerShell</b> and paste the command. It sets up WSL if needed. WSL: paste it in your Ubuntu terminal.`,
-      `Pick your model provider and paste its key when asked.`,
-      `Open <a href="http://localhost:9119/jarvo">localhost:9119</a>. Your team is ready.`,
+      `Open <b>PowerShell</b> (no admin), paste the command and press Enter. No WSL, no Docker, no restart.`,
+      `Jarvo downloads its own pinned tools with checksums and sets up the whole team. An older Docker or WSL install is detected and moved over after you agree.`,
+      `Connect your model on first start: ChatGPT sign-in or an API key.`,
+      `Type <code>jarvo</code> to chat in the terminal, or open <a href="http://localhost:9119/jarvo">localhost:9119</a>.`,
     ] },
   };
   function detect() {
@@ -190,7 +187,7 @@
       b.onclick = () => { tab = t; render(); };
       return b;
     }));
-    $(".inst-for", box).textContent = os === "windows" ? (tab === "WSL" ? "WSL · UBUNTU" : "WINDOWS 10 · 11") : "MACOS · LINUX";
+    $(".inst-for", box).textContent = os === "windows" ? "WINDOWS 10 · 11" : "MACOS · LINUX";
     $("#cmd").textContent = o.tabs[tab];
     // kroki to nasze stałe teksty z linkami: parsujemy je poza dokumentem (DOMParser nie wykonuje skryptów)
     $("#steps").replaceChildren(...o.steps.map((s) => {

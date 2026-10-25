@@ -21,7 +21,7 @@
   RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
   # instalatory jednym poleceniem: zawsze najnowsza wersja z publicznego repo (gałąź main), bez wgrywania po każdej
   # zmianie; curl -L, wget i irm idą za przekierowaniem, GitHub podaje text/plain; charset=utf-8
-  RewriteRule ^install\.(sh|ps1)$ https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.$1 [R=302,L]
+  RewriteRule ^install\.(sh|ps1)$ https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/jarvo/bootstrap/install.$1 [R=302,L]
 </IfModule>
 
 # pliki ukryte (.env, .git, …) i narzędzia nigdy nie są publiczne

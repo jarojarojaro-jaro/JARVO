@@ -37,6 +37,8 @@ from conftest import REPO, WINDOWS, uruchom_bash
 sys.path.insert(0, str(REPO))
 from jarvo import cli, instalator, pobieracz, sciezki, srodowisko  # noqa: E402
 
+WYKRYJ_STARA = instalator.wykryj_stara      # prawdziwa: conftest podmienia ją w każdym teście na „nie ma”
+
 PS1 = REPO / "jarvo" / "bootstrap" / "install.ps1"
 SH = REPO / "jarvo" / "bootstrap" / "install.sh"
 LOCK = json.loads((REPO / "vendor" / "natywne.lock.json").read_text(encoding="utf-8"))
@@ -295,10 +297,21 @@ def test_bootstrap_ps1_klucz_nie_wycieka_i_stara_instalacja(tmp_path):
     assert "tajny-klucz" not in r.stdout + r.stderr and "<ukryty>" in r.stdout
     assert "api.github.com/repos/jarojarojaro-jaro/JARVO/commits/main" in r.stdout
     assert "api.github.com/repos/jarojarojaro-jaro/JARVO/tarball/" in r.stdout      # prywatna kopia: przez API
-    (tmp_path / "root" / "wsl").mkdir(parents=True)
-    r = _ps_na_sucho(tmp_path, JARVO_FAKE_ARCH="AMD64")
-    assert r.returncode != 0 and "stara instalacja Jarvo" in r.stdout + r.stderr
-    assert not (tmp_path / "root" / "program").exists()
+    # stara instalacja z WSL w domyślnym katalogu: wersja natywna obok (Jarvo-natywnie), stary katalog nietknięty
+    stary = tmp_path / "lad" / "Jarvo"
+    (stary / "wsl").mkdir(parents=True)
+    r = _ps_na_sucho(tmp_path, JARVO_FAKE_ARCH="AMD64", JARVO_ROOT="", LOCALAPPDATA=str(tmp_path / "lad"))
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert f"katalog {stary}-natywnie" in r.stdout and f"{stary}-natywnie\\program" in r.stdout
+    assert [p.name for p in stary.iterdir()] == ["wsl"]
+    (stary / "wsl").rmdir()
+    (stary / "bin").mkdir()
+    (stary / "bin" / "jarvo.cmd").write_text('@wsl.exe -d Jarvo -u jarvo -- jarvo %*\r\n', encoding="utf-8")
+    r = _ps_na_sucho(tmp_path, JARVO_FAKE_ARCH="AMD64", JARVO_ROOT="", LOCALAPPDATA=str(tmp_path / "lad"))
+    assert f"katalog {stary}-natywnie" in r.stdout, r.stdout + r.stderr
+    (stary / "bin" / "jarvo.cmd").write_text("@rem Jarvo natywnie (jarvo instaluj)\r\n", encoding="utf-8")
+    r = _ps_na_sucho(tmp_path, JARVO_FAKE_ARCH="AMD64", JARVO_ROOT="", LOCALAPPDATA=str(tmp_path / "lad"))
+    assert f"katalog {stary}\r" in r.stdout or f"katalog {stary}\n" in r.stdout, r.stdout + r.stderr
 
 
 _PS_FUNKCJE = r"""
@@ -380,15 +393,18 @@ def test_bootstrap_ps1_instalator_bez_jarvo_token(tmp_path):
     zakończeniu, także po błędzie instalatora."""
     atrapa = tmp_path / "python.cmd"
     atrapa.write_text("@if defined JARVO_TOKEN (echo TOKEN-JEST) else (echo TOKEN-BRAK)\r\n@echo ARGV=%*\r\n"
-                      "@if \"%1\"==\"blad\" exit /b 3\r\n", encoding="ascii", newline="")
+                      "@if \"%1\"==\"blad\" exit /b 1\r\n@if \"%1\"==\"bez-zgody\" exit /b 3\r\n", encoding="ascii",
+                      newline="")
     wstep = _PS_FUNKCJE.format(skrypt=PS1)
     r = _ps(wstep + "$env:JARVO_TOKEN = 'tajny-klucz-0123456789'\n"
             f"JarvoUruchomInstalator '{atrapa}' @('instaluj', '--bez-path')\n"
             "'PO=' + $env:JARVO_TOKEN\n"
             f"try {{ JarvoUruchomInstalator '{atrapa}' @('blad') }} catch {{ 'BLAD=' + $_.Exception.Message }}\n"
-            "'PO2=' + $env:JARVO_TOKEN\n")
+            "'PO2=' + $env:JARVO_TOKEN\n"
+            f"JarvoUruchomInstalator '{atrapa}' @('bez-zgody'); 'KOD3=' + $LASTEXITCODE\n")
     assert r.returncode == 0, r.stdout + r.stderr
-    assert r.stdout.count("TOKEN-BRAK") == 2 and "TOKEN-JEST" not in r.stdout and "tajny" not in r.stdout.split("PO=")[0]
+    assert "KOD3=3" in r.stdout                  # bez zgody na przeniesienie starej instalacji: nie błąd
+    assert r.stdout.count("TOKEN-BRAK") == 3 and "TOKEN-JEST" not in r.stdout and "tajny" not in r.stdout.split("PO=")[0]
     assert "ARGV=instaluj --bez-path" in r.stdout
     assert "PO=tajny-klucz-0123456789" in r.stdout and "PO2=tajny-klucz-0123456789" in r.stdout
     assert "BLAD=JARVO: instalator Jarva zakonczyl sie bledem" in r.stdout
@@ -433,8 +449,8 @@ def test_bootstrap_sh_klucz_nie_wycieka_i_stare_polecenie(tmp_path):
     stare = tmp_path / "dom" / ".local" / "bin" / "jarvo"
     stare.parent.mkdir(parents=True)
     stare.write_text("#!/bin/sh\nexec docker exec -it jarvo-hermes hermes \"$@\"\n", encoding="utf-8")
-    r = _sh_na_sucho(tmp_path, "Linux", "x86_64")
-    assert r.returncode == 1 and "należy do innej instalacji" in r.stderr
+    r = _sh_na_sucho(tmp_path, "Linux", "x86_64")                  # stara z Dockerem: decyduje instalator w Pythonie
+    assert r.returncode == 0 and "start.py instaluj" in r.stdout, r.stdout + r.stderr   # (przeniesienie za zgodą)
     stare.write_text(instalator.tresc_jarvo_sh(Path("/x/python3"), Path("/x/start.py")), encoding="utf-8")
     assert _sh_na_sucho(tmp_path, "Linux", "x86_64").returncode == 0      # nasze polecenie: aktualizacja
 
@@ -453,6 +469,13 @@ def test_bootstrap_sh_instalator_bez_jarvo_token(tmp_path):
     assert r.returncode == 0, r.stdout + r.stderr
     assert "TOKEN=BRAK" in r.stdout and "tajny" not in r.stdout + r.stderr
     assert "ARGV=-I -X utf8 /x/app/jarvo/start.py instaluj --bez-startu" in r.stdout
+    # kod 3 (bez zgody na przeniesienie starej instalacji) to nie błąd, inny kod tak
+    for kod, oczekiwany in ((3, 0), (1, 1)):
+        atrapa.write_text(f"#!/usr/bin/env bash\nexit {kod}\n", encoding="utf-8", newline="\n")
+        r = _sh(f'source "{_msys(SH)}"\nPY_KAT="{_msys(py_kat)}"; APP=/x/app; DRY=0\n'
+                'instalator\necho "KOD=$KOD"\n')
+        assert r.returncode == oczekiwany, r.stdout + r.stderr
+        assert (f"KOD={kod}" in r.stdout) == (kod == 3) and ("błędem" in r.stderr) == (kod == 1)
 
 
 @pytest.mark.wymaga_bash
@@ -1871,10 +1894,99 @@ def test_instaluj_odmawia_przy_starej_instalacji(tmp_path, stanowisko):
         stare = s["dom"] / ".local" / "bin" / "jarvo"
         stare.parent.mkdir(parents=True)
         stare.write_text("#!/bin/sh\nexec docker exec jarvo-hermes hermes\n", encoding="utf-8")
-    assert _instaluj(s, _aplikacja(tmp_path, s["adres"], s["www"])) == 1
-    log = "\n".join(s["log"])
-    assert "BŁĄD w kroku „Sprawdzenie komputera”" in log and "JARVO_ROOT" in log and "E12" in log
+    assert _instaluj(s, _aplikacja(tmp_path, s["adres"], s["www"])) == 1     # stara wykryta przez sciezke, bez
+    log = "\n".join(s["log"])                                                  # migracji (JARVO_MIGRACJA=nie)
+    assert "BŁĄD w kroku „Sprawdzenie komputera”" in log and "JARVO_MIGRACJA=nie" in log
+    assert ("JARVO_ROOT" if WINDOWS else "JARVO_BEZ_PATH=1") in log
     assert not (u.program / "narzedzia").exists() and not s["zmiany"].lista and not s["rejestr"].zapisy
+
+
+class AtrapaMigracji:
+    """jarvo/migracja.py dla instalatora: main(argv, uklad=, otoczenie=) z kodem i zapisem wywołań."""
+    def __init__(self, kod: int, po=None):
+        self.kod, self.po, self.wywolania = kod, po, []
+
+    def main(self, argv, *, uklad, otoczenie):
+        self.wywolania.append(list(argv))
+        if self.po:
+            self.po(uklad)
+        return self.kod
+
+
+def _stara(s, u) -> None:
+    """Ślad starej instalacji jak u ludzi: macOS i Linux polecenie ~/.local/bin/jarvo starej floty. Na Windows stara
+    zostaje w %LOCALAPPDATA%\\Jarvo, a bootstrap stawia tę obok (Jarvo-natywnie), więc w korzeniu nie ma nic."""
+    if not WINDOWS:
+        stare = s["dom"] / ".local" / "bin" / "jarvo"
+        stare.parent.mkdir(parents=True, exist_ok=True)
+        stare.write_text("#!/bin/sh\nexec docker exec jarvo-hermes hermes\n", encoding="utf-8")
+
+
+def test_instaluj_ze_stara_instalacja_przenosi_dane_przed_startem(tmp_path, stanowisko, monkeypatch):
+    s, u = stanowisko, stanowisko["u"]
+    _stara(s, u)
+    monkeypatch.setattr(instalator.Path, "home", staticmethod(lambda: s["dom"]))
+
+    def po(uklad):                     # jak migracja: stare polecenie usunięte (U4), stan zakończony
+        if not WINDOWS:
+            (s["dom"] / ".local" / "bin" / "jarvo").unlink()
+        uklad.stan.mkdir(parents=True, exist_ok=True)
+        (uklad.stan / "migracja.json").write_text(json.dumps({"zakonczona": "2026-10-25T10:00:00"}), encoding="utf-8")
+    s["moduly"]["migracja"] = m = AtrapaMigracji(0, po)
+    s["env"]["JARVO_YES"] = "1"
+    app = _aplikacja(tmp_path, s["adres"], s["www"])
+    s["log"].clear()
+    kod = instalator.instaluj(u, app, log=s["log"].append, otoczenie=s["otoczenie"](stara=lambda uu, ot: "stara"))
+    log = "\n".join(s["log"])
+    assert kod == 0, log
+    assert m.wywolania == [["--bez-startu", "--tak"]]
+    kroki = [m.group(1) for w in s["log"] if (m := re.match(r"\[[#-]+\] +\d+/\d+  (.+)$", w))]
+    assert kroki.index("Przeniesienie ze starej instalacji") == kroki.index("Środowisko procesów") + 1
+    assert kroki.index("Polecenie jarvo") > kroki.index("Przeniesienie ze starej instalacji")
+    assert s["nadzorca"].dziala and "Panel:" in log
+    assert instalator.obca_instalacja(u, s["dom"]) is None and instalator.migracja_zakonczona(u)
+
+
+def test_instaluj_bez_zgody_na_przeniesienie_kod_3_i_stara_flota_zostaje(tmp_path, stanowisko, monkeypatch):
+    s, u = stanowisko, stanowisko["u"]
+    _stara(s, u)
+    monkeypatch.setattr(instalator.Path, "home", staticmethod(lambda: s["dom"]))
+    s["moduly"]["migracja"] = m = AtrapaMigracji(3)
+    app = _aplikacja(tmp_path, s["adres"], s["www"])
+    s["log"].clear()
+    kod = instalator.instaluj(u, app, log=s["log"].append, otoczenie=s["otoczenie"](stara=lambda uu, ot: "stara"))
+    log = "\n".join(s["log"])
+    assert kod == 3 and m.wywolania == [["--bez-startu"]]
+    assert "stara flota pracuje dalej" in log and "uruchom to samo polecenie instalacji" in log
+    assert not s["nadzorca"].dziala and not s["w_tle"] and not s["autostart"].wywolania
+    assert (u.program / "current.json").is_file()                             # wersja natywna gotowa, stoi
+    if not WINDOWS:
+        assert "docker exec" in (s["dom"] / ".local" / "bin" / "jarvo").read_text(encoding="utf-8")
+    s["moduly"]["migracja"] = AtrapaMigracji(1)
+    s["log"].clear()
+    assert instalator.instaluj(u, app, log=s["log"].append,
+                               otoczenie=s["otoczenie"](stara=lambda uu, ot: "stara")) == 1
+    assert "przeniesienie danych przerwane" in "\n".join(s["log"])
+
+
+def test_wykryj_stara_po_migracji_i_z_jarvo_migracja_nie(tmp_path):
+    u = sciezki.uklad({"JARVO_ROOT": str(tmp_path / "j")})
+    wykrycie = type("W", (), {"jest": True})()
+    migracja = type("M", (), {"SystemMigracji": lambda self=None, env=None: None,
+                              "wykryj": staticmethod(lambda s, uu: wykrycie)})
+    ot = instalator.Otoczenie(modul=lambda n: migracja, env={})
+    prawdziwa = WYKRYJ_STARA
+    assert prawdziwa(u, ot) is wykrycie
+    assert prawdziwa(u, instalator.Otoczenie(modul=lambda n: migracja, env={"JARVO_MIGRACJA": "nie"})) is None
+    wykrycie.jest = False
+    assert prawdziwa(u, ot) is None
+    wykrycie.jest = True
+    u.stan.mkdir(parents=True)
+    (u.stan / "migracja.json").write_text(json.dumps({"zakonczona": "2026-10-25", "wycofana": None}), encoding="utf-8")
+    assert prawdziwa(u, ot) is None
+    (u.stan / "migracja.json").write_text(json.dumps({"zakonczona": "2026-10-25", "wycofana": "2026-10-26"}),
+                                          encoding="utf-8")
+    assert prawdziwa(u, ot) is wykrycie
 
 
 def test_instaluj_bez_gita_i_bez_startu(tmp_path, stanowisko):

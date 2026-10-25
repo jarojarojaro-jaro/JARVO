@@ -7,14 +7,14 @@
 #      w profilu, dowiązanie bezwzględne, fałszywy token Telegrama w secrets/,
 #   3. stara flota stoi, a rozmowy.db dostaje wpis zapisany tylko w pliku -wal,
 #   4. manifest starych danych z filtrem kopii (jarvo/migracja.py --manifest --filtr),
-#   5. instalacja natywna z tego commitu (jarvo/bootstrap/install.sh),
-#   6. jarvo migruj --tak (sudo tar, rozbrojenie, próba, import, pierwszy start); dopóki polecenie jarvo nie ma
-#      podpolecenia migruj (jarvo/cli.py), ten sam kod woła się wprost Pythonem instalacji,
+#   5. jedno polecenie instalacji z tego commitu (jarvo/bootstrap/install.sh) z JARVO_YES=1, jak u ludzi: instalator
+#      wykrywa starą instalację, stawia natywną bez startu i przenosi dane (jarvo migruj: sudo tar, rozbrojenie,
+#      próba, import, flota), a dopiero potem polecenie jarvo i start,
+#   6. stara flota rozbrojona według `jarvo migruj --tylko-wykryj`, serwis natywny działa (`jarvo status`),
 #   7. manifest po zgodny z manifestem przed, ścieżki natywne w bazach, natywny Hermes widzi starą rozmowę w nowym
 #      katalogu, stare logowania z nową nazwą, stare kontenery i polecenie jarvo usunięte, obraz i dane starej
 #      instalacji zostają, kopia z dobrą sumą, `jarvo doctor` bez błędów,
 #   8. drugi przebieg niczego nie zmienia (manifest <dane>, stan i dziennik migracji bez zmian).
-# --bez-floty: build i install_fleet natywnie mają własny test (etap E4); gdy będzie zielony, flaga znika.
 name: migracja
 
 on:
@@ -49,7 +49,7 @@ jobs:
         run: |
           {
             echo "JARVO_ROOT=$RUNNER_TEMP/jarvo-natywnie"
-            echo "KATALOG=$RUNNER_TEMP/migracja"
+            echo "KATALOG=$RUNNER_TEMP/jarvo-natywnie/migracja"
             echo "WYNIKI=$RUNNER_TEMP/wyniki"
           } >> "$GITHUB_ENV"
       - name: Kod tej wersji (instalacja natywna i jarvo migruj)
@@ -139,25 +139,24 @@ jobs:
             --filtr --wyjscie "$WYNIKI/manifest-przed.json"
           sudo chown "$(id -u):$(id -g)" "$WYNIKI/manifest-przed.json"
 
-      - name: 5/8 Instalacja natywna (jarvo/bootstrap/install.sh z tego commitu)
+      - name: 5/8 Jedno polecenie instalacji przenosi dane (jarvo/bootstrap/install.sh z tego commitu, JARVO_YES=1)
         env:
           JARVO_REF: ${{ github.sha }}
           JARVO_TOKEN: ${{ github.token }}
           JARVO_NO_AUTOSTART: "1"
-        run: bash jarvo/bootstrap/install.sh
+          JARVO_YES: "1"
+        run: |
+          set -euo pipefail
+          bash jarvo/bootstrap/install.sh 2>&1 | tee "$WYNIKI/instalacja.log"
+          grep -qF "Przeniesienie ze starej instalacji" "$WYNIKI/instalacja.log"
+          grep -qF "Panel: http" "$WYNIKI/instalacja.log"
 
-      - name: 6/8 jarvo migruj
+      - name: 6/8 Stara flota rozbrojona, serwis natywny działa
         run: |
           set -euxo pipefail
-          # `jarvo migruj`, a dopóki polecenie jarvo go nie zna (w budowie: kod 2), ten sam kod Pythonem instalacji
-          cat > "$RUNNER_TEMP/migruj.sh" <<'SH'
-          set -euo pipefail
-          if ~/.local/bin/jarvo migruj --help >/dev/null 2>&1; then exec ~/.local/bin/jarvo migruj "$@"; fi
-          APP="$(python3 -c 'import json, os; print(json.load(open(os.path.join(os.environ["JARVO_ROOT"], "program", "current.json")))["app"])')"
-          PY="$(python3 -c 'import json, os; print(json.load(open(os.path.join(os.environ["JARVO_ROOT"], "stan", "narzedzia.json")))["python313"]["katalog"])')/bin/python3"
-          exec "$PY" -I -X utf8 -c 'import sys; sys.path.insert(0, sys.argv[1]); from jarvo.migracja import main; sys.exit(main(sys.argv[2:]))' "$APP" "$@"
-          SH
-          bash "$RUNNER_TEMP/migruj.sh" --tak --bez-floty --katalog "$KATALOG" | tee "$WYNIKI/migracja-1.log"
+          ~/.local/bin/jarvo migruj --tylko-wykryj --json | tee "$WYNIKI/wykrycie.json"
+          python3 -c 'import json, sys; w = json.load(open(sys.argv[1])); a = [s for s in w["slady"] if s.get("aktywny")]; assert not a and not w["kontenery"], (a, w["kontenery"])' "$WYNIKI/wykrycie.json"
+          ~/.local/bin/jarvo status
 
       - name: 7/8 Manifest zgodny, dane natywne, stara flota rozbrojona, doctor bez błędów
         run: |
@@ -215,7 +214,7 @@ jobs:
           ~/.local/bin/jarvo down
           python3 -m jarvo.migracja --manifest "$JARVO_ROOT/dane" --wyjscie "$WYNIKI/dane-a.json"
           sha256sum "$JARVO_ROOT/stan/migracja.json" "$JARVO_ROOT/stan/migracja.jsonl" > "$WYNIKI/stan.sha256"
-          bash "$RUNNER_TEMP/migruj.sh" --tak --bez-floty --katalog "$KATALOG" | tee "$WYNIKI/migracja-2.log"
+          ~/.local/bin/jarvo migruj --tak | tee "$WYNIKI/migracja-2.log"
           grep -q "Nic do zrobienia" "$WYNIKI/migracja-2.log"
           python3 -m jarvo.migracja --manifest "$JARVO_ROOT/dane" --wyjscie "$WYNIKI/dane-b.json"
           cmp "$WYNIKI/dane-a.json" "$WYNIKI/dane-b.json"

@@ -82,7 +82,7 @@ indeksu (`tag@sha256`), więc wdrożenie bierze zawsze ten sam obraz, a nowa wer
 
 ### Instalacja natywna
 
-Komponenty instalacji bez Dockera ([NATYWNIE.md](NATYWNIE.md), etap E2; do etapu E13 pod osobnym adresem `jarvo/bootstrap/`). Instalator
+Komponenty instalacji bez Dockera ([NATYWNIE.md](NATYWNIE.md), etap E2; bootstrap `jarvo/bootstrap/`, domyślny od etapu E13). Instalator
 pobiera je u źródła, przypięte adresem, sumą SHA-256 i rozmiarem dla każdej platformy w
 [`vendor/natywne.yaml`](../vendor/natywne.yaml), i sprawdza sumę przed rozpakowaniem; niczego z tego nie hostujemy.
 Wersje i platformy: [TOOLBOX.md](TOOLBOX.md#stan-instalacji-natywnej-windows-macos-linux). **Przegląd 2026-10-24**,
