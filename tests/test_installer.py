@@ -22,8 +22,8 @@ INSTALL = ROOT / "install.sh"
 JARVO = ROOT / "bin/jarvo"
 LOCAL_UP = ROOT / "scripts/local-up.sh"
 SCRIPTS = [INSTALL, JARVO, LOCAL_UP]
-# Próby na sucho udają Linuksa i macOS podmienionymi programami (uname, sw_vers, sysctl) na Linuksie; na prawdziwym
-# macOS wygrywa systemowy uname i Homebrew, więc tam CI (installer.yml) sprawdza install.sh i jarvo na żywo. Dlatego
+# Próby na sucho udają Linuksa (i macOS: przekierowanie na instalację natywną) podmienionymi programami na Linuksie;
+# na prawdziwym macOS wygrywa systemowy uname, więc tam CI (installer.yml) sprawdza jarvo na żywo. Dlatego
 # każdy test, który uruchamia bash, docker albo shellcheck, ma `linux_only` (instalator bash i jarvo to droga starej
 # instalacji z kontenerem, docs/NATYWNIE.md E1); testy samej treści plików biegną na każdym systemie.
 # programy, których instalator ma doinstalować, gdy ich brak (poza PATH testu)
@@ -105,74 +105,15 @@ def test_dry_run_fresh_ubuntu_installs_tools_and_docker(tmp_path):
     assert not (tmp_path / "home/jarvo").exists() and not (tmp_path / "home/jarvo-local").exists()
 
 
-def _wsl_shims(bin_dir: Path, log: Path, app: str = r"C:\Users\tester\AppData\Local") -> None:
-    """Udawany Windows z WSL: cmd.exe podaje LOCALAPPDATA, wslpath tłumaczy ścieżkę, powershell.exe zapisuje polecenie."""
-    (bin_dir / "localappdata.txt").write_text(app + "\r\n", encoding="utf-8")
-    _shim(bin_dir, "cmd.exe", f'cat "{bin_dir}/localappdata.txt"\n')
-    _shim(bin_dir, "wslpath", f'echo "{log.parent}/win"\n')
-    _shim(bin_dir, "powershell.exe", f'printf "%s\\n" "$@" > "{log}"\n')
-
-
 @pytest.mark.linux_only
-def test_dry_run_wsl_makes_windows_jarvo_command(tmp_path):
-    """jarvo update w Linuksie WSL zakłada też jarvo w PowerShellu (ten sam jarvo.cmd co install.ps1)."""
+def test_wsl_points_to_powershell_native_install(tmp_path):
+    """WSL (np. `jarvo update` starej instalacji): Jarvo na Windowsie jest natywne, więc polecenie PowerShella."""
     proc = tmp_path / "version"
     proc.write_text("Linux version 6.6.87.2-microsoft-standard-WSL2\n", encoding="utf-8")
-    bin_dir = tmp_path / "bin"
-    res0 = _dry(tmp_path, _os_release(tmp_path, "ubuntu", "debian"))   # tworzy bin z PATH testu
-    assert res0.returncode == 0, res0.stdout + res0.stderr
-    assert "jarvo.cmd" not in res0.stdout   # zwykły Linux: nic dla Windowsa
-    _wsl_shims(bin_dir, tmp_path / "ps.log")
-    env = {"PATH": str(bin_dir), "HOME": str(tmp_path / "home"), "LANG": "C.UTF-8", "JARVO_DRY_RUN": "1",
-           "JARVO_DISK_GB": "100", "JARVO_DIR": str(tmp_path / "home/jarvo"),
-           "JARVO_OS_RELEASE": str(_os_release(tmp_path, "ubuntu", "debian")), "JARVO_PROC_VERSION": str(proc),
-           "WSL_DISTRO_NAME": "Ubuntu"}
-    res = subprocess.run(["bash", str(INSTALL)], env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
-    assert res.returncode == 0, res.stdout + res.stderr
-    out = res.stdout
-    assert "System: wsl" in out
-    assert r"jarvo.cmd (C:\Users\tester\AppData\Local\Jarvo\bin): wsl.exe -d Ubuntu -u tester --cd ~" in out
-    assert out.index("jarvo.cmd") < out.index("bin/jarvo up")   # przed flotą: jest nawet, gdy flota padnie
-    assert not (tmp_path / "win").exists() and not (tmp_path / "ps.log").exists()   # na sucho nic nie zapisuje
-
-
-def _windows_cli(tmp_path: Path, **env) -> subprocess.CompletedProcess:
-    """Sama funkcja windows_cli z install.sh (bez main), naprawdę zapisuje plik, z udawanym Windowsem."""
-    body = INSTALL.read_text(encoding="utf-8")
-    fn = body[body.index("windows_cli() {"):body.index("\n}\n", body.index("windows_cli() {")) + 3]
-    script = ("say() { echo \"SAY $*\"; }\nwarn() { echo \"WARN $*\"; }\nOS=wsl\nDRY=0\n" + fn + "windows_cli\n")
-    full = {"PATH": f"{tmp_path / 'bin'}:/usr/bin:/bin", "HOME": str(tmp_path), "WSL_DISTRO_NAME": "Ubuntu"}
-    full.update(env)
-    return subprocess.run(["bash", "-c", script], env=full, capture_output=True, text=True, encoding="utf-8", timeout=30)
-
-
-@pytest.mark.linux_only
-def test_wsl_windows_cli_writes_cmd_and_path(tmp_path):
-    (tmp_path / "bin").mkdir()
-    _wsl_shims(tmp_path / "bin", tmp_path / "ps.log", app=r"C:\Users\O'Neil\AppData\Local")
-    res = _windows_cli(tmp_path)
-    assert res.returncode == 0 and "WARN" not in res.stdout, res.stdout + res.stderr
-    cmd = (tmp_path / "win/Jarvo/bin/jarvo.cmd").read_bytes().decode()
-    assert cmd.startswith("@echo off\r\n") and cmd.endswith("jarvo %*\r\n")
-    # ta sama linia co WindowsCommand w install.ps1: ${PATH} i ${HOME} dla basha w Linuksie, %* dla cmd
-    assert ('wsl.exe -d Ubuntu -u ' in cmd and ' --cd ~ -e bash -c "export PATH=${PATH}:${HOME}/.local/bin:'
-            '${HOME}/jarvo/bin; exec jarvo \\"$@\\"" jarvo %*' in cmd)
-    ps = (tmp_path / "ps.log").read_text(encoding="utf-8")
-    assert "-NoProfile" in ps and "HKCU:\\Environment" in ps and "DoNotExpandEnvironmentNames" in ps
-    assert r"$d='C:\Users\O''Neil\AppData\Local\Jarvo\bin'" in ps   # apostrof w nazwie użytkownika
-    assert "SAY Polecenie jarvo w PowerShellu" in res.stdout
-
-
-@pytest.mark.linux_only
-def test_wsl_windows_cli_without_interop_only_warns(tmp_path):
-    (tmp_path / "bin").mkdir()
-    res = _windows_cli(tmp_path, PATH=str(tmp_path / "bin") + ":/usr/bin:/bin")   # brak cmd.exe (interop wyłączony)
-    assert res.returncode == 0 and "WARN Polecenie jarvo w PowerShellu" in res.stdout and "wsl -d Ubuntu -- jarvo" in res.stdout
-    _wsl_shims(tmp_path / "bin", tmp_path / "ps.log")
-    (tmp_path / "bin/powershell.exe").write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")   # PATH się nie zapisał
-    res = _windows_cli(tmp_path)
-    assert res.returncode == 0 and (tmp_path / "win/Jarvo/bin/jarvo.cmd").exists()
-    assert "WARN jarvo.cmd jest w" in res.stdout
+    res = _dry(tmp_path, _os_release(tmp_path, "ubuntu", "debian"), JARVO_PROC_VERSION=str(proc))
+    assert res.returncode == 1, res.stdout + res.stderr
+    assert "PowerShellu" in res.stderr and "/jarvo/bootstrap/install.ps1 | iex" in res.stderr
+    assert "apt-get" not in res.stdout and "jarvo.cmd" not in res.stdout + res.stderr
 
 
 @pytest.mark.linux_only
@@ -250,50 +191,24 @@ def test_dry_run_docker_without_buildx_gets_plugin(tmp_path):
     assert "apt-get -o DPkg::Lock::Timeout=600 install -y -q docker-buildx-plugin" in res.stdout and "get.docker.com" not in res.stdout
 
 
-def _mac_shims(tmp_path: Path, ram_gb: int = 16, ver: str = "14.5", arch: str = "arm64") -> Path:
-    """Udawany macOS na Linuksie: uname, sw_vers, sysctl (procesor Apple albo Intel, RAM)."""
+def _mac_shims(tmp_path: Path, arch: str = "arm64") -> Path:
+    """Udawany macOS na Linuksie (uname)."""
     d = tmp_path / "mac"
     d.mkdir(parents=True)
     _shim(d, "uname", f'case "$1" in -s) echo Darwin;; -m) echo {arch};; *) echo Darwin;; esac\n')
-    _shim(d, "sw_vers", f'echo {ver}\n')
-    _shim(d, "sysctl", f'case "$2" in hw.memsize) echo {ram_gb * 1024 ** 3};; hw.ncpu) echo 8;; esac\n')
-    _shim(d, "id", 'case "$1" in -u) echo 501;; -un) echo tester;; *) echo 501;; esac\n')
     return d
 
 
-def _dry_mac(tmp_path: Path, extra_shims: Path | None = None, **extra) -> subprocess.CompletedProcess:
-    hide = TOOLS + ("brew", "colima")
-    path = [str(_mac_shims(tmp_path, **{k: extra.pop(k) for k in ("ram_gb", "ver", "arch") if k in extra}))]
-    if extra_shims:
-        path.insert(0, str(extra_shims))
-    path.append(str(_bare_path(tmp_path / "p", hide)))
-    return _dry(tmp_path, _os_release(tmp_path, "nieistotne"), PATH=":".join(path), **extra)
-
-
 @pytest.mark.linux_only
-def test_dry_run_macos_installs_brew_and_colima(tmp_path):
-    res = _dry_mac(tmp_path)
+def test_dry_run_macos_hands_over_to_native_install(tmp_path):
+    """macOS (także `jarvo update` starej instalacji z Colimą): instalacja natywna, bez Homebrew i Dockera."""
+    path = f"{_mac_shims(tmp_path)}:{_bare_path(tmp_path / 'p')}"
+    res = _dry(tmp_path, _os_release(tmp_path, "nieistotne"), PATH=path, JARVO_REF="abc123")
     assert res.returncode == 0, res.stdout + res.stderr
-    out = res.stdout
-    assert "System: macOS 14.5 (arm64)" in out
-    # hasło raz, przed instalatorem Homebrew (tryb bez pytań wymaga zapamiętanego sudo)
-    assert "$ sudo -v" in out and out.index("$ sudo -v") < out.index("Homebrew/install")
-    assert "brew install -q bash git python openssl@3" in out
-    assert "brew install -q colima docker docker-compose docker-buildx" in out   # buildx: jarvo komputer on
-    # połowa procesorów, 8 GB przy 16 GB RAM, Virtualization.framework
-    assert "colima start --cpu 4 --memory 8 --disk 60 --vm-type vz --mount-type virtiofs" in out
-    assert "git clone -q --depth 50 -b main" in out and "bin/jarvo up" in out
-    assert "/opt/homebrew/bin/jarvo" in out   # polecenie w katalogu Homebrew: bez sudo
-    assert "apt-get" not in out and "get.docker.com" not in out
-
-
-@pytest.mark.linux_only
-def test_dry_run_macos_homebrew_tier3_warning(tmp_path):
-    """Homebrew ma gotowe paczki tylko dla Apple Silicon z macOS 15+; Intel i macOS 12–14 kompilują na miejscu."""
-    assert "macOS 14: Homebrew ma gotowe paczki dla macOS 15" in _dry_mac(tmp_path / "a").stdout
-    assert "Homebrew" not in _dry_mac(tmp_path / "b", ver="15.4").stdout.split("Instaluję Homebrew")[0]
-    intel = _dry_mac(tmp_path / "c", ver="15.4", arch="x86_64")
-    assert intel.returncode == 0 and "Mac z Intelem" in intel.stdout and "System: macOS 15.4 (x86_64)" in intel.stdout
+    assert ("(na sucho) curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/abc123/jarvo/bootstrap/"
+            "install.sh | bash") in res.stdout
+    assert "Homebrew" in res.stdout and "brew install" not in res.stdout and "colima" not in res.stdout
+    assert "sudo -v" not in res.stdout and "git clone" not in res.stdout
 
 
 @pytest.mark.linux_only
@@ -303,35 +218,6 @@ def test_disk_thresholds(tmp_path):
     assert low.returncode == 1 and "Za mało miejsca (15 GB)" in low.stderr
     mid = _dry(tmp_path / "b", _os_release(tmp_path, "ubuntu"), JARVO_DISK_GB="25")
     assert mid.returncode == 0 and "Polecamy 30 GB wolnego miejsca" in mid.stdout
-
-
-@pytest.mark.linux_only
-def test_dry_run_macos_small_and_old(tmp_path):
-    res = _dry_mac(tmp_path, ram_gb=8, ver="12.7")
-    assert res.returncode == 0, res.stdout + res.stderr
-    # macOS 12: bez vz, QEMU z Homebrew; 8 GB RAM: maszyna wirtualna 5 GB
-    assert "colima docker docker-compose docker-buildx qemu" in res.stdout
-    assert "--memory 5 --disk 60 --vm-type qemu" in res.stdout
-    res = _dry_mac(tmp_path / "s", ver="11.7")
-    assert res.returncode == 1 and "macOS 12" in res.stderr
-
-
-@pytest.mark.linux_only
-def test_dry_run_macos_docker_running_keeps_it(tmp_path):
-    shims = tmp_path / "dk"
-    shims.mkdir()
-    _shim(shims, "docker", 'case "$1 $2" in "compose version"|"info ") exit 0;; version*) echo 28.1;; context*) echo desktop-linux;; esac\n')
-    _shim(shims, "brew", 'case "$1" in shellenv) echo "export HOMEBREW_PREFIX=/opt/homebrew";; --prefix) echo /opt/homebrew;; list) exit 0;; esac\n')
-    res = _dry_mac(tmp_path, extra_shims=shims)
-    assert res.returncode == 0, res.stdout + res.stderr
-    assert "Docker: 28.1 (już działa: desktop-linux)" in res.stdout
-    assert "colima" not in res.stdout and "Homebrew/install" not in res.stdout
-    assert "install -q docker-buildx" not in res.stdout
-    # Colima z wcześniejszej instalacji bez buildx: doinstalowana wtyczka i katalog wtyczek w ~/.docker/config.json
-    _shim(shims, "docker", 'case "$1 $2" in "compose version"|"info ") exit 0;; "buildx version") exit 1;; version*) echo 28.1;; context*) echo colima;; esac\n')
-    res = _dry_mac(tmp_path / "bez-buildx", extra_shims=shims)
-    assert res.returncode == 0, res.stdout + res.stderr
-    assert "brew install -q docker-buildx" in res.stdout and "colima start" not in res.stdout
 
 
 @pytest.mark.linux_only
@@ -486,31 +372,6 @@ def _install_fn(name: str) -> str:
 
 
 @pytest.mark.linux_only
-def test_brew_shellenv_keeps_existing_profile(tmp_path):
-    """bash przy logowaniu czyta tylko pierwszy z .bash_profile/.bash_login/.profile: nowy .bash_profile ukryłby .profile."""
-    brew = tmp_path / "brew"
-    brew.write_text("#!/bin/sh\necho 'export HOMEBREW_PREFIX=/opt/homebrew'\n", encoding="utf-8")
-    brew.chmod(0o755)
-
-    def shellenv(home: Path) -> None:
-        script = _install_fn("brew_shellenv") + f'DRY=0; BREW={brew}; HOME={home}; brew_shellenv\n'
-        res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, encoding="utf-8", timeout=30)
-        assert res.returncode == 0, res.stderr
-
-    a = tmp_path / "a"; a.mkdir()
-    (a / ".profile").write_text("export X=1\n", encoding="utf-8")
-    shellenv(a)
-    shellenv(a)   # drugi raz bez powtórki
-    assert not (a / ".bash_profile").exists() and (a / ".profile").read_text(encoding="utf-8").count("eval ") == 1
-    assert "shellenv" in (a / ".zprofile").read_text(encoding="utf-8")
-    b = tmp_path / "b"; b.mkdir()
-    (b / ".bash_profile").write_text("# moje\n", encoding="utf-8")
-    shellenv(b)
-    assert "shellenv" in (b / ".bash_profile").read_text(encoding="utf-8") and not (b / ".profile").exists()
-
-
-
-@pytest.mark.linux_only
 def test_pobierz_retries_transient_network_error(tmp_path):
     """curl: (7) Failed to connect (sieć runnera, chwilowa awaria) nie kończy instalacji: pobierz() ponawia do 3 razy."""
     bin_dir = tmp_path / "bin"; bin_dir.mkdir()
@@ -530,30 +391,6 @@ def test_pobierz_retries_transient_network_error(tmp_path):
     assert (tmp_path / "out").read_text(encoding="utf-8") == "skrypt\n" and res.stdout.count("ponawiam") == 2
     res = pobierz("9")
     assert res.returncode == 1 and licznik.read_text(encoding="utf-8").count("x") == 4 and "ponawiam (3/3)" in res.stdout
-
-@pytest.mark.linux_only
-def test_mac_compose_plugin_drops_stale_docker_desktop_creds(tmp_path):
-    """Po odinstalowanym Docker Desktop zostaje credsStore "desktop": docker pull w Colimie by się wywracał."""
-    import json
-    (tmp_path / ".docker").mkdir()
-    cfg = tmp_path / ".docker/config.json"
-    shims = tmp_path / "shims"; shims.mkdir()
-    _shim(shims, "brew", f'echo {tmp_path}/brew\n')
-
-    def run(extra_path: str = "") -> dict:
-        cfg.write_text(json.dumps({"credsStore": "desktop", "auths": {}}), encoding="utf-8")
-        script = _install_fn("mac_compose_plugin") + f'DRY=0; BREW={shims}/brew; HOME={tmp_path}; mac_compose_plugin\n'
-        res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, encoding="utf-8", timeout=30,
-                             env={**os.environ, "PATH": f"{extra_path}{shims}:{os.environ['PATH']}"})
-        assert res.returncode == 0, res.stderr
-        return json.loads(cfg.read_text(encoding="utf-8"))
-
-    c = run()
-    assert "credsStore" not in c and c["cliPluginsExtraDirs"] == [f"{tmp_path}/brew/lib/docker/cli-plugins"]
-    helper = tmp_path / "helper"; helper.mkdir()
-    _shim(helper, "docker-credential-desktop", "exit 0\n")
-    assert run(f"{helper}:")["credsStore"] == "desktop"   # Docker Desktop dalej jest: zostaje
-
 
 def test_jarvo_old_bash_does_not_loop(tmp_path):
     """Stary bash pod /usr/local/bin (nie z Homebrew) nie może zapętlić exec w bin/jarvo: jeden skok i dalej."""
@@ -696,7 +533,6 @@ def test_obraz_own_hermes_builds_locally(tmp_path):
                        capture_output=True, text=True, encoding="utf-8")
     assert r.returncode == 1 and "Własny HERMES_IMAGE" in r.stdout
     assert not (tmp_path / "log").exists()
-
 
 
 @pytest.mark.linux_only

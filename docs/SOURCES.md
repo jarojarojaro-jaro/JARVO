@@ -20,7 +20,8 @@ odczekaniu określonej liczby dni. Wydanie sprzed godziny i sprzed roku przechod
 3. **Kod.** Skrypty instalacyjne (postinstall, `setup.py`, build), połączenia z siecią w czasie działania, odczyt
    zmiennych środowiska i sekretów, zaciemniony kod, dołączone binarki. Skille dodatkowo `scripts/skan_skilli.py`.
 4. **Zależności przechodnie:** co nowego wciąga i czy da się je przypiąć.
-5. **Próba w kontenerze:** działa, gdzie się da także bez sieci; ile zajmuje w obrazie.
+5. **Próba na instalacji natywnej** (i w CI `natywnie.yml` na pięciu systemach): działa, gdzie się da także bez
+   sieci; ile zajmuje na dysku (dla VPS także w obrazie).
 6. **Przypięcie:** dokładna wersja i suma (SHA-256, digest obrazu albo commit).
 7. **Zapis:** `vendor/zrodla.yaml` (przejrzany commit) i wpis tutaj albo w [TOOLBOX.md](TOOLBOX.md) z datą i wynikiem przeglądu.
 

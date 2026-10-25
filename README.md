@@ -66,7 +66,7 @@ make test            # testy (pytest): walidator, patrol, raporty, build, skrypt
 make models          # czy modele z fleet.yaml istnieją u wybranego dostawcy (openai-codex: brak listy, pomija)
 ```
 
-Piaskownica Claude Code (kontener za proxy): `JARVO_LOCAL=<scratchpad>/jarvo-local bash scripts/sandbox-up.sh`.
+Stara piaskownica z Dockerem (kontener floty jak na VPS, za proxy): `JARVO_LOCAL=<scratchpad>/jarvo-local bash scripts/sandbox-up.sh`.
 
 Wdrożenie na VPS krok po kroku: **[docs/RUNBOOK.md](docs/RUNBOOK.md)** (bootstrap serwera, Telegram,
 sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mieści się na VPS

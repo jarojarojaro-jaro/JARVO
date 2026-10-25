@@ -1,19 +1,16 @@
 #!/usr/bin/env bash
-# Instalator Jarvo: Linux, WSL2, macOS. Jedno polecenie ze strony:
+# Instalator Jarvo z Dockerem: Linux (serwer i stare instalacje). Od etapu E13 Jarvo na komputerach instaluje się
+# natywnie, bez Dockera (jarvo/bootstrap/install.sh i install.ps1, docs/INSTALER.md): ten skrypt na macOS uruchamia
+# instalację natywną (stara instalacja z Dockerem jest przenoszona za zgodą), a w WSL podaje polecenie PowerShella.
+# `jarvo update` starej instalacji (bin/jarvo) woła ten plik, więc stare instalacje trafiają tak do wersji natywnej.
 #
-#   curl -fsSL https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/install.sh | bash   (albo jarvo.pl/install.sh)
-#   (jarvo.pl/install.sh przekierowuje na ten adres, gdy strona jest wgrana: site/.htaccess)
-#
-# Linux i WSL: sprawdza sprzęt (procesor, RAM, dysk), doinstalowuje brakujące programy (git, curl, python3,
+# Linux: sprawdza sprzęt (procesor, RAM, dysk), doinstalowuje brakujące programy (git, curl, python3,
 # openssl) menedżerem pakietów dystrybucji (apt, dnf/yum, pacman, zypper), instaluje Docker Engine
 # (get.docker.com; Arch i openSUSE z pakietów), uruchamia demona, dodaje Cię do grupy docker, pobiera repo
 # do ~/jarvo (albo je aktualizuje), instaluje polecenie `jarvo` i uruchamia `jarvo up` (scripts/local-up.sh):
 # pytania o dostawcę modeli, flota w Dockerze, healthchecki, pomocnik aktualizacji jako usługa systemd
 # użytkownika, otwarcie dashboardu. Ponowne wklejenie tego samego polecenia = aktualizacja.
-# macOS: doinstalowuje Homebrew (razem z narzędziami Xcode), basha 4+, gita i Pythona; Docker działający już
-# (Docker Desktop, OrbStack, Colima) zostaje, a bez niego instaluje Colimę (darmowa maszyna wirtualna z Dockerem,
-# bez okien i licencji) i włącza jej start przy logowaniu. Dane floty na macOS trzyma w wolumenach Dockera.
-# Windows: install.ps1 (WSL, restart, osobna dystrybucja Jarvo, ten skrypt w środku). Opis: docs/INSTALER.md.
+# Opis: docs/INSTALER.md (historia drogi z Dockerem) i docs/RUNBOOK.md (serwer).
 #
 # Zmienne (wszystkie opcjonalne):
 #   JARVO_DIR, JARVO_LOCAL       katalog repo (~/jarvo) i instalacji floty (~/jarvo-local)
@@ -49,8 +46,8 @@ PORT=9119
 DOCKER_SCRIPT="https://get.docker.com"
 DOCKER_RPM_REPO="https://download.docker.com/linux/centos/docker-ce.repo"
 DISTRO=""
-BREW_SCRIPT="https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"
-# wersja wymagań hosta (programy poza obrazem floty: Docker, Colima, git, Python…). Zmiana tego, co ten skrypt
+NATYWNIE="https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/${JARVO_REF:-main}/jarvo/bootstrap"
+# wersja wymagań hosta (programy poza obrazem floty: Docker, git, Python…). Zmiana tego, co ten skrypt
 # instaluje na komputerze = +1; deploy.sh porównuje ją z zapisaną przy instalacji i prosi o `jarvo update`.
 HOST_VERSION=5
 TOKEN="${JARVO_TOKEN:-}"
@@ -86,18 +83,16 @@ proxy_setup() {
   done
   return 0
 }
-# bash 3.2 (macOS) nie znosi "${tablica[@]}" pustej tablicy przy set -u
+# bash 3.2 nie znosi "${tablica[@]}" pustej tablicy przy set -u
 penv() { as_root env ${PROXY_ENV[@]+"${PROXY_ENV[@]}"} "$@"; }
 
-OS=; ARCH=; PKG=; SUDO=; NEWBASH=; NEED_GROUP=0; BREW=; MACVER=0
+OS=; ARCH=; PKG=; SUDO=; NEED_GROUP=0
 
 sudo_check() {   # hasło administratora raz, na początku; kolejne sudo (pakiety, Docker, chown danych floty) idą z pamięci
   [[ -n $SUDO ]] || return 0
   if [[ $DRY != 1 ]] && $SUDO -n true 2>/dev/null; then return 0; fi   # uprawnienia już zapamiętane (albo NOPASSWD)
   say "Potrzebne hasło administratora (sudo), zwykle tylko raz:"
   if ! run $SUDO -v; then
-    [[ $OS == wsl ]] && die "sudo nie przyjęło hasła. W WSL to hasło użytkownika Linuksa $(id -un) ustawione przy pierwszym uruchomieniu Ubuntu, nie hasło ani PIN Windowsa. Nie pamiętasz? W PowerShellu: wsl -u root passwd $(id -un)   (albo uruchom instalator z PowerShella: irm …/install.ps1 | iex, wtedy hasło nie jest potrzebne)."
-    [[ $OS == macos ]] && die "macOS nie przyjął hasła. Podaj hasło, którym logujesz się do Maca (konto musi być administratorem: Ustawienia systemowe → Użytkownicy i grupy)."
     die "sudo nie przyjęło hasła albo $(id -un) nie ma uprawnień sudo."
   fi
 }
@@ -114,31 +109,28 @@ detect_os() {
     aarch64|arm64) ARCH=arm64 ;;
     *) die "Nieobsługiwany procesor: $ARCH (potrzebny x86_64 albo arm64)." ;;
   esac
-  if [[ $OS == macos ]]; then
-    MACVER="$( (sw_vers -productVersion 2>/dev/null || echo 0) | cut -d. -f1)"
-    say "System: macOS $(sw_vers -productVersion 2>/dev/null || echo '?') ($ARCH)"
-    (( MACVER == 0 || MACVER >= 12 )) || die "Potrzebny macOS 12 albo nowszy (masz $(sw_vers -productVersion)): Homebrew i Colima nie wspierają starszych."
-    # Homebrew (docs.brew.sh/Support-Tiers, od 09.2026): gotowe paczki tylko dla Apple Silicon z macOS 15+;
-    # Intel i macOS 12–14 to Tier 3, więc część programów kompiluje się na miejscu
-    if [[ $ARCH == x86_64 ]]; then
-      warn "Mac z Intelem: Homebrew nie buduje już dla niego gotowych paczek, część programów skompiluje się na miejscu (dłużej, czasem z błędem). Krócej z działającym Docker Desktop albo OrbStack."
-    elif (( MACVER > 0 && MACVER < 15 )); then
-      warn "macOS $MACVER: Homebrew ma gotowe paczki dla macOS 15 i nowszego, część programów skompiluje się na miejscu (dłużej). Polecamy aktualizację macOS."
-    fi
-    # Homebrew, tymczasowe uprawnienia dla sekretów floty (grupa 10000) i polecenie jarvo potrzebują administratora
-    [[ $(id -u) -eq 0 ]] && die "Na macOS uruchom instalator jako zwykły użytkownik (bez sudo): Homebrew odmawia pracy jako root."
-    SUDO=sudo
-    return
-  fi
+  natywnie
   say "System: $OS ($ARCH)"
-  if [[ $OS != macos ]]; then
-    if [[ $(id -u) -eq 0 ]]; then
-      SUDO=
-      warn "Uruchamiasz jako root: flota trafi do $DIR. Na serwerze polecamy scripts/bootstrap-vps.sh (użytkownik bez roota, firewall)."
-    elif have sudo; then SUDO=sudo
-    else die "Potrzebne uprawnienia administratora: zainstaluj sudo albo uruchom jako root."
-    fi
+  if [[ $(id -u) -eq 0 ]]; then
+    SUDO=
+    warn "Uruchamiasz jako root: flota trafi do $DIR. Na serwerze polecamy scripts/bootstrap-vps.sh (użytkownik bez roota, firewall)."
+  elif have sudo; then SUDO=sudo
+  else die "Potrzebne uprawnienia administratora: zainstaluj sudo albo uruchom jako root."
   fi
+}
+
+natywnie() {   # od etapu E13 Jarvo na Macu i na Windowsie jest natywne (bez Dockera); ten skrypt zostaje dla Linuksa
+  case $OS in
+    macos)
+      say "Jarvo na macOS działa natywnie, bez Dockera i Homebrew: uruchamiam instalację natywną (dane starej instalacji z Dockerem przeniesie za Twoją zgodą)."
+      if [[ $DRY == 1 ]]; then say "(na sucho) curl -fsSL $NATYWNIE/install.sh | bash"; exit 0; fi
+      local s
+      s="$(curl -fsSL --retry 3 "$NATYWNIE/install.sh")" \
+        || die "Nie pobrałem instalacji natywnej ($NATYWNIE/install.sh). Sprawdź sieć i uruchom polecenie ponownie."
+      exec bash -c "$s" jarvo-install ;;
+    wsl)
+      die "Jarvo na Windowsie działa natywnie, bez WSL i Dockera. W PowerShellu (zwykły użytkownik): irm https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/jarvo/bootstrap/install.ps1 | iex   (przeniesie dane tej instalacji za Twoją zgodą)." ;;
+  esac
 }
 
 detect_pkg() {
@@ -177,9 +169,8 @@ hw_check() {
   # aktualizacja (jarvo update): flota już stoi na tym sprzęcie, a obraz zajmuje już swoje miejsce na dysku,
   # więc za mało RAM albo dysku tylko ostrzega zamiast przerywać
   [[ -f "$L/.installed" ]] && soft=1
-  if [[ $OS == macos ]]; then ram=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1073741824 ))
   # MemTotal jest mniejszy od kupionej pamięci (jądro rezerwuje część): „4 GB” to ok. 3,8 GB, więc zaokrąglamy
-  else ram="$(awk '/^MemTotal:/ {print int($2/1048576 + 0.5)}' "$MEMINFO" 2>/dev/null || true)"; fi
+  ram="$(awk '/^MemTotal:/ {print int($2/1048576 + 0.5)}' "$MEMINFO" 2>/dev/null || true)"
   ram="${ram:-0}"
   disk="${JARVO_DISK_GB:-$(df -Pk "$HOME" 2>/dev/null | awk 'NR==2 {print int($4/1024/1024)}' || true)}"   # testy: udawany dysk
   say "RAM: ${ram} GB, wolne miejsce w $HOME: ${disk:-?} GB"
@@ -196,158 +187,11 @@ hw_check() {
 tools_check() {
   local missing=() t
   for t in git curl python3 openssl; do have "$t" || missing+=("$(pkg_name "$t")"); done
-  if [[ $OS == macos ]]; then mac_tools; return; fi
   if (( ${#missing[@]} )); then
     say "Doinstalowuję: ${missing[*]}"
     [[ $PKG == apt ]] && missing+=(ca-certificates)
     pkg_install "${missing[@]}"
   fi
-}
-
-# ---------------------------------------------------------------- macOS
-brew_find() {
-  BREW="$(command -v brew 2>/dev/null || true)"
-  [[ -n $BREW ]] || for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do [[ -x $b ]] && BREW=$b && break; done
-  [[ -n $BREW ]]
-}
-
-brew_shellenv() {   # brew, bash, git, python z Homebrew w PATH tej sesji i każdego nowego terminala
-  [[ $DRY == 1 && ! -x $BREW ]] && return 0
-  eval "$("$BREW" shellenv)"
-  local rc="$HOME/.zprofile" line
-  line="eval \"\$($BREW shellenv)\""
-  [[ $DRY == 1 ]] && return 0
-  grep -qsF "$line" "$rc" || printf '\n# Homebrew (dodane przez instalator Jarvo)\n%s\n' "$line" >> "$rc"
-  # bash czyta przy logowaniu pierwszy istniejący z .bash_profile, .bash_login, .profile: nowy .bash_profile
-  # przesłoniłby czyjś .profile, więc dopisujemy do tego, który już jest
-  rc="$HOME/.profile"; [[ -f $HOME/.bash_profile ]] && rc="$HOME/.bash_profile"
-  grep -qsF "$line" "$rc" || printf '\n%s\n' "$line" >> "$rc"
-}
-
-mac_tools() {   # Homebrew (z narzędziami Xcode), bash 4+, git, Python 3, openssl
-  local tmp
-  if ! brew_find; then
-    say "Instaluję Homebrew (menedżer programów macOS; dociąga narzędzia Xcode, kilka minut)…"
-    need_root   # instalator Homebrew w trybie bez pytań wymaga zapamiętanego hasła sudo
-    if [[ $DRY == 1 ]]; then run env NONINTERACTIVE=1 /bin/bash -c "\$(curl -fsSL $BREW_SCRIPT)"; BREW=/opt/homebrew/bin/brew
-    else
-      tmp="$(mktemp)"
-      pobierz "$BREW_SCRIPT" "$tmp" || die "Nie udało się pobrać $BREW_SCRIPT (sieć). Uruchom polecenie ponownie."
-      NONINTERACTIVE=1 /bin/bash -c "$(cat "$tmp")" < /dev/null \
-        || die "Instalacja Homebrew się nie udała (log wyżej). Spróbuj ręcznie: https://brew.sh i uruchom polecenie ponownie."
-      rm -f "$tmp"
-      brew_find || die "Homebrew zainstalowany, ale nie widzę polecenia brew (/opt/homebrew/bin/brew)."
-    fi
-  fi
-  brew_shellenv
-  local f need=()
-  # bash: skrypty floty potrzebują 4+ (macOS ma 3.2 z 2007 r.); python: Python z narzędzi Xcode bywa za stary
-  for f in bash git python openssl@3; do
-    if [[ $DRY == 1 ]] || ! "$BREW" list --formula "$f" >/dev/null 2>&1; then need+=("$f"); fi
-  done
-  if (( ${#need[@]} )); then
-    say "Doinstalowuję: ${need[*]} (brew)"
-    run env HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 "$BREW" install -q "${need[@]}" \
-      || die "brew install ${need[*]} się nie udało."
-  fi
-  NEWBASH="$("$BREW" --prefix 2>/dev/null || echo /opt/homebrew)/bin/bash"
-  if [[ $DRY != 1 ]]; then
-    hash -r
-    have python3 || die "Brak python3 po instalacji (brew install python)."
-  fi
-}
-
-mac_vm_size() {   # procesory i pamięć dla maszyny wirtualnej Colimy: połowa Maca, flota potrzebuje ~6 GB
-  local cpu ram
-  cpu="$(sysctl -n hw.ncpu 2>/dev/null || echo 4)"; ram=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 8589934592) / 1073741824 ))
-  COLIMA_CPU=$(( cpu / 2 )); (( COLIMA_CPU < 2 )) && COLIMA_CPU=2; (( COLIMA_CPU > 6 )) && COLIMA_CPU=6
-  if (( ram >= 16 )); then COLIMA_MEM=8; elif (( ram >= 12 )); then COLIMA_MEM=6; else COLIMA_MEM=5; fi
-}
-
-mac_compose_plugin() {   # docker compose i buildx z Homebrew to wtyczki CLI: Docker musi wiedzieć, gdzie ich szukać
-  local cfg="$HOME/.docker/config.json" dir
-  dir="$("$BREW" --prefix 2>/dev/null || echo /opt/homebrew)/lib/docker/cli-plugins"
-  [[ $DRY == 1 ]] && { run python3 - "$cfg" "$dir"; return; }
-  mkdir -p "$HOME/.docker"
-  python3 - "$cfg" "$dir" <<'PY'
-import json, sys, pathlib
-import shutil
-p, d = pathlib.Path(sys.argv[1]), sys.argv[2]
-c = json.loads(p.read_text() or "{}") if p.exists() else {}
-dirs = c.setdefault("cliPluginsExtraDirs", [])
-if d not in dirs:
-    dirs.append(d)
-# po odinstalowanym Docker Desktop zostaje credsStore "desktop": bez jego programu docker pull kończy się błędem
-if c.get("credsStore") == "desktop" and not shutil.which("docker-credential-desktop"):
-    del c["credsStore"]
-p.write_text(json.dumps(c, indent=2) + "\n")
-PY
-}
-
-mac_docker() {
-  if have docker && docker info >/dev/null 2>&1; then
-    local brak=()
-    docker compose version >/dev/null 2>&1 || brak+=(docker-compose)
-    docker buildx version >/dev/null 2>&1 || brak+=(docker-buildx)   # Colima postawiona wcześniej bez buildx
-    if (( ${#brak[@]} )); then run "$BREW" install -q "${brak[@]}"; mac_compose_plugin; fi
-    say "Docker: $(docker version -f '{{.Server.Version}}' 2>/dev/null || echo ok) (już działa: $(docker context show 2>/dev/null || echo domyślny))"
-    return
-  fi
-  # OrbStack albo Docker Desktop zainstalowany, ale wyłączony: uruchamiamy go zamiast stawiać drugi silnik
-  local app nazwa
-  for app in OrbStack Docker; do
-    [[ -d /Applications/$app.app ]] && ! have colima || continue
-    nazwa=$app; [[ $app == Docker ]] && nazwa="Docker Desktop"
-    say "Uruchamiam $nazwa…"
-    run open -a "$app"
-    [[ $app == OrbStack && -x $HOME/.orbstack/bin/docker ]] && PATH="$HOME/.orbstack/bin:$PATH"
-    if [[ $DRY != 1 ]]; then
-      for _ in $(seq 90); do docker info >/dev/null 2>&1 && break; sleep 2; done
-      if docker info >/dev/null 2>&1; then
-        say "Docker: $nazwa"
-        docker buildx version >/dev/null 2>&1 || warn "$nazwa bez docker buildx: zaktualizuj $nazwa (budowa Komputera Jarva go wymaga)."
-        return
-      fi
-      warn "$nazwa nie wstał w 3 minuty (pierwsze uruchomienie czeka na akceptację licencji w jego oknie). Instaluję Colimę."
-    fi
-    break
-  done
-  local need=() f nowa=0
-  # docker-buildx: docker compose build (Komputer Jarva, obraz floty bez rejestru) bez tej wtyczki nie ruszy
-  for f in colima docker docker-compose docker-buildx; do
-    # polecenie docker z Docker Desktop (/usr/local/bin/docker na Macu z Intelem): brew go nie nadpisze, więc zostaje
-    [[ $f == docker && $DRY != 1 ]] && have docker && continue
-    if [[ $DRY == 1 ]] || ! "$BREW" list --formula "$f" >/dev/null 2>&1; then
-      need+=("$f"); [[ $f == colima ]] && nowa=1
-    fi
-  done
-  # Virtualization.framework (vz) jest od macOS 13; starszy system potrzebuje QEMU
-  local vm=(--vm-type vz --mount-type virtiofs)
-  if (( MACVER > 0 && MACVER < 13 )); then vm=(--vm-type qemu); need+=(qemu); fi
-  if (( ${#need[@]} )); then
-    say "Instaluję Docker bez Docker Desktop: ${need[*]} (Colima: darmowa maszyna wirtualna z Dockerem)…"
-    # po Docker Desktop zostają jego dowiązania w /usr/local/bin (docker-compose…): brew instaluje, ale nie podlinkuje
-    run env HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 "$BREW" install -q "${need[@]}" \
-      || run "$BREW" link --overwrite "${need[@]}" \
-      || die "brew install ${need[*]} się nie udało."
-  fi
-  mac_compose_plugin
-  mac_vm_size
-  if [[ $DRY == 1 ]] || ! colima status >/dev/null 2>&1; then
-    say "Uruchamiam Colimę (${COLIMA_CPU} procesory, ${COLIMA_MEM} GB RAM, dysk do 60 GB; pierwszy raz 1–3 minuty)…"
-    run colima start --cpu "$COLIMA_CPU" --memory "$COLIMA_MEM" --disk 60 "${vm[@]}" \
-      || die "Colima nie wstała (colima status; log: ~/.colima/_lima/colima/ha.stderr.log). Włącz wirtualizację i spróbuj ponownie."
-  fi
-  # start Colimy przy logowaniu włącza `jarvo autostart on` (LaunchAgent); kontenery wstają same (restart: unless-stopped)
-  if [[ $DRY != 1 ]]; then
-    for _ in $(seq 30); do docker info >/dev/null 2>&1 && break; sleep 1; done
-    docker info >/dev/null 2>&1 || die "Docker w Colimie nie odpowiada (colima status, docker context ls)."
-    docker compose version >/dev/null 2>&1 || die "Brak docker compose (brew install docker-compose; ~/.docker/config.json: cliPluginsExtraDirs)."
-    docker buildx version >/dev/null 2>&1 || die "Brak docker buildx (brew install docker-buildx; ~/.docker/config.json: cliPluginsExtraDirs)."
-    # Colimę zainstalował instalator: jarvo uninstall --all może usunąć jej maszynę wirtualną (colima_usun w bin/jarvo)
-    [[ $nowa == 1 && -d $L ]] && touch "$L/.colima"
-  fi
-  say "Docker: Colima ($(docker version -f '{{.Server.Version}}' 2>/dev/null || echo ok))"
 }
 
 docker_start_bg() {   # bez systemd i bez działającego skryptu init (kontener, minimalny system): demon w tle
@@ -436,17 +280,7 @@ docker_group() {   # użytkownik bez roota dostaje grupę docker; ta sesja logow
   id -nG | tr ' ' '\n' | grep -qx docker || NEED_GROUP=1
 }
 
-wsl_iptables_fix() {   # WSL bez systemd: Docker potrzebuje iptables-legacy (nft w WSL nie działa)
-  [[ $OS == wsl ]] || return 1
-  [[ -x /usr/sbin/iptables-legacy ]] || return 1
-  warn "Docker nie wstał: przełączam iptables na wariant legacy (WSL)"
-  as_root update-alternatives --set iptables /usr/sbin/iptables-legacy >/dev/null 2>&1 || true
-  as_root update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy >/dev/null 2>&1 || true
-  docker_start
-}
-
 docker_check() {
-  if [[ $OS == macos ]]; then mac_docker; return; fi
   # Docker już działa jako Ty (Docker Desktop z integracją WSL, wcześniejsza instalacja): nic do roboty, zero sudo
   if have docker && docker info >/dev/null 2>&1; then
     # Docker bez roota (rootless, userns-remap): uid 10000 w kontenerze to inny uid na dysku, a dane floty
@@ -469,7 +303,6 @@ docker_check() {
   if ! docker_wait 3; then
     docker_start
     if ! docker_wait; then
-      wsl_iptables_fix || true
       docker_wait 10 || { docker_start_bg; docker_wait; } \
         || die "Docker nie wstał. Sprawdź: sudo systemctl status docker (bez systemd: sudo dockerd; log: /var/log/dockerd.log)."
     fi
@@ -486,7 +319,7 @@ port_check() {
   local p
   for p in "$PORT" 9120 9122; do   # dashboard, podgląd stron agentów, ekran telefonu testowego (docker-compose.yml)
     if (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null; then
-      die "Port $p jest zajęty przez inny program. Zwolnij go ($( [[ $OS == macos ]] && echo "lsof -i :$p" || echo "ss -ltnp | grep $p" )) i uruchom polecenie ponownie."
+      die "Port $p jest zajęty przez inny program. Zwolnij go (ss -ltnp | grep $p) i uruchom polecenie ponownie."
     fi
   done
   return 0
@@ -564,50 +397,15 @@ repo_sync() {
 
 link_cli() {
   local target="$DIR/bin/jarvo" l
-  for l in /usr/local/bin/jarvo "$HOME/.local/bin/jarvo" /opt/homebrew/bin/jarvo; do   # już jest (aktualizacja)
+  for l in /usr/local/bin/jarvo "$HOME/.local/bin/jarvo"; do   # już jest (aktualizacja)
     if [[ -L $l && "$(readlink "$l")" == "$target" ]]; then say "Polecenie jarvo: $l"; return; fi
   done
-  if [[ $OS == macos && -n $BREW ]]; then   # katalog Homebrew jest w PATH i należy do Ciebie: bez sudo
-    local bin; bin="$("$BREW" --prefix 2>/dev/null || echo /opt/homebrew)/bin"
-    run ln -sfn "$target" "$bin/jarvo"; say "Polecenie jarvo: $bin/jarvo"; return
-  fi
   if [[ -d /usr/local/bin ]] && as_root ln -sfn "$target" /usr/local/bin/jarvo 2>/dev/null; then
     say "Polecenie jarvo: /usr/local/bin/jarvo"
   else
     run mkdir -p "$HOME/.local/bin"; run ln -sfn "$target" "$HOME/.local/bin/jarvo"
     say "Polecenie jarvo: ~/.local/bin/jarvo"
     case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) warn "Dodaj ~/.local/bin do PATH (nowy terminal zwykle robi to sam)." ;; esac
-  fi
-}
-
-# WSL: polecenie jarvo także w PowerShellu. Ten sam jarvo.cmd w %LOCALAPPDATA%\Jarvo\bin i wpis w PATH użytkownika
-# co w install.ps1 (WindowsCommand), żeby jarvo update w Linuksie naprawiał też Windows, bez ponownego irm … | iex.
-# Bez połączenia z Windowsem (interop WSL wyłączony) tylko ostrzeżenie: Jarvo działa dalej przez wsl -d <dystrybucja>.
-windows_cli() {
-  [[ $OS == wsl ]] || return 0
-  local distro="${WSL_DISTRO_NAME:-}" app dir win line ps
-  if [[ -z $distro ]] || ! command -v cmd.exe >/dev/null 2>&1 || ! command -v wslpath >/dev/null 2>&1; then
-    warn "Polecenie jarvo w PowerShellu: brak połączenia z Windowsem z WSL. W PowerShellu działa: wsl -d ${distro:-Ubuntu} -- jarvo …"
-    return 0
-  fi
-  app="$(cd /mnt/c 2>/dev/null; timeout 30 cmd.exe /d /c 'echo %LOCALAPPDATA%' 2>/dev/null | tr -d '\r' | tail -1)"
-  if [[ -z $app || $app == *%* ]] || ! dir="$(wslpath -u "$app" 2>/dev/null)"; then
-    warn "Polecenie jarvo w PowerShellu: Windows nie podał katalogu LOCALAPPDATA. W PowerShellu działa: wsl -d $distro -- jarvo …"
-    return 0
-  fi
-  win="$app\\Jarvo\\bin"; dir="$dir/Jarvo/bin"
-  # ${PATH} i ${HOME} rozwija bash w Linuksie, nie Windows (apostrofy)
-  line='wsl.exe -d '"$distro"' -u '"$(id -un)"' --cd ~ -e bash -c "export PATH=${PATH}:${HOME}/.local/bin:${HOME}/jarvo/bin; exec jarvo \"$@\"" jarvo %*'
-  if [[ $DRY == 1 ]]; then say "jarvo.cmd ($win): $line"; return 0; fi
-  if ! { mkdir -p "$dir" && printf '@echo off\r\nrem Jarvo (install.sh): jarvo in Windows runs jarvo in Linux (%s).\r\n%s\r\n' "$distro" "$line" > "$dir/jarvo.cmd"; }; then
-    warn "Nie zapisałem $win\\jarvo.cmd. W PowerShellu działa: wsl -d $distro -- jarvo …"; return 0
-  fi
-  # PATH użytkownika z rejestru bez rozwijania %ZMIENNYCH%, dopisany raz; JarvoPathTick rozgłasza zmianę do nowych okien
-  ps="\$k='HKCU:\\Environment'; \$d='${win//\'/\'\'}'; \$p=(Get-Item \$k).GetValue('Path','',[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames); if (-not (@(\$p -split ';') -contains \$d)) { New-ItemProperty -Path \$k -Name Path -Value ((@(\$p,\$d) | Where-Object { \$_ }) -join ';') -PropertyType ExpandString -Force | Out-Null; [Environment]::SetEnvironmentVariable('JarvoPathTick','1','User'); [Environment]::SetEnvironmentVariable('JarvoPathTick',\$null,'User') }"
-  if (cd /mnt/c 2>/dev/null; timeout 60 powershell.exe -NoProfile -NonInteractive -Command "$ps" >/dev/null 2>&1); then
-    say "Polecenie jarvo w PowerShellu: $win\\jarvo.cmd (w nowym oknie PowerShella)"
-  else
-    warn "jarvo.cmd jest w $win, ale nie dopisałem go do PATH. W PowerShellu działa: wsl -d $distro -- jarvo …"
   fi
 }
 
@@ -623,18 +421,17 @@ fleet_up() {
   if [[ -f "$L/.installed" ]]; then say "Aktualizuję flotę…"; else
     say "Stawiam flotę (pierwszy raz kilka–kilkanaście minut: budowa obrazu)…"
     # local-up.sh nadaje plikom z kluczami grupę kontenera (sudo): hasło sprawdzamy teraz, nie w połowie
-    # (sudo pamięta je kilka minut, a Homebrew, Colima i Docker trwają dłużej)
+    # (sudo pamięta je kilka minut, a Docker i obraz trwają dłużej)
     SUDO_ASKED=0; need_root
   fi
   # pytania instalatora czytamy z terminala, nie z potoku curl | bash; jarvo sam sięga po grupę docker (sg)
   # klucz dostępu trafia do jarvo up tylko jako zmienna: obraz z prywatnego rejestru (scripts/obraz.sh)
-  JARVO_TOKEN="$TOKEN" JARVO_LOCAL="$L" "${NEWBASH:-bash}" "$jarvo" up < "$TTY"
+  JARVO_TOKEN="$TOKEN" JARVO_LOCAL="$L" bash "$jarvo" up < "$TTY"
   if [[ "${JARVO_NO_AUTOSTART:-0}" != 1 ]]; then
-    "${NEWBASH:-bash}" "$jarvo" autostart on 2>/dev/null \
-      || if [[ $OS == macos ]]; then warn "LaunchAgent się nie włączył (launchctl): flota działa, ale po restarcie Maca uruchom ją: jarvo up (albo jarvo autostart on)."
-         else warn "Bez autostartu (brak usług systemd użytkownika): pomocnik aktualizacji działa w tle do wylogowania (jarvo autostart on, gdy zechcesz)."; fi
+    bash "$jarvo" autostart on 2>/dev/null \
+      || warn "Bez autostartu (brak usług systemd użytkownika): pomocnik aktualizacji działa w tle do wylogowania (jarvo autostart on, gdy zechcesz)."
   fi
-  [[ "${JARVO_NO_OPEN:-0}" == 1 ]] || "${NEWBASH:-bash}" "$jarvo" open >/dev/null 2>&1 || true
+  [[ "${JARVO_NO_OPEN:-0}" == 1 ]] || bash "$jarvo" open >/dev/null 2>&1 || true
 }
 
 main() {
@@ -644,7 +441,7 @@ main() {
   if [[ ! -t 0 ]] && { : < /dev/tty; } 2>/dev/null; then exec < /dev/tty; fi
   detect_os
   proxy_setup
-  [[ $OS == macos ]] || detect_pkg
+  detect_pkg
   hw_check
   if [[ $DRY != 1 ]]; then
     # log całej instalacji (bez kluczy: local-up.sh czyta je bez echa)
@@ -657,7 +454,6 @@ main() {
   port_check
   repo_sync
   link_cli
-  windows_cli
   fleet_up
   if [[ $DRY == 1 ]]; then say "Koniec próby na sucho."; return; fi
   printf '\n%s▌%s Gotowe. Dashboard: %shttp://localhost:%s/jarvo%s   (polecenia: jarvo help)\n' "$G" "$N" "$W" "$PORT" "$N"
