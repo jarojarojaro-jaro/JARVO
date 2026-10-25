@@ -1,15 +1,15 @@
 ---
 name: konwersja-plikow
 description: "Plik → inny format albo bez metadanych: zdjęcia, wideo, PDF, Word."
-version: 1.2.0
-author: "Jarvo (wzór: convt; narzędzia: Pillow, FFmpeg, ExifTool, Ghostscript, qpdf, pandoc, Chromium, LibreOffice)"
+version: 1.3.0
+author: "Jarvo (wzór: convt; narzędzia: Pillow, FFmpeg, ExifTool, PDFium, qpdf, pikepdf, pandoc, Chromium, LibreOffice)"
 license: MIT
 metadata:
   hermes:
     tags: [files, convert, image, video, audio, pdf, docx, heic, metadata, privacy]
   jarvo:
     autonomy: A0
-    reviewed: "2026-10-10"
+    reviewed: "2026-10-25"
 ---
 
 # Konwersja plików
@@ -56,7 +56,8 @@ K="$HERMES_HOME/skills/pliki/konwersja-plikow/scripts/konwertuj.py"
   = zmieść w polu. Nigdy nie powiększa.
 - `--jakosc 1–100`: zdjęcia (domyślnie 85), film (domyślnie 75; mniej = mniejszy plik), audio (kb/s ≈ 3,2 × jakość),
   PDF → PDF (mniejszy plik: ≤ 40 ekran, ≤ 80 e-book, więcej druk).
-- `--strony 1-3,5` i `--dpi`: PDF → obrazy (bez `--strony` najwyżej 200 stron). `--dpi` też dla zdjęć → PDF.
+- `--strony 1-3,5` i `--dpi`: PDF → obrazy (bez `--strony` najwyżej 200 stron) i PDF → tekst. `--dpi` też dla
+  zdjęć → PDF.
 - Film → GIF: 12 klatek/s, dłuższy bok 480 px (inny przez `--rozmiar`). Film z telefonu w HDR wychodzi
   przeliczony na zwykły obraz.
 
@@ -79,9 +80,12 @@ K="$HERMES_HOME/skills/pliki/konwersja-plikow/scripts/konwertuj.py"
   a Ty mówisz to człowiekowi przed wysyłką.
 - Obrazki w Markdown/HTML/Word tylko z katalogu dokumentu: ścieżki absolutne, z „..” i z internetu wypadają
   (ochrona przed wyciekiem plików z serwera). PDF z HTML drukuje Chromium bez dostępu do sieci.
-- Excel, PowerPoint, stare .doc/.xls/.ppt i CSV ↔ XLSX wymagają LibreOffice (dodatek obrazu `office`). Bez niego
-  skrypt mówi to wprost: przekaż człowiekowi, nie obchodź tego. Z PDF nie zrobisz Worda (tekst: `--na txt`;
-  skan bez tekstu: najpierw `ocrmypdf`).
+- Excel, PowerPoint, stare .doc/.xls/.ppt i CSV ↔ XLSX wymagają LibreOffice: w obrazie Jarva dodatek `office`,
+  w instalacji natywnej LibreOffice z tego komputera (skrypt znajdzie go sam) albo program wskazany w JARVO_SOFFICE.
+  Bez niego skrypt mówi to wprost: przekaż człowiekowi, nie obchodź tego i nie instaluj niczego sam. Z PDF nie
+  zrobisz Worda (tekst: `--na txt`; skan bez tekstu: skill `odczyt-ekranu`).
+- PDF → obrazy stron i tekst robi PDFium (pypdfium2), mniejszy PDF pikepdf albo qpdf, bez Ghostscriptu (jest tylko
+  w obrazie). qpdf nie przelicza zdjęć zapisanych już jako JPEG, więc skan zmniejsza się mało: wtedy pole `uwaga`.
 - Kod wyjścia 1 = opis błędu po polsku: powiedz go prosto i zaproponuj inny format, jeśli `--cele` go ma.
 
 ## Definition of Done

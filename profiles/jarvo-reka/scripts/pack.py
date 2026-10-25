@@ -13,10 +13,24 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
+import stat
 import sys
 import zipfile
 from pathlib import Path
+
+
+def usun_katalog(p: Path) -> None:
+    """shutil.rmtree, który na Windows usuwa też pliki tylko do odczytu (np. obiekty gita w out/ karty): bez zdjęcia
+    atrybutu Windows odmawia (PermissionError), a poprzedni pakiet zostałby w połowie."""
+    def zdejmij(funkcja, sciezka, *_):
+        os.chmod(sciezka, stat.S_IWRITE)
+        funkcja(sciezka)
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(p, onexc=zdejmij)
+    else:
+        shutil.rmtree(p, onerror=zdejmij)
 
 
 def sha256(path: Path) -> str:
@@ -48,7 +62,7 @@ def main(argv: list[str] | None = None) -> int:
             continue
         dest = pack / role_dir.name
         if dest.exists():
-            shutil.rmtree(dest)
+            usun_katalog(dest)
         shutil.copytree(src, dest)
         files = []
         for f in sorted(dest.rglob("*")):

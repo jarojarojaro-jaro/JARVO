@@ -9,11 +9,16 @@
     python3 ocr.py skan.pdf --strony 3 --silnik tesseract --jezyk pol
     python3 ocr.py --stan                           # który silnik działa tutaj (JSON)
 
-Silniki: Indra OCR (datalab-to; modele ONNX na CPU, w obrazie: /opt/jarvo/models/indra-ocr) jest główny:
-zrzut ekranu w ~0,3–0,5 s, czyta też obrócone strony, kolumny, tabele i chińskie znaki. Tesseract (pol+eng)
-jest zapasem: gdy Indry brak, gdy padnie albo na życzenie (--silnik tesseract). Bez sieci: modele leżą
-w obrazie, a paczki do pobierania modeli nie ma; gniazda są dodatkowo zablokowane w czasie odczytu.
-Skrypt uruchomiony zwykłym python3 sam przechodzi do venvu OCR (/opt/jarvo/venvs/ocr, albo JARVO_OCR_PYTHON).
+Silniki: Indra OCR (datalab-to; modele ONNX na CPU z INDRA_OCR_MODEL_DIR: w obrazie /opt/jarvo/models/indra-ocr,
+natywnie <dane>/jarvo/models/indra-ocr) jest główny: zrzut ekranu w ~0,3–0,5 s, czyta też obrócone strony, kolumny,
+tabele i chińskie znaki. Tesseract (pol+eng) jest zapasem: gdy Indry brak, gdy padnie albo na życzenie
+(--silnik tesseract). Bez sieci: modele leżą w instalacji, a paczki do pobierania modeli nie ma; gniazda są
+dodatkowo zablokowane w czasie odczytu.
+Skrypt uruchomiony zwykłym python3 sam przechodzi do venvu OCR (JARVO_OCR_PYTHON, w obrazie /opt/jarvo/venvs/ocr).
+Natywnie (docs/NATYWNIE.md E05, E10, B13): obraz z polskimi znakami w ścieżce Indra dostaje przez np.fromfile
+i cv2.imdecode (cv2.imread go nie otworzy), Tesseract przez wejście (stdin), a strony PDF renderuje mu pypdfium2
+(bez Ghostscriptu); Tesseract z PATH floty (natywnie bin-floty), języki z TESSDATA_PREFIX, TSV przez
+`-c tessedit_create_tsv=1`.
 Ramki są w pikselach pliku (PDF: strona wyrenderowana w --dpi); zrzut ekranu 2× → podziel przez 2 przed kliknięciem.
 --szukaj: bez wielkości liter i polskich znaków („zrodlo” znajdzie „Źródło”); ramka napisu wyliczona z ramki linii.
 Wynik --szukaj i --format json: JSON; kod 1 = błąd z opisem po polsku.
@@ -34,14 +39,32 @@ import time
 import unicodedata
 from pathlib import Path
 
-OCR_PYTHON = "/opt/jarvo/venvs/ocr/bin/python"
-MODELE = "/opt/jarvo/models/indra-ocr"
+OCR_PYTHON = "/opt/jarvo/venvs/ocr/bin/python"     # obraz Jarva; natywnie JARVO_OCR_PYTHON (jarvo/srodowisko.py)
+MODELE = "/opt/jarvo/models/indra-ocr"             # obraz Jarva; natywnie INDRA_OCR_MODEL_DIR
 FILMY = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".gif"}
 MAKS_STRON = 50
+MAKS_PIKSELI = 100e6        # strona PDF większa niż tyle pikseli w --dpi renderuje się w niższym (jak w Indrze)
+WINDOWS = os.name == "nt"
+BEZ_OKNA = getattr(subprocess, "CREATE_NO_WINDOW", 0) if WINDOWS else 0   # programy bez okna konsoli (Windows)
 
 
 class Blad(Exception):
     pass
+
+
+def _proc(cmd: list, timeout: float, **kw) -> subprocess.CompletedProcess:
+    """Program z przechwyconym wyjściem, bez okna konsoli; goła nazwa → pełna ścieżka z PATH (CreateProcess na
+    Windows szukałby jej najpierw w katalogu Pythona i w System32)."""
+    cmd = [str(x) for x in cmd]
+    if cmd and not os.path.dirname(cmd[0]):
+        cmd[0] = shutil.which(cmd[0]) or cmd[0]
+    if "input" not in kw:
+        kw["stdin"] = subprocess.DEVNULL
+    return subprocess.run(cmd, capture_output=True, timeout=timeout, creationflags=BEZ_OKNA, **kw)
+
+
+def _tekst(dane: bytes | str | None) -> str:
+    return dane.decode("utf-8", "replace") if isinstance(dane, bytes) else (dane or "")
 
 
 def _odmow(*_a, **_k):
@@ -85,10 +108,9 @@ def katalog_modeli() -> Path | None:
 
 
 def jezyki_tesseracta(chce: str) -> str:
-    """Z „pol+eng” zostają języki, które Tesseract tu ma; nic z listy → pierwszy dostępny."""
+    """Z „pol+eng” zostają języki, które Tesseract tu ma (TESSDATA_PREFIX); nic z listy → pierwszy dostępny."""
     try:
-        out = subprocess.run(["tesseract", "--list-langs"], capture_output=True, text=True, encoding="utf-8",
-                             errors="replace", timeout=30).stdout
+        out = _tekst(_proc(["tesseract", "--list-langs"], timeout=30).stdout)
     except (OSError, subprocess.TimeoutExpired):
         return chce
     sa = {x.strip() for x in out.splitlines()[1:] if x.strip()}
@@ -96,14 +118,26 @@ def jezyki_tesseracta(chce: str) -> str:
     return "+".join(jest) or next(iter(sorted(sa - {"osd"})), "eng")
 
 
+def _pdfium():
+    try:
+        import pypdfium2 as pdfium  # type: ignore[import-not-found]
+        return pdfium
+    except ImportError:
+        return None
+
+
 def stan() -> dict:
     ind = _indra()
     modele, tesseract = katalog_modeli(), shutil.which("tesseract")
+    pdfium = _pdfium()
     return {                                   # ścieżki z „/” także na Windows (JSON dla agenta)
         "indra": getattr(ind, "__version__", None),
         "modele": modele.as_posix() if modele else None,
         "tesseract": Path(tesseract).as_posix() if tesseract else None,
         "jezyki_tesseracta": jezyki_tesseracta("pol+eng") if tesseract else None,
+        # czym strony PDF idą do Tesseracta: pypdfium2 (venv OCR), a bez niego Ghostscript, jeśli jest
+        "pdf_dla_tesseracta": (f"pypdfium2 {getattr(pdfium, 'PYPDFIUM_INFO', '')}".strip() if pdfium
+                               else "ghostscript" if shutil.which("gs") else None),
         "python": Path(sys.executable).as_posix(),
     }
 
@@ -128,11 +162,34 @@ def klatka(film: Path, czas: float, tmp: Path) -> Path:
     if not shutil.which("ffmpeg"):
         raise Blad("klatka filmu wymaga ffmpeg")
     out = tmp / f"klatka-{czas:g}.png"
-    r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{czas}", "-i", str(film), "-frames:v", "1", str(out)],
-                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+    r = _proc(["ffmpeg", "-nostdin", "-v", "error", "-y", "-ss", f"{czas}", "-i", str(film), "-frames:v", "1",
+               str(out)], timeout=120)
     if r.returncode or not out.is_file():
-        raise Blad(f"nie wyjąłem klatki {czas:g} s z {film.name}: {(r.stderr or '').strip()[:200]}")
+        raise Blad(f"nie wyjąłem klatki {czas:g} s z {film.name}: {_tekst(r.stderr).strip()[:200]}")
     return out
+
+
+def _pdf(plik: Path) -> bool:
+    with open(plik, "rb") as f:
+        return f.read(5) == b"%PDF-"
+
+
+def obrazy_pliku(plik: Path) -> list:
+    """Strony obrazu w szarości (każda klatka wielostronicowego TIFF): np.fromfile + cv2.imdecode, bo cv2.imread
+    (tak czyta Indra) nie otworzy na Windows pliku z polskimi znakami w ścieżce („faktura_październik.png”)."""
+    import cv2  # type: ignore[import-not-found]
+    import numpy as np  # type: ignore[import-not-found]
+    dane = np.fromfile(str(plik), dtype=np.uint8)
+    klatki: list = []
+    if hasattr(cv2, "imdecodemulti"):
+        ok, wiele = cv2.imdecodemulti(dane, cv2.IMREAD_GRAYSCALE)
+        klatki = list(wiele) if ok and wiele else []
+    if not klatki:
+        jedna = cv2.imdecode(dane, cv2.IMREAD_GRAYSCALE)
+        klatki = [jedna] if jedna is not None else []
+    if not klatki:
+        raise Blad(f"{plik.name}: to nie jest PDF ani obraz, który da się odczytać")
+    return [np.ascontiguousarray(k) for k in klatki[:MAKS_STRON]]
 
 
 def _linia(ramka, tekst: str, pewnosc: float | None) -> dict:
@@ -140,24 +197,36 @@ def _linia(ramka, tekst: str, pewnosc: float | None) -> dict:
             "pewnosc": None if pewnosc is None else round(float(pewnosc), 3)}
 
 
+def _strona_indry(conv, obraz):
+    """Jedna strona obrazu przez Indrę; awaria = pusta strona z opisem (jak Converter.convert w indra_ocr)."""
+    try:
+        return conv.ocr(obraz)
+    except Exception as e:  # noqa: BLE001  (opis trafia do błędu strony niżej)
+        return type("Strona", (), {"source": "error", "note": f"{type(e).__name__}: {e}", "lines": [],
+                                   "markdown": "", "rotation": 0})()
+
+
 def czytaj_indra(plik: Path, strony: str | None, dpi: float, watki: int, wzory: bool) -> list[dict]:
     ind = _indra()
     if ind is None:
-        raise Blad("brak Indry OCR (venv /opt/jarvo/venvs/ocr z obrazu Jarva)")
+        raise Blad("brak Indry OCR (venv OCR z instalacji Jarva: JARVO_OCR_PYTHON, w obrazie /opt/jarvo/venvs/ocr)")
     md = katalog_modeli()
     if md is None:
-        raise Blad("brak modeli Indry (/opt/jarvo/models/indra-ocr albo INDRA_OCR_MODEL_DIR)")
+        raise Blad("brak modeli Indry (INDRA_OCR_MODEL_DIR; w obrazie /opt/jarvo/models/indra-ocr)")
     zablokuj_siec()
     conv = ind.load(str(md), threads=watki, dpi=dpi, mode="auto", math=wzory)
-    if strony and plik.read_bytes()[:5] == b"%PDF-":
-        import pypdfium2 as pdfium  # type: ignore[import-not-found]
-        doc = pdfium.PdfDocument(str(plik))
-        try:
-            pary = [(i, conv.pdf_page(str(plik), doc, i)) for i in zakres_stron(strony, len(doc))]
-        finally:
-            doc.close()
+    if _pdf(plik):
+        if strony:
+            import pypdfium2 as pdfium  # type: ignore[import-not-found]
+            doc = pdfium.PdfDocument(str(plik))         # pypdfium2 otwiera też ścieżki z polskimi znakami
+            try:
+                pary = [(i, conv.pdf_page(str(plik), doc, i)) for i in zakres_stron(strony, len(doc))]
+            finally:
+                doc.close()
+        else:
+            pary = conv.convert(plik, max_pages=MAKS_STRON)
     else:
-        pary = conv.convert(plik, max_pages=MAKS_STRON)
+        pary = [(i, _strona_indry(conv, obraz)) for i, obraz in enumerate(obrazy_pliku(plik))]
     wynik = []
     for i, p in pary:
         if p.source == "error":
@@ -184,34 +253,78 @@ def _tsv_linie(tsv: str) -> list[dict]:
     return linie
 
 
+def _pgm(szarosc) -> bytes:
+    """Tablica szarości (numpy, wiersze × kolumny) → PGM (P5): format, który Tesseract (Leptonica) czyta z wejścia."""
+    h, w = szarosc.shape[:2]
+    return b"P5\n%d %d\n255\n" % (w, h) + szarosc.tobytes()
+
+
+def strony_pdf_pypdfium(plik: Path, strony: str | None, dpi: float) -> list[tuple[int, bytes]]:
+    """Strony PDF w szarości jako PGM dla Tesseracta, renderowane przez pypdfium2 (venv OCR; bez Ghostscriptu)."""
+    import numpy as np  # type: ignore[import-not-found]
+    pdfium = _pdfium()
+    try:
+        doc = pdfium.PdfDocument(str(plik))
+    except pdfium.PdfiumError as e:
+        if "password" in str(e).lower():
+            raise Blad("PDF jest zabezpieczony hasłem: zdejmij zabezpieczenie i spróbuj jeszcze raz") from None
+        raise Blad(f"nie otworzę PDF {plik.name}: {e}") from None
+    try:
+        out = []
+        for i in zakres_stron(strony, len(doc)):
+            strona = doc[i]
+            w, h = strona.get_size()
+            skala = min(dpi / 72.0, (MAKS_PIKSELI / max(w * h, 1.0)) ** 0.5)
+            tab = strona.render(scale=skala, grayscale=True).to_numpy()
+            tab = np.ascontiguousarray(tab[..., 0] if tab.ndim == 3 else tab)
+            out.append((i + 1, _pgm(tab)))
+            strona.close()
+        return out
+    finally:
+        doc.close()
+
+
+def strony_pdf_gs(plik: Path, strony: str | None, dpi: float, tmp: Path) -> list[tuple[int, bytes]]:
+    """Zapas bez pypdfium2 (Ghostscript tam, gdzie już jest, np. w obrazie Jarva z OCRmyPDF)."""
+    ile = _tekst(_proc(["qpdf", "--show-npages", str(plik)], timeout=120).stdout).strip() if shutil.which("qpdf") else ""
+    n = int(ile) if ile.isdigit() else MAKS_STRON
+    out = []
+    for i in zakres_stron(strony, n):
+        png = tmp / f"s{i + 1}.png"
+        _proc(["gs", "-q", "-dSAFER", "-dBATCH", "-dNOPAUSE", "-sDEVICE=pnggray", f"-r{int(dpi)}",
+               f"-dFirstPage={i + 1}", f"-dLastPage={i + 1}", f"-sOutputFile={png}", str(plik)],
+              timeout=300, check=True)
+        if png.is_file() and png.stat().st_size:
+            out.append((i + 1, png.read_bytes()))
+    return out
+
+
 def czytaj_tesseract(plik: Path, strony: str | None, dpi: float, jezyk: str, tmp: Path) -> list[dict]:
     if not shutil.which("tesseract"):
-        raise Blad("brak Tesseracta (apt tesseract-ocr w obrazie Jarva)")
-    obrazy: list[tuple[int, Path]]
-    if plik.read_bytes()[:5] == b"%PDF-":
-        if not shutil.which("gs"):
-            raise Blad("PDF przez Tesseract wymaga Ghostscripta (gs)")
-        ile = subprocess.run(["qpdf", "--show-npages", str(plik)], capture_output=True, text=True, encoding="utf-8",
-                             errors="replace", timeout=120).stdout.strip() if shutil.which("qpdf") else ""
-        n = int(ile) if ile.isdigit() else MAKS_STRON
-        obrazy = []
-        for i in zakres_stron(strony, n):
-            out = tmp / f"s{i + 1}.png"
-            subprocess.run(["gs", "-q", "-dSAFER", "-dBATCH", "-dNOPAUSE", "-sDEVICE=pnggray", f"-r{int(dpi)}",
-                            f"-dFirstPage={i + 1}", f"-dLastPage={i + 1}", f"-sOutputFile={out}", str(plik)],
-                           capture_output=True, timeout=300, check=True)
-            if out.is_file() and out.stat().st_size:
-                obrazy.append((i + 1, out))
+        raise Blad("brak Tesseracta (program tesseract z instalacji Jarva: natywnie bin-floty, w obrazie apt)")
+    obrazy: list[tuple[int, bytes]]
+    rozdzielczosc: list[str] = []
+    if _pdf(plik):
+        rozdzielczosc = ["--dpi", str(int(dpi))]       # strona wyrenderowana w --dpi (PGM nie niesie rozdzielczości)
+        if _pdfium() is not None:
+            obrazy = strony_pdf_pypdfium(plik, strony, dpi)
+        elif shutil.which("gs"):
+            obrazy = strony_pdf_gs(plik, strony, dpi, tmp)
+        else:
+            raise Blad("PDF przez Tesseract wymaga pypdfium2 (venv OCR z instalacji Jarva) albo Ghostscripta")
     else:
-        obrazy = [(1, plik)]
+        obrazy = [(1, plik.read_bytes())]
     lang = jezyki_tesseracta(jezyk)
     wynik = []
-    for nr, obraz in obrazy:
-        r = subprocess.run(["tesseract", str(obraz), "stdout", "-l", lang, "--psm", "3", "tsv"],
-                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600)
+    for nr, dane in obrazy:
+        # obraz przez wejście (stdin): Tesseract ma wąskie API ścieżek (polskie znaki na Windows); TSV przez -c, bo
+        # konfiguracja `tsv` bywa nie do znalezienia (TESSDATA_PREFIX bez katalogu configs)
+        r = _proc(["tesseract", "stdin", "stdout", "-l", lang, "--psm", "3", *rozdzielczosc,
+                   "-c", "tessedit_create_tsv=1"], timeout=600, input=dane)
         if r.returncode:
-            raise Blad(f"Tesseract: {(r.stderr or '').strip()[:200]}")
-        wynik.append({"strona": nr, "zrodlo": "ocr", "obrot": 0, "linie": _tsv_linie(r.stdout), "markdown": None})
+            raise Blad(f"Tesseract: {_tekst(r.stderr).strip()[:200]}")
+        wynik.append({"strona": nr, "zrodlo": "ocr", "obrot": 0, "linie": _tsv_linie(_tekst(r.stdout)),
+                      "markdown": None})
     return wynik
 
 

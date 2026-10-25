@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
-"""Konwersja do PDF lokalnie, bez sidecarów: pandoc + Chromium z obrazu (+ LibreOffice, jeśli jest).
+"""Konwersja do PDF lokalnie, bez sidecarów: pandoc + Chromium z instalacji Jarva (+ LibreOffice, jeśli jest).
 
     python3 to_pdf.py <wejście.(md|html|docx|odt|xlsx|pptx|...)> <wyjście.pdf>
 
 - Markdown/TXT: pandoc → HTML (z prostym stylem i osadzonymi obrazkami) → Chromium drukuje do PDF.
 - HTML: Chromium drukuje plik bezpośrednio (względne ścieżki do obrazków działają).
-- DOCX/ODT: LibreOffice, jeśli zainstalowany (JARVO_EXTRAS="office"); inaczej pandoc → HTML → Chromium
-  (treść, tabele i obrazki zostają, układ strony jest uproszczony).
-- XLSX/PPTX/ODS/ODP/DOC/XLS/PPT: tylko LibreOffice (JARVO_EXTRAS="office" przy budowie obrazu).
-Proces Chromium żyje tylko na czas konwersji (~150–250 MB RAM).
+- DOCX/ODT: LibreOffice, jeśli jest; inaczej pandoc → HTML → Chromium (treść, tabele i obrazki zostają, układ strony
+  jest uproszczony).
+- XLSX/PPTX/ODS/ODP/DOC/XLS/PPT: tylko LibreOffice.
+Programy (docs/NATYWNIE.md F05, E07, E09): Chromium z CHROME_PATH (natywnie chrome-headless-shell z instalacji, w obrazie
+/usr/local/bin/chromium), pandoc z PATH procesów Jarva, LibreOffice: JARVO_SOFFICE, dodatek z instalacji Jarva, PATH
+(w obrazie dodatek `office`), a natywnie także LibreOffice właściciela (Program Files, Aplikacje, /opt). Na Windows
+programy bez okna konsoli. Proces Chromium żyje tylko na czas konwersji (~150–250 MB RAM).
 """
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -32,52 +36,140 @@ HTML = {".html", ".htm"}
 PANDOC_OFFICE = {".docx", ".odt"}
 OFFICE_ONLY = {".doc", ".rtf", ".xlsx", ".xls", ".ods", ".pptx", ".ppt", ".odp"}
 TIMEOUT = 180
+WINDOWS = os.name == "nt"
+BEZ_OKNA = getattr(subprocess, "CREATE_NO_WINDOW", 0) if WINDOWS else 0
+USERNS_APPARMOR = Path("/proc/sys/kernel/apparmor_restrict_unprivileged_userns")
+# LibreOffice w katalogu instalacji: Windows soffice.com (konsolowy, czeka na koniec) i soffice.exe, macOS pakiet .app,
+# Linux program/soffice (pakiet systemu, /opt/libreofficeX.Y z paczek TDF albo dodatek Jarva z deb bez dpkg)
+WZGLEDNE_SOFFICE = ("program/soffice.com", "program/soffice.exe", "LibreOffice.app/Contents/MacOS/soffice",
+                    "Contents/MacOS/soffice", "program/soffice")
+
+
+def natywnie() -> bool:
+    return bool(os.environ.get("JARVO_ROOT")) and not Path("/.dockerenv").exists()
 
 
 def chromium() -> str:
     for cand in (os.environ.get("CHROME_PATH"), shutil.which("chromium"), shutil.which("chromium-browser"),
-                 shutil.which("google-chrome")):
-        if cand and os.path.exists(cand):
+                 shutil.which("chrome-headless-shell"), shutil.which("google-chrome")):
+        if cand and os.path.isfile(cand):
             return cand
-    raise SystemExit("Brak Chromium (obraz Jarvo: /usr/local/bin/chromium, CHROME_PATH).")
+    raise SystemExit("Brak Chromium (CHROME_PATH: natywnie chrome-headless-shell z instalacji Jarva, "
+                     "w obrazie /usr/local/bin/chromium).")
+
+
+def bez_piaskownicy() -> bool:
+    """--no-sandbox tylko tam, gdzie piaskownica Chromium nie ruszy: Linux jako root, w kontenerze albo przy zakazie
+    przestrzeni nazw użytkownika (Ubuntu 23.10+). Windows i macOS: zawsze z piaskownicą."""
+    if not sys.platform.startswith("linux"):
+        return False
+    if os.geteuid() == 0 or Path("/.dockerenv").exists():
+        return True
+    try:
+        return USERNS_APPARMOR.read_text(encoding="utf-8").strip() == "1"
+    except OSError:
+        return False
+
+
+def _soffice_w(katalog: Path) -> str | None:
+    for rel in WZGLEDNE_SOFFICE:
+        if (katalog / rel).is_file():
+            return str(katalog / rel)
+    return next((str(p) for p in sorted(katalog.glob("opt/libreoffice*/program/soffice"), reverse=True)
+                 if p.is_file()), None)
 
 
 def soffice() -> str | None:
-    return shutil.which("soffice") or shutil.which("libreoffice")
+    """LibreOffice: JARVO_SOFFICE, dodatek `libreoffice` z `<JARVO_ROOT>/stan/narzedzia.json`, PATH, a na końcu
+    instalacja właściciela w typowym miejscu (na Windows i macOS LibreOffice nie trafia do PATH)."""
+    jawny = os.environ.get("JARVO_SOFFICE")
+    if jawny and os.path.isfile(jawny):
+        return jawny
+    if root := os.environ.get("JARVO_ROOT"):
+        try:
+            wpis = json.loads((Path(root) / "stan" / "narzedzia.json").read_text(encoding="utf-8-sig")).get(
+                "libreoffice")
+        except (OSError, ValueError, AttributeError):
+            wpis = None
+        if isinstance(wpis, dict):
+            sciezka = (wpis.get("env") or {}).get("JARVO_SOFFICE")
+            if sciezka and os.path.isfile(sciezka):
+                return sciezka
+            if wpis.get("katalog") and (p := _soffice_w(Path(wpis["katalog"]))):
+                return p
+    if p := shutil.which("soffice") or shutil.which("libreoffice"):
+        return p
+    kandydaci: list[Path] = []
+    if WINDOWS:
+        for zm in ("ProgramW6432", "ProgramFiles", "ProgramFiles(x86)"):
+            if katalog := os.environ.get(zm):
+                kandydaci.append(Path(katalog) / "LibreOffice")
+        if katalog := os.environ.get("LOCALAPPDATA"):
+            kandydaci.append(Path(katalog) / "Programs" / "LibreOffice")
+    elif sys.platform == "darwin":
+        kandydaci += [Path("/Applications/LibreOffice.app"), Path.home() / "Applications" / "LibreOffice.app"]
+    else:
+        kandydaci += [*sorted(Path("/opt").glob("libreoffice*"), reverse=True), Path("/usr/lib/libreoffice")]
+    return next((p for k in kandydaci if (p := _soffice_w(k))), None)
+
+
+def _uruchom(cmd: list, opis: str, **kw) -> None:
+    """Program bez okna konsoli; błąd = SystemExit z ostatnimi liniami wyjścia (bez śladu stosu). Chromium i LibreOffice
+    idą pełną ścieżką, pandoc z PATH procesów Jarva (na Windows nie ma go w System32, więc CreateProcess bierze ten
+    z PATH)."""
+    cmd = [str(x) for x in cmd]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=TIMEOUT,
+                           stdin=subprocess.DEVNULL, creationflags=BEZ_OKNA, **kw)
+    except subprocess.TimeoutExpired:
+        raise SystemExit(f"{opis}: przekroczony czas ({TIMEOUT} s)") from None
+    except OSError as exc:
+        raise SystemExit(f"{opis}: nie da się uruchomić ({exc})") from None
+    if r.returncode != 0:
+        ogon = [x for x in (r.stderr or r.stdout or "").strip().splitlines() if x.strip()][-4:]
+        raise SystemExit(f"{opis} zakończył się błędem ({r.returncode}):\n" + "\n".join(ogon))
 
 
 def print_html(html: Path, dst: Path, tmp: Path) -> None:
-    subprocess.run([chromium(), "--headless", "--no-sandbox", "--disable-gpu", "--disable-extensions",
-                    "--no-first-run", f"--user-data-dir={tmp / 'chrome'}", "--no-pdf-header-footer",
-                    "--print-to-pdf-no-header", "--virtual-time-budget=5000", f"--print-to-pdf={dst}",
-                    html.resolve().as_uri()],
-                   check=True, timeout=TIMEOUT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    _uruchom([chromium(), "--headless", *(["--no-sandbox"] if bez_piaskownicy() else []), "--disable-gpu",
+              "--disable-extensions", "--no-first-run", f"--user-data-dir={tmp / 'chrome'}", "--no-pdf-header-footer",
+              "--print-to-pdf-no-header", "--virtual-time-budget=5000", f"--print-to-pdf={dst}",
+              html.resolve().as_uri()], "Chromium")
 
 
 def pandoc_html(src: Path, tmp: Path) -> Path:
     out = tmp / "index.html"
+    dane = tmp / "pandoc-dane"     # pusty katalog danych: bez szablonów i init.lua z katalogu użytkownika (E01)
+    dane.mkdir(exist_ok=True)
     fmt = ["-f", "markdown"] if src.suffix.lower() == ".txt" else []
-    subprocess.run(["pandoc", str(src), *fmt, "-s", "--embed-resources", f"--resource-path={src.parent}",
-                    "--metadata", f"title={src.stem}", "-o", str(out)], check=True, timeout=TIMEOUT)
+    _uruchom(["pandoc", str(src), *fmt, "-s", "--embed-resources", f"--resource-path={src.parent}",
+              f"--data-dir={dane}", "--metadata", f"title={src.stem}", "-o", str(out)], "pandoc")
     out.write_text(out.read_text(encoding="utf-8").replace("</head>", STYLE + "</head>", 1), encoding="utf-8")
     return out
 
 
 def libreoffice(src: Path, dst: Path, tmp: Path, office: str) -> None:
-    subprocess.run([office, f"-env:UserInstallation={(tmp / 'lo').as_uri()}", "--headless", "--norestore",
-                    "--convert-to", "pdf", "--outdir", str(tmp), str(src)],
-                   check=True, timeout=TIMEOUT, stdout=subprocess.DEVNULL)
+    _uruchom([office, f"-env:UserInstallation={(tmp / 'lo').as_uri()}", "--headless", "--norestore",
+              "--convert-to", "pdf", "--outdir", str(tmp), str(src)], "LibreOffice")
     produced = tmp / (src.stem + ".pdf")
     if not produced.exists():
         raise SystemExit(f"LibreOffice nie utworzył PDF z {src.name}")
     shutil.move(str(produced), dst)
 
 
+def rada_office(ext: str) -> str:
+    if natywnie():
+        return (f"{ext} → PDF wymaga LibreOffice: zainstaluj go na tym komputerze (libreoffice.org; Jarvo znajdzie go "
+                "sam) albo wskaż program zmienną JARVO_SOFFICE; bez niego zapisz plik jako DOCX/HTML.")
+    return f"{ext} → PDF wymaga LibreOffice: zbuduj obraz z JARVO_EXTRAS=\"office\" albo zapisz plik jako DOCX/HTML."
+
+
 def convert(src: Path, dst: Path) -> None:
     ext = src.suffix.lower()
     dst = dst.resolve()
     dst.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="to-pdf-") as t:
+    # ignore_cleanup_errors: na Windows Chromium albo soffice.bin bywa przez chwilę jeszcze przy plikach profilu
+    with tempfile.TemporaryDirectory(prefix="to-pdf-", ignore_cleanup_errors=True) as t:
         tmp = Path(t)
         office = soffice()
         if ext in HTML:
@@ -91,8 +183,7 @@ def convert(src: Path, dst: Path) -> None:
                 print_html(pandoc_html(src, tmp), dst, tmp)
         elif ext in OFFICE_ONLY:
             if not office:
-                raise SystemExit(f"{ext} → PDF wymaga LibreOffice: zbuduj obraz z JARVO_EXTRAS=\"office\" "
-                                 "albo zapisz plik jako DOCX/HTML.")
+                raise SystemExit(rada_office(ext))
             libreoffice(src, dst, tmp, office)
         else:
             raise SystemExit(f"Nieobsługiwany format: {ext}")

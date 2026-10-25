@@ -1,4 +1,10 @@
-"""Wspólny skill odczyt-ekranu: ocr.py (Indra OCR, zapas Tesseract), obraz i przypisanie we flocie."""
+"""Wspólny skill odczyt-ekranu: ocr.py (Indra OCR, zapas Tesseract), obraz i przypisanie we flocie.
+
+Natywnie (docs/NATYWNIE.md E05, E10, B13): obraz dla Indry przez np.fromfile + cv2.imdecode (polskie znaki w ścieżce
+na Windows), Tesseract z obrazem na wejściu i TSV przez `-c tessedit_create_tsv=1`, strony PDF przez pypdfium2 zamiast
+Ghostscriptu, programy pełną ścieżką i bez okna konsoli. Testy z prawdziwym silnikiem biegną tam, gdzie jest venv OCR
+z modelami (JARVO_OCR_PYTHON, INDRA_OCR_MODEL_DIR: obraz Jarva albo środowisko procesów instalacji natywnej).
+"""
 
 from __future__ import annotations
 
@@ -90,7 +96,8 @@ def test_auto_bez_indry_czyta_tesseract_i_mowi_to(monkeypatch, tmp_path):
         ocr.odczytaj(obraz, a, tmp_path)
 
 
-def test_brak_pliku_to_blad_po_polsku(tmp_path, capsys):
+def test_brak_pliku_to_blad_po_polsku(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(ocr, "_do_venvu", lambda argv: None)      # w środowisku Jarva: bez przejścia do venvu OCR
     assert ocr.main([str(tmp_path / "nie-ma.png")]) == 1
     assert "nie ma pliku" in capsys.readouterr().err
 
@@ -190,6 +197,133 @@ def _python_ocr() -> str | None:
         if k and Path(k).is_file():
             return k
     return None
+
+
+# ------------------------------------------------------------------ natywnie: programy, Tesseract, obrazy i PDF
+
+def test_programy_pelna_sciezka_i_bez_okna(monkeypatch, tmp_path):
+    wolane = []
+    monkeypatch.setattr(ocr.shutil, "which", lambda n: str(tmp_path / f"{n}.exe"))
+    monkeypatch.setattr(ocr.subprocess, "run", lambda cmd, **k: wolane.append((cmd, k)) or
+                        subprocess.CompletedProcess(cmd, 0, b"List of available languages (3):\neng\nosd\npol\n", b""))
+    assert ocr.jezyki_tesseracta("pol+eng+deu") == "pol+eng"
+    cmd, kw = wolane[0]
+    assert cmd == [str(tmp_path / "tesseract.exe"), "--list-langs"] and kw["stdin"] == subprocess.DEVNULL
+    assert kw["creationflags"] == (subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+
+
+def test_tesseract_dostaje_obraz_przez_wejscie_i_tsv_przez_c(monkeypatch, tmp_path):
+    """B13: Tesseract ma wąskie API ścieżek, więc obraz idzie przez stdin; TSV przez -c (konfiguracja `tsv` bywa
+    nie do znalezienia przy TESSDATA_PREFIX bez katalogu configs)."""
+    kat = tmp_path / "Michał Żółć"
+    kat.mkdir()
+    obraz = kat / "faktura_październik.png"
+    obraz.write_bytes(b"\x89PNG\r\n\x1a\nobraz")
+    wolane = []
+    tsv = ("level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n"
+           "5\t1\t1\t1\t1\t1\t10\t20\t50\t15\t96\tFaktura\n")
+
+    def proc(cmd, timeout, **kw):
+        wolane.append((cmd, kw))
+        return subprocess.CompletedProcess(cmd, 0, tsv.encode(), b"")
+    monkeypatch.setattr(ocr.shutil, "which", lambda n: "/x/tesseract" if n == "tesseract" else None)
+    monkeypatch.setattr(ocr, "_proc", proc)
+    monkeypatch.setattr(ocr, "jezyki_tesseracta", lambda chce: "pol+eng")
+    strony = ocr.czytaj_tesseract(obraz, None, 200.0, "pol+eng", tmp_path)
+    cmd, kw = wolane[0]
+    assert cmd[:3] == ["tesseract", "stdin", "stdout"] and str(obraz) not in cmd
+    assert cmd[cmd.index("-c") + 1] == "tessedit_create_tsv=1" and "--dpi" not in cmd
+    assert kw["input"] == obraz.read_bytes()
+    assert strony == [{"strona": 1, "zrodlo": "ocr", "obrot": 0, "markdown": None,
+                       "linie": [{"tekst": "Faktura", "ramka": [10, 20, 60, 35], "pewnosc": 0.96}]}]
+
+
+def test_pdf_dla_tesseracta_przez_pypdfium2_albo_blad(monkeypatch, tmp_path):
+    pdf = tmp_path / "skan.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n")
+    wolane = []
+    monkeypatch.setattr(ocr.shutil, "which", lambda n: "/x/tesseract" if n == "tesseract" else None)
+    monkeypatch.setattr(ocr, "jezyki_tesseracta", lambda chce: "pol")
+    monkeypatch.setattr(ocr, "_proc", lambda cmd, timeout, **kw: wolane.append((cmd, kw)) or
+                        subprocess.CompletedProcess(cmd, 0, b"", b""))
+    monkeypatch.setattr(ocr, "_pdfium", lambda: object())
+    monkeypatch.setattr(ocr, "strony_pdf_pypdfium", lambda plik, strony, dpi: [(2, b"P5 strona 2"), (5, b"P5 5")])
+    strony = ocr.czytaj_tesseract(pdf, "2,5", 150.0, "pol", tmp_path)
+    assert [s["strona"] for s in strony] == [2, 5] and [kw["input"] for _, kw in wolane] == [b"P5 strona 2", b"P5 5"]
+    assert wolane[0][0][wolane[0][0].index("--dpi") + 1] == "150"        # PGM nie niesie rozdzielczości
+    monkeypatch.setattr(ocr, "_pdfium", lambda: None)                    # bez pypdfium2 i bez Ghostscriptu
+    with pytest.raises(ocr.Blad, match="pypdfium2"):
+        ocr.czytaj_tesseract(pdf, None, 150.0, "pol", tmp_path)
+
+
+def test_pgm_z_tablicy_szarosci():
+    class Szarosc:
+        shape = (2, 3)
+
+        def tobytes(self):
+            return bytes(range(6))
+    assert ocr._pgm(Szarosc()) == b"P5\n3 2\n255\n" + bytes(range(6))
+
+
+def test_indra_czyta_obraz_z_pamieci_a_pdf_przez_convert(monkeypatch, tmp_path):
+    """Obraz trafia do Indry jako tablica z obrazy_pliku (np.fromfile + imdecode), a nie przez cv2.imread ścieżki."""
+    class Strona:
+        source, note, markdown, rotation = "ocr", "", "Zapisz", 0
+        lines = [type("L", (), {"box": [1, 2, 30, 12], "text": "Zapisz", "conf": 0.9})()]
+
+    class Konwerter:
+        ocr = staticmethod(lambda obraz: Strona())
+
+        def convert(self, plik, max_pages=0):
+            return [(0, Strona())]
+    wolane = []
+    monkeypatch.setattr(ocr, "_indra", lambda: type("I", (), {"load": staticmethod(lambda *a, **k: Konwerter())}))
+    monkeypatch.setattr(ocr, "katalog_modeli", lambda: tmp_path)
+    monkeypatch.setattr(ocr, "zablokuj_siec", lambda: None)
+    monkeypatch.setattr(ocr, "obrazy_pliku", lambda plik: wolane.append(plik) or ["klatka1", "klatka2"])
+    obraz = tmp_path / "Michał Żółć" / "zrzut.png"
+    obraz.parent.mkdir()
+    obraz.write_bytes(b"\x89PNG")
+    strony = ocr.czytaj_indra(obraz, None, 200.0, 2, False)
+    assert wolane == [obraz] and [s["strona"] for s in strony] == [1, 2]
+    assert strony[0]["linie"] == [{"tekst": "Zapisz", "ramka": [1, 2, 30, 12], "pewnosc": 0.9}]
+    pdf = tmp_path / "a.pdf"
+    pdf.write_bytes(b"%PDF-1.7")
+    assert ocr.czytaj_indra(pdf, None, 200.0, 2, False)[0]["zrodlo"] == "ocr" and wolane == [obraz]
+
+
+def test_stan_mowi_czym_pdf_idzie_do_tesseracta(monkeypatch):
+    monkeypatch.setattr(ocr, "_pdfium", lambda: type("P", (), {"PYPDFIUM_INFO": "5.14.0"}))
+    monkeypatch.setattr(ocr, "jezyki_tesseracta", lambda chce: "pol+eng")
+    assert ocr.stan()["pdf_dla_tesseracta"] == "pypdfium2 5.14.0"
+    monkeypatch.setattr(ocr, "_pdfium", lambda: None)
+    monkeypatch.setattr(ocr.shutil, "which", lambda n: None)
+    assert ocr.stan()["pdf_dla_tesseracta"] is None
+
+
+def _zrob_obraz(py: str, cel: Path, napis: str) -> None:
+    """Obraz z napisem przez OpenCV z venvu OCR; bajty zapisuje Python (cv2.imwrite nie zna polskich ścieżek)."""
+    kod = ("import cv2, numpy as n, sys; im = n.full((200, 1100), 255, n.uint8); "
+           f"cv2.putText(im, {napis!r}, (40, 120), cv2.FONT_HERSHEY_SIMPLEX, 2, 0, 4); "
+           "ok, b = cv2.imencode('.png', im); open(sys.argv[1], 'wb').write(b.tobytes())")
+    subprocess.run([py, "-I", "-c", kod, str(cel)], check=True, timeout=120)
+
+
+@pytest.mark.skipif(_python_ocr() is None or ocr.katalog_modeli() is None, reason="brak venvu OCR i modeli Indry")
+def test_prawdziwy_odczyt_pliku_z_polskimi_znakami(tmp_path):
+    """„faktura_październik.png” w katalogu „Michał Żółć”: Indra (i Tesseract, gdy jest) czytają napis."""
+    kat = tmp_path / "Michał Żółć"
+    kat.mkdir()
+    obraz = kat / "faktura_październik.png"
+    _zrob_obraz(_python_ocr(), obraz, "Faktura 2026")
+    silniki = ["indra", *(["tesseract"] if shutil.which("tesseract") else [])]
+    for silnik in silniki:
+        r = subprocess.run([sys.executable, str(OCR), str(obraz), "--silnik", silnik, "--format", "json"],
+                           capture_output=True, text=True, encoding="utf-8", timeout=300)
+        assert r.returncode == 0, (silnik, r.stderr)
+        w = json.loads(r.stdout)
+        tekst = " ".join(ln["tekst"] for s in w["strony"] for ln in s["linie"])
+        assert w["silnik"] == silnik and "Faktura" in tekst and "2026" in tekst, (silnik, tekst)
 
 
 @pytest.mark.skipif(_python_ocr() is None or ocr.katalog_modeli() is None, reason="brak venvu OCR i modeli Indry")

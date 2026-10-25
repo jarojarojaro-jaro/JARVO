@@ -8,16 +8,22 @@
     python3 konwertuj.py <plik…|katalog> --usun-metadane [-o wynik | --katalog DIR]   # ten sam plik bez metadanych
     python3 konwertuj.py --formaty              # formaty i silniki dostępne tutaj (JSON)
 
-Silniki (co jest w obrazie, to działa; bez silnika trasa znika): Pillow (zdjęcia, HEIC z iPhone'a, AVIF, PSD,
-zdjęcia → PDF), FFmpeg (wideo, audio, GIF, SVG → PNG), Ghostscript (PDF → obrazy i tekst, mniejszy PDF), qpdf
-(łączenie PDF), pandoc (Word, ODT, Markdown, HTML, EPUB, RTF), Chromium (HTML → PDF, bez sieci), LibreOffice
-(Excel, PowerPoint, stare .doc/.xls/.ppt; tylko z dodatkiem obrazu `office`).
+Silniki (co jest w instalacji, to działa; bez silnika trasa znika): Pillow (zdjęcia, HEIC z iPhone'a, AVIF, PSD,
+zdjęcia → PDF), FFmpeg (wideo, audio, GIF, SVG → PNG), PDFium przez pypdfium2 (PDF → obrazy stron i tekst), qpdf
+(łączenie PDF, mniejszy PDF bez przeliczania obrazów), pikepdf (mniejszy PDF z przeliczonymi obrazami, gdy jest),
+Ghostscript tylko tam, gdzie już jest (obraz Jarva: mniejszy PDF), pandoc (Word, ODT, Markdown, HTML, EPUB, RTF),
+Chromium (HTML → PDF, bez sieci), LibreOffice (Excel, PowerPoint, stare .doc/.xls/.ppt: w obrazie dodatek `office`,
+natywnie LibreOffice z tego komputera albo dodatek Jarva).
 Trasa: najtańsza przez najwyżej 3 kroki (np. DOCX → HTML → PDF, XLSX → PDF → PNG).
+Natywnie (docs/NATYWNIE.md E04, E09): programy z instalacji Jarva pełną ścieżką z PATH procesów Jarva (pandoc, qpdf,
+exiftool, ffmpeg; Chromium z CHROME_PATH), na Windows bez okna konsoli. Bez Pillow w tym Pythonie (venv narzędzi)
+skrypt sam przechodzi do Pythona Hermesa z instalacji (Pillow i pillow-heif, jak `python3` w obrazie); bez pypdfium2
+strony PDF renderuje Python venvu OCR (JARVO_OCR_PYTHON, w obrazie /opt/jarvo/venvs/ocr).
 Wynik obok pliku (albo -o / --katalog); istniejącego pliku nie nadpisuje: nazwa-2.ext.
 --rozmiar: 1080 = dłuższy bok najwyżej 1080 px, 720p = krótszy bok 720, 50% = połowa, 1920x1080 = zmieść w polu;
 nigdy nie powiększa. --jakosc: zdjęcia (domyślnie 85), film (domyślnie 75), audio (kb/s ≈ 3,2 × jakość),
 PDF → PDF (mniejszy plik). Ten sam format z --rozmiar albo --jakosc = zmniejszenie pliku.
---polacz: kilka plików (zdjęcia, PDF, dokumenty) → jeden PDF. --strony: strony PDF do obrazów („1-3,5”, „4-”).
+--polacz: kilka plików (zdjęcia, PDF, dokumenty) → jeden PDF. --strony: strony PDF do obrazów i tekstu („1-3,5”, „4-”).
 Metadane (miejsce GPS, telefon, daty, autor, opisy) nie przechodzą do wyniku zamiany zdjęcia, filmu ani dźwięku;
 profil koloru i obrót zostają. --usun-metadane (exiftool, FFmpeg, qpdf): ten sam format bez przekodowania, a wynik
 jest sprawdzany (coś zostało = błąd, nie plik); bez -o wynik obok: <nazwa>-bez-metadanych.<ext>. Dokumenty: PDF
@@ -33,6 +39,8 @@ import argparse
 import functools
 import heapq
 import http.server
+import importlib.util
+import io
 import json
 import os
 import re
@@ -47,6 +55,12 @@ import zlib
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
+
+WINDOWS = os.name == "nt"
+# programy bez okna konsoli: konwerter działa też w procesie panelu, który na Windows nie ma konsoli (każdy
+# program konsolowy otworzyłby wtedy własne okno)
+BEZ_OKNA = getattr(subprocess, "CREATE_NO_WINDOW", 0) if WINDOWS else 0
+OCR_PYTHON_OBRAZU = "/opt/jarvo/venvs/ocr/bin/python"      # venv OCR w obrazie (pypdfium2, numpy, opencv)
 
 # --------------------------------------------------------------------------- formaty
 
@@ -193,31 +207,145 @@ def skala_ffmpeg(spec: tuple | None, parzyste: bool = True) -> str:
 
 # --------------------------------------------------------------------------- narzędzia
 
-def _run(cmd: list[str], silnik: str, timeout: int, cwd: Path | None = None) -> subprocess.CompletedProcess:
+def program(nazwa: str) -> str | None:
+    """Pełna ścieżka programu z PATH tego procesu albo None. Natywnie PATH procesów Jarva zaczyna się od programów
+    z instalacji (jarvo/srodowisko.py: bin-floty, pandoc, qpdf, exiftool, ffmpeg…); pełna ścieżka, bo CreateProcess
+    na Windows szuka gołej nazwy najpierw w katalogu Pythona i w System32, a nie w PATH."""
+    return shutil.which(nazwa)
+
+
+def _argv(cmd: list) -> list[str]:
+    """Polecenie z programem pełną ścieżką (goła nazwa → program(); brak programu zostawia nazwę: błąd mówi co)."""
+    cmd = [str(x) for x in cmd]
+    if cmd and not os.path.dirname(cmd[0]):
+        cmd[0] = program(cmd[0]) or cmd[0]
+    return cmd
+
+
+def _proc(cmd: list, timeout: float | None = None, **kw) -> subprocess.CompletedProcess:
+    """Program z przechwyconym wyjściem w UTF-8, bez wejścia i bez okna konsoli (Windows)."""
+    kw.setdefault("stdin", subprocess.DEVNULL)
+    return subprocess.run(_argv(cmd), capture_output=True, text=True, encoding="utf-8", errors="replace",
+                          timeout=timeout, creationflags=BEZ_OKNA, **kw)
+
+
+def _run(cmd: list, silnik: str, timeout: int, cwd: Path | None = None,
+         ok: tuple[int, ...] = (0,), wejscie: str | None = None) -> subprocess.CompletedProcess:
+    """Program silnika; kod spoza `ok` (qpdf: 3 = ostrzeżenia, plik jest dobry) = Blad z ostatnimi liniami wyjścia.
+    `wejscie`: tekst na wejście programu (UTF-8)."""
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
-                           cwd=cwd, stdin=subprocess.DEVNULL)
+        r = (_proc(cmd, timeout=timeout, cwd=cwd) if wejscie is None
+             else _proc(cmd, timeout=timeout, cwd=cwd, input=wejscie, stdin=None))
     except subprocess.TimeoutExpired:
         raise Blad(f"{silnik}: przekroczony czas ({timeout // 60} min)") from None
     except OSError as exc:
         raise Blad(f"{silnik}: nie da się uruchomić ({exc})") from None
-    if r.returncode != 0:
+    if r.returncode not in ok:
         lines = [x for x in (r.stderr or r.stdout or "").strip().splitlines() if x.strip()]
         tail = "\n".join(dict.fromkeys(lines[:4] + lines[-4:]))
         raise Blad(f"{silnik} zakończył się błędem ({r.returncode}):\n{tail}")
     return r
 
 
+def natywnie() -> bool:
+    """Instalacja natywna (JARVO_ROOT w procesach Jarva), a nie obraz Jarva: inne rady w komunikatach."""
+    return bool(os.environ.get("JARVO_ROOT")) and not Path("/.dockerenv").exists()
+
+
 def chromium() -> str | None:
-    for cand in (os.environ.get("CHROME_PATH"), shutil.which("chromium"), shutil.which("chromium-browser"),
-                 shutil.which("google-chrome")):
-        if cand and os.path.exists(cand):
+    """Chromium skryptów: CHROME_PATH (natywnie chrome-headless-shell z instalacji, w obrazie /usr/local/bin/chromium),
+    potem PATH."""
+    for cand in (os.environ.get("CHROME_PATH"), program("chromium"), program("chromium-browser"),
+                 program("chrome-headless-shell"), program("google-chrome")):
+        if cand and os.path.isfile(cand):
             return cand
     return None
 
 
+USERNS_APPARMOR = Path("/proc/sys/kernel/apparmor_restrict_unprivileged_userns")
+PIASKOWNICA_BLAD = re.compile(r"sandbox|namespace|zygote", re.I)   # Chromium bez działającej piaskownicy
+
+
+def _linux() -> bool:
+    return sys.platform.startswith("linux")
+
+
+def bez_piaskownicy() -> bool:
+    """Czy Chromium potrzebuje --no-sandbox (jak audit.py Weba): tylko Linux jako root, w kontenerze albo przy zakazie
+    przestrzeni nazw użytkownika (Ubuntu 23.10+ bez profilu AppArmor). Windows i macOS: piaskownica zawsze działa.
+    Na innym Linuksie, gdzie piaskownica jednak nie ruszy, Chromium.zamien próbuje drugi raz bez niej."""
+    if not _linux():
+        return False
+    if os.geteuid() == 0 or Path("/.dockerenv").exists():
+        return True
+    try:
+        return USERNS_APPARMOR.read_text(encoding="utf-8").strip() == "1"
+    except OSError:
+        return False
+
+
+# LibreOffice (E07): dodatek Jarva albo program właściciela. W katalogu programu Windows ma soffice.com (konsolowy:
+# czeka na koniec i oddaje wyjście) i soffice.exe; macOS w pakiecie .app; Linux soffice z pakietu systemu albo
+# z /opt/libreofficeX.Y (paczki TDF). Pierwszy istniejący wygrywa.
+WZGLEDNE_SOFFICE = ("program/soffice.com", "program/soffice.exe", "LibreOffice.app/Contents/MacOS/soffice",
+                    "Contents/MacOS/soffice", "program/soffice")
+WZOR_SOFFICE_DEB = "opt/libreoffice*/program/soffice"       # paczki deb TDF rozpakowane bez dpkg (dodatek na Linuksie)
+
+
+def _soffice_w(katalog: Path) -> str | None:
+    for rel in WZGLEDNE_SOFFICE:
+        p = katalog / rel
+        if p.is_file():
+            return str(p)
+    return next((str(p) for p in sorted(katalog.glob(WZOR_SOFFICE_DEB), reverse=True) if p.is_file()), None)
+
+
+def _soffice_dodatku() -> str | None:
+    """Dodatek `libreoffice` z instalacji Jarva (`<JARVO_ROOT>/stan/narzedzia.json`: zmienna JARVO_SOFFICE wpisu albo
+    jego katalog), także gdy proces wystartował przed instalacją dodatku (jego środowisko nie ma jeszcze zmiennej)."""
+    root = os.environ.get("JARVO_ROOT")
+    if not root:
+        return None
+    try:
+        narz = json.loads((Path(root) / "stan" / "narzedzia.json").read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        return None
+    wpis = narz.get("libreoffice") if isinstance(narz, dict) else None
+    if not isinstance(wpis, dict):
+        return None
+    sciezka = (wpis.get("env") or {}).get("JARVO_SOFFICE")
+    if sciezka and os.path.isfile(sciezka):
+        return sciezka
+    return _soffice_w(Path(wpis["katalog"])) if wpis.get("katalog") else None
+
+
+def _soffice_systemu() -> str | None:
+    """LibreOffice zainstalowany przez właściciela w typowym miejscu (poza PATH: na Windows i macOS tak jest zawsze)."""
+    kandydaci: list[Path] = []
+    if WINDOWS:
+        for zm in ("ProgramW6432", "ProgramFiles", "ProgramFiles(x86)"):
+            if katalog := os.environ.get(zm):
+                kandydaci.append(Path(katalog) / "LibreOffice")
+        if katalog := os.environ.get("LOCALAPPDATA"):
+            kandydaci.append(Path(katalog) / "Programs" / "LibreOffice")
+    elif sys.platform == "darwin":
+        kandydaci += [Path("/Applications/LibreOffice.app"), Path.home() / "Applications" / "LibreOffice.app"]
+    else:
+        kandydaci += sorted(Path("/opt").glob("libreoffice*"), reverse=True)
+        kandydaci.append(Path("/usr/lib/libreoffice"))
+    for k in kandydaci:
+        if p := _soffice_w(k):
+            return p
+    return None
+
+
 def soffice() -> str | None:
-    return shutil.which("soffice") or shutil.which("libreoffice")
+    """Program LibreOffice: JARVO_SOFFICE (dodatek Jarva albo wskazanie właściciela), dodatek z narzedzia.json,
+    PATH (obraz z dodatkiem `office`, pakiet systemu), na końcu instalacja właściciela w typowym miejscu."""
+    jawny = os.environ.get("JARVO_SOFFICE")
+    if jawny and os.path.isfile(jawny):
+        return jawny
+    return _soffice_dodatku() or program("soffice") or program("libreoffice") or _soffice_systemu()
 
 
 def wolna_sciezka(p: Path) -> Path:
@@ -254,9 +382,11 @@ def strony_lista(spec: str | None, liczba: int | None) -> list[int] | None:
 
 
 def liczba_stron(pdf: Path) -> int | None:
-    if shutil.which("qpdf"):
-        r = subprocess.run(["qpdf", "--show-npages", str(pdf)], capture_output=True, text=True, encoding="utf-8",
-                           errors="replace")
+    if program("qpdf"):
+        try:
+            r = _proc(["qpdf", "--show-npages", os.path.abspath(pdf)], timeout=120)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
         if r.returncode in (0, 3) and r.stdout.strip().isdigit():
             return int(r.stdout.strip())
     return None
@@ -402,13 +532,15 @@ class FFmpeg(Silnik):
     nazwa = "ffmpeg"
 
     def dostepny(self) -> bool:
-        return bool(shutil.which("ffmpeg"))
+        return bool(program("ffmpeg"))
 
     @functools.cached_property
     def _kodeki(self) -> tuple[str, str]:
-        kw = {"capture_output": True, "text": True, "encoding": "utf-8", "errors": "replace"}
-        enc = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"], **kw).stdout
-        dec = subprocess.run(["ffmpeg", "-hide_banner", "-decoders"], **kw).stdout
+        try:
+            enc = _proc(["ffmpeg", "-hide_banner", "-encoders"], timeout=60).stdout
+            dec = _proc(["ffmpeg", "-hide_banner", "-decoders"], timeout=60).stdout
+        except (OSError, subprocess.TimeoutExpired):
+            return "", ""
         return enc, dec
 
     def ma(self, enc: str) -> bool:
@@ -432,11 +564,14 @@ class FFmpeg(Silnik):
         return k
 
     def _probe(self, src: Path) -> dict:
-        if not shutil.which("ffprobe"):
+        if not program("ffprobe"):
             return {}
-        r = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
-                            "stream=codec_type,codec_name,color_transfer,color_primaries,color_space",
-                            "-of", "json", str(src)], capture_output=True, text=True, encoding="utf-8", errors="replace")
+        try:
+            r = _proc(["ffprobe", "-v", "error", "-show_entries",
+                       "stream=codec_type,codec_name,color_transfer,color_primaries,color_space",
+                       "-of", "json", str(src)], timeout=300)
+        except (OSError, subprocess.TimeoutExpired):
+            return {}
         try:
             streams = json.loads(r.stdout or "{}").get("streams", [])
         except ValueError:
@@ -526,14 +661,288 @@ def _hdr_vf(v: dict | None) -> str:
             "tonemap=tonemap=mobius:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p")
 
 
+def _strony_do_wyniku(pary: list[tuple[int, Path]], dst: Path) -> list[Path]:
+    """Obrazy stron (numer strony, plik) → dst (jedna strona) albo dst-03.png… z numerem strony w nazwie."""
+    if not pary:
+        raise Blad("Nie powstała żadna strona (PDF uszkodzony albo zaszyfrowany?).")
+    if len(pary) == 1:
+        shutil.move(str(pary[0][1]), dst)
+        return [dst]
+    szer = max(2, len(str(max(nr for nr, _ in pary))))
+    out = []
+    for nr, p in pary:
+        q = dst.with_name(f"{dst.stem}-{nr:0{szer}d}{dst.suffix}")
+        shutil.move(str(p), q)
+        out.append(q)
+    return out
+
+
+# --- PDF bez Ghostscriptu (docs/NATYWNIE.md E04): strony i tekst przez PDFium (pypdfium2), mniejszy PDF przez pikepdf
+# z Pillow (obrazy przeliczone) albo qpdf (bez strat w obrazach JPEG). Ghostscript (AGPL) zostaje tylko tam, gdzie już
+# jest (obraz Jarva z OCRmyPDF), jako zapas i do mniejszego PDF, gdy pikepdf brak.
+MAX_PIKSELI = 100e6     # strona większa niż tyle pikseli w podanym dpi renderuje się w niższym (plakaty, plany)
+
+
+def _jest_modul(*nazwy: str) -> bool:
+    try:
+        return all(importlib.util.find_spec(n) is not None for n in nazwy)
+    except (ImportError, ValueError):
+        return False
+
+
+def _pdfium_tutaj() -> bool:
+    """pypdfium2 w tym Pythonie i czym zapisać obraz strony (Pillow albo OpenCV z numpy)."""
+    return _jest_modul("pypdfium2") and (_jest_modul("PIL") or _jest_modul("cv2", "numpy"))
+
+
+def _ten_python(sciezka: str) -> bool:
+    return os.path.normcase(os.path.abspath(sciezka)) == os.path.normcase(os.path.abspath(sys.executable))
+
+
+def python_pdfium() -> str | None:
+    """Python ze stronami PDF: "" = ten proces (pypdfium2 jest tutaj), ścieżka = Python venvu OCR (JARVO_OCR_PYTHON,
+    w obrazie /opt/jarvo/venvs/ocr: pypdfium2, numpy, OpenCV z locka), None = nie ma czym."""
+    if _pdfium_tutaj():
+        return ""
+    for k in (os.environ.get("JARVO_OCR_PYTHON"), OCR_PYTHON_OBRAZU):
+        if k and os.path.isfile(k) and not _ten_python(k):
+            return k
+    return None
+
+
+def _zapisz_strone(bitmapa, cel: Path, na: str, jakosc: int) -> None:
+    """Bitmapa PDFium → PNG albo JPG: Pillow, a bez niego OpenCV (venv OCR). Zapis bajtów przez Pythona, bo
+    cv2.imwrite nie otworzy na Windows ścieżki z polskimi znakami."""
+    try:
+        obraz = bitmapa.to_pil()
+    except ImportError:
+        obraz = None
+    if obraz is not None:
+        if na == "jpg":
+            obraz.convert("RGB").save(cel, "JPEG", quality=jakosc, optimize=True)
+        else:
+            obraz.save(cel, "PNG")
+        return
+    import cv2
+    import numpy as np
+    tab = np.ascontiguousarray(bitmapa.to_numpy())          # BGR(A) albo szarość: kolejność kanałów OpenCV
+    if na == "jpg" and tab.ndim == 3 and tab.shape[2] == 4:
+        tab = cv2.cvtColor(tab, cv2.COLOR_BGRA2BGR)
+    ok, dane = cv2.imencode(".jpg" if na == "jpg" else ".png", tab,
+                            [cv2.IMWRITE_JPEG_QUALITY, jakosc] if na == "jpg" else [])
+    if not ok:
+        raise Blad(f"Nie zapiszę strony jako {na.upper()}.")
+    cel.write_bytes(dane.tobytes())
+
+
+def wykonaj_pdfium(z: dict) -> dict:
+    """Zadanie PDFium w tym procesie: {"rodzaj": "tekst"|"strony", "pdf", "strony" (np. "1-3,5" albo None),
+    tekst: "wyjscie"; strony: "katalog", "na" (png|jpg), "dpi", "jakosc"}. Wynik {"liczba", "pliki": [[nr, plik]…]}
+    albo {"blad": opis po polsku}."""
+    import pypdfium2 as pdfium
+    try:
+        doc = pdfium.PdfDocument(z["pdf"])          # pypdfium2 5 otwiera też ścieżki z polskimi znakami (Windows)
+    except pdfium.PdfiumError as exc:
+        if "password" in str(exc).lower():
+            return {"blad": "PDF jest zabezpieczony hasłem: zdejmij zabezpieczenie i spróbuj jeszcze raz."}
+        return {"blad": f"Nie otworzę PDF (uszkodzony albo to nie PDF): {exc}"}
+    try:
+        liczba = len(doc)
+        try:
+            lista = strony_lista(z.get("strony"), liczba)
+        except Blad as exc:
+            return {"blad": str(exc)}
+        if z["rodzaj"] == "tekst":
+            teksty = []
+            for nr in lista or range(1, liczba + 1):
+                strona = doc[nr - 1]
+                tp = strona.get_textpage()
+                teksty.append(tp.get_text_bounded().replace("\r\n", "\n").replace("\r", "\n").strip("\n"))
+                tp.close()
+                strona.close()
+            Path(z["wyjscie"]).write_text("\n\n".join(teksty) + "\n", encoding="utf-8")
+            return {"liczba": liczba, "pliki": [[0, z["wyjscie"]]]}
+        if lista is None and liczba > MAX_STRON:
+            return {"blad": f"PDF ma {liczba} stron: wybierz strony (--strony 1-20)."}
+        doc.init_forms()                            # pola formularzy jak w czytniku (przed pierwszą stroną)
+        dpi = max(36.0, min(600.0, float(z.get("dpi") or 150)))
+        jakosc = int(z.get("jakosc") or 90)
+        katalog, na, pliki = Path(z["katalog"]), z["na"], []
+        for nr in lista or range(1, liczba + 1):
+            strona = doc[nr - 1]
+            w, h = strona.get_size()
+            skala = min(dpi / 72.0, (MAX_PIKSELI / max(w * h, 1.0)) ** 0.5)
+            bitmapa = strona.render(scale=skala, may_draw_forms=True)
+            cel = katalog / f"s-{nr:04d}.{na}"
+            _zapisz_strone(bitmapa, cel, na, jakosc)
+            bitmapa.close()
+            strona.close()
+            pliki.append([nr, str(cel)])
+        return {"liczba": liczba, "pliki": pliki}
+    finally:
+        doc.close()
+
+
+def _pdfium(zadanie: dict) -> dict:
+    """Zadanie PDFium tutaj albo w Pythonie venvu OCR (ten sam skrypt z --pdfium-zadanie, JSON przez wejście
+    i wyjście, bez okna konsoli). Blad z opisem, gdy się nie da."""
+    py = python_pdfium()
+    if py is None:
+        raise Blad("Strony i tekst z PDF czyta PDFium (pypdfium2 z venvu OCR instalacji Jarva), a tu go nie ma.")
+    if py == "":
+        wynik = wykonaj_pdfium(zadanie)
+    else:
+        try:
+            r = subprocess.run([py, "-I", "-X", "utf8", os.path.abspath(__file__), "--pdfium-zadanie"],
+                               input=json.dumps(zadanie, ensure_ascii=False), capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", timeout=1800, creationflags=BEZ_OKNA)
+        except subprocess.TimeoutExpired:
+            raise Blad("PDFium: przekroczony czas (30 min)") from None
+        except OSError as exc:
+            raise Blad(f"PDFium: nie da się uruchomić Pythona venvu OCR ({exc})") from None
+        linie = (r.stdout or "").strip().splitlines()
+        try:
+            wynik = json.loads(linie[-1]) if linie else {}
+        except ValueError:
+            wynik = {}
+        if r.returncode != 0 and not wynik.get("blad"):
+            ogon = [x for x in (r.stderr or "").strip().splitlines() if x.strip()][-4:]
+            raise Blad(f"PDFium zakończył się błędem ({r.returncode}):\n" + "\n".join(ogon))
+    if wynik.get("blad"):
+        raise Blad(wynik["blad"])
+    return wynik
+
+
+class Pdfium(Silnik):
+    nazwa = "pdfium"
+
+    def dostepny(self) -> bool:
+        return python_pdfium() is not None
+
+    def krawedzie(self):
+        return [("pdf", "png", 1.0), ("pdf", "jpg", 1.0), ("pdf", "txt", 1.0)]
+
+    def zamien(self, src, dst, z, na, opt, tmp):
+        if na == "txt":
+            _pdfium({"rodzaj": "tekst", "pdf": os.path.abspath(src), "strony": opt.strony,
+                     "wyjscie": os.path.abspath(dst)})
+            return [dst]
+        wyj = tmp / f"pdfium-{dst.stem}"
+        wyj.mkdir(exist_ok=True)
+        w = _pdfium({"rodzaj": "strony", "pdf": os.path.abspath(src), "strony": opt.strony, "katalog": str(wyj),
+                     "na": na, "dpi": opt.dpi, "jakosc": opt.jakosc or 90})
+        return _strony_do_wyniku([(int(nr), Path(p)) for nr, p in w.get("pliki") or []], dst)
+
+
+class Qpdf(Silnik):
+    """Mniejszy PDF bez Ghostscriptu i bez pikepdf: strumienie od nowa (Flate 9, strumienie obiektów), obrazy
+    zapisane bez strat (Flate) zamieniane na JPEG w jakości --jakosc, gdy wychodzi mniej (qpdf --optimize-images).
+    Obrazy już w JPEG zostają, więc skan zmniejsza się mało; liczby pikseli qpdf nie zmienia."""
+    nazwa = "qpdf"
+
+    def dostepny(self) -> bool:
+        return program("qpdf") is not None
+
+    def krawedzie(self):
+        return [("pdf", "pdf", 1.3)]
+
+    def zamien(self, src, dst, z, na, opt, tmp):
+        q = 75 if opt.jakosc is None else opt.jakosc
+        _run(["qpdf", "--object-streams=generate", "--compression-level=9", "--recompress-flate",
+              "--optimize-images", f"--jpeg-quality={q}", os.path.abspath(src), os.path.abspath(dst)],
+             "qpdf", 1800, ok=(0, 3))
+        return [dst]
+
+
+# obrazy w PDF, które pikepdf przelicza: 8 bitów, RGB albo szarość, bez maski i własnej tablicy Decode
+PIKEPDF_FILTRY = {"/DCTDecode", "/FlateDecode", "/LZWDecode", "/RunLengthDecode"}
+
+
+def _dpi_jakosci(q: int) -> int:
+    """Jakość 1–100 → największe dpi obrazu (jak /screen, /ebook i /printer Ghostscriptu)."""
+    return 72 if q <= 40 else 150 if q <= 80 else 300
+
+
+def mniejszy_pdf(src: Path, dst: Path, jakosc: int | None) -> int:
+    """Mniejszy PDF przez pikepdf i Pillow: obrazy większe niż strona w dpi jakości zmniejszone i zapisane jako JPEG,
+    gdy wychodzi mniej bajtów. Tekst, wektory i układ bez zmian. Zwraca liczbę przeliczonych obrazów."""
+    import pikepdf
+    from PIL import Image
+    q = 75 if jakosc is None else jakosc
+    dpi = _dpi_jakosci(q)
+    zmienione, widziane = 0, set()
+    with pikepdf.open(src) as pdf:
+        for strona in pdf.pages:
+            x0, y0, x1, y1 = (float(v) for v in strona.mediabox)
+            maks_w, maks_h = abs(x1 - x0) / 72 * dpi, abs(y1 - y0) / 72 * dpi
+            # get_images() (pikepdf 10.9+) widzi też obrazy w formularzach XObject; starsze pikepdf: images
+            obrazy = strona.get_images() if hasattr(strona, "get_images") else strona.images
+            for _, obraz in obrazy.items():
+                if obraz.objgen in widziane or obraz.objgen == (0, 0):
+                    continue
+                widziane.add(obraz.objgen)
+                filtry = obraz.get("/Filter")
+                filtry = [str(f) for f in (filtry if isinstance(filtry, pikepdf.Array) else [filtry])] if filtry else []
+                if (obraz.get("/BitsPerComponent") != 8 or obraz.get("/ImageMask") or "/SMask" in obraz
+                        or "/Mask" in obraz or "/Decode" in obraz or not set(filtry) <= PIKEPDF_FILTRY):
+                    continue
+                try:
+                    pil = pikepdf.PdfImage(obraz).as_pil_image()
+                except Exception:       # nietypowa przestrzeń barw albo dane: obraz zostaje jak był
+                    continue
+                if pil.mode not in ("RGB", "L"):
+                    continue
+                k = min(1.0, maks_w / pil.width, maks_h / pil.height)
+                if k < 1.0:
+                    pil = pil.resize((max(1, round(pil.width * k)), max(1, round(pil.height * k))), Image.LANCZOS)
+                bufor = io.BytesIO()
+                pil.save(bufor, "JPEG", quality=q, optimize=True)
+                if bufor.tell() >= len(obraz.read_raw_bytes()):
+                    continue
+                obraz.write(bufor.getvalue(), filter=pikepdf.Name.DCTDecode)
+                obraz.Width, obraz.Height = pil.width, pil.height
+                obraz.ColorSpace = pikepdf.Name.DeviceRGB if pil.mode == "RGB" else pikepdf.Name.DeviceGray
+                obraz.BitsPerComponent = 8
+                for klucz in ("/DecodeParms", "/Interpolate"):
+                    if klucz in obraz:
+                        del obraz[klucz]
+                zmienione += 1
+        pdf.save(dst, compress_streams=True, recompress_flate=True,
+                 object_stream_mode=pikepdf.ObjectStreamMode.generate)
+    return zmienione
+
+
+class Pikepdf(Silnik):
+    nazwa = "pikepdf"
+
+    def dostepny(self) -> bool:
+        return _jest_modul("pikepdf", "PIL")
+
+    def krawedzie(self):
+        return [("pdf", "pdf", 1.0)]
+
+    def zamien(self, src, dst, z, na, opt, tmp):
+        try:
+            mniejszy_pdf(src, dst, opt.jakosc)
+        except Blad:
+            raise
+        except Exception as exc:          # pikepdf.PasswordError, PdfError: opis po polsku zamiast śladu
+            if "password" in type(exc).__name__.lower() or "password" in str(exc).lower():
+                raise Blad("PDF jest zabezpieczony hasłem: zdejmij zabezpieczenie i spróbuj jeszcze raz.") from None
+            raise Blad(f"pikepdf: nie zmniejszę tego PDF ({exc})") from None
+        return [dst]
+
+
 class Ghostscript(Silnik):
+    """Zapas tam, gdzie Ghostscript już jest (obraz Jarva z OCRmyPDF): mniejszy PDF z przeliczonymi obrazami bez
+    pikepdf, strony i tekst bez PDFium. Natywnie Jarvo go nie instaluje (AGPL, E04)."""
     nazwa = "ghostscript"
 
     def dostepny(self) -> bool:
-        return bool(shutil.which("gs"))
+        return bool(program("gs"))
 
     def krawedzie(self):
-        return [("pdf", "png", 1.0), ("pdf", "jpg", 1.0), ("pdf", "txt", 1.0), ("pdf", "pdf", 1.0)]
+        return [("pdf", "png", 1.5), ("pdf", "jpg", 1.5), ("pdf", "txt", 1.5), ("pdf", "pdf", 1.1)]
 
     def zamien(self, src, dst, z, na, opt, tmp):
         gs = ["gs", "-dSAFER", "-dBATCH", "-dNOPAUSE", "-dQUIET"]
@@ -559,17 +968,8 @@ class Ghostscript(Silnik):
         pliki = sorted(wyj.glob(f"s-*.{na}"))
         if not pliki:
             raise Blad("Ghostscript nie utworzył stron (PDF uszkodzony albo zaszyfrowany?).")
-        if len(pliki) == 1:
-            shutil.move(str(pliki[0]), dst)
-            return [dst]
         numery = lista if lista and len(lista) == len(pliki) else list(range(1, len(pliki) + 1))
-        szer = max(2, len(str(max(numery))))
-        out = []
-        for nr, p in zip(numery, pliki):
-            q = dst.with_name(f"{dst.stem}-{nr:0{szer}d}{dst.suffix}")
-            shutil.move(str(p), q)
-            out.append(q)
-        return out
+        return _strony_do_wyniku(list(zip(numery, pliki)), dst)
 
 
 PANDOC_CZYTA = {"md": "markdown", "html": "html", "docx": "docx", "odt": "odt", "epub": "epub", "rtf": "rtf",
@@ -618,15 +1018,20 @@ class Pandoc(Silnik):
     nazwa = "pandoc"
 
     def dostepny(self) -> bool:
-        return bool(shutil.which("pandoc"))
+        return bool(program("pandoc"))
 
     def krawedzie(self):
         return [(a, b, 1.0) for a in PANDOC_CZYTA for b in PANDOC_PISZE if a != b]
 
-    def polecenie(self, src: Path, dst: Path, z: str, na: str, opt: Opcje, filtr: Path) -> list[str]:
+    def polecenie(self, src: Path, dst: Path, z: str, na: str, opt: Opcje, filtr: Path,
+                  dane: Path | None = None) -> list[str]:
         zasoby = os.pathsep.join(dict.fromkeys(str(x.resolve()) for x in (src.parent, opt.zasoby or src.parent)))
         cmd = ["pandoc", "-f", PANDOC_CZYTA[z], "-t", PANDOC_PISZE[na], "-s", "--lua-filter", str(filtr),
                f"--resource-path={zasoby}", "--metadata", f"pagetitle={src.stem}"]
+        if dane is not None:
+            # pusty katalog danych: bez niego pandoc bierze szablony i init.lua (kod Lua uruchamiany przed filtrem)
+            # z katalogu danych użytkownika (%APPDATA%\pandoc, ~/.local/share/pandoc), czyli właściciela albo agenta
+            cmd.append(f"--data-dir={dane}")
         if z in PANDOC_MEDIA and na in ("html", "md"):
             cmd.append(f"--extract-media={dst.stem}-media")      # względnie: obok wyniku (cwd = katalog wyniku)
         return [*cmd, "-o", str(dst.resolve()), str(src.resolve())]
@@ -634,7 +1039,9 @@ class Pandoc(Silnik):
     def zamien(self, src, dst, z, na, opt, tmp):
         filtr = tmp / "bezpieczne-obrazki.lua"
         filtr.write_text(FILTR_LUA, encoding="utf-8")
-        _run(self.polecenie(src, dst, z, na, opt, filtr), "pandoc", 600, cwd=dst.parent)
+        dane = tmp / "pandoc-dane"
+        dane.mkdir(exist_ok=True)
+        _run(self.polecenie(src, dst, z, na, opt, filtr, dane), "pandoc", 600, cwd=dst.parent)
         if na == "html":
             t = dst.read_text(encoding="utf-8", errors="replace")
             dst.write_text(t.replace("</head>", STYL + "</head>", 1), encoding="utf-8")
@@ -674,18 +1081,35 @@ class Chromium(Silnik):
     def krawedzie(self):
         return [("html", "pdf", 1.0)]
 
+    @staticmethod
+    def polecenie(dst: Path, adres: str, profil: str, bez: bool) -> list[str]:
+        """Druk strony do PDF: strona z http://127.0.0.1 nie sięga po file://, a martwe proxy odcina internet
+        (127.0.0.1 omija proxy); --no-sandbox tylko tam, gdzie piaskownica nie ruszy (bez_piaskownicy)."""
+        return [chromium() or "chromium", "--headless", *(["--no-sandbox"] if bez else []), "--disable-gpu",
+                "--disable-extensions", "--no-first-run", f"--user-data-dir={profil}", "--proxy-server=127.0.0.1:9",
+                "--no-pdf-header-footer", "--virtual-time-budget=5000", f"--print-to-pdf={dst.resolve()}", adres]
+
+    def _drukuj(self, dst: Path, adres: str, bez: bool) -> None:
+        with tempfile.TemporaryDirectory(prefix="konwertuj-chrome-", ignore_cleanup_errors=True) as profil:
+            _run(self.polecenie(dst, adres, profil, bez), "Chromium", 300)
+
     def zamien(self, src, dst, z, na, opt, tmp):
         korzenie = tuple(dict.fromkeys(x.resolve() for x in (src.parent, opt.zasoby or src.parent)))
         handler = type("H", (_Zasoby,), {"strona": src.resolve(), "korzenie": korzenie})
         srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
         threading.Thread(target=srv.serve_forever, daemon=True).start()
+        bez = bez_piaskownicy()
         try:
-            with tempfile.TemporaryDirectory(prefix="konwertuj-chrome-") as profil:
-                # strona z http://127.0.0.1 nie sięga po file://, a martwe proxy odcina internet (127.0.0.1 omija proxy)
-                _run([chromium(), "--headless", "--no-sandbox", "--disable-gpu", "--disable-extensions",
-                      "--no-first-run", f"--user-data-dir={profil}", "--proxy-server=127.0.0.1:9",
-                      "--no-pdf-header-footer", "--virtual-time-budget=5000", f"--print-to-pdf={dst.resolve()}",
-                      f"http://127.0.0.1:{srv.server_address[1]}/__strona.html"], "Chromium", 300)
+            while True:
+                try:
+                    self._drukuj(dst, f"http://127.0.0.1:{srv.server_address[1]}/__strona.html", bez)
+                    break
+                except Blad as exc:
+                    # Linux, na którym piaskownica jednak nie ruszyła (np. przestrzenie nazw wyłączone inaczej niż
+                    # przez AppArmor): drugi raz bez niej, jak w obrazie
+                    if bez or not _linux() or not PIASKOWNICA_BLAD.search(str(exc)):
+                        raise
+                    bez = True
         finally:
             srv.shutdown()
             srv.server_close()
@@ -724,7 +1148,9 @@ class LibreOffice(Silnik):
         return [dst]
 
 
-SILNIKI: list[Silnik] = [Pillow(), FFmpeg(), Ghostscript(), Pandoc(), Chromium(), LibreOffice()]
+# kolejność rozstrzyga tylko remis kosztów (pierwszy wygrywa)
+SILNIKI: list[Silnik] = [Pillow(), FFmpeg(), Pdfium(), Pikepdf(), Ghostscript(), Qpdf(), Pandoc(), Chromium(),
+                         LibreOffice()]
 
 
 # --------------------------------------------------------------------------- trasy
@@ -772,16 +1198,26 @@ def trasa(z: str, na: str, opt: Opcje | None = None) -> list[tuple[str, str, str
     if z == na:
         if not (opt and opt.zmienia()):
             return None
-        sil = next((s for b, _, s in _graf().get(z, []) if b == z), None)
-        return [(z, z, sil)] if sil else None
+        # najtańszy silnik zmniejszenia w tym formacie (PDF: pikepdf, potem Ghostscript, na końcu qpdf)
+        sil = min(((k, i, s) for i, (b, k, s) in enumerate(_graf().get(z, [])) if b == z), default=None)
+        return [(z, z, sil[2])] if sil else None
     return trasy(z).get(na)
+
+
+def rada_libreoffice() -> str:
+    """Skąd wziąć LibreOffice: w obrazie dodatek `office`, natywnie program z tego komputera (Jarvo znajdzie go sam)."""
+    if natywnie():
+        return ("LibreOffice: zainstaluj go na tym komputerze (libreoffice.org; Jarvo znajdzie go sam w Program "
+                "Files, w Aplikacjach albo w /opt) albo wskaż program zmienną JARVO_SOFFICE.")
+    return "dodatek obrazu `office` (JARVO_EXTRAS)."
 
 
 def podpowiedz(z: str, na: str) -> str:
     if (na in LO_ARKUSZ | LO_SLAJDY | {"doc"} or z in LO_ARKUSZ | LO_SLAJDY | {"doc"}) and not soffice():
-        return " Arkusze, prezentacje i stare pliki Office wymagają LibreOffice: dodatek obrazu `office` (JARVO_EXTRAS)."
+        return f" Arkusze, prezentacje i stare pliki Office wymagają LibreOffice: {rada_libreoffice()}"
     if z == "pdf" and FORMATY[na][0] in ("dokument", "tekst", "arkusz", "prezentacja"):
-        return " Z PDF nie zrobisz Worda ani arkusza: sam tekst daje --na txt (skan bez tekstu: najpierw ocrmypdf)."
+        return (" Z PDF nie zrobisz Worda ani arkusza: sam tekst daje --na txt (skan bez tekstu: skill odczyt-ekranu, "
+                "ocr.py).")
     if FORMATY[z][0] in ("wideo", "audio") and FORMATY[na][0] in ("obraz", "pdf", "dokument", "tekst"):
         return " Z filmu i dźwięku da się zrobić tylko inny film, GIF albo dźwięk."
     return ""
@@ -826,7 +1262,8 @@ def konwertuj(src: Path, na: str, dst: Path | None = None, katalog: Path | None 
     if out.resolve() == src.resolve():
         raise Blad("Wynik nadpisałby plik źródłowy: podaj inną nazwę (-o).")
     out.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="konwertuj-") as t:
+    # ignore_cleanup_errors: na Windows proces potomny (Chromium, soffice.bin) bywa przez chwilę jeszcze przy pliku
+    with tempfile.TemporaryDirectory(prefix="konwertuj-", ignore_cleanup_errors=True) as t:
         tmp = Path(t)
         biezace = [src]
         for i, (a, b, sil) in enumerate(kroki):
@@ -868,9 +1305,9 @@ def polacz(srcs: list[Path], dst: Path, opt: Opcje | None = None) -> dict:
     if all(f in pil._formaty[0] for f in formaty) and pil.dostepny():
         obrazy_do_pdf(srcs, dst, opt)
     else:
-        if not shutil.which("qpdf"):
-            raise Blad("Łączenie PDF wymaga qpdf (jest w obrazie Jarva).")
-        with tempfile.TemporaryDirectory(prefix="polacz-") as t:
+        if not program("qpdf"):
+            raise Blad("Łączenie PDF wymaga qpdf (jest w instalacji Jarva).")
+        with tempfile.TemporaryDirectory(prefix="polacz-", ignore_cleanup_errors=True) as t:
             czesci = []
             for i, (s, f) in enumerate(zip(srcs, formaty)):
                 if f == "pdf":
@@ -878,7 +1315,8 @@ def polacz(srcs: list[Path], dst: Path, opt: Opcje | None = None) -> dict:
                     continue
                 r = konwertuj(s, "pdf", dst=Path(t) / f"{i:03d}.pdf", opt=Opcje(dpi=opt.dpi, zasoby=s.parent))
                 czesci.extend(Path(p) for p in r["pliki"])
-            _run(["qpdf", "--empty", "--pages", *map(str, czesci), "--", str(dst)], "qpdf", 600)
+            _run(["qpdf", "--empty", "--pages", *(os.path.abspath(c) for c in czesci), "--", os.path.abspath(dst)],
+                 "qpdf", 600, ok=(0, 3))
     return {"wejscie": [s.as_posix() for s in srcs], "na": "pdf", "trasa": ["połączenie w jeden PDF"], "pliki": [dst.as_posix()],
             "rozmiar_przed": _rozmiar(srcs), "rozmiar_po": _rozmiar([dst]), "sek": round(time.monotonic() - t0, 2)}
 
@@ -956,9 +1394,20 @@ def _tekst(v, n: int = 60) -> str:
     return t if len(t) <= n else t[: n - 1] + "…"
 
 
+def _exiftool(argumenty: list, timeout: int = 600) -> subprocess.CompletedProcess:
+    """exiftool z argumentami z wejścia (`-@ -`, jeden w wierszu, UTF-8) i `-charset filename=utf8`. Na Windows
+    exiftool.exe (Perl) dostaje wiersz poleceń w stronie kodowej ANSI: ścieżka ze znakiem spoza niej (np. „ł”
+    przy stronie 1252) zamienia się w „?”, a plik „nie istnieje” (sprawdzone na Windows 11 z exiftool 13.59).
+    Z wejścia czyta UTF-8 na każdym systemie, bez pliku tymczasowego (jego ścieżka też mogłaby mieć polskie znaki)."""
+    argumenty = [str(a) for a in argumenty]
+    if any("\n" in a or "\r" in a for a in argumenty):
+        raise Blad("exiftool: nazwa pliku ze znakiem końca linii")
+    return _run(["exiftool", "-@", "-"], "exiftool", timeout,
+                wejscie="\n".join(["-charset", "filename=utf8", *argumenty]) + "\n")
+
+
 def _exiftool_json(p: Path) -> dict:
-    r = _run(["exiftool", "-j", "-G1", "-a", "-s", "-n", "-m", "-api", "LargeFileSupport=1", os.path.abspath(p)],
-             "exiftool", 600)
+    r = _exiftool(["-j", "-G1", "-a", "-s", "-n", "-m", "-api", "LargeFileSupport=1", os.path.abspath(p)])
     try:
         dane = json.loads(r.stdout or "[]")
     except ValueError:
@@ -1143,8 +1592,8 @@ def metadane(src: Path) -> dict:
     if not src.is_file():
         raise Blad(f"Nie ma pliku: {src}")
     z = format_pliku(src)
-    if z not in PAKIETY and not shutil.which("exiftool"):
-        raise Blad("Odczyt metadanych wymaga exiftool (jest w obrazie Jarva).")
+    if z not in PAKIETY and not program("exiftool"):
+        raise Blad("Odczyt metadanych wymaga exiftool (jest w instalacji Jarva).")
     w = _opisz(_odczyt(src))
     wynik = {"plik": src.as_posix(), "format": z, "wrazliwe": w, "czysty": not w}
     if z in PAKIETY and (u := _uwagi_tresci(src)):
@@ -1161,14 +1610,14 @@ def _wyczysc(src: Path, dst: Path, z: str) -> None:
         _wyczysc_pakiet(src, dst)
         return
     if z == "pdf":
-        with tempfile.TemporaryDirectory(prefix="pdf-meta-") as t:
+        with tempfile.TemporaryDirectory(prefix="pdf-meta-", ignore_cleanup_errors=True) as t:
             posredni = Path(t) / "bez-info.pdf"
-            _run(["exiftool", "-m", "-q", "-q", "-all:all=", "-o", str(posredni), os.path.abspath(src)], "exiftool", 600)
-            _run(["qpdf", "--deterministic-id", str(posredni), os.path.abspath(dst)], "qpdf", 600)
+            _exiftool(["-m", "-q", "-q", "-all:all=", "-o", str(posredni), os.path.abspath(src)])
+            _run(["qpdf", "--deterministic-id", str(posredni), os.path.abspath(dst)], "qpdf", 600, ok=(0, 3))
         return
     if z in FOTO_META:
-        _run(["exiftool", "-m", "-q", "-q", "-all=", "-trailer:all=", "-tagsFromFile", "@", "-ColorSpaceTags",
-              "-Orientation", "-o", os.path.abspath(dst), os.path.abspath(src)], "exiftool", 600)
+        _exiftool(["-m", "-q", "-q", "-all=", "-trailer:all=", "-tagsFromFile", "@", "-ColorSpaceTags",
+                   "-Orientation", "-o", os.path.abspath(dst), os.path.abspath(src)])
         return
     mapy = ["-map", "0:a"] if z in AUDIO else ["-map", "0:V", "-map", "0:a?", "-map", "0:s?"]
     dalej = ["-movflags", "+faststart"] if z in ("mp4", "mov", "m4a") else []
@@ -1225,14 +1674,14 @@ def usun_metadane(src: Path, dst: Path | None = None, katalog: Path | None = Non
         raise Blad(f"Metadane usuwam ze zdjęć (JPG, PNG, WebP, HEIC, AVIF, TIFF, GIF), filmów, dźwięku, PDF "
                    f"i dokumentów (DOCX, XLSX, PPTX, ODT, ODS, ODP), nie z {FORMATY[z][1]}."
                    + (f" Zamień go najpierw na {stary} (--na {stary.lower()})." if stary else ""))
-    if z not in PAKIETY and not shutil.which("exiftool"):
-        raise Blad("Usuwanie metadanych wymaga exiftool (jest w obrazie Jarva).")
-    if z in WIDEO | AUDIO and not shutil.which("ffmpeg"):
-        raise Blad("Film i dźwięk czyści FFmpeg (jest w obrazie Jarva).")
+    if z not in PAKIETY and not program("exiftool"):
+        raise Blad("Usuwanie metadanych wymaga exiftool (jest w instalacji Jarva).")
+    if z in WIDEO | AUDIO and not program("ffmpeg"):
+        raise Blad("Film i dźwięk czyści FFmpeg (jest w instalacji Jarva).")
     if z == "pdf":
-        if not shutil.which("qpdf"):
-            raise Blad("PDF czyści qpdf (jest w obrazie Jarva).")
-        if subprocess.run(["qpdf", "--is-encrypted", str(src)], capture_output=True).returncode == 0:
+        if not program("qpdf"):
+            raise Blad("PDF czyści qpdf (jest w instalacji Jarva).")
+        if _proc(["qpdf", "--is-encrypted", os.path.abspath(src)], timeout=120).returncode == 0:
             raise Blad("PDF jest zabezpieczony hasłem albo blokadą edycji: zdejmij zabezpieczenie i spróbuj jeszcze raz.")
     if dst or katalog:
         out = cel_sciezka(src, z, Path(dst) if dst else None, Path(katalog) if katalog else None)
@@ -1242,7 +1691,7 @@ def usun_metadane(src: Path, dst: Path | None = None, katalog: Path | None = Non
         raise Blad("Wynik nadpisałby plik źródłowy: podaj inną nazwę (-o).")
     out.parent.mkdir(parents=True, exist_ok=True)
     przed = _odczyt(src)
-    with tempfile.TemporaryDirectory(prefix="metadane-") as t:
+    with tempfile.TemporaryDirectory(prefix="metadane-", ignore_cleanup_errors=True) as t:
         tmp = Path(t) / f"czysty.{z}"
         _wyczysc(src, tmp, z)
         po = _sprawdz(tmp)
@@ -1263,7 +1712,7 @@ def usun_metadane(src: Path, dst: Path | None = None, katalog: Path | None = Non
 
 def _dopilnuj(pliki: list[Path]) -> None:
     """Zamiana zdjęcia, filmu albo dźwięku: wynik bez wrażliwych metadanych, nawet gdy biblioteka coś przepisała."""
-    if not shutil.which("exiftool"):
+    if not program("exiftool"):
         return
     for p in pliki:
         f = norm(p.suffix)
@@ -1280,6 +1729,48 @@ def _dopilnuj(pliki: list[Path]) -> None:
 
 # --------------------------------------------------------------------------- CLI
 
+def python_z_pillow() -> str | None:
+    """Python Hermesa z instalacji natywnej (Pillow i pillow-heif są w jego zależnościach; w obrazie to `python3`):
+    `<HERMES_SRC>/.venv` albo katalog JARVO_HERMES_BIN (obie zmienne ustawia jarvo/srodowisko.py)."""
+    kandydaci: list[Path] = []
+    if src := os.environ.get("HERMES_SRC"):
+        kandydaci.append(Path(src) / ".venv" / ("Scripts/python.exe" if WINDOWS else "bin/python"))
+    if hermes := os.environ.get("JARVO_HERMES_BIN"):
+        kandydaci.append(Path(hermes).parent / ("python.exe" if WINDOWS else "python"))
+    for k in kandydaci:
+        if k.is_file() and not _ten_python(str(k)):
+            return str(k)
+    return None
+
+
+def _do_pythona_z_pillow(argv: list[str]) -> None:
+    """Bez Pillow w tym Pythonie (natywnie venv narzędzi floty, @@PY@@) ten sam skrypt w Pythonie Hermesa z instalacji:
+    zdjęcia, HEIC i zdjęcia → PDF działają jak w obrazie. Ten sam kod wyjścia i wyjście. Bez pętli: python_z_pillow()
+    nie zwraca tego samego Pythona. POSIX: execv (ten sam proces), Windows: nowy proces (execv odpina tam proces od
+    rodzica) z -X utf8, bo -I pomija PYTHONUTF8."""
+    if argv[:1] == ["--pdfium-zadanie"] or _jest_modul("PIL"):
+        return
+    py = python_z_pillow()
+    if py is None:
+        return
+    skrypt = os.path.abspath(__file__)
+    if not WINDOWS:
+        os.execv(py, [py, "-I", skrypt, *argv])
+    sys.exit(subprocess.run([py, "-I", "-X", "utf8", skrypt, *argv]).returncode)
+
+
+def _main_pdfium() -> int:
+    """Pomocnik w Pythonie z pypdfium2 (venv OCR): zadanie JSON z wejścia, wynik JSON w ostatniej linii wyjścia."""
+    try:
+        wynik = wykonaj_pdfium(json.loads(sys.stdin.read()))
+    except Blad as exc:
+        wynik = {"blad": str(exc)}
+    except Exception as exc:   # noqa: BLE001  (każdy błąd pomocnika wraca jako opis, nie ślad stosu)
+        wynik = {"blad": f"PDFium: {type(exc).__name__}: {exc}"}
+    print(json.dumps(wynik, ensure_ascii=False))
+    return 1 if wynik.get("blad") else 0
+
+
 def _pliki(wejscia: list[str], rekursywnie: bool) -> list[Path]:
     out = []
     for w in wejscia:
@@ -1293,6 +1784,8 @@ def _pliki(wejscia: list[str], rekursywnie: bool) -> list[Path]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    if (sys.argv[1:] if argv is None else list(argv))[:1] == ["--pdfium-zadanie"]:
+        return _main_pdfium()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("pliki", nargs="*")
     ap.add_argument("--na", help="format wyniku, np. pdf, jpg, mp4, mp3, docx")
@@ -1356,4 +1849,5 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    _do_pythona_z_pillow(sys.argv[1:])
     sys.exit(main())

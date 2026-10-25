@@ -1,7 +1,7 @@
 ---
 name: odczyt-ekranu
 description: "Tekst ze zrzutu ekranu, skanu, zdjęcia albo PDF (OCR)."
-version: 1.0.0
+version: 1.1.0
 author: "Jarvo (silniki: Indra OCR od datalab-to, Tesseract w zapasie)"
 license: MIT
 metadata:
@@ -9,7 +9,7 @@ metadata:
     tags: [ocr, screenshot, screen, scan, pdf, text, image, find-text]
   jarvo:
     autonomy: A0
-    reviewed: "2026-10-17"
+    reviewed: "2026-10-25"
 ---
 
 # Odczyt ekranu (OCR)
@@ -38,7 +38,8 @@ O="$HERMES_HOME/skills/pliki/odczyt-ekranu/scripts/ocr.py"
 @@PY@@ "$O" --stan                                 # który silnik działa tutaj
 ```
 1. Plik od człowieka leży w `@@INBOX_DIR@@/` (ścieżka po 📎 w zleceniu); zrzut z przeglądarki zapisujesz
-   sam (narzędzie przeglądarki albo `chromium --headless --screenshot=out/z.png <url>`) i podajesz ścieżkę.
+   sam (narzędzie przeglądarki albo `"$CHROME_PATH" --headless --screenshot=out/z.png <url>`) i podajesz ścieżkę.
+   Nazwy i katalogi z polskimi znakami (np. `Michał Żółć/faktura_październik.png`) czytają oba silniki.
 2. Uruchom skrypt. Domyślnie wychodzi sam tekst; `--format json` daje linie z ramkami w pikselach pliku,
    `--szukaj` daje listę `trafienia` (pusta = tego napisu na obrazie nie ma).
 3. Kliknięcie w napis: `srodek` z `--szukaj`. Zrzut zrobiony w skali 2× (ekran retina, `deviceScaleFactor: 2`)
@@ -52,8 +53,10 @@ O="$HERMES_HOME/skills/pliki/odczyt-ekranu/scripts/ocr.py"
   wymusza zapas (np. do porównania przy wątpliwym wyniku).
 - Pewność linii poniżej ~0,8 albo dziwne znaki w kwocie, numerze konta czy NIP: nie zgaduj. Powiększ wycinek
   (`konwertuj.py … --rozmiar`), przeczytaj jeszcze raz albo zapytaj człowieka; liczb z OCR nie poprawiasz „na oko”.
-- PDF z warstwą tekstu Indra czyta wprost z tej warstwy (pole `zrodlo`: `text` albo `hybrid`), skan przez OCR.
-  PDF, w którym da się zaznaczać i wyszukiwać tekst (dla człowieka), robi `ocrmypdf` (skill `konwersja-plikow`).
+- PDF z warstwą tekstu Indra czyta wprost z tej warstwy (pole `zrodlo`: `text` albo `hybrid`), skan przez OCR;
+  Tesseract dostaje strony PDF wyrenderowane przez pypdfium2 (`--stan`: pole `pdf_dla_tesseracta`).
+  PDF, w którym da się zaznaczać i wyszukiwać tekst (dla człowieka), robi `ocrmypdf` tam, gdzie jest (obraz Jarva;
+  w instalacji natywnej jeszcze nie): bez niego oddaj tekst z tego skryptu.
 - Wzory matematyczne jako LaTeX: `--wzory` (wolniej, tylko gdy na stronie są wzory).
 - Bez sieci: modele leżą w instalacji Jarva, skrypt blokuje gniazda w czasie odczytu. Licencja modeli Indry
   (OpenRAIL-M) wyklucza produkt konkurujący z Datalab: OCR służy pracy floty, nie sprzedajemy go jako usługi.
