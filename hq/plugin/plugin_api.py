@@ -1931,11 +1931,22 @@ async def health():
 
 
 # ----------------------------------------------------------------------------- aktualizacje
-# Stan pisze pomocnik aktualizacji na hoście (scripts/updater.py). Dashboard może tylko poprosić
-# o sprawdzenie albo aktualizację tej samej gałęzi (plik update-request); poleceń nie wykonuje.
+# Stan pisze pomocnik aktualizacji: w kontenerze proces na hoście (scripts/updater.py), natywnie usługa `aktualizacje`
+# nadzorcy Jarva (`jarvo update --pomocnik`, jarvo/aktualizacja.py). Dashboard może tylko poprosić o sprawdzenie albo
+# aktualizację tej samej gałęzi (plik update-request); poleceń nie wykonuje.
 UPDATE_FILE = core.JARVO_DIR / "state" / "update.json"
 UPDATE_REQUEST = core.JARVO_DIR / "state" / "update-request"
-UPDATER_STALE = 5 * 60  # pomocnik sprawdza co minutę; dłuższa cisza = nie działa
+UPDATER_STALE = 5 * 60  # pomocnik daje znać co minutę (puls); dłuższa cisza = nie działa
+# co zrobić, gdy pomocnik nie działa: natywnie to usługa nadzorcy, w kontenerze proces hosta (docs/RUNBOOK.md)
+RADA_POMOCNIKA = {
+    True: ("Pomocnik aktualizacji nie działa. W terminalu: jarvo serwis --restart aktualizacje (gdy serwis Jarva "
+           "stoi: jarvo up). Zaktualizować możesz też poleceniem jarvo update.",
+           "The update helper is not running. In a terminal run: jarvo serwis --restart aktualizacje (if the Jarvo "
+           "service is stopped: jarvo up). You can also update with: jarvo update.",
+           "jarvo serwis --restart aktualizacje"),
+    False: ("Pomocnik aktualizacji nie działa. Lokalnie: bash scripts/local-up.sh, na serwerze: sudo systemctl start "
+            "jarvo-updater.", "The update helper is not running.", "sudo systemctl start jarvo-updater"),
+}
 PRACA_FILE = core.JARVO_DIR / "state" / "praca.json"
 PRACA_STALE = 2 * 60     # silnik odświeża praca.json co minutę
 
@@ -1976,6 +1987,11 @@ def _update_state() -> dict:
         # pomocnik zniknął w trakcie (zamknięty WSL, restart, zawieszony deploy): nie udajemy, że trwa
         if not state["online"] and (state.get("state") == "updating" or state["pending"]):
             state["state"] = "stalled"
+    state["natywnie"] = NATYWNIE
+    if not state.get("online"):
+        # natywnie (usługa nadzorcy) inna rada niż w kontenerze; front może pokazać `rada.polecenie` do skopiowania
+        pl, en, polecenie = RADA_POMOCNIKA[NATYWNIE]
+        state["rada"] = {"komunikat": pl, "komunikat_en": en, "polecenie": polecenie}
     state["praca"] = _praca()
     state["po_pracy"] = _po_pracy()
     return state
@@ -2013,9 +2029,8 @@ async def update_request(request: Request):
         return JSONResponse({"ok": True, "action": action}, status_code=200)
     state = await asyncio.to_thread(_update_state)
     if not state.get("online"):
-        return _blad_update(503, "pomocnik", "Pomocnik aktualizacji nie działa. Lokalnie: bash scripts/local-up.sh, "
-                                             "na serwerze: sudo systemctl start jarvo-updater.",
-                            "The update helper is not running.")
+        pl, en, _polecenie = RADA_POMOCNIKA[NATYWNIE]
+        return _blad_update(503, "pomocnik", pl, en)
     if state.get("state") == "updating":
         return _blad_update(409, "trwa", "Aktualizacja już trwa.", "An update is already running.")
     if action == "update" and gdy == "wolne":

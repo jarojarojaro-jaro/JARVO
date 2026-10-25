@@ -11,9 +11,12 @@ z --hash) i na którym Pythonie z sekcji narzedzia zbudować venv. Instalator bi
 Przed instalacją sprawdzamy sumę locka z manifestem (lock zmieniony bez `scripts/natywne.py generuj` zatrzymuje
 instalację). Środowisko uv jak przy Hermesie (jarvo/hermes.py: bez zmiennych UV_* właściciela, UV_PYTHON_DOWNLOADS=
 never, UV_CACHE_DIR w <cache>/uv, UV_LINK_MODE=copy, bo na Windows załadowanych .pyd nie da się nadpisać). Venvu nie
-budujemy obok i nie przenosimy (ścieżki w pyvenv.cfg i programach venvu są bezwzględne), więc gotowość mówi znacznik
-`.jarvo-venv.json` zapisany na końcu: venv bez znacznika to resztka przerwanej instalacji i budujemy go od nowa.
-Drugi przebieg ze znacznikiem nie woła uv i nie potrzebuje sieci.
+budujemy w katalogu tymczasowym i nie przenosimy (ścieżki w pyvenv.cfg i programach venvu są bezwzględne), więc
+gotowość mówi znacznik `.jarvo-venv.json` zapisany na końcu: venv bez znacznika to resztka przerwanej instalacji
+i budujemy go od nowa. Drugi przebieg ze znacznikiem nie woła uv i nie potrzebuje sieci. Gotowego venvu tego locka
+na innym Pythonie albo z innym backendem torch (nowa wersja Jarva zmienia tylko Pythona) nie przebudowujemy
+w miejscu, bo może z niego działać poprzednia wersja: nowy powstaje obok, w `<nazwa>-<12 znaków sumy locka>-<8 znaków
+skrótu Pythona i backendu>` (katalog_dla; stary sprząta potem `jarvo update`).
 
 Wpis dla `<stan>/narzedzia.json`: `venv-<nazwa>` = {"wersja": skrót locka, "katalog", "python", "bin", "env"}.
 `env` daje procesom floty interpreter venvu (JARVO_TOOLS_PYTHON, JARVO_OCR_PYTHON, CLAUDE_SEO_PYTHON…), a `bin`
@@ -75,6 +78,20 @@ def do_instalacji(venvy: dict) -> list[str]:
 def katalog(u: Uklad, nazwa: str, wpis: dict) -> Path:
     """`<program>/venvs/<nazwa>-<12 znaków sha256 locka>`: nowy lock = nowy venv obok starego (c4: aktualizacja)."""
     return u.program / KATALOG / f"{nazwa}-{str(wpis['sha256'])[:12]}"
+
+
+def katalog_dla(u: Uklad, nazwa: str, wpis: dict, python: Path | str) -> Path:
+    """Venv tego locka dla tego Pythona: katalog(), a gdy tam jest już gotowy venv tego locka na innym Pythonie albo
+    z innym backendem torch, obok: `<katalog>-<8 znaków skrótu>` (hermes.skrot_srodowiska). Gotowego nie
+    przebudowujemy w miejscu (docstring modułu)."""
+    from .hermes import skrot_srodowiska
+    baza = katalog(u, nazwa, wpis)
+    obok = baza.with_name(f"{baza.name}-{skrot_srodowiska(python, str(wpis.get('torch_backend') or ''))}")
+    if gotowy(baza, wpis, python):
+        return baza
+    if gotowy(obok, wpis, python):
+        return obok
+    return obok if zainstalowany(baza, wpis) else baza
 
 
 def python_venvu(kat: Path) -> Path:
@@ -196,8 +213,9 @@ def sprzatnij_cache(u: Uklad, uv: Path, *, log: Callable[[str], None] = print, c
 def zainstaluj(u: Uklad, app: Path, nazwa: str, wpis: dict, *, uv: Path, python: Path,
                log: Callable[[str], None] = print) -> tuple[dict, bool]:
     """Venv `nazwa` z locka manifestu; zwraca (wpis do narzedzia.json, czy coś zainstalowano). Gotowy venv (znacznik
-    z tą samą sumą locka i tym samym Pythonem) = bez żadnego wywołania i bez sieci. BladVenvu przy błędzie."""
-    kat = katalog(u, nazwa, wpis)
+    z tą samą sumą locka i tym samym Pythonem) = bez żadnego wywołania i bez sieci. Gotowy na innym Pythonie zostaje,
+    a ten powstaje obok (katalog_dla). BladVenvu przy błędzie."""
+    kat = katalog_dla(u, nazwa, wpis, python)
     if gotowy(kat, wpis, python):
         return wpis_spisu(nazwa, wpis, kat), False
     lock = Path(app) / str(wpis["lock"])
@@ -211,8 +229,12 @@ def zainstaluj(u: Uklad, app: Path, nazwa: str, wpis: dict, *, uv: Path, python:
         raise BladVenvu(f"venv {nazwa}: brak {python if not Path(python).is_file() else uv} (krok narzędzi się nie "
                         "wykonał)")
     with przenosne.Zamek(u.stan / ZAMEK):
-        if gotowy(kat, wpis, python):                         # drugi instalator skończył, gdy czekaliśmy
+        kat = katalog_dla(u, nazwa, wpis, python)            # drugi instalator mógł skończyć, gdy czekaliśmy
+        if gotowy(kat, wpis, python):
             return wpis_spisu(nazwa, wpis, kat), False
+        if kat != katalog(u, nazwa, wpis):
+            log(f"venv {nazwa}: ten lock jest już gotowy na innym Pythonie, więc ten powstaje obok ({kat.name}); "
+                "tamten zostaje dla działającej wersji")
         if kat.exists():
             log(f"venv {nazwa}: resztka przerwanej instalacji, buduję od nowa")
             try:

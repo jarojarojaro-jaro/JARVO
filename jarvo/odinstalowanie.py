@@ -19,20 +19,28 @@ Kolejność (c4):
      końcu tego polecenia (usunięty wcześniej daje „The batch file cannot be found.” i kod 1, sprawdzone na Windows 11).
      Wpis, którego nie dało się cofnąć: pytanie (z --yes dalej), opis w raporcie i kod 1,
   5. wpis w „Aplikacje” (HKCU\\...\\Uninstall\\Jarvo), gdy wskazuje ten korzeń (dziś instalator go nie zakłada),
-  6. usunięcie `<program>`, `<stan>`, `<root>/bin`, build, cache i logów (Linux: katalogi XDG Jarva), `<dane>` tylko
+  6. klucz GitHuba `jarvo-github` w magazynie systemu (N15: Menedżer poświadczeń, pęk kluczy, libsecret; czyta go
+     `jarvo update`): z --all usunięty, chyba że na tym koncie jest inna instalacja Jarva (domyślny korzeń, gdy to
+     nie on, albo stara z WSL czy Dockerem), bo klucz jest wspólny dla wszystkich; wtedy i bez --all zostaje celowo,
+  7. usunięcie `<program>`, `<stan>`, `<root>/bin`, build, cache i logów (Linux: katalogi XDG Jarva), `<dane>` tylko
      z --all; obce pliki w korzeniu zostają. Na Windows plików .exe i .dll Pythona tego polecenia nie da się usunąć
      do jego końca, a jarvo.cmd czyta jeszcze cmd.exe: oba usuwa proces sprzątający (PowerShell z System32, bez plików
      tymczasowych, korzeń jawnie w wierszu polecenia), który czeka na koniec tego procesu, usuwa resztę i pusty
      korzeń. Czego nie usunie przez minutę (plik trzyma inny program), to przenosi zmianą nazwy do %TEMP% (działa też
-     dla uruchomionego .exe na tym samym dysku) i zapisuje w HKCU RunOnce (rmdir przy następnym logowaniu),
-  7. skan śladów (katalogi, polecenie jarvo, PATH użytkownika, blok w pliku startowym, autostart, wpis „Aplikacje”,
-     procesy, wpisy dziennika z błędem) i raport: co zostaje celowo (dane bez --all, Python tego polecenia do chwili
-     jego końca, stara instalacja z WSL albo Dockerem do migracji E12, obce pliki w korzeniu), a co jest śladem do
-     usunięcia ręcznie (wtedy kod 1). Stara instalacja: tylko informacja, sprzątanie osobnym pytaniem w migracji (f).
+     dla uruchomionego .exe na tym samym dysku) i zapisuje w HKCU RunOnce (rmdir przy następnym logowaniu). Gdy
+     przeniesienie się nie uda (korzeń na innym dysku niż %TEMP%, katalog bieżący innego programu), wpis RunOnce ma
+     warunek: usuwa ścieżkę tylko wtedy, gdy w korzeniu nie ma nowej instalacji (`<program>\\current.json`), więc
+     ponowna instalacja w tym samym korzeniu przed wylogowaniem zostaje nietknięta,
+  8. skan śladów (katalogi, polecenie jarvo, PATH użytkownika, blok w pliku startowym, autostart, wpis „Aplikacje”,
+     klucz GitHuba, procesy, wpisy dziennika z błędem) i raport: co zostaje celowo (dane bez --all, Python tego
+     polecenia do chwili jego końca, stara instalacja z WSL albo Dockerem do migracji E12, obce pliki w korzeniu,
+     wspólny klucz GitHuba), a co jest śladem do usunięcia ręcznie (wtedy kod 1). Stara instalacja: tylko informacja,
+     sprzątanie osobnym pytaniem w migracji (f).
 
-Wszystko, co dotyka komputera poza plikami (procesy, pytania, polecenia systemu, rejestr, proces w tle), idzie przez
-`Zaplecze` i instalator.Otoczenie, więc testy podstawiają atrapy. Moduły ładujemy przed usuwaniem plików: po
-usunięciu biblioteki standardowej Pythona z `<program>` (POSIX) nowy import by się nie udał.
+Pytania idą na stderr (przy --json stdout ma sam raport JSON). Wszystko, co dotyka komputera poza plikami (procesy,
+pytania, polecenia systemu, rejestr, magazyn kluczy, proces w tle), idzie przez `Zaplecze` i instalator.Otoczenie,
+więc testy podstawiają atrapy. Moduły ładujemy przed usuwaniem plików: po usunięciu biblioteki standardowej Pythona
+z `<program>` (POSIX) nowy import by się nie udał.
 """
 from __future__ import annotations
 
@@ -59,6 +67,7 @@ from .sciezki import LINUX, MACOS, WINDOWS, Uklad
 KLUCZ_APLIKACJI = r"Software\Microsoft\Windows\CurrentVersion\Uninstall"
 KLUCZ_RUNONCE = r"Software\Microsoft\Windows\CurrentVersion\RunOnce"
 NAZWA_APLIKACJI = "Jarvo"
+MAGAZYN_KLUCZA = "jarvo-github"         # klucz GitHuba w magazynie systemu (N15); czyta go jarvo/aktualizacja.py
 CZAS_SPRZATANIA = 60                    # s: tyle proces sprzątający ponawia usuwanie, potem wpis RunOnce
 CZAS_KONCA = 10.0                       # s na zakończenie procesu po SIGTERM (POSIX), potem SIGKILL
 ZNACZNIKI_INSTALACJI = (("program", "current.json"), ("stan", "narzedzia.json"), ("stan", "zmiany-hosta.jsonl"),
@@ -121,6 +130,7 @@ if WINDOWS:
                     (k32, "TerminateProcess", B, [H, wintypes.UINT]),
                     (k32, "WaitForSingleObject", D, [H, D]),
                     (k32, "CloseHandle", B, [H]),
+                    (k32, "ProcessIdToSessionId", B, [D, P(D)]),
                     (nt, "NtQueryInformationProcess", ctypes.c_long,
                      [H, ctypes.c_int, ctypes.c_void_p, wintypes.ULONG, P(wintypes.ULONG)])):
                 f = getattr(biblioteka, nazwa)
@@ -200,6 +210,24 @@ if WINDOWS:
             return bool(k32.GetExitCodeProcess(uchwyt, ctypes.byref(kod))) and kod.value == 259   # STILL_ACTIVE
         finally:
             k32.CloseHandle(uchwyt)
+
+    def _sesja_windows(pid: int) -> int | None:
+        """Sesja Windows procesu (ProcessIdToSessionId nie otwiera procesu, więc działa też dla programu
+        uruchomionego jako administrator); None, gdy procesu nie ma."""
+        k32, _ = _biblioteki()
+        sesja = wintypes.DWORD()
+        return int(sesja.value) if k32.ProcessIdToSessionId(pid, ctypes.byref(sesja)) else None
+
+
+def sesja_procesu(pid: int) -> int | None:
+    """Sesja logowania procesu na Windows (ta sama sesja = ten sam pulpit użytkownika, także podniesione programy);
+    poza Windows None."""
+    if not WINDOWS:
+        return None
+    try:
+        return _sesja_windows(int(pid))
+    except (OSError, ValueError, OverflowError):
+        return None
 
 
 def _procesy_linux() -> list[Proces]:
@@ -547,6 +575,88 @@ def _terminal() -> bool:
         return False
 
 
+def pytaj(tekst: str) -> str:
+    """Pytanie do właściciela na stderr i odpowiedź z wejścia (bez końca wiersza; koniec wejścia = pusta odpowiedź).
+    Nie input(): ten pisze pytanie na stdout, a przy `--json` (np. `> raport.json`) stdout to sam raport JSON."""
+    strumien = sys.stderr or sys.stdout
+    with contextlib.suppress(AttributeError, OSError, ValueError):
+        strumien.write(tekst)
+        strumien.flush()
+    try:
+        linia = sys.stdin.readline() if sys.stdin is not None else ""
+    except (OSError, ValueError):
+        linia = ""
+    return linia.rstrip("\r\n")
+
+
+# ---------------------------------------------------------------- klucz GitHuba w magazynie systemu (N15)
+
+def _cred_windows(usun: bool) -> bool:
+    """Menedżer poświadczeń Windows, poświadczenie ogólne MAGAZYN_KLUCZA: czy jest (CredReadW, treść od razu
+    zwalniana, nigdzie nie trafia), a z `usun` usunięcie (CredDeleteW)."""
+    adv = ctypes.WinDLL("advapi32", use_last_error=True)
+    if usun:
+        adv.CredDeleteW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD]
+        adv.CredDeleteW.restype = wintypes.BOOL
+        return bool(adv.CredDeleteW(MAGAZYN_KLUCZA, 1, 0))                   # CRED_TYPE_GENERIC
+    adv.CredReadW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.POINTER(ctypes.c_void_p)]
+    adv.CredReadW.restype = wintypes.BOOL
+    adv.CredFree.argtypes = [ctypes.c_void_p]
+    wsk = ctypes.c_void_p()
+    if not adv.CredReadW(MAGAZYN_KLUCZA, 1, 0, ctypes.byref(wsk)):
+        return False
+    adv.CredFree(wsk)
+    return True
+
+
+def _magazyn_posix(usun: bool) -> bool:
+    """macOS: pęk kluczy (`security find-generic-password` bez -w nie wypisuje hasła, `delete-generic-password`);
+    Linux: libsecret (`secret-tool lookup` i `clear`), wyjście tylko w pamięci. Brak narzędzia = brak klucza."""
+    if MACOS:
+        argv = ["/usr/bin/security", "delete-generic-password" if usun else "find-generic-password", "-s",
+                MAGAZYN_KLUCZA]
+    else:
+        narzedzie = shutil.which("secret-tool", path="/usr/bin:/bin:/usr/local/bin")
+        if not narzedzie:
+            return False
+        argv = [narzedzie, "clear" if usun else "lookup", "service", MAGAZYN_KLUCZA]
+    if not os.path.isfile(argv[0]):
+        return False
+    try:
+        r = subprocess.run(argv, stdin=subprocess.DEVNULL, capture_output=True, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return r.returncode == 0 and (usun or MACOS or bool(r.stdout.strip()))
+
+
+def klucz_github_jest() -> bool:
+    """Czy w magazynie systemu jest klucz `jarvo-github` (tylko odczyt; plik zapasowy `<dane>/jarvo/konfig/github-
+    token` znika razem z danymi)."""
+    try:
+        return _cred_windows(False) if WINDOWS else _magazyn_posix(False)
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+def usun_klucz_github() -> bool:
+    """Usuwa klucz `jarvo-github` z magazynu systemu; True, gdy po tym go tam nie ma."""
+    with contextlib.suppress(OSError, ValueError, AttributeError):
+        if WINDOWS:
+            _cred_windows(True)
+        else:
+            _magazyn_posix(True)
+    return not klucz_github_jest()
+
+
+def rada_klucza() -> str:
+    """Jak usunąć klucz ręcznie (bez wartości klucza)."""
+    if WINDOWS:
+        return f"cmdkey /delete:{MAGAZYN_KLUCZA} (albo Menedżer poświadczeń > Poświadczenia systemu Windows)"
+    if MACOS:
+        return f"security delete-generic-password -s {MAGAZYN_KLUCZA}"
+    return f"secret-tool clear service {MAGAZYN_KLUCZA}"
+
+
 def uruchom_odlaczony(argv: list[str], *, cwd: str | None = None) -> int:
     """Proces niezależny od tego (zamknięcie okna i koniec tego procesu go nie kończą), bez okna i bez wyjścia."""
     kw: dict[str, Any] = dict(stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -633,18 +743,22 @@ def _usun_wpis_aplikacji(nazwa: str) -> None:
 
 @dataclass
 class Zaplecze:
-    """To, czego odinstalowanie i aktualizacja używają poza instalator.Otoczenie: procesy (lista, zakończenie), proces
-    odłączony (sprzątanie na Windows, `jarvo update` z panelu), pytania do właściciela, polecenia systemu dla
-    dziennika zmian hosta, wpis w „Aplikacje”, programy z wyjściem na bieżąco (instalator nowej wersji) i z wyjściem
-    przechwyconym (`jarvo doctor --json`). Testy podstawiają atrapy."""
+    """To, czego odinstalowanie i aktualizacja używają poza instalator.Otoczenie: procesy (lista, zakończenie, sesja
+    Windows), proces odłączony (sprzątanie na Windows), pytania do właściciela (na stderr), polecenia systemu dla
+    dziennika zmian hosta, wpis w „Aplikacje”, klucz GitHuba w magazynie systemu (czy jest, usunięcie), programy
+    z wyjściem na bieżąco (instalator nowej wersji) i z wyjściem przechwyconym (`jarvo doctor --json`). Testy
+    podstawiają atrapy (magazynu kluczy właściciela test nie dotyka)."""
     procesy: Callable[[], list[Proces]] = procesy
     zakoncz: Callable[[list[Proces]], list[Proces]] = zakoncz
     odlacz: Callable[..., int] = uruchom_odlaczony
-    pytaj: Callable[[str], str] = input
+    pytaj: Callable[[str], str] = pytaj
     terminal: Callable[[], bool] = _terminal
     wykonaj: Callable[[list], tuple[int, str]] = zmiany_hosta.uruchom_domyslnie
     aplikacje: Callable[[str], dict | None] = _wpis_aplikacji
     usun_aplikacje: Callable[[str], None] = _usun_wpis_aplikacji
+    klucz_jest: Callable[[], bool] = klucz_github_jest
+    usun_klucz: Callable[[], bool] = usun_klucz_github
+    sesja: Callable[[int], int | None] = sesja_procesu
     strumien: Callable[..., int] = strumien
     przechwyc: Callable[..., tuple[int, str]] = przechwyc
     pid: int = field(default_factory=os.getpid)
@@ -663,13 +777,28 @@ def uklad_instalacji(u: Uklad, env: dict) -> Uklad:
 
 
 def env_podprocesu(u: Uklad, env: dict) -> dict:
-    """Otoczenie polecenia jarvo uruchamianego z tego procesu (instalator nowej wersji, doctor, `jarvo update`
-    z panelu): bez JARVO_TOKEN (klucz zostaje w tym procesie, jak w bootstrapie) i bez JARVO_ROOT dla domyślnego korzenia
-    (korzeń inny niż domyślny dostaje `--korzen` w argv)."""
-    wynik = {k: v for k, v in env.items() if k.upper() != "JARVO_TOKEN"}
+    """Otoczenie polecenia jarvo uruchamianego z tego procesu (instalator nowej wersji, doctor, pomocnik aktualizacji
+    pod nadzorcą i `jarvo update` z panelu): bez JARVO_TOKEN (klucz zostaje w tym procesie, jak w bootstrapie), bez
+    JARVO_REF (zmienna z okna, w którym instalowano, nie zmienia refu instalacji: ten jest w `.jarvo-ref` kodu i przy
+    `jarvo update --ref`) i bez JARVO_ROOT dla domyślnego korzenia (korzeń inny niż domyślny dostaje `--korzen` w argv)."""
+    wynik = {k: v for k, v in env.items() if k.upper() not in ("JARVO_TOKEN", "JARVO_REF")}
     if instalator.korzen_domyslny(u, env):
         wynik.pop("JARVO_ROOT", None)
     return wynik
+
+
+def inna_instalacja(u: Uklad, env: dict) -> str | None:
+    """Inna instalacja Jarva na tym koncie, która korzysta z tego samego magazynu kluczy: stara z WSL albo Dockerem
+    i instalacja w domyślnym korzeniu, gdy `u` nim nie jest. Opis albo None. Tylko odczyt."""
+    stara = stara_instalacja(u, env)
+    if stara:
+        return stara
+    if not instalator.korzen_domyslny(u, env):
+        with contextlib.suppress(sciezki.BladUkladu, OSError):
+            domyslny = sciezki.uklad({k: v for k, v in env.items() if k != "JARVO_ROOT"})
+            if zainstalowane(domyslny):
+                return f"instalacja Jarva w {domyslny.root}"
+    return None
 
 
 def zly_korzen(u: Uklad) -> str | None:
@@ -727,9 +856,11 @@ def _plik_polecenia_posix(u: Uklad) -> Path | None:
 
 
 def skan_sladow(u: Uklad, ot: Otoczenie, z: Zaplecze, *, dane_zostaja: bool, na_pozniej: list[Path] = (),
-                pliki_rc: list[str] = (), bledy_dziennika: list[str] = (), pomin: set[int] = frozenset()) -> dict:
+                pliki_rc: list[str] = (), bledy_dziennika: list[str] = (), pomin: set[int] = frozenset(),
+                klucz_github: bool | None = None, klucz_zostaje: str | None = None) -> dict:
     """Ślady Jarva na komputerze: {"slady": [{rodzaj, opis, rada}], "celowo": [{rodzaj, opis, powod}]}. Tylko
-    odczyt (ten sam skaner może wołać `jarvo doctor`)."""
+    odczyt (ten sam skaner może wołać `jarvo doctor`). `klucz_github` i `klucz_zostaje`: stan klucza GitHuba po
+    kroku odinstalowania (None = zapytaj magazyn i ustal powód sam)."""
     slady: list[dict] = []
     celowo: list[dict] = []
     pozniej = {_klucz(p) for p in na_pozniej}
@@ -798,6 +929,17 @@ def skan_sladow(u: Uklad, ot: Otoczenie, z: Zaplecze, *, dane_zostaja: bool, na_
             else:
                 zostaje("aplikacje", f"wpis „Aplikacje” {NAZWA_APLIKACJI}", "nie wskazuje tej instalacji (stara "
                                                                            "instalacja?), więc go nie ruszam")
+    jest_klucz = z.klucz_jest() if klucz_github is None else klucz_github
+    if jest_klucz:
+        opis = f"klucz GitHuba {MAGAZYN_KLUCZA} w magazynie systemu"
+        if klucz_zostaje is None:
+            inna = inna_instalacja(u, ot.env)
+            klucz_zostaje = (f"korzysta z niego też {inna}" if inna
+                             else "bez --all dane i klucz zostają" if dane_zostaja else None)
+        if klucz_zostaje:
+            zostaje("klucz", opis, f"{klucz_zostaje}; ręcznie: {rada_klucza()}")
+        else:
+            slad("klucz", opis, f"Usuń go: {rada_klucza()}.")
     auto = stan_autostartu(u, ot, z)
     if auto.get("mechanizm") and auto.get("nasz"):
         slad("autostart", str(auto.get("opis") or auto.get("nazwa")), "Wyłącz: jarvo autostart off przed "
@@ -825,22 +967,49 @@ def stan_autostartu(u: Uklad, ot: Otoczenie, z: Zaplecze) -> dict:
 
 # ---------------------------------------------------------------- proces sprzątający (Windows)
 
+# PowerShell kończy napis w apostrofach na każdym z tych znaków (ASCII ' i typograficzne ‘ ’ ‚ ‛), a w środku
+# napisu każdy z nich podwaja się tak samo jak ' (specyfikacja języka: single-quote-character)
+_APOSTROFY = ("'", "‘", "’", "‚", "‛")
+_CUDZYSLOW = "|"                         # zastępczy znak cudzysłowu w poleceniu RunOnce: w nazwie pliku Windows go nie ma
+
+
 def _ps_napis(tekst: str) -> str:
-    """Napis PowerShella w apostrofach (apostrof podwojony). Bez cudzysłowów: powershell.exe 5.1 psuje je
-    w argumencie -Command."""
-    return "'" + str(tekst).replace("'", "''") + "'"
+    """Napis PowerShella w apostrofach: każdy znak, który PowerShell bierze za apostrof, podwojony (np. korzeń
+    w profilu O’Brien). Bez cudzysłowów: powershell.exe 5.1 psuje je w argumencie -Command."""
+    tekst = str(tekst)
+    for z in _APOSTROFY:
+        tekst = tekst.replace(z, z + z)
+    return "'" + tekst + "'"
+
+
+def polecenie_runonce(sciezka: Path | str, *, znacznik: Path | str | None = None,
+                      korzen: Path | str | None = None) -> str:
+    """Wartość wpisu HKCU RunOnce, która przy następnym logowaniu usuwa `sciezka` (cmd.exe rmdir /s /q nie wchodzi
+    w junction). Ze `znacznik` (`<program>\\current.json`) tylko wtedy, gdy go nie ma: ponowna instalacja w tym samym
+    korzeniu przed wylogowaniem zostaje nietknięta. Z `korzen` na końcu pusty korzeń (rmdir bez /s)."""
+    usun = f'rmdir /s /q "{sciezka}"' + (f' & rmdir "{korzen}" 2>nul' if korzen else "")
+    if znacznik:
+        return f'cmd.exe /c if not exist "{znacznik}" ({usun})'
+    return f"cmd.exe /c {usun}"
 
 
 def skrypt_sprzatania(pidy: list[int], sciezki_do_usuniecia: list[Path], korzen: Path, *, usun_korzen: bool,
-                      czas: int = CZAS_SPRZATANIA, runonce: bool = True) -> str:
+                      czas: int = CZAS_SPRZATANIA, runonce: bool = True, znacznik: Path | None = None) -> str:
     """Skrypt procesu sprzątającego (PowerShell 5.1, bez cudzysłowów): czeka na koniec procesów `pidy` (to polecenie
     i ewentualnie cmd.exe z jarvo.cmd), daje cmd.exe 2 s na dokończenie pliku wsadowego, usuwa ścieżki (ponawia przez
     `czas` sekund), potem pusty korzeń (gdy `usun_korzen`). Czego nie usunie (plik trzyma inny program), to przenosi
     do %TEMP% (zmiana nazwy przechodzi także dla uruchomionego .exe, gdy %TEMP% jest na tym samym dysku), zdejmuje
-    pusty korzeń i zapisuje usunięcie w HKCU RunOnce (rmdir przy następnym logowaniu). Bez `runonce` tylko zostawia:
-    tak robią testy, żeby nie pisać do rejestru właściciela."""
+    pusty korzeń i zapisuje usunięcie w HKCU RunOnce (rmdir przy następnym logowaniu). Ścieżka, której nie dało się
+    przenieść (inny dysk, katalog bieżący innego programu), dostaje wpis z warunkiem `znacznik` (domyślnie
+    `<korzen>\\program\\current.json`, polecenie_runonce): przy ponownej instalacji nic nie znika. Bez `runonce` tylko
+    zostawia: tak robią testy, żeby nie pisać do rejestru właściciela."""
     skrot = hashlib.sha256(_klucz(korzen).encode("utf-8")).hexdigest()[:8]
     lista = ", ".join(_ps_napis(p) for p in sciezki_do_usuniecia) or "''"
+    znacznik = Path(znacznik) if znacznik else Path(korzen) / "program" / "current.json"
+    warunkowe = []                               # ścieżka → polecenie RunOnce z warunkiem („|” zamiast cudzysłowu)
+    for p in sciezki_do_usuniecia:
+        polecenie = polecenie_runonce(p, znacznik=znacznik, korzen=korzen if usun_korzen else None)
+        warunkowe.append(f"{_ps_napis(p)} = {_ps_napis(polecenie.replace(chr(34), _CUDZYSLOW))}")
     w = ["$ErrorActionPreference = 'SilentlyContinue'", "$ProgressPreference = 'SilentlyContinue'",
          f"foreach ($p in @({', '.join(str(int(x)) for x in pidy) or '0'})) {{ Wait-Process -Id $p -Timeout 600 }}",
          "Start-Sleep -Seconds 2",
@@ -862,16 +1031,20 @@ def skrypt_sprzatania(pidy: list[int], sciezki_do_usuniecia: list[Path], korzen:
     w += ["$q = [char]34",
           f"$klucz = 'HKCU:\\' + {_ps_napis(KLUCZ_RUNONCE)}",
           "$tmp = [IO.Path]::GetTempPath()",
+          f"$warunkowe = @{{ {'; '.join(warunkowe)} }}",
           "$n = 0",
           "foreach ($s in $sciezki) {",
           "  if (Test-Path -LiteralPath $s) {",
           "    $n++",
-          "    $gdzie = $s",
           f"    $cel = Join-Path $tmp ('jarvo-usun-{skrot}-' + $n)",
-          "    try { Move-Item -LiteralPath $s -Destination $cel -Force -ErrorAction Stop; $gdzie = $cel } catch { }",
+          "    try {",
+          "      Move-Item -LiteralPath $s -Destination $cel -Force -ErrorAction Stop",
+          "      $wartosc = 'cmd.exe /c rmdir /s /q ' + $q + $cel + $q",
+          "    } catch {",
+          f"      $wartosc = $warunkowe[$s].Replace({_ps_napis(_CUDZYSLOW)}, $q)",
+          "    }",
           "    if (-not (Test-Path -LiteralPath $klucz)) { New-Item -Path $klucz -Force | Out-Null }",
           f"    $nazwa = 'Jarvo-sprzatanie-{skrot}-' + $n",
-          "    $wartosc = 'cmd.exe /c rmdir /s /q ' + $q + $gdzie + $q",
           "    New-ItemProperty -LiteralPath $klucz -Name $nazwa -Value $wartosc -PropertyType String -Force |",
           "      Out-Null",
           "  }",
@@ -926,6 +1099,8 @@ class _Odinstalowanie:
                              "slady": [], "celowo": [], "sprzatanie": None, "wynik": None}
         self.lista: list[Proces] = []
         self.pomin: set[int] = set()
+        self.klucz_github: bool | None = None        # klucz GitHuba w magazynie po kroku „Klucz GitHuba”
+        self.klucz_zostaje: str | None = None        # dlaczego zostaje (bez --all, inna instalacja)
 
     def podlog(self, tekst: str) -> None:
         self.log(f"    {tekst}")
@@ -947,7 +1122,8 @@ class _Odinstalowanie:
                                                          " (dane zostają)"))
         for nazwa, krok in (("Zatrzymanie serwisu", self.zatrzymaj), ("Procesy Jarva", self.procesy),
                             ("Autostart", self.autostart), ("Dziennik zmian hosta", self.dziennik),
-                            ("Wpis w „Aplikacje”", self.aplikacje), ("Pliki", self.pliki)):
+                            ("Wpis w „Aplikacje”", self.aplikacje), ("Klucz GitHuba", self.klucz),
+                            ("Pliki", self.pliki)):
             self.log(f"[{nazwa}]")
             try:
                 if krok() is False:
@@ -1063,6 +1239,28 @@ class _Odinstalowanie:
         else:
             self.podlog(f"wpis {NAZWA_APLIKACJI} nie wskazuje tej instalacji: zostaje")
 
+    def klucz(self) -> None:
+        """Klucz GitHuba `jarvo-github` w magazynie systemu (docstring modułu, krok 6): z --all znika, chyba że korzysta
+        z niego inna instalacja Jarva na tym koncie. Bez --all zostaje razem z danymi."""
+        self.klucz_github = bool(self.z.klucz_jest())
+        if not self.klucz_github:
+            self.podlog(f"brak klucza {MAGAZYN_KLUCZA} w magazynie systemu")
+            return
+        inna = inna_instalacja(self.u, self.ot.env)
+        if not self.usun_dane:
+            self.klucz_zostaje = "bez --all dane i klucz zostają"
+        elif inna:
+            self.klucz_zostaje = f"korzysta z niego też {inna}"
+        if self.klucz_zostaje:
+            self.podlog(f"klucz {MAGAZYN_KLUCZA} w magazynie systemu zostaje: {self.klucz_zostaje}")
+            return
+        if self.z.usun_klucz():
+            self.klucz_github = False
+            self.raport["usuniete"].append(f"magazyn systemu: {MAGAZYN_KLUCZA}")
+            self.podlog(f"usunięty klucz {MAGAZYN_KLUCZA} z magazynu systemu")
+        else:
+            self.podlog(f"BŁĄD: klucz {MAGAZYN_KLUCZA} nie dał się usunąć z magazynu systemu (opis w skanie śladów)")
+
     def pliki(self) -> None:
         u = self.u
         if WINDOWS:
@@ -1119,7 +1317,8 @@ class _Odinstalowanie:
         do_usuniecia = sorted({_klucz(p): p for p in [*self.na_pozniej, *([self.u.program] if
                                                                             self.u.program.exists() else [])]}.values(),
                               key=str)
-        skrypt = skrypt_sprzatania(pidy, do_usuniecia, self.u.root, usun_korzen=not self.u.dane.exists())
+        skrypt = skrypt_sprzatania(pidy, do_usuniecia, self.u.root, usun_korzen=not self.u.dane.exists(),
+                                   znacznik=self.u.program / "current.json")
         system32 = Path(os.environ.get("SystemRoot") or "C:\\Windows") / "System32"
         try:
             pid = self.z.odlacz(argv_sprzatania(skrypt), cwd=str(system32))
@@ -1135,7 +1334,8 @@ class _Odinstalowanie:
         dane_zostaja = self.u.dane.exists() and not self.usun_dane
         skan = skan_sladow(self.u, self.ot, self.z, dane_zostaja=dane_zostaja, na_pozniej=self.na_pozniej,
                            pliki_rc=self.pliki_rc, bledy_dziennika=self.bledy_dziennika,
-                           pomin=self.pomin or {self.z.pid})
+                           pomin=self.pomin or {self.z.pid}, klucz_github=self.klucz_github,
+                           klucz_zostaje=self.klucz_zostaje)
         self.raport.update(skan)
         if wynik == "odinstalowane":
             self._sprzatanie()              # po skanie: proces sprzątający ma korzeń w wierszu polecenia

@@ -2,8 +2,10 @@
 „jarvo update”, S09, H16, D07, N15, I30, I40 „wersje obok siebie”).
 
   jarvo update [--sprawdz] [--ref REF] [--json]
-        1. sprawdzenie wydania: GitHub API `commits/<ref>` (Accept: application/vnd.github.sha) z refem instalacji
-           (`--ref`, JARVO_REF, `<stan>/aktualizacja.json`, `.jarvo-ref` kodu z bootstrapu, inaczej main). Publiczne
+        1. sprawdzenie wydania: GitHub API `commits/<ref>` (Accept: application/vnd.github.sha) z refem instalacji:
+           `--ref` (zapamiętany w `<stan>/aktualizacja.json` dla następnych aktualizacji), JARVO_REF, potem nowszy
+           z dwóch: `.jarvo-ref` bieżącego kodu (zapisują go bootstrap i każda aktualizacja) albo zapamiętany --ref,
+           inaczej main; ponowna instalacja z innym JARVO_REF wygrywa więc ze starszym --ref. Publiczne
            repo bez niczego; prywatna kopia: JARVO_TOKEN ze zmiennej albo z magazynu systemu (Menedżer poświadczeń
            Windows, pęk kluczy macOS, libsecret na Linuksie, zapasowo plik 0600 `<dane>/jarvo/konfig/github-token`;
            wpis zapisze `jarvo klucz`, N15), tylko w nagłówku do api.github.com (add_unredirected_header: po
@@ -11,12 +13,15 @@
            programów, które stąd startują. Ta sama wersja = koniec bez zmian (poza sprzątaniem starych wersji),
         2. kod nowej wersji do `<program>/app/<sha12>` obok starej: archiwum codeload jak w bootstrapie (prywatna kopia:
            `tarball` przez API), rozpakowane bezpiecznie (jarvo/pobieracz.rozpakuj) do `<sha12>.new`, potem zmiana
-           nazwy; `.jarvo-wersja` (pełny SHA) i `.jarvo-ref`,
+           nazwy; `.jarvo-wersja` (pełny SHA) i `.jarvo-ref`. Urwane pobieranie (także IncompleteRead) ponawiamy
+           3 razy, a uszkodzone archiwum pobieramy jeszcze raz,
         3. instalator NOWEJ wersji (`python -I -u -X utf8 <nowa>/jarvo/start.py instaluj` z opcjami tej instalacji:
            --bez-path, gdy polecenie nie trafiło do PATH, --bez-autostartu, gdy autostart jest wyłączony,
            --bez-startu, gdy serwis nie działał): narzędzia i venvy po sumach, Hermes przy zmianie pinu, front,
            flota; sam przełącza current.json (poprzedni zostaje jako current.poprzedni.json) i uruchamia serwis od
-           nowa przez nadzorcę,
+           nowa przez nadzorcę. Nowy Python przy tym samym pinie Hermesa albo locku venvu też nie przebudowuje
+           niczego w miejscu: checkout i venvy tej wersji powstają obok (jarvo/hermes.katalog_dla, venvy.katalog_dla),
+           bo z gotowych działa jeszcze serwis poprzedniej wersji, a powrót przy błędzie ich potrzebuje,
         4. `jarvo doctor --json` nowej wersji wobec przebiegu sprzed aktualizacji: błąd w sprawdzeniu, które przed nią
            przechodziło, to regresja, ale dopiero gdy trwa po rozgrzewce (do 120 s, co 10 s: instalator czeka na
            panel, a API bramy wstaje chwilę później; sprawdzone na Windows 11),
@@ -25,23 +30,34 @@
            i serwis); gdy i on zawiedzie, sam current.json sprzed aktualizacji i start serwisu,
         6. po udanej: stare wersje (kod, checkouty Hermesa, front panelu w `<program>/web-dist`, venvy, narzędzia:
            wszystko, czego ścieżek nie ma w current.json ani w narzedzia.json, resztki `.new`, `.stary-*`, `.usun-*`,
-           stare archiwa w `<cache>/pobrane`) znikają,
-           gdy żaden proces z nich nie korzysta (program albo wiersz polecenia, jarvo/odinstalowanie.uzywaja; na
-           Windows dodatkowo zmiana nazwy katalogu przed usunięciem: zajęty katalog jej nie przejdzie). Zajęte
-           zostają do następnej aktualizacji (np. pracownicy kanbana kończą kartę na starej wersji, H07).
+           stare archiwa w `<cache>/pobrane`) znikają, gdy żaden proces z nich nie korzysta (program albo wiersz
+           polecenia, jarvo/odinstalowanie.uzywaja: to jedyna ochrona, bo na Windows katalog z działającym python.exe
+           i załadowanym .dll przechodzi zmianę nazwy). Katalog najpierw dostaje nazwę `<nazwa>.usun-<czas>` (niepełny
+           nie wygląda jak gotowa wersja; nie przejdzie jej tylko plik otwarty bez FILE_SHARE_DELETE albo katalog
+           bieżący procesu). Na Windows proces w tej samej sesji, którego ścieżki ani wiersza polecenia nie da się
+           odczytać (np. `jarvo chat` uruchomiony jako administrator), a ma nazwę programu z wersji Jarva (python.exe,
+           node.exe…), wstrzymuje całe sprzątanie. Zajęte zostają do następnej aktualizacji (np. pracownicy kanbana
+           kończą kartę na starej wersji, H07).
         Jedna aktualizacja naraz (`<stan>/aktualizacja.lock`), dziennik `<logi>/aktualizacja.log`, stan bez sekretów
-        w `<stan>/aktualizacja.json`. Kod 0: aktualne, zaktualizowane albo (--sprawdz) sprawdzone; 1: błąd albo
-        wycofanie. Limity: JARVO_UPDATE_TIMEOUT (instalator, domyślnie 3600 s), JARVO_UPDATE_ROZGRZEWKA (120 s).
+        w `<stan>/aktualizacja.json`. Każdy błąd, także nieprzewidziany (np. uszkodzone archiwum), kończy się
+        komunikatem po polsku, powrotem do poprzedniej wersji (gdy coś się przełączyło) i stanem „failed” dla
+        panelu. Kod 0: aktualne, zaktualizowane albo (--sprawdz) sprawdzone; 1: błąd albo wycofanie. Limity:
+        JARVO_UPDATE_TIMEOUT (instalator, domyślnie 3600 s), JARVO_UPDATE_ROZGRZEWKA (120 s).
 
   jarvo update --pomocnik [--raz]
-        rola pomocnika aktualizacji (S09; uruchamia go nadzorca, docs/NATYWNIE.md c2): kontrakt plików z panelem bez
-        zmian (hq/plugin/plugin_api.py). Co 3 s prośba `<dane>/jarvo/state/update-request` („check” albo „update”),
-        co JARVO_UPDATE_CHECK s (domyślnie 3600: limit API bez klucza to 60 zapytań na godzinę) sprawdzenie, co 60 s
-        puls. Stan dla panelu: `<dane>/jarvo/state/update.json` (state idle|updating|done|failed, behind, commits,
-        branch, current, latest, checked_at, beat, started_at, finished_at, log, error). „update” uruchamia
-        `jarvo update` jako osobny, odłączony proces (w jednostce systemd --user Jarva przez `systemd-run --user
-        --scope`, bo KillMode=mixed zabiłby go razem z nadzorcą): instalator nowej wersji zatrzymuje nadzorcę razem
-        z pomocnikiem, a wyjście tego procesu idzie do `<logi>/aktualizacja-panel.log`.
+        pomocnik aktualizacji (S09): usługa `aktualizacje` nadzorcy (jarvo/nadzorca.uslugi_jarva, docs/NATYWNIE.md c2)
+        dla przycisku w panelu; kontrakt plików z panelem bez zmian (hq/plugin/plugin_api.py). Co 3 s prośba
+        `<dane>/jarvo/state/update-request` („check” albo „update”; „Zaktualizuj, gdy skończą” to ta sama prośba,
+        którą obserwator panelu zapisuje po 30 s bez pracy), co JARVO_UPDATE_CHECK s (domyślnie 3600: limit API bez
+        klucza to 60 zapytań na godzinę) sprawdzenie, co 60 s puls. Pierwsze sprawdzenie od razu, chyba że ostatnie
+        udane dla tej wersji było niedawno (restart serwisu nie pyta GitHuba za każdym razem). Stan dla panelu:
+        `<dane>/jarvo/state/update.json` (state idle|updating|done|failed, behind, commits, branch, current, latest,
+        checked_at, beat, started_at, finished_at, log, error). „update” uruchamia `jarvo update` jako osobny,
+        odłączony proces (w jednostce systemd --user Jarva przez `systemd-run --user --scope`, bo KillMode=mixed
+        zabiłby go razem z nadzorcą): instalator nowej wersji zatrzymuje nadzorcę razem z pomocnikiem, a wyjście tego
+        procesu idzie do `<logi>/aktualizacja-panel.log`. Stan „updating”, którego żaden `jarvo update` nie trzyma
+        (blokada wolna od CZAS_STARTU s: proces zabity albo nie wystartował), pomocnik zamienia na „failed”. Błąd
+        jednego obiegu (np. sieci) nie kończy pętli; SIGTERM i Ctrl+Break od nadzorcy kończą ją kodem 0.
 
 Zmienna tylko dla prób: JARVO_FAKE_KOD = katalog z kodem Jarva udający wersję z GitHuba (wersja z jego
 `.jarvo-wersja` albo HEAD gita; bez sieci). Testy podmieniają też adresy API i KOD (serwer na 127.0.0.1).
@@ -49,23 +65,30 @@ Zmienna tylko dla prób: JARVO_FAKE_KOD = katalog z kodem Jarva udający wersję
 from __future__ import annotations
 
 import contextlib
+import gzip
+import http.client
 import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
+import tarfile
 import threading
 import time
+import traceback
 import urllib.error
 import urllib.parse
 import urllib.request
+import zlib
 from pathlib import Path
 from typing import Callable
 
 from . import instalator, manifest, pobieracz, przenosne, srodowisko, zmiany_hosta
 from .instalator import Otoczenie
-from .odinstalowanie import Zaplecze, env_podprocesu, rozmiar, uklad_instalacji, usun_drzewo, uzywaja
+from .odinstalowanie import (MAGAZYN_KLUCZA, Proces, Zaplecze, env_podprocesu, rozmiar, uklad_instalacji, usun_drzewo,
+                             uzywaja)
 from .sciezki import LINUX, MACOS, WINDOWS, Uklad
 
 REPO_GH = "jarojarojaro-jaro/JARVO"           # jak $JarvoRepo w jarvo/bootstrap/install.ps1 i REPO_GH w install.sh
@@ -80,7 +103,7 @@ LOG = "aktualizacja.log"
 LOG_PANELU = "aktualizacja-panel.log"         # wyjście `jarvo update` uruchomionego przez pomocnika
 STAN_PANELU = Path("state") / "update.json"   # w <dane>/jarvo (hq/plugin/plugin_api.py UPDATE_FILE)
 PROSBA_PANELU = Path("state") / "update-request"
-MAGAZYN = "jarvo-github"                      # nazwa klucza GitHuba w magazynie systemu (N15)
+MAGAZYN = MAGAZYN_KLUCZA                      # nazwa klucza GitHuba w magazynie systemu (N15): jarvo-github
 PLIK_KLUCZA = Path("konfig") / "github-token"  # w <dane>/jarvo: zapas na Linuksie bez libsecret (plik 0600)
 CZAS_INSTALATORA = 3600.0                     # s; JARVO_UPDATE_TIMEOUT
 CZAS_DOCTORA = 600.0
@@ -90,6 +113,11 @@ CO_ILE_SPRAWDZAC = 3600                       # s; JARVO_UPDATE_CHECK
 CO_ILE_PULS = 60.0
 CO_ILE_PROSBA = 3.0
 CO_ILE_STAN = 15.0                            # s między zapisami update.json w trakcie aktualizacji
+CZAS_STARTU = 120.0                           # s na wzięcie blokady przez `jarvo update` z panelu (wolny dysk, antywirus)
+PROBY_ARCHIWUM = 2                            # pobranie i rozpakowanie kodu: uszkodzone archiwum = jeszcze raz
+# programy z wersji Jarva (narzędzia, venvy, Hermes): proces o takiej nazwie bez widocznej ścieżki wstrzymuje sprzątanie
+PROGRAMY_JARVA = frozenset({"python.exe", "pythonw.exe", "hermes.exe", "node.exe", "uv.exe", "uvx.exe", "git.exe",
+                            "bash.exe", "sh.exe"})
 OGON = 40                                     # wierszy logu w update.json
 ZMIANY_NAJWYZEJ = 50                          # tyle commitów pytamy o listę zmian (behind > 50 = „50+”)
 FAKE = "JARVO_FAKE_KOD"
@@ -135,19 +163,42 @@ def zapisz_stan(u: Uklad, **pola) -> None:
         przenosne.zapisz_atomowo(u.stan / STAN, json.dumps(dane, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
 
 
+def _dobry_ref(ref: str) -> bool:
+    return bool(_REF.fullmatch(ref)) and ".." not in ref
+
+
 def ustal_ref(u: Uklad, env: dict, jawny: str | None = None) -> str:
-    """Ref aktualizacji: --ref, JARVO_REF, zapamiętany w `<stan>/aktualizacja.json`, `.jarvo-ref` bieżącego kodu
-    (bootstrap), inaczej main. Zły zapis (spacje, „..”) to błąd tylko dla jawnego; zapamiętany pomijamy."""
+    """Ref aktualizacji: --ref, JARVO_REF, potem nowszy z dwóch zapisów: `.jarvo-ref` bieżącego kodu (bootstrap
+    i każda aktualizacja; czas zapisu pliku) albo --ref zapamiętany przez zapamietaj_ref (`ref_jawny`, `ref_kiedy`
+    w `<stan>/aktualizacja.json`), inaczej main. Ref, który tylko przyszedł z kodu albo z domyślnego main, nie jest
+    zapamiętywany, więc ponowna instalacja bootstrapem z innym JARVO_REF go zmienia. Zły zapis (spacje, „..”) to błąd
+    tylko dla jawnego; zapisany pomijamy."""
     for kandydat, zrodlo in ((jawny, "--ref"), (env.get("JARVO_REF"), "JARVO_REF")):
         if kandydat:
             kandydat = kandydat.strip()
-            if not _REF.fullmatch(kandydat) or ".." in kandydat:
+            if not _dobry_ref(kandydat):
                 raise BladAktualizacji(f"{zrodlo}={kandydat!r}: to nie nazwa gałęzi, tagu ani SHA.")
             return kandydat
-    zapisany = str(stan(u).get("ref") or "")
-    if _REF.fullmatch(zapisany) and ".." not in zapisany:
-        return zapisany
-    return ref_kodu(srodowisko.biezace(u).get("app")) or REF_DOMYSLNY
+    app = srodowisko.biezace(u).get("app")
+    z_kodu = ref_kodu(app)
+    s = stan(u)
+    zapamietany = str(s.get("ref_jawny") or "").strip()
+    if not _dobry_ref(zapamietany):
+        return z_kodu or REF_DOMYSLNY
+    if not z_kodu:
+        return zapamietany
+    try:
+        kiedy_kodu = (Path(str(app)) / PLIK_REFU).stat().st_mtime
+        kiedy_jawnego = float(s.get("ref_kiedy") or 0)
+    except (OSError, TypeError, ValueError):
+        return z_kodu
+    return zapamietany if kiedy_jawnego > kiedy_kodu else z_kodu
+
+
+def zapamietaj_ref(u: Uklad, ref: str) -> None:
+    """`jarvo update --ref REF`: REF zostaje refem instalacji także wtedy, gdy wersja się nie zmieniła (wtedy kod nie
+    dostaje nowego `.jarvo-ref`) albo aktualizacja wróciła do poprzedniej wersji."""
+    zapisz_stan(u, ref_jawny=ref, ref_kiedy=time.time())
 
 
 # ---------------------------------------------------------------- klucz do prywatnej kopii (N15)
@@ -221,7 +272,10 @@ def czytaj_magazyn(u: Uklad) -> str | None:
 
 
 def klucz_github(u: Uklad, env: dict, magazyn: Callable[[Uklad], str | None] = czytaj_magazyn) -> str | None:
-    """JARVO_TOKEN ze zmiennej albo z magazynu systemu; publiczne repo działa bez niego."""
+    """JARVO_TOKEN ze zmiennej albo z magazynu systemu; publiczne repo działa bez niego. Próba z JARVO_FAKE_KOD nie
+    łączy się z GitHubem, więc magazynu nie czyta."""
+    if env.get(FAKE):
+        return None
     return _klucz_dobry(env.get("JARVO_TOKEN")) or magazyn(u)
 
 
@@ -258,6 +312,9 @@ def _blad_http(e: Exception, co: str, klucz: str | None) -> BladAktualizacji:
             return BladAktualizacji(f"{co}: GitHub nie zna tej wersji (HTTP 404). Zły ref albo prywatna kopia repo "
                                     "bez klucza: ustaw JARVO_TOKEN.")
         return BladAktualizacji(f"{co}: HTTP {e.code} od GitHuba.")
+    if isinstance(e, http.client.HTTPException):          # IncompleteRead, RemoteDisconnected: urwane w trakcie
+        return BladAktualizacji(f"{co}: połączenie z GitHubem urwało się w trakcie ({type(e).__name__}). Spróbuj "
+                                "jeszcze raz.")
     powod = getattr(e, "reason", e)
     return BladAktualizacji(_bez_klucza(f"{co}: brak połączenia z GitHubem ({powod}). Sprawdź sieć i spróbuj "
                                         "jeszcze raz.", klucz))
@@ -277,7 +334,7 @@ def zdalna_wersja(ref: str, klucz: str | None, env: dict) -> str:
     try:
         with _otworz(adres, klucz=klucz, accept="application/vnd.github.sha") as odp:
             sha = odp.read(200).decode("ascii", "replace").strip().lower()
-    except (urllib.error.URLError, OSError, ValueError) as e:
+    except (urllib.error.URLError, OSError, ValueError, http.client.HTTPException) as e:
         raise _blad_http(e, f"sprawdzenie wersji {ref}", klucz) from None
     if not _SHA.fullmatch(sha):
         raise BladAktualizacji(f"API GitHuba nie podało SHA dla {ref!r}.")
@@ -295,7 +352,7 @@ def nowe_zmiany(baza: str | None, cel: str, klucz: str | None, env: dict) -> tup
     try:
         with _otworz(adres, klucz=klucz) as odp:
             lista = json.loads(odp.read(8 << 20).decode("utf-8"))
-    except (urllib.error.URLError, OSError, ValueError):
+    except (urllib.error.URLError, OSError, ValueError, http.client.HTTPException):
         return 1, [], False
     zmiany = []
     for c in lista if isinstance(lista, list) else []:
@@ -307,9 +364,13 @@ def nowe_zmiany(baza: str | None, cel: str, klucz: str | None, env: dict) -> tup
     return max(len(zmiany), 1), zmiany[:20], False
 
 
+_ZLE_ARCHIWUM = (tarfile.TarError, EOFError, zlib.error, gzip.BadGzipFile)
+
+
 def pobierz_kod(u: Uklad, sha: str, ref: str, klucz: str | None, env: dict, log: Callable[[str], None]) -> Path:
     """Kod wersji `sha` w `<program>/app/<sha12>` (gotowy zostaje). Archiwum commitu z codeload (prywatna kopia:
-    `tarball` przez API z kluczem) albo kopia katalogu JARVO_FAKE_KOD; najpierw do `<sha12>.new`."""
+    `tarball` przez API z kluczem) albo kopia katalogu JARVO_FAKE_KOD; najpierw do `<sha12>.new`. Uszkodzone
+    archiwum (urwany gzip, zły tar) pobieramy jeszcze raz, potem BladAktualizacji po polsku."""
     cel = u.program / "app" / sha[:12]
     if (cel / "jarvo" / "start.py").is_file() and wersja_kodu(cel) == sha:
         log(f"kod {sha[:12]}: już jest ({cel})")
@@ -325,12 +386,22 @@ def pobierz_kod(u: Uklad, sha: str, ref: str, klucz: str | None, env: dict, log:
         else:
             adres = (f"{API}/repos/{REPO_GH}/tarball/{sha}" if klucz else f"{KOD}/{REPO_GH}/tar.gz/{sha}")
             archiwum = u.cache / "pobrane" / f"jarvo-{sha}.tar.gz"
-            log(f"pobieram kod {sha[:12]} ({adres})")
-            _pobierz_plik(adres, archiwum, klucz, log)
-            try:
-                pobieracz.rozpakuj(archiwum, nowy, "tar.gz", 1)
-            finally:
-                archiwum.unlink(missing_ok=True)
+            for proba in range(1, PROBY_ARCHIWUM + 1):
+                log(f"pobieram kod {sha[:12]} ({adres})")
+                _pobierz_plik(adres, archiwum, klucz, log)
+                try:
+                    pobieracz.rozpakuj(archiwum, nowy, "tar.gz", 1)
+                    break
+                except _ZLE_ARCHIWUM as e:
+                    usun_drzewo(nowy)
+                    opis = f"{type(e).__name__}: {str(e)[:160]}"
+                    if proba == PROBY_ARCHIWUM:
+                        raise BladAktualizacji(f"archiwum kodu wersji {sha[:12]} jest uszkodzone ({opis}) także po "
+                                               "ponownym pobraniu. Spróbuj później jeszcze raz (jarvo update).") \
+                            from None
+                    log(f"    archiwum uszkodzone ({opis}): pobieram jeszcze raz")
+                finally:
+                    archiwum.unlink(missing_ok=True)
         if not (nowy / "jarvo" / "start.py").is_file():
             raise BladAktualizacji(f"w kodzie wersji {sha[:12]} nie ma jarvo/start.py (zły ref?).")
         (nowy / PLIK_WERSJI).write_text(sha + "\n", encoding="utf-8")
@@ -346,7 +417,8 @@ def pobierz_kod(u: Uklad, sha: str, ref: str, klucz: str | None, env: dict, log:
 
 
 def _pobierz_plik(adres: str, cel: Path, klucz: str | None, log: Callable[[str], None]) -> None:
-    """Archiwum kodu strumieniem do pliku (bez sumy, jak w bootstrapie: HTTPS i SHA z API wystarczą), 3 próby."""
+    """Archiwum kodu strumieniem do pliku (bez sumy, jak w bootstrapie: HTTPS i SHA z API wystarczą), 3 próby: także
+    po urwanym strumieniu (http.client.IncompleteRead, gdy codeload zamknie połączenie przed końcem chunked)."""
     cel.parent.mkdir(parents=True, exist_ok=True)
     czesc = cel.with_name(cel.name + ".czesc")
     ostatni: Exception | None = None
@@ -367,8 +439,10 @@ def _pobierz_plik(adres: str, cel: Path, klucz: str | None, log: Callable[[str],
             ostatni = e
             if e.code in (401, 403, 404):
                 break
-        except (urllib.error.URLError, OSError, TimeoutError) as e:
+        except (urllib.error.URLError, OSError, TimeoutError, http.client.HTTPException) as e:
             ostatni = e
+            log(f"    pobieranie przerwane ({type(e).__name__}), próba {proba + 2} z 3" if proba < 2 else
+                f"    pobieranie przerwane ({type(e).__name__})")
         time.sleep(min(2 ** proba, 10))
     czesc.unlink(missing_ok=True)
     raise _blad_http(ostatni or OSError("?"), "pobranie kodu Jarva", klucz)
@@ -467,15 +541,54 @@ def stare_archiwa(u: Uklad, app: Path) -> list[Path]:
     return wynik
 
 
+def programy_wersji(u: Uklad) -> set[str]:
+    """Nazwy programów (.exe, bez wielkości liter), które dają wersje Jarva: PROGRAMY_JARVA i pliki .exe z katalogów
+    `bin` i z katalogów narzędzi w narzedzia.json (stara wersja ma te same nazwy)."""
+    nazwy = set(PROGRAMY_JARVA)
+    for wpis in srodowisko.narzedzia(u).values():
+        if not isinstance(wpis, dict):
+            continue
+        for k in [wpis.get("katalog"), *(wpis.get("bin") or [])]:
+            if not k:
+                continue
+            with contextlib.suppress(OSError):
+                nazwy |= {e.name.casefold() for e in os.scandir(str(k)) if e.name.casefold().endswith(".exe")}
+    return nazwy
+
+
+def niewidoczne(u: Uklad, lista: list[Proces], z: Zaplecze) -> list[Proces]:
+    """Windows: procesy w sesji tego procesu (ten sam pulpit użytkownika, także uruchomione jako administrator),
+    których ścieżki programu i wiersza polecenia nie da się odczytać (OpenProcess bez prawa), a nazwa to program
+    z wersji Jarva. uzywaja() ich nie widzi, a mogą działać ze starej wersji (np. podniesiony `jarvo chat`). Procesy
+    innych sesji (usługi systemu, inni użytkownicy) nie liczą się. Poza Windows pusto (/proc i ps podają ścieżki)."""
+    if not WINDOWS:
+        return []
+    nasza = z.sesja(z.pid)
+    if nasza is None:
+        return []
+    nazwy = programy_wersji(u)
+    return [p for p in lista if p.pid != z.pid and not os.path.isabs(p.program) and not p.polecenie
+            and p.program.casefold() in nazwy and z.sesja(p.pid) == nasza]
+
+
 def sprzataj(u: Uklad, z: Zaplecze, log: Callable[[str], None], *, app: Path | None = None) -> dict:
-    """Usuwa stare wersje (do_sprzatniecia), których żaden proces nie używa, i stare archiwa. Katalog najpierw zmienia
-    nazwę na `<nazwa>.usun-<czas>` (na Windows zajęty katalog jej nie przejdzie, a niepełny nie wygląda jak gotowa
-    wersja), potem znika. {"usuniete", "w_uzyciu", "bledy", "zwolnione_mb"}."""
-    wynik: dict = {"usuniete": [], "w_uzyciu": [], "bledy": [], "zwolnione_mb": 0.0}
+    """Usuwa stare wersje (do_sprzatniecia), których żaden proces nie używa, i stare archiwa. Jedyna ochrona to lista
+    procesów (uzywaja: program albo wiersz polecenia w katalogu): na Windows katalog z działającym python.exe
+    i załadowanym .dll przechodzi zmianę nazwy, więc ta jej nie zastąpi. Katalog najpierw dostaje nazwę
+    `<nazwa>.usun-<czas>` (niepełny nie wygląda jak gotowa wersja; nie przejdzie jej tylko plik otwarty bez
+    FILE_SHARE_DELETE albo katalog bieżący procesu), potem znika. Proces z niewidoczne() wstrzymuje całe sprzątanie
+    katalogów do następnej aktualizacji. {"usuniete", "w_uzyciu", "bledy", "zwolnione_mb", "wstrzymane"}."""
+    wynik: dict = {"usuniete": [], "w_uzyciu": [], "bledy": [], "zwolnione_mb": 0.0, "wstrzymane": []}
     kandydaci = do_sprzatniecia(u)
     if not kandydaci and not u.cache.is_dir():
         return wynik
     lista = z.procesy() if kandydaci else []
+    nieznane = niewidoczne(u, lista, z) if kandydaci else []
+    if nieznane:
+        wynik["wstrzymane"] = [p.opis() for p in nieznane[:5]]
+        log(f"stare wersje zostają: działa {', '.join(wynik['wstrzymane'][:3])}, a nie widzę, z którego katalogu "
+            "(np. uruchomiony jako administrator); usunie je następna aktualizacja")
+        kandydaci = []
     pomin = set()                                 # ten proces też się liczy: jego kod i Python zostają
     zwolnione = 0
     for k in kandydaci:
@@ -527,6 +640,17 @@ def _json_z(tekst: str) -> dict | None:
     return None
 
 
+def opis_liczby_zmian(n: int, pelna: bool = True) -> str:
+    """„1 nowa zmiana”, „3 nowe zmiany”, „12 nowych zmian”; niepełna lista: „co najmniej 50 nowych zmian”."""
+    if n == 1:
+        rzeczownik = "nowa zmiana"
+    elif 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14:
+        rzeczownik = "nowe zmiany"
+    else:
+        rzeczownik = "nowych zmian"
+    return f"{'' if pelna else 'co najmniej '}{n} {rzeczownik}"
+
+
 def regresje(przed: dict | None, po: dict | None) -> tuple[list[str], list[str]]:
     """(regresje, nowe błędy): sprawdzenia `jarvo doctor`, które przed aktualizacją nie były błędem, a teraz są /
     błędy w sprawdzeniach, których przed nią nie było (nowe sprawdzenie nowej wersji: uwaga, bez wycofania)."""
@@ -560,6 +684,8 @@ class _Aktualizacja:
         self.klucz: str | None = None
         self.biez = srodowisko.biezace(u)
         self.dzialal = False                  # serwis działał przed aktualizacją (start po awaryjnym powrocie)
+        self.opcje: list[str] = []            # opcje instalatora i migawka plików stanu z _kroki: potrzebne do powrotu
+        self.migawka: dict = {}               # także po nieprzewidzianym błędzie (_aktualizuj)
         self.t0 = time.monotonic()
         self._puls_stop = threading.Event()
         self._puls: threading.Thread | None = None
@@ -575,6 +701,12 @@ class _Aktualizacja:
 
     def podlog(self, tekst: str) -> None:
         self.log(f"    {tekst}")
+
+    def slad(self) -> None:
+        """Pełny ślad nieprzewidzianego błędu tylko do `<logi>/aktualizacja.log` (na ekranie wystarczy komunikat)."""
+        if self.u.logi.is_dir():
+            with contextlib.suppress(OSError), open(self.u.logi / LOG, "a", encoding="utf-8") as f:
+                f.write(_bez_klucza(traceback.format_exc(), self.klucz))
 
     def _env(self) -> dict:
         return env_podprocesu(self.u, self.ot.env)
@@ -603,6 +735,8 @@ class _Aktualizacja:
         except BladAktualizacji as e:
             zapisz_panel(u, error=str(e)[:300], checked_at=time.time(), state=_stan_po_sprawdzeniu(u))
             return self._koniec("blad", f"BŁĄD: {e}", kod=1)
+        if self.ref_jawny:
+            zapamietaj_ref(u, ref)
         self.wynik["zdalna"] = zdalna[:12]
         aktualne = zdalna == przed or (przed is None and str(self.biez.get("wersja") or "") == zdalna[:12])
         behind, zmiany, pelna = (0, [], True) if aktualne else nowe_zmiany(przed, zdalna, self.klucz, self.ot.env)
@@ -617,7 +751,7 @@ class _Aktualizacja:
                 self._sprzatanie()
             return self._koniec("aktualne", f"Jarvo jest aktualne ({zdalna[:12]}, ref {ref}): nic do zrobienia.",
                                 kod=0)
-        opis_zmian = f"{behind}{'' if pelna else '+'} nowych zmian" if przed else "inna wersja"
+        opis_zmian = opis_liczby_zmian(behind, pelna) if przed else "inna wersja"
         self.podlog(f"{zrodlo}: {ref} = {zdalna[:12]} ({opis_zmian})")
         for c in zmiany[:10]:
             self.podlog(f"  {c['sha']} {c['subject']}")
@@ -638,17 +772,23 @@ class _Aktualizacja:
             zapisz_panel(u, state="failed", finished_at=time.time(), log="\n".join(self.ogon),
                          error="aktualizację przerwano (Ctrl+C)")
             raise
+        except Exception as e:            # noqa: BLE001 - nieprzewidziany błąd: powrót i „failed”, bez śladu na ekranie
+            self.slad()
+            return self._nieudana(f"nieprzewidziany błąd ({type(e).__name__}: {_bez_klucza(str(e), self.klucz)[:200]};"
+                                  f" pełny opis w {u.logi / LOG})", stara, self.opcje, self.migawka)
         finally:
             self._stop_pulsu()
 
     def _kroki(self, stara: Path, zdalna: str, ref: str) -> int:
         u = self.u
         opcje, self.dzialal = self._opcje()
+        self.opcje = opcje
         self.podlog(f"opcje instalacji: {' '.join(opcje) or 'domyślne'}"
                     + ("" if self.dzialal else " (serwis nie działał: zostaje zatrzymany)"))
         przed_doctor = self._doctor(stara, "przed aktualizacją")
         migawka = {p: p.read_bytes() if p.is_file() else None
                    for p in (u.program / "current.json", u.stan / "narzedzia.json")}
+        self.migawka = migawka
         self.log(f"[Kod wersji {zdalna[:12]}]")
         try:
             nowa = pobierz_kod(u, zdalna, ref, self.klucz, self.ot.env, self.podlog)
@@ -750,7 +890,12 @@ class _Aktualizacja:
         wynik, opis = "blad", f"Aktualizacja się nie udała: {powod}."
         if wycofaj and zmienione:
             self.log(f"[Powrót do wersji {self.wynik['wersja_przed']}]")
-            kod = self._instalator(stara, opcje)
+            try:
+                kod = self._instalator(stara, opcje)
+            except Exception as e:        # noqa: BLE001 - powrót też zawiódł: zostaje awaryjny current.json niżej
+                self.slad()
+                self.podlog(f"BŁĄD: instalator poprzedniej wersji: {type(e).__name__}: {str(e)[:200]}")
+                kod = 1
             if kod == 0 and instalator.ten_sam_katalog(str(srodowisko.biezace(u).get("app") or ""), stara):
                 wynik, opis = "wycofano", (f"Aktualizacja się nie udała ({powod}), więc wróciła poprzednia wersja "
                                            f"{self.wynik['wersja_przed']} (current.poprzedni.json, jej instalatorem).")
@@ -777,7 +922,15 @@ class _Aktualizacja:
                 instalator.uruchom_serwis(self.u, self.ot, self.podlog)
 
     def _sprzatanie(self, app: Path | None = None) -> None:
-        wynik = sprzataj(self.u, self.z, self.podlog, app=app)
+        """Sprzątanie starych wersji; błąd to tylko uwaga (nigdy powód do wycofania udanej aktualizacji)."""
+        try:
+            wynik = sprzataj(self.u, self.z, self.podlog, app=app)
+        except Exception as e:            # noqa: BLE001 - stare wersje zostają do następnej aktualizacji
+            self.slad()
+            self.podlog(f"uwaga: sprzątanie starych wersji nie przeszło ({type(e).__name__}: {str(e)[:160]}); "
+                        "zostają do następnej aktualizacji")
+            self.wynik["sprzatanie"] = {"blad": f"{type(e).__name__}: {str(e)[:160]}"}
+            return
         self.wynik["sprzatanie"] = wynik
         if wynik["usuniete"]:
             self.podlog(f"sprzątanie: usunięte {len(wynik['usuniete'])}, zwolnione {wynik['zwolnione_mb']} MB")
@@ -817,19 +970,40 @@ def aktualizuj(u: Uklad, ot: Otoczenie | None = None, *, ref: str | None = None,
     u = instalator.bezwzgledny(uklad_instalacji(u, ot.env))
     przebieg = _Aktualizacja(u, ot, z, log or _wypisz, ref=ref, tylko_sprawdz=tylko_sprawdz, magazyn=magazyn)
     if not u.stan.is_dir():
-        return przebieg.uruchom(), przebieg.wynik
+        return _bezpiecznie(przebieg), przebieg.wynik
     zamek = przenosne.Zamek(u.stan / ZAMEK, czekaj=False)
-    try:
-        zamek.__enter__()
-    except BlockingIOError:
-        kod = przebieg._koniec("trwa", "Aktualizacja już trwa (z panelu albo z innego okna): poczekaj na jej koniec "
-                                       "(jarvo logs aktualizacja).", kod=1)
-        return kod, przebieg.wynik
+    for proba in range(6):                    # trwa() pomocnika bierze blokadę na chwilę: to jeszcze nie aktualizacja
+        try:
+            zamek.__enter__()
+            break
+        except BlockingIOError:
+            if proba == 5:
+                kod = przebieg._koniec("trwa", "Aktualizacja już trwa (z panelu albo z innego okna): poczekaj na jej "
+                                               "koniec (jarvo logs aktualizacja).", kod=1)
+                return kod, przebieg.wynik
+            time.sleep(0.2)
     try:
         with instalator._katalog_biezacy(u.root):
-            return przebieg.uruchom(), przebieg.wynik
+            return _bezpiecznie(przebieg), przebieg.wynik
     finally:
         zamek.__exit__(None, None, None)
+
+
+def _bezpiecznie(przebieg: "_Aktualizacja") -> int:
+    """Przebieg bez surowego śladu stosu na ekranie: błąd spoza kroków (np. sprawdzenie wersji) = komunikat po polsku,
+    ślad w `<logi>/aktualizacja.log`, update.json z błędem (stan „updating” nie zostaje)."""
+    try:
+        return przebieg.uruchom()
+    except Exception as e:                # noqa: BLE001 - patrz docstring
+        przebieg.slad()
+        tekst = f"{type(e).__name__}: {_bez_klucza(str(e), przebieg.klucz)[:200]}"
+        blad = f"nieprzewidziany błąd ({tekst})"[:300]
+        if stan_panelu(przebieg.u).get("state") == "updating":
+            zapisz_panel(przebieg.u, state="failed", finished_at=time.time(), error=blad, log="\n".join(przebieg.ogon))
+        else:
+            zapisz_panel(przebieg.u, error=blad, checked_at=time.time(), state=_stan_po_sprawdzeniu(przebieg.u))
+        return przebieg._koniec("blad", f"BŁĄD: nieprzewidziany błąd aktualizacji ({tekst}). Pełny opis: "
+                                        f"{przebieg.u.logi / LOG}.", kod=1)
 
 
 def trwa(u: Uklad) -> bool:
@@ -919,44 +1093,120 @@ def zlec_aktualizacje(u: Uklad, ot: Otoczenie) -> int | None:
     _usun_prosbe(u)
     env = env_podprocesu(u, instalator.env_floty(ot.env))
     try:
-        return ot.uruchom_w_tle(argv_aktualizacji(u, ot.env), env, u.logi / LOG_PANELU)
+        pid = ot.uruchom_w_tle(argv_aktualizacji(u, ot.env), env, u.logi / LOG_PANELU)
     except OSError as e:
         zapisz_panel(u, state="failed", finished_at=time.time(), error=f"jarvo update nie wystartował ({e})"[:300])
         return None
+    if not trwa(u):                           # `jarvo update` jeszcze nie wziął blokady: PID do update.json
+        zapisz_panel(u, updater_pid=pid)
+    return pid
+
+
+def _liczba(wartosc) -> float:
+    try:
+        return float(wartosc or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def przerwana_aktualizacja(u: Uklad, teraz: float | None = None) -> bool:
+    """update.json „updating”, a blokady aktualizacji nikt nie trzyma od CZAS_STARTU s (proces `jarvo update` zabity,
+    padł bez wyniku albo nie wystartował): stan „failed” z opisem, żeby panel nie pokazywał „trwa” (i nie odpowiadał
+    409) do następnego sprawdzenia. Najpierw blokada, potem stan: `jarvo update` pisze wynik przed jej zwolnieniem,
+    więc kończący się przebieg nie zostanie oznaczony jako przerwany."""
+    if trwa(u):
+        return False
+    s = stan_panelu(u)
+    teraz = time.time() if teraz is None else teraz
+    if s.get("state") != "updating" or teraz - _liczba(s.get("started_at")) < CZAS_STARTU:
+        return False
+    zapisz_panel(u, state="failed", finished_at=teraz, error="aktualizacja przerwana: proces jarvo update skończył "
+                 "się bez wyniku (zobacz jarvo logs aktualizacja i jarvo logs aktualizacja-panel); poprzednia wersja "
+                 "działa dalej albo wróci przy następnej aktualizacji")
+    return True
+
+
+def pierwsze_sprawdzenie(u: Uklad, co_ile: float, teraz_wall: float | None = None) -> float:
+    """Za ile sekund pierwsze sprawdzenie pomocnika: 0, chyba że update.json ma udane sprawdzenie tej samej wersji
+    sprzed mniej niż `co_ile` s (restart serwisu nie pyta GitHuba za każdym razem: 60 zapytań na godzinę bez
+    klucza)."""
+    s = stan_panelu(u)
+    teraz_wall = time.time() if teraz_wall is None else teraz_wall
+    minelo = teraz_wall - _liczba(s.get("checked_at"))
+    biez = srodowisko.biezace(u)
+    obecna = (wersja_kodu(biez.get("app")) or str(biez.get("wersja") or "dev"))[:7]
+    if s.get("error") or s.get("current") != obecna or not 0 <= minelo < co_ile:
+        return 0.0
+    return co_ile - minelo
+
+
+@contextlib.contextmanager
+def _sygnaly_konca(wlacz: bool = True):
+    """SIGTERM (nadzorca i systemd na POSIX) i SIGBREAK (Ctrl+Break od nadzorcy na Windows) kończą pętlę pomocnika jak
+    Ctrl+C, czyli kodem 0, a nie twardym końcem procesu. Tylko w głównym wątku; poprzednie obsługi wracają."""
+    poprzednie = {}
+    if wlacz and threading.current_thread() is threading.main_thread():
+        def koniec(*_):
+            raise KeyboardInterrupt
+        for nazwa in ("SIGTERM", "SIGBREAK"):
+            numer = getattr(signal, nazwa, None)
+            if numer is not None:
+                with contextlib.suppress(OSError, ValueError):
+                    poprzednie[numer] = signal.signal(numer, koniec)
+    try:
+        yield
+    finally:
+        for numer, obsluga in poprzednie.items():
+            with contextlib.suppress(OSError, ValueError, TypeError):
+                signal.signal(numer, obsluga)
 
 
 def pomocnik(u: Uklad, ot: Otoczenie | None = None, *, raz: bool = False, log: Callable[[str], None] | None = None,
              magazyn: Callable[[Uklad], str | None] = czytaj_magazyn) -> int:
-    """`jarvo update --pomocnik`: pętla pomocnika aktualizacji (docstring modułu). `raz`: jeden obieg (testy)."""
+    """`jarvo update --pomocnik`: pętla pomocnika aktualizacji (docstring modułu), usługa `aktualizacje` nadzorcy.
+    `raz`: jeden obieg (testy, próby na żywo)."""
     ot = ot or Otoczenie()
     u = instalator.bezwzgledny(uklad_instalacji(u, ot.env))
     log = log or _wypisz
-    co_ile = max(60.0, float(ot.env.get("JARVO_UPDATE_CHECK") or CO_ILE_SPRAWDZAC))
-    nastepne = ot.zegar()                     # pierwsze sprawdzenie od razu
+    co_ile = max(60.0, _liczba(ot.env.get("JARVO_UPDATE_CHECK")) or CO_ILE_SPRAWDZAC)
+    za = pierwsze_sprawdzenie(u, co_ile)
+    nastepne = ot.zegar() + za
     puls = -1e9
-    log(f"pomocnik aktualizacji: {u.root} (sprawdzenie co {int(co_ile)} s)")
-    while True:
-        teraz = ot.zegar()
-        prosba = _wez_prosbe(u)
-        if prosba == "update":
-            pid = zlec_aktualizacje(u, ot)
-            log("aktualizacja z panelu: " + (f"jarvo update w tle (PID {pid})" if pid else "już trwa albo nie "
-                                             "wystartowała"))
-            nastepne = teraz + co_ile
-        elif (prosba == "check" or teraz >= nastepne) and not trwa(u):
-            if prosba:
-                _usun_prosbe(u)
-            s = sprawdz_dla_panelu(u, ot, magazyn)
-            log(f"sprawdzenie: {s.get('current')} → {s.get('latest')}, brakuje {s.get('behind')}"
-                + (f", błąd: {s.get('error')}" if s.get("error") else ""))
-            nastepne = teraz + co_ile
-            puls = teraz
-        if teraz - puls >= CO_ILE_PULS and not trwa(u):
-            zapisz_panel(u, beat=time.time(), updater_pid=os.getpid())
-            puls = teraz
-        if raz:
-            return 0
-        ot.czekaj(CO_ILE_PROSBA)
+    log(f"pomocnik aktualizacji: {u.root} (sprawdzenie co {int(co_ile)} s, pierwsze "
+        + (f"za {int(za)} s: ostatnie było niedawno)" if za else "od razu)"))
+    with _sygnaly_konca(not raz):
+        while True:
+            teraz = ot.zegar()
+            try:
+                prosba = _wez_prosbe(u)
+                if prosba == "update":
+                    nastepne = teraz + co_ile
+                    pid = zlec_aktualizacje(u, ot)
+                    log("aktualizacja z panelu: " + (f"jarvo update w tle (PID {pid})" if pid else "już trwa albo "
+                                                     "nie wystartowała"))
+                elif (prosba == "check" or teraz >= nastepne) and not trwa(u):
+                    nastepne = teraz + co_ile     # przed sprawdzeniem: błąd nie powtarza zapytania co 3 s
+                    if prosba:
+                        _usun_prosbe(u)
+                    s = sprawdz_dla_panelu(u, ot, magazyn)
+                    log(f"sprawdzenie: {s.get('current')} → {s.get('latest')}, brakuje {s.get('behind')}"
+                        + (f", błąd: {s.get('error')}" if s.get("error") else ""))
+                    puls = teraz
+                if przerwana_aktualizacja(u):
+                    log("aktualizacja przerwana: jarvo update skończył się bez wyniku (stan „failed” dla panelu)")
+                if teraz - puls >= CO_ILE_PULS and not trwa(u):
+                    zapisz_panel(u, beat=time.time(), updater_pid=os.getpid())
+                    puls = teraz
+            except Exception as e:        # noqa: BLE001 - usługa nadzorcy działa dalej, błąd trafia do panelu
+                opis = f"{type(e).__name__}: {str(e)[:200]}"
+                log(f"pomocnik: błąd obiegu ({opis})")
+                with contextlib.suppress(Exception):
+                    zapisz_panel(u, error=f"pomocnik aktualizacji: {opis}"[:300], beat=time.time(),
+                                 updater_pid=os.getpid())
+                puls = teraz
+            if raz:
+                return 0
+            ot.czekaj(CO_ILE_PROSBA)
 
 
 # ---------------------------------------------------------------- wejście z jarvo/cli.py

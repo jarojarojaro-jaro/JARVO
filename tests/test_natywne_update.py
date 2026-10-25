@@ -1,17 +1,25 @@
 """`jarvo update` i `jarvo uninstall` natywnie (docs/NATYWNIE.md: N09, N11, c4, S09, D07, D08, N15, etap E13).
 
 Aktualizacja na atrapach (instalator nowej wersji, `jarvo doctor --json` i procesy podaje Zaplecze, GitHub to serwer
-na 127.0.0.1 z portów prób 19220–19229): ref instalacji, klucz tylko w nagłówku do API (bez przeniesienia na codeload
-po przekierowaniu) i nigdy w wyjściu, w logu ani w otoczeniu programów; ta sama wersja = nic; nowa wersja obok starej
-z opcjami tej instalacji; powrót instalatorem poprzedniej wersji przy błędzie po przełączeniu i przy regresji doctora;
-awaryjny current.json; jedna aktualizacja naraz; sprzątanie starych wersji poza tymi, z których coś korzysta;
-pomocnik dla panelu (kontrakt update-request i update.json z hq/plugin/plugin_api.py).
+na 127.0.0.1 z portów prób 19220–19229): ref instalacji (--ref zapamiętany, nowszy `.jarvo-ref` z ponownej instalacji
+wygrywa), klucz tylko w nagłówku do API (bez przeniesienia na codeload po przekierowaniu) i nigdy w wyjściu, w logu ani
+w otoczeniu programów; ta sama wersja = nic; nowa wersja obok starej z opcjami tej instalacji; urwane pobieranie
+(IncompleteRead) i uszkodzone archiwum pobierane jeszcze raz; powrót instalatorem poprzedniej wersji przy błędzie po
+przełączeniu, przy regresji doctora i przy nieprzewidzianym wyjątku (stan „failed”, bez śladu stosu na ekranie);
+awaryjny current.json; jedna aktualizacja naraz; sprzątanie starych wersji poza tymi, z których coś korzysta (także
+wstrzymane przez proces, którego ścieżki nie widać); nowy Python przy tym samym pinie Hermesa i locku venvu = katalogi
+obok (atrapy git i uv z testów Hermesa i instalatora). Pomocnik dla panelu (kontrakt update-request i update.json
+z hq/plugin/plugin_api.py): pierwsze sprawdzenie, przerwana aktualizacja, błąd obiegu i sygnał końca; całość od
+przycisku do końca: prawdziwy nadzorca z usługą `aktualizacje`, prawdziwy plugin_api (TestClient) i prawdziwe
+`jarvo update` w tle na atrapie instalatora.
 
-Odinstalowanie na atrapach: zgoda (bez terminala tylko z --yes), stop, procesy Jarva bez tego procesu i jego przodków,
-autostart off, dziennik zmian hosta od końca (wpis pliku z korzenia zapomniany, nie usuwany), dane tylko z --all,
-obce pliki zostają, skan śladów; na Windows proces sprzątający (PowerShell bez cudzysłowów; prawdziwy przebieg na
-katalogu testu, bez RunOnce). Lista procesów, usuwanie drzew (tylko do odczytu, junction, zablokowany plik)
-i dopasowanie ścieżek na prawdziwym systemie. Bootstrap zapisuje `.jarvo-ref` dla `jarvo update`.
+Odinstalowanie na atrapach: zgoda (bez terminala tylko z --yes, pytania na stderr), stop, procesy Jarva bez tego
+procesu i jego przodków, autostart off, dziennik zmian hosta od końca (wpis pliku z korzenia zapomniany, nie usuwany),
+klucz GitHuba z magazynu (atrapa: magazynu właściciela test nie dotyka), dane tylko z --all, obce pliki zostają, skan
+śladów; na Windows proces sprzątający (PowerShell bez cudzysłowów, apostrofy typograficzne; prawdziwy przebieg na
+katalogu testu, bez RunOnce) i polecenie RunOnce z warunkiem (prawdziwy cmd.exe na katalogu testu). Lista procesów,
+usuwanie drzew (tylko do odczytu, junction, zablokowany plik) i dopasowanie ścieżek na prawdziwym systemie. Bootstrap
+zapisuje `.jarvo-ref` dla `jarvo update`.
 """
 from __future__ import annotations
 
@@ -21,6 +29,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import stat
 import subprocess
 import sys
@@ -34,11 +43,12 @@ from pathlib import Path
 
 import pytest
 
+import atrapy
 from conftest import REPO, WINDOWS, uruchom_bash
 
 sys.path.insert(0, str(REPO))
-from jarvo import aktualizacja, cli, instalator, odinstalowanie, przenosne, sciezki, srodowisko  # noqa: E402
-from jarvo import zmiany_hosta  # noqa: E402
+from jarvo import aktualizacja, cli, hermes, instalator, odinstalowanie, przenosne, sciezki, srodowisko  # noqa: E402
+from jarvo import venvy, zmiany_hosta  # noqa: E402
 from jarvo.odinstalowanie import Proces, Zaplecze  # noqa: E402
 
 PORTY = range(19220, 19230)                  # porty prób obszaru update-uninstall
@@ -224,10 +234,12 @@ class Doctor:
 
 
 def _zaplecze(**kw) -> Zaplecze:
+    """Zaplecze na atrapach; magazyn kluczy zawsze atrapą (klucza GitHuba właściciela test nie czyta ani nie usuwa)."""
     domyslne = dict(procesy=lambda: [], zakoncz=lambda lista: [], odlacz=lambda argv, cwd=None: 4321,
                     pytaj=lambda tekst: "n", terminal=lambda: False,
                     wykonaj=lambda argv: (0, "") if "/FO" in [str(a) for a in argv] else (1, ""),
-                    aplikacje=lambda nazwa: None, usun_aplikacje=lambda nazwa: None, pid=100)
+                    aplikacje=lambda nazwa: None, usun_aplikacje=lambda nazwa: None,
+                    klucz_jest=lambda: False, usun_klucz=lambda: True, sesja=lambda pid: 1, pid=100)
     domyslne.update(kw)
     return Zaplecze(**domyslne)
 
@@ -274,7 +286,13 @@ class _GitHub(BaseHTTPRequestHandler):
             return self._odpowiedz(302, b"", {"Location": f"/codeload/{REPO_GH}/tar.gz/{sha}?token=tymczasowy"})
         if p.path.startswith(f"/codeload/{REPO_GH}/tar.gz/"):
             sha = p.path.rsplit("/", 1)[1]
-            dane = s.archiwa.get(sha)
+            if s.urwij.get(sha):                     # jak codeload: chunked zamknięte przed ostatnim kawałkiem
+                s.urwij[sha] -= 1
+                self.close_connection = True
+                self.wfile.write(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n10\r\n" + b"x" * 16 + b"\r\n")
+                return None
+            kolejne = s.kolejne.get(sha)
+            dane = kolejne.pop(0) if kolejne else s.archiwa.get(sha)
             return self._odpowiedz(200, dane) if dane else self._odpowiedz(404, b"")
         return self._odpowiedz(404, b"")
 
@@ -306,6 +324,7 @@ def github(monkeypatch):
     if httpd is None:
         pytest.skip("brak wolnego portu 19220–19229")
     httpd.zapytania, httpd.refy, httpd.lista, httpd.archiwa, httpd.prywatne = [], {}, [], {}, set()
+    httpd.urwij, httpd.kolejne = {}, {}            # urwane odpowiedzi i kolejne archiwa (np. uszkodzone, potem dobre)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     adres = f"http://127.0.0.1:{httpd.server_address[1]}"
     monkeypatch.setattr(aktualizacja, "API", f"{adres}/api")
@@ -317,20 +336,47 @@ def github(monkeypatch):
 
 # ---------------------------------------------------------------- ref, wersja, klucz
 
-def test_ref_z_opcji_zmiennej_stanu_kodu_albo_main(tmp_path):
+def test_ref_z_opcji_zmiennej_nowszego_zapisu_albo_main(tmp_path):
+    """--ref, JARVO_REF, potem nowszy z dwóch: `.jarvo-ref` kodu (bootstrap, aktualizacja) albo zapamiętany --ref.
+    Ref z samego sprawdzenia (pole `ref`) niczego nie przestawia: ponowna instalacja z innym JARVO_REF wygrywa."""
     u, app = _instalacja(tmp_path)
     assert aktualizacja.ustal_ref(u, {}) == "main"
-    (app / ".jarvo-ref").write_text("claude/epic-allen-qfjd0s\n", encoding="utf-8")
+    plik = app / ".jarvo-ref"
+    plik.write_text("claude/epic-allen-qfjd0s\n", encoding="utf-8")
     assert aktualizacja.ustal_ref(u, {}) == "claude/epic-allen-qfjd0s"            # z bootstrapu
-    aktualizacja.zapisz_stan(u, ref="v1.2")
-    assert aktualizacja.ustal_ref(u, {}) == "v1.2"                                 # zapamiętany po --ref
+    aktualizacja.zapisz_stan(u, ref="main")                                      # zwykłe sprawdzenie: tylko opis
+    assert aktualizacja.ustal_ref(u, {}) == "claude/epic-allen-qfjd0s"
+    aktualizacja.zapamietaj_ref(u, "v1.2")                                       # `jarvo update --ref v1.2`
+    assert aktualizacja.ustal_ref(u, {}) == "v1.2"
+    teraz = time.time()
+    plik.write_text("v2\n", encoding="utf-8")                                    # bootstrap z JARVO_REF=v2 potem
+    os.utime(plik, (teraz + 30, teraz + 30))
+    assert aktualizacja.ustal_ref(u, {}) == "v2"
     assert aktualizacja.ustal_ref(u, {"JARVO_REF": "inna"}) == "inna"
     assert aktualizacja.ustal_ref(u, {"JARVO_REF": "inna"}, "jawny") == "jawny"
     for zly in ("a b", "../x", "-zle"):
         with pytest.raises(aktualizacja.BladAktualizacji):
             aktualizacja.ustal_ref(u, {}, zly)
-    aktualizacja.zapisz_stan(u, ref="zly ref")                                    # zepsuty zapis pomijamy
-    assert aktualizacja.ustal_ref(u, {}) == "claude/epic-allen-qfjd0s"
+    aktualizacja.zapisz_stan(u, ref_jawny="zly ref", ref_kiedy=teraz + 60)       # zepsuty zapis pomijamy
+    assert aktualizacja.ustal_ref(u, {}) == "v2"
+    plik.unlink()                                                                # kod z kopii repo: bez .jarvo-ref
+    aktualizacja.zapamietaj_ref(u, "v3")
+    assert aktualizacja.ustal_ref(u, {}) == "v3"
+
+
+def test_update_z_ref_zapamietuje_go_tez_przy_tej_samej_wersji(tmp_path):
+    """`jarvo update --ref v3` do tej samej wersji (kod nie dostaje nowego `.jarvo-ref`): następne `jarvo update` dalej
+    sprawdza v3, a pomocnik pod nadzorcą nie dostaje JARVO_REF z okna instalacji (env_podprocesu)."""
+    u, app = _instalacja(tmp_path, ref="main")
+    ot = _ot(tmp_path, env={aktualizacja.FAKE: str(_kod(tmp_path / "zrodlo", SHA_STARA))},
+             moduly={"nadzorca": Nadzorca(), "autostart": Autostart()})
+    kod, raport, log = _aktualizuj(u, ot, _zaplecze(strumien=Instalator(u), przechwyc=Doctor()), ref="v3")
+    assert kod == 0 and raport["wynik"] == "aktualne" and raport["ref"] == "v3", log
+    assert aktualizacja.ref_kodu(app) == "main" and aktualizacja.ustal_ref(u, {}) == "v3"
+    kod, raport, log = _aktualizuj(u, ot, _zaplecze(strumien=Instalator(u), przechwyc=Doctor()))
+    assert raport["ref"] == "v3", log
+    env = odinstalowanie.env_podprocesu(u, {"JARVO_REF": "z-okna", "jarvo_token": "x" * 20, "PATH": "p"})
+    assert env == {"PATH": "p"}
 
 
 def test_wersja_kodu_z_pliku_albo_gita(tmp_path):
@@ -449,6 +495,36 @@ def test_pobierz_kod_bez_start_py_to_blad_bez_resztek(tmp_path, github):
     github.archiwa[SHA_NOWA] = _archiwum(SHA_NOWA)
     cel = aktualizacja.pobierz_kod(u, SHA_NOWA, "main", None, {}, lambda t: None)
     assert not (cel / "resztka").exists() and (cel / "jarvo" / "start.py").is_file()
+
+
+def test_pobierz_kod_po_urwanym_strumieniu_ponawia(tmp_path, github, monkeypatch):
+    """codeload zamyka chunked przed końcem: http.client.IncompleteRead to nie OSError, a pobieranie i tak ponawia."""
+    monkeypatch.setattr(aktualizacja.time, "sleep", lambda _s: None)
+    u, _ = _instalacja(tmp_path)
+    github.archiwa[SHA_NOWA] = _archiwum(SHA_NOWA)
+    github.urwij[SHA_NOWA] = 1
+    log: list[str] = []
+    cel = aktualizacja.pobierz_kod(u, SHA_NOWA, "main", None, {}, log.append)
+    assert (cel / "jarvo" / "start.py").is_file() and any("IncompleteRead" in x for x in log), log
+    github.urwij[SHA_INNA] = 5                                                     # zawsze urwane: błąd po polsku
+    with pytest.raises(aktualizacja.BladAktualizacji, match="urwało się w trakcie"):
+        aktualizacja.pobierz_kod(u, SHA_INNA, "main", None, {}, log.append)
+    assert not list((u.cache / "pobrane").glob("*.czesc"))
+
+
+def test_pobierz_kod_uszkodzone_archiwum_raz_i_zawsze(tmp_path, github):
+    """Uszkodzony gzip (urwany plik) pobieramy jeszcze raz; zawsze uszkodzony = BladAktualizacji, nie tarfile.ReadError."""
+    u, _ = _instalacja(tmp_path)
+    dobre = _archiwum(SHA_NOWA)
+    github.kolejne[SHA_NOWA] = [dobre[: len(dobre) // 2], dobre]
+    log: list[str] = []
+    cel = aktualizacja.pobierz_kod(u, SHA_NOWA, "main", None, {}, log.append)
+    assert (cel / "jarvo" / "start.py").is_file() and any("archiwum uszkodzone" in x for x in log), log
+    github.kolejne[SHA_INNA] = [b"to nie gzip", b"\x1f\x8b\x08" + b"\0" * 20]
+    with pytest.raises(aktualizacja.BladAktualizacji, match="uszkodzone"):
+        aktualizacja.pobierz_kod(u, SHA_INNA, "main", None, {}, log.append)
+    assert not (u.program / "app" / f"{SHA_INNA[:12]}.new").exists()
+    assert not list((u.cache / "pobrane").glob("jarvo-*"))
 
 
 def test_kod_z_katalogu_testowego_bez_gita_i_pamieci_podrecznej(tmp_path):
@@ -716,6 +792,70 @@ def test_regresje_doctora():
     assert aktualizacja.regresje(d(("a", "uwaga")), d(("a", "ok"))) == ([], [])
 
 
+def test_opis_liczby_zmian_po_polsku():
+    assert [aktualizacja.opis_liczby_zmian(n) for n in (1, 2, 4, 5, 12, 22, 25, 112)] == [
+        "1 nowa zmiana", "2 nowe zmiany", "4 nowe zmiany", "5 nowych zmian", "12 nowych zmian", "22 nowe zmiany",
+        "25 nowych zmian", "112 nowych zmian"]
+    assert aktualizacja.opis_liczby_zmian(50, pelna=False) == "co najmniej 50 nowych zmian"
+
+
+def test_nieprzewidziany_blad_po_przelaczeniu_wraca_i_konczy_failed(tmp_path, monkeypatch):
+    """Wyjątek spoza obsłużonych (np. ValueError z doctora nowej wersji) po przełączeniu: powrót instalatorem
+    poprzedniej wersji, update.json „failed” (nie „updating”), komunikat po polsku i ślad tylko w aktualizacja.log."""
+    u, stara = _instalacja(tmp_path)
+    inst = Instalator(u)
+    ot = _ot(tmp_path, env={aktualizacja.FAKE: str(_kod(tmp_path / "zrodlo", SHA_NOWA))},
+             moduly={"nadzorca": Nadzorca(), "autostart": Autostart()})
+    monkeypatch.setattr(aktualizacja._Aktualizacja, "_doctor_po",
+                        lambda self, app, przed: (_ for _ in ()).throw(ValueError("zepsuty JSON doctora")))
+    kod, raport, log = _aktualizuj(u, ot, _zaplecze(strumien=inst, przechwyc=Doctor()))
+    assert kod == 1 and raport["wynik"] == "wycofano" and inst.aplikacje() == [SHA_NOWA[:12], SHA_STARA[:12]], log
+    assert srodowisko.biezace(u)["app"] == str(stara) and "nieprzewidziany błąd (ValueError" in log
+    assert "Traceback" not in log and "Traceback" in (u.logi / "aktualizacja.log").read_text(encoding="utf-8")
+    panel = aktualizacja.stan_panelu(u)
+    assert panel["state"] == "failed" and "ValueError" in panel["error"]
+
+
+def test_nieprzewidziany_blad_przed_krokami_bez_sladu_stosu(tmp_path, monkeypatch):
+    u, _ = _instalacja(tmp_path)
+    ot = _ot(tmp_path, env={aktualizacja.FAKE: str(_kod(tmp_path / "zrodlo", SHA_NOWA))},
+             moduly={"nadzorca": Nadzorca(), "autostart": Autostart()})
+    monkeypatch.setattr(aktualizacja, "nowe_zmiany", lambda *a: (_ for _ in ()).throw(KeyError("commit")))
+    kod, raport, log = _aktualizuj(u, ot, _zaplecze(strumien=Instalator(u), przechwyc=Doctor()))
+    assert kod == 1 and raport["wynik"] == "blad" and "nieprzewidziany błąd aktualizacji (KeyError" in log
+    assert aktualizacja.stan_panelu(u)["state"] == "idle" and "KeyError" in aktualizacja.stan_panelu(u)["error"]
+
+
+def test_blad_sprzatania_nie_wycofuje_udanej_aktualizacji(tmp_path, monkeypatch):
+    u, _ = _instalacja(tmp_path)
+    inst = Instalator(u)
+    ot = _ot(tmp_path, env={aktualizacja.FAKE: str(_kod(tmp_path / "zrodlo", SHA_NOWA))},
+             moduly={"nadzorca": Nadzorca(), "autostart": Autostart()})
+    monkeypatch.setattr(aktualizacja, "sprzataj", lambda *a, **k: (_ for _ in ()).throw(PermissionError(5, "x")))
+    kod, raport, log = _aktualizuj(u, ot, _zaplecze(strumien=inst, przechwyc=Doctor()))
+    assert kod == 0 and raport["wynik"] == "zaktualizowano" and len(inst.wywolania) == 1, log
+    assert "sprzątanie starych wersji nie przeszło" in log and aktualizacja.stan_panelu(u)["state"] == "done"
+
+
+@pytest.mark.windows_only
+def test_sprzatanie_wstrzymane_przez_niewidoczny_proces_jarva(tmp_path):
+    """Windows: proces w tej samej sesji bez ścieżki i wiersza polecenia (np. podniesiony `jarvo chat` starej
+    wersji), o nazwie programu z wersji Jarva, wstrzymuje sprzątanie; obcy z innej sesji (usługa systemu) nie."""
+    u, app = _instalacja(tmp_path)
+    stary = u.program / "app" / "111111111111"
+    (stary / "jarvo").mkdir(parents=True)
+    niewidoczny = Proces(77, 1, "python.exe")
+    log: list[str] = []
+    wynik = aktualizacja.sprzataj(u, _zaplecze(procesy=lambda: [niewidoczny]), log.append, app=app)
+    assert stary.is_dir() and wynik["wstrzymane"] == ["python.exe (PID 77)"] and not wynik["usuniete"]
+    assert "usunie je następna aktualizacja" in log[0]
+    usluga = _zaplecze(procesy=lambda: [niewidoczny], sesja=lambda pid: 0 if pid == 77 else 1)
+    wynik = aktualizacja.sprzataj(u, usluga, log.append, app=app)
+    assert not stary.exists() and not wynik["wstrzymane"]
+    obcy = Proces(78, 1, "notepad.exe")
+    assert aktualizacja.niewidoczne(u, [obcy, niewidoczny], _zaplecze()) == [niewidoczny]
+
+
 # ---------------------------------------------------------------- pomocnik dla panelu (S09)
 
 def _prosba(u, tresc: str) -> Path:
@@ -782,6 +922,353 @@ def test_argv_aktualizacji_w_usludze_systemd_przez_scope(tmp_path, monkeypatch):
     assert argv[:5] == ["/usr/bin/systemd-run", "--user", "--scope", "--quiet", "--collect"] and argv[-1] == "update"
     monkeypatch.setattr(aktualizacja, "w_jednostce_jarva", lambda cgroup=None: False)
     assert aktualizacja.argv_aktualizacji(u, {"JARVO_ROOT": str(u.root)})[0] != "/usr/bin/systemd-run"
+
+
+def test_pomocnik_blad_obiegu_nie_konczy_petli(tmp_path, monkeypatch):
+    """Wyjątek spoza BladAktualizacji w sprawdzeniu (np. IncompleteRead z API): obieg kończy się wpisem błędu
+    w update.json i pulsem, a pętla (usługa nadzorcy) działa dalej i nie pyta GitHuba co 3 s."""
+    import http.client
+    u, _ = _instalacja(tmp_path)
+    _prosba(u, "check")
+    wywolania = []
+
+    def zle(*_a, **_k):
+        wywolania.append(1)
+        raise http.client.IncompleteRead(b"ab", 10)
+    monkeypatch.setattr(aktualizacja, "sprawdz_dla_panelu", zle)
+    ot = _ot(tmp_path)
+    obiegi = [0]
+
+    def czekaj(_s):
+        obiegi[0] += 1
+        if obiegi[0] >= 3:
+            raise KeyboardInterrupt
+    ot.czekaj = czekaj
+    with pytest.raises(KeyboardInterrupt):
+        aktualizacja.pomocnik(u, ot, log=lambda t: None, magazyn=lambda _u: None)
+    assert obiegi[0] == 3 and len(wywolania) == 1                                 # jedno sprawdzenie, trzy obiegi
+    panel = aktualizacja.stan_panelu(u)
+    assert "IncompleteRead" in panel["error"] and time.time() - panel["beat"] < 60
+
+
+def test_pomocnik_przerwana_aktualizacja_na_failed(tmp_path):
+    """„updating” bez żadnego `jarvo update` z blokadą (proces zabity albo nie wystartował): po CZAS_STARTU s
+    „failed” z opisem; świeży start i trwająca aktualizacja (blokada) zostają."""
+    u, _ = _instalacja(tmp_path)
+    teraz = time.time()
+    aktualizacja.zapisz_panel(u, state="updating", started_at=teraz - 10)
+    assert not aktualizacja.przerwana_aktualizacja(u, teraz)                     # dopiero co zlecona
+    aktualizacja.zapisz_panel(u, state="updating", started_at=teraz - aktualizacja.CZAS_STARTU - 1)
+    with przenosne.Zamek(u.stan / aktualizacja.ZAMEK, czekaj=False):
+        assert not aktualizacja.przerwana_aktualizacja(u, teraz)                 # trwa naprawdę
+    assert aktualizacja.przerwana_aktualizacja(u, teraz)
+    panel = aktualizacja.stan_panelu(u)
+    assert panel["state"] == "failed" and "przerwana" in panel["error"] and panel["finished_at"] == teraz
+    assert not aktualizacja.przerwana_aktualizacja(u, teraz)                     # „failed” zostaje
+
+
+def test_pomocnik_pierwsze_sprawdzenie_bez_zbednego_pytania(tmp_path):
+    """Restart serwisu: udane sprawdzenie tej samej wersji sprzed 10 min = następne za 50 min; inna wersja (ponowna
+    instalacja), błąd albo stare sprawdzenie = od razu."""
+    u, _ = _instalacja(tmp_path)
+    teraz = time.time()
+    assert aktualizacja.pierwsze_sprawdzenie(u, 3600, teraz) == 0.0              # brak update.json
+    aktualizacja.zapisz_panel(u, checked_at=teraz - 600, current=SHA_STARA[:7], error=None)
+    assert aktualizacja.pierwsze_sprawdzenie(u, 3600, teraz) == pytest.approx(3000)
+    aktualizacja.zapisz_panel(u, current=SHA_NOWA[:7])
+    assert aktualizacja.pierwsze_sprawdzenie(u, 3600, teraz) == 0.0
+    aktualizacja.zapisz_panel(u, current=SHA_STARA[:7], error="brak sieci")
+    assert aktualizacja.pierwsze_sprawdzenie(u, 3600, teraz) == 0.0
+    aktualizacja.zapisz_panel(u, error=None, checked_at=teraz - 7200)
+    assert aktualizacja.pierwsze_sprawdzenie(u, 3600, teraz) == 0.0
+
+
+def test_pomocnik_konczy_sie_na_sygnale_kodem_0():
+    """SIGTERM (POSIX, systemd) i SIGBREAK (Ctrl+Break nadzorcy na Windows) w pętli pomocnika = KeyboardInterrupt,
+    który `jarvo update --pomocnik` zamienia na kod 0; po wyjściu poprzednia obsługa wraca."""
+    for nazwa in ("SIGTERM", "SIGBREAK"):
+        numer = getattr(signal, nazwa, None)
+        if numer is None:
+            continue
+        przed = signal.getsignal(numer)
+        with pytest.raises(KeyboardInterrupt):
+            with aktualizacja._sygnaly_konca(True):
+                signal.raise_signal(numer)
+                time.sleep(1)
+        assert signal.getsignal(numer) == przed
+
+
+def test_zlec_aktualizacje_zapisuje_pid_procesu_w_tle(tmp_path):
+    u, _ = _instalacja(tmp_path)
+    ot = _ot(tmp_path, uruchom_w_tle=lambda argv, env, log: 4242)
+    assert aktualizacja.zlec_aktualizacje(u, ot) == 4242
+    panel = aktualizacja.stan_panelu(u)
+    assert panel["state"] == "updating" and panel["updater_pid"] == 4242
+
+
+# Atrapa jarvo/start.py zainstalowanej wersji: `doctor --json` i `instaluj` udaje (instalator przełącza current.json na
+# swój katalog, jak prawdziwy krok „Przełączenie wersji”), reszta poleceń idzie do prawdziwego jarvo/cli.py z repo:
+# pomocnik pod nadzorcą i `jarvo update`, które ten uruchamia w tle
+START_WERSJI = r'''
+import json, os, sys
+from pathlib import Path
+sys.path.insert(0, os.environ["JARVO_TEST_REPO"])
+APP = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+argv = sys.argv[1:]
+korzen = argv[1] if argv[:1] == ["--korzen"] else None
+reszta = argv[2:] if korzen else argv
+if reszta[:1] == ["doctor"]:
+    print(json.dumps({"wyniki": [{"nazwa": "korzeń", "stan": "ok", "opis": "", "rada": ""}], "bledy": 0, "uwagi": 0}))
+    sys.exit(0)
+if reszta[:1] == ["instaluj"]:
+    from jarvo import sciezki
+    u = sciezki.uklad({**os.environ, **({"JARVO_ROOT": korzen} if korzen else {})})
+    cur = u.program / "current.json"
+    biez = json.loads(cur.read_text(encoding="utf-8"))
+    if biez.get("app") != str(APP):
+        (u.program / "current.poprzedni.json").write_text(json.dumps(biez), encoding="utf-8")
+        cur.write_text(json.dumps({**biez, "app": str(APP), "wersja": APP.name}), encoding="utf-8")
+    print("Gotowe. Zmiany w tym przebiegu: atrapa instalatora.", flush=True)
+    sys.exit(0)
+from jarvo.cli import main
+sys.exit(main(argv))
+'''
+
+
+def _czekaj(warunek, limit: float, opis: str, logi: Path | None = None):
+    koniec = time.monotonic() + limit
+    while time.monotonic() < koniec:
+        wynik = warunek()
+        if wynik:
+            return wynik
+        time.sleep(0.2)
+    tekst = ""
+    if logi is not None and logi.is_dir():
+        tekst = "\n".join(f"== {p.name}\n{p.read_text(encoding='utf-8', errors='replace')[-3000:]}"
+                          for p in sorted(logi.glob("*.log")))
+    raise AssertionError(f"{opis}: nie doczekałem się w {limit} s\n{tekst}")
+
+
+def test_przycisk_panelu_do_konca_przez_pomocnika_pod_nadzorca(tmp_path, monkeypatch):
+    """Bloker S09 na żywo w jednym procesie testu: prawdziwy nadzorca uruchamia usługę `aktualizacje` (prawdziwe
+    `jarvo update --pomocnik` z repo), prawdziwy plugin_api panelu (TestClient) widzi pomocnika online i zapisuje
+    prośbę „update”, pomocnik uruchamia w tle prawdziwe `jarvo update` (nowa wersja z JARVO_FAKE_KOD, instalator
+    i doctor to atrapy z START_WERSJI), update.json kończy się „done”, a stop nadzorcy kończy pomocnika kodem 0."""
+    pytest.importorskip("fastapi")
+    pytest.importorskip("httpx")
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from conftest import load_script
+    from jarvo import nadzorca
+
+    u, stara = _instalacja(tmp_path)
+    (stara / "jarvo" / "start.py").write_text(START_WERSJI, encoding="utf-8")
+    zrodlo = _kod(tmp_path / "zrodlo", SHA_NOWA)
+    (zrodlo / "jarvo" / "start.py").write_text(START_WERSJI, encoding="utf-8")
+    env = {k: v for k, v in os.environ.items() if not k.startswith("JARVO_")}
+    env.update({"JARVO_ROOT": str(u.root), "JARVO_PANEL_PORT": "19229", "LOCALAPPDATA": str(tmp_path / "lad"),
+                aktualizacja.FAKE: str(zrodlo), "JARVO_TEST_REPO": str(REPO), "JARVO_TOKEN": KLUCZ,
+                "JARVO_REF": "z-okna-instalacji", "PYTHONUTF8": "1"})
+    usluga = nadzorca.usluga_pomocnika(u, env, stara)
+    assert usluga is not None and usluga.nazwa == "aktualizacje" and usluga.argv[-2:] == ["update", "--pomocnik"]
+    assert not {"JARVO_TOKEN", "JARVO_REF"} & set(usluga.env) and usluga.kolejnosc == 2
+    n = nadzorca.Nadzorca(u, [usluga], env, kanal=False, limit_stopu=20, takt=0.05, co_ile_rotacja=1)
+    watek = threading.Thread(target=n.uruchom, daemon=True)
+    monkeypatch.setenv("HERMES_HOME", str(u.dane))
+    monkeypatch.setenv("JARVO_ROOT", str(u.root))
+    monkeypatch.setenv("JARVO_SHARE_KEYS", "0")
+    api = load_script("hq/plugin/plugin_api.py", "jarvo_hq_plugin_api_natywny_update")
+    monkeypatch.setattr(api, "UPDATE_FILE", aktualizacja.plik_panelu(u))
+    monkeypatch.setattr(api, "UPDATE_REQUEST", u.jarvo_dane / aktualizacja.PROSBA_PANELU)
+    app = FastAPI()
+    app.include_router(api.router, prefix="/api/plugins/jarvo-hq")
+    k = TestClient(app, headers={"X-Jarvo-Request": "1"})
+    adres = "/api/plugins/jarvo-hq/update"
+    watek.start()
+    try:
+        # pomocnik wstaje pod nadzorcą i od razu sprawdza wersję: panel widzi go online i nową wersję
+        st = _czekaj(lambda: (lambda s: s if s.get("online") and s.get("behind") == 1 else None)(k.get(adres).json()),
+                     90, "pomocnik online z nową wersją", u.logi)
+        assert st["latest"] == SHA_NOWA[:7] and st["current"] == SHA_STARA[:7] and st["mode"] == "natywny"
+        r = k.post(adres, json={"action": "update"})
+        assert r.status_code == 202, r.text
+        koniec = _czekaj(lambda: (lambda s: s if s.get("state") in ("done", "failed") and not aktualizacja.trwa(u)
+                                  else None)(k.get(adres).json()), 180, "aktualizacja z przycisku", u.logi)
+        assert koniec["state"] == "done", koniec
+        assert koniec["current"] == SHA_NOWA[:7] and koniec["behind"] == 0 and not koniec.get("pending")
+        assert srodowisko.biezace(u)["app"] == str(u.program / "app" / SHA_NOWA[:12])
+        log_panelu = (u.logi / aktualizacja.LOG_PANELU).read_text(encoding="utf-8", errors="replace")
+        assert "Gotowe: Jarvo" in log_panelu and KLUCZ not in log_panelu
+        assert stara.is_dir(), "stara wersja zostaje, póki pomocnik z niej działa"
+    finally:
+        n.zatrzymaj()
+        watek.join(60)
+    assert not watek.is_alive()
+    pomocnik = nadzorca.stan_z_pliku(u)["uslugi"]["aktualizacje"]
+    assert pomocnik["ostatni_kod"] == 0 and pomocnik["stan"] == "zatrzymana", pomocnik
+    assert "pomocnik aktualizacji:" in (u.logi / "aktualizacje.log").read_text(encoding="utf-8", errors="replace")
+
+
+def test_panel_natywnie_mowi_co_zrobic_gdy_pomocnik_nie_dziala(tmp_path, monkeypatch):
+    """503 `pomocnik` natywnie radzi `jarvo serwis --restart aktualizacje`, a stan dla panelu ma `rada` z poleceniem
+    (front pokazuje je do skopiowania); w kontenerze rada z kontenera zostaje bez zmian."""
+    pytest.importorskip("fastapi")
+    pytest.importorskip("httpx")
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from conftest import load_script
+    upd = tmp_path / "update.json"
+    upd.write_text(json.dumps({"state": "idle", "checked_at": time.time() - 3600}), encoding="utf-8")
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("JARVO_SHARE_KEYS", "0")
+    for natywnie, oczekiwana in ((True, "jarvo serwis --restart aktualizacje"), (False, "bash scripts/local-up.sh")):
+        if natywnie:
+            monkeypatch.setenv("JARVO_ROOT", str(tmp_path / "j"))
+        else:
+            monkeypatch.delenv("JARVO_ROOT", raising=False)
+        api = load_script("hq/plugin/plugin_api.py", f"jarvo_hq_plugin_api_rada_{natywnie}")
+        monkeypatch.setattr(api, "UPDATE_FILE", upd)
+        monkeypatch.setattr(api, "UPDATE_REQUEST", tmp_path / "update-request")
+        app = FastAPI()
+        app.include_router(api.router, prefix="/api/plugins/jarvo-hq")
+        r = TestClient(app, headers={"X-Jarvo-Request": "1"}).post("/api/plugins/jarvo-hq/update",
+                                                                    json={"action": "update"})
+        assert r.status_code == 503 and r.json()["blad"]["kod"] == "pomocnik"
+        assert oczekiwana in r.json()["blad"]["komunikat"] and r.json()["detail"] == r.json()["blad"]["komunikat"]
+        stan = api._update_state()
+        assert stan["natywnie"] is natywnie and not stan["online"]
+        assert (stan["rada"]["polecenie"] == "jarvo serwis --restart aktualizacje") is natywnie
+        assert not (tmp_path / "update-request").exists()
+
+
+def test_test_na_zywo_aktualizacji_gotowy_dla_ci(tmp_path, monkeypatch, capsys):
+    """tests/live/natywnie_update.py: argumenty (podpolecenia, --limit, --bez-panelu, --migawka-przed), budżet czasu,
+    trasa panelu z tokenem sesji z index.html i nagłówkiem ochrony zapisu, podsumowanie JSON na stdout z kodem 1, gdy
+    punkt nie przeszedł, i kod 2 przy złych argumentach."""
+    from conftest import load_script
+    zywo = load_script("tests/live/natywnie_update.py", "natywnie_update_test")
+    a = zywo.parser().parse_args(["aktualizacja", "--limit", "100", "--bez-panelu"])
+    assert a.limit == 100 and a.bez_panelu and a.funkcja is zywo.polecenie_aktualizacja
+    a = zywo.parser().parse_args(["wszystko", "--migawka-przed", "m.json"])
+    assert a.migawka_przed == "m.json" and a.limit == zywo.LIMIT and a.funkcja is zywo.polecenie_wszystko
+    with pytest.raises(SystemExit) as e:
+        zywo.parser().parse_args(["odinstalowanie", "--limit", "5"])
+    assert e.value.code == 2
+    capsys.readouterr()
+    assert 30 <= zywo.Budzet(40).czas(1000) <= 40 and not zywo.Budzet(40).koniec() and zywo.Budzet(10).koniec()
+
+    widziane: list[dict] = []
+
+    class Panel(BaseHTTPRequestHandler):
+        def log_message(self, *_a):
+            pass
+
+        def _wyslij(self, kod: int, tresc: bytes) -> None:
+            self.send_response(kod)
+            self.send_header("Content-Length", str(len(tresc)))
+            self.end_headers()
+            self.wfile.write(tresc)
+
+        def do_GET(self):
+            self._wyslij(200, b'<script>window.__HERMES_SESSION_TOKEN__="tok-123";</script>')
+
+        def do_POST(self):
+            dane = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            widziane.append({"token": self.headers.get("X-Hermes-Session-Token"), "dane": dane,
+                             "jarvo": self.headers.get("X-Jarvo-Request"), "typ": self.headers.get("Content-Type")})
+            self._wyslij(202, json.dumps({"ok": True, "action": dane["action"]}).encode())
+    httpd = None
+    for port in PORTY:
+        try:
+            httpd = _Serwer(("127.0.0.1", port), Panel)
+            break
+        except OSError:
+            continue
+    if httpd is None:
+        pytest.skip("brak wolnego portu 19220–19229")
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        inst = type("I", (), {"port_panelu": lambda self: httpd.server_address[1]})()
+        assert zywo.panel(inst, "POST", zywo.API_UPDATE, {"action": "check"}) == (202, {"ok": True, "action": "check"})
+        assert widziane == [{"token": "tok-123", "dane": {"action": "check"}, "jarvo": "1", "typ": "application/json"}]
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+    assert zywo.panel(inst, "GET", zywo.API_UPDATE)[0] == 0                      # panel nie odpowiada: 0, bez wyjątku
+    monkeypatch.setenv("JARVO_ROOT", str(tmp_path / "brak"))
+    assert zywo.main(["aktualizacja", "--korzen", str(tmp_path / "brak"), "--artefakty", str(tmp_path / "art")]) == 1
+    wyjscie = capsys.readouterr().out
+    podsumowanie = json.loads(wyjscie[wyjscie.index("{\n"):])
+    assert podsumowanie["kod"] == 1 and podsumowanie["polecenie"] == "aktualizacja"
+    assert podsumowanie["punkty"][0]["id"] == "update-instalacja" and podsumowanie["punkty"][0]["ok"] is False
+
+
+# ---------------------------------------------------------------- nowy Python przy tym samym pinie: katalogi obok
+
+def test_hermes_nowy_python_przy_tym_samym_pinie_obok(tmp_path, monkeypatch):
+    """Nowa wersja Jarva zmienia tylko Pythona: gotowy checkout zostaje (może z niego działać serwis), nowy powstaje
+    obok w `<commit12>-<skrót>` z frontem skopiowanym z gotowego; powrót do starego Pythona go odnajduje."""
+    import test_natywne_hermes as th
+    dziennik = tmp_path / "dziennik.jsonl"
+    monkeypatch.setenv("ATRAPA_DZIENNIK", str(dziennik))
+    for zmienna in ("ATRAPA_GIT_HEAD", "ATRAPA_GIT_KLON_BLAD", "ATRAPA_UV_BLAD", "ATRAPA_UV_SUMA", "ATRAPA_BUDOWA",
+                    "ATRAPA_NPM_BLAD", "NODE_ENV"):
+        monkeypatch.delenv(zmienna, raising=False)
+    atrapa = th.Atrapy(tmp_path / "bin", dziennik)
+    u = th._uklad(tmp_path)
+    stary_py, nowy_py = tmp_path / "py-3.13.17" / "python.exe", tmp_path / "py-3.13.18" / "python.exe"
+    for p in (stary_py, nowy_py):
+        p.parent.mkdir(parents=True)
+        p.write_bytes(b"")
+    stary = hermes.zainstaluj(u, th.PIN, git=atrapa.git, uv=atrapa.uv, python=stary_py, log=lambda t: None)
+    assert stary == u.program / "hermes" / th.COMMIT[:12]
+    dist = stary / "hermes_cli" / "web_dist"
+    dist.mkdir(parents=True)
+    (dist / "index.html").write_text("<!doctype html>", encoding="utf-8")
+    (stary / hermes.ZNACZNIK_WEB).write_text(json.dumps({"commit": th.COMMIT}), encoding="utf-8")
+    venv_starego = srodowisko.hermes_python(stary).read_bytes()
+    atrapa.wyczysc()
+    logi: list[str] = []
+    nowy = hermes.zainstaluj(u, th.PIN, git=atrapa.git, uv=atrapa.uv, python=nowy_py, log=logi.append)
+    assert nowy.parent == stary.parent and nowy.name == f"{th.COMMIT[:12]}-{hermes.skrot_srodowiska(nowy_py)}"
+    assert any("powstaje obok" in x for x in logi) and srodowisko.hermes_python(stary).read_bytes() == venv_starego
+    assert json.loads((stary / hermes.ZNACZNIK).read_text(encoding="utf-8"))["python"] == str(stary_py)
+    assert all(th._ta_sama(w["cwd"], nowy) for w in atrapa.wpisy("uv"))          # uv tylko w nowym katalogu
+    assert (nowy / "hermes_cli" / "web_dist" / "index.html").is_file()            # front bez npm
+    assert hermes.katalog_dla(u, th.COMMIT, th.PIN["dodatki"], nowy_py) == nowy
+    assert hermes.katalog_dla(u, th.COMMIT, th.PIN["dodatki"], stary_py) == stary  # powrót: gotowy stary
+    atrapa.wyczysc()
+    assert hermes.zainstaluj(u, th.PIN, git=atrapa.git, uv=atrapa.uv, python=nowy_py, log=lambda t: None) == nowy
+    assert atrapa.wpisy() == []                                                   # drugi przebieg: nic
+
+
+def test_venv_nowy_python_przy_tym_samym_locku_obok(tmp_path, monkeypatch):
+    """Ten sam lock na nowym Pythonie: gotowy venv zostaje nietknięty (bez usuwania w miejscu), nowy w katalogu obok,
+    a wpis narzedzia.json wskazuje nowy."""
+    import test_natywne_instalacja as ti
+    log = tmp_path / "uv.log"
+    monkeypatch.setenv("ATRAPA_UV_LOG", str(log))
+    monkeypatch.delenv("ATRAPA_UV_KOD", raising=False)
+    uv = atrapy.program(tmp_path / "uv-bin", "uv", ti.ATRAPA_UV)
+    u, app = ti.uklad(tmp_path / "j"), tmp_path / "app"
+    wpis = ti._lock(app)
+    stary_py, nowy_py = tmp_path / "py-a" / "python.exe", tmp_path / "py-b" / "python.exe"
+    for p in (stary_py, nowy_py):
+        p.parent.mkdir(parents=True)
+        p.write_bytes(b"")
+    stary, _ = venvy.zainstaluj(u, app, "narzedzia", wpis, uv=Path(uv), python=stary_py, log=lambda t: None)
+    znacznik = (Path(stary["katalog"]) / venvy.ZNACZNIK).read_text(encoding="utf-8")
+    nowy, zmiana = venvy.zainstaluj(u, app, "narzedzia", wpis, uv=Path(uv), python=nowy_py, log=lambda t: None)
+    assert zmiana and nowy["katalog"] != stary["katalog"] and Path(stary["katalog"]).is_dir()
+    assert (Path(stary["katalog"]) / venvy.ZNACZNIK).read_text(encoding="utf-8") == znacznik
+    assert Path(nowy["katalog"]).name == f"{Path(stary['katalog']).name}-{hermes.skrot_srodowiska(nowy_py, '')}"
+    assert nowy["env"]["JARVO_TOOLS_PYTHON"] == str(venvy.python_venvu(Path(nowy["katalog"])))
+    n = len(log.read_text(encoding="utf-8").splitlines())
+    assert venvy.zainstaluj(u, app, "narzedzia", wpis, uv=Path(uv), python=nowy_py, log=lambda t: None) == (nowy,
+                                                                                                         False)
+    assert venvy.zainstaluj(u, app, "narzedzia", wpis, uv=Path(uv), python=stary_py, log=lambda t: None) == (stary,
+                                                                                                          False)
+    assert len(log.read_text(encoding="utf-8").splitlines()) == n                 # oba gotowe: bez uv
 
 
 # ---------------------------------------------------------------- polecenie jarvo: update i uninstall
@@ -1046,6 +1533,124 @@ def test_skrypt_sprzatania_z_runonce_bez_cudzyslowow():
         r = subprocess.run([ps, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", sprawdz], input=skrypt,
                            capture_output=True, encoding="utf-8", errors="replace", timeout=120)
         assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_napis_powershella_z_apostrofami_typograficznymi():
+    """PowerShell kończy napis także na ‘ ’ ‚ ‛: każdy z nich podwojony, więc korzeń konta O’Brien nie psuje skryptu."""
+    assert odinstalowanie._ps_napis("O'Brien") == "'O''Brien'"
+    for z in ("\u2018", "\u2019", "\u201a", "\u201b"):
+        assert odinstalowanie._ps_napis(f"O{z}Brien") == f"'O{z}{z}Brien'"
+
+
+@pytest.mark.windows_only
+def test_skrypt_sprzatania_z_apostrofem_typograficznym_dziala(tmp_path):
+    """Prawdziwy PowerShell: korzeń „Jarvo O’Brien” (U+2019) w skrypcie procesu sprzątającego parsuje się, a ścieżki
+    wracają bez zmian (usunięte są właściwe katalogi, korzeń też)."""
+    korzen = tmp_path / "Jarvo O\u2019Brien \u2018x\u2019"
+    (korzen / "program" / "a").mkdir(parents=True)
+    (korzen / "bin").mkdir()
+    (korzen / "bin" / "jarvo.cmd").write_text("@echo off\r\n", encoding="utf-8")
+    zakonczony = subprocess.Popen([sys.executable, "-c", "pass"])
+    zakonczony.wait()
+    skrypt = odinstalowanie.skrypt_sprzatania([zakonczony.pid], [korzen / "program", korzen / "bin"], korzen,
+                                              usun_korzen=True, czas=10, runonce=False)
+    r = subprocess.run(odinstalowanie.argv_sprzatania(skrypt), capture_output=True, timeout=120,
+                       creationflags=subprocess.CREATE_NO_WINDOW)
+    assert r.returncode == 0, r.stderr.decode("utf-8", "replace")
+    assert not korzen.exists(), sorted(p.name for p in tmp_path.iterdir())
+    ps = shutil.which("powershell")
+    skrypt = odinstalowanie.skrypt_sprzatania([1], [korzen / "program"], korzen, usun_korzen=True)
+    sprawdz = ("$e = $null; [void][System.Management.Automation.Language.Parser]::ParseInput("
+               "[Console]::In.ReadToEnd(), [ref]$null, [ref]$e); exit $e.Count")
+    r = subprocess.run([ps, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", sprawdz], input=skrypt,
+                       capture_output=True, encoding="utf-8", errors="replace", timeout=120)
+    assert r.returncode == 0, r.stdout + r.stderr                               # z gałęzią RunOnce też
+
+
+def test_polecenie_runonce_z_warunkiem_nowej_instalacji():
+    p = odinstalowanie.polecenie_runonce(Path(r"D:\Jarvo\program"), znacznik=Path(r"D:\Jarvo\program\current.json"),
+                                         korzen=Path(r"D:\Jarvo"))
+    assert p == (r'cmd.exe /c if not exist "D:\Jarvo\program\current.json" (rmdir /s /q "D:\Jarvo\program" & '
+                 r'rmdir "D:\Jarvo" 2>nul)')
+    assert odinstalowanie.polecenie_runonce(Path(r"C:\T\jarvo-usun-1")) == r'cmd.exe /c rmdir /s /q "C:\T\jarvo-usun-1"'
+    skrypt = odinstalowanie.skrypt_sprzatania([1], [Path(r"D:\Jarvo\program")], Path(r"D:\Jarvo"), usun_korzen=True,
+                                              znacznik=Path(r"D:\Jarvo\program\current.json"))
+    assert "'D:\\Jarvo\\program' = 'cmd.exe /c if not exist |D:\\Jarvo\\program\\current.json|" in skrypt
+    assert '"' not in skrypt and "$warunkowe[$s].Replace('|', $q)" in skrypt
+
+
+@pytest.mark.windows_only
+def test_polecenie_runonce_naprawde_omija_nowa_instalacje(tmp_path):
+    """Prawdziwy cmd.exe z poleceniem wpisu RunOnce (bez rejestru): przy `<program>\\current.json` ponownej instalacji
+    nic nie znika; bez niego katalog i pusty korzeń znikają (jak przy logowaniu)."""
+    korzen = tmp_path / "Jarvo z spacją"
+    program = korzen / "program"
+    (program / "narzedzia").mkdir(parents=True)
+    (program / "current.json").write_text("{}", encoding="utf-8")                # ponowna instalacja przed logowaniem
+    polecenie = odinstalowanie.polecenie_runonce(program, znacznik=program / "current.json", korzen=korzen)
+    cmd = Path(os.environ.get("SystemRoot") or r"C:\Windows") / "System32" / "cmd.exe"
+    assert subprocess.run(f'"{cmd}" ' + polecenie.removeprefix("cmd.exe "), timeout=60,
+                          creationflags=subprocess.CREATE_NO_WINDOW).returncode in (0, 1)
+    assert (program / "current.json").is_file() and (program / "narzedzia").is_dir()
+    (program / "current.json").unlink()
+    subprocess.run(f'"{cmd}" ' + polecenie.removeprefix("cmd.exe "), timeout=60,
+                   creationflags=subprocess.CREATE_NO_WINDOW)
+    assert not program.exists() and not korzen.exists()
+
+
+def _z_kluczem(**kw):
+    """Zaplecze z atrapą magazynu kluczy: klucz jest, usunięcie się udaje i jest liczone."""
+    stan = {"jest": True, "usuniecia": 0}
+
+    def usun():
+        stan["usuniecia"] += 1
+        stan["jest"] = False
+        return True
+    return _zaplecze(klucz_jest=lambda: stan["jest"], usun_klucz=usun, **kw), stan
+
+
+def test_odinstalowanie_all_usuwa_klucz_github_z_magazynu(tmp_path, dom):
+    """--all: klucz jarvo-github znika z magazynu systemu (czyta go jarvo update), bez --all zostaje celowo, a przy
+    innej instalacji Jarva na koncie (np. stara z WSL) zostaje z powodem i radą; nieudane usunięcie to ślad."""
+    ot = _ot(tmp_path, moduly={"nadzorca": Nadzorca(), "autostart": Autostart()}, rejestr=Rejestr())
+    u, _ = _instalacja(tmp_path)
+    z, stan = _z_kluczem()
+    kod, raport, log = _odinstaluj(u, ot, z, tak=True)                          # bez --all
+    assert kod == 0 and stan["usuniecia"] == 0, log
+    assert any(c["rodzaj"] == "klucz" and "bez --all" in c["powod"] for c in raport["celowo"])
+    u, _ = _instalacja(tmp_path)
+    z, stan = _z_kluczem()
+    kod, raport, log = _odinstaluj(u, ot, z, tak=True, wszystko=True)
+    assert kod == 0 and stan["usuniecia"] == 1 and "magazyn systemu: jarvo-github" in raport["usuniete"], log
+    assert not any(c["rodzaj"] == "klucz" for c in raport["celowo"] + raport["slady"])
+    (tmp_path / "lad" / "Jarvo" / "wsl").mkdir(parents=True)                    # stara instalacja z WSL (Windows)
+    (dom / "jarvo-local").mkdir()                                               # albo z Dockerem (macOS, Linux)
+    u, _ = _instalacja(tmp_path)
+    z, stan = _z_kluczem()
+    kod, raport, log = _odinstaluj(u, ot, z, tak=True, wszystko=True)
+    klucz = [c for c in raport["celowo"] if c["rodzaj"] == "klucz"]
+    assert stan["usuniecia"] == 0 and klucz and "stara instalacja" in klucz[0]["powod"], log
+    assert odinstalowanie.rada_klucza() in klucz[0]["powod"] and kod == 0
+    shutil.rmtree(tmp_path / "lad" / "Jarvo")
+    (dom / "jarvo-local").rmdir()
+    u, _ = _instalacja(tmp_path)
+    kod, raport, log = _odinstaluj(u, ot, _zaplecze(klucz_jest=lambda: True, usun_klucz=lambda: False), tak=True,
+                                   wszystko=True)
+    assert kod == 1 and any(s["rodzaj"] == "klucz" for s in raport["slady"]), log
+
+
+def test_pytania_odinstalowania_na_stderr_przy_json(tmp_path, dom, monkeypatch, capsys):
+    """`jarvo uninstall --json` w terminalu bez --yes (np. `> raport.json`): pytania idą na stderr, a stdout to sam
+    poprawny JSON."""
+    u, _ = _instalacja(tmp_path)
+    monkeypatch.setattr(sys, "stdin", io.StringIO("n\n"))
+    z = _zaplecze(terminal=lambda: True, pytaj=odinstalowanie.pytaj)
+    ot = _ot(tmp_path, moduly={"nadzorca": Nadzorca(), "autostart": Autostart()}, rejestr=Rejestr())
+    a = type("A", (), {"json": True, "wszystko": False, "tak": False})()
+    assert odinstalowanie.polecenie(u, a, ot, zaplecze=z) == 0
+    wyjscie = capsys.readouterr()
+    assert json.loads(wyjscie.out)["wynik"] == "anulowane" and "Odinstalować Jarvo" in wyjscie.err
+    assert "Odinstalować" not in wyjscie.out and u.program.is_dir()
 
 
 # ---------------------------------------------------------------- procesy i pliki na prawdziwym systemie

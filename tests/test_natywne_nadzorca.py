@@ -6,8 +6,10 @@ postój po 78, rosnąca przerwa z sufitem i zerowaniem, kolejność startu z got
 w trakcie stopu, odpowiedź na stop przed końcem nadzorcy), trwałe zatrzymanie (znacznik, `jarvo serwis` przy znaczniku, --stop, --wznow), logi z rotacją
 „kopiuj i przytnij”, zatrzymanie łagodne i twarde z limitem na usługę, sprzątanie po poprzednim nadzorcy, odcisk
 procesu niezależny od locale i strefy, `jarvo serwis` jako osobny proces (stop z czekaniem, sygnał), usługi Jarva
-(argv, zmienne i limity Hermesa f97608f), pytanie do potoku sterującego bramy, a na Windows launcher z dzieckiem
-(zabity launcher i dziecko, wnuk żyje), CREATE_BREAKAWAY_FROM_JOB i DACL potoku kanału."""
+(argv, zmienne i limity Hermesa f97608f, pomocnik aktualizacji `aktualizacje` z kodu bieżącej wersji; przebieg od
+przycisku panelu do końca z prawdziwym pomocnikiem jest w tests/test_natywne_update.py), pytanie do potoku sterującego
+bramy, a na Windows launcher z dzieckiem (zabity launcher i dziecko, wnuk żyje), CREATE_BREAKAWAY_FROM_JOB i DACL
+potoku kanału."""
 from __future__ import annotations
 
 import asyncio
@@ -874,6 +876,33 @@ def test_uslugi_jarva_argv_srodowisko_i_limity_hermesa(tmp_path):
     assert "9119" in nadzorca.uslugi_jarva(u, bez_portu)[1].argv
     with pytest.raises(nadzorca.BladNadzorcy, match="JARVO_PANEL_PORT"):
         nadzorca.uslugi_jarva(u, {**env, "JARVO_PANEL_PORT": "abc"})
+
+
+def test_uslugi_jarva_z_pomocnikiem_aktualizacji(tmp_path):
+    """S09: z kodem Jarva w current.json nadzorca ma trzecią usługę `aktualizacje` (`jarvo update --pomocnik` z tej
+    wersji): po panelu, bez gotowości do czekania, limit stopu 10 s, katalog <stan>, otoczenie bez JARVO_TOKEN
+    i JARVO_REF, korzeń spoza domyślnego w argv. Bez jarvo/start.py w `app` usługi nie ma."""
+    u = sciezki.uklad({"JARVO_ROOT": str(tmp_path / "j")})
+    checkout = tmp_path / "program" / "hermes" / "f97608f"
+    py = srodowisko.hermes_python(checkout)
+    py.parent.mkdir(parents=True)
+    py.write_bytes(b"")
+    u.dane.mkdir(parents=True)
+    app = tmp_path / "app"
+    przenosne.zapisz_atomowo(u.program / "current.json", json.dumps({"hermes": str(checkout), "app": str(app)}))
+    env = srodowisko.srodowisko(u, {"PATH": os.environ.get("PATH", ""), "JARVO_PANEL_PORT": "19123",
+                                    "JARVO_REF": "z-okna", "JARVO_TOKEN": "x" * 20})
+    assert [x.nazwa for x in nadzorca.uslugi_jarva(u, env)] == ["brama", "panel"]       # app bez start.py
+    (app / "jarvo").mkdir(parents=True)
+    (app / "jarvo" / "start.py").write_text("# atrapa\n", encoding="utf-8")
+    brama, panel, pomocnik = nadzorca.uslugi_jarva(u, env)
+    assert pomocnik.nazwa == nadzorca.POMOCNIK == "aktualizacje" and pomocnik.kolejnosc > panel.kolejnosc
+    assert pomocnik.argv[1:5] == ["-I", "-X", "utf8", str(app / "jarvo" / "start.py")]
+    assert pomocnik.argv[5:] == ["--korzen", str(u.root), "update", "--pomocnik"]
+    assert pomocnik.gotowa is None and pomocnik.limit_stopu == nadzorca.LIMIT_STOPU_POMOCNIKA == 10
+    assert Path(pomocnik.cwd) == u.stan and pomocnik.port is None
+    assert not {"JARVO_TOKEN", "JARVO_REF"} & {k.upper() for k in pomocnik.env}
+    assert pomocnik.env["JARVO_ROOT"] == str(u.root)                    # korzeń spoza domyślnego zostaje
 
 
 @contextmanager

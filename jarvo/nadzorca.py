@@ -28,6 +28,13 @@ Usługi (uslugi_jarva; flagi i zmienne sprawdzone w kodzie Hermesa f97608f):
   dashboard na tym porcie (np. prywatny Hermes właściciela na 9119) nie udaje gotowości. uvicorn kończy się łagodnie
   na Ctrl+Break i SIGTERM; limit zatrzymania 30 s. Zajęty port Hermes zgłasza kodem 75 (web_server_lifecycle.py
   PORT_IN_USE_EXIT_CODE).
+- aktualizacje (S09): pomocnik aktualizacji dla przycisku w panelu, `<python Jarva> -I -X utf8 <app>/jarvo/start.py
+  [--korzen R] update --pomocnik` z bieżącej wersji (jarvo/aktualizacja.py): prośby `<dane>/jarvo/state/update-
+  request` z panelu i z „Zaktualizuj, gdy skończą”, sprawdzenie wersji, puls w update.json. Startuje po panelu
+  (kolejność 2), gotowy od startu, w otoczeniu bez JARVO_TOKEN i JARVO_REF (odinstalowanie.env_podprocesu).
+  Ctrl+Break albo SIGTERM kończy go kodem 0, po 10 s zabicie; dotyczy to tylko jego (Python Jarva to nie launcher
+  venvu): `jarvo update`, który uruchomił, ma własną grupę i konsolę (instalator.uruchom_w_tle) i dalej przełącza
+  wersję. Bez kodu Jarva w current.json (`app`) usługi nie ma.
 
 Pętla (c2): start w kolejności (panel czeka na gotowość bramy, najdłużej `limit_kolejnosci`); kod 75 = restart po
 ok. 5 s, ale kolejne szybkie wyjścia 75 (przed 60 s działania) podwajają przerwę aż do 5 min, a przy usłudze z portem
@@ -107,6 +114,8 @@ PORT_PANELU = 9119
 WERSJA_STANU = 1
 LIMIT_STOPU_BRAMY = 70.0  # s: TimeoutStopSec jednostki Hermesa f97608f (drenaż cron 30 s + rezerwa 10 s + zapas 30 s)
 LIMIT_STOPU_PANELU = 30.0
+LIMIT_STOPU_POMOCNIKA = 10.0   # s: pomocnik aktualizacji kończy się od razu na Ctrl+Break i SIGTERM (bez stanu w pamięci)
+POMOCNIK = "aktualizacje"      # usługa pomocnika aktualizacji (S09): log <logi>/aktualizacje.log
 # Najdłuższe zatrzymanie nadzorcy z usługami Jarva: limit bramy, bezpiecznik 10 s, dobicie i zamknięcie kanału.
 # Autostart (TimeoutStopSec, ExitTimeOut) i `jarvo down` mają czekać co najmniej tyle.
 CZAS_ZATRZYMANIA = LIMIT_STOPU_BRAMY + 40.0
@@ -1210,8 +1219,21 @@ def _port_panelu(env: dict[str, str]) -> int:
     return port
 
 
+def usluga_pomocnika(u: Uklad, env: dict[str, str], app: str | Path | None) -> Usluga | None:
+    """Pomocnik aktualizacji (S09, docstring modułu) z kodu bieżącej wersji albo None, gdy kodu nie ma."""
+    start = Path(str(app or "")) / "jarvo" / "start.py"
+    if not app or not start.is_file():
+        return None
+    from .instalator import argumenty_korzenia, python_jarva     # przy użyciu: instalator jest duży
+    from .odinstalowanie import env_podprocesu
+    argv = [str(python_jarva(u)), "-I", "-X", "utf8", str(start), *argumenty_korzenia(u, env), "update", "--pomocnik"]
+    return Usluga(POMOCNIK, argv, cwd=u.stan, env=env_podprocesu(u, env), kolejnosc=2,
+                  limit_stopu=LIMIT_STOPU_POMOCNIKA)
+
+
 def uslugi_jarva(u: Uklad, env: dict[str, str]) -> list[Usluga]:
-    """Brama i panel Hermesa z bieżącej wersji (`<program>/current.json`), w środowisku procesów Jarva `env`."""
+    """Brama i panel Hermesa z bieżącej wersji (`<program>/current.json`) i pomocnik aktualizacji z jej kodu
+    (usluga_pomocnika), w środowisku procesów Jarva `env`."""
     biez = srodowisko.biezace(u)
     if not biez.get("hermes"):
         raise BladNadzorcy(f"Nie ma zainstalowanego Hermesa: {u.program / 'current.json'} nie wskazuje checkoutu. "
@@ -1238,7 +1260,8 @@ def uslugi_jarva(u: Uklad, env: dict[str, str]) -> list[Usluga]:
                    cwd=katalog, env=env_panelu, gotowa=partial(panel_gotowy, f"http://127.0.0.1:{port}/api/status",
                                                                dane),
                    kolejnosc=1, limit_stopu=LIMIT_STOPU_PANELU, port=port)
-    return [brama, panel]
+    pomocnik = usluga_pomocnika(u, env, biez.get("app"))
+    return [brama, panel] + ([pomocnik] if pomocnik else [])
 
 
 # --- nadzorca -----------------------------------------------------------------------------------------------------
@@ -1905,7 +1928,7 @@ def main(argv: list[str] | None = None) -> int:
                                      "Hermesa, restart po awarii, logi i stan dla `jarvo status`.")
     grupa = parser.add_mutually_exclusive_group()
     grupa.add_argument("--status", action="store_true", help="stan działającego nadzorcy (JSON)")
-    grupa.add_argument("--restart", metavar="USLUGA", help="uruchom usługę ponownie (brama, panel)")
+    grupa.add_argument("--restart", metavar="USLUGA", help="uruchom usługę ponownie (brama, panel, aktualizacje)")
     grupa.add_argument("--stop", action="store_true",
                        help="zatrzymaj nadzorcę i usługi; autostart nie uruchomi ich, aż do `jarvo up`")
     grupa.add_argument("--wznow", action="store_true",

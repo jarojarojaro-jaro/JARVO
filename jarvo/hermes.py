@@ -28,7 +28,11 @@ vendor/natywne.yaml, czytany przez `manifest.hermes(app)`.
               Windows uv 0.12.13 czyta go z %APPDATA%\\uv (sprawdzone 2026-10-24; XDG_CONFIG_HOME na Windows nie
               działa), na POSIX z XDG_CONFIG_HOME i XDG_CONFIG_DIRS (c3 punkt 5). Błąd locka albo sumy kończy
               instalację wyjątkiem, bez instalacji w zastępstwie. Znacznik `.jarvo-hermes.json` (commit, dodatki,
-              Python) sprawia, że drugi przebieg nic nie robi.
+              Python) sprawia, że drugi przebieg nic nie robi. Gotowego checkoutu dla innego Pythona (nowa wersja
+              Jarva zmienia tylko Pythona z manifestu) nie przebudowujemy w miejscu, bo może z niego działać serwis
+              poprzedniej wersji: nowy powstaje obok, w `<commit[:12]>-<8 znaków skrótu ścieżki Pythona>`
+              (katalog_dla), z frontem skopiowanym z gotowego (ten sam commit). Inne dodatki przy tym samym
+              Pythonie to same kroki uv w tym samym checkoucie.
 `web_dist`    Front dashboardu z web/: `npm ci --ignore-scripts --no-audit --no-fund --include=dev` (package-lock.json
               z sumami integrity; --include=dev, bo odziedziczone NODE_ENV=production pomija tsc i vite, por.
               hermes_cli/main_web_build.py:317) i `npm run build` do hermes_cli/web_dist, cache npm w <cache>/npm.
@@ -179,6 +183,51 @@ def argv_hermesa(checkout: Path, *argumenty: str) -> list[str]:
 def katalog_checkoutu(u: Uklad, commit: str) -> Path:
     """`<program>/hermes/<commit[:12]>`: wersje obok siebie, `jarvo update` robi nowy katalog (H16, c4)."""
     return u.program / "hermes" / commit[:12]
+
+
+def skrot_srodowiska(python, *reszta: str) -> str:
+    """8 znaków sha256 Pythona (ścieżka jak w _ta_sama) i reszty konfiguracji środowiska (dodatki, backend torch):
+    przyrostek katalogu obok gotowego (katalog_dla, venvy.katalog_dla)."""
+    tekst = "\0".join([os.path.normcase(os.path.abspath(str(python))), *map(str, reszta)])
+    return hashlib.sha256(tekst.encode("utf-8")).hexdigest()[:8]
+
+
+def katalog_dla(u: Uklad, commit: str, dodatki: list[str], python) -> Path:
+    """Checkout tego pinu dla tego Pythona: `<commit12>`, a gdy tam jest już gotowy checkout tego commitu dla innego
+    Pythona (np. nowa wersja Jarva zmienia tylko Pythona z manifestu), obok: `<commit12>-<skrot_srodowiska>`.
+    Gotowego nie przebudowujemy w miejscu: może z niego działać serwis poprzedniej wersji (na Windows załadowanych
+    .pyd i python.exe nie da się usunąć, na POSIX serwis straciłby venv na czas uv sync), a `jarvo update` wraca do
+    niego przy błędzie (c4); niepotrzebny sprząta potem `jarvo update`. Inne dodatki przy tym samym Pythonie to dalej
+    same kroki uv w tym samym checkoucie (uv sync tylko dokłada albo zdejmuje paczki)."""
+    baza = katalog_checkoutu(u, commit)
+    obok = baza.with_name(f"{baza.name}-{skrot_srodowiska(python)}")
+    if _gotowy(baza, commit, dodatki, python):
+        return baza
+    if _gotowy(obok, commit, dodatki, python):
+        return obok
+    z = srodowisko.wczytaj_json(baza / ZNACZNIK)
+    if (z.get("commit") == commit and srodowisko.hermes_python(baza).is_file()
+            and not _ta_sama(z.get("python"), python)):
+        return obok                       # gotowy dla innego Pythona: zostaje, jak jest
+    if srodowisko.wczytaj_json(obok / ZNACZNIK).get("commit") == commit:
+        return obok                       # obok na tym Pythonie, ale z innymi dodatkami: kroki uv w nim
+    return baza
+
+
+def _kopiuj_front(z: Path, do: Path, commit: str, log: Callable[[str], None]) -> None:
+    """Zbudowany front tego commitu (hermes_cli/web_dist i znacznik) z gotowego checkoutu do checkoutu obok: ten sam
+    commit = ten sam front, więc bez npm ci i bez sieci."""
+    dist = z / "hermes_cli" / "web_dist"
+    if not _web_gotowy(z, dist, commit) or _web_gotowy(do, do / "hermes_cli" / "web_dist", commit):
+        return
+    cel = do / "hermes_cli" / "web_dist"
+    if cel.exists():
+        _usun_drzewo(cel)
+    shutil.copytree(dist, cel)
+    _wyklucz(do, ZNACZNIK, ZNACZNIK_WEB)
+    przenosne.zapisz_atomowo(do / ZNACZNIK_WEB, json.dumps({"commit": commit, "zbudowano": _teraz(),
+                                                             "skopiowano_z": str(z)}, indent=2) + "\n")
+    log(f"Hermes: front dashboardu z {z.name} (ten sam commit)")
 
 
 # --- pomocnicze ---------------------------------------------------------------------------------------------------
@@ -632,15 +681,20 @@ def zainstaluj(u: Uklad, pin: dict, *, git, uv, python, log: Callable[[str], Non
     `git`, `uv`, `python`: pełne ścieżki programów (albo nazwy szukane tylko w PATH). Gotowa instalacja (znacznik
     z tym samym commitem, dodatkami i Pythonem) = bez żadnego wywołania. Każdy błąd to BladHermesa po polsku."""
     commit, repo, dodatki, tag = _pin(pin)
-    docelowy = katalog_checkoutu(u, commit)
     python = _program(python, "python")
+    docelowy = katalog_dla(u, commit, dodatki, python)
     if _gotowy(docelowy, commit, dodatki, python):
         log(f"Hermes {tag} ({commit[:12]}): już zainstalowany w {docelowy}")
         return docelowy
     git, uv = _program(git, "git"), _program(uv, "uv")
     with przenosne.Zamek(u.stan / "hermes.lock"):
-        if _gotowy(docelowy, commit, dodatki, python):        # drugi instalator skończył, gdy czekaliśmy
+        docelowy = katalog_dla(u, commit, dodatki, python)    # drugi instalator mógł skończyć, gdy czekaliśmy
+        if _gotowy(docelowy, commit, dodatki, python):
             return docelowy
+        baza = katalog_checkoutu(u, commit)
+        if docelowy != baza and not docelowy.exists():
+            log(f"Hermes {tag} ({commit[:12]}): w {baza.name} jest gotowy dla innego Pythona, więc ten powstaje obok "
+                f"({docelowy.name}); tamten zostaje dla działającej wersji")
         _checkout(repo, commit, docelowy, git=git, log=log)
         (docelowy / ZNACZNIK).unlink(missing_ok=True)
         budowa = _zaleznosci(u, docelowy, dodatki, uv=uv, python=python, log=log)
@@ -650,6 +704,11 @@ def zainstaluj(u: Uklad, pin: dict, *, git, uv, python, log: Callable[[str], Non
             "commit": commit, "tag": pin.get("tag"), "wersja": pin.get("wersja"), "repo": _bez_sekretow(repo),
             "dodatki": dodatki, "python": python, "budowa": budowa, "zainstalowano": _teraz(),
         }, ensure_ascii=False, indent=2) + "\n")
+        if docelowy != baza:
+            try:
+                _kopiuj_front(baza, docelowy, commit, log)
+            except OSError as e:              # front zbuduje web_dist jak zwykle
+                log(f"Hermes: frontu z {baza.name} nie skopiowałem ({e}); zbuduję go od nowa")
     log(f"Hermes {tag} ({commit[:12]}): gotowy w {docelowy}")
     return docelowy
 
