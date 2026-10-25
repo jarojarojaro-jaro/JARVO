@@ -822,22 +822,8 @@ def sprawdz_korzen(u: Uklad) -> dict:
 
 
 def sprawdz_miejsce(u: Uklad) -> dict:
-    p = u.root
-    while not p.exists() and p.parent != p:
-        p = p.parent
-    try:
-        wolne = shutil.disk_usage(p).free / 1e9
-    except OSError as e:
-        return _wynik("wolne miejsce", "uwaga", f"nie umiem sprawdzić ({e})", "Sprawdź dysk ręcznie.")
-    opis = f"{wolne:.1f} GB wolnego na dysku z {p}"
-    if wolne < instalator.MIN_MIEJSCA_GB:
-        return _wynik("wolne miejsce", "blad", opis, f"Jarvo potrzebuje co najmniej {instalator.MIN_MIEJSCA_GB} GB "
-                      f"(cała instalacja z flotą ok. {instalator.ROZMIAR_GB} GB): zwolnij miejsce albo ustaw "
-                      "JARVO_ROOT na inny dysk.")
-    if wolne < 10:
-        return _wynik("wolne miejsce", "uwaga", opis, "Flota z narzędziami i modelami potrzebuje więcej (kilka GB "
-                      "na filmy, przeglądarki i lektora): zwolnij miejsce, zanim je doinstalujesz.")
-    return _wynik("wolne miejsce", "ok", opis)
+    """Zajęte przez Jarvo i wolne miejsce, a przed instalacją potrzeba z manifestu (instalator.sprawdz_miejsce)."""
+    return instalator.sprawdz_miejsce(u)
 
 
 def sprawdz_python(u: Uklad) -> dict:

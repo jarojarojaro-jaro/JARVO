@@ -19,6 +19,11 @@ Wpis dla `<stan>/narzedzia.json`: `venv-<nazwa>` = {"wersja": skrót locka, "kat
 `env` daje procesom floty interpreter venvu (JARVO_TOOLS_PYTHON, JARVO_OCR_PYTHON, CLAUDE_SEO_PYTHON…), a `bin`
 (tylko venv narzędzi) dokłada jego programy (yt-dlp, trafilatura) do PATH procesów floty, jak /opt/jarvo/venv/bin
 w obrazie. Python venvu narzędzi to też @@PY@@ skilli i shim python3 (jarvo/flota.py, jarvo/bin_floty.py, F12).
+
+Miejsce (c3 pkt 11, Z31): `miejsce(wpis, platforma)` liczy venv i koła w cache uv z manifestu (pobranie_mb platformy,
+venv_mb zmierzone na Windows 11 x64), a `sprzatnij_cache` po udanej instalacji robi `uv cache clean` w <cache>/uv:
+venvy i .venv Hermesa mają własne kopie plików (UV_LINK_MODE=copy), a znaczniki sprawiają, że kolejny przebieg nie
+woła uv, więc cache nie jest już potrzebny (nowy lock przy aktualizacji pobierze koła od nowa).
 """
 from __future__ import annotations
 
@@ -44,6 +49,10 @@ ZMIENNE = {"narzedzia": "JARVO_TOOLS_PYTHON", "ocr": "JARVO_OCR_PYTHON", "claude
            "docling": "JARVO_DOCLING_PYTHON"}
 W_PATH = ("narzedzia",)                  # programy tego venvu w PATH procesów floty (jak /opt/jarvo/venv/bin)
 CZAS_UV = 3600                           # s na jedno polecenie uv (pierwsza instalacja pobiera 150–400 MB kół)
+CZAS_SPRZATANIA = 120                    # s na `uv cache clean` (czeka, gdy cache trzyma inny proces uv)
+WZOR = "windows-x64"                     # platforma, na której zmierzono venv_mb
+WSP_VENVU = 4.5                          # venv bez venv_mb: pobrane koła × tyle (zmierzone 2,7–4,5 na Windows 11 x64)
+WSP_CACHE = 0.8                          # cache uv trzyma koła rozpakowane: venv bez .pyc (zmierzone 0,77 na Windows)
 
 
 class BladVenvu(RuntimeError):
@@ -120,6 +129,51 @@ def gotowy(kat: Path, wpis: dict, python: Path) -> bool:
     return (z.get("lock_sha256") == wpis.get("sha256") and z.get("torch_backend") == wpis.get("torch_backend")
             and os.path.normcase(str(z.get("python_bazowy") or "")) == os.path.normcase(str(python))
             and python_venvu(kat).is_file())
+
+
+def zainstalowany(kat: Path, wpis: dict) -> bool:
+    """Venv z tego locka już jest (znacznik i Python venvu), bez sprawdzania Pythona bazowego: do liczenia miejsca
+    przed krokiem narzędzi, gdy Pythona z manifestu może jeszcze nie być."""
+    z = srodowisko.wczytaj_json(Path(kat) / ZNACZNIK)
+    return z.get("lock_sha256") == wpis.get("sha256") and python_venvu(kat).is_file()
+
+
+def miejsce(wpis: dict, platforma: str) -> tuple[int, int]:
+    """(venv, koła w cache uv) w bajtach z manifestu dla platformy: venv_mb (zmierzone na WZOR) przeliczone przez
+    pobranie_mb tej platformy i WZOR, bez venv_mb pobranie_mb × WSP_VENVU; cache uv ok. WSP_CACHE venvu. Brak
+    pobranie_mb dla platformy: największe z innych platform."""
+    pobranie = wpis.get("pobranie_mb") if isinstance(wpis.get("pobranie_mb"), dict) else {}
+    liczby = [float(v) for v in pobranie.values() if isinstance(v, (int, float))]
+    mb = float(pobranie.get(platforma) or (max(liczby) if liczby else 0))
+    wzor = pobranie.get(WZOR)
+    if isinstance(wpis.get("venv_mb"), (int, float)):
+        venv = float(wpis["venv_mb"]) * (mb / float(wzor) if isinstance(wzor, (int, float)) and wzor else 1.0)
+    else:
+        venv = mb * WSP_VENVU
+    return int(venv * 10 ** 6), int(venv * WSP_CACHE * 10 ** 6)
+
+
+def sprzatnij_cache(u: Uklad, uv: Path, *, log: Callable[[str], None] = print, czas: float = CZAS_SPRZATANIA) -> bool:
+    """`uv cache clean` w <cache>/uv po udanej instalacji (docstring modułu), w środowisku uv instalacji (bez
+    konfiguracji właściciela, UV_CACHE_DIR Jarva). `uv cache prune` usunąłby tylko wpisy nieosiągalne, czyli prawie
+    nic, bo wszystkie koła z locków są w indeksie. True = uv skończył bez błędu; cache w użyciu przez inny proces uv
+    (uv czeka wtedy na niego) albo limit czasu = False i wiersz w logu: cache zostaje do następnej instalacji."""
+    from .hermes import BladHermesa, _wywolaj
+    env = env_uv(u, Path(uv))
+    env.pop("UV_PYTHON", None)                    # `cache clean` nie szuka Pythona
+    try:
+        w = _wywolaj([str(uv), "cache", "clean", "--no-config"], env=env, cwd=u.stan, opis="uv cache clean",
+                     czas=int(czas))
+    except BladHermesa as e:
+        log(f"cache uv zostaje do następnej instalacji ({e})")
+        return False
+    linie = [x.strip() for x in f"{w.stdout}\n{w.stderr}".splitlines() if x.strip()]
+    if w.returncode:
+        log(f"cache uv zostaje do następnej instalacji (uv cache clean: kod {w.returncode}"
+            + (f", {linie[-1][:160]}" if linie else "") + ")")
+        return False
+    log(f"cache uv: {linie[-1][:160]}" if linie else "cache uv: wyczyszczony")
+    return True
 
 
 def zainstaluj(u: Uklad, app: Path, nazwa: str, wpis: dict, *, uv: Path, python: Path,

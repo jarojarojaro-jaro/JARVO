@@ -32,6 +32,9 @@ vendor/natywne.yaml, czytany przez `manifest.hermes(app)`.
 `web_dist`    Front dashboardu z web/: `npm ci --ignore-scripts --no-audit --no-fund --include=dev` (package-lock.json
               z sumami integrity; --include=dev, bo odziedziczone NODE_ENV=production pomija tsc i vite, por.
               hermes_cli/main_web_build.py:317) i `npm run build` do hermes_cli/web_dist, cache npm w <cache>/npm.
+              Po zbudowaniu node_modules (ok. 0,3 GB: korzeń checkoutu i web/, bo web jest workspace'em npm
+              z package-lock.json korzenia) znika: znacznik ZNACZNIK_WEB sprawia, że kolejny przebieg frontu nie
+              buduje, a `--web-lokalnie` robi `npm ci` od nowa (z cache npm, który zostaje).
               Potem `dist_jarva`: kopia w <program>/web-dist/<skrót> z łatkami Jarva (branding/patch_dashboard.py
               --web --natywnie: tytuł i marka, powłoka /jarvo z przekierowaniem z „/”, polski, bez przycisku
               „Update Hermes” i bez sprawdzania aktualizacji, H16) i to ją web_dist zwraca (HERMES_WEB_DIST panelu,
@@ -681,6 +684,44 @@ def _web_gotowy(checkout: Path, dist: Path, commit: str) -> bool:
             and (dist / "index.html").is_file())
 
 
+def _bajty(katalog: Path) -> int:
+    """Rozmiar plików drzewa bez wchodzenia w dowiązania i punkty połączenia (npm linkuje nimi workspace'y)."""
+    razem, stos = 0, [str(katalog)]
+    while stos:
+        try:
+            with os.scandir(stos.pop()) as it:
+                wpisy = list(it)
+        except OSError:
+            continue
+        for e in wpisy:
+            try:
+                if e.is_symlink() or (hasattr(e, "is_junction") and e.is_junction()):
+                    continue
+                if e.is_dir(follow_symlinks=False):
+                    stos.append(e.path)
+                else:
+                    razem += e.stat(follow_symlinks=False).st_size
+            except OSError:
+                continue
+    return razem
+
+
+def _usun_node_modules(checkout: Path, log: Callable[[str], None]) -> None:
+    """node_modules po zbudowaniu frontu (docstring modułu: korzeń checkoutu i web/). rmtree nie wchodzi w punkty
+    połączenia (node_modules/web → web), więc źródła frontu zostają. Plik zajęty (antywirus na Windows) zostawia
+    katalog do następnej instalacji, bez błędu."""
+    for katalog in (checkout / "node_modules", checkout / "web" / "node_modules"):
+        if not katalog.is_dir() or katalog.is_symlink():
+            continue
+        mb = _bajty(katalog) / 1e6
+        try:
+            _usun_drzewo(katalog)
+        except OSError as e:
+            log(f"Hermes: {katalog} zostaje do następnej instalacji ({e})")
+            continue
+        log(f"Hermes: usunięte {katalog.relative_to(checkout).as_posix()} ({mb:.0f} MB): front jest zbudowany")
+
+
 def web_dist(u: Uklad, checkout: Path, *, npm=None, log: Callable[[str], None] = print, jarva: bool = True) -> Path:
     """Buduje front dashboardu z `web/` do `hermes_cli/web_dist` i zwraca katalog dla HERMES_WEB_DIST panelu: kopię
     z łatkami Jarva (`dist_jarva`), a bez nich (`jarva=False` albo łatka nie pasuje) sam front Hermesa. Zbudowany
@@ -692,6 +733,10 @@ def web_dist(u: Uklad, checkout: Path, *, npm=None, log: Callable[[str], None] =
         raise BladHermesa(f"{checkout}: brak znacznika instalacji Hermesa ({ZNACZNIK}); najpierw zainstaluj().")
     if _web_gotowy(checkout, dist, commit):
         log(f"Hermes: front dashboardu już zbudowany ({dist})")
+        if any((k / "node_modules").is_dir() for k in (checkout, checkout / "web")):   # z wersji przed sprzątaniem
+            with przenosne.Zamek(u.stan / "hermes.lock"):
+                if _web_gotowy(checkout, dist, commit):
+                    _usun_node_modules(checkout, log)
         return dist_jarva(u, dist, log=log) if jarva else dist
     web = checkout / "web"
     if not (web / "package.json").is_file():
@@ -716,6 +761,7 @@ def web_dist(u: Uklad, checkout: Path, *, npm=None, log: Callable[[str], None] =
         _wyklucz(checkout, ZNACZNIK, ZNACZNIK_WEB)
         przenosne.zapisz_atomowo(checkout / ZNACZNIK_WEB, json.dumps(
             {"commit": commit, "zbudowano": _teraz()}, indent=2) + "\n")
+        _usun_node_modules(checkout, log)
     log(f"Hermes: front dashboardu gotowy ({dist})")
     return dist_jarva(u, dist, log=log) if jarva else dist
 

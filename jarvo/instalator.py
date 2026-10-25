@@ -7,7 +7,11 @@ JARVO_TOKEN: klucz był potrzebny tylko do pobrania kodu). Po jednym poleceniu J
 z paskiem i nazwą kroku:
 
    1. sprawdzenie: platforma (bez Maca z Intelem, I06), stara instalacja z WSL/Dockerem w tym miejscu, korzeń jako
-      osobny katalog (same katalogi Jarva: ochrona dostępu obejmuje całe drzewo), porty panelu i API, wolne miejsce,
+      osobny katalog (same katalogi Jarva: ochrona dostępu obejmuje całe drzewo), porty panelu i API, miejsce na
+      dysku: potrzeba liczona z manifestu (potrzebne_miejsce: rozmiary plików narzędzi, pobranie_mb i venv_mb venvów,
+      rozmiary paczek z pixi.lock, modele, Hermes z frontem i flota; tylko części, których jeszcze nie ma) wobec
+      wolnego miejsca na każdym dysku instalacji; za mało = koniec przed zapisaniem czegokolwiek, z listą innych
+      dysków lokalnych z miejscem i gotowym poleceniem z JARVO_ROOT (Z31),
    2. katalogi z c1; cały korzeń tylko dla właściciela (przenosne.chron z dziedziczeniem w dół: korzeń na innym
       dysku dziedziczyłby zapis dla Użytkowników uwierzytelnionych, a autostart uruchamia kod z `<program>` jako
       właściciel), `<dane>` i `<stan>` jeszcze osobno,
@@ -52,6 +56,15 @@ z paskiem i nazwą kroku:
       w postoju to błąd od razu, bez czekania na limit. Panel, który wstał po instalacji floty, potwierdza jej
       odcisk wtyczek (flota.potwierdz_restart_panelu).
 
+Po udanym przebiegu sprzątanie (c3 pkt 11, Z31): pobrane archiwa (`<cache>/pobrane`), cache uv (`uv cache clean`),
+cache pixi i resztki starych wersji narzędzi; node_modules frontu Hermesa znika już zaraz po budowie (hermes.web_dist).
+Gotowe części mają znaczniki (suma narzędzia, venvu, modelu, Tesseracta, Hermesa, frontu), więc kolejny przebieg ich
+nie pobiera ani nie buduje i działa bez sieci. Kompromis: część uszkodzona albo usunięta ręcznie (np. venv bez
+znacznika, narzędzie bez katalogu) potrzebuje wtedy sieci, bo jej kół, paczek ani archiwów nie ma już w cache, a nowy
+lock przy aktualizacji pobiera koła od nowa. Zostają źródła skilli buildu (`<cache>/build`: aktualizacja buduje flotę)
+i cache npm (`--web-lokalnie` robi `npm ci` od nowa). Na końcu wiersz „Miejsce” z tym, ile zajmuje Jarvo i ile jest
+wolnego (to samo pokazuje `jarvo doctor`).
+
 Każda zmiana poza katalogami Jarva idzie przez jarvo/zmiany_hosta.py (wpis w dzienniku przed zmianą, D08), żeby
 `jarvo uninstall` cofnął ją od końca. Przebieg jest idempotentny: drugi niczego nie zmienia (narzędzia ze zgodną
 sumą zostają, pliki zapisujemy tylko przy innej treści, PATH i blok rc tylko, gdy ich brak). Instalacja spod
@@ -76,6 +89,7 @@ import secrets
 import shlex
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 import time
@@ -100,10 +114,6 @@ ZNACZNIK = "Jarvo natywnie (jarvo instaluj)"         # w poleceniu jarvo: plik j
 PIERWSZE = ("uv", "python313", "python312", "git", "node")
 OPISY = {"uv": "uv", "python313": "Python 3.13", "python312": "Python 3.12", "git": "git i Git Bash",
          "node": "Node.js i npm"}
-MIN_MIEJSCA_GB = 2              # próg odmowy; cała instalacja z flotą zajmuje więcej (ROZMIAR_GB, uwaga w kroku 1)
-# instalacja z flotą zmierzona 2026-10-25 na Windows 11 x64: 8,5 GB = <program> 4,6 GB (narzędzia 2,1, venvy 1,5,
-# Hermes 1,2) + cache 3,4 GB (koła uv 1,4, źródła skilli 0,94, archiwa narzędzi 0,69, pixi 0,35) + dane 0,46 GB
-ROZMIAR_GB = 9
 CZAS_PANELU = 180.0             # pierwszy start panelu (import Hermesa, bazy) trwa kilkanaście–kilkadziesiąt sekund
 CZAS_NADZORCY = 30.0            # tyle czekamy, aż nadzorca otworzy kanał (start przez autostart, czekanie na panel)
 CZAS_STOPU = 120.0              # drenaż bramy i zatrzymanie panelu; dłużej, gdy nadzorca poda CZAS_ZATRZYMANIA
@@ -254,12 +264,121 @@ def uruchom_w_tle(argv: list[str], env: dict, log: Path) -> int:
             return subprocess.Popen(argv, creationflags=flagi, **kw).pid
 
 
+# ---------------------------------------------------------------- dyski: wolne miejsce, ten sam dysk, dyski lokalne
+
+# systemy plików dysków lokalnych w /proc/self/mounts (Linux) i w `mount` (macOS); sieciowe (nfs, cifs, smbfs),
+# obrazy (squashfs snapów, iso9660) i systemy w pamięci (tmpfs, overlay) odpadają
+LOKALNE_FS = frozenset({"ext2", "ext3", "ext4", "xfs", "btrfs", "f2fs", "jfs", "reiserfs", "bcachefs", "zfs", "ntfs",
+                        "ntfs3", "exfat", "vfat", "fuseblk", "apfs", "hfs"})
+_MOUNT_MACOS = re.compile(r"^(?P<urzadzenie>\S+) on (?P<punkt>.+) \((?P<opcje>[^)]*)\)\s*$")
+
+
+def istniejacy(sciezka: Path | str) -> Path:
+    """Najbliższy istniejący katalog nad `sciezka` (albo ona sama): przed instalacją korzenia jeszcze nie ma."""
+    p = Path(os.path.abspath(str(sciezka)))
+    while not p.exists() and p.parent != p:
+        p = p.parent
+    return p
+
+
+def wolne_miejsce(sciezka: Path | str) -> int:
+    """Wolne bajty na dysku, na którym leży (albo powstanie) `sciezka`."""
+    return shutil.disk_usage(istniejacy(sciezka)).free
+
+
+def dysk(sciezka: Path | str) -> int:
+    """Identyfikator dysku (st_dev najbliższego istniejącego katalogu; na Windows numer seryjny woluminu): ta sama
+    wartość = ten sam system plików, więc potrzeby części instalacji na nim się sumują."""
+    return os.stat(istniejacy(sciezka)).st_dev
+
+
+def punkt_dysku(sciezka: Path | str) -> str:
+    """Dysk do komunikatu: Windows litera z ukośnikiem (C:\\), POSIX punkt montowania (/, /home, /Volumes/Dane)."""
+    p = istniejacy(sciezka)
+    if WINDOWS:
+        naped = os.path.splitdrive(str(p))[0]
+        return naped + "\\" if naped and not naped.startswith("\\\\") else (naped or str(p))
+    try:
+        numer = os.stat(p).st_dev
+        while p.parent != p and os.stat(p.parent).st_dev == numer:
+            p = p.parent
+    except OSError:
+        pass
+    return str(p)
+
+
+def _bez_ucieczek(tekst: str) -> str:
+    """Ścieżka z /proc/self/mounts: spacja, tabulator i ukośnik są tam jako \\040, \\011, \\134."""
+    return re.sub(r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)), tekst)
+
+
+def punkty_linux(tekst: str) -> list[str]:
+    """Punkty montowania dysków lokalnych z zapisem z treści /proc/self/mounts (urządzenie /dev/…, system plików
+    z LOKALNE_FS, bez `ro`)."""
+    wynik = []
+    for linia in tekst.splitlines():
+        cz = linia.split()
+        if len(cz) < 4:
+            continue
+        urzadzenie, punkt, typ, opcje = cz[0], _bez_ucieczek(cz[1]), cz[2], cz[3].split(",")
+        if typ in LOKALNE_FS and "ro" not in opcje and (urzadzenie.startswith("/dev/") or typ == "zfs"):
+            wynik.append(punkt)
+    return wynik
+
+
+def punkty_macos(tekst: str) -> list[str]:
+    """Punkty montowania dysków lokalnych z zapisem z wyjścia `mount` na macOS: `local`, bez `read-only` i bez
+    `nobrowse` (woluminy systemu; katalog domowy liczy dyski_lokalne osobno)."""
+    wynik = []
+    for linia in tekst.splitlines():
+        m = _MOUNT_MACOS.match(linia.strip())
+        if not m:
+            continue
+        opcje = {o.strip() for o in m["opcje"].split(",")}
+        if m["urzadzenie"].startswith("/dev/") and "local" in opcje and not opcje & {"read-only", "nobrowse"}:
+            wynik.append(m["punkt"])
+    return wynik
+
+
+def _dyski_windows() -> list[Path]:
+    """Dyski stałe Windows (GetDriveTypeW = DRIVE_FIXED): bez wymiennych, sieciowych, CD i RAM-dysków."""
+    import ctypes
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)       # własna kopia: argtypes nie zmienia innym modułom
+    k32.GetLogicalDrives.restype = ctypes.c_uint32
+    k32.GetDriveTypeW.argtypes = [ctypes.c_wchar_p]
+    k32.GetDriveTypeW.restype = ctypes.c_uint
+    maska = k32.GetLogicalDrives()
+    return [Path(f"{chr(65 + i)}:\\") for i in range(26)
+            if maska >> i & 1 and k32.GetDriveTypeW(f"{chr(65 + i)}:\\") == 3]
+
+
+def dyski_lokalne() -> list[Path]:
+    """Katalogi na dyskach lokalnych, w których właściciel może założyć korzeń Jarva: Windows dyski stałe, macOS
+    i Linux katalog domowy i punkty montowania dysków lokalnych z zapisem dla właściciela, bez spacji w ścieżce
+    (psuje polecenia skilli, c1). Pusta lista, gdy system nie odpowie."""
+    try:
+        if WINDOWS:
+            return _dyski_windows()
+        if MACOS:
+            mount = systemowy("mount")
+            punkty = punkty_macos(_uruchom([mount]).stdout) if mount else []
+        else:
+            punkty = punkty_linux(Path("/proc/self/mounts").read_text(encoding="utf-8", errors="replace"))
+    except (OSError, subprocess.SubprocessError, AttributeError, ValueError):
+        return []
+    wynik = [Path.home()]
+    for punkt in punkty:
+        if not any(z.isspace() for z in punkt) and os.path.isdir(punkt) and os.access(punkt, os.W_OK | os.X_OK):
+            wynik.append(Path(punkt))
+    return wynik
+
+
 @dataclass
 class Otoczenie:
     """Wszystko, czego instalator i polecenia używają poza własnymi plikami: moduły Jarva ładowane przy użyciu,
     zmienne procesu, rejestr Windows (atrapa z interfejsem zmiany_hosta.Rejestr), programy z PATH, procesy w tle,
-    sieć lokalna (zapytanie HTTP, kto słucha na porcie), przeglądarka i zegar. Testy podstawiają atrapy, więc nie
-    dotykają komputera."""
+    sieć lokalna (zapytanie HTTP, kto słucha na porcie), dyski (wolne miejsce, który dysk, dyski lokalne),
+    przeglądarka i zegar. Testy podstawiają atrapy, więc nie dotykają komputera."""
     modul: Callable[[str], Any] = modul
     env: dict = field(default_factory=lambda: dict(os.environ))
     rejestr: Any = None                                  # None = winreg (zmiany_hosta.Rejestr)
@@ -267,6 +386,9 @@ class Otoczenie:
     uruchom_w_tle: Callable[[list[str], dict, Path], int] = uruchom_w_tle
     zapytaj_http: Callable[[str, float], tuple[int, Any] | None] = zapytaj_http
     sluchacz: Callable[[int], tuple[int, str] | None] = sluchacz
+    wolne_miejsce: Callable[[Path], int] = wolne_miejsce
+    dysk: Callable[[Path], Any] = dysk
+    dyski: Callable[[], list[Path]] = dyski_lokalne
     otworz: Callable[[str], bool] | None = None          # przeglądarka; None = webbrowser.open
     na_pierwszym_planie: Callable[[list[str], dict], int] | None = None   # None = cli.uruchom_na_pierwszym_planie
     czekaj: Callable[[float], None] = time.sleep
@@ -851,6 +973,414 @@ def rada_autostartu(start: bool) -> str:
             "--bez-autostartu).")
 
 
+# ---------------------------------------------------------------- miejsce instalacji (c3 pkt 11, Z31)
+
+MB, GB = 10 ** 6, 10 ** 9
+# rozpakowane narzędzie ≈ rozmiar pliku z manifestu × współczynnik formatu, z zapasem na całość (zmierzone 2026-10-25
+# na Windows 11 x64: 17 narzędzi, archiwa 0,72 GB → 2,06 GB po rozpakowaniu, szacunek 2,24 GB; zip zwykle × 1,8–3,1,
+# ale pandoc × 5,6, tar.gz Pythonów × 2,9, tar.bz2 Gita × 3,5); pole `rozpakowany` (B) wpisu platformy, gdy manifest
+# je poda, ma pierwszeństwo
+ROZPAKOWANIE = {"zip": 3.0, "tar.gz": 3.0, "tgz": 3.0, "tar.xz": 4.5, "tar.bz2": 4.0, "tar": 1.0, "plik": 1.0}
+# Hermes w MB (zmierzone 2026-10-25 na Windows 11 x64, f97608f z dodatkami pinu): checkout 753 MB z .git bez blobów
+# historii (235) i .venv (322) plus pliki .pyc, które Python dopisze przy pracy (zostaje), cache uv z kołami .venv
+# (317 MB, znika po instalacji), node_modules frontu (280 MB, znika zaraz po budowie), front: dist, kopia z łatkami
+# Jarva i cache npm (72 MB, zostaje). Pole `miejsce_mb` przypięcia w manifeście (te same klucze) ma pierwszeństwo;
+# do przeniesienia do vendor/natywne.yaml (koordynator)
+HERMES_MB = {"checkout": 850, "cache_uv": 350, "node_modules": 300, "front": 80}
+# flota w MB (zmierzone 2026-10-25 na Windows 11 x64): źródła skilli buildu w <cache>/build (34 repo; zostają, bo
+# aktualizacja buduje flotę), build w <root>/build i profile z wtyczkami w <dane>
+FLOTA_MB = {"zrodla": 1000, "build": 100, "profile": 150}
+ZAPAS = 0.1                     # do potrzeby z manifestu +10 % (pliki tymczasowe, różnice archiwów między systemami)
+ZAPAS_MB = 500                  # i 0,5 GB na dysku korzenia zawsze: dziennik, bazy, build floty w każdym przebiegu
+MIN_WOLNEGO_GB = 2              # doctor: mniej = błąd (bazy SQLite, logi i rendery przestają się zapisywać)
+ZALECANE_WOLNE_GB = 10          # doctor i instalacja: mniej = uwaga (aktualizacja, narzędzia przy pierwszym użyciu)
+CZESCI = ("program", "dane", "cache", "build")     # części korzenia w opisie zajętego miejsca; reszta to „inne”
+PROG_SPRZATANIA = MB            # cache mniejszy (same znaczniki programu) zostaje: drugi przebieg nie woła uv ani pixi
+
+
+class BrakMiejsca(BladInstalacji):
+    """Za mało miejsca na dysku instalacji: komunikat z potrzebą, innymi dyskami i gotowym poleceniem."""
+
+
+@dataclass(frozen=True)
+class Potrzeba:
+    """Miejsce jednej części instalacji w bajtach: `szczyt` w czasie instalacji (z pobranymi archiwami i cache),
+    `zostaje` po sprzątaniu; `gdzie` = katalog, na którego dysku leży ta część."""
+    opis: str
+    gdzie: Path
+    szczyt: int
+    zostaje: int
+
+
+def gb(bajty: float) -> str:
+    """Gigabajty po polsku: „11,4”, a poniżej 1 GB dwie cyfry po przecinku („0,72”)."""
+    wartosc = bajty / GB
+    return (f"{wartosc:.1f}" if abs(wartosc) >= 1 else f"{wartosc:.2f}").replace(".", ",")
+
+
+def _tekst_pliku(p: Path) -> str:
+    try:
+        return p.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def _do_instalacji(wpis: Any) -> bool:
+    return isinstance(wpis, dict) and (wpis.get("kiedy") or "instalacja") == "instalacja"
+
+
+def rozpakowane(wpis: dict) -> int:
+    """Bajty narzędzia po rozpakowaniu: `rozpakowany` z wpisu platformy albo rozmiar pliku × ROZPAKOWANIE formatu."""
+    if wpis.get("rozpakowany"):
+        return int(wpis["rozpakowany"])
+    return int(int(wpis.get("rozmiar") or 0) * ROZPAKOWANIE.get(str(wpis.get("format") or "zip"), 3.0))
+
+
+def potrzebne_miejsce(u: Uklad, app: Path, platforma: str, *, wszystko: bool = False) -> list[Potrzeba]:
+    """Ile miejsca zajmie instalacja z manifestu tej wersji (vendor/natywne.lock.json) na platformie `platforma`:
+    narzędzia z `kiedy: instalacja` (plik w <cache>/pobrane i rozpakowany w <program>), venvy (venvy.miejsce:
+    pobranie_mb i venv_mb, koła w cache uv), modele (rozmiary plików), Tesseract (tesseract.miejsce: rozmiary paczek
+    z pixi.lock), Hermes z frontem (HERMES_MB albo `miejsce_mb` przypięcia) i flota (FLOTA_MB, gdy kod ma fleet.yaml).
+    Części, które już są (znacznik sumy narzędzia, venvu, modelu, Tesseracta, Hermesa i frontu tego pinu, źródła
+    skilli w <cache>/build, profile w <dane>), liczą się jako 0, więc drugi przebieg potrzebuje tylko zapasu;
+    `wszystko=True` liczy całość jak na pustym dysku. Bez zapasu (dolicza go bilans_dyskow). Tylko odczyt."""
+    from . import hermes, modele, tesseract, venvy
+    narz = manifest.wczytaj(app)
+    nazwy = narzedzia_instalacji(narz, platforma)
+    wynik: list[Potrzeba] = []
+    archiwa = rozp = ile = 0
+    for nazwa in nazwy:
+        wpis = manifest.plik(narz, nazwa, platforma)
+        kat = u.program / "narzedzia" / nazwa / pobieracz.katalog_wersji(manifest.wersja(narz, nazwa))
+        if not wszystko and _tekst_pliku(kat / ".jarvo-suma") == str(wpis.get("sha256")):
+            continue
+        archiwa, rozp, ile = archiwa + int(wpis.get("rozmiar") or 0), rozp + rozpakowane(wpis), ile + 1
+    if ile:
+        wynik += [Potrzeba(f"archiwa narzędzi ({ile})", u.cache, archiwa, 0),
+                  Potrzeba(f"narzędzia ({ile})", u.program, rozp, rozp)]
+    venv = cache = ile = 0
+    for nazwa, wpis in manifest.venvy(app).items():
+        if not _do_instalacji(wpis) or (not wszystko and venvy.zainstalowany(venvy.katalog(u, nazwa, wpis), wpis)):
+            continue
+        v, c = venvy.miejsce(wpis, platforma)
+        venv, cache, ile = venv + v, cache + c, ile + 1
+    if ile:
+        wynik += [Potrzeba(f"venvy ({ile})", u.program, venv, venv), Potrzeba("cache uv venvów", u.cache, cache, 0)]
+    pliki = ile = 0
+    for model in manifest.modele(app).values():
+        if not _do_instalacji(model) or (not wszystko and modele.gotowy(modele.katalog(u.jarvo_dane / "models",
+                                                                                         model), model)):
+            continue
+        pliki, ile = pliki + sum(int(p.get("rozmiar") or 0) for p in model.get("pliki") or []), ile + 1
+    if pliki:
+        wynik.append(Potrzeba(f"modele ({ile})", u.jarvo_dane / "models", pliki, pliki))
+    if "pixi" in nazwy and tesseract.projekt(app) is not None and (wszystko or not tesseract.zainstalowany(u, app)):
+        cache, srodowisko_pixi, zostaje = tesseract.miejsce(app, platforma)
+        wynik += [Potrzeba("cache pixi (Tesseract)", u.cache, cache, 0),
+                  Potrzeba("Tesseract", u.program, srodowisko_pixi, zostaje)]
+    try:
+        pin = manifest.hermes(app)
+    except KeyError:                                # manifest bez przypięcia Hermesa (tylko narzędzia)
+        pin = {}
+    commit = str(pin.get("commit") or "").lower() if isinstance(pin, dict) else ""
+    if commit:
+        wlasne = pin.get("miejsce_mb") if isinstance(pin.get("miejsce_mb"), dict) else {}
+        mb = {**HERMES_MB, **{k: v for k, v in wlasne.items() if k in HERMES_MB and isinstance(v, (int, float))}}
+        checkout = hermes.katalog_checkoutu(u, commit)
+        jest = not wszystko and srodowisko.wczytaj_json(checkout / hermes.ZNACZNIK).get("commit") == commit
+        if not jest:
+            wynik += [Potrzeba("Hermes (checkout i .venv)", u.program, int(mb["checkout"] * MB),
+                               int(mb["checkout"] * MB)),
+                      Potrzeba("cache uv Hermesa", u.cache, int(mb["cache_uv"] * MB), 0)]
+        if not jest or srodowisko.wczytaj_json(checkout / hermes.ZNACZNIK_WEB).get("commit") != commit:
+            wynik += [Potrzeba("node_modules frontu", u.program, int(mb["node_modules"] * MB), 0),
+                      Potrzeba("front panelu i cache npm", u.program, int(mb["front"] * MB), int(mb["front"] * MB))]
+    if (Path(app) / "fleet.yaml").is_file():
+        if wszystko or not any((u.cache / "build").glob("*@*")):
+            wynik.append(Potrzeba("źródła skilli floty", u.cache, FLOTA_MB["zrodla"] * MB, FLOTA_MB["zrodla"] * MB))
+        if wszystko or not (u.dane / "profiles").is_dir():
+            wynik += [Potrzeba("build floty", u.build, FLOTA_MB["build"] * MB, FLOTA_MB["build"] * MB),
+                      Potrzeba("profile floty", u.dane, FLOTA_MB["profile"] * MB, FLOTA_MB["profile"] * MB)]
+    return wynik
+
+
+def miejsce_przy_uzyciu(app: Path, platforma: str) -> int:
+    """Bajty narzędzi, venvów i modeli z `kiedy: przy-uzyciu` manifestu (Camoufox, Parakeet, CAD, ManimGX…) po
+    instalacji: tyle zajmą jeszcze przy pierwszym użyciu (doctor)."""
+    from . import venvy
+    razem = 0
+    narz = manifest.wczytaj(app)
+    for nazwa, wpis in narz.items():
+        if isinstance(wpis, dict) and wpis.get("kiedy") == "przy-uzyciu":
+            with contextlib.suppress(manifest.BrakNarzedzia):
+                razem += rozpakowane(manifest.plik(narz, nazwa, platforma))
+    for wpis in manifest.venvy(app).values():
+        if isinstance(wpis, dict) and wpis.get("kiedy") == "przy-uzyciu":
+            razem += venvy.miejsce(wpis, platforma)[0]
+    for model in manifest.modele(app).values():
+        if isinstance(model, dict) and model.get("kiedy") == "przy-uzyciu":
+            razem += sum(int(p.get("rozmiar") or 0) for p in model.get("pliki") or [])
+    return razem
+
+
+def bilans_dyskow(u: Uklad, potrzeby: list[Potrzeba], ot: Otoczenie) -> list[dict]:
+    """Potrzeba z zapasem i wolne miejsce na każdym dysku, na którym leży część instalacji (Linux bez JARVO_ROOT:
+    cache w ~/.cache bywa na innym dysku niż korzeń), najpierw dysk korzenia: [{"dysk", "punkt", "sciezka",
+    "potrzeba", "zostaje", "wolne", "korzen"}]. `potrzeba` = suma szczytów × (1 + ZAPAS), na dysku korzenia jeszcze
+    ZAPAS_MB; `wolne` None = system nie podał."""
+    grupy: dict[Any, dict] = {}
+
+    def dodaj(sciezka: Path, szczyt: int, zostaje: int) -> None:
+        try:
+            klucz = ot.dysk(sciezka)
+        except OSError:
+            klucz = _klucz(istniejacy(sciezka))
+        g = grupy.setdefault(klucz, {"dysk": klucz, "sciezka": Path(sciezka), "szczyt": 0, "zostaje": 0})
+        g["szczyt"] += szczyt
+        g["zostaje"] += zostaje
+
+    dodaj(u.root, 0, 0)
+    for p in potrzeby:
+        dodaj(p.gdzie, p.szczyt, p.zostaje)
+    wynik = []
+    for i, g in enumerate(grupy.values()):
+        try:
+            wolne = ot.wolne_miejsce(g["sciezka"])
+        except OSError:
+            wolne = None
+        wynik.append({"dysk": g["dysk"], "punkt": punkt_dysku(g["sciezka"]), "sciezka": g["sciezka"],
+                      "potrzeba": int(g["szczyt"] * (1 + ZAPAS)) + (ZAPAS_MB * MB if i == 0 else 0),
+                      "zostaje": g["zostaje"], "wolne": wolne, "korzen": i == 0})
+    return wynik
+
+
+def inne_dyski(u: Uklad, potrzeba: int, ot: Otoczenie, pelne: set | None = None) -> list[dict]:
+    """Dyski lokalne (ot.dyski) poza dyskami `pelne` (domyślnie dysk korzenia i cache) z co najmniej `potrzeba`
+    B wolnego, od największego wolnego miejsca: [{"punkt", "wolne", "korzen"}], gdzie `korzen` to proponowany
+    JARVO_ROOT (Windows `<dysk>\\Jarvo`, macOS i Linux `<katalog>/jarvo`; JARVO_ROOT przenosi pod korzeń także cache
+    i logi, więc dysk musi pomieścić całość)."""
+    zajete = set(pelne or ())
+    for k in (() if pelne is not None else (u.root, u.cache)):
+        with contextlib.suppress(OSError):
+            zajete.add(ot.dysk(k))
+    try:
+        punkty = list(ot.dyski())
+    except OSError:
+        punkty = []
+    wynik = []
+    for punkt in punkty:
+        try:
+            numer, wolne = ot.dysk(punkt), ot.wolne_miejsce(punkt)
+        except OSError:
+            continue
+        if numer in zajete or wolne is None or wolne < potrzeba:
+            continue
+        zajete.add(numer)
+        wynik.append({"punkt": str(punkt), "wolne": wolne,
+                      "korzen": str(Path(punkt) / ("Jarvo" if WINDOWS else "jarvo"))})
+    return sorted(wynik, key=lambda k: -k["wolne"])
+
+
+def polecenie_instalacji(korzen: str, *, windows: bool = WINDOWS) -> str:
+    """Instalacja jednym poleceniem (bootstrap jak w radzie `jarvo` bez instalacji) z JARVO_ROOT=`korzen`: PowerShell
+    na Windows, bash na macOS i Linuksie."""
+    from .cli import BOOTSTRAP
+    if windows:
+        return f"$env:JARVO_ROOT = '{korzen.replace(chr(39), chr(39) * 2)}'; irm {BOOTSTRAP}/install.ps1 | iex"
+    return f"curl -fsSL {BOOTSTRAP}/install.sh | JARVO_ROOT={shlex.quote(korzen)} bash"
+
+
+def komunikat_braku_miejsca(u: Uklad, app: Path, platforma: str, brak: list[dict], ot: Otoczenie, *,
+                            instalacja: bool = True) -> str:
+    """Komunikat, gdy na dysku z `brak` (bilans_dyskow) zabraknie miejsca. Aktualizacja (jest current.json): działająca
+    wersja zostaje, rada to zwolnić miejsce. Nowa instalacja: inne dyski lokalne z miejscem na całość (inne_dyski)
+    i gotowe polecenie z JARVO_ROOT na pierwszym z nich, a bez takiego dysku: ile zwolnić. `instalacja=False`
+    (doctor): bez zdań o tym, co zrobił instalator."""
+    b = brak[0]
+    nowa = not (u.program / "current.json").is_file()
+    tekst = (f"na dysku {b['punkt']} jest {gb(b['wolne'])} GB wolnego miejsca, a "
+             + ("instalacja Jarva" if nowa else "ta aktualizacja Jarva")
+             + f" potrzebuje na nim ok. {gb(b['potrzeba'])} GB (w trakcie, z pobranymi archiwami i cache; po "
+             f"sprzątaniu zostaje ok. {gb(b['zostaje'])} GB). ")
+    brakuje = gb(b["potrzeba"] - b["wolne"])
+    if not nowa:
+        return tekst + (f"Działająca wersja zostaje bez zmian. Zwolnij na tym dysku co najmniej {brakuje} GB "
+                        "i uruchom polecenie instalacji jeszcze raz.")
+    if instalacja:
+        tekst += "Niczego nie zainstalowałem. "
+    calosc = int(sum(p.szczyt for p in potrzebne_miejsce(u, app, platforma, wszystko=True)) * (1 + ZAPAS))
+    calosc += ZAPAS_MB * MB
+    kandydaci = inne_dyski(u, calosc, ot, pelne={x["dysk"] for x in brak})
+    if kandydaci:
+        tekst += ("Wystarczy miejsca na: " + ", ".join(f"{k['punkt']} ({gb(k['wolne'])} GB wolnego)"
+                                                       for k in kandydaci)
+                  + f". Zainstaluj Jarvo tam jednym poleceniem{' w PowerShellu' if WINDOWS else ''}:\n    "
+                  + polecenie_instalacji(kandydaci[0]["korzen"]))
+    else:
+        przyklad = ("E:\\Jarvo" if b["punkt"].upper().startswith("D:") else "D:\\Jarvo") if WINDOWS else (
+            "/Volumes/Dysk/jarvo" if MACOS else "/mnt/dysk/jarvo")
+        tekst += (f"Nie znalazłem innego dysku lokalnego z ok. {gb(calosc)} GB wolnego: zwolnij na dysku "
+                  f"{b['punkt']} co najmniej {brakuje} GB albo podłącz inny dysk i uruchom polecenie instalacji "
+                  f"jeszcze raz z JARVO_ROOT na katalogu na nim, np.:\n    {polecenie_instalacji(przyklad)}")
+    startowe = rozmiar_katalogu(u.root) if instalacja and u.root.is_dir() else 0
+    if startowe:
+        tekst += (f"\nPliki programu startowego ({gb(startowe)} GB: uv, Python i kod Jarva) są w {u.root}: po "
+                  "instalacji w innym miejscu możesz usunąć ten katalog.")
+    return tekst
+
+
+def rozmiar_katalogu(katalog: Path | str, widziane: set | None = None, *, wlasne: bool = False) -> int:
+    """Bajty plików w drzewie `katalog` bez wchodzenia w dowiązania i punkty połączenia (junction: wtyczki floty,
+    workspace'y npm). Twarde dowiązanie liczy się raz, gdy system podaje numer pliku (POSIX; os.scandir na Windows
+    go nie podaje, więc suma jest tam górnym oszacowaniem). `wlasne=True`: tylko pliki bez innych twardych dowiązań
+    (os.stat także na Windows), czyli tyle, ile zwolni usunięcie katalogu: cache pixi dzieli pliki ze środowiskiem
+    Tesseracta. Brak katalogu = 0."""
+    widziane = set() if widziane is None else widziane
+    razem = 0
+    stos = [str(katalog)]
+    while stos:
+        try:
+            with os.scandir(stos.pop()) as it:
+                wpisy = list(it)
+        except OSError:
+            continue
+        for e in wpisy:
+            try:
+                if e.is_symlink() or (hasattr(e, "is_junction") and e.is_junction()):
+                    continue
+                if e.is_dir(follow_symlinks=False):
+                    stos.append(e.path)
+                    continue
+                st = os.stat(e.path, follow_symlinks=False) if wlasne and WINDOWS else e.stat(follow_symlinks=False)
+            except OSError:
+                continue
+            if wlasne and st.st_nlink > 1:
+                continue
+            if st.st_nlink > 1 and st.st_ino:
+                if (st.st_dev, st.st_ino) in widziane:
+                    continue
+                widziane.add((st.st_dev, st.st_ino))
+            razem += st.st_size
+    return razem
+
+
+def _w_korzeniu(katalog: Path, root: Path) -> bool:
+    return _klucz(katalog).startswith(_klucz(root).rstrip("\\/") + os.sep)
+
+
+def usun_drzewo(p: Path) -> None:
+    """rmtree, które zdejmuje atrybut tylko do odczytu (archiwa, paczki gita) i pomija pliki, których nie da się
+    usunąć (zajęte przez działający program na Windows): zostają do następnego sprzątania. Punkty połączenia
+    (junction) usuwa bez wchodzenia do ich celu (Python 3.12+)."""
+    def ponow(funkcja, sciezka, _blad):
+        try:
+            os.chmod(sciezka, stat.S_IWRITE | stat.S_IREAD)
+            funkcja(sciezka)
+        except OSError:
+            pass
+    shutil.rmtree(p, onexc=ponow)
+
+
+def usun_zawartosc(katalog: Path) -> None:
+    """Pliki i podkatalogi `katalog` (sam katalog zostaje, dowiązań nie ruszamy); zajęty plik zostaje."""
+    try:
+        with os.scandir(katalog) as it:
+            wpisy = list(it)
+    except OSError:
+        return
+    for e in wpisy:
+        try:
+            if e.is_symlink() or (hasattr(e, "is_junction") and e.is_junction()):
+                continue
+            if e.is_dir(follow_symlinks=False):
+                usun_drzewo(Path(e.path))
+            else:
+                os.chmod(e.path, stat.S_IWRITE | stat.S_IREAD)
+                os.unlink(e.path)
+        except OSError:
+            continue
+
+
+def zajete_miejsce(u: Uklad) -> dict[str, int]:
+    """Bajty plików Jarva według części: program, dane, cache, build i inne (stan, logi, bin w korzeniu); na Linuksie
+    bez JARVO_ROOT także cache i logi z katalogów XDG poza korzeniem. Tylko odczyt."""
+    widziane: set = set()
+    wynik = {c: 0 for c in (*CZESCI, "inne")}
+    try:
+        with os.scandir(u.root) as it:
+            wpisy = list(it)
+    except OSError:
+        wpisy = []
+    for e in wpisy:
+        czesc = e.name.lower() if e.name.lower() in CZESCI else "inne"
+        try:
+            if e.is_symlink() or (hasattr(e, "is_junction") and e.is_junction()):
+                continue
+            wynik[czesc] += (rozmiar_katalogu(e.path, widziane) if e.is_dir(follow_symlinks=False)
+                             else e.stat(follow_symlinks=False).st_size)
+        except OSError:
+            continue
+    for czesc, k in (("cache", u.cache), ("inne", u.logi)):
+        if not _w_korzeniu(k, u.root):
+            wynik[czesc] += rozmiar_katalogu(k, widziane)
+    return wynik
+
+
+def opis_zajetego(zajete: dict[str, int]) -> str:
+    """„5,3 GB (program 4,1, cache 0,95, dane 0,31)”: części od 0,01 GB."""
+    czesci = ", ".join(f"{k} {gb(v)}" for k, v in zajete.items() if v >= GB // 100)
+    return f"{gb(sum(zajete.values()))} GB" + (f" ({czesci})" if czesci else "")
+
+
+def sprawdz_miejsce(u: Uklad, ot: Otoczenie | None = None) -> dict:
+    """Wynik `jarvo doctor` „wolne miejsce” (ta nazwa zostaje: CI dopuszcza po niej uwagę na małym dysku runnera): ile
+    zajmuje Jarvo (zajete_miejsce) i ile jest wolnego na dysku korzenia; poniżej MIN_WOLNEGO_GB błąd, poniżej
+    ZALECANE_WOLNE_GB uwaga z tym, ile zajmą narzędzia przy pierwszym użyciu. Przed instalacją: ile potrzebuje
+    instalacja z manifestu tej wersji i czy się zmieści (za mało = błąd z innymi dyskami i poleceniem). Tylko odczyt."""
+    ot = ot or Otoczenie()
+
+    def wynik(stan: str, opis: str, rada: str = "") -> dict:
+        return {"nazwa": "wolne miejsce", "stan": stan, "opis": opis, "rada": rada}
+
+    try:
+        wolne = ot.wolne_miejsce(u.root)
+    except OSError as e:
+        return wynik("uwaga", f"nie umiem sprawdzić ({e})", "Sprawdź dysk ręcznie.")
+    punkt = punkt_dysku(u.root)
+    app = katalog_aplikacji(u)
+    try:
+        platforma = sciezki.platforma()
+    except sciezki.BladUkladu:
+        platforma = ""
+    if not (u.program / "current.json").is_file():
+        try:
+            potrzeby = potrzebne_miejsce(u, app, platforma) if platforma else None
+        except (OSError, ValueError, KeyError):
+            potrzeby = None
+        if potrzeby is None:
+            return wynik("ok", f"{gb(wolne)} GB wolnego na dysku {punkt} (Jarva tu jeszcze nie ma)")
+        bilans = bilans_dyskow(u, potrzeby, ot)
+        opis = (f"{gb(wolne)} GB wolnego na dysku {punkt}; instalacja potrzebuje ok. {gb(bilans[0]['potrzeba'])} GB "
+                f"(po sprzątaniu zostaje ok. {gb(sum(p.zostaje for p in potrzeby))} GB)")
+        brak = [b for b in bilans if b["wolne"] is not None and b["wolne"] < b["potrzeba"]]
+        if brak:
+            return wynik("blad", opis, komunikat_braku_miejsca(u, app, platforma, brak, ot, instalacja=False))
+        return wynik("ok", opis)
+    opis = f"Jarvo zajmuje {opis_zajetego(zajete_miejsce(u))}; wolne {gb(wolne)} GB na dysku {punkt}"
+    if wolne < MIN_WOLNEGO_GB * GB:
+        return wynik("blad", opis, f"Przy zapełnionym dysku bazy (SQLite), logi i rendery przestają się zapisywać: "
+                                   f"zwolnij miejsce na dysku {punkt}.")
+    if wolne < ZALECANE_WOLNE_GB * GB:
+        try:
+            dodatki = f"ok. {gb(miejsce_przy_uzyciu(app, platforma))} GB" if platforma else "kilka GB"
+        except (OSError, ValueError, KeyError):
+            dodatki = "kilka GB"
+        return wynik("uwaga", opis, "Aktualizacja stawia nową wersję obok działającej, a narzędzia przy pierwszym "
+                                    f"użyciu (Camoufox, Parakeet, CAD, ManimGX…) zajmą jeszcze {dodatki}: zwolnij "
+                                    "miejsce, zanim je doinstalujesz.")
+    return wynik("ok", opis)
+
+
 # ---------------------------------------------------------------- przebieg instalacji
 
 def _pasek(i: int, n: int, szerokosc: int = 24) -> str:
@@ -871,13 +1401,6 @@ def _zapisz_jesli_inne(cel: Path, tresc: str | bytes) -> bool:
 
 def _json(dane: dict) -> str:
     return json.dumps(dane, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-
-
-def _wolne_gb(sciezka: Path) -> float:
-    p = Path(sciezka)
-    while not p.exists() and p.parent != p:
-        p = p.parent
-    return shutil.disk_usage(p).free / 1e9
 
 
 @contextlib.contextmanager
@@ -974,12 +1497,15 @@ class _Instalacja:
                 krok()
             except Exception as e:    # noqa: BLE001 - każdy błąd kroku kończy instalację czytelnym komunikatem
                 self.log(f"BŁĄD w kroku „{nazwa}”: {e}")
+                if isinstance(e, BrakMiejsca):       # komunikat ma już polecenie z JARVO_ROOT albo radę
+                    return 1
                 self._slad()
                 self._po_bledzie()
                 self.log("Instalację można uruchomić ponownie: gotowe kroki zostaną pominięte.")
                 return 1
         if self.oznaczone:                   # bez startu teraz (--bez-startu): autostart podniesie nową wersję sam
             zdejmij_zatrzymanie(self.u, self.ot)
+        self.sprzatanie()
         for uwaga in self.uwagi:
             self.log(f"Uwaga: {uwaga}")
         zmiany = ", ".join(dict.fromkeys(self.zmiany)) or "brak"
@@ -1027,6 +1553,57 @@ class _Instalacja:
             gdzie = kiedy_dziala_path() + (f"; od razu: {cel}" if cel is not None and not WINDOWS else "")
         return f"Polecenia: jarvo panel, jarvo status, jarvo doctor, {chat} ({gdzie})."
 
+    # -- sprzątanie po udanym przebiegu (c3 pkt 11, Z31; docstring modułu)
+    def _funkcja(self, modul: str, nazwa: str) -> Callable | None:
+        """Funkcja modułu Jarva z Otoczenia albo None (brak modułu albo starsza wersja bez tej funkcji)."""
+        try:
+            f = getattr(self.ot.modul(modul), nazwa, None)
+        except ImportError:
+            return None
+        return f if callable(f) else None
+
+    def sprzatanie(self) -> None:
+        """Archiwa z <cache>/pobrane (także niedokończone .czesc), cache uv (venvy.sprzatnij_cache), cache pixi
+        (tesseract.sprzatnij_cache) i katalogi `<wersja>.stary-*` narzędzi, które pobieracz zostawił przy zajętym
+        pliku; zwolnione miejsce to pliki bez innych twardych dowiązań przed i po (rozmiar_katalogu wlasne=True: plik
+        dzielony ze środowiskiem Tesseracta miejsca nie zwalnia). Cache poniżej PROG_SPRZATANIA (same pliki znaczników)
+        zostaje, więc drugi przebieg nie woła uv. Nic tu nie przerywa udanej instalacji: błąd to uwaga. Na końcu
+        wiersz „Miejsce” (zajęte i wolne, jak w `jarvo doctor`)."""
+        zwolnione: list[tuple[str, int]] = []
+
+        def rozmiar(katalog: Path) -> int:
+            return rozmiar_katalogu(katalog, wlasne=True) if katalog.exists() else 0
+
+        def mierz(opis: str, katalog: Path, sprzataj: Callable[[], Any], prog: int = PROG_SPRZATANIA) -> None:
+            przed = rozmiar(katalog)
+            if not przed or przed < prog:
+                return
+            try:
+                sprzataj()
+            except Exception as e:  # noqa: BLE001 - sprzątanie nie psuje udanej instalacji
+                self.uwagi.append(f"sprzątanie ({opis}) nie przeszło: {type(e).__name__}: {str(e)[:200]}")
+            zwolnione.append((opis, max(przed - rozmiar(katalog), 0)))
+
+        mierz("archiwa narzędzi", self.u.cache / "pobrane", lambda: usun_zawartosc(self.u.cache / "pobrane"), prog=1)
+        uv = self._funkcja("venvy", "sprzatnij_cache")
+        if uv is not None and "uv" in self.narz:
+            mierz("cache uv", self.u.cache / "uv", lambda: uv(self.u, self._bin_narzedzia("uv"), log=self.podlog))
+        pixi = self._funkcja("tesseract", "sprzatnij_cache")
+        if pixi is not None:
+            mierz("cache pixi", self.u.cache / "pixi", lambda: pixi(self.u, log=self.podlog))
+        for stary in sorted((self.u.program / "narzedzia").glob("*/*.stary-*")):
+            mierz(f"stara wersja {stary.parent.name}", stary, lambda s=stary: usun_drzewo(s), prog=1)
+        razem = sum(z for _o, z in zwolnione)
+        if razem:
+            self.log(f"Sprzątanie: zwolnione {gb(razem)} GB ("
+                     + ", ".join(f"{o} {gb(z)} GB" for o, z in zwolnione if z) + ")")
+        try:
+            wolne = self.ot.wolne_miejsce(self.u.root)
+        except OSError:
+            return
+        self.log(f"Miejsce: Jarvo zajmuje {opis_zajetego(zajete_miejsce(self.u))}; wolne {gb(wolne)} GB na dysku "
+                 f"{punkt_dysku(self.u.root)}")
+
     # -- kroki
     def sprawdzenie(self) -> None:
         self.platforma = self.platforma or sciezki.platforma()
@@ -1048,14 +1625,31 @@ class _Instalacja:
         if port_api(self.u, self.ot.env) == port_panelu(self.ot.env):
             raise BladInstalacji(f"panel i API bramy nie mogą mieć tego samego portu ({port_panelu(self.ot.env)}): "
                                  "zmień JARVO_PANEL_PORT albo JARVO_API_PORT.")
-        wolne = _wolne_gb(self.u.root)
-        if wolne < MIN_MIEJSCA_GB:
-            raise BladInstalacji(f"na dysku z {self.u.root} jest {wolne:.1f} GB wolnego miejsca, a instalacja "
-                                 f"potrzebuje co najmniej {MIN_MIEJSCA_GB} GB. Zwolnij miejsce albo ustaw JARVO_ROOT "
-                                 "na inny dysk.")
-        if wolne < ROZMIAR_GB and not (self.u.program / "current.json").is_file():
-            uwaga = (f"na dysku z {self.u.root} jest {wolne:.1f} GB wolnego miejsca, a instalacja z flotą zajmuje "
-                     f"ok. {ROZMIAR_GB} GB: może zabraknąć miejsca (JARVO_ROOT na inny dysk)")
+        self.bilans_miejsca()
+
+    def bilans_miejsca(self) -> None:
+        """Potrzeba z manifestu (potrzebne_miejsce: tylko części, których jeszcze nie ma) wobec wolnego miejsca na
+        każdym dysku instalacji (bilans_dyskow). Za mało = BrakMiejsca jeszcze w kroku 1, czyli zanim instalator
+        cokolwiek zapisze (katalogi zakłada krok 2). Mało miejsca po instalacji = uwaga."""
+        potrzeby = potrzebne_miejsce(self.u, self.app, self.platforma)
+        bilans = bilans_dyskow(self.u, potrzeby, self.ot)
+        for b in bilans:
+            wolne = "nie wiem, ile" if b["wolne"] is None else f"{gb(b['wolne'])} GB"
+            if not potrzeby:
+                self.podlog(f"miejsce na dysku {b['punkt']}: wszystkie części instalacji już są (zapas "
+                            f"{gb(b['potrzeba'])} GB), wolne {wolne}")
+                continue
+            self.podlog(f"miejsce na dysku {b['punkt']}: potrzeba ok. {gb(b['potrzeba'])} GB w trakcie instalacji "
+                        f"(po sprzątaniu zostaje ok. {gb(b['zostaje'])} GB), wolne {wolne}")
+        brak = [b for b in bilans if b["wolne"] is not None and b["wolne"] < b["potrzeba"]]
+        if brak:
+            raise BrakMiejsca(komunikat_braku_miejsca(self.u, self.app, self.platforma, brak, self.ot))
+        korzen = bilans[0]
+        po = None if korzen["wolne"] is None else korzen["wolne"] - korzen["zostaje"]
+        if po is not None and potrzeby and po < ZALECANE_WOLNE_GB * GB:
+            uwaga = (f"po instalacji zostanie ok. {gb(po)} GB wolnego na dysku {korzen['punkt']}: aktualizacja i "
+                     "narzędzia przy pierwszym użyciu (Camoufox, Parakeet, CAD…) potrzebują więcej (`jarvo doctor` "
+                     "pokazuje zajęte i wolne miejsce)")
             self.podlog(f"uwaga: {uwaga}")
             self.uwagi.append(uwaga)
 

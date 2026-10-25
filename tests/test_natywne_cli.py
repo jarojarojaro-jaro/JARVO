@@ -587,7 +587,10 @@ def test_pomoc_po_polsku_i_argparse_bez_trwalej_zmiany(capsys, bez_zmian_procesu
 
 def _ot(tmp_path, **kw) -> instalator.Otoczenie:
     """Otoczenie na atrapach: moduły z `moduly`, zmienne bez JARVO_* właściciela, wirtualny zegar (czekaj przesuwa
-    go od razu, bez spania), nikt nie słucha na portach (sluchacz)."""
+    go od razu, bez spania), nikt nie słucha na portach (sluchacz), dysk ma dużo miejsca, a innych dysków nie ma
+    (instalator liczy potrzebę z manifestu, więc wynik nie zależy od dysku, na którym biegną testy)."""
+    kw.setdefault("wolne_miejsce", lambda sciezka: 1 << 50)
+    kw.setdefault("dyski", lambda: [])
     env = {k: v for k, v in os.environ.items() if not k.startswith("JARVO_")}
     env.update({"JARVO_ROOT": str(tmp_path / "j"), "JARVO_PANEL_PORT": str(kw.pop("port", 19199))})
     env.update(kw.pop("env", {}))
@@ -1281,6 +1284,30 @@ def test_doctor_na_zainstalowanym(tmp_path, capsys, monkeypatch):
         wyniki = {w["nazwa"]: w for w in cli.sprawdz_porty(u, ot, None)}
     panel = wyniki[f"port {port} (panel)"]
     assert panel["stan"] == "blad" and "JARVO_PANEL_PORT" in panel["rada"]
+
+
+def test_doctor_miejsce_zajete_i_wolne(tmp_path):
+    """`jarvo doctor` „wolne miejsce”: ile zajmuje Jarvo (części korzenia) i ile jest wolnego; poniżej 10 GB uwaga
+    z tym, ile zajmą narzędzia przy pierwszym użyciu (z manifestu), poniżej 2 GB błąd. Przed instalacją: potrzeba
+    z manifestu tego kodu, a za mało miejsca to błąd z radą (JARVO_ROOT na innym dysku), bez zakładania korzenia."""
+    gb = instalator.GB
+    u = _zainstalowane(tmp_path)
+    with open(u.cache / "kolo.bin", "wb") as f:
+        f.truncate(20 * 10 ** 6)
+    w = instalator.sprawdz_miejsce(u, _ot(tmp_path, wolne_miejsce=lambda p: 50 * gb))
+    assert w["nazwa"] == "wolne miejsce" and w["stan"] == "ok", w
+    assert re.fullmatch(r"Jarvo zajmuje 0,02 GB \(cache 0,02\); wolne 50,0 GB na dysku .+", w["opis"]), w["opis"]
+    w = instalator.sprawdz_miejsce(u, _ot(tmp_path, wolne_miejsce=lambda p: 5 * gb))
+    assert w["stan"] == "uwaga" and re.search(r"przy pierwszym użyciu .+ zajmą jeszcze ok\. [\d,]+ GB", w["rada"])
+    w = instalator.sprawdz_miejsce(u, _ot(tmp_path, wolne_miejsce=lambda p: gb))
+    assert w["stan"] == "blad" and "zwolnij miejsce na dysku" in w["rada"]
+    d = cli.sprawdz_miejsce(u)                                              # prawdziwy dysk testów
+    assert d["nazwa"] == "wolne miejsce" and "Jarvo zajmuje" in d["opis"] and "GB na dysku" in d["opis"]
+    nowy = sciezki.uklad({"JARVO_ROOT": str(tmp_path / "nowy")})
+    w = instalator.sprawdz_miejsce(nowy, _ot(tmp_path, wolne_miejsce=lambda p: gb))
+    assert w["stan"] == "blad" and re.search(r"instalacja potrzebuje ok\. [\d,]+ GB \(po sprzątaniu", w["opis"])
+    assert "JARVO_ROOT" in w["rada"] and "Niczego nie zainstalowałem" not in w["rada"] and not nowy.root.exists()
+    assert instalator.sprawdz_miejsce(nowy, _ot(tmp_path, wolne_miejsce=lambda p: 500 * gb))["stan"] == "ok"
 
 
 def test_doctor_porty_po_pid_uslug_nadzorcy(tmp_path):

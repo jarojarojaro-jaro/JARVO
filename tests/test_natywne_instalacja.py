@@ -10,6 +10,13 @@ infra/bin aktywnej wersji, zmienne z srodowisko.json bez nadpisywania), środowi
 tylko z plikiem), klucze configu profili z install_fleet.py --ustawienia-profili bez zmian w drugim przebiegu, klucz
 i port API w <dane>/.env oraz doctor bramy. Pełny przebieg instalatora z gitem i Node z manifestu, venvem, modelem
 i Tesseractem na atrapach modułów, z restartem usług przez nadzorcę, gdy zmieniła się tylko flota.
+
+Miejsce (c3 pkt 11, Z31): potrzeba liczona z manifestu (rozmiary plików, pobranie_mb i venv_mb, pixi.lock, modele,
+Hermes, flota) tylko dla brakujących części, bilans na każdym dysku, odmowa przed zapisaniem czegokolwiek z innymi
+dyskami i gotowym poleceniem (PowerShell i bash), punkty montowania Linuksa i macOS, dyski stałe Windows; sprzątanie
+po udanej instalacji (archiwa, cache uv przez `uv cache clean`, cache pixi, stare wersje narzędzi, node_modules frontu
+zaraz po budowie, bez wchodzenia w junction workspace'u npm) i drugi przebieg bez sieci bez zmian; zajęte miejsce
+bez liczenia dowiązań dwa razy.
 """
 from __future__ import annotations
 
@@ -17,6 +24,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 import threading
@@ -32,14 +40,17 @@ from conftest import REPO, WINDOWS
 
 sys.path.insert(0, str(REPO))
 from jarvo import bin_floty, cli, flota, instalator, manifest, modele, programy_floty, sciezki  # noqa: E402
-from jarvo import srodowisko, tesseract, venvy  # noqa: E402
+from jarvo import hermes, srodowisko, tesseract, venvy  # noqa: E402
 import install_fleet  # noqa: E402  (scripts/ w sys.path z conftest)
 
 import test_natywne_cli as tc  # noqa: E402  (atrapy modułów i stanowisko instalatora)
+import test_natywne_hermes as th  # noqa: E402  (atrapy git, uv i npm dla frontu Hermesa)
 
 LOCK = json.loads((REPO / "vendor" / "natywne.lock.json").read_text(encoding="utf-8"))
 stanowisko = tc.stanowisko                                       # fixture z testów instalatora
 serwer = tc.serwer
+atrapa = th.atrapa                                               # fixture z testów Hermesa
+MB, GB = instalator.MB, instalator.GB
 
 
 def _sha(b: bytes) -> str:
@@ -714,3 +725,420 @@ def test_ten_sam_port_panelu_i_api_odmowa(tmp_path, stanowisko):
     app = tc._aplikacja(tmp_path, s["adres"], s["www"])
     assert tc._instaluj(s, app) == 1
     assert any("panel i API bramy nie mogą mieć tego samego portu" in x for x in s["log"])
+
+
+# ---------------------------------------------------------------- miejsce: potrzeba z manifestu, dyski, sprzątanie
+
+def _app_miejsca(tmp_path: Path) -> Path:
+    """Kod Jarva z manifestem do liczenia miejsca: trzy narzędzia instalacji (zip, tar.xz i pixi z polem
+    `rozpakowany`), Camoufox przy pierwszym użyciu, Lightpanda `brak`, venv, model, prawdziwy projekt pixi Tesseracta
+    (rozmiary paczek z pixi.lock), pin Hermesa i fleet.yaml."""
+    app = tmp_path / "app-miejsce"
+
+    def plik(rozmiar: int, format: str, **dodatki) -> dict:
+        return {"url": "https://example.invalid/plik", "sha256": "1" * 64, "rozmiar": rozmiar, "format": format,
+                **dodatki}
+    narz = {
+        "uv": {"wersja": "0.12.13", "pliki": {p: plik(10 * MB, "zip") for p in sciezki.PLATFORMY}},
+        "node": {"wersja": "26.12.1", "pliki": {p: plik(20 * MB, "tar.xz") for p in sciezki.PLATFORMY}},
+        "pixi": {"wersja": "0.83.0", "pliki": {p: plik(5 * MB, "zip", rozpakowany=7 * MB) for p in sciezki.PLATFORMY}},
+        "camoufox": {"wersja": "152", "kiedy": "przy-uzyciu",
+                     "pliki": {p: plik(100 * MB, "zip") for p in sciezki.PLATFORMY}},
+        "lightpanda": {"wersja": "1.0.0", "pliki": {p: {"brak": "nie ma wydania"} for p in sciezki.PLATFORMY}},
+    }
+    venvy_ = {"narzedzia": {"python": "python312", "lock": "x.lock", "sha256": "c" * 64, "kiedy": "instalacja",
+                            "pobranie_mb": {"windows-x64": 100, "linux-x64": 200}, "venv_mb": 400},
+              "cad": {"python": "python312", "lock": "y.lock", "sha256": "d" * 64, "kiedy": "przy-uzyciu",
+                      "pobranie_mb": {"linux-x64": 50}}}
+    modele_ = {"lektor": {"rewizja": "8" * 40, "katalog": "lektor", "kiedy": "instalacja",
+                          "pliki": [{"cel": "a.bin", "url": "https://x/a", "sha256": "2" * 64, "rozmiar": MB},
+                                    {"cel": "b.bin", "url": "https://x/b", "sha256": "3" * 64, "rozmiar": 2 * MB}]},
+               "parakeet": {"rewizja": "9" * 40, "katalog": "parakeet", "kiedy": "przy-uzyciu",
+                            "pliki": [{"cel": "c.onnx", "url": "https://x/c", "sha256": "4" * 64, "rozmiar": 30 * MB}]}}
+    (app / "vendor").mkdir(parents=True)
+    (app / manifest.LOCK).write_text(json.dumps({"version": 1, "hermes": dict(tc.HERMES_PIN), "narzedzia": narz,
+                                                 "venvy": venvy_, "modele": modele_}), encoding="utf-8")
+    for rel in tesseract.PLIKI_PROJEKTU:
+        cel = app / tesseract.PROJEKT / rel
+        cel.parent.mkdir(parents=True, exist_ok=True)
+        cel.write_bytes((REPO / tesseract.PROJEKT / rel).read_bytes())
+    (app / "fleet.yaml").write_text("agents: []\n", encoding="utf-8")
+    return app
+
+
+def _mb(potrzeby, opis: str) -> tuple[float, float]:
+    p = next(x for x in potrzeby if x.opis.startswith(opis))
+    return round(p.szczyt / MB, 3), round(p.zostaje / MB, 3)
+
+
+def test_potrzebne_miejsce_z_manifestu_tylko_brakujace_czesci(tmp_path):
+    app = _app_miejsca(tmp_path)
+    u = uklad(tmp_path / "j")
+    p = instalator.potrzebne_miejsce(u, app, "linux-x64")
+    assert _mb(p, "archiwa narzędzi (3)") == (35, 0)                         # pobrane pliki: tylko w trakcie
+    assert _mb(p, "narzędzia (3)") == (10 * 3.0 + 20 * 4.5 + 7,) * 2        # zip × 3, tar.xz × 4,5, pole rozpakowany
+    assert _mb(p, "venvy (1)") == (800, 800)                                 # venv_mb 400 × pobranie 200/100 (Windows)
+    assert _mb(p, "cache uv venvów") == (pytest.approx(800 * venvy.WSP_CACHE), 0)
+    assert _mb(p, "modele (1)") == (3, 3)                                    # parakeet: przy pierwszym użyciu
+    cache, srod, zostaje = tesseract.miejsce(app, "linux-x64")
+    assert _mb(p, "cache pixi") == (round(cache / MB, 3), 0) and _mb(p, "Tesseract") == (round(srod / MB, 3),
+                                                                                         round(zostaje / MB, 3))
+    h, f = instalator.HERMES_MB, instalator.FLOTA_MB
+    assert _mb(p, "Hermes") == (h["checkout"],) * 2 and _mb(p, "cache uv Hermesa") == (h["cache_uv"], 0)
+    assert _mb(p, "node_modules frontu") == (h["node_modules"], 0) and _mb(p, "front panelu") == (h["front"],) * 2
+    assert _mb(p, "źródła skilli") == (f["zrodla"],) * 2 and _mb(p, "build floty") == (f["build"],) * 2
+    assert _mb(p, "profile floty") == (f["profile"],) * 2
+    assert not [x for x in p if "camoufox" in x.opis.lower() or "cad" in x.opis]
+    # części, które już są: znacznik sumy uv, venv, model, Tesseract, Hermes z frontem, źródła skilli i profile
+    (u.program / "narzedzia" / "uv" / "0.12.13").mkdir(parents=True)
+    (u.program / "narzedzia" / "uv" / "0.12.13" / ".jarvo-suma").write_text("1" * 64 + "\n", encoding="utf-8")
+    wpis = manifest.venvy(app)["narzedzia"]
+    kat = venvy.katalog(u, "narzedzia", wpis)
+    venvy.python_venvu(kat).parent.mkdir(parents=True)
+    venvy.python_venvu(kat).write_bytes(b"")
+    (kat / venvy.ZNACZNIK).write_text(json.dumps({"lock_sha256": wpis["sha256"]}), encoding="utf-8")
+    model = manifest.modele(app)["lektor"]
+    kat = modele.katalog(u.jarvo_dane / "models", model)
+    kat.mkdir(parents=True)
+    for plik in model["pliki"]:
+        (kat / plik["cel"]).write_bytes(b"\0" * plik["rozmiar"])
+    (kat / modele.ZNACZNIK).write_text(json.dumps(modele._znacznik(model)), encoding="utf-8")
+    kat = tesseract.katalog(u, app)
+    tesseract.program(kat).parent.mkdir(parents=True)
+    tesseract.program(kat).write_bytes(b"")
+    (kat / tesseract.ZNACZNIK).write_text(json.dumps({"lock_sha256": _sha((app / tesseract.PROJEKT / "pixi.lock")
+                                                                         .read_bytes())}), encoding="utf-8")
+    checkout = hermes.katalog_checkoutu(u, tc.PIN)
+    checkout.mkdir(parents=True)
+    (checkout / hermes.ZNACZNIK).write_text(json.dumps({"commit": tc.PIN}), encoding="utf-8")
+    (u.cache / "build" / "skille@0123456789ab").mkdir(parents=True)
+    (u.dane / "profiles").mkdir()
+    p = instalator.potrzebne_miejsce(u, app, "linux-x64")
+    assert [x.opis for x in p] == ["archiwa narzędzi (2)", "narzędzia (2)", "node_modules frontu",
+                                   "front panelu i cache npm"]             # front tego pinu jeszcze niezbudowany
+    (checkout / hermes.ZNACZNIK_WEB).write_text(json.dumps({"commit": tc.PIN}), encoding="utf-8")
+    assert [x.opis for x in instalator.potrzebne_miejsce(u, app, "linux-x64")] == ["archiwa narzędzi (2)",
+                                                                                   "narzędzia (2)"]
+    assert len(instalator.potrzebne_miejsce(u, app, "linux-x64", wszystko=True)) == 14   # jak na pustym dysku
+    assert instalator.miejsce_przy_uzyciu(app, "linux-x64") == int(100 * MB * 3.0) + int(50 * venvy.WSP_VENVU * MB) \
+        + 30 * MB
+
+
+@pytest.mark.parametrize("platforma", sciezki.PLATFORMY)
+def test_potrzeba_prawdziwego_manifestu_na_kazdej_platformie(tmp_path, platforma):
+    u = sciezki.uklad({"JARVO_ROOT": str(tmp_path / "j")})
+    potrzeby = instalator.potrzebne_miejsce(u, REPO, platforma)
+    szczyt, zostaje = sum(p.szczyt for p in potrzeby), sum(p.zostaje for p in potrzeby)
+    assert 6 * GB < szczyt < 16 * GB and 3 * GB < zostaje < szczyt - 2 * GB, (instalator.gb(szczyt),
+                                                                              instalator.gb(zostaje))
+    assert {p.opis.split(" (")[0] for p in potrzeby} == {
+        "archiwa narzędzi", "narzędzia", "venvy", "cache uv venvów", "modele", "cache pixi", "Tesseract", "Hermes",
+        "cache uv Hermesa", "node_modules frontu", "front panelu i cache npm", "źródła skilli floty", "build floty",
+        "profile floty"}
+    assert not u.root.exists()                                              # liczenie niczego nie zakłada
+
+
+def test_bilans_dyskow_sumuje_na_jednym_dysku_i_dzieli_na_dwa(tmp_path):
+    u = sciezki.Uklad(root=tmp_path / "j", program=tmp_path / "j" / "program", dane=tmp_path / "j" / "dane",
+                      stan=tmp_path / "j" / "stan", logi=tmp_path / "xdg" / "logi", cache=tmp_path / "xdg" / "cache",
+                      build=tmp_path / "j" / "build")
+    potrzeby = [instalator.Potrzeba("program", u.program, 2 * GB, GB),
+                instalator.Potrzeba("cache", u.cache, GB, 0)]
+    jeden = instalator.Otoczenie(dysk=lambda p: "C", wolne_miejsce=lambda p: 50 * GB)
+    b = instalator.bilans_dyskow(u, potrzeby, jeden)
+    assert len(b) == 1 and b[0]["korzen"] and b[0]["potrzeba"] == int(3 * GB * 1.1) + instalator.ZAPAS_MB * MB
+    assert b[0]["zostaje"] == GB and b[0]["wolne"] == 50 * GB
+    dwa = instalator.Otoczenie(dysk=lambda p: "X" if "xdg" in str(p) else "C",
+                               wolne_miejsce=lambda p: GB if "xdg" in str(p) else 50 * GB)
+    korzen, cache = instalator.bilans_dyskow(u, potrzeby, dwa)
+    assert korzen["korzen"] and korzen["potrzeba"] == int(2 * GB * 1.1) + instalator.ZAPAS_MB * MB
+    assert not cache["korzen"] and cache["potrzeba"] == int(GB * 1.1) and cache["wolne"] == GB
+    # pełny tylko dysk cache (XDG): JARVO_ROOT na dysku korzenia przeniesie tam cache, więc ten dysk się nadaje
+    dwa.dyski = lambda: [tmp_path / "j"]
+    assert [k["punkt"] for k in instalator.inne_dyski(u, 3 * GB, dwa, pelne={cache["dysk"]})] == [str(tmp_path / "j")]
+    assert instalator.inne_dyski(u, 3 * GB, dwa) == []                    # domyślnie bez dysku korzenia i cache
+
+    def bez_dysku(p):
+        raise OSError("brak")
+    assert instalator.bilans_dyskow(u, [], instalator.Otoczenie(wolne_miejsce=bez_dysku))[0]["wolne"] is None
+
+
+def _dyski_atrapa(tmp_path: Path, wolne: dict[str, int]) -> dict:
+    """Atrapa dysków Otoczenia: każdy klucz `wolne` poza „korzen” to katalog tmp_path/<nazwa> na osobnym dysku
+    z tyle wolnego, a reszta (korzeń instalacji) to dysk „korzen”."""
+    def ktory(p) -> str:
+        p = Path(os.path.abspath(p))
+        return next((n for n in wolne if n != "korzen" and (tmp_path / n) in (p, *p.parents)), "korzen")
+    return {"dysk": ktory, "wolne_miejsce": lambda p: wolne[ktory(p)],
+            "dyski": lambda: [tmp_path / n for n in wolne if n != "korzen"]}
+
+
+def test_brak_miejsca_odmowa_przed_zapisem_z_innymi_dyskami_i_poleceniem(tmp_path, stanowisko):
+    s, u = stanowisko, stanowisko["u"]
+    app = tc._aplikacja(tmp_path, s["adres"], s["www"])          # z pinem Hermesa: ok. 2 GB z frontem
+    log: list[str] = []
+    ot = s["otoczenie"](**_dyski_atrapa(tmp_path, {"korzen": GB, "duzy": 500 * GB, "maly": 2 * GB}))
+    assert instalator.instaluj(u, app, log=log.append, otoczenie=ot) == 1
+    tekst = "\n".join(log)
+    assert re.search(r"BŁĄD w kroku „Sprawdzenie komputera”: na dysku .+ jest 1,0 GB wolnego miejsca, a instalacja "
+                     r"Jarva potrzebuje na nim ok\. [\d,]+ GB \(w trakcie", tekst), tekst
+    assert "Niczego nie zainstalowałem." in tekst and "Instalację można uruchomić ponownie" not in tekst
+    assert f"Wystarczy miejsca na: {tmp_path / 'duzy'} (500,0 GB wolnego)." in tekst
+    assert str(tmp_path / "maly") not in tekst                                   # za mały na całą instalację
+    assert instalator.polecenie_instalacji(str(tmp_path / "duzy" / ("Jarvo" if WINDOWS else "jarvo"))) in tekst
+    assert not u.root.exists() and s["hermes"].wywolania == [] and not s["w_tle"]
+    # bez dysku z miejscem: ile zwolnić i przykład polecenia; pliki bootstrapu w korzeniu zostają nietknięte
+    (u.program / "app" / "abc").mkdir(parents=True)
+    (u.program / "app" / "abc" / "start.py").write_bytes(b"x" * 1000)
+    przed = tc._migawka(u.root)
+    log.clear()
+    ot = s["otoczenie"](**_dyski_atrapa(tmp_path, {"korzen": GB, "maly": 2 * GB}))
+    assert instalator.instaluj(u, app, log=log.append, otoczenie=ot) == 1
+    tekst = "\n".join(log)
+    assert "Nie znalazłem innego dysku lokalnego z ok." in tekst and "co najmniej" in tekst and "JARVO_ROOT" in tekst
+    assert f"Pliki programu startowego (0,00 GB: uv, Python i kod Jarva) są w {u.root}" in tekst
+    assert tc._migawka(u.root) == przed and not u.logi.exists()
+
+
+def test_brak_miejsca_przy_aktualizacji_zostawia_dzialajaca_wersje(tmp_path, stanowisko):
+    s, u = stanowisko, stanowisko["u"]
+    assert tc._instaluj(s, tc._aplikacja(tmp_path, s["adres"], s["www"])) == 0
+    przed = srodowisko.biezace(u)
+    nowa = tc._aplikacja(tmp_path, s["adres"], s["www"], nazwa="app2", sha="a" * 40, commit="b" * 40)
+    log: list[str] = []
+    ot = s["otoczenie"](**_dyski_atrapa(tmp_path, {"korzen": GB, "duzy": 500 * GB}))
+    assert instalator.instaluj(u, nowa, log=log.append, otoczenie=ot) == 1
+    tekst = "\n".join(log)
+    assert "ta aktualizacja Jarva potrzebuje na nim ok." in tekst and "Działająca wersja zostaje bez zmian." in tekst
+    assert "Wystarczy miejsca" not in tekst and "Niczego nie zainstalowałem" not in tekst
+    assert srodowisko.biezace(u) == przed and s["nadzorca"].zatrzymania == 0 and s["nadzorca"].dziala
+
+
+def test_polecenie_instalacji_powershell_i_bash():
+    baza = "https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/jarvo/bootstrap"
+    assert cli.BOOTSTRAP == baza
+    assert instalator.polecenie_instalacji("D:\\Jarvo", windows=True) == \
+        f"$env:JARVO_ROOT = 'D:\\Jarvo'; irm {baza}/install.ps1 | iex"
+    assert instalator.polecenie_instalacji("D:\\O'Brien\\Jarvo", windows=True).startswith(
+        "$env:JARVO_ROOT = 'D:\\O''Brien\\Jarvo';")                         # apostrof podwojony w PowerShellu
+    assert instalator.polecenie_instalacji("/mnt/dane/jarvo", windows=False) == \
+        f"curl -fsSL {baza}/install.sh | JARVO_ROOT=/mnt/dane/jarvo bash"
+    assert "JARVO_ROOT='/mnt/moje dane/jarvo' bash" in instalator.polecenie_instalacji("/mnt/moje dane/jarvo",
+                                                                                         windows=False)
+
+
+def test_punkty_montowania_linuksa_i_macos():
+    proc = ("/dev/nvme0n1p2 / ext4 rw,relatime 0 0\n"
+            "/dev/nvme0n1p1 /boot/efi vfat rw,relatime 0 0\n"
+            "/dev/sda1 /media/ola/Dysk\\040Dane ext4 rw,nosuid 0 0\n"
+            "/dev/sdb1 /mnt/archiwum xfs ro,relatime 0 0\n"
+            "/dev/loop3 /snap/core/17 squashfs ro,nodev 0 0\n"
+            "tmpfs /tmp tmpfs rw 0 0\n"
+            "server:/eksport /mnt/nfs nfs4 rw 0 0\n"
+            "dane/jarvo /tank zfs rw,xattr 0 0\n")
+    assert instalator.punkty_linux(proc) == ["/", "/boot/efi", "/media/ola/Dysk Dane", "/tank"]
+    mount = ("/dev/disk3s1s1 on / (apfs, sealed, local, read-only, journaled)\n"
+             "/dev/disk3s5 on /System/Volumes/Data (apfs, local, journaled, nobrowse, protect, root data)\n"
+             "devfs on /dev (devfs, local, nobrowse)\n"
+             "/dev/disk5s1 on /Volumes/Dane (apfs, local, nodev, nosuid, journaled, noowners)\n"
+             "/dev/disk6s1 on /Volumes/Moje Zdjęcia (exfat, local, nodev, nosuid, noowners)\n"
+             "//ola@nas/wspolne on /Volumes/wspolne (smbfs, nodev, nosuid, mounted by ola)\n")
+    assert instalator.punkty_macos(mount) == ["/Volumes/Dane", "/Volumes/Moje Zdjęcia"]
+
+
+@pytest.mark.windows_only
+def test_dyski_lokalne_windows_to_dyski_stale():
+    dyski = instalator.dyski_lokalne()
+    systemowy = os.environ.get("SystemDrive", "C:").upper()
+    assert all(re.fullmatch(r"[A-Z]:\\", str(d)) for d in dyski) and Path(systemowy + "\\") in dyski
+    assert instalator.punkt_dysku(Path(systemowy + "\\") / "nie-ma" / "jarvo") == systemowy + "\\"
+
+
+@pytest.mark.posix_only
+def test_dyski_lokalne_posix_z_katalogiem_domowym():
+    dyski = instalator.dyski_lokalne()
+    assert dyski and dyski[0] == Path.home()
+    assert all(not any(z.isspace() for z in str(d)) for d in dyski[1:])
+    assert instalator.punkt_dysku("/nie-ma/jarvo") == "/"
+
+
+def test_gb_po_polsku_i_opis_zajetego():
+    assert (instalator.gb(11.44 * GB), instalator.gb(0.72 * GB), instalator.gb(0)) == ("11,4", "0,72", "0,00")
+    assert instalator.opis_zajetego({"program": int(4.1 * GB), "dane": int(0.3 * GB), "cache": 0,
+                                     "build": 4 * MB, "inne": 0}) == "4,4 GB (program 4,1, dane 0,30)"
+
+
+def _dowiazanie_katalogu(cel: Path, link: Path) -> None:
+    """Junction na Windows (tak npm linkuje workspace'y, a install_fleet.py wtyczki), symlink na POSIX."""
+    link.parent.mkdir(parents=True, exist_ok=True)
+    if WINDOWS:
+        import _winapi
+        _winapi.CreateJunction(str(cel), str(link))
+    else:
+        os.symlink(cel, link, target_is_directory=True)
+
+
+def test_zajete_miejsce_czesci_bez_wchodzenia_w_dowiazania(tmp_path):
+    u = uklad(tmp_path / "j")
+    pliki = {u.program / "a.bin": 1000, u.cache / "b.bin": 2000, u.dane / "c.bin": 300, u.stan / "d.json": 50,
+             u.build / "plugins" / "hq" / "e.js": 400}
+    for p, n in pliki.items():
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(b"x" * n)
+    _dowiazanie_katalogu(u.build / "plugins" / "hq", u.dane / "plugins" / "hq")       # jak wtyczki floty (H27)
+    os.link(u.program / "a.bin", u.program / "a-twarde.bin")
+    z = instalator.zajete_miejsce(u)
+    # twarde dowiązanie raz na POSIX; os.scandir na Windows nie podaje numeru pliku, więc tam dwa razy (górna granica)
+    assert z == {"program": 2000 if WINDOWS else 1000, "dane": 300, "cache": 2000, "build": 400, "inne": 50}
+    assert instalator.rozmiar_katalogu(tmp_path / "nie-ma") == 0
+    # tyle zwolni usunięcie: plik z drugim twardym dowiązaniem (cache pixi a środowisko Tesseracta) nic nie zwalnia
+    assert instalator.rozmiar_katalogu(u.program, wlasne=True) == 0
+    assert instalator.rozmiar_katalogu(u.cache, wlasne=True) == 2000
+
+
+class AtrapaCacheUv:
+    """venvy.sprzatnij_cache bez prawdziwego uv: czyści <cache>/uv jak `uv cache clean`."""
+
+    def __init__(self):
+        self.wywolania: list[Path] = []
+
+    def sprzatnij_cache(self, u, uv, *, log=print):
+        self.wywolania.append(Path(uv))
+        instalator.usun_zawartosc(u.cache / "uv")
+        log("cache uv: Removed 1 file (2.0MiB)")
+        return True
+
+
+def test_sprzatanie_po_udanej_instalacji_i_drugi_przebieg_bez_sieci(tmp_path, stanowisko):
+    s, u = stanowisko, stanowisko["u"]
+    cache_uv = AtrapaCacheUv()
+    s["moduly"].update({"venvy": cache_uv, "tesseract": tesseract})       # prawdziwe sprzątanie cache pixi
+    app = tc._aplikacja(tmp_path, s["adres"], s["www"])
+    # z poprzedniej próby: koła w cache uv i paczki w cache pixi (znikają), źródła skilli i cache npm (zostają)
+    # i resztka starej wersji uv, której pobieracz nie usunął (zajęty plik)
+    pliki = {"cache/uv/archive-v0/a/kolo.bin": 2 * MB, "cache/pixi/pkgs/tesseract/eng.traineddata": 2 * MB,
+             "cache/build/skille@0123456789ab/SKILL.md": 10, "cache/npm/_cacache/index": 10,
+             "program/narzedzia/uv/0.12.12.stary-1/uv.exe": 10}
+    for rel, n in pliki.items():
+        (u.root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (u.root / rel).write_bytes(b"x" * n)
+    os.chmod(u.root / "cache/pixi/pkgs/tesseract/eng.traineddata", stat.S_IREAD)
+    assert tc._instaluj(s, app) == 0, "\n".join(s["log"])
+    log = "\n".join(s["log"])
+    assert list((u.cache / "pobrane").iterdir()) == []                      # archiwa uv i obu Pythonów
+    assert not list((u.cache / "uv").rglob("*.bin")) and not (u.cache / "pixi").exists()
+    assert not (u.program / "narzedzia" / "uv" / "0.12.12.stary-1").exists()
+    assert (u.root / "cache/build/skille@0123456789ab/SKILL.md").is_file()
+    assert (u.root / "cache/npm/_cacache/index").is_file()
+    assert re.search(r"^Sprzątanie: zwolnione [\d,]+ GB \(archiwa narzędzi 0,\d\d GB, cache uv 0,00 GB, cache pixi "
+                     r"0,00 GB, stara wersja uv 0,00 GB\)$", log, re.M), log
+    assert re.search(r"^Miejsce: Jarvo zajmuje [\d,]+ GB.*; wolne [\d,]+ GB na dysku .+$", log, re.M)
+    assert cache_uv.wywolania == [u.program / "narzedzia" / "uv" / "0.12.13" / ("uv.exe" if WINDOWS else "uv")]
+    assert log.index("Sprzątanie:") < log.index("Gotowe. Zmiany w tym przebiegu:")
+    # drugi przebieg bez sieci: plików na serwerze już nie ma, ale nic nie trzeba pobierać ani sprzątać
+    for p in s["www"].iterdir():
+        p.unlink()
+    przed = tc._migawka(u.root)
+    assert tc._instaluj(s, app) == 0, "\n".join(s["log"])
+    assert "Gotowe. Zmiany w tym przebiegu: brak." in s["log"]
+    assert not [x for x in s["log"] if x.startswith("Sprzątanie")] and any(x.startswith("Miejsce:") for x in s["log"])
+    assert tc._migawka(u.root) == przed and len(cache_uv.wywolania) == 1
+
+
+def test_front_bez_node_modules_po_budowie_a_zrodla_web_zostaja(atrapa, tmp_path):
+    u = th._uklad(tmp_path)
+    checkout = atrapa.instaluj(u)
+    logi: list[str] = []
+    dist = hermes.web_dist(u, checkout, npm=atrapa.npm, log=logi.append, jarva=False)
+    assert (dist / "index.html").is_file()
+    assert json.loads((checkout / hermes.ZNACZNIK_WEB).read_text(encoding="utf-8"))["commit"] == th.COMMIT
+    assert not (checkout / "node_modules").exists()                       # npm ci atrapy zakłada je w korzeniu
+    assert any(x.startswith("Hermes: usunięte node_modules (") for x in logi)
+    # node_modules z instalacji sprzed sprzątania, z junction workspace'u (node_modules/web → web): znika bez
+    # budowy, a źródła web zostają
+    (checkout / "web" / "node_modules" / "vite").mkdir(parents=True)
+    (checkout / "web" / "node_modules" / "vite" / "index.js").write_text("x", encoding="utf-8")
+    (checkout / "node_modules" / "react").mkdir(parents=True)
+    _dowiazanie_katalogu(checkout / "web", checkout / "node_modules" / "web")
+    atrapa.wyczysc()
+    logi.clear()
+    assert hermes.web_dist(u, checkout, npm=tmp_path / "nie-ma-npm", log=logi.append, jarva=False) == dist
+    assert atrapa.wpisy() == [] and not (checkout / "node_modules").exists()
+    assert not (checkout / "web" / "node_modules").exists() and (checkout / "web" / "package.json").is_file()
+    assert any(x.startswith("Hermes: usunięte web/node_modules (") for x in logi)
+    logi.clear()
+    hermes.web_dist(u, checkout, npm=tmp_path / "nie-ma-npm", log=logi.append, jarva=False)
+    assert not [x for x in logi if "usunięte" in x]
+
+
+def test_venvy_miejsce_z_manifestu():
+    wpis = {"pobranie_mb": {"windows-x64": 100, "linux-x64": 150}, "venv_mb": 400}
+    assert venvy.miejsce(wpis, "windows-x64") == (400 * MB, pytest.approx(400 * venvy.WSP_CACHE * MB, abs=10))
+    assert venvy.miejsce(wpis, "linux-x64")[0] == 600 * MB                    # venv_mb × pobranie platformy / Windows
+    assert venvy.miejsce(wpis, "macos-arm64")[0] == 600 * MB                  # bez platformy: największe pobranie
+    assert venvy.miejsce({"pobranie_mb": {"linux-x64": 100}}, "linux-x64")[0] == int(100 * venvy.WSP_VENVU * MB)
+    assert venvy.miejsce({}, "linux-x64") == (0, 0)
+    for nazwa, w in LOCK["venvy"].items():
+        for p in sciezki.PLATFORMY:
+            v, c = venvy.miejsce(w, p)
+            assert 100 * MB < v < 3 * GB and 0 < c < v, (nazwa, p)
+
+
+ATRAPA_UV_CACHE = r'''
+import json, os, shutil, sys
+with open(os.environ["ATRAPA_UV_LOG"], "a", encoding="utf-8") as f:
+    f.write(json.dumps({"argv": sys.argv[1:], "cache": os.environ.get("UV_CACHE_DIR"),
+                        "python": os.environ.get("UV_PYTHON")}) + "\n")
+if os.environ.get("ATRAPA_UV_KOD"):
+    print("error: cache in use", file=sys.stderr)
+    sys.exit(int(os.environ["ATRAPA_UV_KOD"]))
+shutil.rmtree(os.environ["UV_CACHE_DIR"])
+print("Clearing cache at: " + os.environ["UV_CACHE_DIR"])
+print("Removed 2 files (2.0MiB)")
+'''
+
+
+def test_venvy_sprzatnij_cache_to_uv_cache_clean(tmp_path, monkeypatch):
+    dziennik = tmp_path / "uv-cache.log"
+    monkeypatch.setenv("ATRAPA_UV_LOG", str(dziennik))
+    monkeypatch.delenv("ATRAPA_UV_KOD", raising=False)
+    monkeypatch.setenv("UV_PYTHON", "obcy-python")                        # z otoczenia właściciela: nie przechodzi
+    uv = atrapy.program(tmp_path / "uv-bin", "uv", ATRAPA_UV_CACHE)
+    u = uklad(tmp_path / "j")
+    (u.cache / "uv" / "archive-v0").mkdir(parents=True)
+    (u.cache / "uv" / "archive-v0" / "a.bin").write_bytes(b"x" * 100)
+    logi: list[str] = []
+    assert venvy.sprzatnij_cache(u, uv, log=logi.append) is True
+    w = json.loads(dziennik.read_text(encoding="utf-8").splitlines()[-1])
+    assert w["argv"] == ["cache", "clean", "--no-config"] and w["python"] is None
+    assert os.path.normcase(w["cache"]) == os.path.normcase(str(u.cache / "uv"))
+    assert not (u.cache / "uv").exists() and logi == ["cache uv: Removed 2 files (2.0MiB)"]
+    monkeypatch.setenv("ATRAPA_UV_KOD", "2")
+    (u.cache / "uv").mkdir()
+    assert venvy.sprzatnij_cache(u, uv, log=logi.append) is False
+    assert logi[-1] == "cache uv zostaje do następnej instalacji (uv cache clean: kod 2, error: cache in use)"
+
+
+@pytest.mark.parametrize("platforma", sciezki.PLATFORMY)
+def test_tesseract_miejsce_z_rozmiarow_paczek_pixi_lock(platforma):
+    razem, sam = tesseract.rozmiary_paczek(REPO, platforma)
+    assert 100 * MB < razem < GB and 100 * MB < sam < razem                  # paczka tesseract to głównie języki
+    cache, srod, zostaje = tesseract.miejsce(REPO, platforma)
+    assert cache == int(razem * tesseract.WSP_CONDA)               # rozpakowane paczki w cache pixi
+    assert srod == zostaje and 0 < zostaje < cache / 2              # środowisko dzieli pliki z cache, bez języków
+    if platforma == "windows-arm64":
+        assert (razem, sam) == tesseract.rozmiary_paczek(REPO, "windows-x64")   # paczki win-64 w emulacji (I27)
+    assert tesseract.rozmiary_paczek(REPO / "nie-ma", platforma) == (0, 0)
+
+
+def test_tesseract_sprzatnij_cache_pixi(tmp_path):
+    u = uklad(tmp_path / "j")
+    assert tesseract.sprzatnij_cache(u, log=lambda _t: None) is False        # bez cache: nic do zrobienia
+    plik = u.cache / "pixi" / "pkgs" / "tesseract-5.5.3" / "share" / "tessdata" / "eng.traineddata"
+    plik.parent.mkdir(parents=True)
+    plik.write_bytes(b"x")
+    os.chmod(plik, stat.S_IREAD)                                               # tylko do odczytu, jak w paczkach
+    logi: list[str] = []
+    assert tesseract.sprzatnij_cache(u, log=logi.append) is True and not (u.cache / "pixi").exists()
+    assert logi == ["Tesseract: cache paczek pixi usunięty (środowisko zostaje, znacznik pomija pixi w kolejnym "
+                    "przebiegu)"]

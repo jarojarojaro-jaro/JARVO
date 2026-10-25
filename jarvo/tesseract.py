@@ -12,12 +12,19 @@ osd z sumami). Paczka conda ma ok. 125 języków (340 MB), więc pliki .trainedd
 a konfiguracje Tesseracta (configs/ z tsv, hocr, txt, pdf…, tessconfigs/ i pdf.ttf, licencja Apache-2.0 jak
 program) kopiujemy obok modeli: bez nich `tesseract … tsv` (skill odczyt-ekranu, ocr.py) nie znajdzie konfiguracji.
 Znacznik `.jarvo-tesseract.json` mówi, że instalacja jest gotowa: drugi przebieg nie woła pixi i nie potrzebuje sieci.
+
+Miejsce (c3 pkt 11, Z31): `miejsce(app, platforma)` liczy cache i środowisko z rozmiarów paczek w pixi.lock (pole
+`size` każdej paczki środowiska default tej platformy), a `sprzatnij_cache` po udanej instalacji usuwa cache paczek
+(`<cache>/pixi`): środowisko w `<program>` zostaje (twarde dowiązania z cache albo kopie), a języki paczki usunięte
+przez porządki zwalniają miejsce dopiero wtedy, bo cache trzymał ich drugie dowiązanie (zmierzone 2026-10-25 na
+Windows 11: cache 527 MB, z tego 364 MB tylko w cache).
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -33,6 +40,17 @@ ZNACZNIK = ".jarvo-tesseract.json"
 KONFIGURACJE = ("configs", "tessconfigs", "pdf.ttf")       # z share/tessdata paczki do katalogu TESSDATA_PREFIX
 MODEL = "tessdata-fast"                                    # katalog modelu języków w <dane>/jarvo/models
 CZAS_PIXI = 3600
+# platforma manifestu Jarva → platforma pixi.lock (Windows arm64 bierze paczki win-64 w emulacji, I27)
+PLATFORMY_PIXI = {"windows-x64": "win-64", "windows-arm64": "win-64", "macos-arm64": "osx-arm64",
+                  "linux-x64": "linux-64", "linux-arm64": "linux-aarch64"}
+# rozpakowana paczka conda ≈ jej `size` z pixi.lock × WSP_CONDA, a języki paczki tesseract ≈ jej `size` × WSP_JEZYKOW
+# (zmierzone 2026-10-25 na Windows 11 x64: paczki win-64 216 MB, cache pixi 527 MB, języki 355 MB z paczki 179 MB)
+WSP_CONDA = 2.5
+WSP_JEZYKOW = 2.0
+_PLATFORMA_LOCKA = re.compile(r"^ {6}([A-Za-z0-9_-]+):\s*$")              # environments.default.packages.<platforma>
+_PACZKA_SRODOWISKA = re.compile(r"^ {6}- (?:conda|pypi): (\S+)\s*$")
+_PACZKA = re.compile(r"^- (?:conda|pypi): (\S+)\s*$")                       # packages: blok paczki
+_ROZMIAR = re.compile(r"^  size: (\d+)\s*$")
 
 
 class BladTesseracta(RuntimeError):
@@ -117,6 +135,75 @@ def env_pixi(u: Uklad, env_narzedzia: dict) -> dict[str, str]:
 
 def gotowy(kat: Path, suma_locka: str) -> bool:
     return srodowisko.wczytaj_json(Path(kat) / ZNACZNIK).get("lock_sha256") == suma_locka and program(kat).is_file()
+
+
+def zainstalowany(u: Uklad, app: Path) -> bool:
+    """Tesseract z pixi.lock tej wersji już jest (znacznik z sumą locka i program)."""
+    zrodlo = projekt(app)
+    return zrodlo is not None and gotowy(katalog(u, app), _sha256(zrodlo / "pixi.lock"))
+
+
+def rozmiary_paczek(app: Path, platforma: str) -> tuple[int, int]:
+    """(wszystkie paczki, sama paczka tesseract) w bajtach z pixi.lock: paczki środowiska default dla platformy pixi
+    (PLATFORMY_PIXI) i ich pole `size`. Bez locka albo bez pól size: (0, 0)."""
+    try:
+        linie = (Path(app) / PROJEKT / "pixi.lock").read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return 0, 0
+    cel = PLATFORMY_PIXI.get(platforma, "")
+    sekcja = platforma_locka = paczka = ""
+    adresy: set[str] = set()
+    rozmiary: dict[str, int] = {}
+    for linia in linie:
+        if linia and not linia.startswith((" ", "-")):
+            sekcja = linia.split(":", 1)[0]
+            continue
+        if sekcja == "environments":
+            if m := _PLATFORMA_LOCKA.match(linia):
+                platforma_locka = m.group(1)
+            elif (m := _PACZKA_SRODOWISKA.match(linia)) and platforma_locka == cel:
+                adresy.add(m.group(1))
+        elif sekcja == "packages":
+            if m := _PACZKA.match(linia):
+                paczka = m.group(1)
+            elif (m := _ROZMIAR.match(linia)) and paczka:
+                rozmiary[paczka] = int(m.group(1))
+    razem = sum(rozmiary.get(a, 0) for a in adresy)
+    sam = sum(rozmiary.get(a, 0) for a in adresy if a.rsplit("/", 1)[-1].startswith("tesseract-"))
+    return razem, sam
+
+
+def miejsce(app: Path, platforma: str) -> tuple[int, int, int]:
+    """(cache pixi, środowisko w czasie instalacji, środowisko po porządkach) w bajtach z rozmiarów paczek z pixi.lock:
+    cache to paczki rozpakowane (× WSP_CONDA). Środowisko dzieli pliki z cache (pixi robi twarde dowiązania na NTFS
+    i ext4, klony na APFS; zmierzone 2026-10-25 na Windows 11: 166 z 169 MB), więc w trakcie zajmuje najwyżej tyle,
+    ile zostaje po porządkach: paczki bez języków paczki tesseract (× WSP_JEZYKOW), które usuwa _usun_jezyki."""
+    razem, sam = rozmiary_paczek(app, platforma)
+    zostaje = max(int(razem * WSP_CONDA - sam * WSP_JEZYKOW), 0)
+    return int(razem * WSP_CONDA), zostaje, zostaje
+
+
+def sprzatnij_cache(u: Uklad, *, log: Callable[[str], None] = print) -> bool:
+    """Cache paczek pixi (`<cache>/pixi`, PIXI_CACHE_DIR i RATTLER_CACHE_DIR z env_pixi) po udanej instalacji
+    (docstring modułu). Plik, którego nie da się usunąć (zajęty na Windows), zostaje do następnej instalacji.
+    True = cache usunięty cały."""
+    kat = u.cache / "pixi"
+    if not kat.is_dir():
+        return False
+    zostaly: list[str] = []
+
+    def ponow(funkcja, sciezka, _blad):
+        try:
+            os.chmod(sciezka, stat.S_IWRITE | stat.S_IREAD)
+            funkcja(sciezka)
+        except OSError:
+            zostaly.append(str(sciezka))
+    shutil.rmtree(kat, onexc=ponow)
+    if zostaly:
+        log(f"Tesseract: {len(zostaly)} plików cache pixi zostaje (zajęte), usunie je następna instalacja")
+    else:
+        log("Tesseract: cache paczek pixi usunięty (środowisko zostaje, znacznik pomija pixi w kolejnym przebiegu)")
+    return not zostaly
 
 
 def _kopiuj_konfiguracje(zrodlo: Path, cel: Path) -> bool:
