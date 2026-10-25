@@ -537,6 +537,50 @@ narzedzia:
         env:
           JARVO_CAMOUFOX: "{katalog}/camoufox-bin"
 
+  # Chrome for Testing Stable dla Komputera Jarva (J01, I17): pełny Chrome z własnym profilem
+  # <dane>/jarvo/komputer/profil, sterowany przez CDP po potoku (komputer/usluga.py, bez portu DevTools), cały ruch przez
+  # proxy filtrujące. Pobiera go dopiero `jarvo komputer on` (kiedy: przy-uzyciu), z paskiem i sumą; `jarvo komputer
+  # odswiez` i następne `on` biorą nowy pin po `jarvo update`. CfT sam się nie aktualizuje: pin podbijany co tydzień
+  # w rutynie źródeł (nowy pin = nowy przegląd). Google nie publikuje sha256: policzone strumieniowo w trzech
+  # niezależnych pobraniach, md5 z x-goog-hash zgodne (Windows także Get-FileHash). Archiwum zostaje z katalogiem
+  # chrome-<platforma>/ (bez usun_poziom). Windows arm64: plik win64 w emulacji x64 (CfT nie wydaje win-arm64).
+  chrome-komputer:
+    zrodlo: chrome-for-testing
+    wersja: "156.0.8078.47"
+    licencja: BSD-3-Clause (Chromium) + składniki w LICENSE i ABOUT; binarka Google Chrome for Testing (chrome://terms)
+    rola: "Przeglądarka Jarva dla Komputera (Operator): osobny profil, CDP po potoku, proxy filtrujące, podgląd w HQ"
+    kiedy: przy-uzyciu
+    pliki:
+      windows-x64: &cftk-win64
+        url: https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/win64/chrome-win64.zip
+        sha256: a4e0d57245e167e98a9d465af1e3774d2b4ec9f04e483d19bcd97a6f63cf46dd
+        rozmiar: 209154801
+        format: zip
+        env:
+          JARVO_KOMPUTER_CHROME: "{katalog}/chrome-win64/chrome.exe"
+      windows-arm64: *cftk-win64
+      macos-arm64:
+        url: https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/mac-arm64/chrome-mac-arm64.zip
+        sha256: ad7f2b49a4dc679af286b1b1b386670d93ca7868079f69012d21ba0ac8293df3
+        rozmiar: 194932023
+        format: zip
+        env:
+          JARVO_KOMPUTER_CHROME: "{katalog}/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
+      linux-x64:
+        url: https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/linux64/chrome-linux64.zip
+        sha256: e6c94490f0b6b337225aeb2d2a5034858516b7017356980ba94f5176d8774a50
+        rozmiar: 200206486
+        format: zip
+        env:
+          JARVO_KOMPUTER_CHROME: "{katalog}/chrome-linux64/chrome"
+      linux-arm64:
+        url: https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/linux-arm64/chrome-linux-arm64.zip
+        sha256: 9e37000e3ee2731e45e475a6a2eac587d3c0ee5f8aef7cab5211ecd52cf3fb7b
+        rozmiar: 199726566
+        format: zip
+        env:
+          JARVO_KOMPUTER_CHROME: "{katalog}/chrome-linux-arm64/chrome"
+
   # ── Media (M01, M03) ──────────────────────────────────────────────────────────────────────────────────────────────
   # FFmpeg 9.0.2 (M01, I20). Windows i Linux: BtbN, wariant gpl (statyczne binarki), wydanie miesięczne
   # autobuild-2026-09-30-13-08 (ostatni build miesiąca GitHub BtbN trzyma 2 lata, do ok. IX 2028). Build jest z gałęzi
@@ -911,6 +955,63 @@ narzedzia:
         env: {ADB_MDNS: "0"}
       linux-arm64:
         brak: "Google nie wydaje platform-tools na Linux arm64 (paczka linux ma tylko binarki x86_64); adb z pakietu systemu, jeśli właściciel go ma (np. apt install adb), doctor to pokazuje"
+
+  # ── Komputer: ręce na ekranie właściciela (K6; docs/NATYWNIE.md J14, J15, I19) ─────────────────────────────────────
+  # cua-driver-rs 0.38.0 (Cua AI, Inc.; tag cua-driver-rs-v0.38.0 = commit 85e2b131, wydanie 2026-10-21 z workflow
+  # cd-rust-cua-driver.yml), przegląd 2026-10-25. Sumy archiwów z SHA256SUMS wydania = digesty GitHuba = własne liczenie
+  # strumieniowe; programy po rozpakowaniu przypięte sumą w komputer/rece/__init__.py (PROGRAMY), bramka sprawdza je przed
+  # każdym uruchomieniem. Windows: Authenticode „Cua AI, Inc.” (Microsoft ID Verified CS AOC CA 04, znacznik czasu
+  # Microsoftu; WinVerifyTrust w bramce); macOS: CuaDriver.app universal (Developer ID Cua AI, Inc. YCK386LBJ7, minos
+  # 13.0), do /Applications kopiuje ją właściciel; Linux: X11 albo XWayland (libX11, libXi, libxkbcommon, glibc >= 2.30).
+  # `usun`: pracownik UIAccess (uiAccess=true omija UIPI, czyli sięga do okien administratora; 0.38.0 go nie uruchamia),
+  # biblioteka SDK, moduł Node, nagłówek C, narzędzie motywów kursora i pomocnik GNOME (rozszerzenie powłoki); na macOS
+  # goła binarka (od 0.36 nie działa) i pliki obok aplikacji, sama CuaDriver.app zostaje cała (podpis). Bez `bin`
+  # i `env`: sterownika nie ma w PATH procesów floty, a otoczenie (telemetria i sprawdzanie aktualizacji wyłączone)
+  # ustawia bramka. Pobiera go `jarvo komputer rece on`.
+  cua-driver:
+    zrodlo: cua
+    wersja: "0.38.0"
+    licencja: MIT (Cua AI, Inc.) + części MIT z THIRD_PARTY_NOTICES.md (trope-cua, Interface-Agent, yabai, QuickJS-ng, rquickjs, T3 Code)
+    rola: "sterownik ekranu właściciela dla rąk Operatora (komputer/rece): tylko przez bramkę, z podpisaną zgodą, w trybie bounded"
+    kiedy: przy-uzyciu
+    pliki:
+      windows-x64:
+        url: https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.38.0/cua-driver-rs-0.38.0-windows-x86_64.zip
+        sha256: 997f20114ad3db227a854e1e5a886234f76405b155f4af70605d4b7ca4a436a1
+        rozmiar: 35894668
+        format: zip
+        usun_poziom: 1
+        usun: &cua-usun-win [cua-driver-uia.exe, cua-cursor-theme.exe, cua_driver_sdk.dll, cua_driver_node_runtime.node,
+                             cua_driver_abi.h]
+      windows-arm64:
+        url: https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.38.0/cua-driver-rs-0.38.0-windows-arm64.zip
+        sha256: c442872360cbb819e288b9f30daa7e3d2693d5945495d1400bcd90af5bd16402
+        rozmiar: 33686209
+        format: zip
+        usun_poziom: 1
+        usun: *cua-usun-win
+      macos-arm64:
+        url: https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.38.0/cua-driver-rs-0.38.0-darwin-universal.tar.gz
+        sha256: 121cf20cafd2cfa69dd720e8967350c6406b22e558be6889de7a1ae3343b6d4b
+        rozmiar: 85040507
+        format: tar.gz
+        usun_poziom: 1
+        usun: [cua-driver, cua-cursor-theme, libcua_driver_sdk.dylib, cua_driver_node_runtime.node, cua_driver_abi.h]
+      linux-x64:
+        url: https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.38.0/cua-driver-rs-0.38.0-linux-x86_64.tar.gz
+        sha256: a305cbd531f94d6413c5db300c33df68e3adbe8b92b9604cf8e645c5f6cb1fa3
+        rozmiar: 37188638
+        format: tar.gz
+        usun_poziom: 1
+        usun: &cua-usun-linux [cua-cursor-theme, libcua_driver_sdk.so, cua_driver_node_runtime.node, cua_driver_abi.h,
+                               wayland-helper]
+      linux-arm64:
+        url: https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.38.0/cua-driver-rs-0.38.0-linux-arm64.tar.gz
+        sha256: ed8a51125ade8807c7717c3dde13d62bd31e6275e6b5e2446cf018d0b01d93b3
+        rozmiar: 36675638
+        format: tar.gz
+        usun_poziom: 1
+        usun: *cua-usun-linux
 
 # Modele i dane niezależne od platformy (przegląd 2026-10-24): pliki z przypiętej rewizji repo modelu, każdy z sumą.
 # Wagi lektorów i OCR to te same pliki i sumy co w infra/Dockerfile. JARVO-ZRODLO.txt (jak w obrazie) pisze instalator.

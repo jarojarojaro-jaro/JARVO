@@ -495,7 +495,7 @@ bezpieczeństwo web, landing jarvo.pl z nagłówkami.
    macOS i Linuksie, z każdą funkcją (czat w terminalu ze zgodami jak w Claude Code, flota, panel, skarbiec, rutyny,
    Telegram, filmy, lektor, OCR, Komputer Jarva, migracja ze starej instalacji). Hermes z przypiętego commitu przez uv,
    narzędzia z wydań u źródła z sumą sha256, własny nadzorca procesów. Etapy E0–E14; decyzje właściciela z 2026-10-24 w planie (bez macOS Intel, minimum macOS 15, domyślne zgody „projekt”,
-   wyszukiwarka: najlepsza dostępna). Stan 2026-10-25 (NATYWNIE § g): E1–E4 w toku. W kodzie są: manifest z 23 narzędziami,
+   wyszukiwarka: najlepsza dostępna). Stan 2026-10-25 (NATYWNIE § g): E1–E4 w toku. W kodzie są: manifest z 25 narzędziami,
    10 modelami i 9 venvami, pobieracz, Hermes z przypięcia, nadzorca `jarvo serwis`, autostart, dziennik zmian hosta,
    polecenie `jarvo`, instalator i bootstrap pod osobnym adresem `jarvo/bootstrap/install.ps1|sh` (do etapu E13 obok
    starego instalatora), wtyczka zgód `zgody/`; próby na żywo na Windows 11, macOS i Linux na razie tylko w testach

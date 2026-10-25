@@ -531,6 +531,7 @@ natywny ma mniej funkcji.
 | Lightpanda | 1.0.0 | brak: silnik `chrome` | brak: silnik `chrome` | plik | plik | instalacja | Linux = binarka z obrazu; telemetria wyłączona zmiennymi |
 | agent-browser | 0.38.1 | plik z wydania | x64 w emulacji | plik | plik | instalacja | te same bajty co w paczce npm z atestacją SLSA |
 | Camoufox | 152.0.4-beta.30 | zip | x64 w emulacji | zip | zip | przy użyciu | paczka Windows ma fonty macOS, a macOS fonty Windows (decyzja właściciela) |
+| Chrome for Testing (Komputer Jarva) | 156.0.8078.47 | zip | x64 w emulacji | zip | zip | przy użyciu | `jarvo komputer on`; CDP po potoku, ruch przez proxy filtrujące; 134/134 sprawdzeń Komputera na Windows 11 |
 | FFmpeg (BtbN, gpl) | 9.0.2 | zip | x64 w emulacji (winarm64 bez libvpx) | brak: build Riedla | tar.xz | instalacja | filtry i kodery floty na Windows 11; libass na Windows potrzebuje `fontsdir` |
 | FFmpeg i ffprobe (Martin Riedl) | 9.0.2 | brak: BtbN | brak: BtbN | dwa zipy, Developer ID | brak: BtbN | instalacja | bez vidstab i librsvg |
 | Fonty Inter i DejaVu | 4.1, 2.37 | zip | ten sam zip | ten sam zip | ten sam zip | instalacja | `JARVO_FONTY_INTER`, `JARVO_FONTY_DEJAVU` |
@@ -540,6 +541,7 @@ natywny ma mniej funkcji.
 | pixi (tylko Tesseract) | 0.83.0 | zip | zip arm64 (`--platform win-64`) | tar.gz | tar.gz (musl) | instalacja | projekt [`vendor/pixi/tesseract`](../vendor/pixi/tesseract/pixi.toml); `PIXI_NO_TELEMETRY=1` |
 | scrcpy | 5.0.1 | zip | zip arm64 | tar.gz | x64 tar.gz, arm64 brak | przy użyciu | `SHA256SUMS.txt` z podpisem GPG |
 | Android platform-tools (adb) | r37.0.1 | zip (x86, podpis Google) | ten sam zip w emulacji | zip (universal) | x64 zip, arm64 brak | przy użyciu | `usun` bez sqlite3 3.50.6 (WAL-reset), mke2fs, make_f2fs, etc1tool, hprof-conv; `ADB_MDNS=0`; `adb version` i `fastboot --version` na Windows 11 |
+| cua-driver-rs (ręce, K6) | 0.38.0 | zip, Authenticode Cua AI | zip arm64, Authenticode | tar.gz (CuaDriver.app, Developer ID) | tar.gz (X11 albo XWayland) | przy użyciu | `jarvo komputer rece on`; bez pracownika UIAccess; tylko przez bramkę rąk |
 
 Tesseract 5.5.3 przychodzi z conda-forge przez [`vendor/pixi/tesseract`](../vendor/pixi/tesseract/pixi.toml):
 - `pixi.lock` ma 31–37 paczek na platformę i sumę każdej z nich;

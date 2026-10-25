@@ -195,6 +195,137 @@
     }
    }
   },
+  "chrome-komputer": {
+   "wersja": "156.0.8078.47",
+   "kiedy": "przy-uzyciu",
+   "licencja": "BSD-3-Clause (Chromium) + składniki w LICENSE i ABOUT; binarka Google Chrome for Testing (chrome://terms)",
+   "zrodlo": "chrome-for-testing",
+   "pliki": {
+    "windows-x64": {
+     "env": {
+      "JARVO_KOMPUTER_CHROME": "{katalog}/chrome-win64/chrome.exe"
+     },
+     "format": "zip",
+     "rozmiar": 209154801,
+     "sha256": "a4e0d57245e167e98a9d465af1e3774d2b4ec9f04e483d19bcd97a6f63cf46dd",
+     "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/win64/chrome-win64.zip"
+    },
+    "windows-arm64": {
+     "env": {
+      "JARVO_KOMPUTER_CHROME": "{katalog}/chrome-win64/chrome.exe"
+     },
+     "format": "zip",
+     "rozmiar": 209154801,
+     "sha256": "a4e0d57245e167e98a9d465af1e3774d2b4ec9f04e483d19bcd97a6f63cf46dd",
+     "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/win64/chrome-win64.zip"
+    },
+    "macos-arm64": {
+     "env": {
+      "JARVO_KOMPUTER_CHROME": "{katalog}/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
+     },
+     "format": "zip",
+     "rozmiar": 194932023,
+     "sha256": "ad7f2b49a4dc679af286b1b1b386670d93ca7868079f69012d21ba0ac8293df3",
+     "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/mac-arm64/chrome-mac-arm64.zip"
+    },
+    "linux-x64": {
+     "env": {
+      "JARVO_KOMPUTER_CHROME": "{katalog}/chrome-linux64/chrome"
+     },
+     "format": "zip",
+     "rozmiar": 200206486,
+     "sha256": "e6c94490f0b6b337225aeb2d2a5034858516b7017356980ba94f5176d8774a50",
+     "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/linux64/chrome-linux64.zip"
+    },
+    "linux-arm64": {
+     "env": {
+      "JARVO_KOMPUTER_CHROME": "{katalog}/chrome-linux-arm64/chrome"
+     },
+     "format": "zip",
+     "rozmiar": 199726566,
+     "sha256": "9e37000e3ee2731e45e475a6a2eac587d3c0ee5f8aef7cab5211ecd52cf3fb7b",
+     "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/linux-arm64/chrome-linux-arm64.zip"
+    }
+   }
+  },
+  "cua-driver": {
+   "wersja": "0.38.0",
+   "kiedy": "przy-uzyciu",
+   "licencja": "MIT (Cua AI, Inc.) + części MIT z THIRD_PARTY_NOTICES.md (trope-cua, Interface-Agent, yabai, QuickJS-ng, rquickjs, T3 Code)",
+   "zrodlo": "cua",
+   "pliki": {
+    "windows-x64": {
+     "format": "zip",
+     "rozmiar": 35894668,
+     "sha256": "997f20114ad3db227a854e1e5a886234f76405b155f4af70605d4b7ca4a436a1",
+     "url": "https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.38.0/cua-driver-rs-0.38.0-windows-x86_64.zip",
+     "usun": [
+      "cua-driver-uia.exe",
+      "cua-cursor-theme.exe",
+      "cua_driver_sdk.dll",
+      "cua_driver_node_runtime.node",
+      "cua_driver_abi.h"
+     ],
+     "usun_poziom": 1
+    },
+    "windows-arm64": {
+     "format": "zip",
+     "rozmiar": 33686209,
+     "sha256": "c442872360cbb819e288b9f30daa7e3d2693d5945495d1400bcd90af5bd16402",
+     "url": "https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.38.0/cua-driver-rs-0.38.0-windows-arm64.zip",
+     "usun": [
+      "cua-driver-uia.exe",
+      "cua-cursor-theme.exe",
+      "cua_driver_sdk.dll",
+      "cua_driver_node_runtime.node",
+      "cua_driver_abi.h"
+     ],
+     "usun_poziom": 1
+    },
+    "macos-arm64": {
+     "format": "tar.gz",
+     "rozmiar": 85040507,
+     "sha256": "121cf20cafd2cfa69dd720e8967350c6406b22e558be6889de7a1ae3343b6d4b",
+     "url": "https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.38.0/cua-driver-rs-0.38.0-darwin-universal.tar.gz",
+     "usun": [
+      "cua-driver",
+      "cua-cursor-theme",
+      "libcua_driver_sdk.dylib",
+      "cua_driver_node_runtime.node",
+      "cua_driver_abi.h"
+     ],
+     "usun_poziom": 1
+    },
+    "linux-x64": {
+     "format": "tar.gz",
+     "rozmiar": 37188638,
+     "sha256": "a305cbd531f94d6413c5db300c33df68e3adbe8b92b9604cf8e645c5f6cb1fa3",
+     "url": "https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.38.0/cua-driver-rs-0.38.0-linux-x86_64.tar.gz",
+     "usun": [
+      "cua-cursor-theme",
+      "libcua_driver_sdk.so",
+      "cua_driver_node_runtime.node",
+      "cua_driver_abi.h",
+      "wayland-helper"
+     ],
+     "usun_poziom": 1
+    },
+    "linux-arm64": {
+     "format": "tar.gz",
+     "rozmiar": 36675638,
+     "sha256": "ed8a51125ade8807c7717c3dde13d62bd31e6275e6b5e2446cf018d0b01d93b3",
+     "url": "https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.38.0/cua-driver-rs-0.38.0-linux-arm64.tar.gz",
+     "usun": [
+      "cua-cursor-theme",
+      "libcua_driver_sdk.so",
+      "cua_driver_node_runtime.node",
+      "cua_driver_abi.h",
+      "wayland-helper"
+     ],
+     "usun_poziom": 1
+    }
+   }
+  },
   "exiftool": {
    "wersja": "13.59",
    "kiedy": "instalacja",
