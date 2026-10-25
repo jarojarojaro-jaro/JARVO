@@ -2115,6 +2115,7 @@ class Opcje:
     lan: bool = False
     bez_floty: bool = False
     bez_startu: bool = False
+    z_instalatora: bool = False          # woła instalator: start i polecenie jarvo robi on
     json: bool = False
 
 
@@ -2873,7 +2874,9 @@ class Migracja:
 
     def _podsumowanie(self) -> str:
         linie = [f"Migracja gotowa: dane w {self.u.dane}, kopia i raport w {self.katalog}."]
-        if self.o.bez_startu:
+        if self.o.z_instalatora:
+            linie.append("Polecenie jarvo, autostart i start robi teraz instalator.")
+        elif self.o.bez_startu:
             linie.append("Serwis Jarva stoi (--bez-startu): uruchom go poleceniem `jarvo up`.")
         if self.o.bez_floty:
             linie.append("Flota bez odtworzenia (--bez-floty): config.yaml, SOUL i skille profili odtworzy "
@@ -3103,6 +3106,7 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--lan", action="store_true", help="przenieś też DASHBOARD_* (tryb LAN panelu, I11)")
     p.add_argument("--bez-floty", action="store_true", help="bez buildu i instalacji floty po imporcie")
     p.add_argument("--bez-startu", action="store_true", help="bez pierwszego startu (serwis zostaje zatrzymany)")
+    p.add_argument("--z-instalatora", action="store_true", help=argparse.SUPPRESS)   # krok instalatora
     p.add_argument("--bez-okresu", action="store_true", help="--sprzatanie przed końcem okresu przejściowego")
     p.add_argument("--filtr", action="store_true", help="--manifest: z regułami kopii (stare dane)")
     p.add_argument("--wyjscie", help="--manifest: zapis do pliku zamiast na ekran")
@@ -3151,7 +3155,7 @@ def main(argv: list[str] | None = None, *, uklad: Uklad | None = None, otoczenie
     n = natywne or natywne_domyslne(otoczenie, log=s.wypisz)
     o = Opcje(tak=a.tak or s.env.get("JARVO_YES") == "1", katalog=a.katalog, dystrybucja=a.dystrybucja,
               uzytkownik=a.uzytkownik, wylacz_docker=a.wylacz_docker, linger=a.linger, lan=a.lan,
-              bez_floty=a.bez_floty, bez_startu=a.bez_startu)
+              bez_floty=a.bez_floty, bez_startu=a.bez_startu, z_instalatora=a.z_instalatora)
     m = Migracja(u, s, n, o)
     try:
         if a.wycofaj:

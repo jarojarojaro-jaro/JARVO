@@ -2354,7 +2354,7 @@ class _Instalacja:
         PrzeniesienieOdlozone, a stara flota pracuje dalej; przerwana migracja rusza przy następnym przebiegu od
         pierwszego niezrobionego etapu."""
         migracja = self.ot.modul("migracja")
-        argv = ["--bez-startu", *(["--tak"] if self.ot.env.get("JARVO_YES") == "1" else [])]
+        argv = ["--bez-startu", "--z-instalatora", *(["--tak"] if self.ot.env.get("JARVO_YES") == "1" else [])]
         self.log("")
         kod = migracja.main(argv, uklad=self.u, otoczenie=self.ot)
         self.log("")

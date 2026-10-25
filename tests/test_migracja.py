@@ -1533,3 +1533,14 @@ def test_dowiazanie_bezwzgledne_z_kropkami_nie_wychodzi_poza_dane(tmp_path):
     przed = {"dowiazania": {"w/skarbiec": "/opt/data/jarvo/./x/../knowledge"}, "pliki": {}, "bazy": {}, "git": {}}
     po = {"dowiazania": {"w/skarbiec": str(dane / "jarvo" / "knowledge")}, "pliki": {}, "bazy": {}, "git": {}}
     assert mig.porownaj(przed, po, mapa={"/opt/data": str(dane)}, bez=()) == []
+
+
+def test_podsumowanie_z_instalatora_nie_kaze_uruchamiac_jarvo_up(tmp_path):
+    """Krok instalatora (`--bez-startu --z-instalatora`): start i polecenie jarvo robi instalator, więc podsumowanie
+    nie odsyła do `jarvo up`; samo `--bez-startu` dalej tak."""
+    assert mig._parser().parse_args(["--bez-startu", "--z-instalatora"]).z_instalatora
+    from jarvo import sciezki
+    u = sciezki.uklad({"JARVO_ROOT": str(tmp_path / "j")})
+    sam = mig.Migracja(u, None, None, mig.Opcje(bez_startu=True))._podsumowanie()
+    z_inst = mig.Migracja(u, None, None, mig.Opcje(bez_startu=True, z_instalatora=True))._podsumowanie()
+    assert "jarvo up" in sam and "jarvo up" not in z_inst and "robi teraz instalator" in z_inst

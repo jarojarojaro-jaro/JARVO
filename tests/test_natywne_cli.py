@@ -1952,7 +1952,7 @@ def test_instaluj_ze_stara_instalacja_przenosi_dane_przed_startem(tmp_path, stan
     kod = instalator.instaluj(u, app, log=s["log"].append, otoczenie=s["otoczenie"](stara=lambda uu, ot: "stara"))
     log = "\n".join(s["log"])
     assert kod == 0, log
-    assert m.wywolania == [["--bez-startu", "--tak"]]
+    assert m.wywolania == [["--bez-startu", "--z-instalatora", "--tak"]]
     kroki = [m.group(1) for w in s["log"] if (m := re.match(r"\[[#-]+\] +\d+/\d+  (.+)$", w))]
     assert kroki.index("Przeniesienie ze starej instalacji") == kroki.index("Środowisko procesów") + 1
     assert kroki.index("Polecenie jarvo") > kroki.index("Przeniesienie ze starej instalacji")
@@ -1969,7 +1969,7 @@ def test_instaluj_bez_zgody_na_przeniesienie_kod_3_i_stara_flota_zostaje(tmp_pat
     s["log"].clear()
     kod = instalator.instaluj(u, app, log=s["log"].append, otoczenie=s["otoczenie"](stara=lambda uu, ot: "stara"))
     log = "\n".join(s["log"])
-    assert kod == 3 and m.wywolania == [["--bez-startu"]]
+    assert kod == 3 and m.wywolania == [["--bez-startu", "--z-instalatora"]]
     assert "stara flota pracuje dalej" in log and "uruchom to samo polecenie instalacji" in log
     assert not s["nadzorca"].dziala and not s["w_tle"] and not s["autostart"].wywolania
     assert (u.program / "current.json").is_file()                             # wersja natywna gotowa, stoi
