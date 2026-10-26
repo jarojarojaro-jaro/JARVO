@@ -1132,6 +1132,28 @@ def polecenie_migawka(a) -> int:
     return 0
 
 
+def _zawartosc(klucz: str, env: dict | None = None, ile: int = 20) -> list[str]:
+    """Nazwy plików (względne, z czasem zmiany) w katalogu z klucza migawki `etykieta:ścieżka`, do opisu różnicy."""
+    etykieta, _, rel = klucz.partition(":")
+    baza = next((k for e, k, _g, _t in miejsca(dict(os.environ if env is None else env)) if e == etykieta), None)
+    if baza is None or not rel:
+        return []
+    katalog = Path(baza) / rel
+    wynik: list[str] = []
+    for korzen, katalogi, pliki in os.walk(katalog):
+        katalogi.sort()
+        for nazwa in sorted(pliki):
+            p = Path(korzen) / nazwa
+            try:
+                kiedy = time.strftime("%H:%M:%S", time.localtime(p.stat().st_mtime))
+            except OSError:
+                kiedy = "?"
+            wynik.append(f"{p.relative_to(katalog).as_posix()} {kiedy}")
+            if len(wynik) >= ile:
+                return wynik
+    return wynik
+
+
 def polecenie_roznica(a) -> int:
     art = katalog_artefaktow(a.artefakty)
     rap = Raport(art)
@@ -1141,10 +1163,15 @@ def polecenie_roznica(a) -> int:
                   f"brak migawki ({a.przed if not isinstance(przed, dict) else a.po})")
         return 1
     r = roznica(przed, po, a.wyjatek)
-    zapisz_json(art / "roznica.json", r)
     nie = [z for z in r["zmiany"] if not z["wyjasnienie"]]
+    for z in nie:                                 # co jest w nowym katalogu: kto go założył (nazwy i czasy, bez treści)
+        if z["rodzaj"] == "dodany":
+            z["zawartosc"] = _zawartosc(z["klucz"])
+    zapisz_json(art / "roznica.json", r)
     opis = (f"{len(r['zmiany'])} różnic, w tym {len(nie)} bez wyjaśnienia"
-            + (": " + "; ".join(f"{z['rodzaj']} {z['klucz']}" for z in nie[:12]) if nie else "")
+            + (": " + "; ".join(f"{z['rodzaj']} {z['klucz']}"
+                                + (f" ({', '.join(z['zawartosc'][:6])})" if z.get("zawartosc") else "")
+                                for z in nie[:12]) if nie else "")
             + (f" (+{len(nie) - 12} w roznica.json)" if len(nie) > 12 else ""))
     rap.punkt("migawka", "komputer po odinstalowaniu jak przed instalacją", not nie, opis)
     return 1 if nie else 0
