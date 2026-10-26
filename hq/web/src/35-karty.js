@@ -127,7 +127,9 @@ function KartaPracy({ x, ctx }) {
     </header>
     <${PasekEtapow} etap=${karta.etap}/>
     <${TerazKarty} k=${karta}/>
-    ${karta.etap === "gotowe" && karta.podsumowanie && html`<p class="j-karta-skrot">${karta.podsumowanie.split(/(?<=[.!?])\s/)[0]}</p>`}
+    ${karta.etap === "gotowe" && (x.koniec_nizej
+      ? karta.podsumowanie && html`<p class="j-karta-skrot">${karta.podsumowanie.split(/(?<=[.!?])\s/)[0]}</p>`
+      : html`<${WynikPracy} k=${karta}/>`)}
     ${id && html`<button type="button" class="j-karta-wiecej" aria-expanded=${String(otwarta)} aria-controls=${domId}
         onClick=${() => setOtwarta(!otwarta)}>
       <${Ikona} n=${otwarta ? "down" : "right"} r=${14}/><span>${T(otwarta ? "karta.zwin" : "karta.jak_pracuje", { agent: nazwaAgenta(karta.agent) })}</span>
@@ -136,27 +138,40 @@ function KartaPracy({ x, ctx }) {
   </article>`;
 }
 
+// co zrobił: wynik (zwinięty, gdy długi), pliki jako zwarta siatka (najwyżej PLIKI_NAJPIERW, reszta pod „+N”), ocena
+const PLIKI_NAJPIERW = 6;
+function WynikPracy({ k, tekst }) {
+  const [calosc, setCalosc] = useState(false);
+  const [wszystkie, setWszystkie] = useState(false);
+  const t = tekst != null ? tekst : k.podsumowanie || "";
+  const dlugi = t.length > 420;
+  const pliki = (k.pliki || []).map(fileFromPath);
+  const widoczne = wszystkie ? pliki : pliki.slice(0, PLIKI_NAJPIERW);
+  return html`<div class="j-wynik">
+    ${t && html`<div class=${cx("j-koniec-wynik", dlugi && !calosc && "is-zwiniety")}><${TrescMd} tekst=${t} klasa="j-msg-t"/></div>`}
+    ${dlugi && html`<button type="button" class="j-link" onClick=${() => setCalosc(!calosc)}>${T(calosc ? "karta.mniej" : "karta.calosc")}</button>`}
+    ${pliki.length > 0 && html`<div class="j-wynik-pliki">${widoczne.map((p) => html`<${KartaPliku} key=${p.path} plik=${p} kompakt=${true}/>`)}
+      ${pliki.length > widoczne.length && html`<button type="button" class="j-wynik-wiecej" onClick=${() => setWszystkie(true)}>
+        ${T("karta.pliki_wiecej", { n: pliki.length - widoczne.length })}</button>`}</div>`}
+    ${k.ocena && html`<p class="j-koniec-ocena"><${Awatar} agent=${{ name: k.przypisany || "jarvo" }} r=${18}/>
+      <span><b>${T("karta.ocena", { sedzia: nazwaAgenta(k.przypisany || "jarvo") })}</b> ${k.ocena}</span></p>`}
+  </div>`;
+}
+
 // „Web · skończone”: koniec karty z tablicy (budzenie completed) z tym, co zrobił, plikami i werdyktem sędziego
 function KoniecPracy({ x, ctx }) {
   const b = x.budzenie || {};
   const k = useSklep((s) => s.karty[b.task_id] || null) || {};
   const agent = k.agent || b.wykonawca;
   const a = useAgent(agent);
-  const [calosc, setCalosc] = useState(false);
   const tekst = k.podsumowanie || b.wynik || "";
-  const dlugi = tekst.length > 420;
-  const pliki = (k.pliki || []).map(fileFromPath);
   return html`<article class="j-msg j-msg-ag j-koniec" data-koniec=${b.task_id} data-agent=${agent}>
     <h3 class="j-sr">${T("karta.skonczyl", { agent: nazwaAgenta(agent) })}, ${Czas.godzina(x.ts)}</h3>
     <header class="j-msg-g"><${Awatar} agent=${a} r=${28}/><b class="j-msg-n">${nazwaAgenta(agent)}</b>
       <span class="j-koniec-tag"><${Ikona} n="check" r=${12}/>${T("karta.skonczyl_krotko")}</span>
       <time title=${czasPelny(x.ts)}>${Czas.godzina(x.ts)}</time></header>
     <p class="j-koniec-t">${tytulKarty(k.tytul || b.tytul)}${k.od && k.koniec ? html` <span class="j-karta-czas">· ${Czas.trwanie(k.koniec - k.od)}</span>` : null}</p>
-    ${tekst && html`<div class=${cx("j-koniec-wynik", dlugi && !calosc && "is-zwiniety")}><${TrescMd} tekst=${tekst} klasa="j-msg-t"/></div>`}
-    ${dlugi && html`<button type="button" class="j-link" onClick=${() => setCalosc(!calosc)}>${T(calosc ? "karta.mniej" : "karta.calosc")}</button>`}
-    ${pliki.length > 0 && html`<div class="j-pliki">${pliki.map((p) => html`<${KartaPliku} key=${p.path} plik=${p}/>`)}</div>`}
-    ${k.ocena && html`<p class="j-koniec-ocena"><${Awatar} agent=${{ name: k.przypisany || "jarvo" }} r=${18}/>
-      <span><b>${T("karta.ocena", { sedzia: nazwaAgenta(k.przypisany || "jarvo") })}</b> ${k.ocena}</span></p>`}
+    <${WynikPracy} k=${k} tekst=${tekst}/>
     <${AkcjeWiadomosci} tekst=${tekst} agent=${agent} watek=${ctx.watek} koordynator=${ctx.koordynator}/>
   </article>`;
 }

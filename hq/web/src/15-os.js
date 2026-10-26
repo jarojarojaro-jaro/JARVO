@@ -184,7 +184,8 @@ const Os = (() => {
   // Wiadomości w drodze (`oczekujace`, optymistyczne dymki właściciela) stoją za osią, a znikają, gdy oś ma wpis
   // z tym samym kluczem. Nieudany przebieg zostaje dymkiem z „Ponów”, dopóki nie ma odpowiedzi ani ponowienia.
   // Budzenia kart przekazanych w tym wątku pokazuje karta pracy (35-karty.js): ostatnie „completed” karty zostaje
-  // jako `koniec` („<agent> · skończone”), reszta znika.
+  // jako `koniec` („<agent> · skończone”), reszta znika, a karta z taką wiadomością dostaje `koniec_nizej`. Karty stoją
+  // pod wiadomością agenta, która je zapowiada (kroki tury idą do niej), a w trwającej turze od razu pod żywym dymkiem.
   // Zatrzymany przebieg (Stop właściciela), którego odpowiedź jest już na osi: ostatnia pozycja agenta z tym
   // przebiegiem dostaje `zatrzymany` (linia „Zatrzymane · Ponów” pod nią, spec §9.1), dopóki nie ma ponowienia;
   // zatrzymany przed pierwszym słowem (żadnej pozycji agenta) zostaje pustym dymkiem z tą linią.
@@ -208,9 +209,14 @@ const Os = (() => {
     }
     const out = [];
     for (const x of pozycje) {
-      if (x.w_toku && ukryte.has(x.przebieg_id)) continue;
+      // karta pracy z trwającej tury stoi od razu pod żywym dymkiem; reszta tury jest w dymku
+      if (x.w_toku && ukryte.has(x.przebieg_id) && !(x.rodzaj === "przekazanie" && x.karta && x.karta.task_id)) continue;
       if (x.rodzaj === "budzenie" && x.budzenie && karty.has(x.budzenie.task_id)) {
         if (ostatniKoniec.get(x.budzenie.task_id) === x.id) out.push({ ...x, rodzaj: "koniec" });
+        continue;
+      }
+      if (x.rodzaj === "przekazanie" && x.karta && ostatniKoniec.has(x.karta.task_id)) {
+        out.push({ ...x, koniec_nizej: true });          // wynik pokazuje wiadomość `koniec`, karta zostaje krótka
         continue;
       }
       // błąd tury przebiegu z dymkiem pokazuje sam dymek (z „Ponów”), nie drugi raz na osi
@@ -226,6 +232,18 @@ const Os = (() => {
         continue;
       }
       out.push(x);
+    }
+    // wiadomość, która zapowiada karty, nad nimi: [kroki?, przekazanie…, agent] tego agenta → [agent (+kroki), przekazanie…]
+    for (let i = 0; i < out.length; i++) {
+      const a = out[i];
+      if (a.rodzaj !== "agent") continue;
+      let j = i - 1;
+      while (j >= 0 && out[j].rodzaj === "przekazanie" && out[j].agent === a.agent && !out[j].w_toku) j--;
+      if (j === i - 1) continue;
+      const kartyTury = out.slice(j + 1, i), k = j >= 0 ? out[j] : null;
+      if (!szczegoly && k && k.rodzaj === "kroki" && k.agent === a.agent && (k.przebieg_id || null) === (a.przebieg_id || null)) {
+        out.splice(j, i - j + 1, { ...a, kroki: (k.kroki || []).concat(a.kroki || []) }, ...kartyTury);
+      } else out.splice(j + 1, i - j, a, ...kartyTury);
     }
     if (stop.size) {
       const ostatnia = new Map();

@@ -1616,6 +1616,12 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-koniec-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 12px;
   font-weight: 600; color: var(--j-ok); background: color-mix(in srgb, var(--j-ok) 13%, transparent); }
 .j-koniec-t { margin: 2px 0 6px; font-size: 14px; font-weight: 600; color: var(--j-tekst-2); }
+.j-karta .j-wynik { margin-top: 10px; font-size: 14px; }
+.j-wynik-pliki { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.j-wynik-pliki .j-plik { margin-top: 0; flex: 1 1 220px; max-width: 320px; }
+.j-wynik-wiecej { align-self: center; padding: 6px 12px; border: 1px dashed var(--j-linia-mocna); border-radius: 10px;
+  background: none; color: var(--j-tekst-2); font: inherit; font-size: 13px; cursor: pointer; }
+.j-wynik-wiecej:hover { color: var(--j-tekst); background: var(--j-tlo-hover); }
 .j-koniec-wynik.is-zwiniety { max-height: 9.5em; overflow: hidden;
   -webkit-mask-image: linear-gradient(#000 65%, transparent); mask-image: linear-gradient(#000 65%, transparent); }
 .j-koniec-ocena { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0 0; padding: 8px 10px; border-radius: 10px;
@@ -1625,8 +1631,10 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 @keyframes j-karta-postep { from { background-position: 100% 0; } to { background-position: -150% 0; } }
 @media (max-width: 640px) {
   .j-karta { margin-left: 0; padding: 12px 12px 8px; }
-  .j-karta-g { flex-wrap: wrap; }
-  .j-karta-etap { order: 3; margin-left: 48px; }
+  .j-karta-g { flex-wrap: wrap; row-gap: 8px; }
+  .j-karta-kto { flex: 1 1 calc(100% - 48px); }
+  .j-karta-etap { margin-left: 48px; }
+  .j-wynik-pliki .j-plik { max-width: none; }
   .j-karta-pasek li span { font-size: 10.5px; }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -965,7 +965,9 @@ dashboardu, a każda trasa zapisu przechodzi ochronę CSRF (`ochrona.Trasa`, sek
   Start → Praca → Ocena → Gotowe, linia „co teraz” (ostatni krok sesji pracownika albo notatka) i po kliknięciu
   „Zobacz, jak pracuje …” przebieg pracy wykonawcy i sędziego. Budzenia tych kart nie mają już własnych linii
   („Karta … · oddana do oceny” powtarzała się przy każdym oddaniu): stan pokazuje karta, a ostatnie `completed` karty
-  to wiadomość `koniec` („<agent> · skończone”: co zrobił, pliki z artefaktów, ocena sędziego). Stan z `GET /karty`
+  to wiadomość `koniec` („<agent> · skończone”: co zrobił, pliki z artefaktów jako zwarta siatka do 6 i „+N”, ocena
+  sędziego); karta bez takiej wiadomości pokazuje ten wynik sama. Karty stoją pod wiadomością agenta, która je
+  zapowiada, a w trwającej turze od razu pod żywym dymkiem (nie dopiero po końcu tury). Stan z `GET /karty`
   co 4 s, dopóki któraś karta wątku nie jest gotowa, i od razu po `watek.os`; w ukrytej karcie przeglądarki bez
   odpytywania.
 

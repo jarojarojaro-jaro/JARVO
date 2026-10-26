@@ -325,6 +325,23 @@ test("Os.widok: budzenia kart z wątku w karcie pracy, ostatnie „completed” 
   eq(v.map((x) => `${x.id}:${x.rodzaj}`), ["p1:przekazanie", "p2:przekazanie", "b7:budzenie", "b8:koniec"]);
   eq([...Os.kartyWatku([przek(1, "t_a"), { rodzaj: "przekazanie", karta: { task_id: null } }])], ["t_a"]);
   eq(Os.noweOdTad(v, 1), "b8");
+  eq(v[0].koniec_nizej, true);                                                       // wynik w wiadomości niżej
+  eq("koniec_nizej" in v[1], false);                                                 // bez niej karta pokazuje wynik
+});
+
+test("Os.widok: karty pod wiadomością, która je zapowiada; w trwającej turze od razu pod dymkiem", () => {
+  const karta = (n, w) => ({ id: `p${n}`, rodzaj: "przekazanie", ts: n, agent: "jarvo", przebieg_id: "r1", w_toku: !!w,
+    karta: { task_id: `t_${n}`, tytul: "x", agent: "jarvo-web" } });
+  const kroki = (n, w) => ({ id: `k${n}`, rodzaj: "kroki", ts: n, agent: "jarvo", przebieg_id: "r1", w_toku: !!w, kroki: [n] });
+  const wpis = { id: "e1", rodzaj: "wlasciciel", ts: 0 };
+  const odp = { id: "a1", rodzaj: "agent", ts: 9, agent: "jarvo", przebieg_id: "r1", tekst: "Web robi audyt" };
+  const v = Os.widok([wpis, kroki(1), karta(2), karta(3), kroki(4), odp], []);
+  eq(v.map((x) => x.id), ["e1", "a1", "p2", "p3"]);
+  eq(v[1].kroki, [1, 4]);
+  eq(Os.widok([wpis, kroki(1), karta(2), karta(3), odp], [], { szczegoly: true }).map((x) => x.id), ["e1", "k1", "a1", "p2", "p3"]);
+  // tura trwa: kroki w dymku, karty widać od razu pod nim
+  const zywy = { id: "r1", stan: "pracuje", wpis_id: "e1", agent: "jarvo", tekst: "" };
+  eq(Os.widok([wpis, kroki(1, true), karta(2, true), karta(3, true)], [zywy]).map((x) => x.id), ["e1", "z:r1", "p2", "p3"]);
 });
 
 test("Os.widok: żywy dymek za wpisem, schowane pozycje w toku, koniec po odpowiedzi", () => {
