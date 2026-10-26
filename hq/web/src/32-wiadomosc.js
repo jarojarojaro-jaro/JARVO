@@ -141,7 +141,9 @@ function KrokiLista({ kroki, szczegoly }) {
       ${szczegoly && k.podglad && html`<pre class="j-kroki-podglad">${k.podglad}</pre>`}</li>`)}</ol></div>`;
 }
 
-// Prosty: zwinięta linia „12 kroków · 2:05” (przy trwającej pracy też ostatni krok); Szczegóły: rozwinięte
+// Prosty: zwinięta linia „12 kroków · 2:05” (przy trwającej pracy też ostatni krok), bez licznika błędów narzędzi
+// (zwykle odzyskane potknięcia, a czerwone „2 błędy” pod odpowiedzią wyglądało jak awaria; błąd widać na liście kroków);
+// Szczegóły: rozwinięte, z licznikiem błędów
 function Kroki({ kroki, szczegoly, zywe }) {
   const [otwarte, setOtwarte] = useState(!!szczegoly);
   useEffect(() => setOtwarte(!!szczegoly), [szczegoly]);
@@ -151,7 +153,7 @@ function Kroki({ kroki, szczegoly, zywe }) {
   return html`<div class=${cx("j-kroki", zywe && "is-zywe")}>
     <button type="button" class="j-kroki-b" aria-expanded=${String(otwarte)} aria-controls=${id} onClick=${() => setOtwarte(!otwarte)}>
       <${Ikona} n="right" r=${14}/><span>${T("os.kroki", { n: s.n })}${s.sekundy ? ` · ${Czas.trwanie(s.sekundy)}` : ""}</span>
-      ${s.bledy > 0 && html`<span class="j-kroki-blad">· ${T("kroki.bledy", { n: s.bledy })}</span>`}
+      ${szczegoly && s.bledy > 0 && html`<span class="j-kroki-blad">· ${T("kroki.bledy", { n: s.bledy })}</span>`}
       ${zywe && s.ostatni && html`<span class="j-kroki-teraz">· ${czasownik(s.ostatni)}</span>`}
     </button>
     <div id=${id} hidden=${!otwarte}>${otwarte && html`<${KrokiLista} kroki=${kroki} szczegoly=${szczegoly}/>`}</div>

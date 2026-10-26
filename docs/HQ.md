@@ -1124,7 +1124,8 @@ innych kanałów etap 6.
   dymek: tekst z delt (po przeładowaniu z `tekst_dotad` migawki, bez rwania), kropki pisania i kroki. Stan, czas
   i **Zatrzymaj** pokazuje raz pasek nad kompozytorem; pod dymkiem zostaje tylko to, czego pasek nie mówi (powód
   kolejki z jej przyciskami, „trwa dłużej niż zwykle”, „Zatrzymane · Ponów”). Kroki: w trybie Prosty jedna linia
-  „12 kroków · 2:05” do rozwinięcia, w Szczegółach lista z podglądem wyników (`ustawienia.szczegoly`). Błąd tury
+  „12 kroków · 2:05” do rozwinięcia, bez licznika błędów narzędzi (błędny krok widać na rozwiniętej liście),
+  w Szczegółach lista z podglądem wyników i liczba błędów (`ustawienia.szczegoly`). Błąd tury
   jednym zdaniem po polsku z wielkiej litery (`blad.komunikat` z przebiegu: znana przyczyna, np. „Model przestał
   odpowiadać”, inaczej „Praca się nie udała”), surowy komunikat zwinięty pod **Szczegóły** (`blad.szczegoly`),
   przyciski **Ponów** (`POST /przebiegi/<id>/ponow`) i, gdy to wina klucza albo modelu, Klucze/Modele. Karta błędu
