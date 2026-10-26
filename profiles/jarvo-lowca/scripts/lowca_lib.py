@@ -50,10 +50,10 @@ _lock = threading.Lock()
 _ostatnie: dict[str, float] = {}
 
 
-def _czekaj(host: str) -> None:
+def _czekaj(host: str, pauza: float | None = None) -> None:
     with _lock:
         teraz = time.monotonic()
-        start = max(teraz, _ostatnie.get(host, 0.0) + PAUZY_HOSTOW.get(host, PAUZA_S))
+        start = max(teraz, _ostatnie.get(host, 0.0) + (PAUZY_HOSTOW.get(host, PAUZA_S) if pauza is None else pauza))
         _ostatnie[host] = start
     if start > teraz:
         time.sleep(start - teraz)
@@ -65,15 +65,16 @@ def _klucz(metoda: str, url: str, dane: bytes | None) -> Path:
 
 
 def http(url: str, metoda: str = "GET", dane: dict | None = None, pamiec_h: float = 12.0, naglowki: dict | None = None,
-         timeout: int = 30, max_mb: int = 6) -> tuple[int, str]:
-    """(kod, treść). Pamięć odpowiedzi na dysku przez `pamiec_h` godzin (0 = bez pamięci)."""
+         timeout: int = 30, max_mb: int = 6, pauza: float | None = None) -> tuple[int, str]:
+    """(kod, treść). Pamięć odpowiedzi na dysku przez `pamiec_h` godzin (0 = bez pamięci). `pauza`: odstęp od
+    poprzedniego zapytania do tego hosta zamiast PAUZY_HOSTOW (lekkie zapytanie do hosta z ciężkimi odpowiedziami)."""
     body = json.dumps(dane).encode() if dane is not None else None
     plik = _klucz(metoda, url, body)
     if pamiec_h and plik.is_file() and time.time() - plik.stat().st_mtime < pamiec_h * 3600:
         LICZNIK["z_pamieci"] += 1
         z = json.loads(plik.read_text(encoding="utf-8"))
         return z["kod"], z["tresc"]
-    _czekaj(urllib.parse.urlsplit(url).netloc)
+    _czekaj(urllib.parse.urlsplit(url).netloc, pauza)
     h = {"User-Agent": UA, "Accept": "application/json, text/html;q=0.9, */*;q=0.5", **(naglowki or {})}
     if body is not None:
         h["Content-Type"] = "application/json"

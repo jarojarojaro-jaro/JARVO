@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """Przetargi jako sygnały Łowcy: e-Zamówienia (BZP) i TED, oficjalne API bez klucza.
 
-    przetargi.py bzp --od 2026-09-22 [--do 2026-09-29] [--cpv 72,48] [--woj PL14,ŚLĄSKIE] [--wyniki] [--szukaj "strona www"] [-o sygnaly.jsonl]
+    przetargi.py bzp --od 2026-09-22 [--do 2026-09-29] [--cpv 72,48] [--woj PL14,ŚLĄSKIE] [--wyniki]
+                     [--szukaj "sztuczna inteligencja|chatbot"] [--w-tresci] [--czas 300] [-o sygnaly.jsonl]
     przetargi.py ted --od 2026-09-01 [--do …] [--cpv 72] [--kraj POL] [-o sygnaly.jsonl]
     przetargi.py sprawdz bzp|ted                            # healthcheck: jedno małe zapytanie, kod 3 = blokada
 
 BZP `--wyniki`: ogłoszenia o udzieleniu zamówienia, a firmą-sygnałem jest **zwycięzca** (NIP, miasto): właśnie dostał
 pracę do wykonania, więc potrzebuje podwykonawców, sprzętu, ludzi. Bez `--wyniki`: ogłoszenia o zamówieniu, a
 sygnałem jest **zamawiający** (kupuje teraz to, co opisuje przedmiot). CPV to prefiksy (72 = usługi IT).
-BZP zwraca do 500 ogłoszeń na zapytanie, więc skrypt pyta dzień po dniu; dzień z pełnymi 500 dostaje ostrzeżenie.
+BZP zwraca do 500 ogłoszeń na zapytanie, więc skrypt pyta dzień po dniu (najnowsze najpierw); dzień z pełnymi 500
+dostaje ostrzeżenie. `--szukaj` (frazy po „|”) filtruje przedmiot zamówienia po stronie API: jedno małe zapytanie na
+dzień i frazę. Pełny dzień bez frazy albo z `--w-tresci` (fraza także w treści ogłoszenia) to do 17 zapytań po 4 s
+pauzy, ok. minuty na dzień. `--czas` (domyślnie 240 s, poniżej limitu terminala agenta) ucina starsze dni z uwagą.
 """
 
 from __future__ import annotations
@@ -18,6 +22,8 @@ import datetime as dt
 import html
 import re
 import sys
+import time
+import urllib.parse
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -27,6 +33,8 @@ BZP = "https://ezamowienia.gov.pl/mo-board/api/v1/notice"
 BZP_LINK = "https://ezamowienia.gov.pl/mo-client-board/bzp/notice-details/id/{}"
 TED = "https://api.ted.europa.eu/v3/notices/search"
 MAX_BZP = 500
+CZAS_S = 240.0                 # cały przebieg BZP: terminal agenta przerywa polecenie po 420 s
+PAUZA_FRAZY_S = 3.0            # zapytanie z frazą zwraca kilka ogłoszeń, nie kilka MB; szybciej niż co 3 s BZP odpowiada 403
 
 
 def dni(od: str, do: str):
@@ -70,33 +78,59 @@ def bzp_sygnaly(n: dict, wyniki: bool) -> list[dict]:
     return out
 
 
-def bzp(od: str, do: str, cpv: list[str], woj: list[str], wyniki: bool, szukaj: str | None) -> tuple[list[dict], list[str]]:
+def bzp(od: str, do: str, cpv: list[str], woj: list[str], wyniki: bool, szukaj: str | None, *, w_tresci: bool = False,
+        czas_s: float = CZAS_S, zegar=time.monotonic) -> tuple[list[dict], list[str]]:
+    """Sygnały z BZP, najnowsze dni najpierw. `szukaj`: frazy rozdzielone „|” (dowolna pasuje). Bez `w_tresci` frazę
+    w przedmiocie zamówienia filtruje samo API (OrderObject): jedno małe zapytanie na dzień i frazę. Z `w_tresci` cały
+    dzień ogłoszeń (do 17 zapytań po 4 s pauzy) i fraza także w treści. Po `czas_s` starsze dni zostają pominięte
+    z uwagą (pamięć 6 h: ponowne uruchomienie przechodzi sprawdzone dni od razu)."""
     rodzaj = "TenderResultNotice" if wyniki else "ContractNotice"
     out, uwagi = [], []
-    fraza = (szukaj or "").lower()
-    for dzien in dni(od, do):
+    frazy = [f.strip() for f in (szukaj or "").split("|") if f.strip()]
+    w_api = bool(frazy) and not w_tresci
+    wszystkie = list(dni(od, do))
+    koniec = zegar() + czas_s
+    widziane: set = set()
+    for i, dzien in enumerate(reversed(wszystkie)):
+        if zegar() >= koniec:
+            uwagi.append(f"limit czasu {czas_s:.0f} s: sprawdzone {i} z {len(wszystkie)} dni ({wszystkie[-i]}–{do}), starsze "
+                         f"pominięte; uruchom ponownie (pamięć dokończy) albo zawęź okres")
+            break
         nast = (dt.date.fromisoformat(dzien) + dt.timedelta(days=1)).isoformat()
-        def pobierz(kod_woj):
+
+        def pobierz(kod_woj, fraza=None):
             q = f"{BZP}?NoticeType={rodzaj}&PublicationDateFrom={dzien}&PublicationDateTo={nast}&PageSize={MAX_BZP}"
             if kod_woj:
                 q += f"&OrganizationProvince={kod_woj}"
-            return ll.json_z(q, pamiec_h=6, max_mb=60, timeout=90) or []   # pełny HTML ogłoszeń: kilka MB na dzień
+            if fraza:
+                q += f"&OrderObject={urllib.parse.quote(fraza)}"
+            return ll.json_z(q, pamiec_h=6, max_mb=60, timeout=90,       # pełny HTML ogłoszeń: kilka MB na dzień
+                             pauza=PAUZA_FRAZY_S if fraza else None) or []
 
         lista = []
         for kod_woj in [ll.WOJ_KOD.get(w, w) for w in woj] or [None]:
-            czesci = [pobierz(kod_woj)]
-            if kod_woj is None and len(czesci[0]) >= MAX_BZP:  # API nie stronicuje: pełny dzień dzielimy na województwa
-                czesci = [pobierz(k) for k in ll.WOJ]
-            if any(len(c) >= MAX_BZP for c in czesci):
-                uwagi.append(f"{dzien}{' ' + kod_woj if kod_woj else ''}: pełne {MAX_BZP} ogłoszeń w jednym zapytaniu, mogło czegoś brakować")
-            lista += [n for c in czesci for n in c]
+            for fraza in (frazy if w_api else [None]):
+                czesci = [pobierz(kod_woj, fraza)]
+                if kod_woj is None and len(czesci[0]) >= MAX_BZP:  # API nie stronicuje: pełny dzień dzielimy na województwa
+                    czesci = [pobierz(k, fraza) for k in ll.WOJ]
+                if any(len(c) >= MAX_BZP for c in czesci):
+                    uwagi.append(f"{dzien}{' ' + kod_woj if kod_woj else ''}: pełne {MAX_BZP} ogłoszeń w jednym zapytaniu, mogło czegoś brakować")
+                lista += [n for c in czesci for n in c]
         for n in lista:
             if (n.get("publicationDate") or "")[:10] != dzien:
                 continue                                      # okno API obejmuje też początek następnego dnia
+            klucz = n.get("objectId") or n.get("noticeNumber")
+            if klucz and klucz in widziane:
+                continue                                      # ogłoszenie pasujące do kilku fraz: raz
             if not pasuje_cpv(cpv_kody(n.get("cpvCode")), cpv):
                 continue
-            if fraza and fraza not in (n.get("orderObject") or "").lower() and fraza not in tekst(n.get("htmlBody"), 20000).lower():
-                continue
+            if frazy:
+                przedmiot = (n.get("orderObject") or "").lower()
+                tresc = tekst(n.get("htmlBody"), 20000).lower() if w_tresci else ""
+                if not any(f.lower() in przedmiot or f.lower() in tresc for f in frazy):
+                    continue
+            if klucz:
+                widziane.add(klucz)
             out.extend(bzp_sygnaly(n, wyniki))
     return out, uwagi
 
@@ -162,7 +196,9 @@ def main(argv: list[str] | None = None) -> int:
         if nazwa == "bzp":
             s.add_argument("--woj", help="województwa (kod PL14 albo nazwa) po przecinku")
             s.add_argument("--wyniki", action="store_true", help="wyniki przetargów: sygnałem jest zwycięzca")
-            s.add_argument("--szukaj", help="fraza w przedmiocie albo treści ogłoszenia")
+            s.add_argument("--szukaj", help="frazy w przedmiocie zamówienia, rozdzielone | (dowolna pasuje)")
+            s.add_argument("--w-tresci", action="store_true", help="fraza także w treści ogłoszenia (wolno: cały dzień)")
+            s.add_argument("--czas", type=float, default=CZAS_S, help="limit czasu w sekundach (starsze dni pominięte)")
         else:
             s.add_argument("--kraj", default="POL")
     s = sub.add_parser("sprawdz", help="healthcheck: jedno małe zapytanie do źródła")
@@ -182,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if a.cmd == "bzp":
             woj = [w.strip().upper() for w in (a.woj or "").split(",") if w.strip()]
-            wiersze, uwagi = bzp(a.od, a.do, cpv, woj, a.wyniki, a.szukaj)
+            wiersze, uwagi = bzp(a.od, a.do, cpv, woj, a.wyniki, a.szukaj, w_tresci=a.w_tresci, czas_s=a.czas)
         else:
             wiersze, uwagi = ted(a.od, a.do, cpv, a.kraj), []
     except ll.Blokada as e:

@@ -1,7 +1,7 @@
 ---
 name: sygnaly
 description: "Sygnały zakupowe: KRS, CEIDG, przetargi, strony, rekrutacje."
-version: 1.1.1
+version: 1.2.0
 author: "Jarvo (metoda za superdesigndev/treg lead-signals, Apache-2.0)"
 license: MIT
 metadata:
@@ -32,6 +32,11 @@ wygrała przetarg, rekrutuje, zmieniła stronę. Zbierasz je do `sygnaly.jsonl` 
    @@PY@@ "$S/przetargi.py" ted --od <miesiąc temu> --cpv 72 -o "$P/ted.jsonl"
    @@PY@@ "$S/leady.py" dodaj "$P" "$P/nowe.jsonl" "$P/bzp.jsonl" …                                       # bez duplikatów
    ```
+   **Przetargi po frazie:** jedno polecenie z frazami po „|”, nie kilka naraz (wszystkie pytają ten sam serwer
+   i czekają na siebie): `bzp --od <14 dni temu> --szukaj "sztuczna inteligencja|chatbot"` (przedmiot zamówienia,
+   filtr po stronie API, ok. 3 s na dzień i frazę). `--w-tresci` szuka też w treści, ale to minuta na dzień: tylko
+   na 1–3 dni. Skrypt sam kończy po `--czas` (240 s) z uwagą „limit czasu”: wtedy zawęź okres albo uruchom ponownie
+   (pamięć 6 h przechodzi sprawdzone dni od razu). Nigdy nie puszczaj kilku `bzp` równolegle.
    Kod 3 = źródło odmówiło (blokada): zapisz w `risks`, nie próbuj innej drogi (API rejestrów i przetargów nie
    dostają `ostrozna-przegladarka`; ta jest tylko na pojedynczą stronę firmy, skill `kontakt-firmy`).
    **KRS czy CEIDG:** KRS to spółki, CEIDG (`ceidg.py`) to jednoosobowe działalności (fryzjer, ekipa remontowa,

@@ -96,6 +96,33 @@ def test_tenders(monkeypatch):
     assert len(zapytania) == 1 + len(ll.WOJ)                                     # pełny dzień dzielony na województwa
 
 
+def test_bzp_frazy_w_api_i_limit_czasu(monkeypatch):
+    """Pierwsza sesja 26.10: 26 dni × 17 zapytań po 4 s pauzy i 6 kopii naraz = Łowca wisiał ponad kwadrans.
+    Frazy filtruje API (OrderObject, jedno zapytanie na dzień i frazę), najnowsze dni najpierw, a po limicie czasu
+    starsze dni są pominięte z uwagą."""
+    zapytania = []
+
+    def fake_json(url, **kw):
+        zapytania.append(url)
+        dzien = url.split("PublicationDateFrom=")[1][:10]
+        return [{"objectId": f"o-{dzien}", "publicationDate": f"{dzien}T08:00:00Z", "orderObject": "Wdrożenie chatbota AI",
+                 "organizationName": "Gmina X", "cpvCode": "72000000-5 (Usługi informatyczne)"}]
+    monkeypatch.setattr(ll, "json_z", fake_json)
+    wyniki, uwagi = przetargi.bzp("2026-10-20", "2026-10-22", [], [], wyniki=False, szukaj="chatbot|sztuczna inteligencja")
+    assert len(zapytania) == 6 and all("OrderObject=" in q for q in zapytania)
+    assert "OrderObject=sztuczna%20inteligencja" in zapytania[1]
+    assert [w["data"] for w in wyniki] == ["2026-10-22", "2026-10-21", "2026-10-20"] and uwagi == []   # raz, mimo dwóch fraz
+    zapytania.clear()
+    zegar = iter([0.0, 10.0, 400.0, 400.0])
+    wyniki, uwagi = przetargi.bzp("2026-10-01", "2026-10-22", [], [], wyniki=False, szukaj="chatbot", czas_s=300,
+                                  zegar=lambda: next(zegar))
+    assert len(zapytania) == 1 and "2026-10-22" in zapytania[0] and len(wyniki) == 1
+    assert "limit czasu 300 s: sprawdzone 1 z 22 dni (2026-10-22–2026-10-22)" in uwagi[0]
+    zapytania.clear()
+    przetargi.bzp("2026-10-22", "2026-10-22", [], [], wyniki=False, szukaj="chatbot", w_tresci=True)
+    assert len(zapytania) == 1 and "OrderObject" not in zapytania[0]             # w treści: cały dzień, fraza u nas
+
+
 
 def test_tender_healthcheck(monkeypatch, capsys):
     monkeypatch.setattr(ll, "json_z", lambda url, **kw: [] if kw.get("pamiec_h") == 0 and "PageSize=1" in url else None)
