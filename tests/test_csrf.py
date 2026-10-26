@@ -174,6 +174,8 @@ def test_odczyty_hq_bez_skutkow(monkeypatch):
         # w pamięci procesu połączenie i jego subskrypcje
         "/rozmowy", "/rozmowy/{wid}", "/rozmowy/{wid}/os", "/rozmowy/{wid}/eksport", "/przebiegi/{pid}", "/strumien",
         "/agenci",
+        # karty pracy (karty.py): kanban.db i state.db pracowników tylko do odczytu (mode=ro)
+        "/karty", "/karty/{tid}",
         # start aplikacji (trasy_aplikacji.py): USER.md, config i .env profilu Jarva tylko po nazwach, nawyki.db mode=ro
         "/app", "/podpowiedzi"}
     zapis = {t.path for t in _trasy(api.router) if "POST" in t.methods}
