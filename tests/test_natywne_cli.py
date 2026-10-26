@@ -1638,6 +1638,24 @@ def test_instaluj_na_atrapach_i_drugi_przebieg_niczego_nie_zmienia(tmp_path, sta
     assert (u.logi / "instalacja.log").read_text(encoding="utf-8").count("Jarvo natywnie: instalacja w") == 2
 
 
+@pytest.mark.windows_only
+def test_polecenie_tez_w_katalogu_aliasow_dla_otwartych_okien(tmp_path, stanowisko):
+    """Windows Terminal daje kartom zmienne z chwili swojego startu, więc nowy wpis PATH tam nie działa: kopia jarvo.cmd
+    w %LOCALAPPDATA%\\Microsoft\\WindowsApps (w PATH od zalogowania) działa od razu; wpis w dzienniku zmian hosta."""
+    s, u = stanowisko, stanowisko["u"]
+    aliasy = tmp_path / "lad" / "Microsoft" / "WindowsApps"
+    aliasy.mkdir(parents=True)
+    s["env"].update(LOCALAPPDATA=str(tmp_path / "lad"))
+    ot = s["otoczenie"]()
+    ot.env["PATH"] = f"{ot.env['PATH']};{aliasy}"
+    s["log"].clear()
+    assert instalator.instaluj(u, _aplikacja(tmp_path, s["adres"], s["www"]), log=s["log"].append, otoczenie=ot) == 0
+    assert (aliasy / "jarvo.cmd").read_bytes() == (u.root / "bin" / "jarvo.cmd").read_bytes()
+    pliki = [w["szczegoly"]["sciezka"] for w in s["zmiany"].lista if w["rodzaj"] == "plik"]
+    assert str(aliasy / "jarvo.cmd") in pliki
+    assert instalator.katalog_aliasow({"LOCALAPPDATA": str(tmp_path / "lad"), "PATH": r"C:\Inne"}) is None
+
+
 def test_instaluj_nowa_wersja_obok_starej_i_restart_serwisu(tmp_path, stanowisko):
     s, u = stanowisko, stanowisko["u"]
     stara = _aplikacja(tmp_path, s["adres"], s["www"])

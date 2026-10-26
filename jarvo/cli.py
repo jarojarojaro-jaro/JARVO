@@ -1079,6 +1079,9 @@ def sprawdz_polecenie(u: Uklad, ot: Otoczenie) -> dict:
     nasze = [u.root / "bin" / ("jarvo.cmd" if WINDOWS else "jarvo")]
     if not WINDOWS:
         nasze.insert(0, Path.home() / ".local" / "bin" / "jarvo")
+    aliasy = instalator.katalog_aliasow(ot.env)
+    if aliasy is not None:                          # kopia polecenia w katalogu aliasów aplikacji (instalator)
+        nasze.append(aliasy / "jarvo.cmd")
     znalezione = shutil.which("jarvo", path=ot.env.get("PATH"))
     if znalezione is None:
         kiedy = (f"zamknij wszystkie okna Windows Terminal i otwórz nowe (jego karty mają zmienne z chwili jego "

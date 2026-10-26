@@ -1076,6 +1076,16 @@ ODSWIEZ_PATH_PS = ("$env:Path = [Environment]::GetEnvironmentVariable('Path','Us
                    "[Environment]::GetEnvironmentVariable('Path','Machine')")
 
 
+def katalog_aliasow(env: dict) -> Path | None:
+    """Windows: %LOCALAPPDATA%\\Microsoft\\WindowsApps, gdy jest w PATH tego procesu (czyli w PATH użytkownika od
+    zalogowania, także w kartach długo otwartego Windows Terminal); inaczej None."""
+    if not WINDOWS or not env.get("LOCALAPPDATA"):
+        return None
+    aliasy = Path(env["LOCALAPPDATA"]) / "Microsoft" / "WindowsApps"
+    w_path = {_klucz(p.rstrip("\\/")) for p in str(env.get("PATH") or "").split(os.pathsep) if p.strip()}
+    return aliasy if aliasy.is_dir() and _klucz(aliasy) in w_path else None
+
+
 def kiedy_dziala_path() -> str:
     """Kiedy nowy wpis PATH zadziała: macOS Terminal otwiera powłokę logowania, a terminal w GNOME i KDE nie (czyta
     ~/.bashrc albo ~/.zshrc), więc na Linuksie dopiero po ponownym zalogowaniu."""
@@ -2412,6 +2422,13 @@ class _Instalacja:
         if zm.dodaj_do_path(self.u, katalog, rejestr=self.ot.rejestr):
             self.zmiany.append("PATH użytkownika")
             self.podlog(f"PATH użytkownika: dopisany {katalog} (nowe okna terminala go widzą)")
+        # od razu także w otwartych oknach: Windows Terminal daje kartom zmienne z chwili swojego startu, a katalog
+        # aliasów aplikacji (%LOCALAPPDATA%\Microsoft\WindowsApps) jest w PATH użytkownika od zalogowania
+        aliasy = katalog_aliasow(self.ot.env)
+        if aliasy is not None and zm.zapisz_plik(self.u, aliasy / "jarvo.cmd", tresc_jarvo_cmd(python, start, korzen),
+                                                 None):
+            self.zmiany.append(str(aliasy / "jarvo.cmd"))
+            self.podlog(f"polecenie także w {aliasy} (działa od razu w otwartych oknach terminala)")
         inne = shutil.which("jarvo", path=self.ot.env.get("PATH", ""))
         if inne and Path(inne).resolve().parent != Path(katalog).resolve():
             self.uwagi.append(f"w PATH wcześniej jest inne polecenie jarvo ({inne}); to uruchomisz pełną ścieżką "
