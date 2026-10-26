@@ -2430,7 +2430,8 @@ class _Instalacja:
             self.zmiany.append(str(aliasy / "jarvo.cmd"))
             self.podlog(f"polecenie także w {aliasy} (działa od razu w otwartych oknach terminala)")
         inne = shutil.which("jarvo", path=self.ot.env.get("PATH", ""))
-        if inne and Path(inne).resolve().parent != Path(katalog).resolve():
+        nasze = {_klucz(Path(katalog).resolve()), *([_klucz(aliasy.resolve())] if aliasy is not None else [])}
+        if inne and _klucz(Path(inne).resolve().parent) not in nasze:
             self.uwagi.append(f"w PATH wcześniej jest inne polecenie jarvo ({inne}); to uruchomisz pełną ścieżką "
                               f"{cel}")
 

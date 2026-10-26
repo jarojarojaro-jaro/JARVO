@@ -1647,10 +1647,12 @@ def test_polecenie_tez_w_katalogu_aliasow_dla_otwartych_okien(tmp_path, stanowis
     aliasy.mkdir(parents=True)
     s["env"].update(LOCALAPPDATA=str(tmp_path / "lad"))
     ot = s["otoczenie"]()
-    ot.env["PATH"] = f"{ot.env['PATH']};{aliasy}"
+    ot.env["PATH"] = f"{aliasy};{ot.env['PATH']}"           # jak u właściciela: WindowsApps przed katalogiem Jarva
     s["log"].clear()
     assert instalator.instaluj(u, _aplikacja(tmp_path, s["adres"], s["www"]), log=s["log"].append, otoczenie=ot) == 0
     assert (aliasy / "jarvo.cmd").read_bytes() == (u.root / "bin" / "jarvo.cmd").read_bytes()
+    # nasza kopia w WindowsApps to nie „inne polecenie jarvo” (aktualizacja 26.10 ostrzegała o jarvo.CMD)
+    assert not [w for w in s["log"] if "inne polecenie jarvo" in w], s["log"]
     pliki = [w["szczegoly"]["sciezka"] for w in s["zmiany"].lista if w["rodzaj"] == "plik"]
     assert str(aliasy / "jarvo.cmd") in pliki
     assert instalator.katalog_aliasow({"LOCALAPPDATA": str(tmp_path / "lad"), "PATH": r"C:\Inne"}) is None
