@@ -708,6 +708,8 @@ def _karta_z_bazy(db: Path, task_id: str) -> Dict[str, Any]:
 # 3) oddanie karty (`kanban_request_review`) bez `reviewer` dostaje recenzenta floty (flota.json obok wtyczki, z
 #    fleet.yaml). Bez niego Hermes zostawia kartę u wykonawcy i tor review uruchamia go znowu: agent oddaje tę samą
 #    pracę w kółko (pierwsza sesja 26.10: Web 6 razy, Sherlock 5). Sam recenzent i host nie dostają dopisku.
+# 4) wykonawca nie zamyka swojej karty (`kanban_complete` na HERMES_KANBAN_TASK): blokada z prośbą o oddanie do oceny
+#    (pierwsza sesja 26.10: Łowca zamknął listę leadów sam, bez sędziego).
 LIMITY_GENERACJI = {"video_generate": ("JARVO_LIMIT_WIDEO_AI", 3), "image_generate": ("JARVO_LIMIT_OBRAZY_AI", 12)}
 _LOGOWANIE_RE = re.compile(r"(?i)\b(has[łl]o|password|passwd|pin)\b(?:\s+[^\s\d!@#$%^&*]{1,12}){0,3}?\s*(?:[:=]|to\b|jest\b)?"
                            r"\s*\S*[\d!@#$%^&*]\S*")
@@ -842,6 +844,19 @@ def _recenzent_oddania(args: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return {"action": "modify", "args": {"reviewer": recenzent}}
 
 
+def _zamkniecie_bez_oceny(args: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Wykonawca nie zamyka swojej karty sam: `kanban_complete` na karcie, nad którą pracuje (HERMES_KANBAN_TASK),
+    wraca z prośbą o oddanie do oceny. Sędzia (recenzent) i host zamykają jak dotąd."""
+    recenzent = recenzent_floty()
+    karta = os.environ.get("HERMES_KANBAN_TASK") or ""
+    if not recenzent or not karta or _profil(_hermes_home()) in (recenzent, "host"):
+        return None
+    if str(args.get("task_id") or karta).strip() != karta:
+        return None
+    return {"action": "block", "message": "Swojej karty nie zamykasz sam: oddaj ją do oceny "
+            "(kanban_request_review z summary i metadata: artifacts, dod_check, risks). Zamyka sędzia po sprawdzeniu."}
+
+
 def straznik(tool_name: str = "", args: Optional[Dict[str, Any]] = None, task_id: str = "", session_id: str = "",
              **_kw: Any) -> Optional[Dict[str, Any]]:
     """Hak pre_tool_call: {"action": "block"|"approve", "message"}, {"action": "modify", "args"} (dopisany recenzent
@@ -858,6 +873,8 @@ def straznik(tool_name: str = "", args: Optional[Dict[str, Any]] = None, task_id
             return _limit_generacji(tool_name, task_id, session_id)
         elif tool_name == "kanban_request_review":
             return _recenzent_oddania(args)
+        elif tool_name == "kanban_complete":
+            return _zamkniecie_bez_oceny(args)
     except Exception as e:                       # strażnik nie może zatrzymać zwykłej pracy własnym błędem
         logger.debug("jarvo-wiedza: strażnik %s: %s", tool_name, e)
     return None

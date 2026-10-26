@@ -289,6 +289,23 @@ def test_straznik_dopisuje_recenzenta_do_oddania(tmp_path, monkeypatch):
     assert pl.straznik(tool_name="kanban_request_review", args=oddanie) is None
 
 
+def test_straznik_wykonawca_nie_zamyka_swojej_karty(tmp_path, monkeypatch):
+    """Pierwsza sesja 26.10: Łowca zamknął kartę sam (kanban_complete), więc nikt nie sprawdził listy leadów."""
+    monkeypatch.setattr(pl, "recenzent_floty", lambda: "jarvo")
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "jarvo-lowca"))
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "t_06f3c3fc")
+    for args in ({"summary": "10 firm"}, {"task_id": "t_06f3c3fc", "summary": "10 firm"}):
+        w = pl.straznik(tool_name="kanban_complete", args=args)
+        assert w["action"] == "block" and "kanban_request_review" in w["message"]
+    assert pl.straznik(tool_name="kanban_complete", args={"task_id": "t_inna0000"}) is None     # cudza karta (podkarta)
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "jarvo"))                    # sędzia zamyka
+    assert pl.straznik(tool_name="kanban_complete", args={"summary": "Zatwierdzam"}) is None
+    monkeypatch.delenv("HERMES_KANBAN_TASK")                                                  # Jarvo w czacie
+    assert pl.straznik(tool_name="kanban_complete", args={"task_id": "t_06f3c3fc"}) is None
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "jarvo-lowca"))             # poza kartą
+    assert pl.straznik(tool_name="kanban_complete", args={"task_id": "t_06f3c3fc"}) is None
+
+
 def test_recenzent_floty_z_pliku_wtyczki(tmp_path, monkeypatch):
     sys.path.insert(0, str(REPO / "scripts"))
     import build

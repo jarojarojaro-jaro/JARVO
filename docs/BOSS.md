@@ -61,7 +61,8 @@ Dzięki temu po każdym restarcie, kompresji czy nowej rozmowie Jarvo odtwarza p
 - **Snajperzy:** dostają kartę, pracują w swoim katalogu misji, na końcu wołają
   `kanban_request_review(reviewer="jarvo")` z samokontrolą wobec DoD. Gdy agent pominie `reviewer`, dopisuje go
   strażnik wtyczki `jarvo-wiedza` (docs/WIEDZA.md): bez niego Hermes zostawiał kartę u wykonawcy, a tor review
-  uruchamiał go znowu, więc nikt niezależny nie sprawdzał wyniku.
+  uruchamiał go znowu, więc nikt niezależny nie sprawdzał wyniku. Ten sam strażnik nie pozwala wykonawcy zamknąć
+  własnej karty (`kanban_complete`): zamyka sędzia po ocenie.
 - **Host (`default`):** profil techniczny. Trzyma token bota, uruchamia gateway (multipleks
   wszystkich profili), dispatcher kanbana i trasy `profile_routes`. Nie rozmawia z Tobą.
 

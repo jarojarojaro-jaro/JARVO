@@ -1,6 +1,7 @@
 # Changelog: jarvo-operator
 
 ## Niewydane
+- Swojej karty nie zamykasz sam: `kanban_complete` na karcie, nad którą pracujesz, strażnik wtyczki `jarvo-wiedza` odrzuca z prośbą o `kanban_request_review` (summary, artifacts, dod_check, risks); zamyka sędzia po ocenie. Pierwsza sesja 26.10: lista leadów Łowcy trafiła do właściciela bez oceny. Cudze karty (np. podkarty, które założyłeś) zamykasz jak dotąd.
 - Oddanie karty zawsze trafia do sędziego: gdy `kanban_request_review` nie ma `reviewer`, strażnik wtyczki `jarvo-wiedza` dopisuje recenzenta floty (`jarvo`). Dotąd taka karta zostawała u Ciebie, a tor review uruchamiał Cię znowu, więc oddawałeś tę samą pracę w kółko i nikt jej niezależnie nie sprawdzał (pierwsza sesja 26.10: Web 6 razy, Sherlock 5). Protokół floty, zasada 12: wynik narzędzia to poszlaka, nie dowód; każde znalezisko w raporcie potwierdzasz sam na co najmniej jednym przykładzie, a kod chwilowy (429, 503, przekroczony czas) to „niesprawdzone”, nie „zepsute”.
 - Komputer Jarva natywnie (docs/NATYWNIE.md, etap E10: J01–J13, J16, J17): w instalacji bez Dockera ekranem
   Operatora jest osobna przeglądarka Jarva (Chrome for Testing z manifestu, profil `<dane>/jarvo/komputer/profil`,
