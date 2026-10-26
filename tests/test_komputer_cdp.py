@@ -195,6 +195,37 @@ def test_okno_potwierdzenia_wybor_pliku_baner_i_pobrania(przegl):
     assert w["structuredContent"]["code"] == "element_przesloniety"
 
 
+def test_padnieta_karta_wraca_po_ponownym_wczytaniu(przegl):
+    """CI natywnie WARM (Chrome x64 w emulacji na Windows arm64): proces karty pada przy starcie strony, a martwa
+    karta nie miała tytułu i polecenia do niej czekały do limitu. Sterownik wczytuje ją ponownie (najwyżej 3 razy
+    na minutę). Tu padnięcie wywołuje Page.crash."""
+    st, _, _ = przegl
+    logi = []
+    st.log = logi.append
+    nr = otworz(st, "https://sklep.jarvo.test/formularz.html")
+    okno = st.okno(nr)
+    tytul = okno.tytul
+    assert tytul and "jarvo.test" not in tytul
+    try:
+        st.b.wyslij("Page.crash", {}, okno.sesja, czas=3)
+    except cdp.BladCDP:
+        pass                                          # odpowiedzi nie ma: proces karty już nie żyje
+    for _ in range(80):
+        if any("wczytuję ją ponownie" in x for x in logi) and okno.tytul == tytul:
+            try:
+                if st.b.wyslij("Runtime.evaluate", {"expression": "document.title", "returnByValue": True},
+                               okno.sesja, czas=3)["result"]["value"] == tytul:
+                    break
+            except cdp.BladCDP:
+                pass
+        time.sleep(0.25)
+    else:
+        raise AssertionError(f"karta nie wróciła: {logi}")
+    assert sum("wczytuję ją ponownie" in x for x in logi) == 1, logi    # kilka zdarzeń jednego padnięcia = raz
+    assert st.wywolaj("get_window_state", {"pid": st.pid, "window_id": nr}, {"max_image_dimension": 800})[
+        "structuredContent"]["elements"]
+
+
 def test_klik_w_punkt_trafia_w_element_strony(przegl):
     st, _, _ = przegl
     nr = otworz(st, "https://sklep.jarvo.test/sklep.html")

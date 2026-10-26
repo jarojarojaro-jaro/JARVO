@@ -57,6 +57,7 @@ CZAS_WEJSCIA = 10.0
 CZAS_FOKUSU = 10.0                 # s: tyle ważna jest ocena pola z fokusem przez zasady (sprawdzenie przy pisaniu)
 PODGLAD_JAKOSC = 60                # JPEG klatek podglądu
 PODGLAD_MAKS = 1280                # px dłuższego boku klatki podglądu
+PODNIESIENIA = 3                   # ponownych wczytań padniętej karty na minutę (potem zostaje martwa z wpisem w dzienniku)
 PODGLAD_BEZCZYNNOSC = 20.0         # s bez pytania o klatkę: screencast staje (nie zużywa procesora bez widza)
 MAKS_TEKST_WLASCICIELA = 4000
 MAKS_PLIKOW = 10
@@ -237,6 +238,7 @@ class Okno:
         self.swiaty: dict[tuple, int] = {}          # (sesja, frameId) -> kontekst odizolowanego świata
         self.utworzone = time.monotonic()
         self.trafienia: dict[tuple, tuple] = {}     # (x, y) -> (czas, sesja, backendNodeId) z oceny zasad
+        self.padniecia: list[float] = []            # chwile padnięcia procesu karty (podnoszenie, najwyżej 3 na minutę)
 
 
 class Sterownik:
@@ -377,7 +379,13 @@ class Sterownik:
         elif metoda == "Browser.downloadProgress":
             self._pobranie_postep(p)
         elif metoda in ("Inspector.targetCrashed", "Target.targetCrashed"):
-            self.log("sterownik: karta przeglądarki padła")
+            with self._lock:
+                okno = (self._okno_sesji(sesja) if metoda == "Inspector.targetCrashed"
+                        else self._okna.get(self._po_celu.get(p.get("targetId"), -1)))
+            if okno is None:
+                self.log("sterownik: karta przeglądarki padła")
+                return
+            threading.Thread(target=self._podnies, args=(okno,), daemon=True).start()
 
     def _dolaczony(self, p: dict, rodzic: str | None) -> None:
         info, sesja = p.get("targetInfo") or {}, p.get("sessionId")
@@ -406,6 +414,27 @@ class Sterownik:
             threading.Thread(target=self._pusc, args=(sesja,), daemon=True).start()   # workery: tylko wznowić
             return
         threading.Thread(target=self._przygotuj_cel, args=(sesja, info, rodzic), daemon=True).start()
+
+    def _podnies(self, okno: Okno) -> None:
+        """Proces karty padł (Windows arm64 z przeglądarką x64 w emulacji: renderer czasem pada przy starcie strony,
+        CI natywnie WARM): karta zostaje martwa, a polecenia do niej czekają do limitu. Wczytujemy ją jeszcze raz
+        (nowy proces renderera), najwyżej PODNIESIENIA razy na minutę; jedno padnięcie daje kilka zdarzeń
+        (Inspector i Target), więc te z ostatnich 2 s liczą się raz."""
+        teraz = time.monotonic()
+        with self._lock:
+            if okno.padniecia and teraz - okno.padniecia[-1] < 2.0:
+                return
+            okno.padniecia = [t for t in okno.padniecia if teraz - t < 60] + [teraz]
+            ile = len(okno.padniecia)
+        if ile > PODNIESIENIA:
+            self.log(f"sterownik: karta {okno.nr} padła {ile} razy w minutę, zostawiam ją (adres: {okno.url[:120]})")
+            return
+        self.log(f"sterownik: karta {okno.nr} padła, wczytuję ją ponownie ({ile}/{PODNIESIENIA})")
+        time.sleep(0.5)
+        try:
+            self.b.wyslij("Page.reload", {}, okno.sesja, czas=20)
+        except cdp.BladCDP as e:
+            self.log(f"sterownik: ponowne wczytanie karty {okno.nr}: {e.tekst[:120]}")
 
     def _pusc(self, sesja: str) -> None:
         try:
