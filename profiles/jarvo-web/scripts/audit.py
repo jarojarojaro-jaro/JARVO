@@ -137,6 +137,62 @@ def _json(p: Path):
         return None
 
 
+# ------------------------------------------------------------------ druga próba linków
+# linkinator pyta 10 adresów naraz, więc serwer z limitem żądań odpowiada 429 („zwolnij”), a linkinator wpisuje to
+# jako BROKEN. Pierwsza sesja 26.10: 27 „martwych linków” enigmalabz.com, które w przeglądarce działały. Kody chwilowe
+# sprawdzamy więc drugi raz po kolei, z przerwą, z uszanowaniem Retry-After; co dalej ogranicza, to `NIESPRAWDZONY`
+# (nie błąd strony), a do raportu trafiają tylko linki z trwałym błędem.
+KODY_CHWILOWE = {0, 408, 425, 429, 500, 502, 503, 504}
+PONOWNIE_MAKS = 60              # linków w drugiej próbie
+PONOWNIE_CZAS_S = 150.0         # cała druga próba, żeby audyt nie przekroczył limitu terminala agenta
+UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36 Jarvo-audyt"
+
+
+def _kod_http(url: str, timeout: float = 20.0) -> tuple[int, float]:
+    """(kod HTTP, Retry-After w sekundach albo 0); 0 = brak odpowiedzi (sieć, czas)."""
+    import urllib.error
+    import urllib.request
+    zadanie = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "text/html,*/*;q=0.8"})
+    try:
+        with urllib.request.urlopen(zadanie, timeout=timeout) as r:   # noqa: S310 (adres z audytowanej strony, http/https)
+            return r.status, 0.0
+    except urllib.error.HTTPError as e:
+        try:
+            po = float(e.headers.get("Retry-After") or 0)
+        except (TypeError, ValueError):
+            po = 0.0
+        return e.code, po
+    except (urllib.error.URLError, OSError, ValueError):
+        return 0, 0.0
+
+
+def sprawdz_ponownie(linki: list[dict], *, kod_http=_kod_http, czekaj=None, zegar=None, przerwa: float = 1.5,
+                     proby: int = 3) -> int:
+    """Linki BROKEN z kodem chwilowym pytane jeszcze raz, po jednym: odpowiedź < 400 = OK, trwały błąd = BROKEN,
+    dalej chwilowy = NIESPRAWDZONY. Zapisuje `pierwszy_status` i `status` po drugiej próbie; zwraca liczbę zmienionych."""
+    import time
+    czekaj = czekaj or time.sleep
+    zegar = zegar or time.monotonic
+    do_sprawdzenia = [x for x in linki if x.get("state") == "BROKEN" and (x.get("status") or 0) in KODY_CHWILOWE
+                      and str(x.get("url") or "").startswith(("http://", "https://"))][:PONOWNIE_MAKS]
+    koniec = zegar() + PONOWNIE_CZAS_S
+    for x in do_sprawdzenia:
+        x["pierwszy_status"] = x.get("status") or 0
+        if zegar() >= koniec:
+            x["state"] = "NIESPRAWDZONY"
+            continue
+        kod = 0
+        for proba in range(proby):
+            kod, po = kod_http(x["url"])
+            if kod not in KODY_CHWILOWE or zegar() >= koniec:
+                break
+            czekaj(min(max(po, przerwa * (proba + 2)), 10.0))
+        x["status"] = kod
+        x["state"] = "OK" if 0 < kod < 400 else ("NIESPRAWDZONY" if kod in KODY_CHWILOWE else "BROKEN")
+        czekaj(przerwa)
+    return len(do_sprawdzenia)
+
+
 def flagi_chrome() -> str:
     return " ".join(["--headless=new", *(["--no-sandbox"] if bez_piaskownicy() else []), "--disable-gpu"])
 
@@ -184,9 +240,16 @@ def podsumowanie(out: Path) -> dict:
     if f.exists():
         try:
             d = json.loads(f.read_text(encoding="utf-8"))
-            broken = [link for link in d.get("links", []) if link.get("state") == "BROKEN"]
-            summary["links"] = {"checked": len(d.get("links", [])), "broken": len(broken),
-                                "examples": [b.get("url") for b in broken[:10]]}
+            linki = d.get("links", [])
+            broken = [link for link in linki if link.get("state") == "BROKEN"]
+            niesprawdzone = [link for link in linki if link.get("state") == "NIESPRAWDZONY"]
+            summary["links"] = {"checked": len(linki), "broken": len(broken),
+                                "examples": [f"{b.get('url')} ({b.get('status')})" for b in broken[:10]]}
+            if niesprawdzone:
+                summary["links"]["niesprawdzone"] = len(niesprawdzone)
+                summary["links"]["uwaga"] = ("serwer ogranicza liczbę żądań (np. 429) także przy wolnej drugiej próbie: "
+                                             "to nie są martwe linki, sprawdź je w przeglądarce, zanim cokolwiek zgłosisz")
+                summary["links"]["niesprawdzone_przyklady"] = [n.get("url") for n in niesprawdzone[:5]]
         except Exception as exc:  # noqa: BLE001
             summary["links"] = f"nieczytelne: {exc}"
     return summary
@@ -227,6 +290,9 @@ def main(argv: list[str] | None = None) -> int:
     poczatek = url[:-1] if url.endswith("/") else url                 # tylko linki tej strony (jak ${URL%/})
     a.run_findings("links", linkinator and [*linkinator, url, "--recurse", "--format", "JSON", "--timeout", "15000",
                                             "--concurrency", "10", "--skip", f"^(?!{poczatek})"], kopia="links.json")
+    linki = _json(out / "links.json")
+    if isinstance(linki, dict) and isinstance(linki.get("links"), list) and sprawdz_ponownie(linki["links"]):
+        (out / "links.json").write_text(json.dumps(linki, ensure_ascii=False, indent=1), encoding="utf-8")
     a.run_findings("seo", [sys.executable, str(HERE / "seo_check.py"), url, "--json"], kopia="seo.json")
     a.run_findings("security", [sys.executable, str(HERE / "security_check.py"), "url", url, "--json"],
                    kopia="security.json")

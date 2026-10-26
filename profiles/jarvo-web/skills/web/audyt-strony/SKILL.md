@@ -1,7 +1,7 @@
 ---
 name: audyt-strony
 description: "Audyt strony: Lighthouse, a11y, SEO, linki, obrazy, mobile."
-version: 1.5.0
+version: 1.6.0
 author: Jarvo
 license: MIT
 metadata:
@@ -25,7 +25,8 @@ Wynik: raport priorytetów, który da się od razu zamienić na karty poprawek.
    - Lighthouse mobile + desktop (JSON + HTML); w `summary.json` także waga strony (`strona_kb`) i firmy trzecie
      (`firmy_trzecie`: analityka, czaty, piksele, CDN; KB i czas na wątku głównym),
    - axe-core (pełna lista naruszeń WCAG),
-   - linkinator (martwe linki, do 2 poziomów),
+   - linkinator (martwe linki, do 2 poziomów); kody chwilowe (429, 503, brak odpowiedzi) skrypt sprawdza drugi
+     raz, po kolei i wolno; co dalej ogranicza, jest w `links.niesprawdzone`, a nie w `broken`,
    - `seo_check.py` (head, meta, OG, JSON-LD, H1, alt, wymiary obrazów, linki wewnętrzne, czyste adresy, robots,
      sitemap, llms.txt, strona 404, obraz OG, landmarki, hreflang); pełna lista widoczności (23 punkty, llms.txt, 404, linki zewnętrzne): `references/widocznosc.md`,
    - `security_check.py url` (nagłówki, HTTPS, wycieki, GPS w zdjęciach; w `summary.json` liczby ustaleń
@@ -48,14 +49,18 @@ Wynik: raport priorytetów, który da się od razu zamienić na karty poprawek.
    - **P2**: średni (obrazy bez AVIF/WebP, brak schema, drobne a11y, skrypt firmy trzeciej > 100 KB albo > 100 ms
      wątku bez decyzji: usunąć, odłożyć po załadowaniu strony (analityka, czat) albo zostawić z powodem),
    - **P3**: kosmetyka.
-4. **Raport:** `out/RAPORT.md`, w nim tabela: problem · dowód (liczba/zrzut/linia) · wpływ · poprawka · wysiłek (S/M/L).
-   Na górze: 3 najważniejsze rzeczy do zrobienia i oczekiwany efekt.
+4. **Weryfikacja przed raportem:** każdy problem potwierdź sam na co najmniej jednym przykładzie (otwórz adres
+   w przeglądarce albo `curl -sI`, obejrzyj zrzut, znajdź linię w kodzie strony). Wynik automatu to poszlaka: 429
+   („za dużo żądań”), 403 od ochrony przed botami i przekroczony czas to „niesprawdzone”, nie zepsute linki.
+   Czego nie potwierdzisz, nie wpisuj jako problemu; opisz to w sekcji „Niesprawdzone” z powodem.
+5. **Raport:** `out/RAPORT.md`, w nim tabela: problem · dowód (liczba/zrzut/linia) · jak potwierdzony · wpływ ·
+   poprawka · wysiłek (S/M/L). Na górze: 3 najważniejsze rzeczy do zrobienia i oczekiwany efekt.
 
 ## DoD
 - [ ] wyniki Lighthouse mobile i desktop (4 kategorie) w raporcie,
 - [ ] lista naruszeń axe pogrupowana (krytyczne/poważne),
-- [ ] martwe linki (albo „brak”),
-- [ ] każdy problem ma dowód i konkretną poprawkę,
+- [ ] martwe linki z trwałym kodem (albo „brak”); niesprawdzone (429, czas) osobno, z powodem,
+- [ ] każdy problem ma dowód, sposób potwierdzenia (sam otworzyłem / curl / zrzut) i konkretną poprawkę,
 - [ ] priorytety P0–P3 i top 3 na górze,
 - [ ] aplikacja z backendem: sekcja „Wydajność backendu” z 11 punktami (✓ z dowodem, ✗ z poprawką, n/d z powodem).
 

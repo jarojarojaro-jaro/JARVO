@@ -59,7 +59,8 @@ elif skrypt == "lighthouse.js":
     Path(wyjscie + ".report.json").write_text(json.dumps(raport), encoding="utf-8")
     Path(wyjscie + ".report.html").write_text("<html></html>", encoding="utf-8")
 elif skrypt == "linkinator.js":
-    print(json.dumps({"links": [{"url": "http://x/", "state": "OK"}, {"url": "http://x/brak", "state": "BROKEN"}]}))
+    print(json.dumps({"links": [{"url": "http://x/", "state": "OK", "status": 200},
+                                {"url": "http://x/brak", "state": "BROKEN", "status": 404}]}))
     sys.exit(1)
 elif skrypt == "dembrandt.js":
     if "--json-only" in args:
@@ -171,6 +172,39 @@ def test_audit_wszystkie_narzedzia_i_podsumowanie(npm, tmp_path, monkeypatch, ca
     link = next(w for w in wywolania(npm.log) if w[0] == "linkinator.js")
     assert link[link.index("--skip") + 1] == "^(?!https://x.pl/?a=1&b=2)"
     assert (out / "links.json").is_file() and (out / "seo.json").is_file() and (out / "security.json").is_file()
+
+
+def test_audit_linki_z_kodem_chwilowym_sprawdza_drugi_raz():
+    """Pierwsza sesja 26.10: linkinator wpisał 27 linków z 429 (limit żądań serwera) jako martwe, a w przeglądarce
+    działały. Druga próba idzie po kolei, z przerwą: odpowiada = OK, trwały błąd = BROKEN, dalej 429 = NIESPRAWDZONY."""
+    odpowiedzi = {"https://x.pl/a": [(429, 2.0), (200, 0)], "https://x.pl/b": [(429, 0)] * 3,
+                  "https://x.pl/c": [(0, 0), (404, 0)]}
+    pytania, przerwy = [], []
+
+    def kod(url):
+        pytania.append(url)
+        return odpowiedzi[url].pop(0)
+
+    linki = [{"url": "https://x.pl/a", "state": "BROKEN", "status": 429},
+             {"url": "https://x.pl/b", "state": "BROKEN", "status": 429},
+             {"url": "https://x.pl/c", "state": "BROKEN", "status": 0},
+             {"url": "https://x.pl/d", "state": "BROKEN", "status": 404},              # trwały: bez drugiej próby
+             {"url": "https://x.pl/", "state": "OK", "status": 200}]
+    assert AUDIT.sprawdz_ponownie(linki, kod_http=kod, czekaj=przerwy.append, zegar=lambda: 0.0) == 3
+    assert [(x["state"], x["status"]) for x in linki] == [("OK", 200), ("NIESPRAWDZONY", 429), ("BROKEN", 404),
+                                                         ("BROKEN", 404), ("OK", 200)]
+    assert "https://x.pl/d" not in pytania and linki[0]["pierwszy_status"] == 429
+    assert przerwy[0] == 3.0 and max(przerwy) <= 10.0                             # Retry-After, ale nie dłużej niż 10 s
+
+
+def test_audit_podsumowanie_linkow_oddziela_niesprawdzone(tmp_path):
+    (tmp_path / "links.json").write_text(json.dumps({"links": [
+        {"url": "https://x.pl/", "state": "OK", "status": 200}, {"url": "https://x.pl/brak", "state": "BROKEN", "status": 404},
+        {"url": "https://x.pl/limit", "state": "NIESPRAWDZONY", "status": 429}]}), encoding="utf-8")
+    linki = AUDIT.podsumowanie(tmp_path)["links"]
+    assert linki["checked"] == 3 and linki["broken"] == 1 and linki["examples"] == ["https://x.pl/brak (404)"]
+    assert linki["niesprawdzone"] == 1 and linki["niesprawdzone_przyklady"] == ["https://x.pl/limit"]
+    assert "nie są martwe linki" in linki["uwaga"]
 
 
 def test_audit_brak_narzedzia_nie_zatrzymuje_reszty(npm, tmp_path, monkeypatch, capsys):
