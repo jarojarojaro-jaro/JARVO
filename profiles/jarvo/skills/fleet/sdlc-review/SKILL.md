@@ -1,7 +1,7 @@
 ---
 name: sdlc-review
 description: "Sędzia: niezależna ocena karty z toru review wobec DoD."
-version: 2.4.0
+version: 2.5.0
 author: "Jarvo (na bazie Hermes Agent sdlc-review: Jakub Wolniewicz + Hermes Agent, MIT)"
 license: MIT
 platforms: [linux, macos, windows]
@@ -62,7 +62,11 @@ Obowiązki bazowe z kroku 4 obowiązują w każdej rundzie. Soczewka mówi, od c
   (albo odczytaj załączone raporty i sprawdź, czy są dla tej samej wersji),
 - zrzuty na 375/768/1440 px (Playwright), szukaj przewijania w poziomie i nachodzących elementów,
 - favicony/manifest/OG: czy pliki istnieją i są podpięte w `<head>`,
-- zgodność z brand kitem (kolory, fonty) i z intencją użytkownika.
+- zgodność z brand kitem (kolory, fonty) i z intencją użytkownika,
+- **audyt strony:** wylosuj co najmniej 2 problemy z raportu i sprawdź je sam (otwórz adres, `curl -sI`, zrzut,
+  linia kodu strony). Problem, którego nie potwierdzisz, wraca do poprawki. Martwe linki tylko z trwałym kodem
+  (404, 410, 5xx po drugiej próbie): 429, 403 od ochrony przed botami i przekroczony czas to „niesprawdzone”
+  (`summary.json` → `links.niesprawdzone`), a nie błąd strony. Fałszywy alarm w raporcie jest blokujący.
 
 **jarvo-sherlock (research):**
 - wylosuj **co najmniej 3 kluczowe twierdzenia** i otwórz ich źródła: czy źródło mówi to, co przypisano?

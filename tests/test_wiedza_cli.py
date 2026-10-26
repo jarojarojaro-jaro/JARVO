@@ -138,7 +138,8 @@ def test_kompiluj_na_atrapie_hermesa(inst, capsys):
     assert (k / "pojecia" / "żółty kłos.md").is_file() and (k / "pojecia" / "łódź nad jeziorem.md").is_file()
     assert not list((k / "skrzynka").glob("*.md"))
     assert json.loads((wc.stan_skarbca(u) / "wiedza-lint.json").read_text(encoding="utf-8"))["bledy"] == 0
-    assert "## [2026-10-25] kompilacja | szkice: 2 · nowe: 2" in (k / "LOG.md").read_text(encoding="utf-8")
+    dzis = time.strftime("%Y-%m-%d")      # osobny proces nie dostaje WIEDZA_DZIS (środowisko bez zmiennych powłoki)
+    assert f"## [{dzis}] kompilacja | szkice: 2 · nowe: 2" in (k / "LOG.md").read_text(encoding="utf-8")
     _szkic(u, "Trzeci")
     blok = w.Blokada(wc.stan_skarbca(u))
     assert blok.wez()

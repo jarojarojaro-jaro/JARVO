@@ -270,6 +270,36 @@ def test_straznik_limit_generacji_na_karte(tmp_path, monkeypatch):
     assert stan == {"t_film": {"video_generate": 2, "image_generate": 1}, "t_inna": {"video_generate": 1}}
 
 
+def test_straznik_dopisuje_recenzenta_do_oddania(tmp_path, monkeypatch):
+    """Pierwsza sesja 26.10: Web i Sherlock oddawali karty bez reviewer=, więc Hermes zostawiał je u nich i tor review
+    uruchamiał ich znowu (Web 6 razy). Strażnik dopisuje recenzenta floty z flota.json; podany zostaje bez zmian."""
+    monkeypatch.setattr(pl, "recenzent_floty", lambda: "jarvo")
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "jarvo-web"))
+    oddanie = {"summary": "Audyt gotowy", "metadata": {"artifacts": ["out/audyt.md"]}}
+    assert pl.straznik(tool_name="kanban_request_review", args=oddanie) == {"action": "modify", "args": {"reviewer": "jarvo"}}
+    assert pl.straznik(tool_name="kanban_request_review", args={**oddanie, "reviewer": " "})["args"] == {"reviewer": "jarvo"}
+    assert pl.straznik(tool_name="kanban_request_review", args={**oddanie, "reviewer": "jarvo-sherlock"}) is None
+    assert pl.straznik(tool_name="kanban_complete", args=oddanie) is None
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "jarvo"))      # sam recenzent: bez dopisku
+    assert pl.straznik(tool_name="kanban_request_review", args=oddanie) is None
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "dom"))                       # host (poza profilem floty)
+    assert pl.straznik(tool_name="kanban_request_review", args=oddanie) is None
+    monkeypatch.setattr(pl, "recenzent_floty", lambda: None)                       # bez flota.json: jak dawniej
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "jarvo-web"))
+    assert pl.straznik(tool_name="kanban_request_review", args=oddanie) is None
+
+
+def test_recenzent_floty_z_pliku_wtyczki(tmp_path, monkeypatch):
+    sys.path.insert(0, str(REPO / "scripts"))
+    import build
+    out = build.build_wiedza_plugin(tmp_path / "jarvo-wiedza", "jarvo")
+    assert json.loads((out / "flota.json").read_text(encoding="utf-8")) == {"recenzent": "jarvo"}
+    monkeypatch.setattr(pl, "__file__", str(out / "__init__.py"))
+    assert pl.recenzent_floty() == "jarvo"
+    (out / "flota.json").write_text("{zepsuty", encoding="utf-8")
+    assert pl.recenzent_floty() is None
+
+
 def test_licznik_generacji_pod_blokada_miedzyprocesowa(tmp_path, monkeypatch):
     """Brama i pracownicy kanbana to osobne procesy: licznik czyta i pisze pod blokadą pliku (fcntl / msvcrt).
     Zajęta blokada: bez czekania od razu „nie”, z czekaniem po czasie praca idzie dalej bez niej, jak dawniej."""

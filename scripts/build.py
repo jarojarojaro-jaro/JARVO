@@ -665,14 +665,17 @@ def glos_floty() -> dict | None:
     return fl.load_yaml(fl.REPO_ROOT / "profiles" / "_host" / "config.yaml").get("tts")
 
 
-def build_wiedza_plugin(out: Path) -> Path:
+def build_wiedza_plugin(out: Path, recenzent: str | None = None) -> Path:
     """Wtyczka skarbca (wiedza/plugin + wiedza.py obok): install-fleet.sh kopiuje ją do <dane>/plugins/ i dowiązuje
-    w każdym profilu (dostawcy pamięci są szukani w <HERMES_HOME profilu>/plugins/)."""
+    w każdym profilu (dostawcy pamięci są szukani w <HERMES_HOME profilu>/plugins/). `recenzent` (fleet.yaml) trafia
+    do flota.json obok: strażnik dopisuje go do oddania karty, gdy agent go pominie."""
     if out.exists():
         remove_tree(out)
     shutil.copytree(fl.REPO_ROOT / "wiedza" / "plugin", out, ignore=COPY_IGNORE)
     shutil.copy2(fl.REPO_ROOT / "wiedza" / "wiedza.py", out / "wiedza.py")
     shutil.copy2(fl.REPO_ROOT / "wiedza" / "kompilacja.py", out / "kompilacja.py")
+    if recenzent:
+        fl.write_json(out / "flota.json", {"recenzent": recenzent})
     # zakładka „Wiedza” w dashboardzie: manifest + trasy + logika już skopiowane z wiedza/plugin/dashboard; tu pakiet JS i style
     import hqbuild
     dash = out / "dashboard"
@@ -1244,7 +1247,7 @@ def main(argv: list[str] | None = None) -> int:
     dane_wiedzy = wiedza_fleet(fleet, profiles_out)
     fl.write_json(out / "wiedza" / "fleet.json", dane_wiedzy)
     n_repo = repo_do_skarbca(fleet, out / "wiedza" / "repo", dane_wiedzy)
-    build_wiedza_plugin(out / "plugins" / WIEDZA_PLUGIN)
+    build_wiedza_plugin(out / "plugins" / WIEDZA_PLUGIN, fleet.reviewer)
     print(f"✓ skarbiec wiedzy: wiedza/fleet.json, wiedza/repo ({n_repo} plików), plugins/{WIEDZA_PLUGIN}")
     # Komputer Jarva (docs/KOMPUTER.md §7): wtyczka z narzędziem `komputer`; install-fleet.sh dowiązuje ją tam, gdzie włączona
     kp = out / "plugins" / KOMPUTER_PLUGIN

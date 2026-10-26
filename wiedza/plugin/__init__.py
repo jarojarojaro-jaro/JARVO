@@ -705,6 +705,9 @@ def _karta_z_bazy(db: Path, task_id: str) -> Dict[str, Any]:
 # 2) płatna generacja AI (`video_generate`, `image_generate`) ma twardy limit na kartę; ponad limit = zgoda człowieka
 #    (A2: wydatek), a bez człowieka (karta, cron) Hermes odmawia, więc agent musi zapytać przez blokadę karty.
 #    Licznik (state/generacje-ai.json) liczą brama i pracownicy kanbana, osobne procesy: pod blokadą generacje-ai.lock.
+# 3) oddanie karty (`kanban_request_review`) bez `reviewer` dostaje recenzenta floty (flota.json obok wtyczki, z
+#    fleet.yaml). Bez niego Hermes zostawia kartę u wykonawcy i tor review uruchamia go znowu: agent oddaje tę samą
+#    pracę w kółko (pierwsza sesja 26.10: Web 6 razy, Sherlock 5). Sam recenzent i host nie dostają dopisku.
 LIMITY_GENERACJI = {"video_generate": ("JARVO_LIMIT_WIDEO_AI", 3), "image_generate": ("JARVO_LIMIT_OBRAZY_AI", 12)}
 _LOGOWANIE_RE = re.compile(r"(?i)\b(has[łl]o|password|passwd|pin)\b(?:\s+[^\s\d!@#$%^&*]{1,12}){0,3}?\s*(?:[:=]|to\b|jest\b)?"
                            r"\s*\S*[\d!@#$%^&*]\S*")
@@ -821,9 +824,28 @@ def _limit_generacji(tool_name: str, task_id: str, session_id: str) -> Optional[
     return None
 
 
+def recenzent_floty() -> Optional[str]:
+    """Recenzent kart z flota.json obok wtyczki (scripts/build.py); None, gdy pliku nie ma albo jest nieczytelny."""
+    try:
+        r = json.loads((Path(__file__).resolve().parent / "flota.json").read_text(encoding="utf-8")).get("recenzent")
+    except (OSError, ValueError, AttributeError):
+        return None
+    return r.strip() if isinstance(r, str) and r.strip() else None
+
+
+def _recenzent_oddania(args: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    if str(args.get("reviewer") or "").strip():
+        return None
+    recenzent = recenzent_floty()
+    if not recenzent or _profil(_hermes_home()) in (recenzent, "host"):
+        return None
+    return {"action": "modify", "args": {"reviewer": recenzent}}
+
+
 def straznik(tool_name: str = "", args: Optional[Dict[str, Any]] = None, task_id: str = "", session_id: str = "",
              **_kw: Any) -> Optional[Dict[str, Any]]:
-    """Hak pre_tool_call: {"action": "block"|"approve", "message"} albo None (narzędzie idzie dalej)."""
+    """Hak pre_tool_call: {"action": "block"|"approve", "message"}, {"action": "modify", "args"} (dopisany recenzent
+    oddania) albo None (narzędzie idzie dalej)."""
     args = args if isinstance(args, dict) else {}
     try:
         if tool_name == "memory":
@@ -834,6 +856,8 @@ def straznik(tool_name: str = "", args: Optional[Dict[str, Any]] = None, task_id
                             "(zasada 16 kontraktu). Zapisz fakt bez danych dostępowych, np. „właściciel loguje się sam”."}
         elif tool_name in LIMITY_GENERACJI:
             return _limit_generacji(tool_name, task_id, session_id)
+        elif tool_name == "kanban_request_review":
+            return _recenzent_oddania(args)
     except Exception as e:                       # strażnik nie może zatrzymać zwykłej pracy własnym błędem
         logger.debug("jarvo-wiedza: strażnik %s: %s", tool_name, e)
     return None

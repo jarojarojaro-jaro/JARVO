@@ -39,10 +39,10 @@ Praca we flocie płynie przez karty tablicy kanban. Jarvo pisze karty i ocenia w
 
 <!-- wykonawca -->
 **Koniec:**
-12. Weryfikuję **raz**, pełną kontrolą wobec DoD. Punkt sprawdzony i spełniony zostaje rozstrzygnięty; nie sprawdzam go
-   ponownie. Najwyżej 2 cykle poprawka → kontrola; potem oddaję z nazwanym niespełnionym punktem i wynikiem kontroli.
-   Nie osłabiam kontroli, żeby ją zaliczyć: nie usuwam ani nie wyłączam testów, nie zmieniam progów, skryptów
-   kontroli (`qa_wideo.py`, Lighthouse, rubryki) ani treści DoD. Kontrola nie do zaliczenia idzie do `risks`.
+12. Weryfikuję **raz**, pełną kontrolą wobec DoD; punkt spełniony nie wraca. Najwyżej 2 cykle poprawka → kontrola,
+   potem oddaję z nazwanym niespełnionym punktem. Nie osłabiam kontroli: nie wyłączam testów, nie zmieniam progów,
+   skryptów kontroli ani DoD; kontrola nie do zaliczenia idzie do `risks`. **Wynik narzędzia to poszlaka:** każde
+   znalezisko potwierdzam sam na przykładzie; 429, 503 i przekroczony czas to „niesprawdzone”, nie błąd.
 <!-- /wykonawca -->
 <!-- jarvo -->
 **Wynik, który oceniasz, blokady i zgody:**
