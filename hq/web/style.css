@@ -1391,6 +1391,41 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-poz-mowa { display: flex; flex-direction: column; gap: 6px; font-family: "Instrument Serif", Georgia, serif; font-size: 22px; line-height: 1.3; }
 .j-poz-mowa p { opacity: .72; }
 .j-poz-mowa p.is-pytanie { opacity: 1; font-size: 27px; font-style: italic; }
+/* powitanie: robot i „Cześć. Jestem Jarvo.” wchodzą po kolei (słowa z rozmycia), kreska pod imieniem się rysuje,
+   potem całość zjeżdża w górę i zaczyna się rozmowa; kolejne kroki wchodzą z boków (arkusz i karta rozmowy) */
+.j-poz[data-krok="witaj"] .j-poz-gora .j-robot, .j-poz[data-krok="witaj"] .j-poz-kto { visibility: hidden; }
+.j-intro { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 32px 0 12vh;
+  text-align: center; cursor: pointer; user-select: none; }
+.j-intro-robot { animation: j-intro-robot .9s var(--j-ease) both; }
+.j-intro-t { margin: 6px 0 0; font-family: "Instrument Serif", Georgia, serif; font-weight: 400; font-size: clamp(56px, 9.5vw, 136px);
+  line-height: .95; letter-spacing: -.025em; }
+.j-intro-s { display: inline-block; margin-right: .22em; opacity: 0; transform: translateY(.32em); filter: blur(10px);
+  animation: j-intro-slowo .75s var(--j-ease) forwards; animation-delay: calc(.6s + var(--i) * .24s); }
+.j-intro-imie { position: relative; margin-right: 0; font-style: italic; color: var(--j-akcent); }
+.j-intro-imie::after { content: ""; position: absolute; left: .04em; right: .12em; bottom: .02em; height: .06em; min-height: 3px;
+  background: currentColor; transform: scaleX(0); transform-origin: left; animation: j-intro-kreska .6s var(--j-ease) 1.85s forwards; }
+.j-intro-o { font-family: var(--j-font-mono); font-size: 13px; letter-spacing: .14em; text-transform: uppercase; opacity: 0;
+  animation: j-intro-pojaw .6s var(--j-ease) 2.15s forwards; }
+.j-intro-d { font-size: 13px; opacity: 0; animation: j-intro-pojaw .6s var(--j-ease) 2.8s forwards; --j-do: .45; }
+.j-intro.is-wyjscie { animation: j-intro-wyjscie .42s var(--j-ease) forwards; }
+@keyframes j-intro-robot { from { opacity: 0; transform: translateY(26px) scale(.62); filter: blur(8px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes j-intro-slowo { to { opacity: 1; transform: none; filter: none; } }
+@keyframes j-intro-kreska { to { transform: scaleX(1); } }
+@keyframes j-intro-pojaw { from { opacity: 0; transform: translateY(6px); } to { opacity: var(--j-do, .7); transform: none; } }
+@keyframes j-intro-wyjscie { to { opacity: 0; transform: translateY(-28px) scale(.97); filter: blur(6px); } }
+.j-poz:not([data-krok="witaj"]) .j-poz-arkusz { animation: j-poz-z-lewej .7s var(--j-ease) both; }
+.j-poz:not([data-krok="witaj"]) .j-poz-rozm { animation: j-poz-z-prawej .7s var(--j-ease) .1s both; }
+.j-poz-mowa p { animation: j-poz-wpis .55s var(--j-ease) both; }
+.j-poz-mowa p:nth-child(2) { animation-delay: .18s; }
+.j-poz-mowa p:nth-child(3) { animation-delay: .36s; }
+@keyframes j-poz-z-lewej { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
+@keyframes j-poz-z-prawej { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .j-intro, .j-intro *, .j-intro *::after, .j-poz-arkusz, .j-poz-rozm, .j-poz-mowa p { animation: none !important; opacity: 1 !important;
+    transform: none !important; filter: none !important; }
+  .j-intro-imie::after { transform: scaleX(1) !important; }
+  .j-intro-d { opacity: .45 !important; }
+}
 .j-poz-pole { display: flex; flex-direction: column; gap: 5px; }
 .j-poz-e { font-size: 12px; font-family: var(--j-font-mono); letter-spacing: .06em; text-transform: uppercase; opacity: .7; }
 .j-poz-pole :is(input, textarea) { width: 100%; padding: 8px 2px; border: 0; border-bottom: 2px solid var(--j-papier-tekst); border-radius: 0;

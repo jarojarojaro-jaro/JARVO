@@ -364,11 +364,13 @@ def punkt_poznanie(strona, base: str, token: str, stan: Stan, wyniki: Path, zrzu
     musi(not polaczony, "profil jarvo ma już podłączony model: pierwsze spotkanie zaczęłoby prawdziwą pierwszą sesję "
                         "(test potrzebuje świeżej instalacji bez mózgu)")
     strona.goto(base + "/jarvo#/")
-    strona.wait_for_selector('.j-poz[data-krok="witaj"]', timeout=30000)
-    strona.wait_for_timeout(600)
+    # powitanie: robot i „Cześć. Jestem Jarvo.” wchodzą animacją, po chwili samo przechodzi do pytania o imię
+    strona.wait_for_selector('.j-poz[data-krok="witaj"] [data-intro]', timeout=30000)
+    strona.wait_for_timeout(2600)
     zrzuty.append(zrzut(strona, wyniki, "poznanie-witaj"))
-    strona.click('.j-poz button[type="submit"]')
-    strona.wait_for_selector('.j-poz[data-krok="imie"]', timeout=10000)
+    strona.wait_for_selector('.j-poz[data-krok="imie"]', timeout=15000)
+    musi("nazywasz" in strona.inner_text(".j-poz-mowa p.is-pytanie") or "name" in strona.inner_text(
+        ".j-poz-mowa p.is-pytanie"), "po powitaniu nie ma pytania o imię")
     strona.fill(".j-poz-pole input", OSOBA["imie"])
     strona.click('.j-poz button[type="submit"]')
     strona.wait_for_selector('.j-poz[data-krok="firma"]', timeout=10000)

@@ -89,7 +89,7 @@ const poznanieOtwarte = (got) => !!got && !got.profil_wlasciciela && !Pamiec.wez
 
 // kwestie Jarva na każdy krok (to samo idzie na ekran i do lektora)
 function kwestiePoznania(krok, d, n) {
-  if (krok === "witaj") return [T("poz.witaj1"), T("poz.witaj2", { n })];
+  if (krok === "witaj") return [T("poz.witaj1"), `${T("poz.intro_zespol", { n })}.`];
   if (krok === "imie") return [T("poz.imie")];
   if (krok === "firma") return [T("poz.milo", { imie: d.imie }), T("poz.firma")];
   if (krok === "linki") return [T("poz.linki")];
@@ -228,6 +228,39 @@ function ZdaniePoznania({ d }) {
     : html`<span key=${i}>${x.t}</span>`))}</p>`;
 }
 
+// Powitanie (krok „witaj”): robot i „Cześć. Jestem Jarvo.” wchodzą animacją, a po chwili (albo po kliknięciu,
+// Enter, spacji) zjeżdżają w górę i zaczyna się rozmowa od pytania o imię. Bez ruchu (prefers-reduced-motion)
+// od razu cały tekst i krótsza pauza.
+const INTRO_MS = 3600, INTRO_BEZ_RUCHU_MS = 1200, INTRO_WYJSCIE_MS = 420;
+function PoznanieIntro({ n, mowi, dalej }) {
+  const ruch = !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const [wyjscie, setWyjscie] = useState(false);
+  const raz = useRef(false);
+  const idz = () => {
+    if (raz.current) return;
+    raz.current = true;
+    Glos.odblokuj();
+    setWyjscie(true);
+    setTimeout(dalej, ruch ? INTRO_WYJSCIE_MS : 0);
+  };
+  useEffect(() => {
+    const t = setTimeout(idz, ruch ? INTRO_MS : INTRO_BEZ_RUCHU_MS);
+    const klawisz = (e) => { if (["Enter", " ", "Escape"].includes(e.key)) { e.preventDefault(); idz(); } };
+    window.addEventListener("keydown", klawisz);
+    return () => { clearTimeout(t); window.removeEventListener("keydown", klawisz); };
+  }, []);
+  const slowa = (tekst, od) => tekst.split(" ").map((s, i) => html`<span key=${`${od}:${i}`} class="j-intro-s"
+    style=${{ "--i": od + i }}>${s}</span>`);
+  const czesc = T("poz.intro_czesc").split(" ");
+  return html`<div class=${cx("j-intro", wyjscie && "is-wyjscie")} onClick=${idz} data-intro="">
+    <${Robot} r=${132} mowi=${mowi} klasa="j-intro-robot"/>
+    <h1 class="j-intro-t">${slowa(czesc.join(" "), 0)}<br/>${slowa(T("poz.intro_jestem"), czesc.length)}${" "}<em
+      class="j-intro-s j-intro-imie" style=${{ "--i": czesc.length + 1 }}>Jarvo.</em></h1>
+    <p class="j-intro-o">${T("poz.intro_zespol", { n })}</p>
+    <p class="j-intro-d">${T("poz.intro_dalej")}</p>
+  </div>`;
+}
+
 function Poznajmy({ koniec, poczatek = "witaj" }) {
   const got = useSklep((s) => s.gotowosc);
   const wlasciciel = useSklep((s) => s.wlasciciel);
@@ -250,7 +283,7 @@ function Poznajmy({ koniec, poczatek = "witaj" }) {
   // stałe kwestie do lektora od razu (wsad w tle), żeby grały bez czekania
   useEffect(() => {
     if (poczatek !== "mozg") sklep.ustaw({ poznanie: "trwa" });
-    Glos.przygotuj([T("poz.witaj1"), T("poz.witaj2", { n: ileAgentow || 9 }), T("poz.imie"), T("poz.firma"), T("poz.linki"),
+    Glos.przygotuj([T("poz.witaj1"), `${T("poz.intro_zespol", { n: ileAgentow || 9 })}.`, T("poz.imie"), T("poz.firma"), T("poz.linki"),
       T("poz.cele"), T("poz.zapisane"), T("poz.mozg"), T("poz.mam_mozg")]);
     return () => Glos.ucisz();
   }, []);
@@ -319,7 +352,6 @@ function Poznajmy({ koniec, poczatek = "witaj" }) {
   const pomin = () => { Pamiec.daj(POZNANIE_POMINIETE, true); Glos.ucisz(); koniec(); };
   const wyslij = (e) => {
     e.preventDefault();
-    if (krok === "witaj") return dalej("imie");
     if (krok === "imie") { const imie = Poznanie.imie(pole); return imie ? dalej("firma", { imie }) : null; }
     if (krok === "firma") return dalej("linki", { firma: Poznanie.pole(pole), zajecie: Poznanie.pole(pole2, 120) });
     if (krok === "linki") return dalej("cele", { linki: Poznanie.linki(pole) });
@@ -342,6 +374,7 @@ function Poznajmy({ koniec, poczatek = "witaj" }) {
       <${ZmienGlos} probka=${T("glos.probka")}/>
       ${krok !== "mozg" && html`<button type="button" class="j-link j-poz-pomin" onClick=${pomin}>${T("poz.pomin")}</button>`}
     </header>
+    ${krok === "witaj" ? html`<${PoznanieIntro} n=${ileAgentow || 9} mowi=${mowi} dalej=${() => dalej("imie")}/>` : html`
     <div class="j-poz-in">
       <section class="j-poz-arkusz" aria-label=${T("poz.arkusz")}>
         <p class="j-poz-kicker">${T("poz.kicker")}</p>
@@ -379,10 +412,8 @@ function Poznajmy({ koniec, poczatek = "witaj" }) {
             : html`<${KartaMozgu} gotowe=${podlaczony} pozniej=${() => koniec()} wejscie=${wejscie}/>`)}
         ${zapis.blad && html`<p class="j-poz-blad" role="alert">${zapis.blad}</p>`}
         ${krok !== "mozg" && html`<div class="j-poz-akcje">
-          ${krok === "witaj"
-            ? html`<button type="submit" class="j-btn j-btn-glowny" ref=${wejscie}>${T("poz.zaczynamy")}<${Ikona} n="right" r=${16}/></button>`
-            : html`<button type="submit" class="j-btn j-btn-glowny" disabled=${(krok === "imie" && !Poznanie.imie(pole)) || zapis.trwa}>
-                ${krok === "cele" ? T("poz.zapisz") : T("poz.dalej")}<${Ikona} n="right" r=${16}/></button>`}
+          <button type="submit" class="j-btn j-btn-glowny" disabled=${(krok === "imie" && !Poznanie.imie(pole)) || zapis.trwa}>
+            ${krok === "cele" ? T("poz.zapisz") : T("poz.dalej")}<${Ikona} n="right" r=${16}/></button>
           ${["firma", "linki", "cele"].includes(krok) && html`<button type="button" class="j-link"
               onClick=${() => (krok === "cele" ? zapisz(d) : dalej(krok === "firma" ? "linki" : "cele"))}>${T("poz.pomin_pytanie")}</button>`}
         </div>`}
@@ -390,6 +421,6 @@ function Poznajmy({ koniec, poczatek = "witaj" }) {
           ${POZNANIE_KROKI.map((k, i) => html`<li key=${k} class=${cx(i < nr && "is-zrobiony", i === nr && "is-teraz")}>${String(i + 1).padStart(2, "0")}</li>`)}
         </ol>
       </form>
-    </div>
+    </div>`}
   </div>`;
 }

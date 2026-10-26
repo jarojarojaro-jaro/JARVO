@@ -1024,8 +1024,10 @@ innych kanałów etap 6.
   nie ma imienia (`gotowosc.profil_wlasciciela` = false) i właściciel nie kliknął **Pomiń** (`localStorage`
   `jarvo.poznanie.pominiete.v1`), aplikacja zamiast startu prowadzi na całym ekranie (bez paska rozmów i górnej belki;
   zasłona startowa schodzi dopiero po wczytaniu gotowości, najpóźniej po 2,5 s, więc pasek nie mignie) krótką rozmowę
-  **bez modelu**, 6 kroków: powitanie
-  („Cześć. Jestem Jarvo.”, zespół N agentów), imię („Jak mam do Ciebie mówić?”), firma i czym się zajmuje, strony
+  **bez modelu**, 6 kroków: powitanie (animacja na całym ekranie: robot, potem słowa „Cześć.” i „Jestem *Jarvo.*”
+  wchodzą z rozmycia, pod imieniem rysuje się kreska, pod spodem „Szefuję zespołowi N agentów”; po ok. 3,6 s albo po
+  kliknięciu, Enter, spacji całość zjeżdża w górę, bez ruchu przy `prefers-reduced-motion`), imię („Jak się
+  nazywasz?”, arkusz i karta rozmowy wchodzą z boków), firma i czym się zajmuje, strony
   i konta (jedno pole; adres, `@konto`, Instagram, Facebook, TikTok, YouTube, LinkedIn i Mapy Google rozpoznane
   od razu, znaczniki pod polem), cele (5 gotowych i „coś innego”), mózg. Po lewej rośnie zdanie „Bohater: Kuba.”
   i „Cześć, jestem Kuba. Mam firmę…”: każda odpowiedź podkreślona z odręczną notką (imię, firma, strona…). Każdy
