@@ -306,6 +306,11 @@ Object.assign(liveApi, {
     ponow: (id) => zadanie("POST", `/przebiegi/${kodujUrl(id)}/ponow`),
     nadzor: (id) => zadanie("POST", `/przebiegi/${kodujUrl(id)}/nadzor`),
   },
+  // karty pracy w wątku (przekazania Jarva): stan z tablicy i sesji pracownika; {karty: {id: karta}} / {karta}
+  karty: {
+    stan: (ids) => zadanie("GET", `/karty${zapytanieUrl({ id: (ids || []).join(",") })}`),
+    wez: (id) => zadanie("GET", `/karty/${kodujUrl(id)}`),
+  },
   // trasy z kolejnych etapów (§6.3): klient gotowy, serwer odpowie 404, dopóki ich nie ma
   sesje: {
     os: (profil, id, p) => zadanie("GET", `/sesje/${kodujUrl(profil)}/${kodujUrl(id)}/os${zapytanieUrl(p)}`),

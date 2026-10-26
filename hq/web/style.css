@@ -1550,6 +1550,89 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-msg-kroki { margin: -14px 0 14px 42px; }
 .j-msg-sys { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 16px 0; font-size: 13px; color: var(--j-tekst-3); text-align: center; }
 .j-msg-sys.is-luka { color: var(--j-uwaga); }
+/* karty pracy w wątku (35-karty.js): przekazanie Jarva jako żywa karta agenta i wiadomość „<agent> skończył” */
+.j-karta { --k-akcent: var(--j-tekst-3); position: relative; margin: 14px 0 14px 42px; padding: 14px 16px 10px;
+  border: 1px solid var(--j-linia-2); border-radius: 14px; background: var(--j-tlo-karta);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .06); animation: j-karta-wejscie .32s var(--j-ease) both; }
+.j-karta::before { content: ""; position: absolute; left: -1px; top: 14px; bottom: 14px; width: 3px; border-radius: 3px;
+  background: var(--k-akcent); }
+.j-karta.is-pracuje, .j-karta.is-poprawki { --k-akcent: var(--j-akcent); }
+.j-karta.is-do_oceny, .j-karta.is-ocena { --k-akcent: #6E8BFF; }
+.j-karta.is-gotowe { --k-akcent: var(--j-ok); }
+.j-karta.is-zablokowana { --k-akcent: var(--j-uwaga); }
+.j-karta.is-porzucona { --k-akcent: var(--j-blad); }
+.j-karta + .j-karta { margin-top: -6px; }
+.j-karta-g { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.j-karta-kto { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.3; }
+.j-karta-kto b { font-size: 14.5px; font-weight: 650; }
+.j-karta-tytul { font-size: 14px; color: var(--j-tekst-2); overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.j-karta-etap { display: inline-flex; align-items: center; gap: 6px; flex: none; padding: 4px 10px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600; color: var(--k-akcent); background: color-mix(in srgb, var(--k-akcent) 12%, transparent);
+  white-space: nowrap; }
+.j-karta.is-czeka .j-karta-etap { color: var(--j-tekst-2); background: var(--j-tlo-2); }
+.j-karta-czas { font-weight: 500; font-variant-numeric: tabular-nums; opacity: .85; }
+.j-karta-pasek { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; list-style: none; margin: 12px 0 0; padding: 0; }
+.j-karta-pasek li { position: relative; padding-top: 8px; font-size: 11.5px; color: var(--j-tekst-3); }
+.j-karta-pasek li::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px; border-radius: 4px;
+  background: var(--j-tlo-3); }
+.j-karta-pasek li.is-za::before { background: color-mix(in srgb, var(--k-akcent) 55%, var(--j-tlo-3)); }
+.j-karta-pasek li.is-teraz { color: var(--j-tekst); font-weight: 600; }
+.j-karta-pasek li.is-teraz::before { background: var(--k-akcent); }
+.j-karta.is-pracuje .j-karta-pasek li.is-teraz::before, .j-karta.is-poprawki .j-karta-pasek li.is-teraz::before,
+.j-karta.is-ocena .j-karta-pasek li.is-teraz::before {
+  background: linear-gradient(90deg, var(--k-akcent) 0 40%, color-mix(in srgb, var(--k-akcent) 35%, var(--j-tlo-3)) 50%, var(--k-akcent) 60% 100%);
+  background-size: 250% 100%; animation: j-karta-postep 1.8s linear infinite; }
+.j-karta-pasek li.is-zle::before { background: var(--k-akcent); }
+.j-karta-teraz { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0 0; font-size: 13.5px; color: var(--j-tekst-2);
+  line-height: 1.45; overflow-wrap: anywhere; }
+.j-karta-teraz > span:last-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.j-karta-teraz.is-zle { color: var(--j-uwaga); }
+.j-karta-puls { flex: none; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--k-akcent);
+  animation: j-oddech 1.4s ease-in-out infinite; }
+.j-karta-skrot { margin: 10px 0 0; font-size: 13.5px; color: var(--j-tekst-2); line-height: 1.45; display: -webkit-box;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.j-karta-wiecej { display: inline-flex; align-items: center; gap: 6px; margin: 8px 0 0 -6px; padding: 4px 6px; border: 0;
+  border-radius: 8px; background: none; color: var(--j-tekst-3); font: inherit; font-size: 13px; cursor: pointer; }
+.j-karta-wiecej:hover { color: var(--j-tekst); background: var(--j-tlo-hover); }
+.j-karta-proby { padding: 1px 7px; border-radius: 999px; background: var(--j-tlo-2); font-size: 11.5px; }
+.j-karta-pusto { margin: 8px 0 4px; font-size: 13px; color: var(--j-tekst-3); }
+.j-karta-przebieg { margin: 6px 0 4px; border-top: 1px solid var(--j-linia); padding-top: 8px; max-height: 420px; overflow: auto; }
+.j-karta-run + .j-karta-run { margin-top: 10px; }
+.j-karta-run h4 { display: flex; align-items: center; gap: 7px; margin: 0 0 6px; font-size: 13px; font-weight: 600; }
+.j-karta-run h4 small { font-weight: 400; color: var(--j-tekst-3); }
+.j-karta-run ol { list-style: none; margin: 0; padding: 0 0 0 9px; border-left: 2px solid var(--j-linia-2); }
+.j-karta-krok { display: grid; grid-template-columns: 18px 1fr auto; gap: 6px; align-items: baseline; padding: 3px 0 3px 8px;
+  font-size: 13px; color: var(--j-tekst-2); overflow-wrap: anywhere; }
+.j-karta-krok b { font-weight: 600; color: var(--j-tekst); }
+.j-karta-krok time { font-size: 11.5px; color: var(--j-tekst-3); font-variant-numeric: tabular-nums; }
+.j-karta-krok-z { color: var(--j-ok); display: inline-flex; }
+.j-karta-krok.is-blad .j-karta-krok-z, .j-karta-krok.is-blad b { color: var(--j-blad); }
+.j-karta-krok.is-teraz .j-karta-krok-z { color: var(--j-akcent); }
+.j-karta-mowi { margin: 4px 0 6px 8px; padding: 8px 10px; border-radius: 10px; background: var(--j-tlo-2); font-size: 13.5px; }
+.j-karta-mowi-t { line-height: 1.5; }
+.j-karta-mowi-t > :first-child { margin-top: 0; } .j-karta-mowi-t > :last-child { margin-bottom: 0; }
+.j-koniec { animation: j-karta-wejscie .36s var(--j-ease) both; }
+.j-koniec-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 12px;
+  font-weight: 600; color: var(--j-ok); background: color-mix(in srgb, var(--j-ok) 13%, transparent); }
+.j-koniec-t { margin: 2px 0 6px; font-size: 14px; font-weight: 600; color: var(--j-tekst-2); }
+.j-koniec-wynik.is-zwiniety { max-height: 9.5em; overflow: hidden;
+  -webkit-mask-image: linear-gradient(#000 65%, transparent); mask-image: linear-gradient(#000 65%, transparent); }
+.j-koniec-ocena { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0 0; padding: 8px 10px; border-radius: 10px;
+  background: var(--j-tlo-2); font-size: 13px; color: var(--j-tekst-2); line-height: 1.45; }
+.j-koniec-ocena b { color: var(--j-tekst); font-weight: 600; }
+@keyframes j-karta-wejscie { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes j-karta-postep { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+@media (max-width: 640px) {
+  .j-karta { margin-left: 0; padding: 12px 12px 8px; }
+  .j-karta-g { flex-wrap: wrap; }
+  .j-karta-etap { order: 3; margin-left: 48px; }
+  .j-karta-pasek li span { font-size: 10.5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .j-karta, .j-koniec { animation: none; }
+  .j-karta-pasek li.is-teraz::before, .j-karta-puls { animation: none; }
+}
 .j-pisze { display: flex; gap: 4px; height: 24px; align-items: center; }
 .j-pisze i { width: 6px; height: 6px; border-radius: 50%; background: var(--j-tekst-3); animation: j-oddech 1.2s ease-in-out infinite; }
 .j-pisze i:nth-child(2) { animation-delay: .15s; }

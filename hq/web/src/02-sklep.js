@@ -48,7 +48,8 @@ function stanPoczatkowy() {
     wysylane: {},      // wątek (albo „nowa”) → wiadomości w drodze [{klucz, tekst, pliki, obrazy, adresaci, ts, stan, blad}]
     podglad: null,     // plik w oknie podglądu {path, name, kind, …}
     pytanie: null,     // okno z pytaniem (praca w toku przy archiwum i koszu, trwałe usunięcie, wysyłka do wielu) + odpowiedz(wartość)
-    karty: {}, decyzje: { liczba: 0 },
+    karty: {},         // id karty kanbana → karta pracy z GET /karty (35-karty.js: etap, agent, teraz, wynik)
+    decyzje: { liczba: 0 },
     strumien: { stan: "laczy", epoka: null, lider: false, wielokarty: false, nowa_wersja: false },
     podzial: Pamiec.wez("jarvo.podzial.v1", null) || { tryb: "jeden", panele: [], proporcja: 0.5, aktywny: 0 },
     ustawienia: { ...USTAWIENIA_DOMYSLNE, ...(Pamiec.wez("jarvo.ustawienia.v1", null) || {}) },

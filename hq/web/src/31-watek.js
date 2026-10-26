@@ -73,6 +73,9 @@ function Watek({ id, panel = 0 }) {
 
   const pozycje = useMemo(() => Os.widok(os ? os.pozycje : [], przebiegi, { szczegoly, oczekujace }),
     [os, przebiegi, szczegoly, oczekujace]);
+  // karty pracy przekazane w wątku: stan z tablicy na żywo (35-karty.js)
+  const idsKart = useMemo(() => [...Os.kartyWatku(os ? os.pozycje : [])], [os]);
+  useKartyWatku(id, idsKart);
   // ostatnia pozycja każdego przebiegu: pod nią zostaje wygasła zgoda
   const ostatnie = useMemo(() => {
     const m = {};

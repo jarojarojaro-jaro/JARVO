@@ -184,3 +184,24 @@ def test_czlonek_nieczytelny_nie_psuje_osi():
     w = sc.os_watku(db, Czytnik({"web": linia}, bledne={"api"}), WID)
     assert [p["rodzaj"] for p in w["pozycje"]] == ["wlasciciel", "agent"]
     assert w["niedostepni"] == ["api"]                                         # agent spoza listy: bez wpisu
+
+
+def test_cicha_odpowiedz_na_budzenie_bez_pozycji():
+    """Pierwsza sesja 26.10: Jarvo odpowiadał „[SILENT]” na budzenia z tablicy, a oś pokazywała to jako wiadomość.
+    Sama cisza = brak pozycji; linia ciszy w dłuższej odpowiedzi znika, reszta tekstu zostaje."""
+    linia = [{"sesja_id": "s1", "stan": "ok", "wiersze": [
+        wiersz(1, "user", BUDZENIE),
+        wiersz(2, "assistant", "[SILENT]"),
+        wiersz(3, "user", BUDZENIE),
+        wiersz(4, "assistant", " `[silent]`.\n"),
+        wiersz(5, "user", BUDZENIE),
+        wiersz(6, "assistant", "Web skończył audyt.\n[SILENT]"),
+        wiersz(7, "assistant", "", tool_calls=[{"id": "c1", "function": {"name": "kanban_show", "arguments": "{}"}}]),
+        wiersz(8, "assistant", "[SILENT]", tool_calls=[{"id": "c2", "function": {"name": "kanban_list", "arguments": "{}"}}]),
+        wiersz(9, "assistant", "Cytuję znacznik [SILENT] w zdaniu."),
+    ]}]
+    wynik = sc.os_watku(Baza([], [], {"web": ["s1"]}), Czytnik({"web": linia}), WID, budzenia=bz)
+    agent = [p["tekst"] for p in wynik["pozycje"] if p["rodzaj"] == "agent"]
+    assert agent == ["Web skończył audyt.", "Cytuję znacznik [SILENT] w zdaniu."]
+    assert [p["rodzaj"] for p in wynik["pozycje"]] == ["budzenie", "budzenie", "budzenie", "agent", "kroki", "agent"]
+    assert sc.bez_ciszy("[SILENT]") == "" and sc.bez_ciszy("Zwykła odpowiedź") == "Zwykła odpowiedź"

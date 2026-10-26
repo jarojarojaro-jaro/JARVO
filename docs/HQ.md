@@ -841,7 +841,8 @@ dashboardu, a każda trasa zapisu przechodzi ochronę CSRF (`ochrona.Trasa`, sek
   `kroki` (narzędzia z czasem i błędem), `przekazanie` (`kanban_create`), `budzenie` (wiersz `[kanban] Task …`,
   `hq/plugin/budzenia.py`, szablon z `/opt/hermes/locales/en.yaml`), `dopisano` (obcy steer), `dostawa`, `obca`
   (wiadomość spoza aplikacji), `kompresja`, `blad_tury`, `luka` (sesja rodowodu usunięta). Obcy dopisek pokazujemy
-  bez znacznika Hermesa. Pozycje trwającej tury
+  bez znacznika Hermesa. Odpowiedź asystenta bez linii `[SILENT]` (cicha odpowiedź na budzenie, `scalanie.bez_ciszy`);
+  sama cisza nie daje pozycji. Pozycje trwającej tury
   mają `w_toku` i wracają po kursorze `po`, aż się skończy. Kursor jest nieprzezroczysty; zmiana pokolenia kompresji =
   `pelny: true`. Członek, którego state.db nie da się przeczytać (zmieniony schemat Hermesa), wypada z osi
   z `niedostepni: [agent]` zamiast błędu całej osi.
@@ -868,6 +869,8 @@ dashboardu, a każda trasa zapisu przechodzi ochronę CSRF (`ochrona.Trasa`, sek
   | `GET /rozmowy/<id>/eksport` | cała rozmowa jako plik Markdown do pobrania (`rozmowa-<tytuł ASCII>.md`, `Content-Disposition: attachment`): teksty, ścieżki plików, kroki w jednej linii, notatki kursywą; całość przez `ochrona.utajnij`, najwyżej 100 stron osi |
   | `GET /agenci` | agenci aplikacji: nazwa, uchwyt, aliasy wzmianek, opis (z `JARVO_E2E=1` także testowi); źródło listy „Do:” i podpowiedzi `@` |
   | `GET /przebiegi/<id>`, `POST …/stop`, `…/anuluj`, `…/wyslij-teraz`, `…/zgoda {wybor, request_id}`, `…/dopisz {tekst, klucz?}`, `…/ponow` | przebieg i sterowanie nim |
+  | `GET /karty?id=t_a,t_b` | karty pracy wątku (`hq/plugin/karty.py`, najwyżej 40): `etap` (`czeka`, `pracuje`, `do_oceny`, `ocena`, `poprawki`, `zablokowana`, `gotowe`, `porzucona`), `agent` (wykonawca, nie sędzia, któremu karta przeszła), `od`/`koniec`, `notatka` (heartbeat), `teraz` (ostatni krok sesji pracownika), `podsumowanie` (co zrobił wykonawca), `ocena` (werdykt sędziego), `pliki` (artefakty), `proby`, `powod` (blokada); teksty przez `ochrona.utajnij` |
+  | `GET /karty/<id>` | to samo i `przebieg`: kroki i wypowiedzi z sesji kanbana wykonawcy i sędziego (najwyżej 80 najnowszych); sesję przebiegu wiąże profil, źródło `kanban` i czas startu |
   | `GET /strumien`, `POST /strumien/<klient>/subskrypcje` | SSE (wyżej) |
 
   Limity wysyłki: tekst 32 000 znaków, dopisek 4000, do 8 załączników (ścieżki przez `safe_path`) i 4 obrazów
@@ -956,6 +959,15 @@ dashboardu, a każda trasa zapisu przechodzi ochronę CSRF (`ochrona.Trasa`, sek
   restartu bramy” sprawdza tylko pierwszy przebieg po restarcie bramy (gdy brama musiała wstać od nowa, raport ma
   ten punkt w `niedowiedzione`); to samo dotyczy etapu 8 (usunięty i ponownie
   założony agent o tej samej nazwie potrzebuje restartu bramy).
+
+- **Karty pracy w wątku** (`hq/web/src/35-karty.js`): przekazanie Jarva (`przekazanie` z `task_id`) to żywa karta
+  agenta zamiast linii „Przekazanie: …”: awatar wykonawcy, zadanie bez prefiksu misji, etap z czasem pracy, pasek
+  Start → Praca → Ocena → Gotowe, linia „co teraz” (ostatni krok sesji pracownika albo notatka) i po kliknięciu
+  „Zobacz, jak pracuje …” przebieg pracy wykonawcy i sędziego. Budzenia tych kart nie mają już własnych linii
+  („Karta … · oddana do oceny” powtarzała się przy każdym oddaniu): stan pokazuje karta, a ostatnie `completed` karty
+  to wiadomość `koniec` („<agent> · skończone”: co zrobił, pliki z artefaktów, ocena sędziego). Stan z `GET /karty`
+  co 4 s, dopóki któraś karta wątku nie jest gotowa, i od razu po `watek.os`; w ukrytej karcie przeglądarki bez
+  odpytywania.
 
 ## 2f. Aplikacja: rozmowa, pasek, szuflada
 

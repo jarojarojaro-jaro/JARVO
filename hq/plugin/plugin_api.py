@@ -2116,7 +2116,7 @@ from types import SimpleNamespace  # noqa: E402
 
 roz = SimpleNamespace(hq_core=core, ochrona=ochrona)
 for _nazwa in ("agenci", "rozmowy", "czytnik", "kontekst", "wzmianki", "budzenia", "scalanie", "brama", "strumien",
-               "przebiegi", "prace", "obserwator", "aplikacja", "podpowiedzi", "glos", "mozg", "silnik"):
+               "przebiegi", "prace", "karty", "obserwator", "aplikacja", "podpowiedzi", "glos", "mozg", "silnik"):
     setattr(roz, _nazwa, _load(f"jarvo_hq_{_nazwa}", f"{_nazwa}.py"))
 trasy_rozmow = _load("jarvo_hq_trasy_rozmow", "trasy_rozmow.py")
 trasy_aplikacji = _load("jarvo_hq_trasy_aplikacji", "trasy_aplikacji.py")

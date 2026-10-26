@@ -120,6 +120,13 @@ class Agenci:
             raise ValueError(f"nieznany agent {nazwa!r}")
         return nazwa
 
+    def recenzent(self) -> str:
+        """Recenzent kart floty (fleet.json `reviewer`, bez niego koordynator `orchestrator`, w ostateczności jarvo)."""
+        d = _czytaj(self.fleet_json)
+        d = d if isinstance(d, dict) else {}
+        r = d.get("reviewer") or d.get("orchestrator") or "jarvo"
+        return r if isinstance(r, str) and PROFIL_RE.fullmatch(r) else "jarvo"
+
     def nazwy_wyswietlane(self) -> dict[str, str]:
         return {a["name"]: a["nazwa"] for a in self.lista()}
 

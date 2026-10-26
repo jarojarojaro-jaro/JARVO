@@ -324,6 +324,8 @@ const ElementOsi = React.memo(function ElementOsiW({ x, ctx, ostatniaPrzebiegu }
     case "kroki": return html`<div class="j-msg-kroki"><${Kroki} kroki=${x.kroki || []} szczegoly=${ctx.szczegoly}/></div>`;
     case "obca": return html`<${WiadomoscObca} x=${x}/>`;
     case "blad_tury": return html`<${BladTury} x=${x}/>`;
+    case "przekazanie": return x.karta && x.karta.task_id ? html`<${KartaPracy} x=${x} ctx=${ctx}/>` : html`<${PozycjaSystemowa} x=${x}/>`;
+    case "koniec": return html`<${KoniecPracy} x=${x} ctx=${ctx}/>`;
     default: return html`<${PozycjaSystemowa} x=${x}/>`;
   }
 });

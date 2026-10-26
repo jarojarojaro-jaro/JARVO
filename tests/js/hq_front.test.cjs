@@ -315,6 +315,18 @@ test("Os.widok: kroki zwinięte w trybie Prosty, pełne w Szczegółach", () => 
   eq(v[1].kroki, [1, 2, 3]);
   eq(Os.widok(poz, [], { szczegoly: true }).map((x) => x.id), ["m1", "k1", "k2", "k3", "a1"]);
 });
+test("Os.widok: budzenia kart z wątku w karcie pracy, ostatnie „completed” jako koniec", () => {
+  // pierwsza sesja 26.10: „Karta … · oddana do oceny” kilka razy pod rząd zamiast jednej karty agenta
+  const przek = (n, id) => ({ id: `p${n}`, rodzaj: "przekazanie", ts: n, agent: "jarvo", karta: { task_id: id, tytul: "Audyt", agent: "jarvo-web" } });
+  const budz = (n, id, status) => ({ id: `b${n}`, rodzaj: "budzenie", ts: n, agent: "jarvo", budzenie: { task_id: id, status } });
+  const handed = "handed off for review; the implementation is done";
+  const v = Os.widok([przek(1, "t_a"), przek(2, "t_b"), budz(3, "t_a", handed), budz(4, "t_a", handed), budz(5, "t_a", "completed"),
+    budz(6, "t_b", handed), budz(7, "t_x", "completed"), budz(8, "t_a", "completed")], []);
+  eq(v.map((x) => `${x.id}:${x.rodzaj}`), ["p1:przekazanie", "p2:przekazanie", "b7:budzenie", "b8:koniec"]);
+  eq([...Os.kartyWatku([przek(1, "t_a"), { rodzaj: "przekazanie", karta: { task_id: null } }])], ["t_a"]);
+  eq(Os.noweOdTad(v, 1), "b8");
+});
+
 test("Os.widok: żywy dymek za wpisem, schowane pozycje w toku, koniec po odpowiedzi", () => {
   const poz = [p("m1", { rodzaj: "wlasciciel" }), p("t1", { rodzaj: "agent", przebieg_id: "p1", w_toku: true }), p("m2", { rodzaj: "wlasciciel" })];
   const zywy = { id: "p1", wpis_id: "m1", stan: "pracuje", tekst: "pi" };

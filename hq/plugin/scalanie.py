@@ -10,7 +10,8 @@ wierszami sesji Hermesa każdego członka (czytnik.py: projekcja Hermesa albo za
   rodzaje = `system`; użytkownik: nasz = ukryty, `[kanban] Task …` = `budzenie`, streszczenie kompresji = `kompresja`,
   reszta = `obca` (w wątku `import` dymek właściciela); asystent z `tool_calls` = grupa `kroki` przed następnym
   tekstem (czas kroku z zapisanych `kroki` przebiegu), `kanban_create` dodatkowo `przekazanie`; asystent z tekstem =
-  `agent`; `tool` uzupełnia błąd kroku; sesja rodowodu, której już nie ma = `luka`.
+  `agent`, ale bez linii `[SILENT]` (cicha odpowiedź na budzenie: Hermes jej nie dostarcza, my też nie pokazujemy;
+  sama cisza = brak pozycji); `tool` uzupełnia błąd kroku; sesja rodowodu, której już nie ma = `luka`.
 - **Tura w toku**: wiersze członka od `user_msg_id` aktywnego przebiegu mają `w_toku: true` i `przebieg_id`
   (klient składa je w żywy dymek); kursor `po` cofa się do nich, więc po końcu przebiegu przyjdą jeszcze raz już bez
   `w_toku` (klient podmienia pozycje po `id`). Tak samo otwarta grupa kroków.
@@ -45,6 +46,13 @@ SYSTEMOWE = {"auto_continue": "Automatyczna kontynuacja", "model_switch": "Zmian
              "personality_switch": "Zmiana osobowości", "skill_invocation": "Użyto umiejętności",
              "internal_notification": "Komunikat systemowy"}
 DOSTAWY = ("async_delegation_complete", "process_complete")
+# znacznik cichej odpowiedzi (Hermes cron/scheduler.py SILENT_MARKER): cała linia, także w `…` albo z kropką
+CISZA = re.compile(r"^[ \t]*`?\[SILENT\]`?[.!]?[ \t]*$", re.I | re.M)
+
+
+def bez_ciszy(tekst: str) -> str:
+    """Tekst odpowiedzi bez linii `[SILENT]`; pusty, gdy agent odpowiedział samą ciszą."""
+    return CISZA.sub("", tekst).strip() if "silent" in tekst.lower() else tekst
 
 
 def _sha(tekst: str) -> str:
@@ -167,6 +175,8 @@ def _czlonek(agent: str, rola: str, linia: list[dict], przebiegi: list[dict], wp
             if m.get("skompaktowany"):
                 skompaktowane += 1
             rodzaj, rola_m, tresc = m.get("rodzaj"), m.get("rola"), m.get("tresc") or ""
+            if rola_m == "assistant":
+                tresc = bez_ciszy(tresc)
             klucz = f"m:{agent}:{m['klucz']}" if rola == "rozmowa" else f"m:{agent}.{rola}:{m['klucz']}"
             if rodzaj == "hidden":
                 continue

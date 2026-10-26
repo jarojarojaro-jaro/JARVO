@@ -882,6 +882,50 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
             return p
         return await akcja(pid, _wez)
 
+    # karty pracy w wątku (karty.py, docs/HQ.md „Karty pracy”): stan przekazań z tablicy i sesji pracowników
+    def _state_db(sil):
+        def sciezka(profil: str):
+            try:
+                p = sil.czytnik.state_db(profil)
+            except ValueError:
+                return None
+            return p if p.is_file() else None
+        return sciezka
+
+    @trasa("GET", "/karty")
+    @obsluga
+    async def karty_pracy(request: Request, id: str = ""):
+        tylko_ta_strona(request)
+        sil = s()
+        stan = await asyncio.to_thread(m.karty.stan_kart, sil.home / "kanban.db", id.split(","),
+                                       recenzent=agenci.recenzent(), state_db=_state_db(sil), etykieta=core.tool_label,
+                                       utajnij=ochrona.utajnij)
+        return {"karty": stan}
+
+    @trasa("GET", "/karty/{tid}")
+    @obsluga
+    async def karta_pracy(tid: str, request: Request):
+        """Rozwinięta karta: stan i przebieg pracy (kroki i wypowiedzi wykonawcy i sędziego)."""
+        tylko_ta_strona(request)
+        sil = s()
+        if not m.karty.poprawne_id([tid]):
+            raise BladTrasy(404, "brak", "Nie ma takiej karty.", "No such card.")
+        db, sciezki = sil.home / "kanban.db", _state_db(sil)
+
+        def zbierz():
+            stan = m.karty.stan_kart(db, [tid], recenzent=agenci.recenzent(), state_db=sciezki, etykieta=core.tool_label,
+                                     utajnij=ochrona.utajnij)
+            if tid not in stan:
+                return None
+            return {**stan[tid], "przebieg": m.karty.przebieg(
+                db, tid, recenzent=agenci.recenzent(), state_db=sciezki,
+                wiadomosci=lambda p, sesja: core.read_session_messages(p, sesja)[1],
+                aktywnosc=core.activity_from_messages, utajnij=ochrona.utajnij)}
+        karta = await asyncio.to_thread(zbierz)
+        if karta is None:
+            raise BladTrasy(404, "brak", "Nie ma takiej karty.", "No such card.")
+        return {"karta": karta}
+
     async def _stop(pid: str):
         return await akcja(pid, lambda sil: sil.rejestr.stop(pid), status=202)
 

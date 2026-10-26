@@ -35,9 +35,11 @@ PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "ochrona.py", "e
                 "przenosne.py", "sciezki.py",
                 # silnik rozmów aplikacji (docs/HQ.md „Rozmowy”): magazyn rozmowy.db, czytnik sesji Hermesa, wzmianki,
                 # blok kontekstu, lista agentów, klient bramy, strumień SSE, rejestr przebiegów, oś czasu, budzenia,
-                # praca floty, obserwator, wątek silnika i trasy; start aplikacji (gotowość, podpowiedzi N0, GET /app)
+                # praca floty, karty pracy w wątku, obserwator, wątek silnika i trasy; start aplikacji (gotowość,
+                # podpowiedzi N0, GET /app)
                 "rozmowy.py", "czytnik.py", "wzmianki.py", "kontekst.py", "agenci.py", "brama.py", "strumien.py",
-                "przebiegi.py", "scalanie.py", "budzenia.py", "prace.py", "obserwator.py", "silnik.py", "trasy_rozmow.py",
+                "przebiegi.py", "scalanie.py", "budzenia.py", "prace.py", "karty.py", "obserwator.py", "silnik.py",
+                "trasy_rozmow.py",
                 "aplikacja.py", "podpowiedzi.py", "glos.py", "mozg.py", "trasy_aplikacji.py")
 
 
@@ -99,7 +101,7 @@ def fleet_json(fleet: fl.Fleet | None = None) -> dict:
     m = fleet.raw["models"]
     zestawy = {m["provider"]: dict(m["tiers"]), **{k: dict(v) for k, v in (m.get("presets") or {}).items()}}
     zapasowe = {k: dict(v) for k, v in (m.get("fallback") or {}).items() if isinstance(v, dict)}
-    return {"orchestrator": fleet.orchestrator, "agents": agents,
+    return {"orchestrator": fleet.orchestrator, "reviewer": fleet.reviewer, "agents": agents,
             "modele": {"domyslny": m["provider"], "zestawy": zestawy, "zapasowe": zapasowe}}
 
 

@@ -183,6 +183,8 @@ const Os = (() => {
   // odpowiedź (pozycję agenta z tym przebieg_id i bez w_toku).
   // Wiadomości w drodze (`oczekujace`, optymistyczne dymki właściciela) stoją za osią, a znikają, gdy oś ma wpis
   // z tym samym kluczem. Nieudany przebieg zostaje dymkiem z „Ponów”, dopóki nie ma odpowiedzi ani ponowienia.
+  // Budzenia kart przekazanych w tym wątku pokazuje karta pracy (35-karty.js): ostatnie „completed” karty zostaje
+  // jako `koniec` („<agent> · skończone”), reszta znika.
   // Zatrzymany przebieg (Stop właściciela), którego odpowiedź jest już na osi: ostatnia pozycja agenta z tym
   // przebiegiem dostaje `zatrzymany` (linia „Zatrzymane · Ponów” pod nią, spec §9.1), dopóki nie ma ponowienia;
   // zatrzymany przed pierwszym słowem (żadnej pozycji agenta) zostaje pustym dymkiem z tą linią.
@@ -196,9 +198,21 @@ const Os = (() => {
         && !maOdpowiedz(p))));
     const ukryte = new Set(zywe.map((p) => p.id));
     const stop = new Map(lista.filter((p) => p.stan === "zatrzymane" && !ponowione.has(p.id) && !ukryte.has(p.id)).map((p) => [p.id, p]));
+    // budzenia kart z tego wątku: stan pokazuje karta pracy, więc pośrednie (oddana do oceny, ponowienia) znikają,
+    // a ostatnie „completed” każdej karty to wiadomość „<agent> · skończone” (rodzaj `koniec`)
+    const karty = kartyWatku(pozycje);
+    const ostatniKoniec = new Map();
+    for (const x of pozycje) {
+      const b = x.rodzaj === "budzenie" && x.budzenie;
+      if (b && karty.has(b.task_id) && b.status === "completed") ostatniKoniec.set(b.task_id, x.id);
+    }
     const out = [];
     for (const x of pozycje) {
       if (x.w_toku && ukryte.has(x.przebieg_id)) continue;
+      if (x.rodzaj === "budzenie" && x.budzenie && karty.has(x.budzenie.task_id)) {
+        if (ostatniKoniec.get(x.budzenie.task_id) === x.id) out.push({ ...x, rodzaj: "koniec" });
+        continue;
+      }
       // błąd tury przebiegu z dymkiem pokazuje sam dymek (z „Ponów”), nie drugi raz na osi
       if (x.rodzaj === "blad_tury" && x.przebieg_id && ukryte.has(x.przebieg_id)) continue;
       const pop = out[out.length - 1];
@@ -228,6 +242,13 @@ const Os = (() => {
     return out;
   }
 
+  // karty kanbana przekazane w wątku (pozycje `przekazanie` z task_id), w kolejności osi
+  function kartyWatku(pozycje) {
+    const ids = new Set();
+    for (const x of pozycje || []) if (x.rodzaj === "przekazanie" && x.karta && x.karta.task_id) ids.add(x.karta.task_id);
+    return ids;
+  }
+
   function oczekujaceWidoczne(pozycje, oczekujace) {
     if (!oczekujace || !oczekujace.length) return [];
     const klucze = new Set();
@@ -237,7 +258,7 @@ const Os = (() => {
 
   // „Nowe od tąd”: przed n-tą od końca pozycją od agentów (n = nieprzeczytane przy otwarciu); nie dalej niż do
   // ostatniej wiadomości właściciela (po niej wszystko jest nowe). Kroki się nie liczą. Zwraca id pozycji albo null.
-  const NOWE = new Set(["agent", "blad_tury", "obca", "budzenie", "dostawa", "przekazanie"]);
+  const NOWE = new Set(["agent", "blad_tury", "obca", "budzenie", "dostawa", "przekazanie", "koniec"]);
   function noweOdTad(pozycje, n) {
     if (!(n > 0)) return null;
     let id = null, ile = 0;
@@ -289,8 +310,8 @@ const Os = (() => {
   }
 
   return { KONCOWE, PONOWIALNE, DO_ZATRZYMANIA, porownaj, FILTRY, listaStrona, listaZmiana, listaUsun, osStrona, osWpis,
-    zWpisu, zMigawki, przebieg, dodajPrzebiegi, scalPrzebieg, zastosujZdarzenie, widok, noweOdTad, ryzyko, wyboryZgody,
-    krokiPodsumowanie, doZatrzymania, klasaBledu };
+    zWpisu, zMigawki, przebieg, dodajPrzebiegi, scalPrzebieg, zastosujZdarzenie, widok, kartyWatku, noweOdTad, ryzyko,
+    wyboryZgody, krokiPodsumowanie, doZatrzymania, klasaBledu };
 })();
 
 // ------------------------------------------------------------------------------------------------- kompozytor

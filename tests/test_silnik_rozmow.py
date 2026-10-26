@@ -26,7 +26,7 @@ M = SimpleNamespace(**{n: load_script(f"hq/plugin/{p}.py", f"jarvo_test_sr_{n}")
     ("hq_core", "hq_core"), ("ochrona", "ochrona"), ("agenci", "agenci"), ("rozmowy", "rozmowy"),
     ("czytnik", "czytnik"), ("kontekst", "kontekst"), ("wzmianki", "wzmianki"), ("budzenia", "budzenia"),
     ("scalanie", "scalanie"), ("brama", "brama"), ("strumien", "strumien"), ("przebiegi", "przebiegi"),
-    ("prace", "prace"), ("obserwator", "obserwator"), ("silnik", "silnik"))})
+    ("prace", "prace"), ("karty", "karty"), ("obserwator", "obserwator"), ("silnik", "silnik"))})
 trasy = load_script("hq/plugin/trasy_rozmow.py", "jarvo_test_sr_trasy")
 P = "/api/plugins/jarvo-hq"
 PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
@@ -543,3 +543,32 @@ def test_archiwum_z_praca_wymaga_wyboru_i_praca_json(swiat):
     czekaj(lambda: json.loads(praca.read_text())["aktywne"] == 0, opis="praca.json bez pracy")
     zdrowie = swiat.sil.zdrowie()
     assert zdrowie["silnik"] == "ok" and zdrowie["obserwator"]["bledy"] == 0
+
+
+def test_karty_pracy_z_tablicy(swiat):
+    """GET /karty i /karty/{id} (karty.py): stan przekazania z tablicy kanbana dla żywej karty w wątku."""
+    import sqlite3
+    conn = sqlite3.connect(swiat.home / "kanban.db")
+    conn.executescript("""
+    CREATE TABLE tasks (id TEXT PRIMARY KEY, title TEXT, assignee TEXT, status TEXT, created_at INTEGER, started_at INTEGER,
+      completed_at INTEGER, last_heartbeat_at INTEGER, current_run_id INTEGER, result TEXT);
+    CREATE TABLE task_runs (id INTEGER PRIMARY KEY, task_id TEXT, profile TEXT, status TEXT, started_at INTEGER,
+      ended_at INTEGER, outcome TEXT, summary TEXT, metadata TEXT);
+    CREATE TABLE task_events (id INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT, run_id INTEGER, kind TEXT, payload TEXT,
+      created_at INTEGER);
+    INSERT INTO tasks VALUES ('t_0000abcd', 'Audyt', 'jarvo', 'done', 1, 2, 9, 8, NULL, NULL);
+    INSERT INTO task_runs VALUES (1, 't_0000abcd', 'test-e2e-a', 'review', 2, 5, 'review_requested', 'Raport z 5 problemami.',
+      '{"artifacts": ["out/audyt.md"]}');
+    INSERT INTO task_runs VALUES (2, 't_0000abcd', 'jarvo', 'done', 6, 9, 'completed', 'Zatwierdzam.', NULL);
+    """)
+    conn.commit()
+    conn.close()
+    k = swiat.k.get(f"{P}/karty", params={"id": "t_0000abcd,t_nieznana0,zle"}).json()["karty"]
+    assert list(k) == ["t_0000abcd"]
+    assert k["t_0000abcd"]["etap"] == "gotowe" and k["t_0000abcd"]["agent"] == "test-e2e-a"
+    assert k["t_0000abcd"]["podsumowanie"] == "Raport z 5 problemami." and k["t_0000abcd"]["ocena"] == "Zatwierdzam."
+    karta = swiat.k.get(f"{P}/karty/t_0000abcd").json()["karta"]
+    assert [p["rola"] for p in karta["przebieg"]] == ["praca", "ocena"]
+    assert swiat.k.get(f"{P}/karty/t_ffffffff").status_code == 404
+    assert swiat.k.get(f"{P}/karty/zle-id").status_code == 404
+    assert swiat.k.get(f"{P}/karty", headers={"Sec-Fetch-Site": "same-site"}).status_code == 403
