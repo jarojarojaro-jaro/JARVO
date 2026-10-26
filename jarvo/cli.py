@@ -1081,15 +1081,18 @@ def sprawdz_polecenie(u: Uklad, ot: Otoczenie) -> dict:
         nasze.insert(0, Path.home() / ".local" / "bin" / "jarvo")
     znalezione = shutil.which("jarvo", path=ot.env.get("PATH"))
     if znalezione is None:
-        kiedy = ("otwórz nowe okno terminala" if WINDOWS else "otwórz nowe okno Terminala" if MACOS else
+        kiedy = (f"zamknij wszystkie okna Windows Terminal i otwórz nowe (jego karty mają zmienne z chwili jego "
+                 f"startu) albo w tym oknie PowerShella: {instalator.ODSWIEZ_PATH_PS}" if WINDOWS else
+                 "otwórz nowe okno Terminala" if MACOS else
                  "zaloguj się ponownie (terminal w GNOME i KDE nie czyta ~/.profile, w którym jest blok PATH)")
         return _wynik("polecenie jarvo", "uwaga", f"nie ma go w PATH tego terminala (plik: {nasze[0]})",
                       f"PATH zmienia się dla nowych sesji: {kiedy}, albo uruchamiaj pełną ścieżką. Po instalacji "
                       "z --bez-path zawsze pełną ścieżką.")
     if all(Path(znalezione).resolve() != p.resolve() for p in nasze):
         return _wynik("polecenie jarvo", "uwaga", f"w PATH najpierw jest {znalezione}, a nie {nasze[0]}",
-                      "To zwykle polecenie starej instalacji (Docker, WSL) albo innej kopii Jarva: usuń je albo "
-                      "uruchamiaj tę pełną ścieżką. Migracja: etap E12.")
+                      "To zwykle polecenie starej instalacji (Docker, WSL) albo innej kopii Jarva: przeniesienie "
+                      "starej instalacji robi polecenie instalacji albo `jarvo migruj`; inaczej uruchamiaj tę "
+                      "pełną ścieżką.")
     return _wynik("polecenie jarvo", "ok", znalezione)
 
 

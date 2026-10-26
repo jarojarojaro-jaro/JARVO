@@ -1071,11 +1071,17 @@ def plik_rc(dom: Path, powloka: str, macos: bool) -> Path:
     return dom / ".bash_profile" if (dom / ".bash_profile").is_file() else dom / ".profile"
 
 
+# PowerShell: PATH z rejestru w otwartym oknie (Windows Terminal daje nowym kartom zmienne z chwili swojego startu)
+ODSWIEZ_PATH_PS = ("$env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + "
+                   "[Environment]::GetEnvironmentVariable('Path','Machine')")
+
+
 def kiedy_dziala_path() -> str:
     """Kiedy nowy wpis PATH zadziała: macOS Terminal otwiera powłokę logowania, a terminal w GNOME i KDE nie (czyta
     ~/.bashrc albo ~/.zshrc), więc na Linuksie dopiero po ponownym zalogowaniu."""
     if WINDOWS:
-        return "w nowym oknie terminala"
+        return ("w nowym oknie terminala (Windows Terminal przekazuje kartom stare zmienne, dopóki nie zamkniesz "
+                "wszystkich jego okien); w otwartym oknie: " + ODSWIEZ_PATH_PS)
     if MACOS:
         return "w nowym oknie Terminala"
     return "po ponownym zalogowaniu (terminal w GNOME i KDE nie czyta ~/.profile)"

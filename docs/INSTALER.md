@@ -43,7 +43,10 @@ Krótszy adres po wgraniu strony: `curl -fsSL https://jarvo.pl/install.sh | bash
   - `jarvo uninstall` (`--all` z danymi i z kopią migracji `<root>/migracja` po pytaniu, `--yes` bez pytań, `--json`; bez `--all` dane i kopia migracji zostają);
   - `jarvo migruj`: przeniesienie danych ze starej instalacji z Dockerem i WSL (docs/NATYWNIE.md, sekcja f).
 - Linux: polecenie `jarvo` działa w nowym terminalu dopiero po ponownym zalogowaniu (terminal w GNOME i KDE nie czyta
-  `~/.profile`).
+  `~/.profile`). Windows: Windows Terminal daje nowym kartom zmienne z chwili swojego startu, więc po instalacji
+  zamknij wszystkie jego okna albo w otwartym oknie PowerShella wpisz
+  `$env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine')`
+  (podpowiada to też `jarvo doctor`); pełna ścieżka `<korzeń>in\jarvo.cmd` działa zawsze.
 - **Stara instalacja z Dockerem albo WSL** (jarvo/migracja.py `wykryj`, tylko odczyt, bez startu WSL i Dockera): to samo
   polecenie instaluje wersję natywną bez startu, autostartu i polecenia `jarvo`, potem przenosi dane (`jarvo migruj
   --bez-startu`: rozbrojenie starej floty, kopia z sumą, próba bez sekretów, import, flota; pytanie o zgodę przed każdą

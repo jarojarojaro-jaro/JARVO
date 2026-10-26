@@ -345,8 +345,8 @@
       return
     }
     if (-not (@($env:Path -split ';') -contains $bin)) { $env:Path = "$env:Path;$bin" }   # to okno tez
-    JarvoKrok ('Gotowe. Polecenie jarvo dziala w tym oknie i w kazdym nowym: jarvo (rozmowa w terminalu), ' +
-               'jarvo panel, jarvo status, jarvo doctor.')
+    JarvoKrok ('Gotowe. Polecenie jarvo dziala w tym oknie i w kazdym nowym (Windows Terminal: po zamknieciu ' +
+               'wszystkich jego okien): jarvo (rozmowa w terminalu), jarvo panel, jarvo status, jarvo doctor.')
   }
 
   JarvoInstaluj

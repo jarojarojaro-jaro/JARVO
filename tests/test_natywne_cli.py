@@ -2060,8 +2060,8 @@ def test_polecenie_posix_blok_rc_tylko_raz(tmp_path, stanowisko):
 def test_kiedy_dziala_nowy_path():
     """Linux: terminal w GNOME i KDE nie czyta ~/.profile, więc wpis PATH działa dopiero po ponownym zalogowaniu."""
     tekst = instalator.kiedy_dziala_path()
-    if WINDOWS:
-        assert tekst == "w nowym oknie terminala"
+    if WINDOWS:                                     # Windows Terminal daje kartom zmienne z chwili swojego startu
+        assert tekst.startswith("w nowym oknie terminala") and instalator.ODSWIEZ_PATH_PS in tekst
     elif sciezki.MACOS:
         assert tekst == "w nowym oknie Terminala"
     else:
