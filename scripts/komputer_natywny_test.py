@@ -423,7 +423,15 @@ def formularz(k: Klient, pid: int) -> None:
     for etykieta in ("Hasło do konta", "Kod BLIK"):
         w = k.narzedzie("type_text", {**pisz, "element_token": el[etykieta]["element_token"], "text": "123456"})
         sprawdz(kod(w) == "wymaga_czlowieka", f"formularz: „{etykieta}” wpisuje właściciel", tekst(w))
-    karta = next((e for e in el.values() if e.get("role") == "entry" and e["label"] == "Numer karty"), None)
+    # ramka płatności to inna witryna (osobny proces): na Windows arm64 z przeglądarką x64 w emulacji jej
+    # przygotowanie trwa kilkanaście sekund (CI natywnie WARM: Page.enable ramki po 14 s), więc czekamy jak na kartę
+    koniec = time.monotonic() + 45
+    while True:
+        karta = next((e for e in el.values() if e.get("role") == "entry" and e["label"] == "Numer karty"), None)
+        if karta is not None or time.monotonic() >= koniec:
+            break
+        time.sleep(1)
+        el = migawka()
     if sprawdz(karta is not None, "formularz: pole karty z ramki płatności (inna witryna) jest w migawce"):
         w = k.narzedzie("type_text", {**pisz, "element_token": karta["element_token"], "text": "4111"})
         sprawdz(kod(w) == "wymaga_czlowieka", "formularz: numer karty w ramce płatności wpisuje właściciel", tekst(w))
