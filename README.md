@@ -18,6 +18,16 @@ pilnuje terminów i niczego nie zapomina. Z każdym specjalistą można też roz
 | 🖥️ `jarvo-operator` | operator ekranu: klika, wypełnia i przepisuje w przeglądarce na Komputerze Jarva (osobny pulpit w kontenerze), gdzie nie ma API; logowanie, płatność i wysyłkę oddaje Tobie w Ekranie HQ |
 | 🦾 `jarvo-reka` | prawa ręka: generalista ze wszystkimi skillami, składa pakiety misji, dokumenty, prototypy |
 
+## Próba: Jarvo jako paczka do zwykłego Hermesa
+
+Od 28.10.2026 sprawdzamy drugą drogę, w osobnym repo
+[jarojarojaro-jaro/jarvo-hermes-plugin](https://github.com/jarojarojaro-jaro/jarvo-hermes-plugin) (na razie prywatne).
+Zamiast własnego instalatora, panelu i nadzorcy instalujesz oficjalnego Hermesa (v0.22.5 sam dokłada Pythona, Node,
+Chromium i ffmpeg), a Jarvo dochodzi jako dystrybucje profili Hermesa (`hermes profile install`), jednym poleceniem
+(`install.ps1`, `install.sh`). Na start jeden agent, Web, z nowym progiem jakości: wynik zamiast szkieletu (zero
+„[TU WPISZ]”), najwyżej jedno pytanie albo pełna propozycja, kontrola wyglądu na zrzutach przed oddaniem, odpowiedź
+bez list plików. To repo zostaje bez zmian, dopóki właściciel nie oceni próby.
+
 ## Aplikacja Jarvo
 
 Jarvo w przeglądarce (`/jarvo`): spokojny ekran z jedną rozmową, rozmowy po lewej, ustawienia w szufladzie z prawej,
