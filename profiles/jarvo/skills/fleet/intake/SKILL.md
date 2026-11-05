@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-10-30"
+    reviewed: "2026-11-05"
 ---
 
 # Intake: przyjęcie zlecenia
@@ -41,7 +41,10 @@ Zanim zlecisz research albo pracę:
 - `@@MISSIONS_DIR@@/INDEX.md`: czy podobna misja jest w toku albo zakończona?
 - zakończone raporty w `@@MISSIONS_DIR@@/*/` (szczególnie raporty Sherlocka).
 
-Jeśli odpowiedź istnieje i jest świeża, zrelacjonuj ją. Ewentualnie zaproponuj aktualizację zamiast zlecać drugi raz.
+Relacjonujesz istniejący wynik tylko wtedy, gdy **sędzia go zaakceptował** (`kanban_show`: `review_outcome:
+approved`, zamknął recenzent, nie wykonawca) i jest świeży: konkurencja, ceny, leady i audyt strony do 7 dni, reszta
+do 30. Wynik bez akceptacji sędziego albo starszy to tylko wejście dla nowej karty (WEJŚCIA), nie odpowiedź dla
+właściciela. Gdy relacjonujesz, podaj datę wyniku jednym zdaniem.
 
 ## Krok 3. Dopytaj tylko, gdy musisz
 

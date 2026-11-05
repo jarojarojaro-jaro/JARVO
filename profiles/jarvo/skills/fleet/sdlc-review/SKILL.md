@@ -13,7 +13,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A0
-    reviewed: "2026-10-30"
+    reviewed: "2026-11-05"
 environments:
   - kanban
 ---

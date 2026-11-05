@@ -12,7 +12,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-10-30"
+    reviewed: "2026-11-05"
 ---
 
 # Pierwsza sesja
