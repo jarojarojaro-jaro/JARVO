@@ -157,8 +157,10 @@ class Odmowa(RuntimeError):
     """Właściciel nie zgodził się na krok, bez którego migracja nie pójdzie dalej."""
 
 
-def _teraz_iso() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%S")
+def _teraz_iso(teraz: Callable[[], float] | None = None) -> str:
+    """Czas lokalny ISO; `teraz` = zegar systemu migracji (SystemMigracji.teraz), żeby okres przejściowy liczył się
+    od tej samej chwili, od której go potem mierzymy (bez niego test z atrapą zegara psuł się z upływem dni)."""
+    return time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(teraz() if teraz else None))
 
 
 def _sha_pliku(p: Path) -> str:
@@ -2054,8 +2056,9 @@ def opis_wykrycia(w: Wykrycie) -> str:
 class Stan:
     """`<stan>/migracja.json`: etapy z czasem, źródło, katalog, kopia z sumą, wstrzymane rutyny, przepisane pliki."""
 
-    def __init__(self, u: Uklad):
+    def __init__(self, u: Uklad, zegar: Callable[[], float] | None = None):
         self.u = u
+        self.zegar = zegar
         self.sciezka = u.stan / PLIK_STANU
         self.d: dict = srodowisko.wczytaj_json(self.sciezka)
 
@@ -2066,7 +2069,7 @@ class Stan:
         return etap in (self.d.get("etapy") or {})
 
     def oznacz(self, etap: str, **szczegoly: Any) -> None:
-        self.d.setdefault("etapy", {})[etap] = {"czas": _teraz_iso(), **szczegoly}
+        self.d.setdefault("etapy", {})[etap] = {"czas": _teraz_iso(self.zegar), **szczegoly}
         self.zapisz()
 
     @property
@@ -2122,7 +2125,7 @@ class Opcje:
 class Migracja:
     def __init__(self, u: Uklad, s: SystemMigracji, n: Natywne, o: Opcje):
         self.u, self.s, self.n, self.o = u, s, n, o
-        self.stan = Stan(u)
+        self.stan = Stan(u, getattr(s, "teraz", None))
         # trwająca migracja zostaje przy swoim katalogu (tam jest kopia), także gdy wznowienie poda inny --katalog
         zapisany = self.stan.d.get("katalog") if self.stan.aktywna else None
         self.katalog = Path(zapisany or o.katalog or (u.root / KATALOG))
@@ -2199,7 +2202,7 @@ class Migracja:
             self.wymagaj(f"Migracja do {self.u.dane}: najpierw wyłączę starą flotę (nic nie usuwam), potem skopiuję "
                          f"dane do {self.katalog}, sprawdzę je na próbie i przeniosę. Zaczynamy?")
             self._przygotuj_katalog()
-            self.stan.d = {"wersja": WERSJA, "id": uuid.uuid4().hex[:12], "rozpoczeta": _teraz_iso(),
+            self.stan.d = {"wersja": WERSJA, "id": uuid.uuid4().hex[:12], "rozpoczeta": _teraz_iso(self.stan.zegar),
                            "katalog": str(self.katalog), "zrodlo": asdict(self.zrodlo), "etapy": {}}
             self.stan.zapisz()
         for nazwa, opis, krok in self._kroki(w):
@@ -2208,7 +2211,7 @@ class Migracja:
             self.wypisz(f"== {opis}")
             szczegoly = krok() or {}
             self.stan.oznacz(nazwa, **szczegoly)
-        self.stan.d["zakonczona"] = _teraz_iso()
+        self.stan.d["zakonczona"] = _teraz_iso(self.stan.zegar)
         self.stan.zapisz()
         self._zapisz_raport()
         self.wypisz(self._podsumowanie())
