@@ -62,7 +62,10 @@ Dzięki temu po każdym restarcie, kompresji czy nowej rozmowie Jarvo odtwarza p
   `kanban_request_review(reviewer="jarvo")` z samokontrolą wobec DoD. Gdy agent pominie `reviewer`, dopisuje go
   strażnik wtyczki `jarvo-wiedza` (docs/WIEDZA.md): bez niego Hermes zostawiał kartę u wykonawcy, a tor review
   uruchamiał go znowu, więc nikt niezależny nie sprawdzał wyniku. Ten sam strażnik nie pozwala wykonawcy zamknąć
-  własnej karty (`kanban_complete`): zamyka sędzia po ocenie.
+  własnej karty (`kanban_complete`): zamyka sędzia po ocenie. Nie przyjmie też oddania z treścią zastępczą w `out/`
+  („[TU WPISZ…]”, lorem ipsum, `JARVO-TODO`), a od Sherlocka bez rejestru źródeł `out/zrodla.json`. Sędzia ocenia
+  wynik rubryką i testem wartości („czy właściciel pokazałby to klientowi”, `sdlc-review` krok 4c), a wynik
+  wizualny tylko po obejrzeniu go narzędziem vision.
 - **Host (`default`):** profil techniczny. Trzyma token bota, uruchamia gateway (multipleks
   wszystkich profili), dispatcher kanbana i trasy `profile_routes`. Nie rozmawia z Tobą.
 

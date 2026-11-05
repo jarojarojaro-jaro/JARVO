@@ -1,6 +1,7 @@
 # Rubryka: jarvo-mobile
 
 ## Blokujące (poprawki obowiązkowe)
+- Treść zastępcza w wyniku („[TU WPISZ…]”, lorem ipsum, „Moja Firma”, puste miejsca na zdjęcia), chyba że właściciel dosłownie poprosił o szablon; wynik, którego właściciel nie pokazałby klientowi.
 - Wniosek o aplikacji albo stronie bez dowodu (adres, wersja, data) albo zasada sklepu bez numeru wytycznej.
 - Aplikacja partnera albo niepotwierdzony kandydat z wyszukiwarki audytowany jako aplikacja firmy.
 - Rekomendacja aplikacji natywnej bez funkcji, której przeglądarka nie zrobi dobrze, bez ostrzeżenia o ryzyku 4.2.

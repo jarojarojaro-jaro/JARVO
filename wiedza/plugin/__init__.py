@@ -710,6 +710,9 @@ def _karta_z_bazy(db: Path, task_id: str) -> Dict[str, Any]:
 #    pracę w kółko (pierwsza sesja 26.10: Web 6 razy, Sherlock 5). Sam recenzent i host nie dostają dopisku.
 # 4) wykonawca nie zamyka swojej karty (`kanban_complete` na HERMES_KANBAN_TASK): blokada z prośbą o oddanie do oceny
 #    (pierwsza sesja 26.10: Łowca zamknął listę leadów sam, bez sędziego).
+# 5) oddanie karty z dziurami w wyniku („[TU WPISZ…]”, lorem ipsum, JARVO-TODO w plikach out/) wraca do wykonawcy:
+#    treść zastępcza to praca niegotowa (strona-wizytówka 26.10: 25 dziur, sędzia zaakceptował). Sherlock oddaje
+#    tylko z rejestrem źródeł `out/zrodla.json` (SOUL, zasada 9; 26.10: dwa raporty bez rejestru i bez `verify`).
 LIMITY_GENERACJI = {"video_generate": ("JARVO_LIMIT_WIDEO_AI", 3), "image_generate": ("JARVO_LIMIT_OBRAZY_AI", 12)}
 _LOGOWANIE_RE = re.compile(r"(?i)\b(has[łl]o|password|passwd|pin)\b(?:\s+[^\s\d!@#$%^&*]{1,12}){0,3}?\s*(?:[:=]|to\b|jest\b)?"
                            r"\s*\S*[\d!@#$%^&*]\S*")
@@ -728,6 +731,65 @@ def _numer_karty(tekst: str) -> bool:
         if suma % 10 == 0:
             return True
     return False
+
+
+_DZIURA_RE = re.compile(r"\[\s*TU\s+(?:WPISZ|WSTAW|DODAJ|UZUPE[ŁL]NIJ)\b|\blorem ipsum\b|\bJARVO-TODO\b", re.IGNORECASE)
+# pliki wyniku, które czyta człowiek albo klient (bez raportów narzędzi: JSON Lighthouse cytuje cudzą stronę)
+_TEKSTOWE = {".html", ".htm", ".css", ".js", ".jsx", ".ts", ".tsx", ".md", ".txt", ".csv", ".svg", ".srt", ".ass"}
+_POMIJANE = {"raport.md", "index.md"}          # opis pracy wykonawcy, nie wynik (może nazwać sprawdzenie dziur)
+# katalogi bez wyniku: zależności, git i teksty cudzych stron zapisane przez Sherlocka jako dowód (out/strony)
+_KATALOGI_POMIJANE = {"node_modules", ".git", "strony", ".expo", "dist-cache"}
+_MAKS_PLIKOW, _MAKS_BAJTOW = 400, 2_000_000
+
+
+def dziury_w_wyniku(out: Path) -> List[str]:
+    """Pliki tekstowe w `out/` z treścią zastępczą: „ścieżka: fragment” (najwyżej 5), pusto = czysto."""
+    znalezione: List[str] = []
+    if not out.is_dir():
+        return znalezione
+    przejrzane = 0
+    for korzen, katalogi, pliki in os.walk(out):
+        katalogi[:] = sorted(k for k in katalogi if k.lower() not in _KATALOGI_POMIJANE)
+        for nazwa in sorted(pliki):
+            p = Path(korzen) / nazwa
+            if p.suffix.lower() not in _TEKSTOWE or nazwa.lower() in _POMIJANE:
+                continue
+            przejrzane += 1
+            if przejrzane > _MAKS_PLIKOW or len(znalezione) >= 5:
+                return znalezione
+            try:
+                if p.stat().st_size > _MAKS_BAJTOW:
+                    continue
+                m = _DZIURA_RE.search(p.read_text(encoding="utf-8", errors="ignore"))
+            except OSError:
+                continue
+            if m:
+                znalezione.append(f"{p.relative_to(out).as_posix()}: {m.group(0)}")
+    return znalezione
+
+
+def _brak_jakosci_oddania() -> Optional[Dict[str, Any]]:
+    """Blokada oddania z dziurami w `out/` albo (Sherlock) bez rejestru źródeł; None = oddanie idzie dalej."""
+    ws = (os.environ.get("HERMES_KANBAN_WORKSPACE") or "").strip()
+    if not ws or not os.environ.get("HERMES_KANBAN_TASK"):
+        return None
+    profil = _profil(_hermes_home())
+    if profil in (recenzent_floty(), "host"):
+        return None
+    out = Path(ws) / "out"
+    dziury = dziury_w_wyniku(out)
+    if dziury:
+        return {"action": "block", "message": "Wynik ma treść zastępczą, więc nie jest gotowy: " + "; ".join(dziury)
+                + ". Wpisz prawdziwe dane z karty, brand kitu albo strony firmy; czego nie wiesz, zastąp wiarygodną "
+                "treścią przykładową (opisz ją raz w RAPORT.md jako przykład do podmiany). Brakuje faktu, bez którego "
+                "wynik nie ma sensu: kanban_block(kind=\"needs_input\") z jednym pytaniem. Cytat z cudzej strony "
+                "(np. audyt znalazł tekst zastępczy) opisz słowami, bez cytowania znacznika."}
+    if profil == "jarvo-sherlock" and not (out / "zrodla.json").is_file():
+        return {"action": "block", "message": "Raport bez rejestru źródeł: brak out/zrodla.json. Zapisz źródła przez "
+                "sources.py (extract.py, quote), wygeneruj raport przez render i sprawdź verify, zanim oddasz kartę."}
+    return None
+
+
 _generacje_lock = threading.Lock()
 
 
@@ -836,6 +898,9 @@ def recenzent_floty() -> Optional[str]:
 
 
 def _recenzent_oddania(args: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    blokada = _brak_jakosci_oddania()
+    if blokada:
+        return blokada
     if str(args.get("reviewer") or "").strip():
         return None
     recenzent = recenzent_floty()

@@ -306,6 +306,47 @@ def test_straznik_wykonawca_nie_zamyka_swojej_karty(tmp_path, monkeypatch):
     assert pl.straznik(tool_name="kanban_complete", args={"task_id": "t_06f3c3fc"}) is None
 
 
+def test_straznik_oddanie_z_dziurami_wraca_do_wykonawcy(tmp_path, monkeypatch):
+    """Strona-wizytówka 26.10: 25× „[TU WPISZ…]” w index.html i sędzia zaakceptował. Oddanie z treścią zastępczą
+    w pliku wyniku wraca do wykonawcy; RAPORT.md (opis pracy), JSON narzędzi i out/strony (cudze teksty) się nie liczą."""
+    monkeypatch.setattr(pl, "recenzent_floty", lambda: "jarvo")
+    ws = tmp_path / "karta"
+    (ws / "out" / "strony").mkdir(parents=True)
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "jarvo-web"))
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "t_dfde9ecf")
+    monkeypatch.setenv("HERMES_KANBAN_WORKSPACE", str(ws))
+    oddanie = {"summary": "Strona gotowa"}
+    (ws / "out" / "index.html").write_text("<h1>Salon Ania</h1><p>Tel. 600 100 200</p>", encoding="utf-8")
+    (ws / "out" / "RAPORT.md").write_text("Sprawdziłem: 0 wystąpień [TU WPISZ.", encoding="utf-8")
+    (ws / "out" / "lighthouse.json").write_text('{"tekst": "lorem ipsum"}', encoding="utf-8")
+    (ws / "out" / "strony" / "1.txt").write_text("Lorem ipsum z cudzej strony", encoding="utf-8")
+    assert pl.straznik(tool_name="kanban_request_review", args=oddanie) == {"action": "modify", "args": {"reviewer": "jarvo"}}
+    (ws / "out" / "index.html").write_text("<h1>[TU WPISZ: imię]</h1>", encoding="utf-8")
+    w = pl.straznik(tool_name="kanban_request_review", args={**oddanie, "reviewer": "jarvo"})
+    assert w["action"] == "block" and "index.html: [TU WPISZ" in w["message"] and "needs_input" in w["message"]
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "jarvo"))       # sędzia nie jest sprawdzany
+    assert pl.straznik(tool_name="kanban_request_review", args=oddanie) is None
+
+
+def test_straznik_sherlock_oddaje_tylko_z_rejestrem_zrodel(tmp_path, monkeypatch):
+    """Pierwsza sesja 26.10: Sherlock oddał konkurencję bez sources.py i zrodla.json (zasada 9 SOUL tylko na papierze)."""
+    monkeypatch.setattr(pl, "recenzent_floty", lambda: "jarvo")
+    ws = tmp_path / "karta"
+    (ws / "out").mkdir(parents=True)
+    (ws / "out" / "konkurencja.md").write_text("3 konkurentów [1][2]", encoding="utf-8")
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "jarvo-sherlock"))
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "t_2d67cf6c")
+    monkeypatch.setenv("HERMES_KANBAN_WORKSPACE", str(ws))
+    w = pl.straznik(tool_name="kanban_request_review", args={"summary": "Konkurencja"})
+    assert w["action"] == "block" and "zrodla.json" in w["message"]
+    (ws / "out" / "zrodla.json").write_text('{"zrodla": []}', encoding="utf-8")
+    assert pl.straznik(tool_name="kanban_request_review", args={"summary": "Konkurencja"})["action"] == "modify"
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "jarvo-web"))   # inni agenci bez rejestru
+    (ws / "out" / "zrodla.json").unlink()
+    assert pl.straznik(tool_name="kanban_request_review", args={"summary": "Audyt"})["action"] == "modify"
+
+
+
 def test_recenzent_floty_z_pliku_wtyczki(tmp_path, monkeypatch):
     sys.path.insert(0, str(REPO / "scripts"))
     import build

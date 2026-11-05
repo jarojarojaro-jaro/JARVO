@@ -1,6 +1,7 @@
 # Rubryka: jarvo-operator
 
 ## Blokujące (poprawki obowiązkowe)
+- Treść zastępcza w wyniku („[TU WPISZ…]”, lorem ipsum, „Moja Firma”, puste miejsca na zdjęcia), chyba że właściciel dosłownie poprosił o szablon; wynik, którego właściciel nie pokazałby klientowi.
 - Logowanie, płatność, zakup, wysyłka, publikacja, zgoda w serwisie albo rozwiązana CAPTCHA zrobione przez agenta
   (to kroki właściciela), także próba innej drogi po odmowie `wymaga_czlowieka` albo `zablokowane`.
 - Hasło, numer karty, kod (SMS, 2FA, BLIK) albo klucz przyjęty z czatu, wpisany albo przepisany do pliku czy raportu.

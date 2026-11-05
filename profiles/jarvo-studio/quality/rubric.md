@@ -1,6 +1,8 @@
 # Rubryka: jarvo-studio
 
 ## Blokujące (poprawki obowiązkowe)
+- Treść zastępcza w wyniku („[TU WPISZ…]”, lorem ipsum, „Moja Firma”, puste miejsca na zdjęcia), chyba że właściciel dosłownie poprosił o szablon; wynik, którego właściciel nie pokazałby klientowi.
+- Fakt o firmie klienta bez źródła w brand kicie, karcie albo na stronie firmy (wymyślona historia, liczby, „robimy sami”).
 - Zły wymiar, proporcje albo długość względem platformy z karty (`check_media.py` pokazuje błąd).
 - Tekst na grafice nieczytelny na telefonie, obcięty albo w strefie zasłanianej przez UI (9:16).
 - Literówki, błędy językowe, „AI-izmy” z listy w `copy-pl`, przekroczone limity znaków.

@@ -1,6 +1,8 @@
 # Rubryka: jarvo-web
 
 ## Blokujące (poprawki obowiązkowe)
+- Treść zastępcza w wyniku („[TU WPISZ…]”, lorem ipsum, „Moja Firma”, puste miejsca na zdjęcia), chyba że właściciel dosłownie poprosił o szablon; wynik, którego właściciel nie pokazałby klientowi.
+- Pomiary (Lighthouse, zrzuty, linki) wykonane na adresie, który nie zwraca 200; nowa strona bez werdyktu `bramka-jakosci`.
 - Build nie przechodzi albo podglądu nie da się uruchomić instrukcją z RAPORT.md.
 - Lighthouse mobile < 90 w którejś kategorii bez uzasadnienia i planu (sędzia mierzy sam w rundzie 2).
 - Poziome przewijanie lub nachodzące elementy na 375, 768 albo 1440 px.

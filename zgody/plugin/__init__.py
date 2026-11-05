@@ -529,7 +529,10 @@ def _miejsca(tryb: str, bez_czl: Optional[str], yolo: bool) -> _Miejsca:
         if m.tryb != "pytaj" and m.folder_k:   # to, co tryb przepuszcza bez pytania, przechodzi też bez człowieka
             m.dozwolone.append(m.folder_k)
     else:
-        m.dozwolone = [k for k in (m.folder_k, m.karta_k) if k]
+        # z człowiekiem: tryb projekt nie pyta też o skarbiec i misje (dziennik Jarva). Bez tego czat w HQ pytał
+        # o każdy MISSION.md i INDEX.md, a odmowa albo brak odpowiedzi gubiły dziennik (26.10: 6 próśb w 96 s).
+        # Tryb pytaj dalej pyta o każdy zapis (sprawdzany przed `korzen` w _ocen_sciezke).
+        m.dozwolone = [k for k in (m.folder_k, m.karta_k, wiedza_k, misje_k) if k]
     konf = _plik_konfigu()
     m.konfig_k = _k_realny(konf) if konf else None
     return m

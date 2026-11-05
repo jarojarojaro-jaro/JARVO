@@ -1,6 +1,7 @@
 # Rubryka: jarvo-wideo
 
 ## Blokujące (poprawki obowiązkowe)
+- Treść zastępcza w wyniku („[TU WPISZ…]”, lorem ipsum, „Moja Firma”, puste miejsca na zdjęcia), chyba że właściciel dosłownie poprosił o szablon; wynik, którego właściciel nie pokazałby klientowi.
 - `qa_wideo.py` zgłasza błąd (kodek/pix_fmt, rozdzielczość albo proporcje niezgodne z formatem, czarny początek, głośność poza −20…−10 LUFS, za długi dla platformy).
 - Brak werdyktu `out/wideo/<film>/kontrola.json` albo wynik < 85 bez nazwanych powodów i decyzji w `decisions_needed`.
 - Hook dłuższy niż 2 s do pierwszej treści (plansza tytułowa, logo, cisza na starcie).

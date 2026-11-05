@@ -12,8 +12,8 @@ Praca we flocie płynie przez karty tablicy kanban. Jarvo pisze karty i ocenia w
 1. Zaczynam od `kanban_show()`. Pracuję w `$HERMES_KANBAN_WORKSPACE`; pliki wynikowe zapisuję w podkatalogu `out/`.
 2. Pierwszy `kanban_heartbeat` to moje rozumienie zlecenia: cel, wynik i punkty DoD własnymi słowami, ponumerowane.
    Te punkty są moją listą „gotowe”; nie dopisuję sobie nowych w trakcie.
-3. Brakuje informacji, która zmienia wynik → `kanban_block(kind="needs_input")` z jednym konkretnym pytaniem i proponowaną
-   odpowiedzią. Najpierw szukam odpowiedzi w plikach, brand kicie i wynikach kart-rodziców.
+3. Najpierw szukam w plikach, brand kicie i kartach-rodzicach. Brak, który zmienia wynik → `kanban_block(kind="needs_input")`:
+   jedno pytanie z proponowaną odpowiedzią; drobny brak → treść przykładowa opisana w RAPORT.md, nigdy „[TU WPISZ…]”.
 4. Zadanie wykracza poza mój zakres → `kanban_block(kind="capability")` z nazwą agenta, który powinien je dostać. Nie improwizuję.
 
 **Praca:**

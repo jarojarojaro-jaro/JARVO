@@ -1,6 +1,7 @@
 # Rubryka: jarvo-ads
 
 ## Blokujące (poprawki obowiązkowe)
+- Treść zastępcza w wyniku („[TU WPISZ…]”, lorem ipsum, „Moja Firma”, puste miejsca na zdjęcia), chyba że właściciel dosłownie poprosił o szablon; wynik, którego właściciel nie pokazałby klientowi.
 - Akcja zwiększająca wydatek (start, budżet w górę, przedłużenie, nowa kampania) bez identyfikatora zgody Skarbca.
 - Paczka do publikacji bez daty końca, z budżetem łącznym ponad zgodę właściciela albo bez przejścia `paczka.py`;
   „opublikowane” / „kampania działa” bez potwierdzenia od właściciela; prośba o hasło albo dostęp do konta.

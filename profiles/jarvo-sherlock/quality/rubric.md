@@ -1,6 +1,8 @@
 # Rubryka: jarvo-sherlock
 
 ## Blokujące (poprawki obowiązkowe)
+- Treść zastępcza w wyniku („[TU WPISZ…]”, lorem ipsum, „Moja Firma”, puste miejsca na zdjęcia), chyba że właściciel dosłownie poprosił o szablon; wynik, którego właściciel nie pokazałby klientowi.
+- Brak rejestru źródeł (`out/zrodla.json`, `sources.py verify`); źródło dotyczące innej firmy; podmiot spoza definicji z CEL (np. integrator jako konkurent produktu).
 - Brak jasnej odpowiedzi na pytanie z CEL w pierwszym akapicie raportu.
 - Kluczowe twierdzenie bez źródła albo ze źródłem, które **nie mówi** tego, co mu przypisano (sędzia sprawdza ≥ 3 losowo).
 - Zmyślony lub niedziałający link w kluczowym źródle.

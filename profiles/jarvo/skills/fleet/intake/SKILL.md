@@ -1,7 +1,7 @@
 ---
 name: intake
 description: "Każda nowa wiadomość: sklasyfikuj i wybierz ścieżkę."
-version: 1.1.0
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-10-02"
+    reviewed: "2026-10-30"
 ---
 
 # Intake: przyjęcie zlecenia
@@ -66,6 +66,21 @@ termin, budżet, platforma). Zasady:
 - jeśli domyślne odpowiedzi są rozsądne, powiedz „ruszam z domyślnymi, chyba że zmienisz” i **ruszaj**,
 - nigdy nie pytaj o rzeczy, które agent ustali sam (np. framework strony, kolejność kroków researchu).
 
+**„Działaj” albo „zrób jak uważasz”, a faktów brakuje** (np. nie wiesz, czym zajmuje się firma, dla której ma powstać
+strona). Wynik ma się nadawać do pokazania, nie być szkieletem:
+- najpierw szukasz faktów sam: `USER.md`, skarbiec, strona i konta firmy, wcześniejsze rozmowy i misje;
+- brakuje faktu, bez którego wynik nie ma sensu (branża, nazwa) → **jedno** pytanie z gotową odpowiedzią domyślną
+  („Czym się zajmuje i jak się nazywa? Jeśli nie odpiszesz, zrobię przykładową wersję dla salonu kosmetycznego.”);
+- właściciel nie chce pytań → zlecasz **pełną wersję z wiarygodną treścią przykładową** (realistyczne nazwy, oferta,
+  ceny), oznaczoną raz w raporcie jako przykład do podmiany. **Nigdy** nie zamawiasz szkieletu z treścią zastępczą
+  („[TU WPISZ…]”): strażnik i sędzia go odrzucą, a właściciel dostałby pustą stronę;
+- „nie wymyślaj” dotyczy faktów podawanych jako prawdziwe (dane kontaktowe, opinie, nagrody, liczby); treść
+  przykładowa jawnie oznaczona jako przykład to nie kłamstwo.
+
+**Kontynuacja po rozmowie z agentem:** gdy właściciel pisał wcześniej wprost do agenta (`@web` itp.), a teraz do
+Ciebie („działaj”), w KONTEKŚCIE karty przepisujesz pytania agenta i to, co właściciel już odpowiedział. Nowa karta
+nie może zaczynać od zera.
+
 ## Krok 4. Ustal granice
 
 Zapisz (w misji albo w karcie):
@@ -81,3 +96,4 @@ Bez listy kart, bez identyfikatorów.
 - Zakładanie misji dla prostego pytania → odpowiedz sam.
 - Dopytywanie o wszystko → rusz z domyślnymi i je nazwij.
 - Poszerzanie zakresu („przy okazji zrobię też…”) → do sekcji *Propozycje na później*.
+- Zamówienie szkieletu z „[TU WPISZ…]”, bo brakuje faktów → pełna wersja z treścią przykładową albo jedno pytanie.

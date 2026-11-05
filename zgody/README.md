@@ -12,7 +12,7 @@ Wtyczka Hermesa (`plugin/`: `__init__.py`, `plugin.yaml`) ma hak `pre_tool_call`
 | Tryb | Co robi hak |
 |---|---|
 | **pytaj** | pyta o `write_file`, `patch` (także łatki V4A), `execute_code`, `process_manage` i `cronjob_manage` (działania zmieniające) oraz o terminal spoza listy poleceń tylko do odczytu |
-| **projekt** (domyślny) | jak pytaj, ale bez pytania zapisy i proste polecenia plikowe (`mkdir`, `touch`, `cp`, `mv`, `rm`, `rmdir`, `sed -i`, `tee`, `>` i `>>`), gdy rzeczywista ścieżka leży w folderze projektu albo w katalogu roboczym karty |
+| **projekt** (domyślny) | jak pytaj, ale bez pytania zapisy i proste polecenia plikowe (`mkdir`, `touch`, `cp`, `mv`, `rm`, `rmdir`, `sed -i`, `tee`, `>` i `>>`), gdy rzeczywista ścieżka leży w folderze projektu, w katalogu roboczym karty, w skarbcu (`JARVO_KNOWLEDGE_DIR`) albo w misjach (`JARVO_MISSIONS_DIR`, dziennik Jarva) |
 | **pełny** | tylko na sesję: `jarvo chat --tryb pelny` (czyli `--yolo`) albo `/yolo`; Hermes zatwierdza prośby sam; wtyczka nigdy nie włącza go sama i blokuje go w `jarvo-operator` |
 
 Zawsze, w każdym trybie:
