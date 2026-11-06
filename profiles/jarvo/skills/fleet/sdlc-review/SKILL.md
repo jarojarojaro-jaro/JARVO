@@ -1,7 +1,7 @@
 ---
 name: sdlc-review
 description: "Sędzia: niezależna ocena karty z toru review wobec DoD."
-version: 2.6.0
+version: 2.7.0
 author: "Jarvo (na bazie Hermes Agent sdlc-review: Jakub Wolniewicz + Hermes Agent, MIT)"
 license: MIT
 platforms: [linux, macos, windows]
@@ -62,8 +62,11 @@ Obowiązki bazowe z kroku 4 i test wartości z kroku 4c obowiązują w każdej r
 - zbuduj/uruchom podgląd zgodnie z RAPORT.md wykonawcy, sprawdź, że adres zwraca 200 (`curl -sI`; strona 404 albo
   `{"error": "not found"}` = wszystkie pomiary na niej są nieważne), potem `lighthouse <url>` (mobile, domyślnie)
   i `lighthouse <url> --preset=desktop` (albo odczytaj załączone raporty i sprawdź, czy są dla tej samej wersji),
-- **pełne** zrzuty (`--full`) na 375 i 1440 px obejrzane narzędziem vision: przewijanie w poziomie, nachodzące
-  elementy, widoczne napisy techniczne („Przejdź do treści”, nagłówki pomocnicze), puste kafle, symbole zamiast ikon,
+- **pełne** zrzuty (`--full`) na 375 i 1440 px obejrzane narzędziem vision **kawałkami**: cały długi zrzut model widzi
+  pomniejszony i nieostry, więc oglądaj go z `region` = [0, y, szerokość, y + 1800] (1440) albo [0, y, 375, y + 1600]
+  (375), od góry do dołu bez przerw, wszystkie kawałki w jednej turze (idą równolegle). Szukasz: przewijania
+  w poziomie, nachodzących elementów, widocznych napisów technicznych („Przejdź do treści”, nagłówki pomocnicze),
+  pustych kafli, symboli zamiast ikon,
 - nowa strona albo landing: werdykt `bramka-jakosci` (≥ 90) w wyniku albo uruchomiony przez Ciebie; bez niego nie ma
   akceptacji. Wygląd jak szablon (krem + szeryf + identyczne karty, ogólne hasła, zero zdjęć i treści firmy) blokuje,
 - favicony/manifest/OG: czy pliki istnieją i są podpięte w `<head>` (canonical i og:url to prawdziwe adresy),
