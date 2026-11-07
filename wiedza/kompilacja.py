@@ -8,7 +8,9 @@ do istniejących ścieżek), dopisuje LOG.md, przenosi szkic do `skrzynka/zrobio
 git. Całość pod blokadą (wiedza.Blokada: blokada systemu na `state/wiedza.zamek` i znacznik `state/wiedza.lock`, ten sam,
 który stawia zasiew przy wdrożeniu). Przed przebiegiem i po nim lint (docs/WIEDZA.md §6, NATYWNIE K02): LINT.md
 i state/wiedza-lint.json pokazują stan po kompilacji, a raport przebiegu ma liczby z obu. Limity na przebieg: 40 szkiców,
-60 dotkniętych notatek.
+60 dotkniętych notatek. Błąd samego wywołania modelu (czas, dostawca, sieć) przerywa przebieg: ten szkic dostaje próbę,
+dalsze czekają bez zmiany licznika (Hermes po przekroczeniu czasu wyłącza dostawcę na 10 min, więc reszta partii padłaby
+od razu i po trzech takich przebiegach wypadła do `zrobione/`); zła odpowiedź na jeden szkic (bez JSON) liczy się tylko jemu.
 
 Uruchomienie: wątek wtyczki jarvo-wiedza (co godzinę przy szkicach, co noc, także nadrabiane po uśpieniu), przycisk
 w zakładce Wiedza i `jarvo wiedza kompiluj` (jarvo/wiedza_cli.py) wołają ten plik Pythonem z venvu Hermesa, bez basha
@@ -104,6 +106,7 @@ class Kompilacja:
         self.raport: Dict[str, Any] = {"szkice": 0, "nowe": 0, "aktualizacje": 0, "sprzeczne": 0, "odrzucone": 0, "bledy": 0,
                                        "notatki": [], "pominiete": 0, "zablokowana": False, "git": False, "na_sucho": self.na_sucho}
         self._dotkniete = 0
+        self._awaria = ""                       # błąd wywołania modelu w tym przebiegu: koniec przebiegu, reszta czeka
         self._agenci = self._wczytaj_agentow()
 
     # ---- pomocnicze
@@ -177,6 +180,7 @@ class Kompilacja:
                 odp = self.model(SYSTEM, user if proba == 0 else user + "\n\nOdpowiedz wyłącznie poprawnym JSON według schematu.")
             except Exception as e:
                 self.raport.setdefault("bledy_opis", []).append(f"{szkic['plik']}: model: {e}")
+                self._awaria = (f"{type(e).__name__}: {e}" if str(e) else type(e).__name__)[:200]
                 return None
             d = _json_z_odpowiedzi(odp or "")
             if d is not None:
@@ -371,7 +375,8 @@ class Kompilacja:
             ix.odswiez()
             if not self.na_sucho:
                 self.raport["lint_przed"] = self._lint(ix)      # docs/WIEDZA.md §6: lint przed każdą kompilacją
-            for p in szkice[:self.limit_szkicow]:
+            do_zrobienia = szkice[:self.limit_szkicow]
+            for i, p in enumerate(do_zrobienia):
                 if self._dotkniete >= self.limit_notatek:
                     self.raport["pominiete"] += 1
                     continue
@@ -395,6 +400,13 @@ class Kompilacja:
                     else:
                         self._oznacz_probe(p, szkic)
                         wpisy.append(f"{p.name}: błąd modelu (próba {szkic['proby'] + 1}), szkic czeka")
+                    if self._awaria:            # wywołanie padło (czas, dostawca, sieć), nie odpowiedź na ten szkic
+                        reszta = len(do_zrobienia) - i - 1
+                        self.raport["pominiete"] += reszta
+                        self.raport["przerwana"] = self._awaria
+                        wpisy.append(f"przebieg przerwany po błędzie wywołania modelu ({self._awaria}); "
+                                     f"{reszta} szkiców czeka bez zmiany licznika prób")
+                        break
                     continue
                 opisy = []
                 for w in wyniki:

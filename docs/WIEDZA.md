@@ -239,7 +239,11 @@ z dziesięciu profili kompilował jeden); ręcznie: przycisk w zakładce Wiedza 
 Cała partia to jedna transakcja: blokada `state/wiedza.lock`, zapis do plików `.tmp` → rename, na końcu `git add -A && git commit`
 w skarbcu (punkt zapisu; `wiedza.py cofnij` przywraca poprzedni; automatyczne porządki gita po commicie biegną od razu,
 nie w odłączonym procesie, więc po poleceniu nic nie zmienia skarbca w tle). Limity na przebieg: 40 szkiców, 60 notatek dotkniętych,
-1 model; reszta czeka na następny przebieg. Wynik przebiegu widać w LOG i w zakładce.
+1 model; reszta czeka na następny przebieg. Błąd samego wywołania modelu (przekroczony czas, niedostępny dostawca, sieć)
+kończy przebieg: ten szkic dostaje próbę, dalsze czekają bez zmiany licznika (Hermes po przekroczeniu czasu wyłącza dostawcę
+na 10 min, więc reszta partii padałaby od razu i po trzech przebiegach wypadała do `zrobione/`); szkic z oznaczoną próbą idzie
+na koniec kolejki. Zadanie `auxiliary.jarvo_wiedza` ma limit czasu 180 s (kompilacja szkicu na deepseek-v4.1-flash trwa
+ok. 20–25 s, a domyślne 30 s Hermesa było na granicy; pomiar 2026-11-07). Wynik przebiegu widać w LOG i w zakładce.
 
 **Lint** (`wiedza.py lint`, 0 tokenów, co tydzień w niedzielę przed przeglądem tygodnia i przed każdą kompilacją):
 martwe linki, sieroty (bez linku przychodzącego), brak obowiązkowych kluczy frontmatteru, notatka bez `zrodlo`, duplikaty
@@ -469,7 +473,7 @@ Wpisy do [SOURCES.md](SOURCES.md) i [TOOLBOX.md](TOOLBOX.md) dojdą z etapem, w 
 | `scripts/install-fleet.sh` (krok „Skarbiec wiedzy”) | `zasiej` przy każdym wdrożeniu |
 | `tests/test_wiedza.py` | testy skarbca |
 | `wiedza/plugin/plugin.yaml`, `wiedza/plugin/__init__.py` | wtyczka `jarvo-wiedza`: dostawca pamięci (`SkarbiecProvider`), hak kanbana (`karta_zamknieta`), zadanie pomocnicze `jarvo_wiedza` |
-| `scripts/build.py` → `build/plugins/jarvo-wiedza/` i `config.yaml` profili | kopia wtyczki z `wiedza.py`; `memory.provider`, `plugins.enabled`, `auxiliary.jarvo_wiedza.model` w każdym profilu |
+| `scripts/build.py` → `build/plugins/jarvo-wiedza/` i `config.yaml` profili | kopia wtyczki z `wiedza.py`; `memory.provider`, `plugins.enabled`, `auxiliary.jarvo_wiedza.model` i `.timeout` (180 s) w każdym profilu |
 | `scripts/install-fleet.sh` (krok „Wtyczka jarvo-wiedza”) | kopia do `<dane>/plugins/jarvo-wiedza`, dowiązanie w `<dane>/profiles/<agent>/plugins/` |
 | `tests/test_wiedza_plugin.py` | testy wtyczki na stubie `agent.memory_provider` |
 | `wiedza/kompilacja.py` | kompilacja (jeden piszący): szkice → notatki głównym modelem, LOG, INDEX, punkt zapisu; CLI z `--na-sucho` |

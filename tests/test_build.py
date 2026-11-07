@@ -221,6 +221,7 @@ def test_wiedza_plugin_wiring(built, tmp_path):
         assert cfg["memory"]["provider"] == "jarvo-wiedza", agent.name
         assert "jarvo-wiedza" in cfg["plugins"]["enabled"], agent.name
         assert cfg["auxiliary"]["jarvo_wiedza"]["model"] == fleet.model_for("frontier"), agent.name
+        assert cfg["auxiliary"]["jarvo_wiedza"]["timeout"] > 30, agent.name     # 30 s Hermesa nie starcza na kompilację
         # głos floty: Matcha przez jarvo-tts z profiles/_host/config.yaml (nie Edge)
         assert cfg["tts"]["provider"] == "matcha", agent.name
         assert cfg["tts"]["providers"]["matcha"]["command"].startswith("/opt/jarvo/bin/jarvo-tts --plik {input_path}"), agent.name

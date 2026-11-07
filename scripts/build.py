@@ -658,6 +658,9 @@ def render_roster_skill(fleet: fl.Fleet) -> str:
 WIEDZA_PLUGIN = "jarvo-wiedza"
 KOMPUTER_PLUGIN = "jarvo-komputer"     # narzędzie `komputer` (komputer/plugin) dla agentów z `komputer: true`
 ZGODY_PLUGIN = "jarvo-zgody"           # tryby zgód pytaj/projekt/pełny (zgody/plugin), tylko w układzie natywnym
+# czas zadania jarvo_wiedza (s): kompilacja jednego szkicu na deepseek-v4.1-flash trwa ok. 20–25 s, wyciąg z długiej
+# rozmowy dłużej; domyślne 30 s Hermesa po przekroczeniu wyłącza dostawcę na 10 min (pomiar 2026-11-07)
+CZAS_ZADANIA_WIEDZY = 180
 
 
 def glos_floty() -> dict | None:
@@ -1101,7 +1104,7 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         wlaczone = list(wtyczki.get("enabled") or [])
         wtyczki["enabled"] = wlaczone + [w for w in [WIEDZA_PLUGIN] + ([KOMPUTER_PLUGIN] if agent.komputer else [])
                                          + ([ZGODY_PLUGIN] if u.natywny else []) if w not in wlaczone]
-        cfg.setdefault("auxiliary", {})["jarvo_wiedza"] = {"model": fleet.model_for("frontier")}
+        cfg.setdefault("auxiliary", {})["jarvo_wiedza"] = {"model": fleet.model_for("frontier"), "timeout": CZAS_ZADANIA_WIEDZY}
         naglowek = "# Wygenerowane przez scripts/build.py (tokeny, wspólne zakazy floty, skarbiec wiedzy, głos floty)."
         if u.natywny:
             ustaw_natywnie(cfg, fleet, u, czat=agent.name == fleet.orchestrator)

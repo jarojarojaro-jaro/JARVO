@@ -155,6 +155,29 @@ def test_zly_json_ponowienie_licznik_prob_i_odrzucenie_sekretu(sk):
     assert r["szkice"] == 0
 
 
+def test_blad_wywolania_modelu_przerywa_przebieg_a_zly_json_nie(sk):
+    """Na żywo (2026-11-07): przekroczony czas pierwszego wywołania wyłączył dostawcę w Hermesie na 10 min i 40 szkiców
+    straciło po próbie. Błąd samego wywołania kończy przebieg: tylko ten szkic dostaje próbę, reszta czeka nietknięta."""
+    rels = [szkic(sk, "fakt", f"Fakt {i}", f"Treść faktu numer {i}.") for i in range(3)]
+    wolania = []
+
+    def padniety(system, user):
+        wolania.append(user)
+        raise TimeoutError("request timed out after 30.0s")
+    r = k.Kompilacja(sk, padniety).uruchom()
+    assert len(wolania) == 1 and r["bledy"] == 1 and r["pominiete"] == 2 and "TimeoutError" in r["przerwana"]
+    proby = [w.podziel((sk.root / f"{rel}.md").read_text(encoding="utf-8"))[0].get("proby") for rel in rels]
+    assert [None if x is None else int(x) for x in proby] == [1, None, None]
+    assert "przebieg przerwany po błędzie wywołania modelu" in (sk.root / "LOG.md").read_text(encoding="utf-8")
+    odp = {"wyniki": [{"decyzja": "nowa", "sciezka": "pojecia/fakt 2", "typ": "fakt", "tytul": "Fakt 2", "streszczenie": "s",
+                       "tresc": "t", "tagi": [], "linki": [], "wazne_do": None, "powod": "p"}]}
+    r = k.Kompilacja(sk, model_z(["bez json", "nadal bez", odp]), limit_szkicow=2).uruchom()
+    assert "przerwana" not in r and r["bledy"] == 1 and r["nowe"] == 1          # zła odpowiedź dla jednego szkicu nie zatrzymuje
+    # szkic z oznaczoną próbą dostaje nowy mtime i idzie na koniec kolejki: teraz najpierw Fakt 1 (bez JSON), potem Fakt 2
+    assert int(w.podziel((sk.root / f"{rels[1]}.md").read_text(encoding="utf-8"))[0]["proby"]) == 1
+    assert not (sk.root / f"{rels[2]}.md").exists() and (sk.root / "pojecia/fakt 2.md").exists()
+
+
 def _proces_spiacy():
     """Żywy proces innego właściciela (jak install_fleet.py w trakcie zasiewu): jego PID trafia do znacznika."""
     return subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"], stdin=subprocess.DEVNULL)
