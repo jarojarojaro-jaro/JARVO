@@ -39,15 +39,18 @@ _HERE = Path(__file__).resolve().parent
 SCHEMAT_DLA = {"jarvo"}
 NAZWA = "jarvo-wiedza"
 ZADANIE_AUX = "jarvo_wiedza"          # auxiliary.jarvo_wiedza.model = poziom frontier (scripts/build.py)
-MIN_TUR = 4                           # wyciąg dopiero, gdy użytkownik napisał tyle razy
-CISZA_S = 30 * 60                     # wyciąg po tylu sekundach ciszy w sesji
+MIN_TUR = 2                           # wyciąg, gdy użytkownik napisał tyle razy (nowych wiadomości)…
+MIN_ZNAKOW_TURY = 300                 # …albo choć raz tyle znaków (jedno konkretne zlecenie, pytanie z danymi)
+CISZA_S = 10 * 60                     # wyciąg po tylu sekundach ciszy w sesji
 MAX_ZNAKOW_ROZMOWY = 24_000
 MAX_PRZYPOMNIENIA = 2_200
 MAX_ORZECZEN = 20
 LIMIT_NOTATEK = 5
 DZIENNIK_PRZYPOMNIEN = "wiedza-przypomnienia.jsonl"   # w state/: co agent dostał ze skarbca przed turą (do sprawdzenia w zakładce i w pliku)
 DZIENNIK_MAX_B = 5_000_000
-KOMPILACJA_CO_S = 3600                # kompilacja najwyżej raz na godzinę, gdy są szkice; do tego co noc (KOMPILACJA_NOC)
+SZKIC_SPOKOJ_S = 5 * 60               # kompilacja, gdy najnowszy szkic ma tyle (seria szkiców z jednej rozmowy idzie razem)…
+SZKIC_NAJSTARSZY_S = 15 * 60          # …albo najstarszy tyle (ciągły dopływ szkiców nie odkłada kompilacji w nieskończoność)
+KOMPILACJA_PO_AWARII_S = 15 * 60      # po przebiegu przerwanym błędem wywołania modelu (Hermes wyłącza dostawcę na 10 min)
 KOMPILACJA_NOC = (3, 10)              # godzina, minuta: nocny przebieg (czas lokalny komputera, w kontenerze jego strefa);
                                       # komputer uśpiony o tej porze nadrabia przebieg raz, po wybudzeniu
 TYPY_SZKICU = ["fakt", "decyzja", "lekcja", "podmiot", "pojecie", "projekt"]
@@ -186,9 +189,15 @@ def model_kompilacji(system: str, user: str) -> str:
     return wywolaj_model(system, user, max_tokens=2000)
 
 
-def _zapis_rozmowy(messages: List[Dict[str, Any]], od_tury: int = 0) -> tuple[str, int]:
-    """Czytelny zapis (UŻYTKOWNIK / AGENT / NARZĘDZIE) od `od_tury`-tej wypowiedzi użytkownika; (tekst, liczba tur użytkownika)."""
-    linie, tury = [], 0
+def _dosc_tresci(teksty: List[str]) -> bool:
+    """Nowe wiadomości użytkownika warte wyciągu: co najmniej MIN_TUR albo jedna od MIN_ZNAKOW_TURY znaków."""
+    return len(teksty) >= MIN_TUR or any(len(t.strip()) >= MIN_ZNAKOW_TURY for t in teksty)
+
+
+def _zapis_rozmowy(messages: List[Dict[str, Any]], od_tury: int = 0) -> tuple[str, int, List[str]]:
+    """Czytelny zapis (UŻYTKOWNIK / AGENT / NARZĘDZIE) od `od_tury`-tej wypowiedzi użytkownika; (tekst, liczba tur
+    użytkownika, nowe wiadomości użytkownika)."""
+    linie, tury, nowe = [], 0, []
     for m in messages or []:
         rola, tresc = m.get("role"), m.get("content")
         if isinstance(tresc, list):   # bloki multimodalne
@@ -198,6 +207,7 @@ def _zapis_rozmowy(messages: List[Dict[str, Any]], od_tury: int = 0) -> tuple[st
             tury += 1
             if tury <= od_tury or not tresc:
                 continue
+            nowe.append(tresc)
             linie.append(f"UŻYTKOWNIK: {tresc[:4000]}")
         elif tury <= od_tury:
             continue
@@ -212,7 +222,7 @@ def _zapis_rozmowy(messages: List[Dict[str, Any]], od_tury: int = 0) -> tuple[st
     zapis = "\n".join(linie)
     if len(zapis) > MAX_ZNAKOW_ROZMOWY:
         zapis = "[…początek pominięty…]\n" + zapis[-MAX_ZNAKOW_ROZMOWY:]
-    return zapis, tury
+    return zapis, tury, nowe
 
 
 def _tytul_z_wyciagu(wyciag: str, domyslny: str) -> tuple[str, str]:
@@ -593,20 +603,16 @@ class SkarbiecProvider(MemoryProvider):
         return f"Ustalenia z tej części rozmowy zapisano w skarbcu wiedzy: {n['zrodlo']}\n{n['wyciag'][:1500]}"
 
     def _petla_ciszy(self) -> None:
-        """Co minutę: sesja bez nowej tury przez CISZA_S i z ≥ MIN_TUR nowymi turami → wyciąg (człowiek nie musi pisać /new);
-        do tego kompilacja skrzynki, gdy pora (raz na godzinę przy szkicach albo nocny przebieg). Blokada w state/ pilnuje,
-        żeby z dziesięciu profili gatewaya kompilował jeden."""
+        """Co minutę: sesja bez nowej tury przez CISZA_S z nowymi wiadomościami wartymi wyciągu (_dosc_tresci) → wyciąg
+        (człowiek nie musi pisać /new); do tego kompilacja skrzynki, gdy pora (_moze_kompilowac). Blokada w state/
+        pilnuje, żeby z dziesięciu profili gatewaya kompilował jeden."""
         while not self._stop.wait(60):
             try:
                 self._moze_kompilowac() and self.kompiluj("harmonogram")
             except Exception as e:
                 logger.debug("jarvo-wiedza: harmonogram kompilacji: %s", e)
             try:
-                teraz = time.time()
-                with self._lock:
-                    kandydaci = [(sid, dict(b)) for sid, b in self._bufor.items()
-                                 if b["tury"] and teraz - b["ts"] >= CISZA_S and len(b["tury"]) - b["wyciagnieto"] >= MIN_TUR]
-                for sid, b in kandydaci:
+                for sid, b in self._sesje_po_ciszy():
                     msgs = []
                     for u, a in b["tury"]:
                         msgs += [{"role": "user", "content": u}, {"role": "assistant", "content": a}]
@@ -617,24 +623,39 @@ class SkarbiecProvider(MemoryProvider):
             except Exception as e:
                 logger.debug("jarvo-wiedza: pętla ciszy: %s", e)
 
+    def _sesje_po_ciszy(self, teraz: Optional[float] = None) -> List[tuple]:
+        """Sesje bez nowej tury od CISZA_S z niewyciągniętymi wiadomościami wartymi wyciągu: [(sesja, kopia bufora)]."""
+        teraz = time.time() if teraz is None else teraz
+        with self._lock:
+            return [(sid, dict(b)) for sid, b in self._bufor.items()
+                    if b["tury"] and teraz - b["ts"] >= CISZA_S and _dosc_tresci([u for u, _a in b["tury"][b["wyciagnieto"]:]])]
+
     # ---- kompilacja (jeden piszący)
-    def _ostatnia_kompilacja(self) -> float:
+    def _stan_kompilacji(self) -> tuple[float, bool]:
+        """(czas ostatniej kompilacji, czy przerwał ją błąd wywołania modelu) z state/wiedza-kompilacja.json."""
         try:
-            return float(json.loads((self._stan / "wiedza-kompilacja.json").read_text(encoding="utf-8")).get("ostatnia") or 0)
-        except (OSError, ValueError, TypeError):
-            return 0.0
+            d = json.loads((self._stan / "wiedza-kompilacja.json").read_text(encoding="utf-8"))
+            return float(d.get("ostatnia") or 0), bool((d.get("raport") or {}).get("przerwana"))
+        except (OSError, ValueError, TypeError, AttributeError):
+            return 0.0, False
 
     def _moze_kompilowac(self, teraz: Optional[float] = None) -> bool:
-        """Szkice w skrzynce i: godzina od poprzedniej kompilacji albo nocny przebieg, którego jeszcze nie było (ostatnia
-        kompilacja przed ostatnią porą KOMPILACJA_NOC). Komputer uśpiony o 03:10 nadrabia go raz po wybudzeniu, zamiast
-        czekać do następnej nocy (docs/NATYWNIE.md K03)."""
+        """Szkice w skrzynce i: najnowszy ma ≥ SZKIC_SPOKOJ_S (seria z jednej rozmowy już się skończyła) albo najstarszy
+        ≥ SZKIC_NAJSTARSZY_S, albo nocny przebieg, którego jeszcze nie było (ostatnia kompilacja przed ostatnią porą
+        KOMPILACJA_NOC; komputer uśpiony o 03:10 nadrabia go raz po wybudzeniu, docs/NATYWNIE.md K03). Po przebiegu
+        przerwanym błędem wywołania modelu czeka KOMPILACJA_PO_AWARII_S. Bez szkiców nigdy (0 wywołań modelu)."""
         if self._kontekst != "primary" or not self._skarbiec or not (self._skarbiec / "skrzynka").is_dir():
             return False
-        if not any((self._skarbiec / "skrzynka").glob("*.md")):
+        czasy = [p.stat().st_mtime for p in (self._skarbiec / "skrzynka").glob("*.md") if p.is_file()]
+        if not czasy:
             return False
         teraz = time.time() if teraz is None else teraz
-        ostatnia = self._ostatnia_kompilacja()
-        return teraz - ostatnia >= KOMPILACJA_CO_S or ostatnia < ostatnia_noc(teraz)
+        ostatnia, przerwana = self._stan_kompilacji()
+        if ostatnia < ostatnia_noc(teraz):
+            return True
+        if przerwana and teraz - ostatnia < KOMPILACJA_PO_AWARII_S:
+            return False
+        return teraz - max(czasy) >= SZKIC_SPOKOJ_S or teraz - min(czasy) >= SZKIC_NAJSTARSZY_S
 
     def kompiluj(self, powod: str = "ręcznie") -> Dict[str, Any]:
         """Przebieg kompilacji skrzynki głównym modelem (wiedza/kompilacja.py); zwraca raport."""
@@ -655,8 +676,8 @@ class SkarbiecProvider(MemoryProvider):
         sk = self._sk()
         if sk is None:
             return None
-        zapis, tury = _zapis_rozmowy(messages, od_tury)
-        if tury - od_tury < MIN_TUR or len(zapis) < 200:
+        zapis, tury, nowe = _zapis_rozmowy(messages, od_tury)
+        if not _dosc_tresci(nowe) or len(zapis) < 200:
             return None
         lib = _lib()
         try:

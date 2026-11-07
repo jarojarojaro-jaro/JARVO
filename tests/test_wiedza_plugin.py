@@ -2,6 +2,7 @@
 przypomnienia, narzędzia, strażnik orzeczeń, lustro pamięci, wyciągi (model podstawiony), hak kanbana."""
 import importlib.util
 import json
+import os
 import sqlite3
 import sys
 import time
@@ -439,7 +440,7 @@ def test_ostatnia_pora_nocnego_przebiegu():
 
 def test_nocny_przebieg_nadrabiany_po_uspieniu(srodowisko):
     """Laptop uśpiony o 03:10: nocny przebieg nie przepada do następnej nocy, tylko rusza raz po wybudzeniu; potem
-    obowiązuje zwykły rytm (najwyżej raz na godzinę przy szkicach). Bez szkiców nic nie rusza."""
+    obowiązuje zwykły rytm (szkice odstane, test_harmonogram_kompilacji_po_szkicach). Bez szkiców nic nie rusza."""
     root, home, sk, p = srodowisko
     stan = root / "jarvo" / "state" / "wiedza-kompilacja.json"
 
@@ -447,15 +448,65 @@ def test_nocny_przebieg_nadrabiany_po_uspieniu(srodowisko):
         stan.write_text(json.dumps({"ostatnia": t}), encoding="utf-8")
     ostatnia(_chwila("2026-10-20 02:50"))
     assert not p._moze_kompilowac(_chwila("2026-10-20 07:30"))           # skrzynka pusta
-    w.zapisz_szkic(sk, "fakt", "Nocny fakt", "Treść.", "karta t_5", "jarvo-web")
-    assert p._moze_kompilowac(_chwila("2026-10-20 03:05")) is False       # 15 min od poprzedniej, przed porą nocną
+    rel = w.zapisz_szkic(sk, "fakt", "Nocny fakt", "Treść.", "karta t_5", "jarvo-web")
+    os.utime(sk.plik(rel), (_chwila("2026-10-20 03:02"),) * 2)
+    assert p._moze_kompilowac(_chwila("2026-10-20 03:05")) is False       # szkic świeży, przed porą nocną
     assert p._moze_kompilowac(_chwila("2026-10-20 03:11"))                # pora nocna (dawniej tylko okno 10 min)
     assert p._moze_kompilowac(_chwila("2026-10-20 07:30"))                # po wybudzeniu: nadrabia
-    ostatnia(_chwila("2026-10-20 07:31"))                                # po nadrobieniu: zwykły rytm
-    assert not p._moze_kompilowac(_chwila("2026-10-20 08:00"))
-    assert p._moze_kompilowac(_chwila("2026-10-20 08:32"))               # godzina od poprzedniej
+    ostatnia(_chwila("2026-10-20 07:31"))
+    os.utime(sk.plik(rel), (_chwila("2026-10-20 07:58"),) * 2)
+    assert not p._moze_kompilowac(_chwila("2026-10-20 08:00"))           # po nadrobieniu: zwykły rytm
     p._kontekst = "subagent"
     assert not p._moze_kompilowac(_chwila("2026-10-20 08:32"))           # tylko kontekst główny (jedna kompilacja)
+
+
+def test_harmonogram_kompilacji_po_szkicach(srodowisko):
+    """Kompilacja rusza, gdy najnowszy szkic ma ≥ 5 min (seria z rozmowy skończona) albo najstarszy ≥ 15 min (ciągły
+    dopływ), a nie najwyżej raz na godzinę; po przebiegu przerwanym błędem modelu czeka 15 min; bez szkiców nigdy."""
+    root, home, sk, p = srodowisko
+    stan = root / "jarvo" / "state" / "wiedza-kompilacja.json"
+    t0 = _chwila("2026-10-20 10:00")
+    stan.write_text(json.dumps({"ostatnia": t0}), encoding="utf-8")
+    assert not p._moze_kompilowac(t0 + 3600)                                # pusta skrzynka: 0 wywołań modelu
+    a = sk.plik(w.zapisz_szkic(sk, "fakt", "Fakt A", "Treść.", "karta t_1", "jarvo-web"))
+    os.utime(a, (t0 + 60,) * 2)
+    assert not p._moze_kompilowac(t0 + 60 + pl.SZKIC_SPOKOJ_S - 1)         # szkic świeży: może dojść następny
+    assert p._moze_kompilowac(t0 + 60 + pl.SZKIC_SPOKOJ_S)                  # 5 min spokoju
+    b = sk.plik(w.zapisz_szkic(sk, "fakt", "Fakt B", "Treść.", "karta t_2", "jarvo-web"))
+    for minuta in range(1, 15):                                            # szkic co minutę: najnowszy zawsze świeży
+        os.utime(b, (t0 + 60 + minuta * 60,) * 2)
+        assert not p._moze_kompilowac(t0 + 60 + minuta * 60 + 30)
+    assert p._moze_kompilowac(t0 + 60 + pl.SZKIC_NAJSTARSZY_S)              # najstarszy 15 min: kompilujemy mimo dopływu
+    stan.write_text(json.dumps({"ostatnia": t0 + 1200, "raport": {"przerwana": "TimeoutError"}}), encoding="utf-8")
+    assert not p._moze_kompilowac(t0 + 1200 + pl.KOMPILACJA_PO_AWARII_S - 1)  # dostawca wyłączony: nie palimy prób
+    assert p._moze_kompilowac(t0 + 1200 + pl.KOMPILACJA_PO_AWARII_S)
+
+
+def test_progi_wyciagu(srodowisko, monkeypatch):
+    """Wyciąg po 10 min ciszy, także z krótkiej sesji: od 2 wiadomości użytkownika albo z jednej od 300 znaków;
+    jedno krótkie pytanie nie kosztuje wywołania modelu."""
+    root, home, sk, p = srodowisko
+    assert pl.CISZA_S == 600 and pl.MIN_TUR == 2 and pl.MIN_ZNAKOW_TURY == 300
+    assert not pl._dosc_tresci(["gdzie jest kod strony?"]) and pl._dosc_tresci(["a", "b"]) and pl._dosc_tresci(["x" * 300])
+    wywolania = []
+    monkeypatch.setattr(pl.SkarbiecProvider, "_model", staticmethod(
+        lambda s, u, max_tokens=1200: wywolania.append(u) or "## Fakty\n- kod strony enigmalabz.com leży w repo enigmalabz\nTytuł: Kod strony"))
+    jedno = [{"role": "user", "content": "gdzie jest kod strony enigmalabz.com?"}, {"role": "assistant", "content": "W repo enigmalabz na GitHubie. " * 8}]
+    p.on_session_end(jedno)
+    assert wywolania == []                                                   # jedno krótkie pytanie: bez modelu
+    dlugie = [{"role": "user", "content": "Ustalmy zasady strony: " + "kod strony trzymamy w repo enigmalabz, wgrywa tylko Jarvo. " * 6},
+              {"role": "assistant", "content": "Zapisane."}]
+    p.on_session_end(dlugie)
+    assert len(wywolania) == 1                                               # jedna wiadomość od 300 znaków: wyciąg
+    teraz = time.time()
+    p.sync_turn("gdzie jest kod?", "w repo", session_id="s-krotka")
+    p.sync_turn("a wgrywanie?", "tylko Jarvo", session_id="s-krotka")
+    p.sync_turn("hej", "cześć", session_id="s-jedna")
+    p._bufor["s-krotka"]["ts"] = p._bufor["s-jedna"]["ts"] = teraz - pl.CISZA_S + 5
+    assert p._sesje_po_ciszy(teraz) == []                                    # jeszcze nie 10 min ciszy
+    assert [sid for sid, _b in p._sesje_po_ciszy(teraz + 5)] == ["s-krotka"]  # 2 wiadomości tak, jedno „hej” nie
+    p._bufor["s-krotka"]["wyciagnieto"] = 2
+    assert p._sesje_po_ciszy(teraz + 5) == []                                # już wyciągnięte
 
 
 # ------------------------------------------------------------------------------------------------ tekst zapytania przed turą

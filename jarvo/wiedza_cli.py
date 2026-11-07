@@ -488,7 +488,7 @@ def sprawdz_kompilacje(u: Uklad, teraz: float | None = None) -> dict:
     kiedy = _kiedy(ostatnia)
     if szkice and (not ostatnia or teraz - ostatnia > KOMPILACJA_STARA_S):
         return _wynik("kompilacja skarbca", "uwaga", f"{szkice} szkiców czeka, ostatnia kompilacja: {kiedy}",
-                      "Kompilację odpala brama (co godzinę przy szkicach i co noc o 03:10, po uśpieniu nadrabia): "
+                      "Kompilację odpala brama (przy szkicach odstanych 5 min albo najstarszym 15 min i co noc o 03:10, po uśpieniu nadrabia): "
                       "sprawdź `jarvo status` i model profilu jarvo; ręcznie: jarvo wiedza kompiluj.")
     if raport.get("bledy"):
         return _wynik("kompilacja skarbca", "uwaga", f"ostatnia ({kiedy}) z błędami: {raport.get('bledy')}",

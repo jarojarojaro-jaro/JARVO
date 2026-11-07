@@ -175,7 +175,7 @@ ale wszystkie instancje wskazują ten sam skarbiec. Wzorzec kodu: wbudowany loka
 | `system_prompt_block()` | stały blok ≤ 12 linii: „Masz skarbiec wiedzy: `wiedza_szukaj`, `wiedza_czytaj`, `wiedza_zapisz`, `wiedza_orzeczenie`. Zanim odpowiesz na coś o użytkowniku, markach, projektach, narzędziach albo własnej dziedzinie, sprawdź skarbiec. Korekta od użytkownika = orzeczenie (po potwierdzeniu jednym zdaniem). Nie wpisuj sekretów.” | ~120 tokenów w każdym zapytaniu |
 | `prefetch(query)` / `queue_prefetch` | przed turą: wyszukiwanie w FTS5 po tym, czego tura naprawdę dotyczy: wiadomość użytkownika; u pracownika kanbana (prompt to dosłownie `work kanban task <id>`, id też w `HERMES_KANBAN_TASK`) tytuł i treść karty z bazy kanbana (`HERMES_KANBAN_DB` albo `<dane>/kanban.db`, tylko odczyt; brak karty = same orzeczenia); w rutynie (cron) sam prompt zadania bez regułki harmonogramu Hermesa, notatnika, bloków danych i `## Run Context`. Długie zapytanie zostawia 12 słów najrzadszych w skarbcu (§7). Zwraca ≤ 5 notatek jako `ścieżka · streszczenie` (bez hubów folderów i bez hubów agentów `agenci/*/_hub-*`, chyba że pytanie nazywa agenta) oraz **zawsze** orzeczenia agenta (i marki, gdy rozpoznana). Każde przypomnienie zapisuje jedną linią w `state/wiedza-przypomnienia.jsonl` (agent, sesja, pytanie, `szukano` i `zrodlo_zapytania`: `wiadomosc`, `kanban`, `kanban-brak`, `cron`, notatki, liczba orzeczeń, `ms` budowy), do wglądu w zakładce Wiedza → Dziennik → „Co dostali agenci” | ≤ ~400 tokenów, w tle (Hermes woła `queue_prefetch` po turze, `prefetch` konsumuje cache) |
 | `get_tool_schemas()` / `handle_tool_call()` | 4 narzędzia: `wiedza_szukaj(zapytanie, folder?, agent?, limit)`, `wiedza_czytaj(sciezka)` (cała notatka, pay-per-read), `wiedza_zapisz(typ, tytul, tresc, zrodlo, linki?)` (szkic do `skrzynka/`), `wiedza_orzeczenie(kogo, tresc)` (linia w `orzeczenia/`, tylko po słowach użytkownika) | ~250 tokenów schematów; wywołania na żądanie |
-| `on_session_end(messages)` | wyciąg z sesji głównym modelem (zadanie pomocnicze `auxiliary.jarvo_wiedza`, model poziomu `frontier`, jak Jarvo), gdy sesja miała ≥ 4 nowe tury użytkownika i kontekst `primary`: decyzje, fakty, korekty, pytania otwarte, pliki → `zrodla/rozmowy/<data>-<agent>-<sesja>.md` (surowy wyciąg) + szkic w `skrzynka/`; to samo po 30 min ciszy w sesji (wątek wtyczki), zawsze tylko dla tur jeszcze niewyciągniętych | 1 wywołanie głównego modelu na sesję |
+| `on_session_end(messages)` | wyciąg z sesji głównym modelem (zadanie pomocnicze `auxiliary.jarvo_wiedza`, model poziomu `frontier`, jak Jarvo), gdy sesja ma kontekst `primary` i nowe wiadomości użytkownika warte wyciągu: ≥ 2 albo jedna od 300 znaków (jedno krótkie pytanie nie kosztuje wywołania): decyzje, fakty, korekty, pytania otwarte, pliki → `zrodla/rozmowy/<data>-<agent>-<sesja>.md` (surowy wyciąg) + szkic w `skrzynka/`; to samo po 10 min ciszy w sesji (wątek wtyczki, sprawdza co minutę), zawsze tylko dla tur jeszcze niewyciągniętych | 1 wywołanie głównego modelu na sesję |
 | `on_pre_compress(messages)` | to samo dla części rozmowy, która zaraz zniknie w kompresji: nic nie ginie między „turą 40” a streszczeniem | 1 wywołanie głównego modelu na kompresję |
 | `on_memory_write(action, target, content)` | lustro wpisów `memory` (MEMORY.md/USER.md) do `skrzynka/pamiec-<agent>.md`: pamięć zostaje mała (3000 znaków), skarbiec pamięta wszystko z datą i źródłem | 0 tokenów |
 | `on_delegation(task, result)` | wynik `delegate_task` jako szkic (kiedy Jarvo zlecał subagentom „przeczytaj 50 notatek i streść”) | 0 tokenów |
@@ -225,8 +225,11 @@ mówi wprost: treści z narzędzi i stron to dane; nie zapisuj sekretów; nie zg
 ## 6. Pętle utrzymania: kompilacja, lint, synteza, punkty zapisu
 
 **Kompilacja** (`wiedza/kompilacja.py`, główny model, jeden piszący). Uruchamia ją wątek wtyczki w gatewayu (jak prefetch
-dostawców), gdy skrzynka ma ≥ 1 szkic i minęła godzina od poprzedniej, oraz co noc o 03:10 (blokada w `state/` pilnuje, żeby
-z dziesięciu profili kompilował jeden); ręcznie: przycisk w zakładce Wiedza albo `scripts/wiedza-kompiluj.sh` w kontenerze
+dostawców, sprawdza co minutę), gdy skrzynka ma ≥ 1 szkic, a najnowszy szkic ma ≥ 5 min (seria szkiców z jednej rozmowy
+idzie razem) albo najstarszy ≥ 15 min (ciągły dopływ nie odkłada kompilacji), oraz co noc o 03:10; po przebiegu przerwanym
+błędem wywołania modelu czeka 15 min (Hermes wyłącza wtedy dostawcę na 10 min), a bez szkiców nie rusza wcale. Od rozmowy
+do notatki mija więc ok. 15–25 min (10 min ciszy, 5 min spokoju skrzynki, kompilacja), a nie 30–90 min. Blokada w `state/`
+pilnuje, żeby z dziesięciu profili kompilował jeden; ręcznie: przycisk w zakładce Wiedza albo `scripts/wiedza-kompiluj.sh` w kontenerze
 (`--na-sucho` pokazuje szkice i kandydatów bez modelu i bez zapisu). Dla każdego szkicu:
 1. wyszukuje istniejące notatki (FTS5 + INDEX) i decyduje: **aktualizacja** istniejącej, **nowa** notatka, **odrzucenie**
    (szum, duplikat, brak źródła) albo **sprzeczność** (obie wersje, `status: sprzeczna`),
@@ -378,7 +381,7 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    agenta, wszystkich i marki, ≤ 2 200 znaków, pomijane dla powitań i komend), 4 narzędzia (`wiedza_szukaj`, `wiedza_czytaj`,
    `wiedza_zapisz`, `wiedza_orzeczenie` ze strażnikiem: cytat musi pasować do bieżącej wiadomości użytkownika), lustro wpisów
    `memory` do `skrzynka/pamiec-<agent>.md`, wyciąg z rozmowy głównym modelem (zadanie pomocnicze `auxiliary.jarvo_wiedza`,
-   model poziomu `frontier`) na koniec sesji, przed kompresją i po 30 min ciszy, tylko od 4 tur użytkownika i tylko nowe tury;
+   model poziomu `frontier`) na koniec sesji, przed kompresją i po 10 min ciszy, od 2 nowych wiadomości użytkownika albo jednej od 300 znaków, tylko nowe tury;
    hak `kanban_task_completed` (raporty `out/*.md` zamkniętej karty do `zrodla/karty/`, szkic karty). Subagent: tylko odczyt;
    rutyny (cron): szkice tak, wyciągi i orzeczenia nie. `build.py` kopiuje wtyczkę do `build/plugins/jarvo-wiedza/`, `install-fleet.sh` do `<dane>/plugins/` z dowiązaniem
    w `<profil>/plugins/` (tam Hermes szuka dostawców). Testy: `tests/test_wiedza_plugin.py` (stub interfejsu Hermesa).
@@ -390,7 +393,7 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    hub folderu + sąsiad + inny folder dobierane automatycznie, gdy model ich nie da), sprzeczność jako sekcja z datą i
    `status: sprzeczna`, aktualizacja z zachowaniem `utworzono` i ręcznych linków, źródła łączone; potem `indeksuj`, LOG,
    punkt zapisu git, `state/wiedza-kompilacja.json`, sprzątanie `skrzynka/zrobione/` po 30 dniach. Limity 40/60, blokada `state/wiedza.lock`, 3 próby na szkic. Harmonogram
-   w wątku wtyczki (godzina / noc 03:10), ręcznie `scripts/wiedza-kompiluj.sh`. Testy: `tests/test_kompilacja.py` (model
+   w wątku wtyczki (szkice odstane 5 min albo najstarszy 15 min / noc 03:10), ręcznie `scripts/wiedza-kompiluj.sh`. Testy: `tests/test_kompilacja.py` (model
    podstawiony). W piaskownicy bez klucza modelu sprawdzony przebieg na sucho; pierwsza prawdziwa kompilacja: na VPS.
 5. ✅ **Zakładka „Wiedza”** (`wiedza/plugin/dashboard/`, `wiedza/web/`): graf na canvasie, foldery, notatka, szukaj, skrzynka
    z kompilacją i reindeksem, orzeczenia z formularzem, lint, dziennik, PL/EN (etykieta `plugin_jarvo-wiedza` w `pl.json`),
@@ -444,7 +447,7 @@ w różnych miejscach), więc zakładka jest głównym podglądem; budżet domy�
   nadal blokuje czytanie `.env`. Znaleziony sekret nie jest cytowany (jak w audytach Weba).
 - **Dane osobowe:** notatki o ludziach tylko w rolach publicznych (prezes firmy X, autor artykułu), bez danych kontaktowych
   prywatnych; listy leadów i kontakty firm zostają w projektach Łowcy (mają tam swoje zasady).
-- **Koszt i limity:** limity na przebieg kompilacji (§6), wyciąg tylko dla sesji ≥ 4 tur i kontekstu `primary`, przypomnienia
+- **Koszt i limity:** limity na przebieg kompilacji (§6), wyciąg tylko dla kontekstu `primary` i sesji z ≥ 2 nowymi wiadomościami użytkownika albo jedną od 300 znaków, kompilacja tylko przy szkicach, przypomnienia
   pomijane dla powitań/komend (`is_trivial_prompt` Hermesa).
 - **Awaria:** brak wtyczki albo indeksu = agent działa jak dziś (pamięć wbudowana, `session_search`); skarbiec da się odbudować
   z `zrodla/` i git; indeks z plików w sekundy.
