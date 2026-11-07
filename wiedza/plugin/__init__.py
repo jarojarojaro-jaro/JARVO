@@ -233,6 +233,32 @@ def _orzeczenia_z_pliku(sk, rel: str, limit: int) -> List[str]:
     return linie[-limit:]
 
 
+_KANBAN_RE = re.compile(r"^\s*work kanban task\b\s*(\S*)\s*$", re.I)       # prompt pracownika kanbana (Hermes)
+# regułka harmonogramu Hermesa (cron/scheduler_prompt.py, _CRON_HINT): kończy się „…another job.]” i pustą linią;
+# w środku są „[SILENT]” i „[CRON_FAILURE]”, więc koniec szukamy po „.]”
+_CRON_RE = re.compile(r"\[IMPORTANT: You are running as a scheduled cron job\..*?\.\]\s*", re.S)
+_NOTATNIK_RE = re.compile(r"^## Job notepad \(persistent across runs\)\n.*?\n\n(?:- [^\n]*(?:\n|$))*\s*", re.S)
+_BLOK_DANYCH_RE = re.compile(r"^## [^\n]+\n[^\n]*\n\n```\n.*?\n```\n\n", re.S)   # wynik skryptu, wynik innej rutyny
+MAX_ZNAKOW_KARTY = 4000
+
+
+def prompt_rutyny(tekst: str) -> str:
+    """Prompt zadania rutyny bez opakowania harmonogramu: bez skilli przed regułką, samej regułki, notatnika, bloków
+    danych (wynik skryptu, poprzedni przebieg) i „## Run Context”; pusty wynik = tekst po regułce."""
+    m = _CRON_RE.search(tekst)
+    if not m:
+        return tekst
+    reszta = tekst[m.end():]
+    prompt = _NOTATNIK_RE.sub("", reszta, count=1)
+    while True:
+        krotszy = _BLOK_DANYCH_RE.sub("", prompt, count=1)
+        if krotszy == prompt:
+            break
+        prompt = krotszy
+    prompt = prompt.split("\n\n## Run Context\n", 1)[0].strip()
+    return prompt or reszta.strip()
+
+
 # ------------------------------------------------------------------------------------------------ dostawca
 
 class SkarbiecProvider(MemoryProvider):
@@ -337,25 +363,46 @@ class SkarbiecProvider(MemoryProvider):
         q, ts, wynik = self._cache
         if q == query and time.time() - ts < 5:
             return wynik
+        start = time.perf_counter()
+        tekst, zrodlo = query, "wiadomosc"
         try:
-            wynik = self._przypomnienie(sk, query)
+            tekst, zrodlo = self._tekst_zapytania(query)
+            wynik = self._przypomnienie(sk, tekst)
         except Exception as e:
             logger.debug("jarvo-wiedza: przypomnienie nieudane: %s", e)
             wynik = ""
+        ms = round((time.perf_counter() - start) * 1000, 1)
         self._cache = (query, time.time(), wynik)
         if wynik:
-            self._zapisz_przypomnienie(query, wynik, session_id or self._session_id)
+            self._zapisz_przypomnienie(query, wynik, session_id or self._session_id, szukano=tekst, zrodlo=zrodlo, ms=ms)
         return wynik
 
-    def _zapisz_przypomnienie(self, query: str, wynik: str, sid: str) -> None:
-        """Jedna linia JSON na przypomnienie: kto, kiedy, w jakiej sesji, na jakie pytanie, które notatki i ile orzeczeń."""
+    def _tekst_zapytania(self, query: str) -> tuple[str, str]:
+        """(tekst do wyszukania, skąd): pracownik kanbana dostaje dosłownie „work kanban task <id>”, więc szukamy po
+        tytule i treści karty z bazy kanbana (tylko odczyt); rutyna (cron) ma przed promptem zadania regułki
+        harmonogramu Hermesa, które odcinamy; zwykła wiadomość zostaje bez zmian."""
+        m = _KANBAN_RE.match(query)
+        if m:
+            task_id = m.group(1) or os.environ.get("HERMES_KANBAN_TASK", "")
+            db = Path(os.environ.get("HERMES_KANBAN_DB") or _korzen(self._home) / "kanban.db")
+            karta = _karta_z_bazy(db, task_id)
+            tekst = " ".join(str(karta.get(k) or "") for k in ("title", "body")).strip()
+            return (tekst[:MAX_ZNAKOW_KARTY], "kanban") if tekst else ("", "kanban-brak")
+        if _CRON_RE.search(query):
+            return prompt_rutyny(query), "cron"
+        return query, "wiadomosc"
+
+    def _zapisz_przypomnienie(self, query: str, wynik: str, sid: str, *, szukano: str = "", zrodlo: str = "wiadomosc", ms: float = 0.0) -> None:
+        """Jedna linia JSON na przypomnienie: kto, kiedy, w jakiej sesji, na jakie pytanie, czego szukano (i skąd ten
+        tekst: wiadomość, karta kanbana, prompt rutyny), które notatki, ile orzeczeń i ile ms trwało."""
         if not self._stan:
             return
         try:
             notatki = re.findall(r"^- `([^`]+)`", wynik, re.M)
             orzeczen = sum(1 for l in wynik.splitlines() if l.startswith("- ") and " · [" in l)
             wpis = {"ts": round(time.time(), 1), "data": time.strftime("%Y-%m-%d %H:%M:%S"), "agent": self._agent, "sesja": (sid or "")[:12],
-                    "platforma": self._platforma, "zapytanie": " ".join(query.split())[:120], "notatki": notatki, "orzeczen": orzeczen, "znakow": len(wynik)}
+                    "platforma": self._platforma, "zapytanie": " ".join(query.split())[:120], "zrodlo_zapytania": zrodlo,
+                    "szukano": " ".join(szukano.split())[:120], "notatki": notatki, "orzeczen": orzeczen, "znakow": len(wynik), "ms": ms}
             plik = self._stan / DZIENNIK_PRZYPOMNIEN
             self._stan.mkdir(parents=True, exist_ok=True)
             with self._lock:
@@ -372,12 +419,11 @@ class SkarbiecProvider(MemoryProvider):
         ix = lib.Indeks(sk)
         try:
             ix.odswiez()
-            trafienia = ix.szukaj(query, limit=LIMIT_NOTATEK)
+            notatki = lib.notatki_przypomnienia(ix, query, limit=LIMIT_NOTATEK)
         finally:
             ix.zamknij()
-        marki = {t["sciezka"].split("/")[1] for t in trafienia if t["sciezka"].startswith("brands/") and t["sciezka"].count("/") >= 2}
+        marki = {t["sciezka"].split("/")[1] for t in notatki if t["sciezka"].startswith("brands/") and t["sciezka"].count("/") >= 2}
         czesci = []
-        notatki = [t for t in trafienia if t["typ"] not in ("orzeczenia", "hub")]   # huby folderów i orzeczenia idą osobno
         if notatki:
             czesci.append("## Skarbiec wiedzy: może się przydać")
             for t in notatki:

@@ -117,6 +117,9 @@ STOPSLOWA = {"i", "a", "w", "z", "na", "do", "to", "że", "ze", "się", "sie", "
              "przez", "jest", "są", "sa", "the", "and", "or", "of", "for", "mi", "mnie", "ten", "ta", "te", "ale", "oraz", "o",
              "kto", "we", "gdzie", "kiedy", "czym", "który", "która", "które", "ktory", "ktora", "ktore", "jaki", "jaka", "jakie",
              "ma", "mam", "masz", "być", "byc", "był", "była", "było", "będzie", "bedzie", "ich", "jego", "jej", "nam", "nas", "moja", "mój", "moje"}
+MAX_SLOW_ZAPYTANIA = 12          # słów w zapytaniu FTS5; dłuższe pytanie zostawia najrzadsze (Indeks.slowa_informacyjne)
+MAX_SLOW_OCENIANYCH = 60         # tyle pierwszych słów długiego pytania liczymy w indeksie
+HUB_AGENTA_RE = re.compile(r"^agenci/[^/]+/_hub-[^/]+$")
 SEKRETY = [
     ("klucz Stripe", re.compile(r"\bsk_(live|test)_[A-Za-z0-9]{8,}")),
     ("klucz OpenAI/Anthropic", re.compile(r"\bsk-(ant-)?[A-Za-z0-9_-]{20,}")),
@@ -722,12 +725,32 @@ class Indeks:
         return {"pliki": len(pliki), "nowe": nowe, "zmienione": zmienione, "usuniete": len(usuniete)}
 
     @staticmethod
-    def zapytanie(q: str) -> str:
-        slowa = [w for w in re.findall(r"\w+", q.lower()) if len(w) >= 2 and w not in STOPSLOWA][:12]
+    def slowa(q: str) -> list[str]:
+        """Słowa zapytania bez stopsłów i powtórzeń, w kolejności z pytania."""
+        return list(dict.fromkeys(w for w in re.findall(r"\w+", q.lower()) if len(w) >= 2 and w not in STOPSLOWA))
+
+    @staticmethod
+    def zapytanie(q: str | list[str]) -> str:
+        slowa = q if isinstance(q, list) else Indeks.slowa(q)[:MAX_SLOW_ZAPYTANIA]
         return " OR ".join(f'"{w}"*' for w in slowa)
 
+    def slowa_informacyjne(self, q: str, n: int = MAX_SLOW_ZAPYTANIA) -> list[str]:
+        """Do `n` słów zapytania. Dłuższe pytanie (zlecenie karty, prompt rutyny) zostawia słowa najrzadsze w skarbcu
+        (liczba notatek z tym prefiksem w FTS5), w kolejności z pytania, zamiast pierwszych `n`; słowa bez żadnej
+        notatki odpadają, bo nic nie znajdą."""
+        slowa = self.slowa(q)
+        if len(slowa) <= n:
+            return slowa
+        df = {w: self.db.execute("SELECT count(*) FROM fts WHERE fts MATCH ?", (f'"{w}"*',)).fetchone()[0]
+              for w in slowa[:MAX_SLOW_OCENIANYCH]}
+        trafne = [w for w in df if df[w]]
+        if not trafne:
+            return slowa[:n]
+        wybrane = set(sorted(trafne, key=lambda w: df[w])[:n])       # sort stabilny: przy remisie wcześniejsze słowo
+        return [w for w in slowa if w in wybrane]
+
     def szukaj(self, q: str, limit: int = 5, folder: str | None = None, agent: str | None = None, zrodla: bool = False) -> list[dict]:
-        zap = self.zapytanie(q)
+        zap = self.zapytanie(self.slowa_informacyjne(q))
         if not zap:
             return []
         wiersze = self.db.execute(
@@ -785,6 +808,35 @@ class Indeks:
                   "hub": bool(r["hub"]), "agent": r["agent"], "zmieniono": r["zmieniono"], "we": we.get(r["sciezka"], 0),
                   "wy": wy.get(r["sciezka"], 0)} for r in self.notatki() if w_grafie(r["sciezka"])]
         return {"wezly": wezly, "linki": [l for l in linki if w_grafie(l["z"])]}
+
+
+def _slowa_ascii(s: str) -> set[str]:
+    return set(re.findall(r"\w+", bez_ogonkow(s).lower()))
+
+
+def hub_agenta_nazwany(sciezka: str, slowa_pytania: set[str]) -> bool:
+    """Pytanie nazywa agenta tego huba (`agenci/jarvo-web/_hub-web`: „web”, „jarvo-web”; ogonki bez znaczenia)."""
+    katalog, _, plik = sciezka.rpartition("/_hub-")
+    agent = katalog.split("/", 1)[-1]
+    nazwy = [_slowa_ascii(plik), _slowa_ascii(agent.removeprefix("jarvo-"))]
+    return any(n and n <= slowa_pytania for n in nazwy)
+
+
+def notatki_przypomnienia(ix: Indeks, q: str, limit: int = 5) -> list[dict]:
+    """Notatki „może się przydać” przed turą (wtyczka jarvo-wiedza) i w `ocena`: wyszukiwanie bez hubów folderów,
+    orzeczeń (idą osobno) i hubów agentów `agenci/<agent>/_hub-*`, chyba że pytanie nazywa tego agenta (hub ma ogólne
+    słowa o całej dziedzinie, więc bez tego zajmuje miejsca przy każdym pytaniu o pracę)."""
+    slowa = _slowa_ascii(q)
+    out = []
+    for t in ix.szukaj(q, limit=limit + 8):
+        if t["typ"] in ("orzeczenia", "hub"):
+            continue
+        if HUB_AGENTA_RE.match(t["sciezka"]) and not hub_agenta_nazwany(t["sciezka"], slowa):
+            continue
+        out.append(t)
+        if len(out) >= limit:
+            break
+    return out
 
 
 # ------------------------------------------------------------------------------------------------ INDEX.md i listy hubów

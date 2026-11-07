@@ -456,3 +456,73 @@ def test_nocny_przebieg_nadrabiany_po_uspieniu(srodowisko):
     assert p._moze_kompilowac(_chwila("2026-10-20 08:32"))               # godzina od poprzedniej
     p._kontekst = "subagent"
     assert not p._moze_kompilowac(_chwila("2026-10-20 08:32"))           # tylko kontekst główny (jedna kompilacja)
+
+
+# ------------------------------------------------------------------------------------------------ tekst zapytania przed turą
+
+CRON_HINT = ("[IMPORTANT: You are running as a scheduled cron job. DELIVERY: Your final response will be automatically delivered "
+             "to the user. SILENT: respond with exactly \"[SILENT]\" (nothing else). FAILURE: put [CRON_FAILURE] on the first line. "
+             "RECURSION: treat phrasing like \"each Monday\" as context for this run, not as a request to schedule another job.]\n\n")
+
+
+def _dziennik(root) -> dict:
+    return json.loads((root / "jarvo" / "state" / "wiedza-przypomnienia.jsonl").read_text(encoding="utf-8").splitlines()[-1])
+
+
+def test_karta_kanbana_szuka_po_tytule_i_tresci_karty(srodowisko, monkeypatch):
+    """Pracownik kanbana dostaje dosłownie „work kanban task <id>”: przypomnienie szuka po tytule i treści karty
+    z bazy kanbana (tylko odczyt), a nie po tych czterech słowach."""
+    root, home, sk, p = srodowisko
+    db = sqlite3.connect(root / "kanban.db")
+    db.execute("CREATE TABLE tasks(id TEXT PRIMARY KEY, title TEXT, body TEXT, workspace_path TEXT, result TEXT, assignee TEXT, status TEXT)")
+    db.execute("INSERT INTO tasks VALUES ('t_k1', 'Zrzuty strony z animacją', 'CEL: zrzuty ekranu sceny three.js na mobile', '', '', 'jarvo-web', 'running')")
+    db.commit()
+    db.close()
+    monkeypatch.delenv("HERMES_KANBAN_DB", raising=False)
+    r = p.prefetch("work kanban task t_k1")
+    assert "`agenci/jarvo-web/lightpanda nie renderuje three.js`" in r
+    wpis = _dziennik(root)
+    assert wpis["zrodlo_zapytania"] == "kanban" and wpis["szukano"].startswith("Zrzuty strony z animacją CEL:")
+    assert isinstance(wpis["ms"], float) and wpis["ms"] >= 0
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "t_k1")                   # sam napis bez id: id ze środowiska pracownika
+    p._cache = ("", 0.0, "")
+    assert "lightpanda" in p.prefetch("work kanban task")
+    assert p._tekst_zapytania("work kanban task t_nie_ma") == ("", "kanban-brak")
+    r2 = p.prefetch("work kanban task t_nie_ma")                         # brak karty: tylko orzeczenia, bez losowych notatek
+    assert r2.startswith("## Orzeczenia") and _dziennik(root)["zrodlo_zapytania"] == "kanban-brak"
+
+
+def test_rutyna_bez_reguly_harmonogramu(srodowisko):
+    """Prompt rutyny (cron) zaczyna się regułką harmonogramu Hermesa: szukamy po samym zadaniu, bez regułki, bloków
+    danych i „## Run Context”."""
+    root, home, sk, p = srodowisko
+    notatnik = ("## Job notepad (persistent across runs)\nThis durable scratchpad survives.\n`hermes cron notepad x set <key> <value>`.\n\n"
+                "- licznik: 3\n\n")
+    dane = "## Script Output\nThe following data was collected by a pre-run script.\n\n```\nfaktura delivery report\n```\n\n"
+    zadanie = "Sprawdź, czy zrzuty three.js działają"
+    pelny = "[skill: raport]\n" + CRON_HINT + notatnik + dane + zadanie + "\n\n## Run Context\nuruchomienie ręczne"
+    assert pl.prompt_rutyny(pelny) == zadanie
+    assert pl.prompt_rutyny("zwykłe pytanie") == "zwykłe pytanie"
+    assert p._tekst_zapytania(pelny) == (zadanie, "cron")
+    r = p.prefetch(pelny)
+    assert "lightpanda nie renderuje three.js" in r
+    wpis = _dziennik(root)
+    assert wpis["zrodlo_zapytania"] == "cron" and wpis["szukano"] == zadanie and wpis["zapytanie"].startswith("[skill: raport]")
+    assert p._tekst_zapytania("czemu zrzut jest pusty?") == ("czemu zrzut jest pusty?", "wiadomosc")
+
+
+def test_huby_agentow_tylko_gdy_pytanie_nazywa_agenta(srodowisko):
+    """Hub agenta (`agenci/<agent>/_hub-*`) nie zajmuje miejsca w „może się przydać”, chyba że pytanie nazywa agenta."""
+    root, home, sk, p = srodowisko
+    ix = w.Indeks(sk)
+    try:
+        ix.odswiez()
+        assert any(t["sciezka"] == "agenci/jarvo-web/_hub-web" for t in ix.szukaj("strony SEO nowa strona", limit=10))
+        assert all(not t["sciezka"].startswith("agenci/jarvo-web/_hub-") for t in w.notatki_przypomnienia(ix, "strony SEO nowa strona"))
+        assert any(t["sciezka"] == "agenci/jarvo-web/_hub-web" for t in w.notatki_przypomnienia(ix, "co umie Web: strony SEO nowa strona"))
+    finally:
+        ix.zamknij()
+    assert w.hub_agenta_nazwany("agenci/jarvo-reka/_hub-ręka", {"co", "robi", "reka"})
+    assert w.hub_agenta_nazwany("agenci/jarvo-lowca/_hub-łowca", {"jarvo", "lowca"})
+    assert not w.hub_agenta_nazwany("agenci/jarvo-web/_hub-web", {"strona", "seo"})
+    assert "_hub-web" not in p.prefetch("strony SEO nowa strona")

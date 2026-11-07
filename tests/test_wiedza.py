@@ -681,3 +681,23 @@ def test_lint_gdy_drugi_proces_trzyma_lint_md(skarbiec, tmp_path):
         p.wait(timeout=30)
     assert (sk.root / "LINT.md").read_text(encoding="utf-8").startswith("# Lint skarbca (2026-09-30)")
     assert not list(sk.root.glob("*.tmp"))
+
+
+def test_dlugie_pytanie_zostawia_najrzadsze_slowa(skarbiec):
+    """Długie zapytanie (zlecenie karty, prompt rutyny): zamiast pierwszych 12 słów zostają słowa najrzadsze w skarbcu;
+    słowo bez żadnej notatki odpada. Krótkie pytanie zostaje bez zmian."""
+    sk = skarbiec
+    sk.zapisz_plik("projekty/kampania zielonka", w.sklej({"typ": "projekt", "tagi": [], "utworzono": "2026-09-30", "zmieniono": "2026-09-30",
+                                                        "status": "aktualna", "zrodlo": "karta t_1"},
+                                                       "# Kampania Zielonka\n\n**Kampania marki Zielonka ruszyła we wrześniu.**\n"))
+    ix = w.Indeks(sk)
+    try:
+        ix.odswiez()
+        assert ix.slowa_informacyjne("kampania marki Acme") == ["kampania", "marki", "acme"]
+        dlugie = " ".join(f"slowo{i}" for i in range(20)) + " agent strona hub Zielonka"
+        wybrane = ix.slowa_informacyjne(dlugie)
+        assert "zielonka" in wybrane and len(wybrane) <= w.MAX_SLOW_ZAPYTANIA and not any(s.startswith("slowo") for s in wybrane)
+        assert ix.szukaj(dlugie, limit=3)[0]["sciezka"] == "projekty/kampania zielonka"
+        assert ix.slowa_informacyjne(" ".join(f"brak{i}" for i in range(15))) == [f"brak{i}" for i in range(12)]
+    finally:
+        ix.zamknij()
