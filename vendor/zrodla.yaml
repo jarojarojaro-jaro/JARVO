@@ -648,3 +648,14 @@ zrodla:
     status: do-wdrozenia
     przejrzane: 374ece89b2099818244f5a65ef466b89c0c392ae
     notatka: "en_core_web_sm 3.8.0 (tag en_core_web_sm-3.8.0 = ten commit), MIT: model spaCy dla G2P misaki. W natywnym locku venvu narzędzi (infra/python/natywne/narzedzia.lock) jest kołem z adresem wydania GitHub i sumą 1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85 (ta sama co w infra/Dockerfile; zasób nie ma digestu GitHuba, więc sumę policzyłem strumieniowo i przez uv; 12806118 B jak w API). Przegląd 2026-10-24; próba na Windows: misaki en.G2P działa bez sieci"
+  # — wektory skarbca wiedzy (docs/WIEDZA.md §7, decyzja W4 zmieniona przez właściciela 2026-11-08); przegląd 2026-11-08 —
+  multilingual-e5-small-onnx:
+    repo: https://huggingface.co/Xenova/multilingual-e5-small
+    status: do-wdrozenia
+    przejrzane: 761b726dd34fb83930e26aab4e9ac3899aa1fa78
+    notatka: "MIT (licencja modelu bazowego intfloat/multilingual-e5-small, Microsoft: Liang Wang i in., karta 614241f6; repo Xenova bez pliku licencji, README wskazuje model bazowy): eksport ONNX dla Transformers.js (Joshua Lochner, Hugging Face), rewizja = main od 2025-07-22. Przegląd 2026-11-08: bierzemy onnx/model_quantized.onnx (int8, 118 308 185 B, f80102d3…) i tokenizer.json (17 082 730 B, 0b44a9d7…) plus README.md; sumy = oid LFS z API drzewa Hugging Face = własne liczenie strumieniowe; same wagi i słownik, bez kodu. Próba na Linuksie x64 (onnxruntime 1.31.1, tokenizers 0.23.3, 2 wątki; venv narzędzi ma onnxruntime 1.29.0): wymiar 384, wektory znormalizowane, mediana ok. 10 ms na przypomnienie po rozgrzaniu (pomiar operatora: 8–13 ms, 0,25 s na notatkę); bez sieci w czasie działania (pliki z dysku). Natywnie: modele.e5-small, usługa wektory nadzorcy (wiedza/wektory.py)"
+  tokenizers:
+    repo: https://github.com/huggingface/tokenizers
+    status: do-wdrozenia
+    przejrzane: 301277072263fb3830eb66eec7e47adadf76f1dc
+    notatka: "tokenizers 0.23.3 (tag v0.23.3, obiekt tagu 9ab7691f → ten commit; PyPI 2026-10-09), Apache-2.0 (LICENSE w repo; koło bez pliku licencji, ma SBOM CycloneDX w dist-info/sboms), Hugging Face (Nicolas Patry, Anthony Moi). Przegląd 2026-11-08: koła cp310-abi3 win_amd64, macosx_11_0_arm64, manylinux_2_17 x86_64 i aarch64 (Rust, bez Authenticode na Windows); sumy 4 kół liczone strumieniowo zgodne z lockiem i JSON API PyPI. Jedyna zależność huggingface-hub (już w venvie narzędzi z onnx-asr[hub]); sieci używa tylko Tokenizer.from_pretrained, a usługa wektorów czyta tokenizer.json z dysku (Tokenizer.from_file). W venvie narzędzi (infra/python/natywne/narzedzia.lock) dla wiedza/wektory.py"

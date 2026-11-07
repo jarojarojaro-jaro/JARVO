@@ -2,7 +2,8 @@
 
 Sekcja `modele` manifestu: pliki niezależne od platformy z przypiętej rewizji repo modelu (adres z commitem, sha256,
 rozmiar). Instalator pobiera modele z `kiedy: instalacja` (bez pola: instalacja): lektory Matcha-TTS-PL i Paradee,
-Indra OCR, języki Tesseracta i fonty Noto; Parakeet, Silero, MODNet i YuNet przyjdą przy pierwszym użyciu.
+Indra OCR, języki Tesseracta, fonty Noto i e5-small (wektory skarbca wiedzy); Parakeet, Silero, MODNet i YuNet
+przyjdą przy pierwszym użyciu.
 Każdy plik przez jarvo/pobieracz.py (suma przed użyciem, pasek, wznawianie). Obok plików `JARVO-ZRODLO.txt` jak
 w obrazie (skąd, która rewizja, licencja) i znacznik `.jarvo-model.json` z sumami: drugi przebieg sprawdza same
 rozmiary plików, bez liczenia sum i bez sieci.

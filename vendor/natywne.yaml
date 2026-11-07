@@ -1254,6 +1254,30 @@ modele:
         sha256: a45578c40b04f9aaa1e154bca1d0179ffad6dab840458ac8f7cb0a9362413b72
         rozmiar: 2745
 
+  # Wektory skarbca wiedzy (wiedza/wektory.py, docs/WIEDZA.md §7, W4): eksport ONNX Xenova (int8) modelu
+  # intfloat/multilingual-e5-small (MIT). Rewizja = main od 2025-07-22; sumy = oid LFS z API Hugging Face = własne
+  # liczenie (przegląd 2026-11-08). Bez sentencepiece.bpe.model: tokenizer.json wystarcza bibliotece tokenizers.
+  e5-small:
+    zrodlo: multilingual-e5-small-onnx
+    rewizja: 761b726dd34fb83930e26aab4e9ac3899aa1fa78
+    licencja: MIT
+    rola: "wektory notatek skarbca wiedzy: przypomnienia przed turą po znaczeniu, nie tylko po słowach (usługa wektory nadzorcy)"
+    kiedy: instalacja
+    katalog: e5-small
+    pliki:
+      - cel: model_quantized.onnx
+        url: https://huggingface.co/Xenova/multilingual-e5-small/resolve/761b726dd34fb83930e26aab4e9ac3899aa1fa78/onnx/model_quantized.onnx
+        sha256: f80102d3f2a1229f387d3c81909990d8945513e347b0eab049f7de3c6f98c193
+        rozmiar: 118308185
+      - cel: tokenizer.json
+        url: https://huggingface.co/Xenova/multilingual-e5-small/resolve/761b726dd34fb83930e26aab4e9ac3899aa1fa78/tokenizer.json
+        sha256: 0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39
+        rozmiar: 17082730
+      - cel: README.md
+        url: https://huggingface.co/Xenova/multilingual-e5-small/resolve/761b726dd34fb83930e26aab4e9ac3899aa1fa78/README.md
+        sha256: 561a19594636657fe033f8b4427a7743b5f6f3a12f16cecc5f286feca0453245
+        rozmiar: 1077
+
   # Języki Tesseracta (E05): tessdata_fast 4.1.0 (tag 4.1.0 = ten commit; pliki pol, eng, osd takie same też na
   # gałęzi main). Te same pliki są w paczce conda-forge tesseract 5.5.3 (ze wszystkimi ~120 językami).
   tessdata-fast:
@@ -1341,10 +1365,10 @@ venvy:
     python: python312
     lock: infra/python/natywne/narzedzia.lock
     kiedy: instalacja
-    rola: "venv narzędzi floty: trafilatura, yt-dlp, onnx-asr + onnxruntime 1.29.0 (jarvo-stt), misaki + spaCy 3.8.16 z en_core_web_sm 3.8.0, espeakng-loader + phonemizer-fork (jarvo-tts), num2words, camoufox + Playwright 1.62, pikepdf 10.17.0 + Pillow 12.3.0 + pillow-heif 1.5.0 + pypdfium2 5.14.0 (konwertuj.py: mniejszy PDF, zdjęcia, HEIC, strony PDF)"
+    rola: "venv narzędzi floty: trafilatura, yt-dlp, onnx-asr + onnxruntime 1.29.0 (jarvo-stt), misaki + spaCy 3.8.16 z en_core_web_sm 3.8.0, espeakng-loader + phonemizer-fork (jarvo-tts), num2words, camoufox + Playwright 1.62, pikepdf 10.17.0 + Pillow 12.3.0 + pillow-heif 1.5.0 + pypdfium2 5.14.0 (konwertuj.py: mniejszy PDF, zdjęcia, HEIC, strony PDF), tokenizers 0.23.3 (usługa wektorów skarbca, wiedza/wektory.py)"
     bez: [docopt]
-    pobranie_mb: {windows-x64: 180, windows-arm64: 180, macos-arm64: 178, linux-x64: 233, linux-arm64: 220}
-    venv_mb: 646
+    pobranie_mb: {windows-x64: 183, windows-arm64: 183, macos-arm64: 181, linux-x64: 236, linux-arm64: 224}
+    venv_mb: 655
   ocr:
     python: python312
     lock: infra/python/requirements-ocr.txt

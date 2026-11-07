@@ -30,8 +30,12 @@ Krótszy adres po wgraniu strony: `curl -fsSL https://jarvo.pl/install.sh | bash
   `JARVO_NO_AUTOSTART=1`, `JARVO_WEB_LOKALNIE=1` (front panelu od nowa), `JARVO_BEZ_PATH=1` (polecenie `jarvo` tylko
   w `<root>/bin`), `JARVO_DRY_RUN=1` (sam plan; w install.ps1 razem z `JARVO_FAKE_ARCH`).
 - Programy przypięte w manifeście (`vendor/natywne.yaml`) instalator pobiera sam, z sumą sha256: uv, Python, Node.js,
-  git (Windows), ffmpeg, przeglądarki, lektory, OCR i inne. Na macOS i Linuksie potrzebny jest systemowy git (bez niego
-  krok kończy się radą: `xcode-select --install` albo menedżer pakietów).
+  git (Windows), ffmpeg, przeglądarki, lektory, OCR, model wektorów skarbca wiedzy i inne. Na macOS i Linuksie
+  potrzebny jest systemowy git (bez niego krok kończy się radą: `xcode-select --install` albo menedżer pakietów).
+  Od 2026-11-08 instalacja pobiera o ok. 138 MB więcej: model `e5-small` (multilingual-e5-small int8, 135 MB,
+  `<dane>/jarvo/models/e5-small`) i koło tokenizers w venvie narzędzi (ok. 3 MB). Z nich nadzorca uruchamia usługę
+  `wektory` (jeden ciepły model na instalację, ok. 0,5 GB RAM), z której przypomnienia skarbca szukają po znaczeniu
+  ([WIEDZA.md](WIEDZA.md) §7); bez niej przypomnienia działają po słowach jak wcześniej.
 - Polecenia: `jarvo` (rozmowa w terminalu, jak `jarvo chat`), `jarvo panel`, `jarvo status`, `jarvo doctor`, `jarvo up`,
   `jarvo down` (serwis stoi do `jarvo up`), `jarvo logs`, `jarvo autostart on|off|status`, `jarvo chat` (profil `jarvo`,
   `--profil`, `--tryb pytaj|projekt|pelny`), `jarvo wiedza`, `jarvo rutyny`, `jarvo telegram`, `jarvo komputer`

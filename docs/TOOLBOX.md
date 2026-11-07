@@ -557,7 +557,7 @@ i opisem odtworzenia w nagłówku.
 
 | venv | Python | Lock (paczek) | Pobranie Windows / macOS / Linux x64 | Kiedy | Próba na Windows 11 x64 |
 |---|---|---|---|---|---|
-| `narzedzia` | 3.12.15 | [`narzedzia.lock`](../infra/python/natywne/narzedzia.lock) (122) | 158 / 163 / 214 MB | instalacja | 9 z 9 prób bez sieci; bez docopt (ma tylko sdist) |
+| `narzedzia` | 3.12.15 | [`narzedzia.lock`](../infra/python/natywne/narzedzia.lock) (127) | 183 / 181 / 236 MB | instalacja | 9 z 9 prób bez sieci; bez docopt (ma tylko sdist); tokenizers 0.23.3 dla usługi wektorów skarbca (próba na Linuksie x64) |
 | `ocr` | 3.12.15 | [`requirements-ocr.txt`](../infra/python/requirements-ocr.txt) (8) | 76 / 79 / 106 MB | instalacja | Indra odczytała tekst bez sieci |
 | `cad` | 3.12.15 | [`requirements-cad.txt`](../infra/python/requirements-cad.txt) (56) | 215 / 207 / 244 MB | przy użyciu | STEP, STL, GLB i 3MF w 6 s |
 | `manimgx` | 3.13.17 | [`requirements-manimgx.txt`](../infra/python/requirements-manimgx.txt) (18) | 85 / 64 / 109 MB | przy użyciu | 1 s filmu w 3,3 s |
@@ -579,6 +579,7 @@ z sumą; Matcha, Paradee i Indra mają te same pliki i sumy co obraz.
 | `silero-vad` | `b3e3ee3` | 4 | 2,3 MB | przy użyciu |
 | `modnet` | `903cc06` | 2 | 26 MB | przy użyciu |
 | `yunet` | `3cc26e7` | 3 | 0,2 MB | przy użyciu |
+| `e5-small` (multilingual-e5-small, int8, wektory skarbca) | `761b726` | 3 | 135 MB | instalacja |
 | `tessdata-fast` (pol, eng, osd) | `6572757` | 4 | 20 MB | instalacja |
 | `fonty-noto-sans` (Noto Sans 2.015) | `28b15b4` | 5 | 2,5 MB | instalacja |
 | `fonty-noto-emoji` (Noto Color Emoji 2.051) | `8998f5d` | 2 | 11 MB | instalacja |

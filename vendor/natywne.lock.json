@@ -1446,6 +1446,33 @@
   }
  },
  "modele": {
+  "e5-small": {
+   "rewizja": "761b726dd34fb83930e26aab4e9ac3899aa1fa78",
+   "kiedy": "instalacja",
+   "licencja": "MIT",
+   "zrodlo": "multilingual-e5-small-onnx",
+   "katalog": "e5-small",
+   "pliki": [
+    {
+     "cel": "model_quantized.onnx",
+     "url": "https://huggingface.co/Xenova/multilingual-e5-small/resolve/761b726dd34fb83930e26aab4e9ac3899aa1fa78/onnx/model_quantized.onnx",
+     "sha256": "f80102d3f2a1229f387d3c81909990d8945513e347b0eab049f7de3c6f98c193",
+     "rozmiar": 118308185
+    },
+    {
+     "cel": "tokenizer.json",
+     "url": "https://huggingface.co/Xenova/multilingual-e5-small/resolve/761b726dd34fb83930e26aab4e9ac3899aa1fa78/tokenizer.json",
+     "sha256": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+     "rozmiar": 17082730
+    },
+    {
+     "cel": "README.md",
+     "url": "https://huggingface.co/Xenova/multilingual-e5-small/resolve/761b726dd34fb83930e26aab4e9ac3899aa1fa78/README.md",
+     "sha256": "561a19594636657fe033f8b4427a7743b5f6f3a12f16cecc5f286feca0453245",
+     "rozmiar": 1077
+    }
+   ]
+  },
   "fonty-noto-emoji": {
    "rewizja": "8998f5dd683424a73e2314a8c1f1e359c19e8742",
    "kiedy": "instalacja",
@@ -1942,20 +1969,20 @@
   "narzedzia": {
    "python": "python312",
    "lock": "infra/python/natywne/narzedzia.lock",
-   "sha256": "09b11e6e7af1ec732dd64bfbff118451fe04756af3675d8161df8af13de2e7fe",
-   "paczek": 126,
+   "sha256": "bcc37257827c93c8d5f4c7fbe97807031edd4e34997f8f3c38dab8b17ff15f13",
+   "paczek": 127,
    "kiedy": "instalacja",
    "bez": [
     "docopt"
    ],
    "pobranie_mb": {
-    "windows-x64": 180,
-    "windows-arm64": 180,
-    "macos-arm64": 178,
-    "linux-x64": 233,
-    "linux-arm64": 220
+    "windows-x64": 183,
+    "windows-arm64": 183,
+    "macos-arm64": 181,
+    "linux-x64": 236,
+    "linux-arm64": 224
    },
-   "venv_mb": 646
+   "venv_mb": 655
   },
   "ocr": {
    "python": "python312",

@@ -18,3 +18,5 @@ pillow-heif==1.5.0
 pypdfium2==5.14.0
 # model spaCy dla G2P misaki (V03): koło z wydania explosion/spacy-models, suma jak w infra/Dockerfile
 en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
+# tokenizer modelu wektorów skarbca (wiedza/wektory.py, multilingual-e5-small; onnxruntime i numpy są wyżej)
+tokenizers==0.23.3
