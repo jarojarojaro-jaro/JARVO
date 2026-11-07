@@ -358,6 +358,7 @@ def test_jarvo_android_on_arm_skips_x86_emulator(tmp_path):
     """Obraz emulatora jest tylko dla x86_64: na ARM (Ampere, Graviton, Raspberry Pi) od razu jasna odmowa."""
     bin_ = tmp_path / "bin"; bin_.mkdir()
     _shim(bin_, "uname", 'case "$1" in -m) echo aarch64;; *) echo Linux;; esac\n')
+    _shim(bin_, "docker", "exit 0\n")         # Docker działa (bez tego na Linuksie bez Dockera test nie dojdzie do ARM)
     flota = tmp_path / "flota"; (flota / "compose").mkdir(parents=True)
     (flota / "compose/.env").write_text("DASHBOARD_PASSWORD=x\n", encoding="utf-8")
     res = _jarvo("android", "on", "--emulator", JARVO_LOCAL=str(flota), PATH=f"{bin_}:{os.environ['PATH']}")
@@ -641,8 +642,12 @@ def test_dashboard_password_on_screen_not_in_install_log(tmp_path):
 @pytest.mark.linux_only
 def test_local_up_prepare_without_terminal(tmp_path):
     """ssh 'curl | bash', cloud-init, Ansible: bez terminala read zwraca EOF; wybór domyślny zamiast cichego wyjścia."""
+    bin_ = tmp_path / "bin"; bin_.mkdir()
+    _shim(bin_, "docker", "exit 0\n")         # Docker działa i sudo bez hasła (jak w CI): test sprawdza wybór
+    _shim(bin_, "sudo", "exit 0\n")           # bez terminala, nie Dockera ani sudo hosta
     res = subprocess.run(["bash", str(LOCAL_UP), "--prepare"], stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                         encoding="utf-8", timeout=60, env={**os.environ, "JARVO_LOCAL": str(tmp_path / "L")})
+                         encoding="utf-8", timeout=60, env={**os.environ, "JARVO_LOCAL": str(tmp_path / "L"),
+                                                            "PATH": f"{bin_}:{os.environ['PATH']}"})
     assert res.returncode == 0, res.stdout + res.stderr
     assert "Bez terminala" in res.stdout and (tmp_path / "L/compose/.env").exists()
 
