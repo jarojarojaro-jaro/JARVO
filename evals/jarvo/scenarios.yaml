@@ -256,6 +256,7 @@ scenarios:
         - "korektę potwierdza jednym zdaniem i zapisuje `wiedza_orzeczenie` z cytatem użytkownika"
       should_not:
         - "wymyśla ustalenia bez notatki"
+        - "szuka faktu terminalem albo przeglądarką, zanim sprawdzi skarbiec (SOUL, zasada 10), albo sprawdza drugi raz fakt z notatki sprzed najwyżej 30 dni"
 
   - id: jarvo-przeglad-liczby
     type: protocol
