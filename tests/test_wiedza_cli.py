@@ -37,10 +37,11 @@ RUTYNY = ["jarvo-patrol", "jarvo-daily-brief", "jarvo-weekly-review", "jarvo-kno
 
 
 class Nadzorca:
-    """Atrapa modułu nadzorcy: kanał działa (status z bramą) albo nie (wyjątek), restarty zapisane."""
+    """Atrapa modułu nadzorcy: kanał działa (status z bramą i, gdy ustawiona, usługą wektorów) albo nie (wyjątek),
+    restarty zapisane."""
 
-    def __init__(self, brama: str | None = "dziala"):
-        self.brama, self.restarty = brama, []
+    def __init__(self, brama: str | None = "dziala", wektory: str | None = None):
+        self.brama, self.wektory, self.restarty = brama, wektory, []
 
     def polacz(self, _u):
         if self.brama is None:
@@ -48,8 +49,10 @@ class Nadzorca:
         return self
 
     def status(self):
-        return {"nadzorca": {"pid": 1}, "uslugi": {"brama": {"stan": self.brama, "pid": 4242, "gotowa": True,
-                                                              "powod": "kod 78" if self.brama == "postoj" else None}}}
+        uslugi = {"brama": {"stan": self.brama, "pid": 4242, "gotowa": True, "powod": "kod 78" if self.brama == "postoj" else None}}
+        if self.wektory:
+            uslugi["wektory"] = {"stan": self.wektory, "pid": 4343, "gotowa": self.wektory == "dziala"}
+        return {"nadzorca": {"pid": 1}, "uslugi": uslugi}
 
     def restart(self, nazwa):
         self.restarty.append(nazwa)
@@ -260,6 +263,41 @@ def test_wiek_kompilacji_i_lint(inst):
     finally:
         ix.zamknij()
     assert wc.sprawdz_lint(u)["stan"] == "ok"
+
+
+def test_wektory_w_diagnozie(inst, capsys):
+    """Doctor: model e5-small i venv narzędzi z narzedzia.json, usługa `wektory` w stanie nadzorcy i na /zdrowie,
+    liczba wektorów w indeksie (tylko odczyt). Bez czegokolwiek z tego uwaga, bo przypomnienia idą słowami;
+    `jarvo wiedza indeksuj` osadza brakujące, `status` mówi o usłudze."""
+    from atrapa_wektorow import MODEL, usluga_atrapy
+    u, ot = inst
+    r = wc.sprawdz_wektory(u, ot)
+    assert r["stan"] == "uwaga" and "model e5-small nie jest zainstalowany" in r["opis"]
+    model = u.jarvo_dane / "models" / "e5-small"
+    model.mkdir(parents=True)
+    spis = {"model-e5-small": {"katalog": str(model)}}
+    (u.stan / "narzedzia.json").write_text(json.dumps(spis), encoding="utf-8")
+    assert "brak venvu narzędzi" in wc.sprawdz_wektory(u, ot)["opis"]
+    spis["venv-narzedzia"] = {"python": sys.executable}
+    (u.stan / "narzedzia.json").write_text(json.dumps(spis), encoding="utf-8")
+    assert "serwis nie działa" in wc.sprawdz_wektory(u, ot)["opis"]                  # nadzorca nie działa
+    ot.nadzorca.brama = "dziala"
+    assert "nie prowadzi usługi wektorów" in wc.sprawdz_wektory(u, ot)["opis"]
+    ot.nadzorca.wektory = "ponowienie"
+    r = wc.sprawdz_wektory(u, ot)
+    assert r["stan"] == "uwaga" and "usługa ponowienie" in r["opis"] and "jarvo logs wektory" in r["rada"]
+    ot.nadzorca.wektory = "dziala"
+    with usluga_atrapy(wc.stan_skarbca(u)):
+        r = wc.sprawdz_wektory(u, ot)
+        assert r["stan"] == "uwaga" and f"{MODEL}, usługa działa" in r["opis"] and "wektory: 0/" in r["opis"]
+        assert wc.polecenie_wiedza_indeksuj(u, _a(pelny=False), [], ot) == 0
+        assert "✓ wektory:" in capsys.readouterr().out
+        r = wc.sprawdz_wektory(u, ot)
+        assert r["stan"] == "ok" and "wektory: 0/" not in r["opis"], r
+        assert wc.polecenie_wiedza_status(u, _a(json=False), [], ot) == 0
+        assert f"usługa: działa ({MODEL})" in capsys.readouterr().out
+    assert wc.polecenie_wiedza_indeksuj(u, _a(pelny=False), [], ot) == 0               # bez usługi: bez błędu
+    assert "usługa wektorów nie działa" in capsys.readouterr().out
 
 
 def test_brama_ze_stanu_nadzorcy(inst):

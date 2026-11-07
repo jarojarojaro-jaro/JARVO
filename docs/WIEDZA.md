@@ -275,7 +275,7 @@ ostrzegają zarówno Karpathy, jak i second-brain-os); Obsidian otwiera folder b
 
 ## 7. Wyszukiwanie i koszt
 
-**Teraz: FTS5 + linki, bez wektorów.** Indeks SQLite (`state/wiedza.db`): tabela FTS5 `unicode61 remove_diacritics 2`
+**Słowa: FTS5 + linki.** Indeks SQLite (`state/wiedza.db`): tabela FTS5 `unicode61 remove_diacritics 2`
 („wydajność” = „wydajnosc”), kolumny tytuł (waga 3), streszczenie (2), treść (1), tagi, folder, agent; zapytanie z prefiksami
 (`landing*`) i BM25. Zapytanie bierze do 12 słów bez stopsłów; dłuższe (treść karty, prompt rutyny, szkic w kompilacji)
 zostawia 12 najrzadszych w skarbcu (liczba notatek z danym prefiksem w FTS5, `Indeks.slowa_informacyjne`), a słowa bez
@@ -291,12 +291,24 @@ hit@5 (pytania z notatką wzorcową w pierwszych 5), MRR (średnia 1/pozycja pie
 oraz chybione pytania. Zestaw z pytaniami właściciela leży poza repo (prywatne dane), w repo jest tylko syntetyczny przykład
 w `tests/test_wiedza.py`. Punkt wyjścia (2026-11-07, 30 pytań po polsku): hit@5 23/30, MRR 0,55, 32 ms na turę z odświeżeniem.
 
-**Później (etap 7, gdy FTS zacznie chybiać albo skarbiec przekroczy ~3 000 notatek):** osadzenia (embeddingi) przez
-ONNX Runtime 1.29 i NumPy, które są już w obrazie w venv narzędzi (`/opt/jarvo/venv`, to samo, na czym działa `jarvo-stt`;
-wtyczka woła je podprocesem jak mowę): model `intfloat/multilingual-e5-small` (MIT, ~120 MB, pobierany przy pierwszym
-użyciu jak model mowy), wektory w tej samej bazie SQLite, iloczyn skalarny w NumPy (5 000 × 384 to milisekundy), wynik hybrydowy
-(BM25 + kosinus). Bez nowych usług, bez GPU, bez kluczy. FTS5 z `remove_diacritics` sprawdzone w Pythonie obrazu (SQLite 3.53). `qmd` odpada (3 modele GGUF ~2 GB), zewnętrzni dostawcy z chmurą odpadają
-(dane wychodzą z VPS).
+**Wektory (od 2026-11-08, decyzja W4 zmieniona przez właściciela).** Model `multilingual-e5-small` (MIT, eksport ONNX
+int8 Xenova, 135 MB, `modele.e5-small` pobierany przy instalacji) działa w jednej usłudze na instalację: `wektory`
+nadzorcy (`wiedza/wektory.py` w venvie narzędzi z onnxruntime, numpy i tokenizers; Windows, macOS, Linux). Brama
+Hermesa i `jarvo chat` nie mają tych bibliotek, więc wtyczka, kompilacja i `wiedza.py` pytają usługę po HTTP na
+127.0.0.1 z tokenem ze `state/wektory.json` (`KlientWektorow`, sama biblioteka standardowa). Osadzanie: prefiksy
+„query: ”/„passage: ”, tekst notatki = tytuł + streszczenie + 1200 znaków treści, do 512 tokenów, średnia z maską,
+normalizacja L2, 4 wątki. Wektory (ścieżka, hash tekstu, id modelu, float32) leżą w tabeli `wektory` w `state/wiedza.db`,
+liczone przyrostowo przy `indeksuj`, kompilacji, zasiewie i po starcie usługi; inny model = pełne przeliczenie.
+Iloczyn skalarny liczy czysty Python (setki notatek: kilka ms). **Aliasy** z frontmattera `aliasy: [...]` (SCHEMA)
+dopisują do pytania tytuł notatki, także w odmianie. **Długie pytanie** (> 25 słów: karta, prompt rutyny) idzie
+zdaniami (do 8), wynik notatki = najlepsze zdanie. Brak modelu, usługi albo odpowiedzi w 0,3 s = przypomnienie
+słowami jak wcześniej, bez błędu w turze; dziennik przypomnień ma pole `silnik` (wektory | hybryda | slowa) i `ms`.
+**Wybór silnika pomiarem** (`wiedza.py ocena --silnik`, zestaw syntetyczny `tests/data/wiedza-ocena.json`, 33 pytania,
+2026-11-08): wektory hit@5 32/33, MRR 0,83; hybryda RRF (k=60) z BM25 28/33, 0,77; słowa 25/33, 0,66; mediana ok.
+10 ms na pytanie. Domyślnie więc wektory, a notatka jeszcze bez wektora wchodzi z miejscem z listy słów; hybryda
+zostaje do porównania na prywatnych zestawach właściciela. Pomiar operatora (7–8.11): wektory 29/30, słowa 23/30.
+VPS (obraz Dockera) nie ma jeszcze usługi: tam przypomnienia idą słowami. `jarvo doctor` pokazuje model, usługę
+i liczbę wektorów. `qmd` odpada (3 modele GGUF ~2 GB), zewnętrzni dostawcy z chmurą odpadają (dane wychodzą z komputera).
 
 | Mechanizm | Model | Ile |
 |---|---|---|
@@ -419,7 +431,7 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    scenariusz `<agent>-skarbiec` (typ `protocol`) w evals każdego agenta (dziś 10) (najpierw `wiedza_szukaj`, korekta →
    `wiedza_orzeczenie`, lekcje przez `wiedza_zapisz`, wyniki pracy zostają w plikach), dokumentacja (FLEET, BOSS, HQ, RUNBOOK,
    VPS, PROFILE-SPEC, JARVO-CALOSC, PLAN). Red team i evals wymagają modeli: uruchomienie na VPS/stagingu.
-7. ⬜ **Opcjonalnie:** osadzenia ONNX (hybryda), `hermes-memory-wiki` obok, Obsidian na Twoim komputerze (instrukcja w RUNBOOK).
+7. 🟡 **Opcjonalnie:** osadzenia ONNX ✅ (2026-11-08: wektory e5-small z usługi nadzorcy, §7), `hermes-memory-wiki` obok, Obsidian na Twoim komputerze (instrukcja w RUNBOOK).
 
 Kolejność jest taka, żeby po etapie 3 flota już zbierała wiedzę (nawet zanim będzie ją ładnie widać), a po etapie 4 z niej
 korzystała; zakładka jest ostatnia, bo pokazuje to, co już działa.
@@ -433,7 +445,7 @@ korzystała; zakładka jest ostatnia, bo pokazuje to, co już działa.
 | W1 ✅ | Gdzie leży skarbiec | istniejący `knowledge/` floty (`/opt/data/jarvo/knowledge`) | już w backupie, w podglądzie HQ i w skillach (`brands/`, `user/`, `fleet/`); jeden folder = jeden vault Obsidiana |
 | W2 ✅ | Jak agenci są wpięci | wtyczka Hermesa jako **dostawca pamięci** (`memory.provider: jarvo-wiedza`) u każdego agenta floty (dziś 10), nie sam skill | przypomnienie przed turą i wyciąg po sesji bez decyzji modelu „czy zajrzeć”; działa w kanbanie i cronie; jeden kod dla wszystkich profili |
 | W3 ✅ | Kto pisze notatki | **jeden piszący**: kompilacja głównym modelem; agenci tylko szkice i orzeczenia | brak konfliktów, jedna transakcja z cofaniem, spójny format, notatki pisane raz zamiast przez każdego agenta w trakcie pracy |
-| W4 | Wyszukiwanie | FTS5 + krok po linkach; osadzenia ONNX dopiero, gdy FTS zawodzi | zero nowych usług, działa dziś w obrazie; wzorzec i doświadczenie innych mówią „najpierw struktura, wektory potem” |
+| W4 ✅ | Wyszukiwanie | **zmiana właściciela 2026-11-08:** wektory e5-small z usługi nadzorcy (jeden ciepły model na instalację), aliasy i długie pytania zdaniami; FTS5 + krok po linkach zostaje jako zapas i dla notatek bez wektora | pomiar: słowa chybiały parafrazy (23/30), wektory 29/30; dawniej „najpierw struktura, wektory potem” |
 | W5 ✅ | Modele | wyciągi i kompilacja: główny model, poziom `frontier` (decyzja właściciela 2026-10-21: „tani model nie może weryfikować skarbca”); synteza tygodnia: Jarvo | do skarbca trafia główna wiedza floty; koszty w §7 |
 | W6 | GUI | własna zakładka „Wiedza” z grafem na canvasie (bez bibliotek); `hermes-memory-wiki` opcjonalnie obok | ma pokazywać notatki, orzeczenia i skrzynkę, których wtyczka Nous nie zna; graf ~150 linii, jak wieża HQ |
 | W7 ✅ | Obsidian | skarbiec żyje tam, gdzie stoi Jarvo (VPS, lokalnie, telefon); zakładka „Wiedza” jest podglądem wszędzie, Obsidian to opcjonalne okno na ten sam folder, bez synchronizacji chmurowej | jeden system zapisu; Obsidian nie jest wymagany, żeby całość działała |

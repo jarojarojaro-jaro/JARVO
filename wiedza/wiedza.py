@@ -3,16 +3,19 @@
 
 Skarbiec to katalog zwykłych plików Markdown (projekt: docs/WIEDZA.md). Ten skrypt:
   zasiej      katalogi, SCHEMA.md, huby (z fleet.json), INDEX, LOG, orzeczenia, docs repo i pliki profili (SOUL, README,
-              CHANGELOG, rubryka, materiały skilli, spis źródeł) → zrodla/jarvo-repo, git init
-  indeksuj    indeks FTS5 (state/wiedza.db), INDEX.md i listy w hubach z plików (0 tokenów, deterministycznie)
-  szukaj      wyszukiwanie po polsku (ogonki bez znaczenia), wynik: ścieżka · streszczenie
+              CHANGELOG, rubryka, materiały skilli, spis źródeł) → zrodla/jarvo-repo, git init, indeks i wektory
+  indeksuj    indeks FTS5 (state/wiedza.db), INDEX.md i listy w hubach z plików (0 tokenów, deterministycznie), wektory
+              nowych i zmienionych notatek (gdy działa usługa wiedza/wektory.py)
+  szukaj      wyszukiwanie po polsku (ogonki bez znaczenia, aliasy notatek): wektory (albo hybryda z BM25, --silnik),
+              a bez usługi wektorów same słowa (BM25); wynik: ścieżka · streszczenie
   czytaj      cała notatka
   zapisz      szkic do skrzynka/ (agent nie pisze notatek sam: zasada 9 schematu)
   orzeczenie  jedna datowana linia w orzeczenia/<kogo>.md (tylko od człowieka)
   lint        raport LINT.md (martwe linki, sieroty, brak źródła, sekrety, duplikaty, przeterminowane…)
   graf        węzły i linki jako JSON (zakładka „Wiedza”)
   cofnij      cofa ostatni punkt zapisu git
-  status      liczby
+  status      liczby (także wektory i stan usługi)
+  ocena       trafność przypomnień na zestawie pytań (hit@5, MRR, ms) dla silnika hybryda | wektory | slowa
 
 Używane przez wtyczkę jarvo-wiedza (import), rutyny (CLI), `jarvo wiedza` (jarvo/wiedza_cli.py), testy
 (tests/test_wiedza.py). Domyślne ścieżki: JARVO_KNOWLEDGE_DIR, a bez niej <dane>/jarvo/knowledge, gdzie <dane> to
@@ -25,14 +28,22 @@ końcu, zapis spoza NFC, ta sama nazwa inną wielkością liter, ścieżka dłu�
 w state/wiedza-lint.json (czyta je `jarvo doctor`, który sam niczego nie zapisuje).
 Jeden piszący (§6): `Blokada` = blokada systemu (msvcrt na Windows, fcntl na POSIX) na state/wiedza.zamek i znacznik
 state/wiedza.lock z PID-em i czasem (ten sam format czyta i stawia scripts/install_fleet.py przy zasiewie).
+Wektory (docs/WIEDZA.md §7, W4): model e5-small działa w osobnej usłudze (wiedza/wektory.py, venv narzędzi), a ten
+plik zostaje przy bibliotece standardowej: KlientWektorow pyta ją po HTTP na 127.0.0.1 z tokenem ze state/wektory.json,
+wektory notatek leżą w tabeli `wektory` w state/wiedza.db, iloczyn skalarny liczy czysty Python.
 """
 from __future__ import annotations
 
 import argparse
+import array
+import base64
 import contextlib
 import datetime as dt
 import hashlib
+import http.client
 import json
+import math
+import operator
 import os
 import re
 import shutil
@@ -119,6 +130,25 @@ STOPSLOWA = {"i", "a", "w", "z", "na", "do", "to", "że", "ze", "się", "sie", "
              "ma", "mam", "masz", "być", "byc", "był", "była", "było", "będzie", "bedzie", "ich", "jego", "jej", "nam", "nas", "moja", "mój", "moje"}
 MAX_SLOW_ZAPYTANIA = 12          # słów w zapytaniu FTS5; dłuższe pytanie zostawia najrzadsze (Indeks.slowa_informacyjne)
 MAX_SLOW_OCENIANYCH = 60         # tyle pierwszych słów długiego pytania liczymy w indeksie
+# wektory (docs/WIEDZA.md §7, decyzja W4): jeden ciepły model e5-small na instalację w usłudze wiedza/wektory.py
+WEKTORY_STAN = "wektory.json"     # state/: port, token, model i PID usługi (pisze ją usługa przy starcie, czytają klienci)
+WEKTORY_CZAS_S = 0.3              # przypomnienie przed turą: tyle czeka na wektor pytania, potem same słowa (BM25)
+WEKTORY_CZAS_NARZEDZIA_S = 2.0    # wiedza_szukaj i kandydaci kompilacji (poza turą rozmowy)
+WEKTORY_CZAS_ZAPISU_S = 120.0     # osadzanie notatek (indeksuj, kompilacja, zasiew): jedna paczka
+WEKTORY_PACZKA = 8                # notatek na jedno wywołanie usługi (zapytanie z tury nie czeka za długą paczką)
+MAX_ZNAKOW_WEKTORA = 1200         # treści notatki w tekście wektora, po tytule i streszczeniu
+DLUGIE_ZAPYTANIE = 25             # słów: dłuższe pytanie idzie zdaniami, wynik notatki = najlepsze zdanie
+MAX_ZDAN = 8                      # zdań długiego pytania (pierwsze; każde to osobny wektor)
+MIN_SLOW_ZDANIA = 3               # krótszy kawałek długiego pytania (nagłówek, „Tak.”) nie dostaje wektora
+WEKTOROW_W_RANKINGU = 30
+RRF_K = 60                        # miejsce na liście → punkty 1 / (k + pozycja) (Reciprocal Rank Fusion)
+SILNIKI = ("wektory", "hybryda", "slowa")
+# wybór pomiarem `wiedza.py ocena` na zestawie syntetycznym tests/data/wiedza-ocena.json (2026-11-08, 33 pytania):
+# wektory hit@5 32/33, MRR 0,83; hybryda RRF 28/33, 0,77; słowa 25/33, 0,66 (docs/WIEDZA.md §7)
+SILNIK = "wektory"
+MAX_ALIASOW = 8                   # aliasów jednej notatki (frontmatter `aliasy:`)
+MAX_DOPISKOW_ALIASOW = 5          # tytułów dopisanych do jednego zapytania
+WERSJA_INDEKSU = "2"              # 2: aliasy i wektory; inna wersja w bazie = jedno pełne odświeżenie indeksu
 HUB_AGENTA_RE = re.compile(r"^agenci/[^/]+/_hub-[^/]+$")
 SEKRETY = [
     ("klucz Stripe", re.compile(r"\bsk_(live|test)_[A-Za-z0-9]{8,}")),
@@ -656,7 +686,8 @@ class Skarbiec:
 # ------------------------------------------------------------------------------------------------ indeks FTS5
 
 class Indeks:
-    """SQLite poza skarbcem (state/wiedza.db): FTS5 z `remove_diacritics 2` (ogonki bez znaczenia), linki, metadane."""
+    """SQLite poza skarbcem (state/wiedza.db): FTS5 z `remove_diacritics 2` (ogonki bez znaczenia), linki, metadane,
+    aliasy notatek (frontmatter `aliasy:`) i wektory notatek (`wektory`: ścieżka, hash tekstu, id modelu, float32)."""
 
     def __init__(self, sk: Skarbiec):
         self.sk = sk
@@ -671,14 +702,23 @@ class Indeks:
             CREATE TABLE IF NOT EXISTS linki(z TEXT, do_ TEXT, etykieta TEXT, auto INTEGER, rozwiazany INTEGER);
             CREATE INDEX IF NOT EXISTS linki_do ON linki(do_);
             CREATE TABLE IF NOT EXISTS meta(klucz TEXT PRIMARY KEY, wartosc TEXT);
+            CREATE TABLE IF NOT EXISTS aliasy(sciezka TEXT, alias TEXT, tytul TEXT);
+            CREATE INDEX IF NOT EXISTS aliasy_sciezka ON aliasy(sciezka);
+            CREATE TABLE IF NOT EXISTS wektory(sciezka TEXT PRIMARY KEY, hash TEXT, model TEXT, wektor BLOB, mtime REAL,
+                rozmiar INTEGER);
         """)
+        wersja = self.db.execute("SELECT wartosc FROM meta WHERE klucz = 'wersja'").fetchone()
+        self._przebuduj = wersja is None or wersja[0] != WERSJA_INDEKSU      # indeks sprzed aliasów: raz od nowa
+        self.silnik = "slowa"                   # silnik ostatniego szukaj(): hybryda | wektory | slowa (dziennik przypomnień)
 
     def zamknij(self) -> None:
         self.db.close()
 
     def odswiez(self, pelny: bool = False) -> dict:
         """Indeks przyrostowy po mtime i rozmiarze. Linki przeliczane w całości, ale tylko gdy coś się zmieniło
-        (notatka, lista plików specjalnych) albo przy `pelny`; bez zmian odświeżenie to sam przegląd katalogów."""
+        (notatka, lista plików specjalnych) albo przy `pelny`; bez zmian odświeżenie to sam przegląd katalogów.
+        Wektorów nie liczy (to robi odswiez_wektory przy indeksuj, kompilacji i zasiewie, poza turą rozmowy)."""
+        pelny = pelny or self._przebuduj
         pliki = self.sk.pliki()
         zbior = set(pliki)
         specjalne = ",".join(sorted(n for n in PLIKI_SPECJALNE if (self.sk.root / n).is_file()))
@@ -688,6 +728,7 @@ class Indeks:
         with self.db:
             if pelny:                                    # DELETE po kolumnie UNINDEXED skanuje całe FTS: przy przebudowie raz
                 self.db.execute("DELETE FROM fts")
+                self.db.execute("DELETE FROM aliasy")
             for rel in pliki:
                 p = self.sk.root / f"{rel}.md"           # z pliki(), więc w skarbcu: bez resolve() (na Windows otwiera plik)
                 st = p.stat()
@@ -705,10 +746,16 @@ class Indeks:
                                 (rel, n.mtime, n.rozmiar, n.tytul, n.streszczenie, n.typ, str(n.fm.get("status") or ""),
                                  str(n.fm.get("agent") or ""), n.folder, str(n.fm.get("zmieniono") or ""),
                                  str(n.fm.get("wazne_do") or ""), int(n.hub), n.slowa))
+                if not pelny:
+                    self.db.execute("DELETE FROM aliasy WHERE sciezka = ?", (rel,))
+                for alias in aliasy_notatki(n):
+                    self.db.execute("INSERT INTO aliasy VALUES (?,?,?)", (rel, alias, n.tytul))
             usuniete = [s for s in stare if s not in zbior]
             for s in usuniete:
                 self.db.execute("DELETE FROM fts WHERE sciezka = ?", (s,))
                 self.db.execute("DELETE FROM pliki WHERE sciezka = ?", (s,))
+                self.db.execute("DELETE FROM aliasy WHERE sciezka = ?", (s,))
+                self.db.execute("DELETE FROM wektory WHERE sciezka = ?", (s,))
             # linki: całość od nowa (potrzebne do lintu, grafu i rozszerzania wyników), gdy cokolwiek się zmieniło
             stan_linkow = self.db.execute("SELECT wartosc FROM meta WHERE klucz = 'linki'").fetchone()
             if pelny or nowe or zmienione or usuniete or stan_linkow is None or stan_linkow[0] != specjalne:
@@ -722,6 +769,9 @@ class Indeks:
                         cel_r = self.sk.rozwiaz(cel, znane, zbior)
                         self.db.execute("INSERT INTO linki VALUES (?,?,?,?,?)", (rel, cel_r or cel, etykieta, int(auto), int(cel_r is not None)))
                 self.db.execute("INSERT OR REPLACE INTO meta VALUES ('linki', ?)", (specjalne,))
+            if self._przebuduj:
+                self.db.execute("INSERT OR REPLACE INTO meta VALUES ('wersja', ?)", (WERSJA_INDEKSU,))
+        self._przebuduj = False
         return {"pliki": len(pliki), "nowe": nowe, "zmienione": zmienione, "usuniete": len(usuniete)}
 
     @staticmethod
@@ -749,30 +799,102 @@ class Indeks:
         wybrane = set(sorted(trafne, key=lambda w: df[w])[:n])       # sort stabilny: przy remisie wcześniejsze słowo
         return [w for w in slowa if w in wybrane]
 
-    def szukaj(self, q: str, limit: int = 5, folder: str | None = None, agent: str | None = None, zrodla: bool = False) -> list[dict]:
-        zap = self.zapytanie(self.slowa_informacyjne(q))
-        if not zap:
-            return []
-        wiersze = self.db.execute(
-            "SELECT f.sciezka, p.tytul, p.streszczenie, p.typ, p.status, p.folder, p.agent, p.zmieniono, "
-            "bm25(fts, 0, 3.0, 2.0, 1.0, 1.5) AS w FROM fts f JOIN pliki p ON p.sciezka = f.sciezka WHERE fts MATCH ? ORDER BY w LIMIT ?",
-            (zap, limit * 6)).fetchall()
-        out, widziane = [], set()
-        for r in wiersze:
+    def rozszerz(self, q: str) -> str:
+        """Zapytanie z tytułami notatek, których alias (frontmatter `aliasy:`) pada w pytaniu: „co lubi szefowa” →
+        „co lubi szefowa Ola Wrona”. Ogonki i wielkość liter bez znaczenia, słowa aliasu pasują też w odmianie
+        (_ma_fraze). Tytuł, który już jest w pytaniu, nie wraca."""
+        slowa = _slowa_lista(q)
+        if not slowa:
+            return q
+        w_pytaniu = " ".join(slowa)
+        dopiski: list[str] = []
+        for alias, tytul in self.db.execute("SELECT alias, tytul FROM aliasy ORDER BY sciezka, alias"):
+            if tytul in dopiski or " ".join(_slowa_lista(tytul)) in w_pytaniu or not _ma_fraze(slowa, alias.split()):
+                continue
+            dopiski.append(tytul)
+            if len(dopiski) >= MAX_DOPISKOW_ALIASOW:
+                break
+        return q + (" " + " ".join(dopiski) if dopiski else "")
+
+    def szukaj_wektorami(self, osadzacz, q: str, n: int = WEKTOROW_W_RANKINGU) -> list[tuple[str, float]] | None:
+        """[(ścieżka, kosinus)] najlepszych `n` notatek albo None (brak modelu, wektorów, usługi albo czasu: wołający
+        zostaje przy słowach). Pytanie dłuższe niż DLUGIE_ZAPYTANIE słów idzie zdaniami (każde z aliasami), wynik notatki
+        to najlepsze zdanie. Iloczyn skalarny w czystym Pythonie: wektory są znormalizowane, brama nie ma numpy."""
+        model = getattr(osadzacz, "model", "") if osadzacz is not None else ""
+        if not model:
+            return None
+        wiersze = self.db.execute("SELECT sciezka, wektor FROM wektory WHERE model = ?", (model,)).fetchall()
+        if not wiersze:
+            return None
+        pytania = osadzacz.osadz([f"query: {self.rozszerz(z)}" for z in zdania_zapytania(q)])
+        if not pytania:
+            return None
+        wymiar = len(pytania[0])
+        wyniki = []
+        for s, blob in wiersze:
+            v = wektor_z_bajtow(blob)
+            if len(v) == wymiar:
+                wyniki.append((-max(_iloczyn(p, v) for p in pytania), s))
+        wyniki.sort()
+        return [(s, -w) for w, s in wyniki[:n]]
+
+    def szukaj(self, q: str, limit: int = 5, folder: str | None = None, agent: str | None = None, zrodla: bool = False,
+               wektory=None, silnik: str | None = None) -> list[dict]:
+        """Notatki do pytania. `wektory` (KlientWektorow albo atrapa: `model`, `osadz(teksty)`) i `silnik` (SILNIKI,
+        domyślnie SILNIK): wektory = lista wektorów (kosinus), a notatki jeszcze bez wektora (nowe od ostatniego
+        osadzania, zrodla/ przy `zrodla`) wchodzą z miejscem z listy BM25; hybryda = fuzja RRF listy BM25 i listy
+        wektorów; slowa = BM25. Bez wektorów (brak usługi, modelu, czasu) zawsze BM25; użyty silnik zostaje
+        w `self.silnik`. Zapytanie rozszerzają aliasy notatek (rozszerz)."""
+        silnik = silnik if silnik in SILNIKI else SILNIK
+        wek = self.szukaj_wektorami(wektory, q) if wektory is not None and silnik != "slowa" else None
+        self.silnik = silnik if wek is not None else "slowa"
+        kolumny = "p.sciezka, p.tytul, p.streszczenie, p.typ, p.status, p.folder, p.agent, p.zmieniono"
+
+        def dopuszczona(r) -> bool:
             s = r["sciezka"]
             if not zrodla and s.startswith(POZA_WYSZUKIWANIEM):
-                continue
+                return False
             if r["typ"] == "skill" and not folder:            # węzły grafu o flocie: tylko z folder="fleet"
-                continue
+                return False
             if folder and not s.startswith(folder.rstrip("/") + "/"):
-                continue
-            if agent and r["agent"] and r["agent"] != agent:
-                continue
+                return False
+            return not (agent and r["agent"] and r["agent"] != agent)
+
+        bm = []
+        zap = self.zapytanie(self.slowa_informacyjne(self.rozszerz(q)))
+        if zap:
+            bm = [r for r in self.db.execute(
+                f"SELECT {kolumny}, bm25(fts, 0, 3.0, 2.0, 1.0, 1.5) AS w FROM fts f JOIN pliki p ON p.sciezka = f.sciezka "
+                "WHERE fts MATCH ? ORDER BY w LIMIT ?", (zap, limit * 6)).fetchall() if dopuszczona(r)]
+        if wek is None:
+            ranking = [(r, round(-r["w"], 3)) for r in bm]
+        else:
+            meta = {r["sciezka"]: r for r in bm}
+            brak = [s for s, _w in wek if s not in meta]
+            for i in range(0, len(brak), 500):
+                czesc = brak[i:i + 500]
+                for r in self.db.execute(f"SELECT {kolumny} FROM pliki p WHERE p.sciezka IN ({','.join('?' * len(czesc))})", czesc):
+                    meta[r["sciezka"]] = r
+            lista_wek = [s for s, _w in wek if s in meta and dopuszczona(meta[s])]
+            wynik: dict[str, float] = {}
+            if self.silnik == "wektory":
+                z_wektorem = {r[0] for r in self.db.execute("SELECT sciezka FROM wektory WHERE model = ?", (wektory.model,))}
+                for lista in (lista_wek, [r["sciezka"] for r in bm if r["sciezka"] not in z_wektorem]):
+                    for poz, s in enumerate(lista):
+                        wynik.setdefault(s, 1.0 / (RRF_K + poz))
+            else:
+                for lista in ([r["sciezka"] for r in bm], lista_wek):
+                    for poz, s in enumerate(lista):
+                        wynik[s] = wynik.get(s, 0.0) + 1.0 / (RRF_K + poz)
+            ranking = [(meta[s], round(wynik[s], 5)) for s in sorted(wynik, key=lambda s: (-wynik[s], s))]
+        out, widziane = [], set()
+        for r, punkty in ranking:
+            s = r["sciezka"]
             if s in widziane:
                 continue
             widziane.add(s)
             out.append({"sciezka": s, "tytul": r["tytul"], "streszczenie": r["streszczenie"], "typ": r["typ"],
-                        "status": r["status"], "zmieniono": r["zmieniono"], "wynik": round(-r["w"], 3)})
+                        "status": r["status"], "zmieniono": r["zmieniono"], "wynik": punkty})
             if len(out) >= limit:
                 break
         # krok po linkach: trafienie w marce pociąga orzeczenia tej marki
@@ -785,6 +907,50 @@ class Indeks:
                     out.append({"sciezka": orz, "tytul": f"Orzeczenia marki {marka}", "streszczenie": "korekty użytkownika dotyczące tej marki",
                                 "typ": "orzeczenia", "status": "aktualna", "zmieniono": "", "wynik": 0.0})
         return out
+
+    def odswiez_wektory(self, osadzacz, czas_s: float | None = None) -> dict:
+        """Wektory notatek przyrostowo (po odswiez(): pliki i FTS aktualne). Tekst wektora jak w pomiarze: „passage: ”,
+        tytuł, streszczenie, początek treści (tekst_wektora). Nowa albo zmieniona notatka (mtime, rozmiar) z innym hashem
+        tekstu dostaje nowy wektor; ten sam hash = sam nowy mtime. Inny model niż w bazie = pełne przeliczenie (wektory
+        starego modelu znikają). Zrodla/ i skrzynka/ bez wektorów (poza wyszukiwaniem). Paczki po WEKTORY_PACZKA, każda
+        we własnej transakcji; usługa niedostępna w trakcie = przerwane, reszta przy następnym razie. Zwraca liczby."""
+        model = getattr(osadzacz, "model", "") if osadzacz is not None else ""
+        wynik = {"model": model, "nowe": 0, "usuniete": 0, "wektorow": 0, "notatek": 0, "przerwane": not model}
+        if not model:
+            return wynik
+        with self.db:
+            wynik["usuniete"] = self.db.execute("DELETE FROM wektory WHERE model != ? OR sciezka NOT IN (SELECT sciezka FROM pliki)",
+                                                (model,)).rowcount
+        stare = {r[0]: (r[1], r[2], r[3]) for r in self.db.execute("SELECT sciezka, mtime, rozmiar, hash FROM wektory")}
+        szukane = [(r[0], r[1], r[2]) for r in self.db.execute("SELECT sciezka, mtime, rozmiar FROM pliki")
+                   if not r[0].startswith(POZA_WYSZUKIWANIEM)]
+        wynik["notatek"] = len(szukane)
+        zmienione = {s: (m, n) for s, m, n in szukane if stare.get(s, (None, None, None))[:2] != (m, n)}
+        kolejka = []
+        if zmienione:
+            teksty = {s: tekst_wektora(t, st, tr) for s, t, st, tr in
+                      self.db.execute("SELECT sciezka, tytul, streszczenie, tresc FROM fts") if s in zmienione}
+            with self.db:
+                for s, (m, n) in zmienione.items():
+                    if s not in teksty:
+                        continue
+                    h = hashlib.sha256(teksty[s].encode("utf-8")).hexdigest()[:16]
+                    if s in stare and stare[s][2] == h:          # dotknięty plik bez zmiany tekstu: bez osadzania
+                        self.db.execute("UPDATE wektory SET mtime = ?, rozmiar = ? WHERE sciezka = ?", (m, n, s))
+                    else:
+                        kolejka.append((s, h, m, n, teksty[s]))
+        for i in range(0, len(kolejka), WEKTORY_PACZKA):
+            paczka = kolejka[i:i + WEKTORY_PACZKA]
+            wektory = osadzacz.osadz([x[4] for x in paczka], czas_s=czas_s)
+            if not wektory or len(wektory) != len(paczka):
+                wynik["przerwane"] = True
+                break
+            with self.db:
+                for (s, h, m, n, _t), v in zip(paczka, wektory):
+                    self.db.execute("INSERT OR REPLACE INTO wektory VALUES (?,?,?,?,?,?)", (s, h, model, wektor_do_bajtow(v), m, n))
+            wynik["nowe"] += len(paczka)
+        wynik["wektorow"] = self.db.execute("SELECT count(*) FROM wektory WHERE model = ?", (model,)).fetchone()[0]
+        return wynik
 
     def notatki(self) -> list[sqlite3.Row]:
         return self.db.execute("SELECT * FROM pliki ORDER BY sciezka").fetchall()
@@ -810,6 +976,141 @@ class Indeks:
         return {"wezly": wezly, "linki": [l for l in linki if w_grafie(l["z"])]}
 
 
+# ------------------------------------------------------------------------------------------------ wektory i aliasy
+
+def _slowa_lista(s: str) -> list[str]:
+    return re.findall(r"\w+", bez_ogonkow(s).lower())
+
+
+def _ma_fraze(slowa: list[str], fraza: list[str]) -> bool:
+    """Fraza aliasu w słowach pytania (oba bez ogonków, małymi literami), słowo po słowie. Słowo aliasu od 4 liter
+    pasuje też do odmiany: słowo pytania zaczyna się od niego bez dwóch ostatnich liter, ale od co najmniej 4
+    („szefowa” → „szefowej”, „właścicielka” → „właścicielce”); krótsze tylko dokładnie („Ola”)."""
+    def pasuje(slowo: str, f: str) -> bool:
+        return slowo == f or (len(f) >= 4 and slowo.startswith(f[:max(4, len(f) - 2)]))
+    n = len(fraza)
+    return n > 0 and any(all(pasuje(slowa[i + j], f) for j, f in enumerate(fraza)) for i in range(len(slowa) - n + 1))
+
+
+def aliasy_notatki(n: Notatka) -> list[str]:
+    """Aliasy z frontmattera `aliasy: [właściciel, szef]` (lista albo tekst z przecinkami) jako frazy bez ogonków,
+    małymi literami, najwyżej MAX_ALIASOW."""
+    surowe = n.fm.get("aliasy") or []
+    lista = surowe if isinstance(surowe, list) else str(surowe).split(",")
+    out = [" ".join(_slowa_lista(str(a)[:60])) for a in lista]
+    return list(dict.fromkeys(a for a in out if a))[:MAX_ALIASOW]
+
+
+def zdania_zapytania(q: str) -> list[str]:
+    """Pytanie do osadzenia: krótkie (do DLUGIE_ZAPYTANIE słów) w całości, dłuższe (treść karty, prompt rutyny)
+    zdaniami od MIN_SLOW_ZDANIA słów, najwyżej MAX_ZDAN pierwszych; bez takich zdań całe pytanie."""
+    if len(q.split()) <= DLUGIE_ZAPYTANIE:
+        return [q]
+    czesci = [" ".join(c.split()) for c in re.split(r"(?<=[.!?])\s+|\n+| — ", q)]
+    return [c for c in czesci if len(c.split()) >= MIN_SLOW_ZDANIA][:MAX_ZDAN] or [q]
+
+
+def tekst_wektora(tytul: str, streszczenie: str, tresc: str) -> str:
+    """Tekst notatki dla modelu e5 (prefiks „passage: ”): tytuł, streszczenie i początek treści z indeksu FTS."""
+    return f"passage: {tytul}. {streszczenie or ''} {(tresc or '')[:MAX_ZNAKOW_WEKTORA]}"
+
+
+def wektor_do_bajtow(v) -> bytes:
+    """float32 little-endian (ten sam układ na każdym systemie i w odpowiedzi usługi)."""
+    a = array.array("f", v)
+    if sys.byteorder == "big":
+        a.byteswap()
+    return a.tobytes()
+
+
+def wektor_z_bajtow(b: bytes) -> array.array:
+    a = array.array("f")
+    a.frombytes(b[:len(b) - len(b) % 4])
+    if sys.byteorder == "big":
+        a.byteswap()
+    return a
+
+
+_iloczyn = getattr(math, "sumprod", None) or (lambda a, b: sum(map(operator.mul, a, b)))   # sumprod od Pythona 3.12
+
+
+class KlientWektorow:
+    """Klient usługi wektorów (wiedza/wektory.py: jeden ciepły model e5-small na instalację w venvie narzędzi, docs/
+    WIEDZA.md §7). Port, token, id modelu i PID z state/wektory.json (pisze je usługa przy starcie); HTTP tylko na
+    127.0.0.1, z tokenem w nagłówku, bez proxy systemu (http.client). Sama biblioteka standardowa: brama Hermesa i
+    `jarvo chat` nie mają numpy ani onnxruntime. Brak pliku, martwy PID, odmowa, zły token, inny model albo przekroczony
+    `czas_s` = None, a powód w `blad`: wołający zostaje przy słowach (BM25), tura idzie dalej bez błędu."""
+
+    MAX_ODPOWIEDZI = 32 << 20
+
+    def __init__(self, stan: str | Path, czas_s: float = WEKTORY_CZAS_S):
+        self.czas_s = czas_s
+        self.blad = ""
+        try:
+            d = json.loads((Path(stan) / WEKTORY_STAN).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            d = {}
+        d = d if isinstance(d, dict) else {}
+        port, pid = d.get("port"), d.get("pid")
+        self.port = port if isinstance(port, int) and 0 < port < 65536 else 0
+        self.token = str(d.get("token") or "")
+        self.model = str(d.get("model") or "")
+        if self.port and isinstance(pid, int) and not pid_zyje(pid):     # resztka po awarii usługi: bez czekania na port
+            self.port, self.blad = 0, f"usługa wektorów nie działa (PID {pid})"
+        if not self.dostepny:
+            self.model = ""
+            self.blad = self.blad or "usługa wektorów nie działa (brak state/wektory.json)"
+
+    @property
+    def dostepny(self) -> bool:
+        return bool(self.port and self.token and self.model)
+
+    def _zapytaj(self, metoda: str, sciezka: str, cialo: dict | None = None, czas_s: float | None = None) -> dict | None:
+        if not self.dostepny:
+            return None
+        polaczenie = http.client.HTTPConnection("127.0.0.1", self.port, timeout=self.czas_s if czas_s is None else czas_s)
+        try:
+            dane = json.dumps(cialo, ensure_ascii=False).encode("utf-8") if cialo is not None else None
+            polaczenie.request(metoda, sciezka, body=dane, headers={"Authorization": f"Bearer {self.token}",
+                                                                    "Content-Type": "application/json"})
+            odp = polaczenie.getresponse()
+            tresc = odp.read(self.MAX_ODPOWIEDZI)
+            if odp.status != 200:
+                self.blad = f"usługa wektorów: HTTP {odp.status}"
+                return None
+            wynik = json.loads(tresc.decode("utf-8"))
+            return wynik if isinstance(wynik, dict) else None
+        except (OSError, http.client.HTTPException, ValueError) as e:
+            self.blad = f"usługa wektorów: {type(e).__name__}"           # TimeoutError, ConnectionRefusedError…
+            return None
+        finally:
+            polaczenie.close()
+
+    def zdrowie(self, czas_s: float | None = None) -> dict | None:
+        """{"model", "wymiar", "pid", "od"} działającej usługi albo None."""
+        w = self._zapytaj("GET", "/zdrowie", czas_s=czas_s)
+        return w if w and w.get("model") == self.model else None
+
+    def osadz(self, teksty: list[str], czas_s: float | None = None) -> list[array.array] | None:
+        """Znormalizowane wektory tekstów (z prefiksami e5: „query: ”, „passage: ”) albo None."""
+        if not teksty:
+            return []
+        w = self._zapytaj("POST", "/osadz", {"teksty": list(teksty)}, czas_s)
+        if not w or w.get("model") != self.model:
+            self.blad = self.blad or "usługa wektorów: inny model niż w state/wektory.json"
+            return None
+        try:
+            wymiar = int(w["wymiar"])
+            plaskie = wektor_z_bajtow(base64.b64decode(w["wektory"]))
+        except (KeyError, TypeError, ValueError):
+            self.blad = "usługa wektorów: zła odpowiedź"
+            return None
+        if wymiar <= 0 or len(plaskie) != wymiar * len(teksty):
+            self.blad = "usługa wektorów: zła odpowiedź"
+            return None
+        return [plaskie[i * wymiar:(i + 1) * wymiar] for i in range(len(teksty))]
+
+
 def _slowa_ascii(s: str) -> set[str]:
     return set(re.findall(r"\w+", bez_ogonkow(s).lower()))
 
@@ -822,13 +1123,14 @@ def hub_agenta_nazwany(sciezka: str, slowa_pytania: set[str]) -> bool:
     return any(n and n <= slowa_pytania for n in nazwy)
 
 
-def notatki_przypomnienia(ix: Indeks, q: str, limit: int = 5) -> list[dict]:
-    """Notatki „może się przydać” przed turą (wtyczka jarvo-wiedza) i w `ocena`: wyszukiwanie bez hubów folderów,
-    orzeczeń (idą osobno) i hubów agentów `agenci/<agent>/_hub-*`, chyba że pytanie nazywa tego agenta (hub ma ogólne
-    słowa o całej dziedzinie, więc bez tego zajmuje miejsca przy każdym pytaniu o pracę)."""
+def notatki_przypomnienia(ix: Indeks, q: str, limit: int = 5, wektory=None, silnik: str | None = None) -> list[dict]:
+    """Notatki „może się przydać” przed turą (wtyczka jarvo-wiedza) i w `ocena`: wyszukiwanie (Indeks.szukaj: wektory,
+    gdy usługa odpowie w czasie, inaczej słowa) bez hubów folderów, orzeczeń (idą osobno) i hubów agentów
+    `agenci/<agent>/_hub-*`, chyba że pytanie nazywa tego agenta (hub ma ogólne słowa o całej dziedzinie, więc bez
+    tego zajmuje miejsca przy każdym pytaniu o pracę). Użyty silnik: `ix.silnik`."""
     slowa = _slowa_ascii(q)
     out = []
-    for t in ix.szukaj(q, limit=limit + 8):
+    for t in ix.szukaj(q, limit=limit + 8, wektory=wektory, silnik=silnik):
         if t["typ"] in ("orzeczenia", "hub"):
             continue
         if HUB_AGENTA_RE.match(t["sciezka"]) and not hub_agenta_nazwany(t["sciezka"], slowa):
@@ -839,10 +1141,11 @@ def notatki_przypomnienia(ix: Indeks, q: str, limit: int = 5) -> list[dict]:
     return out
 
 
-def ocena(ix: Indeks, zestaw: list, limit: int = 5) -> dict:
+def ocena(ix: Indeks, zestaw: list, limit: int = 5, wektory=None, silnik: str | None = None) -> dict:
     """Pomiar przypomnień na zestawie `[{"pytanie": ..., "wzor": [ścieżki]}]` (zestaw właściciela leży poza repo):
-    to samo wyszukiwanie co wtyczka przed turą (odświeżenie indeksu + notatki_przypomnienia). hit@k = jakakolwiek
-    ścieżka wzorcowa w pierwszych k, MRR = średnia 1/pozycja pierwszej wzorcowej (0 bez trafienia), czas na pytanie w ms."""
+    to samo wyszukiwanie co wtyczka przed turą (odświeżenie indeksu + notatki_przypomnienia, te same wektory i czas
+    na nie). hit@k = jakakolwiek ścieżka wzorcowa w pierwszych k, MRR = średnia 1/pozycja pierwszej wzorcowej (0 bez
+    trafienia), czas na pytanie w ms, silnik każdego pytania (hybryda, wektory albo slowa, gdy wektorów zabrakło)."""
     if not isinstance(zestaw, list) or not all(isinstance(p, dict) and str(p.get("pytanie") or "").strip() and isinstance(p.get("wzor"), list)
                                                for p in zestaw):
         raise ValueError('zestaw to lista [{"pytanie": "...", "wzor": ["ścieżka notatki", ...]}]')
@@ -852,18 +1155,22 @@ def ocena(ix: Indeks, zestaw: list, limit: int = 5) -> dict:
         wzor = [str(s).strip().strip("/").removesuffix(".md") for s in p["wzor"]]
         start = time.perf_counter()
         ix.odswiez()
-        sciezki = [t["sciezka"] for t in notatki_przypomnienia(ix, str(p["pytanie"]), limit=limit)]
+        sciezki = [t["sciezka"] for t in notatki_przypomnienia(ix, str(p["pytanie"]), limit=limit, wektory=wektory, silnik=silnik)]
         ms = round((time.perf_counter() - start) * 1000, 1)
         pozycja = next((i + 1 for i, s in enumerate(sciezki) if s in wzor), 0)
         czasy.append(ms)
-        pytania.append({"pytanie": p["pytanie"], "wzor": wzor, "wyniki": sciezki, "pozycja": pozycja, "ms": ms})
+        pytania.append({"pytanie": p["pytanie"], "wzor": wzor, "wyniki": sciezki, "pozycja": pozycja, "ms": ms,
+                        "silnik": ix.silnik})
     n = len(pytania)
     trafione = sum(1 for p in pytania if p["pozycja"])
     posortowane = sorted(czasy)
     mediana = (posortowane[(n - 1) // 2] + posortowane[n // 2]) / 2 if n else 0.0
+    silniki: dict[str, int] = {}
+    for p in pytania:
+        silniki[p["silnik"]] = silniki.get(p["silnik"], 0) + 1
     return {"pytan": n, "k": limit, "trafione": trafione, "hit_at_k": round(trafione / n, 3) if n else 0.0,
             "mrr": round(sum(1 / p["pozycja"] for p in pytania if p["pozycja"]) / n, 3) if n else 0.0,
-            "ms_mediana": round(mediana, 1), "ms_max": max(czasy, default=0.0), "pytania": pytania}
+            "ms_mediana": round(mediana, 1), "ms_max": max(czasy, default=0.0), "silniki": silniki, "pytania": pytania}
 
 
 # ------------------------------------------------------------------------------------------------ INDEX.md i listy hubów
@@ -1406,7 +1713,25 @@ def status(sk: Skarbiec, ix: Indeks) -> dict:
             "git": (sk.root / ".git").exists(), "ostatni_wpis": ostatni,
             "kompilacja": {"ostatnia": komp.get("ostatnia") or 0, "data": komp.get("data") or "",
                            "raport": komp.get("raport") or {}},
-            "lint": z_json(LINT_JSON), "blokada": znacznik_blokady(sk.stan)}
+            "lint": z_json(LINT_JSON), "blokada": znacznik_blokady(sk.stan), "wektory": stan_wektorow(sk, ix)}
+
+
+def stan_wektorow(sk: Skarbiec, ix: Indeks) -> dict:
+    """Wektory w indeksie wg modelu i usługa (state/wektory.json, bez zapytania do niej): dla statusu i doctora."""
+    klient = KlientWektorow(sk.stan)
+    modele = {r[0]: r[1] for r in ix.db.execute("SELECT model, count(*) FROM wektory GROUP BY model")}
+    notatek = sum(1 for r in ix.db.execute("SELECT sciezka FROM pliki") if not r[0].startswith(POZA_WYSZUKIWANIEM))
+    return {"usluga": klient.dostepny, "model": klient.model, "powod": "" if klient.dostepny else klient.blad,
+            "modele": modele, "wektorow": modele.get(klient.model, 0) if klient.model else sum(modele.values()),
+            "notatek": notatek}
+
+
+def opis_wektorow(w: dict) -> str:
+    """Linia dla `indeksuj` i `zasiej` z wyniku Indeks.odswiez_wektory."""
+    if not w["model"]:
+        return "wektory: usługa wektorów nie działa, bez zmian (przypomnienia słowami; brakujące wektory nadrobi usługa po starcie)"
+    return (f"✓ wektory: {w['wektorow']}/{w['notatek']} notatek ({w['nowe']} osadzonych, {w['usuniete']} usuniętych)"
+            + (" · przerwane: usługa przestała odpowiadać, reszta następnym razem" if w["przerwane"] else ""))
 
 
 # ------------------------------------------------------------------------------------------------ CLI
@@ -1430,6 +1755,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--folder")
     s.add_argument("--agent")
     s.add_argument("--zrodla", action="store_true", help="także zrodla/ i skrzynka/")
+    s.add_argument("--silnik", choices=SILNIKI, default=SILNIK, help="wektory (domyślnie), hybryda (RRF z BM25) albo slowa")
     s.add_argument("--json", action="store_true")
     c = sub.add_parser("czytaj", help="cała notatka")
     c.add_argument("sciezka")
@@ -1457,6 +1783,8 @@ def main(argv: list[str] | None = None) -> int:
     oc = sub.add_parser("ocena", help="trafność przypomnień na zestawie pytań: hit@5, MRR, czas (to samo szukanie co wtyczka)")
     oc.add_argument("plik", help='JSON: [{"pytanie": "...", "wzor": ["ścieżka notatki", ...]}]')
     oc.add_argument("--limit", type=int, default=5, help="ile notatek przypomnienia (k w hit@k)")
+    oc.add_argument("--silnik", choices=SILNIKI, default=SILNIK,
+                    help="wektory (domyślnie), hybryda (RRF słów i wektorów), slowa (BM25); bez usługi wektorów zawsze slowa")
     oc.add_argument("--json", action="store_true")
     a = ap.parse_args(argv)
 
@@ -1473,6 +1801,8 @@ def main(argv: list[str] | None = None) -> int:
         sk.punkt_zapisu("zasiew skarbca: indeks")
         print(f"✓ zasiew: {r['huby']} hubów folderów, {r['agenci']} hubów agentów, {r['skille']} skilli zmienionych, {r['docs']} docs, "
               f"indeks {n} notatek, git: {'tak' if r['git'] else 'nie'}")
+        print(opis_wektorow(ix.odswiez_wektory(KlientWektorow(sk.stan, WEKTORY_CZAS_ZAPISU_S))))
+        ix.zamknij()
         return 0
     if not sk.root.is_dir():
         print(f"✗ brak skarbca {sk.root} (najpierw `zasiej`)", file=sys.stderr)
@@ -1485,9 +1815,11 @@ def main(argv: list[str] | None = None) -> int:
             h = odswiez_listy_hubow(sk, ix)
             ix.odswiez()
             print(f"✓ indeks: {r['pliki']} plików ({r['nowe']} nowych, {r['zmienione']} zmienionych, {r['usuniete']} usuniętych), INDEX.md: {n} notatek, huby odświeżone: {h}")
+            print(opis_wektorow(ix.odswiez_wektory(KlientWektorow(sk.stan, WEKTORY_CZAS_ZAPISU_S))))
         elif a.cmd == "szukaj":
             ix.odswiez()
-            wyn = ix.szukaj(a.zapytanie, limit=a.limit, folder=a.folder, agent=a.agent, zrodla=a.zrodla)
+            wyn = ix.szukaj(a.zapytanie, limit=a.limit, folder=a.folder, agent=a.agent, zrodla=a.zrodla,
+                            wektory=KlientWektorow(sk.stan, WEKTORY_CZAS_NARZEDZIA_S), silnik=a.silnik)
             if a.json:
                 print(json.dumps(wyn, ensure_ascii=False, indent=1))
             elif not wyn:
@@ -1543,9 +1875,14 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"skarbiec: {r['skarbiec']} · notatek: {sum(r['wg_folderu'].values())} · linków: {r['linki']} · szkiców: {r['szkice']} · git: {'tak' if r['git'] else 'nie'} · ostatni wpis: {r['ostatni_wpis'] or '-'}")
                 for f, n in sorted(r["wg_folderu"].items()):
                     print(f"  {f:12} {n}")
+                wek = r["wektory"]
+                print(f"wektory: {wek['wektorow']}/{wek['notatek']} notatek · usługa: "
+                      + (f"działa ({wek['model']})" if wek["usluga"] else f"nie działa ({wek['powod']}; przypomnienia słowami)"))
         elif a.cmd == "ocena":
             try:
-                r = ocena(ix, json.loads(Path(a.plik).read_text(encoding="utf-8")), limit=a.limit)
+                wektory = None if a.silnik == "slowa" else KlientWektorow(sk.stan)
+                r = ocena(ix, json.loads(Path(a.plik).read_text(encoding="utf-8")), limit=a.limit, wektory=wektory,
+                          silnik=a.silnik)
             except (OSError, ValueError) as e:
                 print(f"✗ {e}", file=sys.stderr)
                 return 2
@@ -1553,7 +1890,8 @@ def main(argv: list[str] | None = None) -> int:
                 print(json.dumps(r, ensure_ascii=False, indent=1))
             else:
                 print(f"ocena: {r['pytan']} pytań · hit@{r['k']}: {r['trafione']}/{r['pytan']} ({r['hit_at_k']:.3f}) · MRR {r['mrr']:.3f} · "
-                      f"ms: mediana {r['ms_mediana']}, max {r['ms_max']}")
+                      f"ms: mediana {r['ms_mediana']}, max {r['ms_max']} · silnik: "
+                      + ", ".join(f"{s} {n}" for s, n in sorted(r["silniki"].items())))
                 for p in r["pytania"]:
                     if not p["pozycja"]:
                         print(f"  ✗ {p['pytanie'][:80]} → {', '.join(p['wyniki']) or '(nic)'}")

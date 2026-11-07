@@ -35,6 +35,13 @@ Usługi (uslugi_jarva; flagi i zmienne sprawdzone w kodzie Hermesa f97608f):
   Ctrl+Break albo SIGTERM kończy go kodem 0, po 10 s zabicie; dotyczy to tylko jego (Python Jarva to nie launcher
   venvu): `jarvo update`, który uruchomił, ma własną grupę i konsolę (instalator.uruchom_w_tle) i dalej przełącza
   wersję. Bez kodu Jarva w current.json (`app`) usługi nie ma.
+- wektory: jeden ciepły model e5-small na instalację dla skarbca wiedzy (docs/WIEDZA.md §7), `<python venvu narzędzi>
+  -I -X utf8 <app>/wiedza/wektory.py serwuj --model <models>/e5-small --stan <dane>/jarvo/state --skarbiec
+  <dane>/jarvo/knowledge`. HTTP tylko na 127.0.0.1, port od systemu, token i port w `<dane>/jarvo/state/wektory.json`
+  (tam szukają ich wtyczka jarvo-wiedza w bramie i w `jarvo chat`, kompilacja i `wiedza.py`). Startuje ostatnia
+  (kolejność 3), gotowa, gdy /zdrowie odpowiada z tokenem; po starcie nadrabia brakujące wektory skarbca. Ctrl+Break
+  albo SIGTERM kończy ją od razu (plik z tokenem znika), po 10 s zabicie. Bez kodu, venvu narzędzi albo modelu
+  w narzedzia.json usługi nie ma, a przypomnienia idą słowami.
 
 Pętla (c2): start w kolejności (panel czeka na gotowość bramy, najdłużej `limit_kolejnosci`); kod 75 = restart po
 ok. 5 s, ale kolejne szybkie wyjścia 75 (przed 60 s działania) podwajają przerwę aż do 5 min, a przy usłudze z portem
@@ -116,6 +123,9 @@ LIMIT_STOPU_BRAMY = 70.0  # s: TimeoutStopSec jednostki Hermesa f97608f (drenaż
 LIMIT_STOPU_PANELU = 30.0
 LIMIT_STOPU_POMOCNIKA = 10.0   # s: pomocnik aktualizacji kończy się od razu na Ctrl+Break i SIGTERM (bez stanu w pamięci)
 POMOCNIK = "aktualizacje"      # usługa pomocnika aktualizacji (S09): log <logi>/aktualizacje.log
+WEKTORY = "wektory"            # usługa wektorów skarbca wiedzy (wiedza/wektory.py): log <logi>/wektory.log
+MODEL_WEKTOROW = "e5-small"    # modele.e5-small z vendor/natywne.yaml (wpis model-e5-small w narzedzia.json)
+LIMIT_STOPU_WEKTOROW = 10.0    # s: usługa wektorów kończy się od razu na Ctrl+Break i SIGTERM (bez stanu poza plikiem portu)
 # Najdłuższe zatrzymanie nadzorcy z usługami Jarva: limit bramy, bezpiecznik 10 s, dobicie i zamknięcie kanału.
 # Autostart (TimeoutStopSec, ExitTimeOut) i `jarvo down` mają czekać co najmniej tyle.
 CZAS_ZATRZYMANIA = LIMIT_STOPU_BRAMY + 40.0
@@ -1231,9 +1241,31 @@ def usluga_pomocnika(u: Uklad, env: dict[str, str], app: str | Path | None) -> U
                   limit_stopu=LIMIT_STOPU_POMOCNIKA)
 
 
+def wektory_gotowe(app: str | Path, stan: Path) -> bool:
+    """Usługa wektorów odpowiada na /zdrowie z tokenem ze `<stan>/wektory.json` (wiedza.KlientWektorow)."""
+    from .wiedza_cli import wiedza_lib                         # przy użyciu: moduł skarbca tej wersji Jarva
+    return wiedza_lib(Path(app)).KlientWektorow(stan, 2.0).zdrowie() is not None
+
+
+def usluga_wektorow(u: Uklad, env: dict[str, str], app: str | Path | None) -> Usluga | None:
+    """Usługa `wektory` (docstring modułu) z kodu bieżącej wersji, venvu narzędzi i modelu e5-small z narzedzia.json
+    albo None, gdy czegoś z tego nie ma (wtedy przypomnienia skarbca idą słowami)."""
+    skrypt = Path(str(app or "")) / "wiedza" / "wektory.py"
+    narz = srodowisko.narzedzia(u)
+    python = str((narz.get("venv-narzedzia") or {}).get("python") or "")
+    model = str((narz.get(f"model-{MODEL_WEKTOROW}") or {}).get("katalog") or "")
+    if not app or not skrypt.is_file() or not python or not Path(python).is_file() or not model or not Path(model).is_dir():
+        return None
+    stan = u.jarvo_dane / "state"
+    argv = [python, "-I", "-X", "utf8", str(skrypt), "serwuj", "--model", model, "--stan", str(stan),
+            "--skarbiec", str(u.jarvo_dane / "knowledge")]
+    return Usluga(WEKTORY, argv, cwd=u.stan, env=env, gotowa=partial(wektory_gotowe, app, stan), kolejnosc=3,
+                  limit_stopu=LIMIT_STOPU_WEKTOROW)
+
+
 def uslugi_jarva(u: Uklad, env: dict[str, str]) -> list[Usluga]:
-    """Brama i panel Hermesa z bieżącej wersji (`<program>/current.json`) i pomocnik aktualizacji z jej kodu
-    (usluga_pomocnika), w środowisku procesów Jarva `env`."""
+    """Brama i panel Hermesa z bieżącej wersji (`<program>/current.json`), pomocnik aktualizacji z jej kodu
+    (usluga_pomocnika) i usługa wektorów skarbca (usluga_wektorow), w środowisku procesów Jarva `env`."""
     biez = srodowisko.biezace(u)
     if not biez.get("hermes"):
         raise BladNadzorcy(f"Nie ma zainstalowanego Hermesa: {u.program / 'current.json'} nie wskazuje checkoutu. "
@@ -1261,7 +1293,8 @@ def uslugi_jarva(u: Uklad, env: dict[str, str]) -> list[Usluga]:
                                                                dane),
                    kolejnosc=1, limit_stopu=LIMIT_STOPU_PANELU, port=port)
     pomocnik = usluga_pomocnika(u, env, biez.get("app"))
-    return [brama, panel] + ([pomocnik] if pomocnik else [])
+    wektory = usluga_wektorow(u, env, biez.get("app"))
+    return [brama, panel] + [x for x in (pomocnik, wektory) if x]
 
 
 # --- nadzorca -----------------------------------------------------------------------------------------------------

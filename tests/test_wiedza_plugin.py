@@ -99,6 +99,26 @@ def test_blok_promptu_i_przypomnienie(srodowisko):
     assert p.prefetch("o niczym konkretnym xyzzy") .startswith("## Orzeczenia")   # bez trafień zostają orzeczenia
 
 
+def test_przypomnienie_wektorami_z_uslugi_i_slowami_bez_niej(srodowisko):
+    """Usługa wektorów działa (state/wektory.json z tokenem): przypomnienie i wiedza_szukaj trafiają po znaczeniu,
+    dziennik ma silnik „wektory”; bez usługi te same tury idą słowami (silnik „slowa”), bez błędu."""
+    from atrapa_wektorow import usluga_atrapy
+    root, home, sk, p = srodowisko
+    stan = root / "jarvo" / "state"
+    p.prefetch("czemu kadr z animacji w przeglądarce wychodzi czarny?")
+    assert _dziennik(root)["silnik"] == "slowa"
+    with usluga_atrapy(stan):
+        assert w.main(["--skarbiec", str(sk.root), "--stan", str(stan), "indeksuj"]) == 0
+        r = p.prefetch("zrzut z animacją webgl daje pusty kadr")
+        assert "`agenci/jarvo-web/lightpanda nie renderuje three.js`" in r
+        wpis = _dziennik(root)
+        assert wpis["silnik"] == "wektory" and wpis["ms"] >= 0
+        wyn = json.loads(p.handle_tool_call("wiedza_szukaj", {"zapytanie": "pusty kadr przy webgl"}))["wyniki"]
+        assert wyn and wyn[0]["sciezka"] == "agenci/jarvo-web/lightpanda nie renderuje three.js"
+    r = p.prefetch("zrzut strony z three.js jest pusty")
+    assert "lightpanda nie renderuje" in r and _dziennik(root)["silnik"] == "slowa"
+
+
 def test_narzedzia(srodowisko):
     root, home, sk, p = srodowisko
     nazwy = [t["name"] for t in p.get_tool_schemas()]

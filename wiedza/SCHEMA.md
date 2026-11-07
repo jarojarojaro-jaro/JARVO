@@ -67,6 +67,7 @@ status: aktualna       # aktualna | do-sprawdzenia | sprzeczna | przestarzala | 
 zrodlo: zrodla/karty/2026-09-30-t_8f2-audyt-mw.md   # ścieżka w skarbcu, adres, `karta t_…` albo `rozmowa 2026-09-30 jarvo-web`
 agent: jarvo-web       # opcjonalnie: kogo dotyczy / kto zgłosił
 wazne_do: 2027-03-31   # opcjonalnie
+aliasy: [Lightpanda, lekka przeglądarka]   # opcjonalnie, głównie podmioty/ i user/: inne nazwy, jak się mówi
 ---
 # Lightpanda nie renderuje three.js
 
@@ -80,6 +81,11 @@ Treść: 50–150 słów, konkret, daty przy danych zmiennych w czasie.
 ```
 
 Linki: `[[ścieżka w skarbcu bez .md|etykieta]]`; sama nazwa pliku też działa, gdy jest jednoznaczna (jak w Obsidianie).
+
+**Aliasy** (`aliasy: [...]`, najwyżej 8): inne nazwy tego samego podmiotu, osoby albo rzeczy, np. dla `user/<imię i nazwisko>`
+`[właściciel, szef]`, dla klienta jego skrót. Gdy alias pada w pytaniu (także w odmianie: „szefa”, „szefowej”), szukanie
+dopisuje do pytania tytuł tej notatki, więc przypomnienie trafia w podmiot, choć pytanie go nie nazywa. Aliasy dopisuje
+człowiek (w Obsidianie albo przez orzeczenie dla kompilacji).
 
 ## Orzeczenie
 

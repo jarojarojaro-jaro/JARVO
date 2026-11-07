@@ -7,9 +7,11 @@ K02, K03, K07, K08, H06, H11, decyzja I36).
         scripts/wiedza-kompiluj.sh z kontenera). Jeden piszący: wiedza.Blokada (blokada systemu + znacznik
         state/wiedza.lock, który widzi też zasiew przy wdrożeniu); lint przed i po przebiegu (K02)
   jarvo wiedza lint [--json] [--strict] | indeksuj [--pelny] | status [--json]
-        lint z regułami nazw przenośnych (K07), indeks FTS5 z INDEX.md i listami hubów (pod blokadą), liczby
+        lint z regułami nazw przenośnych (K07), indeks FTS5 z INDEX.md i listami hubów (pod blokadą) i wektory nowych
+        notatek z usługi `wektory` (po blokadzie), liczby (także wektorów i stanu usługi)
   jarvo wiedza doctor [--json]
-        sprawdzenia skarbca, rutyn i Telegrama (K08), te same, które dostaje `jarvo doctor`
+        sprawdzenia skarbca (z wektorami: model e5-small, usługa, liczba wektorów), rutyn i Telegrama (K08), te same,
+        które dostaje `jarvo doctor`
   jarvo rutyny [status|on|off] [--json]
         rutyny Jarva (cron Hermesa w bramie): stan z cron/jobs.json profilu jarvo, włączenie i wstrzymanie przez
         `hermes -p jarvo cron resume|pause` (H06). Po instalacji są wstrzymane; włącza je udana próbna wiadomość
@@ -41,6 +43,7 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import time
@@ -251,7 +254,8 @@ def polecenie_wiedza_lint(u: Uklad, a, _reszta, _ot) -> int:
 
 
 def polecenie_wiedza_indeksuj(u: Uklad, a, _reszta, _ot) -> int:
-    """Indeks FTS5, INDEX.md i listy w hubach (bloki GEN w notatkach), więc pod blokadą jednego piszącego."""
+    """Indeks FTS5, INDEX.md i listy w hubach (bloki GEN w notatkach), więc pod blokadą jednego piszącego; potem,
+    już bez blokady (to tylko state/wiedza.db), wektory nowych i zmienionych notatek z usługi `wektory`."""
     if not skarbiec(u).is_dir():
         print(f"Brak skarbca {skarbiec(u)} (zasiew robi instalacja floty).", file=sys.stderr)
         return 1
@@ -272,7 +276,12 @@ def polecenie_wiedza_indeksuj(u: Uklad, a, _reszta, _ot) -> int:
     finally:
         blokada.zwolnij()
     print(f"Indeks: {r['pliki']} plików ({r['nowe']} nowych, {r['zmienione']} zmienionych, {r['usuniete']} usuniętych), "
-          f"INDEX.md: {n} notatek, huby odświeżone: {h}")
+          f"INDEX.md: {n} notatek, huby odświeżone: {h}", flush=True)
+    ix = lib.Indeks(sk)
+    try:
+        print(lib.opis_wektorow(ix.odswiez_wektory(lib.KlientWektorow(sk.stan, lib.WEKTORY_CZAS_ZAPISU_S))))
+    finally:
+        ix.zamknij()
     return 0
 
 
@@ -306,6 +315,9 @@ def polecenie_wiedza_status(u: Uklad, a, _reszta, _ot) -> int:
                                                             f"{lint.get('ostrzezenia', 0)})" if lint else ""))
     if blok and blok.get("aktualny"):
         print(f"Teraz: kompilacja albo zasiew trwa (proces {blok['pid']}, od {int(blok['wiek_s'] // 60)} min)")
+    wek = r.get("wektory") or {}
+    print(f"Wektory: {wek.get('wektorow', 0)}/{wek.get('notatek', 0)} notatek · usługa: "
+          + (f"działa ({wek.get('model')})" if wek.get("usluga") else "nie działa (przypomnienia słowami)"))
     return 0
 
 
@@ -535,6 +547,56 @@ def sprawdz_brame(u: Uklad, ot) -> dict:
                   "jarvo status; jarvo logs brama")
 
 
+def _liczby_wektorow(stan: Path, model: str) -> tuple[int, int]:
+    """(wektorów modelu `model`, notatek w wyszukiwaniu) z state/wiedza.db, tylko do odczytu; (0, 0) bez bazy."""
+    try:
+        db = sqlite3.connect((stan / "wiedza.db").as_uri() + "?mode=ro", uri=True, timeout=2)
+    except sqlite3.Error:
+        return 0, 0
+    try:
+        notatek = sum(1 for (s,) in db.execute("SELECT sciezka FROM pliki") if not s.startswith(("zrodla/", "skrzynka/")))
+        wektorow = db.execute("SELECT count(*) FROM wektory WHERE model = ?", (model,)).fetchone()[0] if model else 0
+        return wektorow, notatek
+    except sqlite3.Error:                                # indeks sprzed wektorów albo pusty
+        return 0, 0
+    finally:
+        db.close()
+
+
+def sprawdz_wektory(u: Uklad, ot) -> dict:
+    """Model e5-small (narzedzia.json), usługa `wektory` nadzorcy (stan i /zdrowie z tokenem ze state/wektory.json)
+    i wektory notatek w indeksie. Bez nich przypomnienia działają słowami, więc najwyżej uwaga."""
+    nazwa = "wektory skarbca"
+    narz = srodowisko.narzedzia(u)
+    model = narz.get("model-e5-small") or {}
+    if not model.get("katalog") or not Path(str(model["katalog"])).is_dir():
+        return _wynik(nazwa, "uwaga", "model e5-small nie jest zainstalowany: przypomnienia skarbca szukają słowami",
+                      "Uruchom instalację jeszcze raz (polecenie z README) albo jarvo update.")
+    if not (narz.get("venv-narzedzia") or {}).get("python"):
+        return _wynik(nazwa, "uwaga", "brak venvu narzędzi: usługa wektorów nie ma czym działać",
+                      "Uruchom instalację jeszcze raz (polecenie z README).")
+    stan, powod = instalator.stan_serwisu(u, ot)
+    usluga = instalator.usluga_nadzorcy(stan, "wektory")
+    if stan is None:
+        return _wynik(nazwa, "uwaga", f"serwis nie działa ({powod or 'brak nadzorcy'}): przypomnienia szukają słowami",
+                      "jarvo up")
+    if not usluga:
+        return _wynik(nazwa, "uwaga", "nadzorca nie prowadzi usługi wektorów (serwis sprzed tej wersji)",
+                      "jarvo down, potem jarvo up")
+    klient = wiedza_lib(_app(u)).KlientWektorow(stan_skarbca(u), 2.0)
+    zdrowie = klient.zdrowie() if klient.dostepny else None
+    if usluga.get("stan") != "dziala" or zdrowie is None:
+        opis = f"usługa {usluga.get('stan') or 'nie działa'}" + (f" ({usluga['powod']})" if usluga.get("powod") else "")
+        return _wynik(nazwa, "uwaga", f"{opis}; {klient.blad or 'brak odpowiedzi'}: przypomnienia szukają słowami",
+                      "jarvo logs wektory; jarvo status")
+    wektorow, notatek = _liczby_wektorow(stan_skarbca(u), klient.model)
+    opis = f"{klient.model}, usługa działa (PID {zdrowie.get('pid')}), wektory: {wektorow}/{notatek} notatek"
+    if wektorow < notatek:
+        return _wynik(nazwa, "uwaga", opis + " (część notatek szukana tylko słowami)",
+                      "jarvo wiedza indeksuj (osadza brakujące; robi to też każda kompilacja i start usługi)")
+    return _wynik(nazwa, "ok", opis)
+
+
 def linger(uzytkownik: str | None = None, uruchom: Callable | None = None) -> bool | None:
     """Linux: czy systemd trzyma usługi użytkownika bez logowania (loginctl Linger); None = nie wiadomo."""
     loginctl = instalator.systemowy("loginctl")
@@ -632,14 +694,14 @@ def sprawdz_telegram(u: Uklad, ot=None, teraz: float | None = None) -> list[dict
 
 
 def sprawdzenia(u: Uklad, ot=None) -> list[dict]:
-    """Wyniki dla `jarvo doctor` (K08): skarbiec (poza chmurą, FTS5 Hermesa, git, długie ścieżki, kompilacja, lint),
-    brama, rutyny i Telegram (konfiguracja, 409). Nic nie zapisuje."""
+    """Wyniki dla `jarvo doctor` (K08): skarbiec (poza chmurą, FTS5 Hermesa, git, długie ścieżki, kompilacja, lint,
+    wektory: model, usługa i liczba wektorów), brama, rutyny i Telegram (konfiguracja, 409). Nic nie zapisuje."""
     ot = ot or instalator.Otoczenie()
     wyniki = [sprawdz_skarbiec(u, ot.env), sprawdz_fts5_hermesa(u), sprawdz_git_skarbca(u, ot)]
     dlugie = sprawdz_dlugie_sciezki(u)
     if dlugie:
         wyniki.append(dlugie)
-    wyniki += [sprawdz_kompilacje(u), sprawdz_lint(u), sprawdz_brame(u, ot), *sprawdz_rutyny(u, ot),
+    wyniki += [sprawdz_kompilacje(u), sprawdz_lint(u), sprawdz_wektory(u, ot), sprawdz_brame(u, ot), *sprawdz_rutyny(u, ot),
                *sprawdz_telegram(u, ot)]
     return wyniki
 

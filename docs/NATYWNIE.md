@@ -368,11 +368,13 @@ autostart systemu (Harmonogram zadań / LaunchAgent / systemd --user)
        ├─ panel:  python -P -m hermes_cli.main dashboard --host 127.0.0.1 --port 9119 --no-open --skip-build
        │          HERMES_WEB_DIST; jarvo-hq: silnik rozmów, podgląd :9120, rendery i konwersje
        ├─ Komputer (opcjonalnie): CfT przez Playwright + wejście z zasadami + proxy filtrujące
+       ├─ wektory: <venv narzędzi>/python -I -X utf8 <app>/wiedza/wektory.py serwuj (model e5-small, HTTP 127.0.0.1
+       │          z tokenem w <dane>/jarvo/state/wektory.json; przypomnienia skarbca po znaczeniu, docs/WIEDZA.md §7)
        └─ rola pomocnika aktualizacji: state/update-request → jarvo update (osobny proces)
 ```
 
 Polityka nadzorcy:
-- Kolejność startu: brama, potem panel, potem Komputer.
+- Kolejność startu: brama, potem panel, potem Komputer; pomocnik aktualizacji i usługa wektorów na końcu.
 - Jeden nadzorca na korzeń: blokada `<stan>/nadzorca.lock` bez czekania; drugi start kończy się komunikatem i kodem 1. Umowa w jarvo/autostart.py zakłada tu kod 0 (inaczej launchd podnosi go co 30 s, a systemd co 10 s): do uzgodnienia (recenzja E3).
 - Brama startuje z flagą `--external-supervisor`, która ustawia w procesie HERMES_GATEWAY_EXTERNAL_SUPERVISOR=1: `/restart` z czatu i `hermes update` kończą ją kodem 75, a nie odłączonym pomocnikiem. HERMES_SUPERVISED_CHILD=1 tylko utrzymuje stały profil (brama i panel nie idą za `hermes profile use`). HERMES_GATEWAY_DETACHED=1 każe bramie na Windows ignorować Ctrl+C i Ctrl+Break z konsoli.
 - Kod 75: restart po ok. 5 s; szybkie wyjścia 75 z rzędu (przed 60 s działania) podwajają przerwę od 5 s do 5 min, a przy panelu powód w `jarvo status` mówi, kto trzyma port (PID, nazwa programu). Kod 78: postój i powód z `<dane>/gateway_state.json` w `jarvo status`. Inne kody: ponowienie z rosnącą przerwą od 5 s do 5 min; zeruje ją 10 min działania.

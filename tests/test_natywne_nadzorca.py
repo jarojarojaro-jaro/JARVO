@@ -905,6 +905,45 @@ def test_uslugi_jarva_z_pomocnikiem_aktualizacji(tmp_path):
     assert pomocnik.env["JARVO_ROOT"] == str(u.root)                    # korzeń spoza domyślnego zostaje
 
 
+def test_uslugi_jarva_z_usluga_wektorow(tmp_path):
+    """Usługa `wektory` (docs/WIEDZA.md §7): Python venvu narzędzi i model e5-small z narzedzia.json, skrypt
+    <app>/wiedza/wektory.py; ostatnia w kolejności, gotowa po /zdrowie z tokenem, limit stopu 10 s, katalog <stan>.
+    Bez venvu, modelu albo skryptu usługi nie ma (przypomnienia idą słowami)."""
+    from atrapa_wektorow import usluga_atrapy
+    u = sciezki.uklad({"JARVO_ROOT": str(tmp_path / "j")})
+    checkout = tmp_path / "program" / "hermes" / "f97608f"
+    py = srodowisko.hermes_python(checkout)
+    py.parent.mkdir(parents=True)
+    py.write_bytes(b"")
+    u.dane.mkdir(parents=True)
+    u.stan.mkdir(parents=True)
+    app = Path(__file__).resolve().parents[1]                        # kod Jarva = to repo (wiedza/wektory.py)
+    przenosne.zapisz_atomowo(u.program / "current.json", json.dumps({"hermes": str(checkout), "app": str(app)}))
+    env = srodowisko.srodowisko(u, {"PATH": os.environ.get("PATH", ""), "JARVO_PANEL_PORT": "19123"})
+    assert nadzorca.WEKTORY not in [x.nazwa for x in nadzorca.uslugi_jarva(u, env)]       # brak venvu i modelu
+    venv_py = tmp_path / "venv" / "bin" / "python"
+    venv_py.parent.mkdir(parents=True)
+    venv_py.write_bytes(b"")
+    model = u.jarvo_dane / "models" / "e5-small"
+    spis = {"venv-narzedzia": {"python": str(venv_py)}, "model-e5-small": {"katalog": str(model)}}
+    przenosne.zapisz_atomowo(u.stan / "narzedzia.json", json.dumps(spis))
+    assert nadzorca.WEKTORY not in [x.nazwa for x in nadzorca.uslugi_jarva(u, env)]       # katalog modelu jeszcze pusty
+    model.mkdir(parents=True)
+    uslugi = nadzorca.uslugi_jarva(u, env)
+    wek = uslugi[-1]
+    assert wek.nazwa == nadzorca.WEKTORY == "wektory" and wek.kolejnosc > max(x.kolejnosc for x in uslugi[:-1])
+    stan = u.jarvo_dane / "state"
+    assert wek.argv == [str(venv_py), "-I", "-X", "utf8", str(app / "wiedza" / "wektory.py"), "serwuj", "--model",
+                        str(model), "--stan", str(stan), "--skarbiec", str(u.jarvo_dane / "knowledge")]
+    assert wek.limit_stopu == nadzorca.LIMIT_STOPU_WEKTOROW == 10 and Path(wek.cwd) == u.stan and wek.port is None
+    assert wek.env["JARVO_ROOT"] == str(u.root) and wek.gotowa() is False                  # usługa jeszcze nie wstała
+    with usluga_atrapy(stan):
+        assert wek.gotowa() is True
+    assert wek.gotowa() is False
+    venv_py.unlink()
+    assert nadzorca.WEKTORY not in [x.nazwa for x in nadzorca.uslugi_jarva(u, env)]
+
+
 @contextmanager
 def atrapa_kontroli_bramy(dane: Path, odpowiedz: dict):
     """Serwer jak gateway/control_socket.py Hermesa: jedna linia JSON tam i z powrotem na połączenie."""

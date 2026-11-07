@@ -3,7 +3,8 @@
 Jeden katalog wtyczki służy każdemu profilowi (install-fleet.sh dowiązuje go do <profil>/plugins/, a config.yaml
 profilu ma `memory.provider: jarvo-wiedza`). Co robi:
   - stały blok w prompcie (skarbiec istnieje, jak z niego korzystać) i przypomnienia przed każdą turą: ≤ 5 notatek
-    z FTS5 (wiedza.py) plus orzeczenia agenta, wszystkich i marki,
+    (wiedza.py: wektory z usługi `wektory` nadzorcy, a bez niej albo po 0,3 s FTS5) plus orzeczenia agenta,
+    wszystkich i marki,
   - 4 narzędzia: wiedza_szukaj, wiedza_czytaj, wiedza_zapisz (szkic do skrzynki), wiedza_orzeczenie (tylko ze słowami
     użytkownika z tej tury),
   - lustro wpisów `memory` (MEMORY.md/USER.md) do skrzynki,
@@ -374,17 +375,18 @@ class SkarbiecProvider(MemoryProvider):
         if q == query and time.time() - ts < 5:
             return wynik
         start = time.perf_counter()
-        tekst, zrodlo = query, "wiadomosc"
+        tekst, zrodlo, silnik = query, "wiadomosc", ""
         try:
             tekst, zrodlo = self._tekst_zapytania(query)
-            wynik = self._przypomnienie(sk, tekst)
+            wynik, silnik = self._przypomnienie(sk, tekst)
         except Exception as e:
             logger.debug("jarvo-wiedza: przypomnienie nieudane: %s", e)
             wynik = ""
         ms = round((time.perf_counter() - start) * 1000, 1)
         self._cache = (query, time.time(), wynik)
         if wynik:
-            self._zapisz_przypomnienie(query, wynik, session_id or self._session_id, szukano=tekst, zrodlo=zrodlo, ms=ms)
+            self._zapisz_przypomnienie(query, wynik, session_id or self._session_id, szukano=tekst, zrodlo=zrodlo, ms=ms,
+                                       silnik=silnik)
         return wynik
 
     def _tekst_zapytania(self, query: str) -> tuple[str, str]:
@@ -402,9 +404,11 @@ class SkarbiecProvider(MemoryProvider):
             return prompt_rutyny(query), "cron"
         return query, "wiadomosc"
 
-    def _zapisz_przypomnienie(self, query: str, wynik: str, sid: str, *, szukano: str = "", zrodlo: str = "wiadomosc", ms: float = 0.0) -> None:
+    def _zapisz_przypomnienie(self, query: str, wynik: str, sid: str, *, szukano: str = "", zrodlo: str = "wiadomosc", ms: float = 0.0,
+                              silnik: str = "") -> None:
         """Jedna linia JSON na przypomnienie: kto, kiedy, w jakiej sesji, na jakie pytanie, czego szukano (i skąd ten
-        tekst: wiadomość, karta kanbana, prompt rutyny), które notatki, ile orzeczeń i ile ms trwało."""
+        tekst: wiadomość, karta kanbana, prompt rutyny), które notatki, ile orzeczeń, którym silnikiem (wektory, hybryda
+        albo slowa, gdy usługa wektorów nie odpowiedziała w czasie) i ile ms trwało."""
         if not self._stan:
             return
         try:
@@ -412,7 +416,8 @@ class SkarbiecProvider(MemoryProvider):
             orzeczen = sum(1 for l in wynik.splitlines() if l.startswith("- ") and " · [" in l)
             wpis = {"ts": round(time.time(), 1), "data": time.strftime("%Y-%m-%d %H:%M:%S"), "agent": self._agent, "sesja": (sid or "")[:12],
                     "platforma": self._platforma, "zapytanie": " ".join(query.split())[:120], "zrodlo_zapytania": zrodlo,
-                    "szukano": " ".join(szukano.split())[:120], "notatki": notatki, "orzeczen": orzeczen, "znakow": len(wynik), "ms": ms}
+                    "szukano": " ".join(szukano.split())[:120], "notatki": notatki, "orzeczen": orzeczen, "znakow": len(wynik),
+                    "silnik": silnik, "ms": ms}
             plik = self._stan / DZIENNIK_PRZYPOMNIEN
             self._stan.mkdir(parents=True, exist_ok=True)
             with self._lock:
@@ -424,12 +429,16 @@ class SkarbiecProvider(MemoryProvider):
         except Exception as e:
             logger.debug("jarvo-wiedza: dziennik przypomnień: %s", e)
 
-    def _przypomnienie(self, sk, query: str) -> str:
+    def _przypomnienie(self, sk, query: str) -> tuple[str, str]:
+        """(blok przypomnienia, silnik szukania). Wektory z usługi (state/wektory.json) z limitem WEKTORY_CZAS_S;
+        bez usługi albo po czasie przypomnienie idzie słowami (silnik „slowa”), tura bez błędu."""
         lib = _lib()
         ix = lib.Indeks(sk)
         try:
             ix.odswiez()
-            notatki = lib.notatki_przypomnienia(ix, query, limit=LIMIT_NOTATEK)
+            klient = lib.KlientWektorow(sk.stan)
+            notatki = lib.notatki_przypomnienia(ix, query, limit=LIMIT_NOTATEK, wektory=klient if klient.dostepny else None)
+            silnik = ix.silnik
         finally:
             ix.zamknij()
         marki = {t["sciezka"].split("/")[1] for t in notatki if t["sciezka"].startswith("brands/") and t["sciezka"].count("/") >= 2}
@@ -447,9 +456,9 @@ class SkarbiecProvider(MemoryProvider):
             czesci.append("## Orzeczenia (wiążące)")
             czesci += orz
         if not czesci:
-            return ""
+            return "", silnik
         tekst = "\n".join(czesci)
-        return tekst[:MAX_PRZYPOMNIENIA]
+        return tekst[:MAX_PRZYPOMNIENIA], silnik
 
     # ---- narzędzia
     def get_tool_schemas(self) -> List[Dict[str, Any]]:
@@ -524,7 +533,9 @@ class SkarbiecProvider(MemoryProvider):
         try:
             ix.odswiez()
             limit = max(1, min(int(args.get("limit") or LIMIT_NOTATEK), 12))
-            wyn = ix.szukaj(str(args.get("zapytanie") or ""), limit=limit, folder=(args.get("folder") or None))
+            klient = lib.KlientWektorow(sk.stan, lib.WEKTORY_CZAS_NARZEDZIA_S)
+            wyn = ix.szukaj(str(args.get("zapytanie") or ""), limit=limit, folder=(args.get("folder") or None),
+                            wektory=klient if klient.dostepny else None)
         finally:
             ix.zamknij()
         return {"wyniki": [{"sciezka": r["sciezka"], "tytul": r["tytul"], "streszczenie": r["streszczenie"], "typ": r["typ"],
