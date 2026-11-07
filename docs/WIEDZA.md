@@ -40,7 +40,8 @@ do skarbca przy wdrożeniu i czytany przez kompilację i przez agentów, gdy pis
 3. **Aktualizuj, nie dubluj.** Zanim powstanie notatka, kompilacja szuka istniejącej (wyszukiwarka + INDEX). Ten sam temat
    to ta sama notatka z nową datą `zmieniono`.
 4. **Sprzeczność nie nadpisuje.** Gdy nowe źródło przeczy notatce, obie wersje zostają z datami i źródłami, notatka dostaje
-   `status: sprzeczna` i trafia na listę lintu. Rozstrzyga człowiek (orzeczenie) albo nowsze, pewniejsze źródło.
+   `status: sprzeczna` i trafia na listę lintu. Rozstrzyga człowiek (orzeczenie) albo nowsze, pewniejsze źródło. Decyzja
+   właściciela nowsza niż notatka (rozmowa z nim, jego orzeczenie) to nie sprzeczność, tylko aktualizacja na nową decyzję.
 5. **Usuwaj, co błędne, ale z dziennikiem.** Notatkę usuwa tylko kompilacja albo człowiek, zawsze z wpisem w `LOG.md`
    i w punkcie zapisu git skarbca (§6), więc da się cofnąć.
 6. **Każda notatka ma źródło i datę.** Bez `zrodlo:` notatka jest szkicem, nie wiedzą (lint ją wypisze). Wiedza, która
@@ -231,8 +232,13 @@ błędem wywołania modelu czeka 15 min (Hermes wyłącza wtedy dostawcę na 10 
 do notatki mija więc ok. 15–25 min (10 min ciszy, 5 min spokoju skrzynki, kompilacja), a nie 30–90 min. Blokada w `state/`
 pilnuje, żeby z dziesięciu profili kompilował jeden; ręcznie: przycisk w zakładce Wiedza albo `scripts/wiedza-kompiluj.sh` w kontenerze
 (`--na-sucho` pokazuje szkice i kandydatów bez modelu i bez zapisu). Dla każdego szkicu:
-1. wyszukuje istniejące notatki (FTS5 + INDEX) i decyduje: **aktualizacja** istniejącej, **nowa** notatka, **odrzucenie**
-   (szum, duplikat, brak źródła) albo **sprzeczność** (obie wersje, `status: sprzeczna`),
+1. wyszukuje istniejące notatki (FTS5 + INDEX; szkic z lustra pamięci osobno dla każdego wpisu) i z orzeczeniami właściciela
+   (`orzeczenia/wszyscy` i plik agenta szkicu, z datami) oraz datą `zmieniono` kandydatów w prompcie decyduje: **aktualizacja**
+   istniejącej, **nowa** notatka, **odrzucenie** (szum, duplikat, brak źródła; z lustra pamięci zostają tylko nowe fakty) albo
+   **sprzeczność** (obie wersje, `status: sprzeczna`) tylko przy nierozstrzygniętej różnicy źródeł; decyzja właściciela nowsza
+   niż notatka (albo powtarzająca orzeczenie) to aktualizacja, która przepisuje notatkę na nową decyzję. „Nowa” obok notatki
+   o prawie tym samym tytule w tym samym folderze (Jaccard rdzeni słów nazwy ≥ 0,75, poza `rozmowy/`) nie powstaje: bez nowych
+   zdań to odrzucenie (duplikat), z nowymi aktualizacja istniejącej (dopisane zdania, tytuł i ścieżka zostają),
 2. pisze notatkę według §3 (frontmatter, streszczenie, linki: hub + 2 sąsiadów + 1 między folderami; bez linku do nieistniejącej
    notatki: albo tworzy ją jako krótką, albo linkuje hub),
 3. dopisuje `LOG.md` (`## [data] kompilacja | szkic X → notatka Y (nowa/aktualizacja)`); `INDEX.md` i listy w hubach
@@ -388,7 +394,8 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    Sprawdzone w kontenerze: Hermes ładuje dostawcę w profilu, blok promptu i przypomnienia z prawdziwego skarbca, narzędzia,
    konfiguracja zadania pomocniczego (bez klucza modelu w piaskownicy: sam wyciąg modelem zostaje do sprawdzenia na VPS).
 4. ✅ **Kompilacja i punkty zapisu** (`wiedza/kompilacja.py`): dla każdego szkicu kandydaci z FTS5 (6, dwa z pełną treścią),
-   jedno wywołanie głównego modelu z JSON-em decyzji (nowa / aktualizacja / sprzeczność / odrzuć, do 4 wyników na szkic;
+   orzeczenia właściciela w prompcie, jedno wywołanie głównego modelu z JSON-em decyzji (nowa / aktualizacja / sprzeczność /
+   odrzuć, do 4 wyników na szkic; strażnik prawie tych samych tytułów;
    wyciąg z rozmowy = notatka w `rozmowy/` + do 3 notatek faktów), zapis według schematu (linki tylko do istniejących ścieżek,
    hub folderu + sąsiad + inny folder dobierane automatycznie, gdy model ich nie da), sprzeczność jako sekcja z datą i
    `status: sprzeczna`, aktualizacja z zachowaniem `utworzono` i ręcznych linków, źródła łączone; potem `indeksuj`, LOG,

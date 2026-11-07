@@ -11,7 +11,8 @@ i człowiek. Pełny projekt: `docs/WIEDZA.md` w repo (kopia w `zrodla/jarvo-repo
 3. **Aktualizuj, nie dubluj.** Zanim powstanie notatka, szukaj istniejącej (`wiedza.py szukaj`, INDEX). Ten sam temat = ta sama
    notatka z nową datą `zmieniono`.
 4. **Sprzeczność nie nadpisuje.** Nowe źródło przeczy notatce → obie wersje z datami i źródłami, `status: sprzeczna`, sprawa na
-   liście lintu. Rozstrzyga człowiek (orzeczenie) albo nowsze, pewniejsze źródło.
+   liście lintu. Rozstrzyga człowiek (orzeczenie) albo nowsze, pewniejsze źródło. Decyzja właściciela (rozmowa z nim, jego
+   orzeczenie) nowsza niż notatka to nie sprzeczność, tylko aktualizacja: notatka mówi nową decyzję z datą (dawną jednym zdaniem).
 5. **Usuwaj, co błędne, ale z dziennikiem.** Notatkę usuwa tylko kompilacja albo człowiek, zawsze z wpisem w `LOG.md` i punktem
    zapisu git (`wiedza.py cofnij` przywraca).
 6. **Każda notatka ma źródło i datę** (`zrodlo:`, `utworzono:`, `zmieniono:`). Wiedza, która się starzeje, ma `wazne_do:`.

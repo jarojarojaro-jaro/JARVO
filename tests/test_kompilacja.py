@@ -364,3 +364,72 @@ def test_main_przestawia_home_na_profil(tmp_path):
     assert k.home_profilu("jarvo", env) == str(tmp_path / "dane" / "profiles" / "jarvo")
     assert k.home_profilu("jarvo", {"HERMES_HOME": str(tmp_path / "dane" / "profiles" / "jarvo")}) is None
     assert k.home_profilu("inny", env) is None
+
+
+def test_decyzja_wlasciciela_aktualizuje_zamiast_sprzecznosci(sk):
+    """Prompt kompilacji ma orzeczenia właściciela (wszyscy + plik agenta szkicu) i daty kandydatów, a zasada mówi:
+    decyzja właściciela nowsza niż notatka = aktualizacja (notatka przepisana na nową decyzję), nie sprzeczność."""
+    notatka(sk, "projekty/wgrywanie strony enigmalabz", "Wgrywanie strony enigmalabz",
+            "Stronę enigmalabz wgrywa Web przez FTP.", typ="decyzja", linki=["projekty/_hub-projekty"])
+    w.dodaj_orzeczenie(sk, "wszyscy", "Strony właściciela wgrywa na hosting tylko Jarvo", "rozmowa 2026-09-29")
+    w.dodaj_orzeczenie(sk, "jarvo-web", "Nie wgrywaj stron przez FTP", "rozmowa 2026-09-29")
+    w.dodaj_orzeczenie(sk, "marki/acme", "Przyciski zaokrąglone", "rozmowa")
+    szkic(sk, "rozmowa", "Wgrywanie strony enigmalabz: decyzja", "Właściciel zdecydował: stronę enigmalabz wgrywa tylko Jarvo przez wgraj.py, "
+          "nie Web przez FTP.", zrodlo="zrodla/rozmowy/2026-09-29-jarvo-x")
+    cel = "projekty/wgrywanie strony enigmalabz"
+
+    def model(system, user):
+        model.prompty.append(user)
+        regula = 'a NIE "sprzecznosc"' in system and "nowsza niż notatka-kandydat" in system
+        widzi = "[wszyscy] Strony właściciela wgrywa na hosting tylko Jarvo" in user and "[web] Nie wgrywaj stron przez FTP" in user \
+            and f"[{cel}] (decyzja, zmieniono: 2026-09-01)" in user
+        decyzja = "aktualizacja" if regula and widzi else "sprzecznosc"
+        return json.dumps({"wyniki": [{"decyzja": decyzja, "sciezka": cel, "typ": "decyzja", "tytul": "Wgrywanie strony enigmalabz",
+                                       "streszczenie": "Stronę enigmalabz wgrywa tylko Jarvo przez wgraj.py",
+                                       "tresc": "Od 2026-09-29 stronę wgrywa tylko Jarvo (wgraj.py). Wcześniej: Web przez FTP.",
+                                       "powod": "nowsza decyzja właściciela"}]}, ensure_ascii=False)
+    model.prompty = []
+    r = k.Kompilacja(sk, model).uruchom()
+    assert r["aktualizacje"] == 1 and r["sprzeczne"] == 0
+    assert "ORZECZENIA WŁAŚCICIELA" in model.prompty[0] and "Przyciski zaokrąglone" not in model.prompty[0]   # marka nie dotyczy
+    fm, tresc = w.podziel(sk.plik(cel).read_text(encoding="utf-8"))
+    assert fm["status"] == "aktualna" and fm["zmieniono"] == "2026-09-30" and "tylko Jarvo" in tresc and "## Sprzeczność" not in tresc
+
+
+def test_nowa_obok_prawie_tej_samej_notatki(sk):
+    """„nowa” z prawie tym samym tytułem co notatka w tym samym folderze: bez nowych zdań = odrzucenie (duplikat),
+    z nowymi = aktualizacja istniejącej notatki (dopisane zdania, tytuł i ścieżka zostają)."""
+    szkic(sk, "pojecie", "Audyt stron", "Audyt strony to Lighthouse, axe i linkinator.", zrodlo="karta t_20")
+    szkic(sk, "pojecie", "Audyt stron (2)", "Linkinator też obrazy.", zrodlo="karta t_21")
+    model = model_z([
+        {"wyniki": [{"decyzja": "nowa", "sciezka": "pojecia/audyt stron", "typ": "pojecie", "tytul": "Audyt stron",
+                     "streszczenie": "Audyt to Lighthouse, axe i linkinator", "tresc": "Audyt strony to Lighthouse, axe i linkinator."}]},
+        {"wyniki": [{"decyzja": "nowa", "sciezka": "pojecia/Audyt stronie", "typ": "pojecie", "tytul": "Audyt stronie",
+                     "streszczenie": "Audyt", "tresc": "Audyt strony to Lighthouse, axe i linkinator. Linkinator sprawdza także obrazy i PDF-y."}]},
+    ])
+    r = k.Kompilacja(sk, model).uruchom()
+    assert r["nowe"] == 0 and r["odrzucone"] == 1 and r["aktualizacje"] == 1
+    assert not sk.istnieje("pojecia/audyt stron") and not sk.istnieje("pojecia/audyt stronie")
+    assert any("duplikat [[pojecia/audyt strony]]" in wp for wp in r["wpisy"])
+    fm, tresc = w.podziel(sk.plik("pojecia/audyt strony").read_text(encoding="utf-8"))
+    assert tresc.startswith("# Audyt strony\n\n**Audyt strony to Lighthouse, axe i linkinator.**")
+    assert "Linkinator sprawdza także obrazy i PDF-y." in tresc and tresc.count("Lighthouse, axe i linkinator") == 1   # znane zdanie nie wraca
+    assert "karta t_21" in fm["zrodlo"]
+    kp = k.Kompilacja(sk, None)
+    assert kp.bliska_notatka("pojecia/audyt kampanii") is None and kp.bliska_notatka("rozmowy/audyt strony") is None
+
+
+def test_lustro_pamieci_kandydaci_dla_kazdego_wpisu(sk):
+    """Szkic z lustra pamięci: kandydaci szukani osobno dla każdego wpisu, a prompt mówi „tylko fakty, których nie ma”."""
+    rel = "skrzynka/pamiec-jarvo-web"
+    sk.zapisz_plik(rel, w.sklej({"szkic": True, "typ": "fakt", "tytul": "Pamięć agenta jarvo-web: wpisy", "agent": "jarvo-web",
+                                 "zrodlo": "pamięć (memory) agenta jarvo-web", "utworzono": "2026-09-30", "skad": "lustro memory"},
+                                "# Pamięć agenta jarvo-web: wpisy\n\nWpisy `memory`.\n"
+                                "- 2026-09-30 · add memory: Lightpanda nie renderuje three.js, zrzuty WebGL przez Chromium\n"
+                                "- 2026-09-30 · add user: Audyt strony obejmuje linkinator\n"))
+    model = model_z([{"wyniki": [{"decyzja": "odrzuc", "powod": "wszystko już jest w notatkach"}]}])
+    r = k.Kompilacja(sk, model).uruchom()
+    assert r["odrzucone"] == 1 and r["nowe"] == 0
+    p = model.prompty[0]
+    assert "SZKIC (lustro pamięci: tylko fakty, których nie ma w kandydatach):" in p
+    assert "[agenci/jarvo-web/lightpanda nie renderuje three.js]" in p and "[pojecia/audyt strony]" in p
