@@ -22,6 +22,13 @@ metadata:
 - tymczasowy publiczny: skill `cloudflare-temporary-deploy` (link wygasa). Użyj, gdy użytkownik ma obejrzeć stronę z telefonu.
 
 ## Wdrożenie produkcyjne (A2)
+**Strony właściciela na jego hostingu** (12 domen, repo `jarojarojaro-jaro/<domena>`, `main` = strona na żywo) **nie
+wdrażasz sam.** Twoja część: zmiana na gałęzi repo strony (strona z builda: wpisy z `z_buildu` w `.strona.json`
+podmieniasz zawartością `build/`, reszta repo bez zmian), podgląd w `<dane>/jarvo/workspaces/podglad/<domena>/`
+(zawartość repo bez `.git`, `.github`, `.gitignore`, `.strona.json`) i `kanban_request_review`. Wgrywa tylko Jarvo
+(skill `wgrywanie-stron`) po zgodzie właściciela; na hosting się nie łączysz (ssh, rsync, FTP). Procedura niżej dotyczy
+innych celów (GitHub Pages, Cloudflare Pages, Netlify).
+
 Warunek: w karcie albo w komentarzu jest **wyraźna zgoda użytkownika** z datą (np. „Decyzja użytkownika 2026-10-02: wdrożyć na nova.pl”).
 Bez tego: `kanban_block(kind="needs_input", reason="Gotowe do wdrożenia na <cel> (wersja <odcisk dist/>). Potrzebna zgoda użytkownika.")`.
 
