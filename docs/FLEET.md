@@ -11,7 +11,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 
 | Agent | Main prompt | Workflowy własne | Skille zewnętrzne | Skrypty | Evals |
 |---|---|---|---|---|---|
-| `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [14 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 3 (`writing-for-agents`, mattpocock; wspólne `konwersja-plikow` i `odczyt-ekranu`) | patrol, brief, przegląd, raport floty, liczby floty, świeżość, linter kontraktu, prosty polski, księga lekcji, poczekalnia skilli | [28](../evals/jarvo/scenarios.yaml) |
+| `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [15 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 3 (`writing-for-agents`, mattpocock; wspólne `konwersja-plikow` i `odczyt-ekranu`) | patrol, brief, przegląd, raport floty, liczby floty, świeżość, linter kontraktu, prosty polski, księga lekcji, poczekalnia skilli, wgrywanie stron | [28](../evals/jarvo/scenarios.yaml) |
 | `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [8 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 18 (Hermes, marketingskills, wspólne `transkrypcja-filmu`, `konwersja-plikow`, `odczyt-ekranu` i `ostrozna-przegladarka`) | search_fanout, extract, sources (rejestr cytowań), fakty (brief do filmu) | [16](../evals/jarvo-sherlock/scenarios.yaml) |
 | `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [10 w `skills/web/`](../profiles/jarvo-web/skills/web) | 62 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólne `graf-kodu`, `izometria`, `warsztat-3d`, `konwersja-plikow` i `odczyt-ekranu`) | audit, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [20](../evals/jarvo-web/scenarios.yaml) |
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [7 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 28 (marketingskills, Anthropic, Hermes, impeccable, lemo-wake, wspólne `hooki`, `izometria`, `konwersja-plikow` i `odczyt-ekranu`) | render_html, check_media, lemo_wake | [15](../evals/jarvo-studio/scenarios.yaml) |
@@ -31,7 +31,7 @@ Legenda przy skillach:
 
 | Profil | Rola | Typ | Maks. autonomia bez zgody |
 |---|---|---|---|
-| `jarvo` | Main Judge: przyjmuje zlecenia, rozdziela, ocenia, raportuje | orkiestrator | A1 (tworzy karty, ocenia) |
+| `jarvo` | Main Judge: przyjmuje zlecenia, rozdziela, ocenia, raportuje | orkiestrator | A1 (tworzy karty, ocenia; wgranie strony na hosting = A2) |
 | `jarvo-web` | Web Senior Dev: strony od faviconu po SEO | snajper | A1 (buduje lokalnie; wdrożenie = A2) |
 | `jarvo-sherlock` | Researcher-detektyw: znajduje i weryfikuje | snajper | A1 (czyta, pisze raporty) |
 | `jarvo-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media | snajper | A1 (tworzy; publikacja = A2) |
@@ -106,7 +106,9 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
   przypisuje je właściwemu agentowi i łączy zależnościami,
 - judge: ocenia każdy wynik według DoD z karty i rubryki danego agenta:
   `complete` albo `request_changes` z konkretnymi uwagami,
-- raport: jedno podsumowanie z linkami do wyników, ryzykami i decyzjami do podjęcia.
+- raport: jedno podsumowanie z linkami do wyników, ryzykami i decyzjami do podjęcia,
+- wgrywanie stron właściciela na hosting (`wgrywanie-stron`, `wgraj.py`): plan z odciskiem, Twoje „tak” dla tego
+  odcisku, wgranie z kopią na serwerze i weryfikacją sumami, cofnięcie do tagu.
 
 **Nie robi:** żadnej pracy dziedzinowej. Nie pisze stron, nie robi researchu, nie projektuje grafik.
 
@@ -127,7 +129,8 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 **Skille:** [T] `intake`, `wywiad`, `dispatch-playbook` (jak pisać karty z DoD, typowe przepływy),
 `mission-ledger` (dziennik misji i raport końcowy), `decision-queue`, `sdlc-review` (sędzia; rubryki agentów
 `references/rubric-<agent>.md` generowane z ich `quality/rubric.md`), `patrol`, `daily-brief`, `weekly-review`,
-`onboarding-interview`, `fleet-improvement`, [T] `roster` (generowany z `fleet.yaml`: kto istnieje i co umie);
+`onboarding-interview`, `fleet-improvement`, [A2] `wgrywanie-stron` (strony właściciela na hosting po SSH: plan,
+zgoda na odcisk, wgranie z kopią i weryfikacją sumami, cofnięcie; `wgraj.py`), [T] `roster` (generowany z `fleet.yaml`: kto istnieje i co umie);
 [Z] `writing-for-agents` (mattpocock/skills: warsztat pisania SOUL i skilli, dla `fleet-improvement`), wspólny
 `konwersja-plikow` (zamiana pliku od ręki, bez karty dla snajpera) i `odczyt-ekranu` (tekst z obrazu; na czacie bez
 terminala, więc odczyt robi Ręka).

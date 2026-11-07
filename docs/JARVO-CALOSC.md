@@ -58,7 +58,7 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 
 | Agent | Rola | Uchwyt | Pokój HQ | Temat Telegram | Skille |
 |---|---|---|---|---|---|
-| 🛰️ `jarvo` | **Main Judge** — intake, misje, karty, sędziowanie, raporty, patrol | `@jarvo` | Mostek dowodzenia (`bridge`) | general | 14 |
+| 🛰️ `jarvo` | **Main Judge** — intake, misje, karty, sędziowanie, raporty, patrol, wgrywanie stron właściciela na hosting za zgodą | `@jarvo` | Mostek dowodzenia (`bridge`) | general | 15 |
 | 🔎 `jarvo-sherlock` | **Researcher-detektyw** — wieloźródłowy research, weryfikacja faktów, raporty z cytatami z rejestru źródeł sprawdzanymi przed oddaniem, transkrypcja filmu z linku | `@sherlock` | Gabinet śledczy (`study`) | sherlock | 8 |
 | 🌐 `jarvo-web` | **Web Senior Dev** — strony/landingi (z inspiracjami z branży: Inspo + własna baza), SEO techniczne, bezpieczeństwo aplikacji, wydajność, wdrożenie | `@web` | Pracownia webowa (`devlab`) | web | 10 |
 | 🎬 `jarvo-studio` | **Marketing i kreacja** — grafiki social, obrazy AI, żywe obrazy (pętla 5 s, warstwy PSD), copy PL, kampanie, kalendarze | `@studio` | Atelier kreatywne (`atelier`) | studio | 7 |
@@ -335,6 +335,12 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
   na dwóch kontach, limit logowania, upload, wylogowanie, cache odpowiedzi zalogowanego), audyt zależności (`supply-chain-risk-auditor`,
   Trail of Bits), przegląd kodu wg OWASP (`security-review`, getsentry); bramka jakości BLOKUJE oddanie strony przy
   KRYTYCZNE/WYSOKIE.
+- **Wgrywanie stron właściciela na hosting** (skill Jarva `wgrywanie-stron`, `profiles/jarvo/scripts/wgraj.py`): każda
+  strona to repo `jarojarojaro-jaro/<domena>` = `public_html`, `main` = strona na żywo. Wgrywa tylko Jarvo, po „tak”
+  właściciela dla odcisku z planu (hash drzewa wersji); jedno połączenie SSH (ControlMaster) i jedna próba logowania
+  na przebieg, jedno wgrywanie naraz we flocie (blokada w `state/`), kopia `~/kopie-stron/<domena>/` przed wgraniem,
+  rsync bez plików `chronione` i metadanych repo, weryfikacja sumami sha256 przez to samo połączenie, potem tag
+  `wgranie-…` i przewinięcie `main`; cofnięcie nowym commitem z drzewem tagu. Śledzony sekret z `.gitignore` = odmowa.
 - Zasady stałe: nigdy nie commitujemy sekretów; hasło FTP tylko w scratchpadzie
   `WGRAJ-LANDING-JARVO.md`; agenci nigdy nie trzymają tokenów platform reklamowych (Skarbiec);
   nie drukujemy znalezionych sekretów.

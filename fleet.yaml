@@ -75,8 +75,8 @@ agents:
     emoji: "🛰️"
     description: >-
       Main Judge floty. Przyjmuje zlecenia, zakłada misje, rozbija je na karty kanbana dla
-      specjalistów, ocenia wyniki według Definition of Done i raportuje. Sam nie wykonuje
-      pracy dziedzinowej.
+      specjalistów, ocenia wyniki według Definition of Done i raportuje. Wgrywa strony właściciela
+      na hosting tylko za jego zgodą. Sam nie wykonuje pracy dziedzinowej.
     model_tier: frontier
     delegation_tier: fast
     autonomy_max: A1
