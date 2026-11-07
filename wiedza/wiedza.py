@@ -839,6 +839,33 @@ def notatki_przypomnienia(ix: Indeks, q: str, limit: int = 5) -> list[dict]:
     return out
 
 
+def ocena(ix: Indeks, zestaw: list, limit: int = 5) -> dict:
+    """Pomiar przypomnień na zestawie `[{"pytanie": ..., "wzor": [ścieżki]}]` (zestaw właściciela leży poza repo):
+    to samo wyszukiwanie co wtyczka przed turą (odświeżenie indeksu + notatki_przypomnienia). hit@k = jakakolwiek
+    ścieżka wzorcowa w pierwszych k, MRR = średnia 1/pozycja pierwszej wzorcowej (0 bez trafienia), czas na pytanie w ms."""
+    if not isinstance(zestaw, list) or not all(isinstance(p, dict) and str(p.get("pytanie") or "").strip() and isinstance(p.get("wzor"), list)
+                                               for p in zestaw):
+        raise ValueError('zestaw to lista [{"pytanie": "...", "wzor": ["ścieżka notatki", ...]}]')
+    ix.odswiez()
+    pytania, czasy = [], []
+    for p in zestaw:
+        wzor = [str(s).strip().strip("/").removesuffix(".md") for s in p["wzor"]]
+        start = time.perf_counter()
+        ix.odswiez()
+        sciezki = [t["sciezka"] for t in notatki_przypomnienia(ix, str(p["pytanie"]), limit=limit)]
+        ms = round((time.perf_counter() - start) * 1000, 1)
+        pozycja = next((i + 1 for i, s in enumerate(sciezki) if s in wzor), 0)
+        czasy.append(ms)
+        pytania.append({"pytanie": p["pytanie"], "wzor": wzor, "wyniki": sciezki, "pozycja": pozycja, "ms": ms})
+    n = len(pytania)
+    trafione = sum(1 for p in pytania if p["pozycja"])
+    posortowane = sorted(czasy)
+    mediana = (posortowane[(n - 1) // 2] + posortowane[n // 2]) / 2 if n else 0.0
+    return {"pytan": n, "k": limit, "trafione": trafione, "hit_at_k": round(trafione / n, 3) if n else 0.0,
+            "mrr": round(sum(1 / p["pozycja"] for p in pytania if p["pozycja"]) / n, 3) if n else 0.0,
+            "ms_mediana": round(mediana, 1), "ms_max": max(czasy, default=0.0), "pytania": pytania}
+
+
 # ------------------------------------------------------------------------------------------------ INDEX.md i listy hubów
 
 def zbuduj_index(sk: Skarbiec, ix: Indeks) -> int:
@@ -1427,6 +1454,10 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("cofnij", help="cofa ostatni punkt zapisu git")
     st = sub.add_parser("status")
     st.add_argument("--json", action="store_true")
+    oc = sub.add_parser("ocena", help="trafność przypomnień na zestawie pytań: hit@5, MRR, czas (to samo szukanie co wtyczka)")
+    oc.add_argument("plik", help='JSON: [{"pytanie": "...", "wzor": ["ścieżka notatki", ...]}]')
+    oc.add_argument("--limit", type=int, default=5, help="ile notatek przypomnienia (k w hit@k)")
+    oc.add_argument("--json", action="store_true")
     a = ap.parse_args(argv)
 
     sk = Skarbiec(a.skarbiec, a.stan)
@@ -1512,6 +1543,20 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"skarbiec: {r['skarbiec']} · notatek: {sum(r['wg_folderu'].values())} · linków: {r['linki']} · szkiców: {r['szkice']} · git: {'tak' if r['git'] else 'nie'} · ostatni wpis: {r['ostatni_wpis'] or '-'}")
                 for f, n in sorted(r["wg_folderu"].items()):
                     print(f"  {f:12} {n}")
+        elif a.cmd == "ocena":
+            try:
+                r = ocena(ix, json.loads(Path(a.plik).read_text(encoding="utf-8")), limit=a.limit)
+            except (OSError, ValueError) as e:
+                print(f"✗ {e}", file=sys.stderr)
+                return 2
+            if a.json:
+                print(json.dumps(r, ensure_ascii=False, indent=1))
+            else:
+                print(f"ocena: {r['pytan']} pytań · hit@{r['k']}: {r['trafione']}/{r['pytan']} ({r['hit_at_k']:.3f}) · MRR {r['mrr']:.3f} · "
+                      f"ms: mediana {r['ms_mediana']}, max {r['ms_max']}")
+                for p in r["pytania"]:
+                    if not p["pozycja"]:
+                        print(f"  ✗ {p['pytanie'][:80]} → {', '.join(p['wyniki']) or '(nic)'}")
     finally:
         ix.zamknij()
     return 0

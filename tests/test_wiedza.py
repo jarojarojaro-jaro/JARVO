@@ -701,3 +701,31 @@ def test_dlugie_pytanie_zostawia_najrzadsze_slowa(skarbiec):
         assert ix.slowa_informacyjne(" ".join(f"brak{i}" for i in range(15))) == [f"brak{i}" for i in range(12)]
     finally:
         ix.zamknij()
+
+
+def test_ocena_przypomnien(skarbiec, tmp_path, capsys):
+    """`wiedza.py ocena <plik.json>`: syntetyczny zestaw pytań (zestaw właściciela leży poza repo), to samo szukanie co
+    wtyczka; hit@5, MRR, mediana i max ms, lista chybionych; `--json`; zły plik = kod 2."""
+    sk = skarbiec
+    sk.zapisz_plik("projekty/kod strony enigmalabz", w.sklej({"typ": "fakt", "tagi": [], "utworzono": "2026-09-30", "zmieniono": "2026-09-30",
+                                                              "status": "aktualna", "zrodlo": "rozmowa"},
+                                                             "# Kod strony enigmalabz\n\n**Kod strony enigmalabz.com leży w repo enigmalabz na GitHubie.**\n"))
+    zestaw = [{"pytanie": "gdzie jest kod źródłowy strony enigmalabz.com?", "wzor": ["projekty/kod strony enigmalabz.md"]},
+              {"pytanie": "jakie kolory ma marka Acme?", "wzor": ["brands/acme/BRAND"]},
+              {"pytanie": "xyzzy plugh", "wzor": ["projekty/nie ma"]}]
+    plik = tmp_path / "zestaw.json"
+    plik.write_text(json.dumps(zestaw, ensure_ascii=False), encoding="utf-8")
+    argv = ["--skarbiec", str(sk.root), "--stan", str(sk.stan), "ocena", str(plik)]
+    assert w.main(argv + ["--json"]) == 0
+    r = json.loads(capsys.readouterr().out)
+    assert r["pytan"] == 3 and r["k"] == 5 and r["trafione"] == 2 and r["hit_at_k"] == round(2 / 3, 3)
+    poz = [p["pozycja"] for p in r["pytania"]]
+    assert poz[0] == 1 and poz[1] >= 1 and poz[2] == 0
+    assert r["mrr"] == round((1 + 1 / poz[1]) / 3, 3)
+    assert r["pytania"][0]["wzor"] == ["projekty/kod strony enigmalabz"]                       # „.md” w zestawie bez znaczenia
+    assert r["ms_max"] >= r["ms_mediana"] >= 0 and all(p["ms"] >= 0 for p in r["pytania"])
+    assert w.main(argv) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("ocena: 3 pytań · hit@5: 2/3 (0.667) · MRR ") and "ms: mediana" in out and "✗ xyzzy plugh → (nic)" in out
+    plik.write_text('[{"pytanie": "x"}]', encoding="utf-8")
+    assert w.main(argv) == 2 and "zestaw to lista" in capsys.readouterr().err

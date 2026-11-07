@@ -285,6 +285,12 @@ rozwiązywane w pamięci (jedno przejście po dysku). Zmierzone przy 5 000 notat
 linkach z hubów (notatka o marce X pociąga orzeczenia marki X). Karpathy: przy ~100 źródłach i setkach stron wystarczy INDEX
 i wyszukiwarka tekstowa; second-brain-os: „no vector database until you need one”. Hermes szuka tak samo w sesjach (FTS5).
 
+**Pomiar.** `wiedza.py ocena <plik.json> [--limit 5] [--json]` puszcza zestaw pytań `[{"pytanie": "…", "wzor": ["ścieżka
+notatki", …]}]` przez to samo szukanie co przypomnienie przed turą (odświeżenie indeksu + `notatki_przypomnienia`) i podaje
+hit@5 (pytania z notatką wzorcową w pierwszych 5), MRR (średnia 1/pozycja pierwszej wzorcowej), medianę i max ms na pytanie
+oraz chybione pytania. Zestaw z pytaniami właściciela leży poza repo (prywatne dane), w repo jest tylko syntetyczny przykład
+w `tests/test_wiedza.py`. Punkt wyjścia (2026-11-07, 30 pytań po polsku): hit@5 23/30, MRR 0,55, 32 ms na turę z odświeżeniem.
+
 **Później (etap 7, gdy FTS zacznie chybiać albo skarbiec przekroczy ~3 000 notatek):** osadzenia (embeddingi) przez
 ONNX Runtime 1.29 i NumPy, które są już w obrazie w venv narzędzi (`/opt/jarvo/venv`, to samo, na czym działa `jarvo-stt`;
 wtyczka woła je podprocesem jak mowę): model `intfloat/multilingual-e5-small` (MIT, ~120 MB, pobierany przy pierwszym
@@ -358,7 +364,7 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
 2. ✅ **Skarbiec i skrypt** `wiedza/wiedza.py` (bez zależności poza biblioteką standardową; w kontenerze
    `python3 /opt/jarvo/repo/wiedza/wiedza.py`): `zasiej` (katalogi, `SCHEMA.md`, huby folderów i agentów z `build/wiedza/fleet.json`,
    orzeczenia, `fleet/lekcje.md`, docs repo i `--repo` (pliki profili z buildu) do `zrodla/jarvo-repo/`, git init i punkt zapisu), `indeksuj` (FTS5 w `state/wiedza.db`,
-   `INDEX.md`, listy w hubach), `szukaj`, `czytaj`, `zapisz`, `orzeczenie`, `lint`, `graf`, `cofnij`, `status`; `wiedza/SCHEMA.md`;
+   `INDEX.md`, listy w hubach), `szukaj`, `czytaj`, `zapisz`, `orzeczenie`, `lint`, `graf`, `cofnij`, `status`, `ocena`; `wiedza/SCHEMA.md`;
    `scripts/build.py` pisze `build/wiedza/fleet.json` (skille własne z opisami i materiałami, zewnętrzne z locka, skrypty,
    serwery MCP z `config.yaml` z `trust` i narzędziami z `tools.include`, nazwy zmiennych środowiska z `distribution.yaml`
    i `terminal.env_passthrough` bez wartości, narzędzia z `toolbox.yaml`, identyfikatory evals, spis źródeł z
@@ -479,7 +485,7 @@ Wpisy do [SOURCES.md](SOURCES.md) i [TOOLBOX.md](TOOLBOX.md) dojdą z etapem, w 
 
 | Ścieżka | Rola |
 |---|---|
-| `wiedza/wiedza.py` | narzędzie skarbca (zasiew, indeks, szukanie, szkice, orzeczenia, lint, graf, punkty zapisu); importowane przez wtyczkę |
+| `wiedza/wiedza.py` | narzędzie skarbca (zasiew, indeks, szukanie, szkice, orzeczenia, lint, graf, punkty zapisu, pomiar przypomnień `ocena`); importowane przez wtyczkę |
 | `wiedza/SCHEMA.md` | zasady skarbca kopiowane do `knowledge/SCHEMA.md` |
 | `scripts/build.py` → `build/wiedza/fleet.json` | dane do hubów agentów (rola, skille z opisami, skille zewnętrzne, skrypty, serwery MCP) |
 | `scripts/install-fleet.sh` (krok „Skarbiec wiedzy”) | `zasiej` przy każdym wdrożeniu |
