@@ -244,6 +244,23 @@ class Kompilacja:
                 return [w for w in d["wyniki"] if isinstance(w, dict)][:4], "", ""
         return None, f"{szkic['plik']}: odpowiedź modelu bez JSON", ""
 
+    def _cele(self, wyniki: List[dict], szkic: dict) -> set:
+        """Ścieżki, które odpowiedź może zapisać: cel aktualizacji albo sprzeczności, a dla „nowa” jej ścieżka i bliska
+        notatka o prawie tym samym tytule (zastosuj zamienia wtedy „nowa” na aktualizację tamtej)."""
+        cele: set = set()
+        for w in wyniki:
+            decyzja = str(w.get("decyzja") or "")
+            if decyzja in ("aktualizacja", "sprzecznosc"):
+                cel = str(w.get("sciezka") or "").strip().strip("/")
+                cele.add(cel[:-3] if cel.endswith(".md") else cel)
+            elif decyzja == "nowa":
+                sciezka = self.sciezka_nowej(w, szkic)
+                cele.add(sciezka)
+                bliska = self.bliska_notatka(sciezka)
+                if bliska:
+                    cele.add(bliska)
+        return cele
+
     def _modele_rownolegle(self, fala: List[tuple]) -> List[tuple]:
         """Odpowiedzi modelu dla szkiców fali (plik, szkic, kandydaci), w kolejności fali; do ROWNOLEGLE wątków."""
         if len(fala) <= 1:
@@ -536,12 +553,14 @@ class Kompilacja:
                         self.raport["pominiete"] += 1         # czeka bez zmiany licznika prób
                         continue
                     if odp[0] is not None and zapisane_w_fali:
-                        # strażnik tematu: wcześniejszy szkic tej fali zapisał notatkę, której model tego szkicu nie
-                        # widział, a jest wśród kandydatów teraz: decyzja od nowa, po kolei (jak bez równoległości)
+                        # strażnik tematu: model tego szkicu odpowiadał na stan sprzed zapisów tej fali. Gdy którakolwiek
+                        # notatka zapisana w tej fali jest wśród jego kandydatów (starych albo świeżych) albo celów
+                        # (ścieżka aktualizacji, ścieżka nowej), jego odpowiedź mogłaby nadpisać cudzy fakt: decyzja od
+                        # nowa na świeżym stanie, po kolei (jak bez równoległości)
                         ix.odswiez()
                         swiezi = self.kandydaci(ix, szkic)
-                        znane = {x["sciezka"] for x in kand}
-                        if any(x["sciezka"] in zapisane_w_fali and x["sciezka"] not in znane for x in swiezi):
+                        dotyka = {x["sciezka"] for x in kand} | {x["sciezka"] for x in swiezi} | self._cele(odp[0], szkic)
+                        if dotyka & zapisane_w_fali:
                             kand = swiezi
                             odp = self.zapytaj_model(szkic, kand)
                             self.raport["ponowione"] = self.raport.get("ponowione", 0) + 1

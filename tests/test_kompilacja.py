@@ -105,6 +105,27 @@ def test_rownolegle_wywolania_modelu_i_straznik_tematu(sk, monkeypatch):
     assert not list((sk.root / "skrzynka").glob("*.md"))
 
 
+def test_dwa_szkice_fali_aktualizuja_te_sama_notatke_bez_utraty_faktu(sk, monkeypatch):
+    """Oba szkice jednej fali aktualizują istniejącą notatkę (oba modele odpowiadały na jej starą treść): drugi
+    dostaje decyzję od nowa na treści po zapisie pierwszego, więc notatka ma oba fakty, a nie tylko ostatni."""
+    import re
+    monkeypatch.setattr(k, "ROWNOLEGLE", 2)
+    szkic(sk, "fakt", "Audyt strony: axe", "Fakt A. Axe sprawdza kontrast.", zrodlo="karta t_40")
+    szkic(sk, "fakt", "Audyt strony: linkinator", "Fakt B. Linkinator sprawdza obrazy.", zrodlo="karta t_41")
+
+    def model(system, user):
+        wlasny = re.search(r"Fakt [AB]\.", user.split("ORZECZENIA")[0]).group(0)
+        widziane = re.findall(r"Fakt [AB]\.", user.split("KANDYDACI")[1])        # treść kandydata w prompcie
+        tresc = " ".join(sorted({wlasny, *widziane})) + " Audyt strony to Lighthouse, axe i linkinator."
+        return json.dumps({"wyniki": [{"decyzja": "aktualizacja", "sciezka": "pojecia/audyt strony", "typ": "pojecie",
+                                       "tytul": "Audyt strony", "streszczenie": "Audyt strony to Lighthouse, axe i linkinator.",
+                                       "tresc": tresc, "powod": "nowy fakt"}]}, ensure_ascii=False)
+    r = k.Kompilacja(sk, model).uruchom()
+    assert r["aktualizacje"] == 2 and r["ponowione"] == 1 and r["bledy"] == 0
+    tresc = sk.wczytaj("pojecia/audyt strony").tresc
+    assert "Fakt A." in tresc and "Fakt B." in tresc
+
+
 def test_nowa_aktualizacja_sprzecznosc_odrzucenie(sk):
     szkic(sk, "lekcja", "Zrzuty mobile zawsze przed oddaniem", "Sędzia odsyła strony bez zrzutów mobile.")
     szkic(sk, "fakt", "Lightpanda a WebGL", "Lightpanda od wersji 0.5 renderuje WebGL, więc Chromium nie jest potrzebne.", zrodlo="karta t_10")
