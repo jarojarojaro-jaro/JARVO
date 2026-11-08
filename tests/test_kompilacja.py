@@ -32,6 +32,7 @@ def notatka(sk, rel, tytul, tresc, typ="fakt", zrodlo="karta t_1", linki=(), **f
 @pytest.fixture
 def sk(tmp_path, monkeypatch):
     monkeypatch.setenv("WIEDZA_DZIS", "2026-09-30")
+    monkeypatch.setattr(k, "ROWNOLEGLE", 1)      # atrapy modelu odpowiadają w kolejności wywołań; równoległość: osobny test
     root = tmp_path / "knowledge"
     fleet = tmp_path / "fleet.json"
     fleet.write_text(json.dumps(FLEET, ensure_ascii=False), encoding="utf-8")
@@ -68,6 +69,40 @@ def model_z(odpowiedzi):
         return o if isinstance(o, str) else json.dumps(o, ensure_ascii=False)
     f.prompty = prompty
     return f
+
+
+def test_rownolegle_wywolania_modelu_i_straznik_tematu(sk, monkeypatch):
+    """Fala do ROWNOLEGLE szkiców: wywołania modelu naraz (w kilku wątkach), zapis po kolei w kolejności skrzynki.
+    Drugi szkic tej samej fali o temacie, który pierwszy właśnie zapisał (model drugiego tej notatki nie widział),
+    dostaje decyzję od nowa z nowymi kandydatami, więc nie powstaje druga notatka o tym samym."""
+    import threading
+    monkeypatch.setattr(k, "ROWNOLEGLE", 3)
+    szkic(sk, "fakt", "Hosting Chmurka", "Strony klientów stoją na Chmurka Hosting od października.", zrodlo="karta t_30")
+    szkic(sk, "fakt", "Serwery Chmurka", "Chmurka Hosting ma serwery w Polsce i kopie co noc.", zrodlo="karta t_31")
+    szkic(sk, "fakt", "Szum", "Dzisiaj jest ładna pogoda.", zrodlo="rozmowa x")
+    watki, bariera, prompty = set(), threading.Barrier(3, timeout=10), []
+
+    def model(system, user):
+        prompty.append(user)
+        tytul = next(l for l in user.splitlines() if l.startswith("- tytuł: "))[9:]
+        if "[pojecia/chmurka hosting]" in user:               # widzi notatkę z tej fali: aktualizacja zamiast duplikatu
+            return json.dumps({"wyniki": [{"decyzja": "aktualizacja", "sciezka": "pojecia/chmurka hosting", "typ": "fakt",
+                                           "tytul": "Chmurka Hosting", "streszczenie": "Chmurka Hosting trzyma strony klientów.",
+                                           "tresc": "Serwery w Polsce, kopie co noc. " * 4, "powod": "ten sam temat"}]})
+        if len(prompty) <= 3:
+            watki.add(threading.get_ident())
+            bariera.wait()                                    # trzy wywołania naraz, inaczej bariera nie puści
+        if tytul == "Szum":
+            return json.dumps({"wyniki": [{"decyzja": "odrzuc", "powod": "szum"}]})
+        return json.dumps({"wyniki": [{"decyzja": "nowa", "sciezka": "pojecia/Chmurka Hosting", "typ": "fakt", "tytul": "Chmurka Hosting",
+                                       "streszczenie": "Chmurka Hosting trzyma strony klientów.", "tresc": "Strony klientów od października. " * 4,
+                                       "powod": "nowy fakt"}]})
+    r = k.Kompilacja(sk, model).uruchom()
+    assert len(watki) == 3 and r["ponowione"] == 1 and len(prompty) == 4
+    assert r["nowe"] == 1 and r["aktualizacje"] == 1 and r["odrzucone"] == 1 and r["bledy"] == 0
+    n = sk.wczytaj("pojecia/chmurka hosting")
+    assert "karta t_30" in n.fm["zrodlo"] and "karta t_31" in n.fm["zrodlo"]
+    assert not list((sk.root / "skrzynka").glob("*.md"))
 
 
 def test_nowa_aktualizacja_sprzecznosc_odrzucenie(sk):

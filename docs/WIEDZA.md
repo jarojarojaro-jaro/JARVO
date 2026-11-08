@@ -253,6 +253,12 @@ kończy przebieg: ten szkic dostaje próbę, dalsze czekają bez zmiany licznika
 na 10 min, więc reszta partii padałaby od razu i po trzech przebiegach wypadała do `zrobione/`); szkic z oznaczoną próbą idzie
 na koniec kolejki. Zadanie `auxiliary.jarvo_wiedza` ma limit czasu 180 s (kompilacja szkicu na deepseek-v4.1-flash trwa
 ok. 20–25 s, a domyślne 30 s Hermesa było na granicy; pomiar 2026-11-07). Wynik przebiegu widać w LOG i w zakładce.
+**Równolegle (od 2026-11-08):** model dostaje szkice falami po 3 (`ROWNOLEGLE`, wątki), a zapis idzie po kolei,
+w kolejności skrzynki, pod tą samą jedną blokadą. Strażnik tematu przy zapisie: gdy szkic z tej samej fali właśnie zapisał
+notatkę, która teraz jest kandydatem następnego szkicu, a model tamtego jej nie widział, decyzja idzie od nowa, po kolei
+(w raporcie `ponowione`). Kandydaci szukani wektorami (§7), gdy usługa działa; po przebiegu kompilacja osadza nowe
+i zmienione notatki. Podmioty i notatki w `user/` mogą dostać od kompilacji `aliasy` (SCHEMA). Błąd wywołania modelu
+w fali przerywa przebieg jak wyżej: dalsze szkice tej fali czekają bez zmiany licznika.
 
 **Lint** (`wiedza.py lint`, 0 tokenów, co tydzień w niedzielę przed przeglądem tygodnia i przed każdą kompilacją):
 martwe linki, sieroty (bez linku przychodzącego), brak obowiązkowych kluczy frontmatteru, notatka bez `zrodlo`, duplikaty

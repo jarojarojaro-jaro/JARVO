@@ -6,7 +6,10 @@ notatek-kandydatów (FTS5) i z orzeczeniami właściciela w prompcie pyta głów
 (także decyzja właściciela nowsza niż notatka), sprzeczność (obie wersje zostają) albo odrzucenie; „nowa” obok notatki
 o prawie tym samym tytule staje się aktualizacją albo odrzuceniem. Notatki pisze według schematu (frontmatter, streszczenie, linki: hub + sąsiedzi + inny folder; linki tylko
 do istniejących ścieżek), dopisuje LOG.md, przenosi szkic do `skrzynka/zrobione/`, odświeża INDEX i huby, robi punkt zapisu
-git. Całość pod blokadą (wiedza.Blokada: blokada systemu na `state/wiedza.zamek` i znacznik `state/wiedza.lock`, ten sam,
+git. Model dostaje szkice falami po ROWNOLEGLE (wątki), zapis idzie po kolei; szkic, którego temat właśnie zapisał
+wcześniejszy szkic tej fali (nowa notatka wśród kandydatów, której model nie widział), dostaje decyzję od nowa.
+Kandydaci wektorami z usługi `wektory` (wiedza.KlientWektorow), bez niej słowami; po przebiegu osadzenie nowych notatek.
+Całość pod blokadą (wiedza.Blokada: blokada systemu na `state/wiedza.zamek` i znacznik `state/wiedza.lock`, ten sam,
 który stawia zasiew przy wdrożeniu). Przed przebiegiem i po nim lint (docs/WIEDZA.md §6, NATYWNIE K02): LINT.md
 i state/wiedza-lint.json pokazują stan po kompilacji, a raport przebiegu ma liczby z obu. Limity na przebieg: 40 szkiców,
 60 dotkniętych notatek. Błąd samego wywołania modelu (czas, dostawca, sieć) przerywa przebieg: ten szkic dostaje próbę,
@@ -24,6 +27,7 @@ Hermesa z HERMES_SRC (domyślnie /opt/hermes w kontenerze). Testy podstawiają f
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import importlib.util
 import json
 import os
@@ -53,6 +57,7 @@ LIMIT_NOTATEK = 60
 LIMIT_PROB = 3                      # nieudane wywołania modelu na szkic, potem szkic ląduje w zrobione/ z wpisem w LOG
 ZROBIONE_DNI = 30                  # szkice po kompilacji zostają tyle dni (źródła są w zrodla/, decyzje w LOG.md)
 KANDYDATOW = 6
+ROWNOLEGLE = 3                     # wywołań modelu naraz (szkice jednej fali); zapis i tak po kolei, pod jedną blokadą
 KANDYDATOW_LUSTRA = 10              # szkic z lustra pamięci: po 2 na wpis, najwyżej tyle
 PELNA_TRESC_KANDYDATOW = 2
 MAX_ORZECZEN = 20                   # ostatnie orzeczenia z pliku (wszyscy, agent) w prompcie kompilacji
@@ -83,10 +88,13 @@ Szkic typu "rozmowa" (wyciąg z rozmowy albo karty) → jedna notatka w folderze
 osobne notatki dla trwałych faktów, decyzji albo lekcji, które przydadzą się poza tą rozmową. Inne szkice → zwykle 1 wynik.
 Foldery: agenci/<agent>/ (o agencie: lekcje, narzędzia), projekty/, podmioty/ (firmy, ludzie w rolach publicznych, narzędzia),
 pojecia/ (metody, definicje), rozmowy/, user/ (o użytkowniku i jego firmie), brands/<marka>/ (o marce).
+Podmiot albo notatka w user/: pole "aliasy" = inne nazwy, jak ludzie o nim mówią (np. „szef”, skrót firmy), najwyżej 8;
+przy aktualizacji tylko nowe aliasy; inne typy bez aliasów.
 Odpowiadasz WYŁĄCZNIE JSON bez komentarzy:
 {"wyniki": [{"decyzja": "nowa|aktualizacja|sprzecznosc|odrzuc", "sciezka": "folder/tytuł jak się mówi (nowa) albo ścieżka kandydata",
   "typ": "fakt|decyzja|lekcja|podmiot|pojecie|projekt|rozmowa", "tytul": "…", "streszczenie": "jedno zdanie",
-  "tresc": "50–150 słów", "tagi": ["…"], "linki": ["ścieżka z listy", "…"], "wazne_do": "RRRR-MM-DD albo null", "powod": "jedno zdanie"}]}"""
+  "tresc": "50–150 słów", "tagi": ["…"], "linki": ["ścieżka z listy", "…"], "wazne_do": "RRRR-MM-DD albo null", "aliasy": ["…"],
+  "powod": "jedno zdanie"}]}"""
 
 
 def _json_z_odpowiedzi(text: str) -> Optional[dict]:
@@ -121,6 +129,7 @@ class Kompilacja:
                                        "notatki": [], "pominiete": 0, "zablokowana": False, "git": False, "na_sucho": self.na_sucho}
         self._dotkniete = 0
         self._awaria = ""                       # błąd wywołania modelu w tym przebiegu: koniec przebiegu, reszta czeka
+        self.wektory = None                     # KlientWektorow przy przebiegu (kandydaci po znaczeniu) albo None
         self._agenci = self._wczytaj_agentow()
 
     # ---- pomocnicze
@@ -174,12 +183,12 @@ class Kompilacja:
             wpisy = [re.sub(r"^- [\d-]+ · \w+ \w+: ", "", l) for l in szkic["tresc"].splitlines() if l.startswith("- ")]
             out: List[dict] = []
             for w in wpisy[-KANDYDATOW_LUSTRA:]:
-                for r in ix.szukaj(w, limit=2):
+                for r in ix.szukaj(w, limit=2, wektory=self.wektory):
                     if r["typ"] != "orzeczenia" and all(r["sciezka"] != o["sciezka"] for o in out):
                         out.append(r)
             return out[:KANDYDATOW_LUSTRA]
         zap = f"{szkic['tytul']} {szkic['tresc'][:400]}"
-        wyn = ix.szukaj(zap, limit=KANDYDATOW)
+        wyn = ix.szukaj(zap, limit=KANDYDATOW, wektory=self.wektory)
         return [r for r in wyn if r["typ"] not in ("orzeczenia",)]
 
     def orzeczenia(self, szkic: dict) -> List[str]:
@@ -221,20 +230,34 @@ class Kompilacja:
         linie += ["", "DOSTĘPNE ŚCIEŻKI DO LINKÓW (tylko te i kandydaci):"] + [f"- {h}" for h in self._huby()]
         return "\n".join(linie)
 
-    def decyzje(self, szkic: dict, kandydaci: List[dict]) -> Optional[List[dict]]:
+    def zapytaj_model(self, szkic: dict, kandydaci: List[dict]) -> tuple:
+        """(wyniki albo None, opis błędu, awaria): samo wywołanie modelu, bez zapisu do raportu, więc bezpieczne
+        w wątku równoległego przebiegu. Awaria = błąd wywołania (czas, dostawca, sieć); zła odpowiedź to tylko opis."""
         user = self.prompt(szkic, kandydaci)
         for proba in range(2):
             try:
                 odp = self.model(SYSTEM, user if proba == 0 else user + "\n\nOdpowiedz wyłącznie poprawnym JSON według schematu.")
             except Exception as e:
-                self.raport.setdefault("bledy_opis", []).append(f"{szkic['plik']}: model: {e}")
-                self._awaria = (f"{type(e).__name__}: {e}" if str(e) else type(e).__name__)[:200]
-                return None
+                return None, f"{szkic['plik']}: model: {e}", (f"{type(e).__name__}: {e}" if str(e) else type(e).__name__)[:200]
             d = _json_z_odpowiedzi(odp or "")
             if d is not None:
-                return [w for w in d["wyniki"] if isinstance(w, dict)][:4]
-        self.raport.setdefault("bledy_opis", []).append(f"{szkic['plik']}: odpowiedź modelu bez JSON")
-        return None
+                return [w for w in d["wyniki"] if isinstance(w, dict)][:4], "", ""
+        return None, f"{szkic['plik']}: odpowiedź modelu bez JSON", ""
+
+    def _modele_rownolegle(self, fala: List[tuple]) -> List[tuple]:
+        """Odpowiedzi modelu dla szkiców fali (plik, szkic, kandydaci), w kolejności fali; do ROWNOLEGLE wątków."""
+        if len(fala) <= 1:
+            return [self.zapytaj_model(s, k) for _p, s, k in fala]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(ROWNOLEGLE, len(fala))) as pula:
+            return list(pula.map(lambda x: self.zapytaj_model(x[1], x[2]), fala))
+
+    def _zapisz_odpowiedz(self, odpowiedz: tuple) -> Optional[List[dict]]:
+        wyniki, opis, awaria = odpowiedz
+        if opis:
+            self.raport.setdefault("bledy_opis", []).append(opis)
+        if awaria:
+            self._awaria = awaria
+        return wyniki
 
     # ---- ścieżki i linki
     def sciezka_nowej(self, wynik: dict, szkic: dict) -> str:
@@ -354,6 +377,8 @@ class Kompilacja:
         if typ not in lib.TYPY or typ in ("hub", "orzeczenia", "zrodlo"):
             typ = szkic["typ"] if szkic["typ"] in lib.TYPY else "fakt"
         tagi = [str(t).strip() for t in (wynik.get("tagi") or szkic.get("tagi") or []) if str(t).strip()][:8]
+        aliasy = [" ".join(str(a).replace(",", " ").split())[:40] for a in (wynik.get("aliasy") or [])
+                  if isinstance(wynik.get("aliasy"), list) and str(a).strip() and not lib.zawiera_sekret(str(a))][:8]
         wazne_do = str(wynik.get("wazne_do") or "").strip()
         wazne_do = wazne_do if lib.DATA_RE.match(wazne_do) else ""
         cel = str(wynik.get("sciezka") or "").strip().strip("/")
@@ -380,6 +405,8 @@ class Kompilacja:
         if decyzja == "nowa":
             linki = self.linki(wynik, sciezka, kandydaci)
             fm = {"typ": typ, "tagi": tagi, "utworzono": lib.dzis(), "zmieniono": lib.dzis(), "status": "aktualna", "zrodlo": szkic["zrodlo"]}
+            if aliasy and (typ == "podmiot" or sciezka.startswith("user/")):
+                fm["aliasy"] = aliasy
             if szkic.get("agent"):
                 fm["agent"] = szkic["agent"]
             if wazne_do:
@@ -404,6 +431,9 @@ class Kompilacja:
             fm["status"] = "aktualna"
             if tagi:
                 fm["tagi"] = list(dict.fromkeys(list(stara.fm.get("tagi") or []) + tagi))[:10] if isinstance(stara.fm.get("tagi"), list) else tagi
+            if aliasy and (fm.get("typ") == "podmiot" or cel.startswith("user/")):
+                stare_aliasy = stara.fm.get("aliasy") if isinstance(stara.fm.get("aliasy"), list) else []
+                fm["aliasy"] = list(dict.fromkeys([*stare_aliasy, *aliasy]))[:8]
             if wazne_do:
                 fm["wazne_do"] = wazne_do
             linki = self.linki(wynik, cel, kandydaci, stare=stare_linki)
@@ -476,48 +506,74 @@ class Kompilacja:
             if not self.na_sucho:
                 self.raport["lint_przed"] = self._lint(ix)      # docs/WIEDZA.md §6: lint przed każdą kompilacją
             do_zrobienia = szkice[:self.limit_szkicow]
-            for i, p in enumerate(do_zrobienia):
-                if self._dotkniete >= self.limit_notatek:
-                    self.raport["pominiete"] += 1
-                    continue
-                szkic = self._wczytaj_szkic(p)
-                if not szkic["tresc"] or not szkic["zrodlo"]:
-                    if not self.na_sucho:
-                        self._zrobione(p)
-                    wpisy.append(f"{p.name}: odrzucony (pusty albo bez źródła)")
-                    self.raport["odrzucone"] += 1
-                    continue
-                kand = self.kandydaci(ix, szkic)
-                if self.na_sucho:
-                    wpisy.append(f"{p.name}: kandydaci: " + (", ".join(k["sciezka"] for k in kand) or "brak"))
-                    continue
-                wyniki = self.decyzje(szkic, kand)
-                if wyniki is None:
-                    self.raport["bledy"] += 1
-                    if szkic["proby"] + 1 >= LIMIT_PROB:
-                        self._zrobione(p)
-                        wpisy.append(f"{p.name}: odrzucony po {LIMIT_PROB} nieudanych próbach modelu")
-                    else:
-                        self._oznacz_probe(p, szkic)
-                        wpisy.append(f"{p.name}: błąd modelu (próba {szkic['proby'] + 1}), szkic czeka")
-                    if self._awaria:            # wywołanie padło (czas, dostawca, sieć), nie odpowiedź na ten szkic
-                        reszta = len(do_zrobienia) - i - 1
-                        self.raport["pominiete"] += reszta
-                        self.raport["przerwana"] = self._awaria
-                        wpisy.append(f"przebieg przerwany po błędzie wywołania modelu ({self._awaria}); "
-                                     f"{reszta} szkiców czeka bez zmiany licznika prób")
-                        break
-                    continue
-                opisy = []
-                for w in wyniki:
-                    try:
-                        opisy.append(self.zastosuj(szkic, w, kand))
-                    except Exception as e:      # jeden zły wynik nie psuje przebiegu
-                        opisy.append(f"błąd zapisu: {e}")
+            k = lib.KlientWektorow(self.sk.stan, lib.WEKTORY_CZAS_NARZEDZIA_S)
+            self.wektory = k if k.dostepny else None             # kandydaci po znaczeniu, bez usługi słowami
+            i, przerwany = 0, False
+            while i < len(do_zrobienia) and not przerwany:
+                fala: List[tuple] = []                           # (plik, szkic, kandydaci): do ROWNOLEGLE naraz
+                while i < len(do_zrobienia) and len(fala) < ROWNOLEGLE:
+                    p = do_zrobienia[i]
+                    i += 1
+                    if self._dotkniete >= self.limit_notatek:
+                        self.raport["pominiete"] += 1
+                        continue
+                    szkic = self._wczytaj_szkic(p)
+                    if not szkic["tresc"] or not szkic["zrodlo"]:
+                        if not self.na_sucho:
+                            self._zrobione(p)
+                        wpisy.append(f"{p.name}: odrzucony (pusty albo bez źródła)")
+                        self.raport["odrzucone"] += 1
+                        continue
+                    kand = self.kandydaci(ix, szkic)
+                    if self.na_sucho:
+                        wpisy.append(f"{p.name}: kandydaci: " + (", ".join(k["sciezka"] for k in kand) or "brak"))
+                        continue
+                    fala.append((p, szkic, kand))
+                odpowiedzi = self._modele_rownolegle(fala)
+                zapisane_w_fali: set = set()
+                for j, ((p, szkic, kand), odp) in enumerate(zip(fala, odpowiedzi)):
+                    if przerwany or self._dotkniete >= self.limit_notatek:
+                        self.raport["pominiete"] += 1         # czeka bez zmiany licznika prób
+                        continue
+                    if odp[0] is not None and zapisane_w_fali:
+                        # strażnik tematu: wcześniejszy szkic tej fali zapisał notatkę, której model tego szkicu nie
+                        # widział, a jest wśród kandydatów teraz: decyzja od nowa, po kolei (jak bez równoległości)
+                        ix.odswiez()
+                        swiezi = self.kandydaci(ix, szkic)
+                        znane = {x["sciezka"] for x in kand}
+                        if any(x["sciezka"] in zapisane_w_fali and x["sciezka"] not in znane for x in swiezi):
+                            kand = swiezi
+                            odp = self.zapytaj_model(szkic, kand)
+                            self.raport["ponowione"] = self.raport.get("ponowione", 0) + 1
+                    wyniki = self._zapisz_odpowiedz(odp)
+                    if wyniki is None:
                         self.raport["bledy"] += 1
-                self._zrobione(p)
-                wpisy.append(f"{p.name}: " + "; ".join(opisy or ["bez wyników"]))
-                ix.odswiez()                     # kolejne szkice widzą nowe notatki
+                        if szkic["proby"] + 1 >= LIMIT_PROB:
+                            self._zrobione(p)
+                            wpisy.append(f"{p.name}: odrzucony po {LIMIT_PROB} nieudanych próbach modelu")
+                        else:
+                            self._oznacz_probe(p, szkic)
+                            wpisy.append(f"{p.name}: błąd modelu (próba {szkic['proby'] + 1}), szkic czeka")
+                        if self._awaria:            # wywołanie padło (czas, dostawca, sieć), nie odpowiedź na ten szkic
+                            reszta = len(fala) - j - 1 + len(do_zrobienia) - i
+                            self.raport["pominiete"] += len(do_zrobienia) - i
+                            self.raport["przerwana"] = self._awaria
+                            wpisy.append(f"przebieg przerwany po błędzie wywołania modelu ({self._awaria}); "
+                                         f"{reszta} szkiców czeka bez zmiany licznika prób")
+                            przerwany = True
+                        continue
+                    przed = len(self.raport["notatki"])
+                    opisy = []
+                    for w in wyniki:
+                        try:
+                            opisy.append(self.zastosuj(szkic, w, kand))
+                        except Exception as e:      # jeden zły wynik nie psuje przebiegu
+                            opisy.append(f"błąd zapisu: {e}")
+                            self.raport["bledy"] += 1
+                    zapisane_w_fali.update(self.raport["notatki"][przed:])
+                    self._zrobione(p)
+                    wpisy.append(f"{p.name}: " + "; ".join(opisy or ["bez wyników"]))
+                    ix.odswiez()                     # kolejne szkice widzą nowe notatki
             self.raport["pominiete"] += max(0, len(szkice) - self.limit_szkicow)
             self.raport["wpisy"] = wpisy
             if not self.na_sucho:
@@ -526,6 +582,7 @@ class Kompilacja:
                 lib.zbuduj_index(self.sk, ix)
                 lib.odswiez_listy_hubow(self.sk, ix)
                 ix.odswiez()
+                self.raport["wektory"] = ix.odswiez_wektory(lib.KlientWektorow(self.sk.stan, lib.WEKTORY_CZAS_ZAPISU_S))
                 self.raport["lint"] = self._lint(ix)            # LINT.md i doctor widzą stan po kompilacji
                 self._zapisz_wynik(len(szkice), wpisy)          # LOG, punkt zapisu git i stan: jeszcze pod blokadą
         finally:

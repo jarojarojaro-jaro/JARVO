@@ -84,8 +84,8 @@ Linki: `[[ścieżka w skarbcu bez .md|etykieta]]`; sama nazwa pliku też działa
 
 **Aliasy** (`aliasy: [...]`, najwyżej 8): inne nazwy tego samego podmiotu, osoby albo rzeczy, np. dla `user/<imię i nazwisko>`
 `[właściciel, szef]`, dla klienta jego skrót. Gdy alias pada w pytaniu (także w odmianie: „szefa”, „szefowej”), szukanie
-dopisuje do pytania tytuł tej notatki, więc przypomnienie trafia w podmiot, choć pytanie go nie nazywa. Aliasy dopisuje
-człowiek (w Obsidianie albo przez orzeczenie dla kompilacji).
+dopisuje do pytania tytuł tej notatki, więc przypomnienie trafia w podmiot, choć pytanie go nie nazywa. Aliasy pisze
+człowiek albo kompilacja (tylko dla podmiotów i notatek w `user/`, przy aktualizacji dopisuje nowe).
 
 ## Orzeczenie
 
