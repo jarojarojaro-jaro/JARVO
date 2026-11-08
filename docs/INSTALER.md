@@ -39,8 +39,9 @@ Krótszy adres po wgraniu strony: `curl -fsSL https://jarvo.pl/install.sh | bash
 - Polecenia: `jarvo` (rozmowa w terminalu, jak `jarvo chat`), `jarvo panel`, `jarvo status`, `jarvo doctor`, `jarvo up`,
   `jarvo down` (serwis stoi do `jarvo up`), `jarvo logs`, `jarvo autostart on|off|status`, `jarvo chat` (profil `jarvo`,
   `--profil`, `--tryb pytaj|projekt|pelny`), `jarvo wiedza`, `jarvo rutyny`, `jarvo telegram`, `jarvo komputer`
-  (Komputer Jarva; `jarvo komputer rece` = ręce na Twoim ekranie, domyślnie wyłączone), `jarvo android`,
-  `jarvo version`, `jarvo help` oraz:
+  (Komputer Jarva; `jarvo komputer rece` = ręce na Twoim ekranie, domyślnie wyłączone), `jarvo android`, `jarvo telefon`
+  (`on --phoneuse KATALOG`, `off`, `status`: telefon przez serwer MCP PHONEUSE dla Operatora, podgląd dla Jarva;
+  docs/MOBILE.md), `jarvo version`, `jarvo help` oraz:
   - `jarvo update` (`--sprawdz`, `--ref REF`, `--json`): nowa wersja obok starej w `<program>/app/<sha12>`, instalator
     nowej wersji, `jarvo doctor`, powrót przy błędzie; nie używa HOST_VERSION (zawsze instalator nowej wersji);
     zmienne JARVO_UPDATE_TIMEOUT (3600 s), JARVO_UPDATE_ROZGRZEWKA (120 s), JARVO_UPDATE_CHECK (3600 s, pomocnik);

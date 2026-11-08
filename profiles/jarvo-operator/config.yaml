@@ -1,5 +1,6 @@
 # jarvo-operator: computer use na Komputerze Jarva (docs/KOMPUTER.md). Tokeny @@...@@ podstawia scripts/build.py.
-# Ekran tylko przez computer_use (bramka komputer/jarvo_cua.py → wejście z twardymi zasadami w Komputerze).
+# Ekran Komputera tylko przez computer_use (bramka komputer/jarvo_cua.py → wejście z twardymi zasadami w Komputerze).
+# Telefon: serwer MCP phone (PHONEUSE) dopisuje do zainstalowanego configu dopiero `jarvo telefon on`, nie ten plik.
 # Bez terminala, code_execution, przeglądarki floty i delegacji: walidator pilnuje tego dla `komputer: true`.
 model:
   provider: "@@PROVIDER@@"

@@ -174,6 +174,8 @@ def _parser() -> argparse.ArgumentParser:
     wiedza_cli.dodaj_polecenia(sub)
     from . import android                   # telefon testowy Twórcy aplikacji (etap E11): jarvo android status|on|off|ekran
     android.dodaj_polecenia(sub)
+    from . import telefon                   # telefon przez PHONEUSE (serwer MCP phone): jarvo telefon status|on|off
+    telefon.dodaj_polecenia(sub)
 
     s = sub.add_parser("komputer", add_help=False, help="Komputer Jarva: przeglądarka Operatora (on, off, status, …) "
                        "i ręce na Twoim ekranie (komputer rece on|off|status)",
@@ -1195,6 +1197,8 @@ def zbierz_diagnoze(u: Uklad, ot: Otoczenie) -> dict:
         wyniki.append(zgody_cli.sprawdzenie(u))  # wtyczka zgód w każdym profilu bramy (sekcja d, Z39)
     from . import android                       # telefon testowy i ekran (E11): opcjonalne, brak = „ok” z opisem
     wyniki += android.sprawdzenia(u, ot)
+    from . import telefon                       # telefon przez PHONEUSE: opcjonalny, wyłączony = „ok” z opisem
+    wyniki += telefon.sprawdzenia(u, ot)
     return {"root": str(u.root), "czas": time.strftime("%Y-%m-%dT%H:%M:%S"), "serwis": stan is not None,
             "wyniki": wyniki, "bledy": sum(w["stan"] == "blad" for w in wyniki),
             "uwagi": sum(w["stan"] == "uwaga" for w in wyniki)}

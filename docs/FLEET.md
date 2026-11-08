@@ -463,6 +463,9 @@ haseł ani numerów kart z czatu. Nie ma terminala, wykonywania kodu ani delegow
 po 3 nieudanych próbach zmienia drogę albo oddaje ekran. Ekran jest jeden: Jarvo daje karty Operatora po kolei (`parents`, wzorzec 11), a gdy na Komputerze pracuje
 już inna sesja, wejście zwraca `zajete` (jedna sesja naraz).
 Ze skarbca nie robi wyciągu po sesji (`bez_wyciagu`): to, co było na ekranie, nie trafia do wiedzy floty sam.
+Po `jarvo telefon on` (instalacja natywna, [MOBILE.md](MOBILE.md)) obsługuje też telefon właściciela przez PHONEUSE
+(`mcp__phone__*`): najpierw `ping`, przed działaniem `screen`, `confirm=true` tylko po „tak” właściciela dla tej jednej
+akcji (wtyczka `jarvo-zgody` pyta o nie, a na karcie i pod YOLO blokuje). Jarvo ma ten serwer tylko do odczytu.
 
 **Skille:** [T] `praca-na-ekranie` (pętla, tryby patrzenia, werdykty, odmowy wejścia), `formularze` (pole po polu,
 listy przez `set_value`, sprawdzenie wartości, formularze wrażliwe), `dane-z-ekranu` (tabela z drzewa albo obrazu

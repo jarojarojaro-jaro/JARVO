@@ -23,6 +23,12 @@ Zawsze, w każdym trybie:
   da się zapytać, więc są blokowane;
 - o polecenia, które Hermes sam uzna za niebezpieczne, pyta tylko Hermes (bez drugiego pytania). Pliki instrukcji
   przez `write_file` i `patch` też pyta sam Hermes (zawsze, także pod YOLO).
+- telefon (serwer MCP `phone` z PHONEUSE po `jarvo telefon on`, [docs/MOBILE.md](../docs/MOBILE.md)):
+  `mcp__phone__act` i `mcp__phone__batch` z `confirm: true` (na wierzchu, w `args` albo w kroku `batch`) omijają
+  bramkę `needs_confirm` telefonu, więc z człowiekiem to prośba z treścią akcji (zgoda = „tak” dla tej jednej akcji;
+  „zawsze” niczego nie zapamiętuje), a bez człowieka i w trybie pełnym blokada (na karcie z poradą
+  `kanban_block(kind="needs_input")`). Pozostałe narzędzia telefonu wtyczka zostawia Hermesowi. Pod YOLO
+  `jarvo-operator` ma zablokowany telefon tak jak `computer_use`.
 
 Folder projektu to katalog startu czatu: `JARVO_FOLDER_PROJEKTU` albo `TERMINAL_CWD` (u pracownika karty: katalog
 karty). Katalog domowy i korzeń dysku nie są folderem projektu: wtedy tryb projekt pyta o każdy zapis. Ścieżki Git Bash

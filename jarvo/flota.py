@@ -16,7 +16,8 @@
      --ustawienia-profili `<stan>/flota-ustawienia.json`: klucze configu profili, których build nie zna, bo zależą
      od instalacji (I13, H24): `updates.check: false` w każdym profilu (bez pytania GitHuba o wersję Hermesa), a na
      Windows `terminal.shell_init_files` z plikiem `<stan>/powloka/<agent>.sh` (USERPROFILE, APPDATA… w katalogu
-     domowym profilu, jarvo/hermes.py). install_fleet.py ustawia je w tym samym przebiegu co `profile update
+     domowym profilu, jarvo/hermes.py), a po `jarvo telefon on` serwer MCP phone (PHONEUSE) w jarvo i jarvo-operator
+     (jarvo/telefon.py klucze_profili). install_fleet.py ustawia je w tym samym przebiegu co `profile update
      --force-config`, więc drugi przebieg niczego nie zmienia; plik powłoki i katalogi pisze potem ten moduł.
   3. Wynik: podsumowanie install_fleet.py (agenci, wtyczki, dowiązania, zmiany, `restart_bramy`, `restart_panelu`,
      skarbiec, lint, ostrzeżenia, bez sekretów) i `build` (katalog, użyte opcje, czas).
@@ -266,10 +267,14 @@ def plik_powloki(u: Uklad, agent: str) -> Path:
 
 
 def ustawienia_profili(u: Uklad, agenci: list[str]) -> dict:
-    """Klucze configu profili zależne od instalacji (dla install_fleet.py --ustawienia-profili)."""
-    profile = {}
+    """Klucze configu profili zależne od instalacji (dla install_fleet.py --ustawienia-profili); z włączonym
+    `jarvo telefon` także serwer MCP phone w jarvo i jarvo-operator (wzór w jarvo/telefon.py)."""
+    profile: dict[str, dict] = {}
     if WINDOWS:
         profile = {a: {"terminal.shell_init_files": [str(plik_powloki(u, a))]} for a in agenci}
+    from . import telefon
+    for agent, klucze in telefon.klucze_profili(u, agenci).items():
+        profile.setdefault(agent, {}).update(klucze)
     return {"wersja": 1, "wszystkie": dict(KLUCZE_WSZYSTKICH), "profile": profile}
 
 

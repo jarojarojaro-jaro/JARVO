@@ -36,5 +36,5 @@ tools:
 sidecars: []
 hermes_skills: []
 hermes_plugins: [jarvo-komputer]
-mcp_servers: []
+mcp_servers: [phone]       # PHONEUSE, wszystkie narzędzia; w config.yaml dopiero po `jarvo telefon on` (docs/MOBILE.md)
 env_requires: []

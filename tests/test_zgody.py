@@ -538,6 +538,47 @@ def test_siatka_bezpieczenstwa_approve_bez_czlowieka(sr, monkeypatch):
     assert akcja(hak("write_file", path="x", content="x")) == "block"
 
 
+# ------------------------------------------------------------------------------------------------ telefon (PHONEUSE)
+
+def test_telefon_confirm_z_czlowiekiem_to_prosba_o_te_jedna_akcje(sr):
+    w = hak("mcp__phone__act", phone="first", cmd="tap", args={"text": "Kup teraz"}, confirm=True)
+    assert akcja(w) == "approve" and "Kup teraz" in w["message"] and "confirm" in w["message"]
+    drugi = hak("mcp__phone__act", phone="first", cmd="tap", args={"text": "Kup teraz"}, confirm=True)
+    assert drugi["rule_key"] != w["rule_key"]                        # „zawsze” nie zapamięta zgody na następne
+    assert akcja(hak("mcp__phone__act", cmd="tap", args={"index": 4, "confirm": True})) == "approve"   # przez args
+    kroki = [{"cmd": "tap", "text": "Szukaj"}, {"cmd": "tap", "text": "Usuń konto", "confirm": True}]
+    w = hak("mcp__phone__batch", steps=kroki)
+    assert akcja(w) == "approve" and "Usuń konto" in w["message"]
+    assert akcja(hak("mcp__phone__batch", steps='[{"cmd": "enter", "confirm": "true"}]')) == "approve"   # JSON w napisie
+
+
+def test_telefon_bez_confirm_i_inne_narzedzia_bez_zdania(sr):
+    assert hak("mcp__phone__act", cmd="tap", args={"index": 3}, confirm=False) is None
+    assert hak("mcp__phone__act", cmd="tap", args={"index": 3, "confirm": "false"}) is None
+    assert hak("mcp__phone__batch", steps=[{"cmd": "tap", "text": "Szukaj"}, {"cmd": "type", "text": "rower"}]) is None
+    assert hak("mcp__phone__screen", phone="first") is None
+    assert hak("mcp__inny__act", cmd="tap", confirm=True) is None    # tylko serwer phone
+
+
+@pytest.mark.parametrize("kontekst", KONTEKSTY)
+def test_telefon_confirm_bez_czlowieka_block(sr, monkeypatch, kontekst):
+    bez_czlowieka(sr, monkeypatch, kontekst)
+    w = hak("mcp__phone__batch", steps=[{"cmd": "tap", "text": "Wyślij", "confirm": True}])
+    assert akcja(w) == "block" and "confirm" in w["message"]
+    assert ('kanban_block(kind="needs_input"' in w["message"]) == (kontekst == "kanban")
+    assert hak("mcp__phone__act", cmd="tap", args={"index": 3}) is None
+
+
+def test_telefon_confirm_pod_yolo_block(sr, monkeypatch):
+    monkeypatch.setattr(z, "_yolo", lambda: True)                    # YOLO zatwierdziłoby prośbę bez człowieka
+    assert akcja(hak("mcp__phone__act", cmd="enter", confirm=True)) == "block"
+    operator = sr.dane / "profiles" / "jarvo-operator"
+    operator.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(operator))
+    assert akcja(hak("mcp__phone__screen", phone="first")) == "block"   # Operator pod YOLO: telefon jak computer_use
+
+
+
 # ------------------------------------------------------------------------------------------------ błąd = blokada
 
 def test_wyjatek_w_haku_blokuje_bez_tresci_argumentow(sr, monkeypatch):

@@ -44,7 +44,8 @@ import atrapy
 from conftest import REPO, WINDOWS
 
 sys.path.insert(0, str(REPO))
-from jarvo import bin_floty, cli, flota, instalator, manifest, modele, programy_floty, sciezki  # noqa: E402
+from jarvo import android, bin_floty, cli, flota, instalator, manifest, modele, programy_floty, sciezki  # noqa: E402
+from jarvo import telefon  # noqa: E402
 from jarvo import hermes, przy_uzyciu, srodowisko, tesseract, venvy  # noqa: E402
 import install_fleet  # noqa: E402  (scripts/ w sys.path z conftest)
 
@@ -508,6 +509,44 @@ def test_flota_przekazuje_ustawienia_profili(tmp_path):
     argv = flota.argv_instalacji(u, tmp_path / "app", Path(sys.executable), pierwsza=False, wznow_rutyny=False,
                                  ustawienia=u.stan / "x.json")
     assert argv[argv.index("--ustawienia-profili") + 1] == str(u.stan / "x.json")
+
+
+def test_ustawienia_profili_z_telefonem_przezywaja_force_config(tmp_path, monkeypatch):
+    """`jarvo telefon on` (<stan>/telefon.json) → serwer MCP phone w jarvo (odczyt) i jarvo-operator (pełny) przy każdej
+    instalacji floty; bez pliku albo wyłączony: nic (instalacja bez PHONEUSE bez zmian)."""
+    u = uklad(tmp_path / "Jarvo")
+    adb = tmp_path / "pt" / "adb"
+    monkeypatch.setattr(android, "adb", lambda _u: adb)
+    agenci = ["jarvo", "jarvo-operator", "jarvo-web"]
+    bez = flota.ustawienia_profili(u, agenci)["profile"]
+    assert not any(telefon.KLUCZ in k for k in bez.values())
+    telefon.zapisz_stan(u, {"wlaczony": True, "python": str(tmp_path / "py"), "serwer": str(tmp_path / "phone_mcp.py"),
+                            "telefon": None})
+    ust = json.loads(json.dumps(flota.ustawienia_profili(u, agenci)))       # tak, jak zapisuje je zainstaluj_flote
+    szef, operator = ust["profile"]["jarvo"][telefon.KLUCZ], ust["profile"]["jarvo-operator"][telefon.KLUCZ]
+    assert szef["tools"]["include"] == list(telefon.NARZEDZIA_ODCZYTU) and "act" not in szef["tools"]["include"]
+    assert "tools" not in operator and operator["env"] == {"ADB": str(adb)}   # bez --telefon: bez PHONEUSE_PHONE
+    assert telefon.KLUCZ not in ust["profile"].get("jarvo-web", {})
+    if WINDOWS:                                                               # klucze powłoki zostają obok
+        assert "terminal.shell_init_files" in ust["profile"]["jarvo"]
+    assert "jarvo-operator" not in flota.ustawienia_profili(u, ["jarvo"])["profile"]   # tylko agenci z buildu
+    # install_fleet.py po --force-config: wpis w config.yaml, drugi przebieg bez zapisu
+    plik = tmp_path / "ustawienia.json"
+    plik.write_text(json.dumps(ust), encoding="utf-8")
+    a = install_fleet.parser().parse_args(["--dane", str(u.dane), "--build", str(u.build), "--natywnie",
+                                           "--bez-sekretow", "--ustawienia-profili", str(plik)])
+    f = install_fleet.Flota(a, wypisz=lambda _t: None)
+    config = u.dane / "profiles" / "jarvo" / "config.yaml"
+    config.parent.mkdir(parents=True)
+    config.write_text("model:\n  default: x\n", encoding="utf-8")
+    f.ustaw_klucze_profilu("jarvo", config)
+    import yaml
+    assert yaml.safe_load(config.read_text(encoding="utf-8"))["mcp_servers"]["phone"] == szef
+    przed = config.stat().st_mtime_ns
+    f.ustaw_klucze_profilu("jarvo", config)
+    assert config.stat().st_mtime_ns == przed
+    telefon.zapisz_stan(u, {**telefon.stan_telefonu(u), "wlaczony": False})
+    assert not any(telefon.KLUCZ in k for k in flota.ustawienia_profili(u, agenci)["profile"].values())
 
 
 # ---------------------------------------------------------------- klucz i port API bramy

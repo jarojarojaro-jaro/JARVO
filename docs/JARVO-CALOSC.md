@@ -85,6 +85,9 @@ przewijanie i przeciąganie działają tylko na wierzchu; wejście przepuszcza j
 Logowanie, płatność, CAPTCHA i wysyłkę robi właściciel w Ekranie HQ; Operator nie przyjmuje haseł ani kart z czatu.
 Bez wyciągu rozmów do skarbca (`bez_wyciagu`). 20 evals, 2 ataki red teamu (wstrzyknięcie z ekranu, karta i hasło
 na ekranie), pokój Sterownia w HQ. Wzorzec 11 w `dispatch-playbook` mówi Jarvowi, kiedy dać kartę Operatorowi.
+Telefon właściciela przez PHONEUSE (serwer MCP `phone`, dopisuje go `jarvo telefon on`): Operator ma wszystkie
+narzędzia, Jarvo tylko odczyt; `confirm=true` w `act` i `batch` wymaga „tak” człowieka (wtyczka `jarvo-zgody`),
+pod YOLO telefon jest zablokowany jak `computer_use` ([MOBILE.md](MOBILE.md)).
 
 ### 2a. jarvo-mobile — szczegóły
 Twórca aplikacji, etap 1 z [MOBILE.md](MOBILE.md): `natywna-czy-pwa` (`decyzja.py`: potrzeby → strona, PWA, karta

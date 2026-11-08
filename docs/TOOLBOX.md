@@ -490,6 +490,11 @@ serwerom stdio tylko bezpieczne zmienne środowiska (`PATH`, `HOME`, bez proxy),
 `NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt` (CA dodane do systemu, np. proxy z własnym certyfikatem).
 Proxy wymagające `HTTPS_PROXY` dalej blokuje pobór. Healthcheck (`toolbox.yaml`) startuje serwer z takim samym okrojonym
 środowiskiem i robi prawdziwe `search_screens`, więc zielony wynik znaczy, że katalog się pobrał.
+Drugi, tylko w instalacji natywnej i tylko po `jarvo telefon on`: `phone` (serwer MCP PHONEUSE `tools/phone_mcp.py`,
+telefon właściciela z Androidem, [MOBILE.md](MOBILE.md)) u `jarvo-operator` (wszystkie narzędzia) i `jarvo` (tylko
+odczyt przez `tools.include`). W repo `config.yaml` go nie ma: wpis dopisuje `jarvo telefon on` w zainstalowanych
+profilach i każda instalacja floty (`flota.ustawienia_profili`), więc hub wiedzy, który czyta config z buildu, go
+nie pokazuje. Też `trust: full` (bez `readOnlyHint`); `confirm=true` w `act` i `batch` pilnuje wtyczka `jarvo-zgody`.
 
 ---
 

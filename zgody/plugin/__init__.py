@@ -16,6 +16,10 @@ Tryby (wybór: `/tryb` w sesji > JARVO_TRYB_ZGOD z `jarvo chat --tryb` > plik st
 Zawsze, w każdym trybie: zapis config.yaml Hermesa = block; zgoda na AGENTS.md, CLAUDE.md, SOUL.md i chronione
 miejsca (.git, .vscode, .idea, .claude, .hermes, .gitconfig, .bashrc, .zshrc, .npmrc, .mcp.json i podobne pliki
 startowe powłoki, dane i kod Jarva). Pod YOLO o chronione miejsca nie da się zapytać, więc wtyczka je blokuje.
+Telefon (serwer MCP `phone` z PHONEUSE, `jarvo telefon on`): mcp__phone__act i mcp__phone__batch z confirm=true
+(na wierzchu, w args albo w kroku batch) przechodzą bramkę needs_confirm telefonu, więc z człowiekiem to prośba
+z treścią akcji (zgoda = „tak” dla tej jednej akcji, bez zapamiętania), bez człowieka i pod YOLO block. Reszta
+narzędzi telefonu bez zdania wtyczki.
 Bez człowieka (karta kanbana, cron, -q, podagent delegate_task, webhook, sesja bez nikogo, kto odpowie na prośbę):
 nigdy approve. Zapisy w katalogu karty, skarbcu (JARVO_KNOWLEDGE_DIR) i misjach (JARVO_MISSIONS_DIR) oraz to, co
 tryb przepuszcza bez pytania w folderze projektu (projekt i pełny), idą dalej; reszta zapisów to block z poradą
@@ -106,6 +110,11 @@ RUTYNY_ODCZYT = frozenset({"list"})                              # cronjob_manag
 # jarvo-operator pod YOLO: tylko odczyt i raport na karcie, reszta block (I08, docs/NATYWNIE.md F09)
 OPERATOR_PRZY_YOLO = frozenset({"read_file", "search_files", "todo_list", "clarify", "session_search", "skill_view",
                                 "skills_list", "vision_analyze"})
+# telefon przez PHONEUSE (jarvo telefon on, serwer MCP `phone`): act i batch z confirm=true przechodzą bramkę
+# needs_confirm telefonu, więc confirm daje tylko „tak” człowieka dla tej jednej akcji
+TELEFON = "phone"
+TELEFON_POTWIERDZENIA = frozenset({f"mcp__{TELEFON}__act", f"mcp__{TELEFON}__batch"})
+_NIE = frozenset({"", "false", "0", "no", "off", "none", "null", "nie"})
 
 # zawsze pytamy (pod YOLO blokujemy): katalogi z ustawieniami, które wykonują kod albo sterują agentem
 CHRONIONE_KATALOGI = frozenset({".git", ".vscode", ".idea", ".claude", ".hermes"})
@@ -1711,12 +1720,65 @@ def _terminal(args: Dict[str, Any], m: _Miejsca, task_id: str) -> Optional[Dict[
     return _prosba("terminal", m, f"polecenie `{pokaz}` ({'; '.join(powody)})", polecenie.strip())
 
 
+def _potwierdza(v: Any) -> bool:
+    """Wartość `confirm`, którą telefon może uznać za tak (niepewna też: lepiej zapytać)."""
+    return not (v is None or v is False or (isinstance(v, (int, float)) and v == 0)
+                or str(v).strip().lower() in _NIE)
+
+
+def _z_potwierdzeniem(x: Any, glebokosc: int = 0) -> bool:
+    """Czy w argumentach act/batch jest `confirm` (na wierzchu, w `args` albo w którymś kroku batch, także w JSON
+    podanym jako napis). Zbyt głęboko = tak (fail-closed)."""
+    if glebokosc > 8:
+        return True
+    if isinstance(x, str) and x.strip()[:1] in ("{", "["):
+        try:
+            return _z_potwierdzeniem(json.loads(x), glebokosc + 1)
+        except ValueError:
+            return "confirm" in x.lower()
+    if isinstance(x, dict):
+        return any((str(k).strip().lower() == "confirm" and _potwierdza(v)) or _z_potwierdzeniem(v, glebokosc + 1)
+                   for k, v in x.items())
+    if isinstance(x, (list, tuple)):
+        return any(_z_potwierdzeniem(v, glebokosc + 1) for v in x)
+    return False
+
+
+def _telefon(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[str, str]]:
+    """mcp__phone__act / batch z confirm: prośba z treścią akcji (zgoda człowieka = jego „tak”), bez człowieka
+    i pod YOLO (Hermes zatwierdziłby sam) block. Bez confirm: None (bramka telefonu i tak zatrzyma ryzykowną akcję).
+    Klucz reguły z losowym składnikiem: „zawsze” nie zapisze zgody na następne potwierdzenia."""
+    if not _z_potwierdzeniem(args):
+        return None
+    akcja = _poczatek(json.dumps(args, sort_keys=True, ensure_ascii=False, default=str), 240)
+    bez_czl = bez_czlowieka()
+    if bez_czl:
+        if bez_czl == "kanban":
+            rada = ("Nie wysyłaj confirm; zatrzymaj kartę: kanban_block(kind=\"needs_input\", reason=\"potrzebne „tak” "
+                    "właściciela dla akcji na telefonie: …\").")
+        elif bez_czl == "podagent":
+            rada = "Nie wysyłaj confirm; opisz akcję w wyniku dla agenta, który Cię wywołał: on zapyta właściciela."
+        else:
+            rada = "Nie wysyłaj confirm; opisz akcję w odpowiedzi, a zgodę da właściciel w czacie."
+        return _blok(f"confirm=true na telefonie ({tool_name}) to „tak” człowieka dla tej jednej akcji, a "
+                     f"{KONTEKSTY.get(bez_czl, bez_czl)} działa bez niego. {rada}")
+    if _yolo():
+        return _blok(f"confirm=true na telefonie ({tool_name}) wymaga „tak” człowieka, a w trybie pełnym (YOLO) Hermes "
+                     "zatwierdza wszystko sam. Wyłącz /yolo i ponów.")
+    tryb, _ = tryb_zgod()
+    m = _miejsca(tryb, None, False)
+    return _prosba(tool_name, m, f"telefon: ryzykowna akcja z confirm=true (bramka needs_confirm telefonu): {akcja}. "
+                   "Zgoda = Twoje „tak” dla tej jednej akcji.", f"{akcja}\n{os.urandom(8).hex()}")
+
+
 def _decyzja(tool_name: str, args: Dict[str, Any], task_id: str) -> Optional[Dict[str, str]]:
     yolo = _yolo()
     if yolo and _profil(_hermes_home()) == OPERATOR and not (tool_name in OPERATOR_PRZY_YOLO
                                                              or tool_name.startswith("kanban_")):
         return _blok("tryb pełny (YOLO) jest wyłączony dla jarvo-operator: Komputer Jarva działałby wtedy bez "
                      "ograniczeń. Uruchom czat bez --yolo albo wpisz /yolo, żeby je wyłączyć.")
+    if tool_name in TELEFON_POTWIERDZENIA:
+        return _telefon(tool_name, args)
     if tool_name not in OBSLUGIWANE:
         return None
     bez_czl = bez_czlowieka()

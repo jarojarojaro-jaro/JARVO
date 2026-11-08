@@ -121,6 +121,25 @@ użycie albo `jarvo android off`. Wartości nieczytelnej nie zmieniają, offline
 aplikacji (`pm clear`) czyszczą tylko na emulatorze albo telefonie oznaczonym jako testowy
 (`jarvo android on --telefon-testowy`). Najlepiej podłączyć telefon testowy, nie prywatny.
 
+**Telefon przez PHONEUSE (Operator i podgląd dla Jarva, instalacja natywna).** To inna droga niż `jarvo android`:
+`jarvo-mobile` testuje przez adb swoją aplikację (instalacja, zrzuty, ustawienia testów), a PHONEUSE (osobne repo
+właściciela) obsługuje cały telefon przez usługę dostępności na telefonie: czyta ekran jako ponumerowane wiersze
+i stuka, pisze, przewija. Jego serwer MCP `tools/phone_mcp.py` (stdio, MCP SDK `mcp>=2.3,<3`) włącza
+`jarvo telefon on --phoneuse <katalog PHONEUSE> [--python PYTHON] [--telefon NAZWA]` (jarvo/telefon.py). Polecenie
+sprawdza serwer i import SDK (domyślny Python: `~/.phoneuse/mcp-venv`, zakłada go
+`python3 <katalog PHONEUSE>/tools/mcp_setup.py`), zapisuje `<stan>/telefon.json` i dopisuje serwer `phone`
+w zainstalowanych profilach: `jarvo-operator` dostaje wszystkie narzędzia (`mcp__phone__list_phones`, `ping`, `screen`,
+`act`, `shot`, `wait`, `batch`), `jarvo` tylko odczyt (`list_phones`, `ping`, `screen`, `shot`, `wait`), np. do
+sprawdzenia pracy Operatora. Serwer dostaje `ADB` z platform-tools `jarvo android` (jeden serwer adb jednej wersji)
+i `PHONEUSE_PHONE` z `--telefon`. Potem restart bramy przez nadzorcę, ale tylko gdy żadna karta kanbana nie jest
+w toku; inaczej zmiana działa po następnym restarcie bramy (`jarvo serwis --restart brama`) albo `jarvo update`.
+Wpis przeżywa `jarvo update` (`flota.ustawienia_profili`); w repo `profiles/*/config.yaml` go nie ma, więc instalacja
+bez PHONEUSE jest bez zmian. `jarvo telefon off` ustawia `enabled: false` (ta sama zasada restartu), `jarvo telefon
+status` pokazuje pliki, SDK, adb i wpisy w profilach, `jarvo doctor` sprawdza pliki i SDK. `on` i `off` robi tylko
+właściciel w swoim terminalu. Zgoda: `act` i `batch` z `confirm: true` omijają bramkę `needs_confirm` telefonu, więc
+wtyczka `jarvo-zgody` pyta o nie z treścią akcji (zgoda = „tak” właściciela dla tej jednej akcji), a na karcie,
+w rutynie i pod YOLO je blokuje; pod YOLO `jarvo-operator` nie ma telefonu wcale, tak jak `computer_use`.
+
 **Włączenie jednym poleceniem (serwer z kontenerem):** `jarvo android on` wybiera wariant sam: `/dev/kvm` dostępne dla Dockera → emulator
 (profil compose `android-kvm`), inaczej binder w jądrze → Redroid (profil `android`; brakujący moduł `binder_linux`
 ładuje, w razie potrzeby doinstalowuje `linux-modules-extra`, i zapisuje go w `modules-load.d`), inaczej wyjaśnia, czemu

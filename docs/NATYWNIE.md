@@ -307,6 +307,7 @@ Ma działać wszystko, co działa dziś: czat w terminalu z trybami zgód, pierw
 | **N15** jarvo klucz (nowe, prywatna kopia repo) | JARVO_TOKEN zapisany jako nagłówek w .git/config albo token.dat | Menedżer poświadczeń; sprawdzenie przez GET /repos; stan bez sekretu w update.json | pęk kluczy | libsecret albo plik 0600 | repo jest dziś publiczne; dotyczy prywatnych kopii |
 | **N16** jarvo version / updater / help | git i bash | wersja z locka; updater to rola nadzorcy | to samo | to samo | `version` (`wersja`, `--wersja`) i `help` (`pomoc`) zrobione; updater nie |
 | **N17** Nowe polecenia pomocnicze | brak | `jarvo serwis`, `jarvo wiedza kompiluj`, `jarvo narzedzia instaluj/dodaj`, `jarvo e2e <etap>` | to samo | to samo | |
+| **N18** jarvo telefon on/off/status (nowe) | brak | serwer MCP PHONEUSE (`phone`) w profilach jarvo-operator (pełny) i jarvo (odczyt): stan `<stan>/telefon.json`, wpis z `flota.ustawienia_profili`, restart bramy tylko bez kart w toku | to samo | to samo | jarvo/telefon.py, docs/MOBILE.md |
 
 ### Dane
 

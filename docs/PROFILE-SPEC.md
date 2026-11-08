@@ -289,7 +289,8 @@ profiles/jarvo-web/
 ├── distribution.yaml        # manifest dystrybucji Hermesa
 ├── SOUL.md                  # main prompt
 ├── config.yaml              # model (@@MODEL@@ z fleet.yaml), reasoning_effort, toolsety per platforma, zgody,
-│                            # terminal/przeglądarka/delegacja, mcp_servers (dziś tylko jarvo-web: inspo),
+│                            # terminal/przeglądarka/delegacja, mcp_servers (w repo tylko jarvo-web: inspo;
+│                            # phone dla jarvo i jarvo-operator dopisuje do instalacji `jarvo telefon on`),
 │                            # skills.write_approval: true przy creation_nudge_interval > 0 (poczekalnia, RSI.md §5)
 ├── .no-bundled-skills       # snajper i orkiestrator: bez katalogu skilli Hermesa (brak tylko u jarvo-reka)
 ├── toolbox.yaml             # narzędzia OSS (nasz manifest + healthchecki)

@@ -34,5 +34,5 @@ tools:
 sidecars: []
 hermes_skills: []          # hermes-agent jest dosiewany zawsze
 hermes_plugins: [langfuse] # faza 6: ślady i koszty (opcjonalnie)
-mcp_servers: []
+mcp_servers: [phone]       # PHONEUSE, tylko odczyt (list_phones, ping, screen, shot, wait); w config.yaml dopiero po `jarvo telefon on`
 env_requires: [OPENROUTER_API_KEY]
