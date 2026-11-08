@@ -126,6 +126,7 @@ POMOCNIK = "aktualizacje"      # usługa pomocnika aktualizacji (S09): log <logi
 WEKTORY = "wektory"            # usługa wektorów skarbca wiedzy (wiedza/wektory.py): log <logi>/wektory.log
 MODEL_WEKTOROW = "e5-small"    # modele.e5-small z vendor/natywne.yaml (wpis model-e5-small w narzedzia.json)
 LIMIT_STOPU_WEKTOROW = 10.0    # s: usługa wektorów kończy się od razu na Ctrl+Break i SIGTERM (bez stanu poza plikiem portu)
+WATKI_WEKTOROW = "2"           # wątki onnxruntime usługi wektorów: procesor najwyżej 80% z 4 rdzeni (zasada właściciela)
 # Najdłuższe zatrzymanie nadzorcy z usługami Jarva: limit bramy, bezpiecznik 10 s, dobicie i zamknięcie kanału.
 # Autostart (TimeoutStopSec, ExitTimeOut) i `jarvo down` mają czekać co najmniej tyle.
 CZAS_ZATRZYMANIA = LIMIT_STOPU_BRAMY + 40.0
@@ -1258,7 +1259,7 @@ def usluga_wektorow(u: Uklad, env: dict[str, str], app: str | Path | None) -> Us
         return None
     stan = u.jarvo_dane / "state"
     argv = [python, "-I", "-X", "utf8", str(skrypt), "serwuj", "--model", model, "--stan", str(stan),
-            "--skarbiec", str(u.jarvo_dane / "knowledge")]
+            "--skarbiec", str(u.jarvo_dane / "knowledge"), "--watki", WATKI_WEKTOROW]
     return Usluga(WEKTORY, argv, cwd=u.stan, env=env, gotowa=partial(wektory_gotowe, app, stan), kolejnosc=3,
                   limit_stopu=LIMIT_STOPU_WEKTOROW)
 

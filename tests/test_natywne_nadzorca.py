@@ -934,7 +934,7 @@ def test_uslugi_jarva_z_usluga_wektorow(tmp_path):
     assert wek.nazwa == nadzorca.WEKTORY == "wektory" and wek.kolejnosc > max(x.kolejnosc for x in uslugi[:-1])
     stan = u.jarvo_dane / "state"
     assert wek.argv == [str(venv_py), "-I", "-X", "utf8", str(app / "wiedza" / "wektory.py"), "serwuj", "--model",
-                        str(model), "--stan", str(stan), "--skarbiec", str(u.jarvo_dane / "knowledge")]
+                        str(model), "--stan", str(stan), "--skarbiec", str(u.jarvo_dane / "knowledge"), "--watki", "2"]
     assert wek.limit_stopu == nadzorca.LIMIT_STOPU_WEKTOROW == 10 and Path(wek.cwd) == u.stan and wek.port is None
     assert wek.env["JARVO_ROOT"] == str(u.root) and wek.gotowa() is False                  # usługa jeszcze nie wstała
     with usluga_atrapy(stan):

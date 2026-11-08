@@ -908,12 +908,13 @@ class Indeks:
                                 "typ": "orzeczenia", "status": "aktualna", "zmieniono": "", "wynik": 0.0})
         return out
 
-    def odswiez_wektory(self, osadzacz, czas_s: float | None = None) -> dict:
+    def odswiez_wektory(self, osadzacz, czas_s: float | None = None, przerwa_s: float = 0.0) -> dict:
         """Wektory notatek przyrostowo (po odswiez(): pliki i FTS aktualne). Tekst wektora jak w pomiarze: „passage: ”,
         tytuł, streszczenie, początek treści (tekst_wektora). Nowa albo zmieniona notatka (mtime, rozmiar) z innym hashem
         tekstu dostaje nowy wektor; ten sam hash = sam nowy mtime. Inny model niż w bazie = pełne przeliczenie (wektory
         starego modelu znikają). Zrodla/ i skrzynka/ bez wektorów (poza wyszukiwaniem). Paczki po WEKTORY_PACZKA, każda
-        we własnej transakcji; usługa niedostępna w trakcie = przerwane, reszta przy następnym razie. Zwraca liczby."""
+        we własnej transakcji, z `przerwa_s` między nimi (nadrabianie w usłudze nie zajmuje procesora bez przerwy);
+        usługa niedostępna w trakcie = przerwane, reszta przy następnym razie. Zwraca liczby."""
         model = getattr(osadzacz, "model", "") if osadzacz is not None else ""
         wynik = {"model": model, "nowe": 0, "usuniete": 0, "wektorow": 0, "notatek": 0, "przerwane": not model}
         if not model:
@@ -940,6 +941,8 @@ class Indeks:
                     else:
                         kolejka.append((s, h, m, n, teksty[s]))
         for i in range(0, len(kolejka), WEKTORY_PACZKA):
+            if i and przerwa_s > 0:
+                time.sleep(przerwa_s)
             paczka = kolejka[i:i + WEKTORY_PACZKA]
             wektory = osadzacz.osadz([x[4] for x in paczka], czas_s=czas_s)
             if not wektory or len(wektory) != len(paczka):
@@ -1082,6 +1085,8 @@ class KlientWektorow:
             return wynik if isinstance(wynik, dict) else None
         except (OSError, http.client.HTTPException, ValueError) as e:
             self.blad = f"usługa wektorów: {type(e).__name__}"           # TimeoutError, ConnectionRefusedError…
+            if isinstance(e, (TimeoutError, ConnectionRefusedError)):
+                self.port = 0          # usługa wisi albo jej nie ma: ten klient już jej nie pyta (jeden czas na przebieg)
             return None
         finally:
             polaczenie.close()

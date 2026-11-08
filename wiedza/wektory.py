@@ -15,11 +15,13 @@ starcie w `<state>/wektory.json` (tylko właściciel pliku, zapis atomowy) i usu
   POST /osadz     {"teksty": [...]} → {"model", "wymiar", "wektory": base64 float32 little-endian, wiersz na tekst}
 
 Osadzanie jak w pomiarze (2026-11-07): teksty z prefiksami e5 („query: ”, „passage: ”; dokłada je klient), do 512
-tokenów, średnia ukrytych stanów po tokenach z maską, normalizacja L2; onnxruntime na CPU z `--watki` wątkami (4),
-na Windows bez zdarzeń telemetrii. Id modelu: `multilingual-e5-small@<rewizja>` ze znacznika instalatora
-(.jarvo-model.json, jarvo/modele.py), a bez niego z sumy pliku modelu; inny id = pełne przeliczenie wektorów.
-Z `--skarbiec` usługa po starcie nadrabia brakujące wektory skarbca (Indeks.odswiez_wektory w osobnym wątku): zasiew
-przy instalacji biegnie, zanim usługa wstanie.
+tokenów, średnia ukrytych stanów po tokenach z maską, normalizacja L2; onnxruntime na CPU z `--watki` wątkami (2:
+zasada właściciela, procesor najwyżej 80% z 4 rdzeni), na Windows bez zdarzeń telemetrii. Id modelu:
+`multilingual-e5-small@<rewizja>` ze znacznika instalatora (.jarvo-model.json, jarvo/modele.py), a bez niego z sumy
+pliku modelu; inny id = pełne przeliczenie wektorów. Z `--skarbiec` usługa po starcie nadrabia brakujące wektory
+skarbca (Indeks.odswiez_wektory w osobnym wątku, z przerwą NADRABIANIE_PRZERWA_S między paczkami, żeby pierwsze
+osadzanie po aktualizacji nie trzymało procesora na pełnych obrotach): zasiew przy instalacji biegnie, zanim usługa
+wstanie. Połączenie bez zapytania przez 5 s jest zamykane (wątek nie wisi przed sprawdzeniem tokenu).
 """
 from __future__ import annotations
 
@@ -46,7 +48,8 @@ PLIK_MODELU = "model_quantized.onnx"
 PLIK_TOKENIZERA = "tokenizer.json"
 ZNACZNIK = ".jarvo-model.json"         # jarvo/modele.py: rewizja i sumy plików z manifestu
 MAX_TOKENOW = 512
-WATKI = 4
+WATKI = 2                              # wątki onnxruntime: procesor najwyżej 80% (4 rdzenie), także z bramą i agentami
+NADRABIANIE_PRZERWA_S = 0.2           # przerwa między paczkami nadrabiania po starcie usługi
 MAX_TEKSTOW = 64                       # na jedno zapytanie
 MAX_ZNAKOW_TEKSTU = 8000               # dłuższy tekst i tak przytnie tokenizer (512 tokenów)
 MAX_ZAPYTANIA_B = 2 << 20
@@ -128,6 +131,7 @@ class ModelE5:
 class _Obsluga(http.server.BaseHTTPRequestHandler):
     server_version = "jarvo-wektory/1"
     sys_version = ""
+    timeout = 5                                                # s na odczyt zapytania: bezczynne połączenie nie trzyma wątku
 
     def log_message(self, format: str, *args) -> None:     # noqa: A002  bez adresów i treści zapytań w logu
         pass
@@ -251,7 +255,7 @@ def nadrob(skarbiec: str | Path, stan: str | Path, osadzacz, log: Callable[[str]
     ix = lib.Indeks(sk)
     try:
         ix.odswiez()
-        w = ix.odswiez_wektory(osadzacz)
+        w = ix.odswiez_wektory(osadzacz, przerwa_s=NADRABIANIE_PRZERWA_S)
     finally:
         ix.zamknij()
     log(lib.opis_wektorow(w))

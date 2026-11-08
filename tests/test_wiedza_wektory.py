@@ -77,6 +77,10 @@ def test_wektory_przyrostowo_i_pelne_przeliczenie_przy_innym_modelu(sk, monkeypa
         assert r["przerwane"] and r["nowe"] == 2 and r["wektorow"] == 2
         assert ix.odswiez_wektory(None) == {"model": "", "nowe": 0, "usuniete": 0, "wektorow": 0, "notatek": 0,
                                             "przerwane": True}
+        przerwy = []
+        monkeypatch.setattr(w.time, "sleep", przerwy.append)
+        r = ix.odswiez_wektory(AtrapaWektorow(model="atrapa-e5@4"), przerwa_s=0.2)    # nadrabianie w usłudze: z przerwami
+        assert r["nowe"] == r["notatek"] and przerwy == [0.2] * (-(-r["notatek"] // 2) - 1)
     finally:
         ix.zamknij()
 
@@ -190,6 +194,10 @@ def test_usluga_http_token_czas_i_plik_stanu(tmp_path):
         start = time.perf_counter()
         assert wolny.osadz(["query: x"]) is None and "Timeout" in wolny.blad
         assert time.perf_counter() - start < 0.5                                         # nie czeka na model
+        start = time.perf_counter()                                                      # zawieszona usługa: jeden czas
+        assert not wolny.dostepny and wolny.osadz(["query: y"]) is None and time.perf_counter() - start < 0.05
+        from atrapa_wektorow import modul_wektorow
+        assert modul_wektorow()._Obsluga.timeout == 5 and modul_wektorow().WATKI == 2
         inny = w.KlientWektorow(stan, 2.0)
         inny.model = "inny@1"                                                            # usługa z innym modelem
         serwer.koder = wolny_koder(0)

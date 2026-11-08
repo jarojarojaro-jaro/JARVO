@@ -304,7 +304,8 @@ nadzorcy (`wiedza/wektory.py` w venvie narzędzi z onnxruntime, numpy i tokenize
 Hermesa i `jarvo chat` nie mają tych bibliotek, więc wtyczka, kompilacja i `wiedza.py` pytają usługę po HTTP na
 127.0.0.1 z tokenem ze `state/wektory.json` (`KlientWektorow`, sama biblioteka standardowa). Osadzanie: prefiksy
 „query: ”/„passage: ”, tekst notatki = tytuł + streszczenie + 1200 znaków treści, do 512 tokenów, średnia z maską,
-normalizacja L2, 4 wątki. Wektory (ścieżka, hash tekstu, id modelu, float32) leżą w tabeli `wektory` w `state/wiedza.db`,
+normalizacja L2, 2 wątki (procesor najwyżej 80% z 4 rdzeni; nadrabianie po starcie usługi z przerwą 0,2 s między
+paczkami). Wektory (ścieżka, hash tekstu, id modelu, float32) leżą w tabeli `wektory` w `state/wiedza.db`,
 liczone przyrostowo przy `indeksuj`, kompilacji, zasiewie i po starcie usługi; inny model = pełne przeliczenie.
 Iloczyn skalarny liczy czysty Python (setki notatek: kilka ms). **Aliasy** z frontmattera `aliasy: [...]` (SCHEMA)
 dopisują do pytania tytuł notatki, także w odmianie. **Długie pytanie** (> 25 słów: karta, prompt rutyny) idzie
