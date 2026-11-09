@@ -151,6 +151,28 @@ na Macu z 8 GB, `scripts/limity.py` dzieli ją z Hermesem: 1 GB), `KOMPUTER_CPUS
 (2, deploy przycina do liczby rdzeni), 2048 procesów, 1 GB `/dev/shm`. Uprawnienia kontenera: wszystkie zdjęte,
 dodane tylko te do filtra, katalogów i zmiany użytkownika; `no-new-privileges`.
 
+### Instalacja natywna: usługa pod nadzorcą i postój
+
+W instalacji natywnej (docs/NATYWNIE.md, wiersze J i sekcja c2) Komputer to przeglądarka Jarva (Chrome for Testing)
+z usługą `komputer/usluga.py`. Polecenia są te same, a działają tak:
+
+| Co | Jak |
+|---|---|
+| `jarvo komputer on [--okno\|--w-tle]` | pobiera przeglądarkę z sumą (pierwszy raz), zapisuje `wlaczony: true` w `<stan>/komputer/ustawienia.json` i czeka, aż usługa odpowie. Przy działającym serwisie usługę uruchamia nadzorca (`jarvo serwis`, usługa `komputer`), więc Komputer wraca sam po awarii, po restarcie komputera i po `jarvo update`, a na Linuksie działa w cgroup `jarvo.service`. Bez działającego serwisu `on` uruchamia usługę sam, w tle; nadzorca, który wstanie później, zastępuje ją swoją |
+| `jarvo komputer off` | zapisuje `wlaczony: false` i zatrzymuje usługę; nadzorca jej nie podnosi (w `jarvo status`: `komputer: wylaczona`) |
+| `jarvo komputer okno on\|off` | zapisuje ustawienie i przełącza działającą przeglądarkę; na Linuksie zapamiętuje pulpit z Twojego terminala (ustawienie `ekran`: DISPLAY, WAYLAND_DISPLAY, XAUTHORITY), bo usługa pod nadzorcą nie zawsze go zna |
+| `jarvo komputer odswiez` | nowy pin przeglądarki z manifestu tej wersji Jarva i start usługi od nowa |
+
+**Postój.** Strona zostawiona po zadaniu (animacja, skrypty) zajmowała ponad rdzeń procesora godzinami, także
+w tle. Dlatego gdy z ekranu nikt nie korzysta przez 60 s, usługa przenosi każdą kartę ze stroną na pustą stronę
+(`about:blank`). „Nikt” to razem: żadnej czynnej sesji Operatora (sesja otwarta, ale bez wiadomości od 15 minut,
+liczy się jak zakończona, bo Hermes trzyma sterownik otwarty do godziny po turze agenta), żadnej pauzy, podgląd
+w Ekranie HQ wyłączony, a przy oknie widocznym żadna strona nie ma fokusu (nie pracujesz w oknie sam). Profil,
+ciasteczka i zalogowania zostają; strona jest w historii karty (Wstecz), a Operator zaczyna następne zadanie od
+adresu (`launch_app` z `urls`). Postój widać w `jarvo komputer status` („postój od …”), w `komputer.log`
+i w dzienniku decyzji (`postoj`). Przy pauzie (Operator oddał Ci ekran albo przejąłeś go w HQ) strona zostaje taka,
+jaka jest, i dalej zużywa procesor, dopóki nie wznowisz.
+
 ## 6. Wejście sterownika i twarde zasady (`infra/komputer/wejscie.py`, `zasady.py`, K2)
 
 Flota nie rozmawia ze sterownikiem bezpośrednio. Każde połączenie z `cua.sock` to jedna sesja MCP w procesie

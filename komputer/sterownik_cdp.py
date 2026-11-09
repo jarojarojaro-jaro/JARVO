@@ -28,6 +28,10 @@ Podgląd dla HQ (J10): Page.startScreencast aktywnej karty (JPEG), ostatnia klat
 po PODGLAD_BEZCZYNNOSC s bez pytań. „Przejmij” w HQ: `wejscie_wlasciciela()` wysyła mysz, kółko, klawisze, tekst,
 adres, odpowiedź w oknie JavaScript i plik z katalogu `wysylane` wprost do aktywnej karty przez CDP Input.*, bez
 twardych zasad; wejście natywne przepuszcza je tylko z tokenem właściciela i przy jego pauzie.
+
+Postój: `zaparkuj()` przenosi każdą kartę ze stroną na about:blank (strona przestaje rysować, liczyć i pobierać;
+profil i zalogowania zostają, strona jest w historii karty), a `wlasciciel_przy_oknie()` mówi, czy przy oknie
+widocznym któraś strona ma fokus. Kiedy parkować, decyduje usługa (usluga.py, „Postój”).
 """
 from __future__ import annotations
 
@@ -59,6 +63,8 @@ PODGLAD_JAKOSC = 60                # JPEG klatek podglądu
 PODGLAD_MAKS = 1280                # px dłuższego boku klatki podglądu
 PODNIESIENIA = 3                   # ponownych wczytań padniętej karty na minutę (potem zostaje martwa z wpisem w dzienniku)
 PODGLAD_BEZCZYNNOSC = 20.0         # s bez pytania o klatkę: screencast staje (nie zużywa procesora bez widza)
+PUSTE_ADRESY = ("", "about:blank")  # karta bez strony: nie ma czego parkować
+CZAS_POSTOJU = 5.0                 # s na przejście jednej karty na pustą stronę przy postoju
 MAKS_TEKST_WLASCICIELA = 4000
 MAKS_PLIKOW = 10
 # strona testowa (usługa z --strona-testowa): dwie witryny, żeby ramka płatności była z innego procesu (OOPIF)
@@ -1787,6 +1793,53 @@ class Sterownik:
             cisza = time.monotonic() - self._podglad["pytanie"]
         if wlaczony and cisza > PODGLAD_BEZCZYNNOSC:
             self.zatrzymaj_podglad()
+
+    # ------------------------------------------------------------------ postój bezczynnej przeglądarki
+
+    def _strony(self) -> list[Okno]:
+        """Karty z otwartą stroną."""
+        return [o for o in self.okna() if o.url not in PUSTE_ADRESY]
+
+    def wlasciciel_przy_oknie(self) -> bool:
+        """Okno widoczne: czy któraś strona ma fokus, czyli właściciel pracuje w oknie sam (loguje się, czyta).
+        W tle do stron sięga tylko Operator i HQ, więc nie."""
+        if self.w_tle:
+            return False
+        for okno in self._strony():
+            if okno.dialog:
+                continue
+            try:
+                ctx = self._swiat(okno, okno.sesja)
+                w = self.b.wyslij("Runtime.evaluate", {"expression": "document.hasFocus()", "contextId": ctx,
+                                                       "returnByValue": True}, okno.sesja, czas=3)
+            except (cdp.BladCDP, BladSterownika, KeyError, TypeError):
+                okno.swiaty.clear()
+                continue
+            if (w.get("result") or {}).get("value") is True:
+                return True
+        return False
+
+    def zaparkuj(self) -> int:
+        """Postój: każda karta ze stroną przechodzi na about:blank, więc strona przestaje rysować, liczyć i pobierać.
+        Profil, ciasteczka i zalogowania zostają, a strona jest w historii karty (Wstecz). Okno JavaScript zostawione
+        na stronie dostaje Anuluj, pytanie strony przed wyjściem (beforeunload) zgodę. Zwraca liczbę zaparkowanych."""
+        ile = 0
+        for okno in self._strony():
+            try:
+                if okno.dialog:
+                    self._obsluz_dialog(okno, False)
+                przejscie = self.b.nadaj("Page.navigate", {"url": "about:blank"}, okno.sesja)
+                koniec = time.monotonic() + CZAS_POSTOJU
+                while not przejscie.gotowe(0.2) and time.monotonic() < koniec:
+                    if okno.dialog:
+                        self._obsluz_dialog(okno, True)
+                przejscie.wynik(0.5)
+            except cdp.BladCDP as e:
+                self.log(f"sterownik: karta {okno.nr} nie przeszła na pustą stronę ({e.tekst[:100]})")
+                continue
+            okno.url, okno.tytul = "about:blank", ""
+            ile += 1
+        return ile
 
     def _opis_klatki(self, k: dict, okno: Okno) -> dict:
         wynik = dict(k, aktywne=okno.nr, tytul=okno.tytul, url=okno.url,

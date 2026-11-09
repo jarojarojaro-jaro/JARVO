@@ -2,11 +2,12 @@
 
   on [--okno|--w-tle]   przeglądarka Jarva (Chrome for Testing z manifestu, wpis `chrome-komputer`, pobierana przy
                         pierwszym włączeniu z paskiem i sumą sha256), nakładka bramki `jarvo-cua` dla Hermesa
-                        (HERMES_CUA_DRIVER_CMD), start usługi (komputer/usluga.py: proxy filtrujące z samotestem,
-                        przeglądarka, wejście z twardymi zasadami) i czekanie, aż odpowie
-  off                   zatrzymanie usługi (profil, pobrane pliki, dziennik i pauza zostają)
+                        (HERMES_CUA_DRIVER_CMD), `wlaczony: true` w ustawieniach, start usługi (komputer/usluga.py:
+                        proxy filtrujące z samotestem, przeglądarka, wejście z twardymi zasadami) i czekanie, aż
+                        odpowie
+  off                   `wlaczony: false` i zatrzymanie usługi (profil, pobrane pliki, dziennik i pauza zostają)
   status [--json]       działa czy nie, okno albo w tle, pauza (kto, dlaczego), sesje Operatora, filtr ruchu
-                        (zablokowane połączenia), pobrane i odrzucone pliki, piaskownica, wersja przeglądarki
+                        (zablokowane połączenia), pobrane i odrzucone pliki, piaskownica, postój, wersja przeglądarki
   okno on|off           okno przeglądarki na pulpicie (właściciel sam się w nim loguje) albo w tle (--headless=new)
   pauza [powód]         zatrzymuje Operatora od razu: patrzeć może, działać nie; trwa także po restarcie
   wznow                 zdejmuje pauzę (token właściciela z `<stan>/komputer/wlasciciel.klucz`)
@@ -20,8 +21,16 @@ wejście właściciela, wznow), opis w komputer/wejscie_natywne.py.
 
 Podpięte w jarvo/cli.py (polecenie_komputer): `jarvo komputer …` woła main(reszta, u=u, ot=ot) bez własnej pomocy
 argparse jarvo, a `jarvo komputer rece …` idzie do jarvo/rece.py (ekran właściciela, K6).
-Autostart przez nadzorcę (usługa `komputer` po bramie i panelu, gdy `<stan>/komputer/ustawienia.json` ma
-`wlaczony: true`) dopisuje jarvo/nadzorca.py; do tego czasu `on` uruchamia usługę sam, w tle.
+
+Kto uruchamia usługę. Ustawienia `<stan>/komputer/ustawienia.json` mówią, jak ma wstać: `wlaczony`, `okno`, `chrome`
+i `wersja` (pin), na Linuksie `ekran` (DISPLAY, WAYLAND_DISPLAY i XAUTHORITY z terminala, w którym właściciel włączył
+okno), a w próbach `proba` (przeglądarka ze zmiennej próby) i `strona_testowa`. Przy działającym serwisie (`jarvo
+serwis`) usługę `komputer` trzyma nadzorca (jarvo/nadzorca.py, usluga_komputera): startuje ją po bramie i panelu, gdy
+ustawienia mówią `wlaczony: true` i przeglądarka jest zainstalowana (do_startu), podnosi po awarii, po restarcie
+komputera i po `jarvo update`, a po `off` zatrzymuje. `on` zapisuje wtedy ustawienia i czeka, aż usługa nadzorcy
+odpowie (usługę, która stoi po awarii, rusza od razu restartem z kanału nadzorcy); sam niczego nie uruchamia, więc
+nie ma drugiej usługi. Bez działającego nadzorcy (albo z nadzorcą starszej wersji, bez tej usługi) `on` uruchamia
+usługę sam, w tle; nadzorca, który wstanie później, zastępuje ją swoją (`usluga.py --zastap`).
 """
 from __future__ import annotations
 
@@ -40,6 +49,7 @@ APP = Path(__file__).resolve().parent.parent
 CZAS_STARTU = 120.0                 # pierwszy start: profil, samotest proxy i przeglądarki
 CZAS_STOPU = 40.0
 LOG = "komputer.log"
+ZMIENNE_EKRANU = ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY")   # Linux: pulpit właściciela dla okna przeglądarki
 
 
 def _kanal():
@@ -70,7 +80,8 @@ def ustawienia(u: Uklad) -> dict:
 
 
 def zapisz_ustawienia(u: Uklad, **zmiany) -> dict:
-    biezace = {**ustawienia(u), **zmiany}
+    """Dopisuje `zmiany` do ustawień Komputera; wartość None usuwa klucz."""
+    biezace = {k: v for k, v in {**ustawienia(u), **zmiany}.items() if v is not None}
     przenosne.zapisz_atomowo(katalogi(u)["ustawienia"], json.dumps(biezace, ensure_ascii=False, indent=2) + "\n")
     return biezace
 
@@ -112,9 +123,38 @@ def wpis_przegladarki(app: Path) -> tuple[str, dict]:
 
 
 def program_przegladarki(u: Uklad, env: dict) -> str | None:
-    """Zainstalowana przeglądarka Jarva (zmienna próby, narzedzia.json albo ustawienia Komputera) albo None."""
-    p = _przegladarka().program(env, srodowisko.narzedzia(u)) or ustawienia(u).get("chrome")
+    """Zainstalowana przeglądarka Jarva (zmienna próby, próba z ustawień, narzedzia.json albo pin z ustawień
+    Komputera: ta sama kolejność co w usłudze) albo None."""
+    p = _przegladarka().program(env, srodowisko.narzedzia(u), ustawienia(u))
     return p if p and Path(p).is_file() else None
+
+
+def env_uslugi(env: dict) -> dict:
+    """Otoczenie usługi pod nadzorcą: środowisko procesów Jarva bez zmiennej programu przeglądarki. Nadzorca składa
+    środowisko raz, przy swoim starcie, a usługa ma przy każdym starcie brać pin z narzedzia.json i ustawień (po
+    `jarvo komputer odswiez` nowy)."""
+    return {k: v for k, v in env.items() if k != _przegladarka().ZMIENNA_PROGRAMU}
+
+
+def do_startu(u: Uklad, env: dict) -> bool:
+    """Bramka usługi `komputer` nadzorcy: właściciel włączył Komputer (`wlaczony: true`) i przeglądarka jest
+    zainstalowana. Inaczej usługa nie startuje i to nie jest błąd."""
+    return bool(ustawienia(u).get("wlaczony")) and program_przegladarki(u, env) is not None
+
+
+def usluga_nadzorcy(u: Uklad, ot: instalator.Otoczenie):
+    """(klient kanału nadzorcy, opis usługi `komputer` z jego stanu), gdy nadzorca działa i ma tę usługę. None:
+    nadzorca nie działa albo jest ze starszej wersji Jarva, bez tej usługi; wtedy `on` uruchamia usługę sam."""
+    try:
+        n = ot.modul("nadzorca")
+    except ImportError:
+        return None
+    try:
+        klient = n.polacz(u, 5.0)
+        us = (klient.status().get("uslugi") or {}).get(n.KOMPUTER)
+    except n.BladNadzorcy:
+        return None
+    return (klient, us) if isinstance(us, dict) else None
 
 
 def _katalog_pinu(u: Uklad, wersja: str) -> Path:
@@ -208,6 +248,45 @@ def _czekaj_na_start(u: Uklad, ot: instalator.Otoczenie, pid: int, czas: float) 
     return None
 
 
+def _czekaj_na_nadzorce(u: Uklad, ot: instalator.Otoczenie, czas: float) -> tuple[dict | None, str]:
+    """Czeka na usługę uruchamianą przez nadzorcę (ustawienia mówią już `wlaczony: true`, bramkę nadzorca pyta co
+    sekundę). Usługę, która stoi po awarii albo po `off` sprzed chwili (ponowienie, postój), raz rusza restartem
+    z kanału, bez czekania na przerwę nadzorcy. (stan usługi, "") albo (None, powód z nadzorcy)."""
+    n = ot.modul("nadzorca")
+    ruszona, przed, od = False, None, ot.zegar()
+    koniec = od + czas
+    while ot.zegar() < koniec:
+        stan = dziala(u)
+        if stan:
+            return stan, ""
+        nadz = usluga_nadzorcy(u, ot)
+        if nadz is None:
+            return None, "nadzorca Jarva przestał odpowiadać"
+        klient, us = nadz
+        if us.get("stan") in ("ponowienie", "postoj"):
+            if not ruszona:
+                try:
+                    klient.restart(n.KOMPUTER)
+                except n.BladNadzorcy as e:
+                    return None, str(e)
+                ruszona, przed, od = True, us.get("restarty"), ot.zegar()
+            elif us.get("restarty") != przed or ot.zegar() - od > 5:      # wstała po restarcie i znowu stoi
+                return None, str(us.get("powod") or us.get("stan"))
+        elif us.get("stan") == "wylaczona" and ot.zegar() - od > 10:
+            return None, "nadzorca nie widzi włączonego Komputera z zainstalowaną przeglądarką"
+        ot.czekaj(0.5)
+    return None, f"usługa nie odpowiedziała w {czas:g} s"
+
+
+def _ekran(env: dict) -> dict:
+    """Linux: zmienne pulpitu z terminala właściciela jako ustawienie `ekran`, dla okna przeglądarki uruchamianej
+    przez nadzorcę (serwis z systemd --user nie zawsze je ma). Terminal bez pulpitu (SSH): bez zmian w ustawieniach."""
+    if not sciezki.LINUX:
+        return {}
+    zmienne = {k: str(env[k]) for k in ZMIENNE_EKRANU if env.get(k)}
+    return {"ekran": zmienne} if zmienne else {}
+
+
 def _zyje(pid: int | None) -> bool:
     """Czy proces `pid` jeszcze działa (Windows: kod wyjścia STILL_ACTIVE; POSIX: sygnał 0)."""
     if not pid:
@@ -249,11 +328,12 @@ def polecenie_on(u: Uklad, a, ot: instalator.Otoczenie) -> int:
     app = instalator.katalog_aplikacji(u)
     stan = dziala(u)
     okno = a.okno if a.okno is not None else bool(ustawienia(u).get("okno"))
+    ekran = _ekran(ot.env) if okno else {}
     if stan:
+        zapisz_ustawienia(u, wlaczony=True, okno=okno, **ekran)
         uslugi = stan.get("usluga") or {}
         if bool(uslugi.get("okno")) != okno:
             zapytaj(u, {"polecenie": "okno", "okno": okno}, 120.0, wlasciciel=True)
-        zapisz_ustawienia(u, wlaczony=True, okno=okno)
         print(f"Komputer Jarva już działa ({'okno widoczne' if okno else 'w tle'}).")
         return 0
     try:
@@ -269,17 +349,24 @@ def polecenie_on(u: Uklad, a, ot: instalator.Otoczenie) -> int:
     nakladka = nakladka_bramki(u, app, python)
     for nazwa in ("dane", "profil", "pobrane", "wysylane"):
         katalogi(u)[nazwa].mkdir(parents=True, exist_ok=True)
-    zapisz_ustawienia(u, wlaczony=True, okno=okno)
-    argv = [str(python), "-I", "-X", "utf8", str(app / "komputer" / "usluga.py"), "--korzen", str(u.root),
-            "--okno" if okno else "--w-tle", "--przegladarka", str(program)]
-    if a.strona_testowa:
-        argv += ["--strona-testowa", str(Path(a.strona_testowa).resolve())]
-    env = srodowisko.srodowisko(u, instalator.env_floty(ot.env))
-    pid = ot.uruchom_w_tle(argv, env, katalogi(u)["log"])
+    # wszystko, czego usługa potrzebuje do startu, jest w ustawieniach: pod nadzorcą czyta je przy każdym starcie
+    proba = program if str(ot.env.get(_przegladarka().ZMIENNA_PROBY) or "").strip() else None
+    strona = str(Path(a.strona_testowa).resolve()) if a.strona_testowa else None
+    zapisz_ustawienia(u, wlaczony=True, okno=okno, proba=proba, strona_testowa=strona, **ekran)
     print(f"Startuję Komputer Jarva (przeglądarka {'w oknie' if okno else 'w tle'}, filtr ruchu z samotestem)…")
-    stan = _czekaj_na_start(u, ot, pid, CZAS_STARTU)
+    if usluga_nadzorcy(u, ot) is not None:
+        stan, powod = _czekaj_na_nadzorce(u, ot, CZAS_STARTU)
+    else:
+        argv = [str(python), "-I", "-X", "utf8", str(app / "komputer" / "usluga.py"), "--korzen", str(u.root),
+                "--okno" if okno else "--w-tle", "--przegladarka", str(program)]
+        if strona:
+            argv += ["--strona-testowa", strona]
+        env = srodowisko.srodowisko(u, instalator.env_floty(ot.env))
+        pid = ot.uruchom_w_tle(argv, env, katalogi(u)["log"])
+        stan, powod = _czekaj_na_start(u, ot, pid, CZAS_STARTU), ""
     if not stan:
-        print("BŁĄD: Komputer nie wstał. Ostatnie wiersze logu:\n" + _ogon_logu(u), file=sys.stderr)
+        print("BŁĄD: Komputer nie wstał" + (f" ({powod})" if powod else "") + ". Ostatnie wiersze logu:\n"
+              + _ogon_logu(u), file=sys.stderr)
         return 1
     print(opis_stanu(u, stan))
     print(f"Bramka dla Hermesa: {nakladka} (HERMES_CUA_DRIVER_CMD).")
@@ -287,13 +374,19 @@ def polecenie_on(u: Uklad, a, ot: instalator.Otoczenie) -> int:
 
 
 def polecenie_off(u: Uklad, a, ot: instalator.Otoczenie) -> int:
+    """Najpierw ustawienia (nadzorca nie podniesie usługi znowu, a próba nie zostaje na następny start), potem
+    `stop` do usługi; usługę pod nadzorcą, która nie odpowiada, zatrzymuje nadzorca (bramka)."""
     kanal = _kanal()
-    zapisz_ustawienia(u, wlaczony=False)
+    zapisz_ustawienia(u, wlaczony=False, proba=None, strona_testowa=None)
     pid = kanal.pid_uslugi(u.root)
     if not dziala(u):
         print("Komputer Jarva nie działa.")
         return 0
-    zapytaj(u, {"polecenie": "stop"}, 10.0, wlasciciel=True)
+    try:
+        zapytaj(u, {"polecenie": "stop"}, 10.0, wlasciciel=True)
+    except kanal.BladKanalu:
+        if usluga_nadzorcy(u, ot) is None:           # nadzorca zatrzymuje ją sam (bramka), bez niego nikt
+            raise
     koniec = ot.zegar() + CZAS_STOPU
     while ot.zegar() < koniec and _zyje(pid) and katalogi(u)["usluga"].exists():
         ot.czekaj(0.3)
@@ -365,6 +458,9 @@ def opis_stanu(u: Uklad, stan: dict | None = None) -> str:
         if not us.get("piaskownica", True):
             linie.append("  UWAGA: przeglądarka bez piaskownicy (--no-sandbox): brak przestrzeni nazw użytkownika "
                          "(docs/NATYWNIE.md I41)")
+        if us.get("postoj"):
+            linie.append(f"  postój od {us['postoj']}: nikt nie korzystał z ekranu, karty stoją na pustej stronie "
+                         "(zalogowania zostają, strona wraca przez Wstecz)")
     if s.get("wstrzymane"):
         p = s.get("pauza") or {}
         linie.append(f"  PAUZA: {p.get('opis') or p.get('powod') or 'właściciel zatrzymał Komputer'} "
@@ -382,9 +478,9 @@ def polecenie_status(u: Uklad, a, _ot) -> int:
     return 0 if s["dziala"] else 1
 
 
-def polecenie_okno(u: Uklad, a, _ot) -> int:
+def polecenie_okno(u: Uklad, a, ot) -> int:
     okno = a.stan == "on"
-    zapisz_ustawienia(u, okno=okno)
+    zapisz_ustawienia(u, okno=okno, **(_ekran(ot.env) if okno else {}))
     if dziala(u):
         odp = zapytaj(u, {"polecenie": "okno", "okno": okno}, 120.0, wlasciciel=True)
         if not odp.get("ok"):

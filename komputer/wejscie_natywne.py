@@ -32,6 +32,7 @@ import os
 import queue
 import sys
 import threading
+import time
 from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
@@ -219,6 +220,11 @@ class SesjaNatywna(wejscie.Sesja):
         self._konfig: dict = {"capture_scope": "window", "capture_mode": "som", "max_image_dimension": None}
         self._w_toku = 0                              # wiadomości w kolejce sterownika i ta w obsłudze
         self._bezczynny = threading.Condition()
+        self.ostatnio = time.monotonic()              # ostatnia wiadomość od agenta (postój: WejscieNatywne.w_uzyciu)
+
+    def _od_agenta(self, linia: bytes) -> None:
+        self.ostatnio = time.monotonic()
+        super()._od_agenta(linia)
 
     def do_sterownika(self, wiadomosc: dict) -> None:
         if self._pracownik is None:
@@ -311,6 +317,17 @@ class WejscieNatywne:
             if sesja in self.sesje:
                 self.sesje.discard(sesja)
                 log(f"sesja {sesja.nr}: koniec")
+
+    def w_uzyciu(self, cisza: float, teraz: float | None = None) -> bool:
+        """Czy ktoś korzysta z ekranu albo ekran na kogoś czeka (usługa nie parkuje wtedy kart): pauza (prośba
+        Operatora do właściciela albo przejęcie w HQ: strona ma zostać taka, jaka jest) albo sesja Operatora, od
+        której przyszła wiadomość w ostatnich `cisza` s. Sesja otwarta, ale milcząca dłużej, nie liczy się: Hermes
+        trzyma sterownik otwarty do godziny po turze agenta w bramie. `teraz`: zegar monotoniczny."""
+        if self.ekran.wstrzymane:
+            return True
+        teraz = time.monotonic() if teraz is None else teraz
+        with self._lock:
+            return any(teraz - s.ostatnio < cisza for s in self.sesje)
 
     def obsluz_cua(self, strumien) -> None:
         with self._lock:

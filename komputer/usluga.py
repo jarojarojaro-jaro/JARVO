@@ -1,6 +1,12 @@
 """Usługa Komputera Jarva natywnie (docs/NATYWNIE.md J01–J13): jeden proces właściciela, bez kluczy floty.
 
-    python -I -X utf8 <app>/komputer/usluga.py [--korzen <root>] [--okno|--w-tle] [--strona-testowa <katalog>]
+    python -I -X utf8 <app>/komputer/usluga.py [--korzen <root>] [--okno|--w-tle] [--przegladarka <program>]
+                                               [--strona-testowa <katalog>] [--zastap]
+
+Bez flag okno albo tło, program przeglądarki i stronę próby usługa bierze z `<stan>/komputer/ustawienia.json`
+(zapisuje je `jarvo komputer on|okno`): tak uruchamia ją nadzorca Jarva (usługa `komputer`, jarvo/nadzorca.py), z
+`--zastap`: gdy blokadę trzyma usługa uruchomiona wcześniej poza nadzorcą, dostaje `stop` z tokenem właściciela
+i nowa czeka do 40 s, aż tamta skończy.
 
 Kolejność startu (każdy krok, który się nie uda, kończy usługę: Komputer bez filtra nie wstaje):
   1. blokada `<stan>/komputer/usluga.lock` (jedna usługa na korzeń), token właściciela `wlasciciel.klucz` (nowy przy
@@ -17,6 +23,15 @@ przekazuje stronie tylko pliki z tego katalogu.
 Przeglądarka, która padnie, wstaje od nowa z tym samym profilem (przerwa rośnie do 60 s). SIGTERM, SIGINT i Ctrl+Break
 (nadzorca Jarva) zatrzymują usługę łagodnie. Na Linuksie bez przestrzeni nazw użytkownika (Ubuntu 24.04 z AppArmor)
 przeglądarka startuje drugi raz z `--no-sandbox` i status mówi to wprost (decyzja I41).
+
+Postój: gdy z ekranu nikt nie korzysta, karty przechodzą na `about:blank` (sterownik_cdp.zaparkuj), bo strona
+zostawiona po zadaniu (animacja, skrypty) zajmowała ponad rdzeń procesora godzinami, także w tle. „Nikt” to razem:
+żadnej czynnej sesji Operatora (sesja otwarta, ale bez wiadomości od CISZA_SESJI s, liczy się jak zakończona:
+Hermes trzyma sterownik otwarty do godziny po turze agenta w bramie), żadnej pauzy (prośba Operatora albo przejęcie
+w HQ: strona czeka na właściciela taka, jaka jest), podgląd w HQ wyłączony, a przy oknie widocznym żadna karta nie
+ma fokusu (właściciel nie pracuje w oknie sam). Po POSTOJ_PO s takiej ciszy usługa parkuje karty, zapisuje to
+w logu, w dzienniku decyzji i w stanie (`postoj`). Profil, ciasteczka i zalogowania zostają, strona jest w historii
+karty (Wstecz).
 """
 from __future__ import annotations
 
@@ -42,6 +57,11 @@ from komputer import cdp, filtr, kanal, przegladarka, sterownik_cdp, wejscie_nat
 KOD_BLAD = 1
 KOD_FILTR = 3                      # samotest filtra albo przeglądarki nie przeszedł: Komputer nie wstaje
 PORT_PANELU = 9119
+CZAS_ZASTAPIENIA = 40.0            # s: tyle usługa z --zastap czeka, aż poprzednia odda blokadę (jak CZAS_STOPU off)
+POSTOJ_PO = 60.0                   # s bez sesji Operatora, pauzy, podglądu i fokusu okna: karty na about:blank
+CISZA_SESJI = 900.0                # s bez wiadomości od agenta: otwarta sesja Operatora nie liczy się jako czynna
+CO_ILE_FOKUS = 5.0                 # s: przy oknie widocznym co tyle sprawdzamy, czy właściciel pracuje w oknie
+ZMIENNE_EKRANU = ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY")   # Linux: ustawienie `ekran` (jarvo komputer on|okno)
 
 
 def log(*a: object) -> None:
@@ -74,7 +94,7 @@ def zapisz_ustawienia(u: sciezki.Uklad, **zmiany) -> dict:
 
 class Usluga:
     def __init__(self, u: sciezki.Uklad, *, program: str, okno: bool, strona_testowa: Path | None = None,
-                 port_panelu: int = PORT_PANELU, port_proxy: int = 0):
+                 port_panelu: int = PORT_PANELU, port_proxy: int = 0, zastap: bool = False):
         self.u = u
         self.k = katalogi(u)
         self.program = program
@@ -94,6 +114,10 @@ class Usluga:
         self.samotest: dict = {}
         self.od = datetime.now(timezone.utc).isoformat(timespec="seconds")
         self.restarty = 0
+        self.zastap = zastap
+        self.postoj: str | None = None             # od kiedy karty stoją zaparkowane (czas UTC)
+        self._wolny_od: float | None = None        # od kiedy nikt nie korzysta z ekranu (zegar monotoniczny)
+        self._fokus_sprawdzony = 0.0
 
     # ------------------------------------------------------------------ przeglądarka
 
@@ -106,7 +130,8 @@ class Usluga:
         """Środowisko przeglądarki bez kluczy floty i sekretów właściciela (srodowisko.przechodzi). Linux: katalogi
         XDG w katalogu Komputera: Chrome trzyma raporty awarii w domyślnym katalogu danych mimo --user-data-dir,
         a do tego bazę NSS i cache fontconfig (CI natywnie: ~/.config/google-chrome-for-testing, ~/.local/share/pki,
-        ~/.cache/fontconfig zostawały po odinstalowaniu)."""
+        ~/.cache/fontconfig zostawały po odinstalowaniu). Okno na Linuksie: zmienne pulpitu, których proces nie ma
+        (usługa pod nadzorcą z systemd --user), z ustawienia `ekran` zapisanego w terminalu właściciela."""
         env = {k: v for k, v in os.environ.items() if srodowisko.przechodzi(k)
                and not k.upper().startswith(("HERMES_", "JARVO_"))}
         if sciezki.LINUX:
@@ -114,6 +139,10 @@ class Usluga:
             xdg = self.k["profil"].parent / "xdg"
             env.update({"XDG_CONFIG_HOME": str(xdg / "config"), "XDG_CACHE_HOME": str(xdg / "cache"),
                         "XDG_DATA_HOME": str(xdg / "data")})
+            ekran = ustawienia(self.u).get("ekran") if self.okno else None
+            for k, v in (ekran.items() if isinstance(ekran, dict) else []):
+                if k in ZMIENNE_EKRANU and isinstance(v, str) and v:
+                    env.setdefault(k, v)
         return env
 
     def _slad_raportow_awarii(self) -> None:
@@ -233,7 +262,7 @@ class Usluga:
                 "pobrania": dict(st.statystyki) if st else {}, "okna": len(st.okna()) if st else 0,
                 "podglad": st is not None and st.podglad_wlaczony,
                 "piaskownica": not self.bez_piaskownicy, "samotest": self.samotest, "restarty": self.restarty,
-                "strona_testowa": self.strona_testowa is not None}
+                "strona_testowa": self.strona_testowa is not None, "postoj": self.postoj}
 
     def _zapisz_stan(self) -> None:
         dane = {**self.stan(), "cua": kanal.adres(self.u.root, "cua"), "ster": kanal.adres(self.u.root, "ster"),
@@ -249,9 +278,7 @@ class Usluga:
         except OSError as e:
             log(f"ochrona katalogu stanu: {e}")
         zamek = przenosne.Zamek(self.k["blokada"], czekaj=False)
-        try:
-            zamek.__enter__()
-        except BlockingIOError:
+        if not self._zajmij(zamek):
             log("usługa Komputera już działa dla tego korzenia")
             return KOD_BLAD
         try:
@@ -259,6 +286,32 @@ class Usluga:
         finally:
             self._sprzatnij()
             zamek.__exit__(None, None, None)
+
+    def _zajmij(self, zamek: przenosne.Zamek) -> bool:
+        """Blokada jednej usługi na korzeń. Zajęta: odmowa, a z `zastap` (start pod nadzorcą) usługa, która ją trzyma
+        (uruchomiona wcześniej w tle przez `jarvo komputer on`), dostaje `stop` z tokenem właściciela i mamy
+        CZAS_ZASTAPIENIA s na jej koniec."""
+        try:
+            zamek.__enter__()
+            return True
+        except BlockingIOError:
+            if not self.zastap:
+                return False
+        log("usługa Komputera już działa dla tego korzenia poza nadzorcą: proszę ją o koniec i zastępuję")
+        try:
+            token = self.k["token"].read_text(encoding="utf-8").strip()
+            kanal.zapytaj(kanal.adres(self.u.root, "ster"), {"polecenie": "stop", "token": token}, 10.0,
+                          kanal.pid_uslugi(self.u.root))
+        except (OSError, ValueError) as e:             # także kanal.BladKanalu: tamta dopiero startuje albo wisi
+            log(f"poprzednia usługa nie przyjęła polecenia stop ({e})")
+        koniec = time.monotonic() + CZAS_ZASTAPIENIA
+        while time.monotonic() < koniec and not self.stop.is_set():
+            try:
+                zamek.__enter__()
+                return True
+            except BlockingIOError:
+                self.stop.wait(0.5)
+        return False
 
     def _uruchom_pod_blokada(self) -> int:
         token = secrets.token_urlsafe(32)
@@ -309,6 +362,7 @@ class Usluga:
             if self.sterownik is not None:
                 try:
                     self.sterownik.podglad_bezczynny()          # podgląd bez widza staje (procesor)
+                    self._postoj(time.monotonic())              # ekran bez nikogo: karty na pustą stronę (procesor)
                 except cdp.BladCDP:
                     pass
             if self.przegl is not None and not self.przegl.dziala() and not self.stop.is_set():
@@ -328,6 +382,32 @@ class Usluga:
                 ostatni_zapis = time.monotonic()
         log("zatrzymanie")
         return 0
+
+    def _postoj(self, teraz: float) -> None:
+        """Postój bezczynnej przeglądarki (docstring modułu); wołane co chwilę z pętli usługi, `teraz` to zegar
+        monotoniczny. Karta, której nie udało się zaparkować, dostaje następną próbę po kolejnych POSTOJ_PO s."""
+        st, wej = self.sterownik, self.wejscie
+        if st is None or wej is None:
+            return
+        if wej.w_uzyciu(CISZA_SESJI, teraz) or st.podglad_wlaczony:
+            self._wolny_od, self.postoj = None, None
+            return
+        if self._wolny_od is None:
+            self._wolny_od = teraz
+        if teraz - self._fokus_sprawdzony >= CO_ILE_FOKUS:
+            self._fokus_sprawdzony = teraz
+            if st.wlasciciel_przy_oknie():
+                self._wolny_od, self.postoj = teraz, None
+        if teraz - self._wolny_od < POSTOJ_PO:
+            return
+        self._wolny_od = teraz
+        ile = st.zaparkuj()
+        if ile:
+            self.postoj = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            log(f"postój: nikt nie korzysta z ekranu od {POSTOJ_PO:g} s, kart na pustej stronie: {ile} "
+                "(zalogowania zostają, strona wraca przez Wstecz)")
+            wej.dziennik.zapisz({"narzedzie": "usluga", "decyzja": "postoj", "karty": ile})
+            self._zapisz_stan()
 
     def _sprzatnij(self) -> None:
         for s in self.serwery:
@@ -360,6 +440,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--strona-testowa", metavar="KATALOG", help="próby: strona z katalogu pod https://*.jarvo.test/")
     p.add_argument("--przegladarka", metavar="PROGRAM", help="program przeglądarki (jarvo komputer on podaje pin z "
                    "manifestu); bez niego zmienna próby albo ustawienia Komputera")
+    p.add_argument("--zastap", action="store_true", help="zastąp usługę tego korzenia uruchomioną poza nadzorcą")
     p.add_argument("--port-proxy", type=int, default=int(os.environ.get("JARVO_KOMPUTER_PORT_PROXY") or 0),
                    help="port proxy filtrującego na 127.0.0.1 (domyślnie dowolny wolny)")
     a = p.parse_args(argv)
@@ -371,15 +452,16 @@ def main(argv: list[str] | None = None) -> int:
         log(f"BŁĄD: {e}")
         return KOD_BLAD
     ust = ustawienia(u)
-    program = a.przegladarka or przegladarka.program(os.environ, srodowisko.narzedzia(u)) or ust.get("chrome")
+    program = a.przegladarka or przegladarka.program(os.environ, srodowisko.narzedzia(u), ust)
     if not program or not Path(program).is_file():
         log("BŁĄD: nie ma przeglądarki Jarva (Chrome for Testing): `jarvo komputer on` pobierze ją z sumą")
         return KOD_BLAD
     okno = a.okno if a.okno is not None else bool(ust.get("okno"))
     port = os.environ.get("JARVO_PANEL_PORT") or srodowisko.wczytaj_json(u.stan / "ustawienia.json").get(
         "JARVO_PANEL_PORT") or PORT_PANELU
-    usluga = Usluga(u, program=program, okno=okno, port_panelu=int(port), port_proxy=a.port_proxy,
-                    strona_testowa=Path(a.strona_testowa).resolve() if a.strona_testowa else None)
+    strona = a.strona_testowa or ust.get("strona_testowa")
+    usluga = Usluga(u, program=program, okno=okno, port_panelu=int(port), port_proxy=a.port_proxy, zastap=a.zastap,
+                    strona_testowa=Path(strona).resolve() if strona else None)
     for nazwa in ("SIGTERM", "SIGINT", "SIGBREAK"):
         if hasattr(signal, nazwa):
             signal.signal(getattr(signal, nazwa), lambda *_: usluga.stop.set())

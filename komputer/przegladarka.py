@@ -40,17 +40,19 @@ py pyw pyc pyz pl rb php lua
 """.split())
 
 
-def program(env: dict | None = None, narzedzia: dict | None = None) -> str | None:
-    """Program przeglądarki: zmienna próby, potem zmienna z wpisu manifestu (narzedzia.json albo ustawienia
-    Komputera). None, gdy przeglądarki nie zainstalowano."""
+def program(env: dict | None = None, narzedzia: dict | None = None, ustawienia: dict | None = None) -> str | None:
+    """Program przeglądarki: zmienna próby, przeglądarka próby z ustawień Komputera (`proba`: zapisuje ją `jarvo
+    komputer on` wywołane ze zmienną próby, żeby usługa pod nadzorcą wzięła tę samą), zmienna z wpisu manifestu,
+    wpis w narzedzia.json i pin z ustawień (`chrome`). None, gdy przeglądarki nie zainstalowano."""
     env = os.environ if env is None else env
-    for klucz in (ZMIENNA_PROBY, ZMIENNA_PROGRAMU):
-        p = str(env.get(klucz) or "").strip()
+    ustawienia = ustawienia or {}
+    wpis = (narzedzia or {}).get(NARZEDZIE) or {}
+    for p in (env.get(ZMIENNA_PROBY), ustawienia.get("proba"), env.get(ZMIENNA_PROGRAMU),
+              (wpis.get("env") or {}).get(ZMIENNA_PROGRAMU), ustawienia.get("chrome")):
+        p = str(p or "").strip()
         if p:
             return p
-    wpis = (narzedzia or {}).get(NARZEDZIE) or {}
-    p = str((wpis.get("env") or {}).get(ZMIENNA_PROGRAMU) or "").strip()
-    return p or None
+    return None
 
 
 def x64_w_emulacji(program: str | Path, maszyna: str = "") -> bool:

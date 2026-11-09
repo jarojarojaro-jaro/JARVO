@@ -464,3 +464,16 @@ def test_file_i_siec_lokalna_zablokowane(przegl):
     finally:
         serwer.close()
     assert proxy.statystyki.zablokowane > przed
+
+
+def test_postoj_przenosi_strony_na_pusta_karte(przegl):
+    """Postój: karta ze stroną (także z pytaniem strony przed wyjściem) przechodzi na about:blank, a strona zostaje
+    w historii karty; pusta karta nie jest ruszana drugi raz."""
+    st, _, _ = przegl
+    nr = otworz(st, "https://sklep.jarvo.test/sklep.html")
+    js(st, nr, "window.onbeforeunload = (e) => { e.preventDefault(); e.returnValue = 'x'; return 'x'; }")
+    assert st.zaparkuj() >= 1
+    assert all(o.url == "about:blank" for o in st.okna()) and js(st, nr, "location.href") == "about:blank"
+    historia = st.b.wyslij("Page.getNavigationHistory", {}, st.okno(nr).sesja)
+    assert "sklep.html" in historia["entries"][historia["currentIndex"] - 1]["url"]
+    assert st.zaparkuj() == 0 and st.wlasciciel_przy_oknie() is False

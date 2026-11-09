@@ -632,3 +632,152 @@ def test_przegladarka_bez_sladow_poza_jarvem(tmp_path, monkeypatch):
         assert wpisy[0]["szczegoly"]["dozwolone"] == ["Chrome for Testing/User Data/Crashpad"]
     else:
         assert wpisy == []
+
+
+ATRAPA_USLUGI = r'''
+import json, os, signal, sys, threading
+sys.path.insert(0, @@REPO@@)
+from komputer import kanal
+korzen = sys.argv[sys.argv.index("--korzen") + 1]
+stan = kanal.katalog_stanu(korzen)
+os.makedirs(stan, exist_ok=True)
+stop = threading.Event()
+for nazwa in ("SIGTERM", "SIGBREAK", "SIGINT"):
+    if hasattr(signal, nazwa):
+        signal.signal(getattr(signal, nazwa), lambda *_: stop.set())
+def obsluz(s):
+    try:
+        p = json.loads(kanal.czytaj_wiersz(s, 1 << 16) or b"{}")
+        if p.get("polecenie") == "stop":
+            stop.set()
+        odp = {"ok": True, "sesje": 0, "wstrzymane": False, "usluga": {"pid": os.getpid(), "okno": False}}
+        s.sendall((json.dumps(odp) + "\n").encode("utf-8"))
+    finally:
+        s.close()
+serwer = kanal.Serwer(kanal.adres(korzen, "ster"), obsluz, "ster").start()
+with open(os.path.join(stan, "usluga.json"), "w", encoding="utf-8") as f:
+    json.dump({"pid": os.getpid()}, f)
+with open(os.path.join(korzen, "starty.jsonl"), "a", encoding="utf-8") as f:
+    f.write(json.dumps({"pid": os.getpid()}) + "\n")
+while not stop.wait(0.05):
+    pass
+serwer.zamknij()
+os.remove(os.path.join(stan, "usluga.json"))
+'''
+
+
+def _czekaj(warunek, limit: float = 30.0):
+    koniec = time.monotonic() + limit
+    while time.monotonic() < koniec:
+        wynik = warunek()
+        if wynik:
+            return wynik
+        time.sleep(0.02)
+    raise AssertionError(f"nie doczekałem się w {limit} s")
+
+
+def test_on_i_off_przy_nadzorcy_bez_drugiej_uslugi():
+    """Przy działającym nadzorcy `on` i `off` zmieniają ustawienia, a usługę uruchamia i zatrzymuje nadzorca: `on` nic
+    nie startuje w tle, powtórzone `on` nie daje drugiej usługi, po `off` usługa nie wraca, a następne `on` daje znowu
+    jedną."""
+    from jarvo import instalator, nadzorca
+    root = Path(tempfile.mkdtemp(prefix="jk"))         # krótka ścieżka: gniazdo unix ma limit ok. 100 bajtów
+    u, app, chrome, plik = _uklad(root), root / "app", root / "chrome", root / "starty.jsonl"
+    (app / "komputer").mkdir(parents=True)
+    (app / "komputer" / "usluga.py").write_text(ATRAPA_USLUGI.replace("@@REPO@@", repr(str(REPO))), encoding="utf-8")
+    chrome.write_bytes(b"x")
+    env = {k: v for k, v in os.environ.items() if not k.startswith("JARVO_KOMPUTER_CHROME")}
+    n = nadzorca.Nadzorca(u, [nadzorca.usluga_komputera(u, env, app)], env, takt=0.02, co_ile_wlaczona=0.05,
+                          co_ile_gotowosc=0.05, przerwa_min=0.1, przerwa_restartu=0.2, limit_stopu=10)
+    ot = instalator.Otoczenie(env={**env, "JARVO_KOMPUTER_CHROME_PROBA": str(chrome)},
+                              uruchom_w_tle=lambda *a: pytest.fail("przy nadzorcy `on` nie uruchamia usługi sam"))
+
+    def starty() -> list[int]:
+        try:
+            return [json.loads(w)["pid"] for w in plik.read_text(encoding="utf-8").splitlines()]
+        except OSError:
+            return []
+
+    def stan() -> dict:
+        return (n.stan().get("uslugi") or {}).get("komputer") or {}
+
+    def cli(*argv: str) -> int:
+        with redirect_stdout(io.StringIO()):
+            return jk.main(list(argv), u=u, ot=ot)
+    watek = threading.Thread(target=n.uruchom, daemon=True)
+    watek.start()
+    try:
+        _czekaj(lambda: stan().get("stan") == "wylaczona")
+        assert cli("on", "--w-tle") == 0 and len(starty()) == 1
+        assert stan()["stan"] == "dziala" and kanal.pid_uslugi(root) == starty()[0]
+        assert cli("on") == 0 and len(starty()) == 1                     # już działa: bez drugiej usługi
+        assert cli("off") == 0 and jk.ustawienia(u)["wlaczony"] is False
+        _czekaj(lambda: stan().get("stan") == "wylaczona" and not jk._zyje(starty()[0]))
+        time.sleep(0.6)
+        assert len(starty()) == 1 and jk.dziala(u) is None               # nadzorca jej nie podnosi
+        assert cli("on") == 0 and len(starty()) == 2
+        assert stan()["stan"] == "dziala" and kanal.pid_uslugi(root) == starty()[1] and not jk._zyje(starty()[0])
+        pidy = starty()
+    finally:
+        n.zatrzymaj()
+        watek.join(60)
+        shutil.rmtree(root, ignore_errors=True)
+    assert not watek.is_alive() and not jk._zyje(pidy[1])
+
+
+def test_postoj_po_ostatniej_sesji_a_nie_w_trakcie(usluga, monkeypatch):
+    """Karty idą na pustą stronę dopiero, gdy nikt nie korzysta z ekranu przez POSTOJ_PO s: nie w trakcie sesji
+    Operatora, nie przy podglądzie w HQ, nie przy pauzie (strona czeka na właściciela) i nie, gdy właściciel pracuje
+    w oknie. Sesja otwarta, ale milcząca dłużej niż CISZA_SESJI, liczy się jak zakończona."""
+    from komputer import usluga as ku
+    st, wej, parkowania = usluga.sterownik, usluga.wejscie, []
+    st.podglad_wlaczony, st.przy_oknie = False, False
+    st.wlasciciel_przy_oknie = lambda: st.przy_oknie
+    st.zaparkuj = lambda: parkowania.append(1) or 1
+    us = ku.Usluga(_uklad(usluga.root), program="brak", okno=False)
+    us.sterownik, us.wejscie = st, wej
+    monkeypatch.setattr(us, "_zapisz_stan", lambda: None)
+    dlugo = ku.POSTOJ_PO + ku.CO_ILE_FOKUS + 1
+
+    def mija(od: float, ile: float) -> float:
+        """Pętla usługi przez `ile` s od chwili `od` (co sekundę); zwraca chwilę końca."""
+        for i in range(int(ile) + 1):
+            us._postoj(od + i)
+        return od + ile
+    t = time.monotonic()
+    sesja = kanal.polacz(kanal.adres(usluga.root, "cua"), 5.0)
+    _czekaj(lambda: len(wej.sesje) == 1)
+    t = mija(t, dlugo)
+    assert not parkowania                                                # sesja Operatora trwa
+    sesja.close()
+    _czekaj(lambda: not wej.sesje)
+    t = mija(t, ku.POSTOJ_PO - 2)
+    assert not parkowania                                                # dopiero po POSTOJ_PO s od końca sesji
+    t = mija(t, 4)
+    assert parkowania == [1] and us.postoj
+    assert any(w.get("decyzja") == "postoj" for w in wej.dziennik.ostatnie)
+
+    st.podglad_wlaczony = True                                           # właściciel patrzy w HQ
+    t = mija(t, dlugo)
+    assert parkowania == [1] and us.postoj is None
+    st.podglad_wlaczony = False
+    wej.ekran.ustaw_pauze(True, "Zaloguj się w panelu", "flota")         # Operator oddał ekran: strona czeka
+    t = mija(t, dlugo)
+    assert parkowania == [1]
+    wej.ekran.ustaw_pauze(False)
+    st.przy_oknie = True                                                 # właściciel pracuje w oknie sam
+    t = mija(t, dlugo)
+    assert parkowania == [1]
+    st.przy_oknie = False
+    t = mija(t, dlugo)
+    assert parkowania == [1, 1]
+
+    sesja = kanal.polacz(kanal.adres(usluga.root, "cua"), 5.0)           # otwarta, ale bez wiadomości od agenta
+    try:
+        _czekaj(lambda: len(wej.sesje) == 1)
+        t = mija(max(t, time.monotonic()), dlugo)
+        assert parkowania == [1, 1]
+        mija(t + ku.CISZA_SESJI, dlugo)
+        assert parkowania == [1, 1, 1]
+    finally:
+        sesja.close()

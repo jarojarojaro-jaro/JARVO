@@ -12,6 +12,7 @@ sterowana przez CDP po potoku, z twardymi zasadami wejścia i filtrem ruchu w ap
                        znak po znaku w polu hasła)
   wejscie_natywne.py   wejście z twardymi zasadami: rdzeń z infra/komputer/wejscie.py i zasady.py, kontekst CDP;
                        kanał `ster` z poleceniami właściciela (wznow, klatka, przejmij, wejscie, stop, okno, wyczysc)
-  usluga.py            proces usługi Komputera (proxy, przeglądarka, wejście, kanały, samotesty)
+  usluga.py            proces usługi Komputera (proxy, przeglądarka, wejście, kanały, samotesty, postój bezczynnej
+                       przeglądarki); pod nadzorcą Jarva jako usługa `komputer` (jarvo/nadzorca.py)
 Polecenie właściciela: `jarvo komputer` (jarvo/komputer.py).
 """

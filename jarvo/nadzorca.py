@@ -42,6 +42,17 @@ Usługi (uslugi_jarva; flagi i zmienne sprawdzone w kodzie Hermesa f97608f):
   (kolejność 3), gotowa, gdy /zdrowie odpowiada z tokenem; po starcie nadrabia brakujące wektory skarbca. Ctrl+Break
   albo SIGTERM kończy ją od razu (plik z tokenem znika), po 10 s zabicie. Bez kodu, venvu narzędzi albo modelu
   w narzedzia.json usługi nie ma, a przypomnienia idą słowami.
+- komputer: Komputer Jarva, czyli przeglądarka Jarva dla Operatora (docs/NATYWNIE.md J12), `<python Jarva> -I -X utf8
+  <app>/komputer/usluga.py --korzen R --zastap`. Usługa z bramką: działa tylko wtedy, gdy właściciel ją włączył
+  (`jarvo komputer on`: `wlaczony: true` w `<stan>/komputer/ustawienia.json`) i przeglądarka jest zainstalowana
+  (jarvo/komputer.py do_startu); inaczej ma stan `wylaczona` i to nie jest błąd. Okno albo tło, program przeglądarki
+  i stronę próby usługa czyta przy każdym starcie z ustawień, więc `jarvo komputer on|off|okno|odswiez` zmienia
+  ustawienia, a start, zatrzymanie i powrót po awarii, restarcie komputera i `jarvo update` robi nadzorca. Startuje
+  po panelu (kolejność 2), gotowa, gdy odpowiada na `stan` na kanale `ster` (komputer/kanal.py). `--zastap`: usługa
+  uruchomiona wcześniej poza nadzorcą (`jarvo komputer on` bez działającego serwisu) dostaje `stop` i ustępuje, więc
+  na korzeń działa jedna (blokada `<stan>/komputer/usluga.lock`). Otoczenie jak procesów Jarva, bez zmiennej programu
+  przeglądarki z chwili startu nadzorcy (po `jarvo komputer odswiez` liczy się nowy pin). Ctrl+Break albo SIGTERM
+  zatrzymuje ją łagodnie (kanały, przeglądarka, proxy), po 30 s zabicie. Bez kodu usługi w `app` usługi nie ma.
 
 Pętla (c2): start w kolejności (panel czeka na gotowość bramy, najdłużej `limit_kolejnosci`); kod 75 = restart po
 ok. 5 s, ale kolejne szybkie wyjścia 75 (przed 60 s działania) podwajają przerwę aż do 5 min, a przy usłudze z portem
@@ -50,6 +61,11 @@ inne kody = ponowienie z rosnącą przerwą 5 s → 5 min (zeruje ją 10 min dzi
 co 30 s, ale tylko do raportu (własne strażniki ma Hermes). Stan (pid, od kiedy, restarty, ostatni kod, gotowość,
 powód) w `<stan>/nadzorca.json`, zapisywany atomowo przy każdej zmianie i co najmniej co 30 s (pole `zapisano` to
 puls nadzorcy). Czyta go `jarvo status`: WMIC zniknął z Windows 11, więc PID-y zna tylko nadzorca (N03).
+
+Usługa z bramką (`Usluga.wlaczona`, dziś tylko komputer): nadzorca pyta bramkę co 1 s i przed każdym startem.
+Wyłączona nie startuje i ma stan `wylaczona`; włączona w trakcie pracy nadzorcy startuje w swojej kolejności;
+wyłączona w trakcie działania jest zatrzymywana łagodnie (potem twardo, jak każda), a gdy skończyła sama, nie jest
+ponawiana. Restart z kanału uruchamia ją od razu, jeśli bramka na to pozwala.
 
 Trwałe zatrzymanie: znacznik `<stan>/zatrzymany.json` (oznacz_zatrzymanie, zdejmij_zatrzymanie, zatrzymany).
 Zapisuje go stop z kanału (`jarvo down`, `jarvo serwis --stop`). `jarvo serwis` przy znaczniku kończy się od razu
@@ -126,6 +142,8 @@ POMOCNIK = "aktualizacje"      # usługa pomocnika aktualizacji (S09): log <logi
 WEKTORY = "wektory"            # usługa wektorów skarbca wiedzy (wiedza/wektory.py): log <logi>/wektory.log
 MODEL_WEKTOROW = "e5-small"    # modele.e5-small z vendor/natywne.yaml (wpis model-e5-small w narzedzia.json)
 LIMIT_STOPU_WEKTOROW = 10.0    # s: usługa wektorów kończy się od razu na Ctrl+Break i SIGTERM (bez stanu poza plikiem portu)
+KOMPUTER = "komputer"          # usługa Komputera Jarva (komputer/usluga.py): log <logi>/komputer.log
+LIMIT_STOPU_KOMPUTERA = 30.0   # s: usługa zamyka kanały i sesje, przeglądarkę (do 10 s) i proxy
 WATKI_WEKTOROW = "2"           # wątki onnxruntime usługi wektorów: procesor najwyżej 80% z 4 rdzeni (zasada właściciela)
 # Najdłuższe zatrzymanie nadzorcy z usługami Jarva: limit bramy, bezpiecznik 10 s, dobicie i zamknięcie kanału.
 # Autostart (TimeoutStopSec, ExitTimeOut) i `jarvo down` mają czekać co najmniej tyle.
@@ -168,7 +186,8 @@ class Usluga:
     launchera) tuż przed łagodnym zatrzymaniem. `powod_postoju()` dopowiada powód kodu 78. `launcher`: czy argv[0]
     uruchamia właściwy proces jako swoje dziecko (None: rozpoznaj `Scripts\\python.exe` venvu; tylko Windows).
     `limit_stopu`: sekundy na łagodne zatrzymanie, potem zabicie (None: limit nadzorcy). `port`: port, na którym
-    usługa słucha; przy kodzie 75 nadzorca sprawdza, kto go trzyma.
+    usługa słucha; przy kodzie 75 nadzorca sprawdza, kto go trzyma. `wlaczona()` -> bool: bramka usługi opcjonalnej
+    (None: działa zawsze); wyłączona nie startuje i ma stan `wylaczona`, a działająca jest zatrzymywana.
     """
     nazwa: str
     argv: list[str]
@@ -181,6 +200,7 @@ class Usluga:
     launcher: bool | None = None
     limit_stopu: float | None = None
     port: int | None = None
+    wlaczona: Callable[[], bool] | None = None
 
 
 # --- procesy na Windows: ctypes, sama biblioteka standardowa ------------------------------------------------------
@@ -1264,9 +1284,30 @@ def usluga_wektorow(u: Uklad, env: dict[str, str], app: str | Path | None) -> Us
                   limit_stopu=LIMIT_STOPU_WEKTOROW)
 
 
+def komputer_gotowy(u: Uklad) -> bool:
+    """Usługa Komputera odpowiada na `stan` na kanale `ster` (jarvo/komputer.py dziala)."""
+    from . import komputer                                      # przy użyciu: moduł ciągnie instalator
+    return komputer.dziala(u) is not None
+
+
+def usluga_komputera(u: Uklad, env: dict[str, str], app: str | Path | None) -> Usluga | None:
+    """Usługa `komputer` (docstring modułu) z kodu bieżącej wersji albo None, gdy kodu nie ma. Zawsze na liście
+    nadzorcy, a o tym, czy działa, decyduje bramka: ustawienia Komputera i zainstalowana przeglądarka."""
+    skrypt = Path(str(app or "")) / "komputer" / "usluga.py"
+    if not app or not skrypt.is_file():
+        return None
+    from . import komputer
+    from .instalator import python_jarva
+    env_uslugi = komputer.env_uslugi(env)
+    argv = [str(python_jarva(u)), "-I", "-X", "utf8", str(skrypt), "--korzen", str(u.root), "--zastap"]
+    return Usluga(KOMPUTER, argv, cwd=u.stan, env=env_uslugi, gotowa=partial(komputer_gotowy, u), kolejnosc=2,
+                  limit_stopu=LIMIT_STOPU_KOMPUTERA, wlaczona=partial(komputer.do_startu, u, env_uslugi))
+
+
 def uslugi_jarva(u: Uklad, env: dict[str, str]) -> list[Usluga]:
-    """Brama i panel Hermesa z bieżącej wersji (`<program>/current.json`), pomocnik aktualizacji z jej kodu
-    (usluga_pomocnika) i usługa wektorów skarbca (usluga_wektorow), w środowisku procesów Jarva `env`."""
+    """Brama i panel Hermesa z bieżącej wersji (`<program>/current.json`), Komputer Jarva z jej kodu
+    (usluga_komputera: startuje tylko włączony), pomocnik aktualizacji (usluga_pomocnika) i usługa wektorów skarbca
+    (usluga_wektorow), w środowisku procesów Jarva `env`."""
     biez = srodowisko.biezace(u)
     if not biez.get("hermes"):
         raise BladNadzorcy(f"Nie ma zainstalowanego Hermesa: {u.program / 'current.json'} nie wskazuje checkoutu. "
@@ -1293,9 +1334,10 @@ def uslugi_jarva(u: Uklad, env: dict[str, str]) -> list[Usluga]:
                    cwd=katalog, env=env_panelu, gotowa=partial(panel_gotowy, f"http://127.0.0.1:{port}/api/status",
                                                                dane),
                    kolejnosc=1, limit_stopu=LIMIT_STOPU_PANELU, port=port)
+    komputer = usluga_komputera(u, env, biez.get("app"))
     pomocnik = usluga_pomocnika(u, env, biez.get("app"))
     wektory = usluga_wektorow(u, env, biez.get("app"))
-    return [brama, panel] + [x for x in (pomocnik, wektory) if x]
+    return [brama, panel] + [x for x in (komputer, pomocnik, wektory) if x]
 
 
 # --- nadzorca -----------------------------------------------------------------------------------------------------
@@ -1315,7 +1357,7 @@ class _Stan:
 
     def __init__(self, usluga: Usluga, dziennik: _Dziennik):
         self.u, self.dziennik = usluga, dziennik
-        self.stan = "czeka"           # czeka, dziala, zatrzymywanie, ponowienie, postoj, zatrzymana
+        self.stan = "czeka"           # czeka, dziala, zatrzymywanie, ponowienie, postoj, zatrzymana, wylaczona
         self.proces: subprocess.Popen | None = None
         self.pid: int | None = None
         self.odcisk: str | None = None
@@ -1341,6 +1383,8 @@ class _Stan:
         self.ostatnia_sonda = 0.0
         self.szukaj_dzieci = 0.0
         self.czekanie_zgloszone = False
+        self.ostatnia_bramka = 0.0    # kiedy ostatnio pytaliśmy bramkę `wlaczona`
+        self.blad_bramki = False
 
 
 class Nadzorca:
@@ -1354,7 +1398,7 @@ class Nadzorca:
                  reset_po: float = 600.0, szybki_restart: float = 60.0, limit_stopu: float = 30.0,
                  limit_kolejnosci: float = 60.0, co_ile_gotowosc: float = 1.0, co_ile_zycie: float = 30.0,
                  co_ile_rotacja: float = 5.0, co_ile_znacznik: float = 1.0, co_ile_sprzatanie: float = 300.0,
-                 takt: float = 0.25,
+                 co_ile_wlaczona: float = 1.0, takt: float = 0.25,
                  log_max: int = 10 * 2 ** 20, log_kopie: int = 3, kanal: bool = True,
                  szanuj_zatrzymanie: bool = False, log: Callable[[str], None] | None = None):
         nazwy = [x.nazwa for x in uslugi]
@@ -1370,7 +1414,7 @@ class Nadzorca:
         self.limit_stopu, self.limit_kolejnosci = limit_stopu, limit_kolejnosci
         self.co_ile_gotowosc, self.co_ile_zycie, self.co_ile_rotacja = co_ile_gotowosc, co_ile_zycie, co_ile_rotacja
         self.co_ile_znacznik, self.co_ile_sprzatanie = co_ile_znacznik, co_ile_sprzatanie
-        self.takt = takt
+        self.co_ile_wlaczona, self.takt = co_ile_wlaczona, takt
         self._stany = {x.nazwa: _Stan(x, _Dziennik(u.logi / f"{x.nazwa}.log", log_max, log_kopie))
                        for x in sorted(uslugi, key=lambda x: x.kolejnosc)}
         self._dziennik = _Dziennik(u.logi / "nadzorca.log", log_max, log_kopie)
@@ -1553,7 +1597,47 @@ class Nadzorca:
                 self._log(f"{nazwa}: restart na polecenie")
                 self._zatrzymaj_usluge(self._stany[nazwa], "restart")
 
+    def _wlaczona(self, s: _Stan) -> bool:
+        """Odpowiedź bramki usługi (bez bramki: tak). Błąd bramki nie zmienia tego, co jest: działająca działa dalej,
+        stojąca stoi."""
+        if s.u.wlaczona is None:
+            return True
+        try:
+            wynik = bool(s.u.wlaczona())
+        except Exception as e:            # bramka nie może zatrzymać pętli
+            if not s.blad_bramki:
+                s.blad_bramki = True
+                self._log(f"{s.u.nazwa}: nie sprawdziłem, czy usługa jest włączona ({type(e).__name__}); zostaje, "
+                          "jak jest")
+            return s.stan in ("dziala", "zatrzymywanie")
+        s.blad_bramki = False
+        return wynik
+
+    def _wylacz(self, s: _Stan) -> None:
+        """Usługa z zamkniętą bramką, bez procesu: stan `wylaczona` do chwili, gdy bramka powie tak."""
+        if s.stan != "wylaczona":
+            self._log(f"{s.u.nazwa}: wyłączona, nie startuję")
+        s.stan, s.powod, s.nastepny_wall = "wylaczona", None, None
+        s.bledy = s.szybkie_75 = 0
+        self._brudny = True
+
+    def _bramka(self, s: _Stan) -> None:
+        """Okresowe pytanie do bramki: włączona wraca do kolejki startu, wyłączona staje."""
+        wlaczona = self._wlaczona(s)
+        if wlaczona and s.stan == "wylaczona":
+            self._log(f"{s.u.nazwa}: włączona")
+            s.stan, s.czekanie_zgloszone = "czeka", False
+            self._brudny = True
+        elif not wlaczona and s.stan in ("czeka", "ponowienie", "postoj"):
+            self._wylacz(s)
+        elif not wlaczona and s.stan == "dziala":
+            self._log(f"{s.u.nazwa}: wyłączona, zatrzymuję")
+            self._zatrzymaj_usluge(s, "stop")
+
     def _krok(self, s: _Stan, teraz: float) -> None:
+        if s.u.wlaczona is not None and not self._calosc and teraz - s.ostatnia_bramka >= self.co_ile_wlaczona:
+            s.ostatnia_bramka = teraz
+            self._bramka(s)
         if s.stan == "czeka":
             if not self._calosc and self._kolej_na(s, teraz):
                 self._start(s)
@@ -1612,6 +1696,9 @@ class Nadzorca:
         return subprocess.Popen(s.u.argv, creationflags=flagi, **kw)
 
     def _start(self, s: _Stan) -> None:
+        if not self._wlaczona(s):
+            self._wylacz(s)
+            return
         env = dict(self.env if s.u.env is None else s.u.env)
         s.generacja += 1
         if s.generacja > 1:
@@ -1675,6 +1762,10 @@ class Nadzorca:
         s.gotowa = None if s.u.gotowa is None else False
         s.dziennik.dopisz(f"=== {time.strftime('%Y-%m-%d %H:%M:%S')} nadzorca: {s.u.nazwa} zakończony kodem "
                           f"{_kod_tekst(kod)} po {czas:.0f} s ===\n")
+        if not self._wlaczona(s):         # wyłączona skończyła sama (np. `jarvo komputer off`): bez ponawiania
+            self._log(f"{s.u.nazwa}: zakończona kodem {_kod_tekst(kod)} po {czas:.0f} s")
+            self._wylacz(s)
+            return
         szybko = czas < self.szybki_restart
         if not szybko:
             s.szybkie_75 = 0
@@ -1763,6 +1854,8 @@ class Nadzorca:
         if s.po_zatrzymaniu == "restart" and not self._calosc:
             s.bledy = s.szybkie_75 = 0
             self._start(s)
+        elif s.u.wlaczona is not None and not self._calosc:
+            self._wylacz(s)               # zatrzymana przez bramkę: wróci, gdy bramka powie tak
         else:
             s.stan, s.powod, s.nastepny_wall = "zatrzymana", None, None
         self._brudny = True
@@ -1972,10 +2065,12 @@ def main(argv: list[str] | None = None) -> int:
     zatrzymania kończy się od razu kodem 0. Ctrl+C albo SIGTERM zatrzymuje usługi łagodnie (bez znacznika).
     --status, --restart i --stop rozmawiają z działającym nadzorcą przez kanał; --wznow zdejmuje znacznik."""
     parser = argparse.ArgumentParser(prog="jarvo serwis", description="Nadzorca procesów Jarva: brama i panel "
-                                     "Hermesa, restart po awarii, logi i stan dla `jarvo status`.")
+                                     "Hermesa, włączony Komputer Jarva, restart po awarii, logi i stan dla "
+                                     "`jarvo status`.")
     grupa = parser.add_mutually_exclusive_group()
     grupa.add_argument("--status", action="store_true", help="stan działającego nadzorcy (JSON)")
-    grupa.add_argument("--restart", metavar="USLUGA", help="uruchom usługę ponownie (brama, panel, aktualizacje)")
+    grupa.add_argument("--restart", metavar="USLUGA",
+                       help="uruchom usługę ponownie (brama, panel, komputer, aktualizacje, wektory)")
     grupa.add_argument("--stop", action="store_true",
                        help="zatrzymaj nadzorcę i usługi; autostart nie uruchomi ich, aż do `jarvo up`")
     grupa.add_argument("--wznow", action="store_true",

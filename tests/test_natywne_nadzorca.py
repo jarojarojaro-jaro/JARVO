@@ -944,6 +944,52 @@ def test_uslugi_jarva_z_usluga_wektorow(tmp_path):
     assert nadzorca.WEKTORY not in [x.nazwa for x in nadzorca.uslugi_jarva(u, env)]
 
 
+ATRAPA_KOMPUTERA = r'''
+import json, os, signal, sys, time
+korzen = sys.argv[sys.argv.index("--korzen") + 1]
+for nazwa in ("SIGTERM", "SIGBREAK", "SIGINT"):
+    if hasattr(signal, nazwa):
+        signal.signal(getattr(signal, nazwa), lambda *_: sys.exit(0))
+with open(os.path.join(korzen, "komputer-starty.jsonl"), "a", encoding="utf-8") as f:
+    f.write(json.dumps({"pid": os.getpid(), "argv": sys.argv[1:]}) + "\n")
+while True:
+    time.sleep(0.05)
+'''
+
+
+def test_komputer_dziala_tylko_wlaczony_i_z_przegladarka(u, tmp_path):
+    """Usługa `komputer` jest pod nadzorcą zawsze, ale startuje tylko przy `wlaczony: true` w ustawieniach Komputera
+    i z zainstalowaną przeglądarką (to nie błąd: stan `wylaczona`, bez ponowień). Wyłączona w trakcie pracy staje
+    i nie wraca, włączona znowu startuje bez restartu nadzorcy."""
+    from jarvo import komputer as jk
+    app, plik, chrome = tmp_path / "app", u.root / "komputer-starty.jsonl", tmp_path / "chrome"
+    (app / "komputer").mkdir(parents=True)
+    (app / "komputer" / "usluga.py").write_text(ATRAPA_KOMPUTERA, encoding="utf-8")
+    u.root.mkdir(parents=True, exist_ok=True)
+    env = {k: v for k, v in os.environ.items() if not k.startswith("JARVO_KOMPUTER_CHROME")}
+    assert nadzorca.usluga_komputera(u, env, tmp_path / "bez-kodu") is None
+    n = nowy(u, [nadzorca.usluga_komputera(u, env, app)], co_ile_wlaczona=0.05)
+
+    def stan() -> dict:
+        return usluga(n, nadzorca.KOMPUTER)
+    with dziala(n):
+        czekaj(lambda: stan().get("stan") == "wylaczona", opis="komputer wyłączony")
+        jk.zapisz_ustawienia(u, wlaczony=True, chrome=str(chrome))        # włączony, ale przeglądarki jeszcze nie ma
+        time.sleep(0.5)
+        assert not starty(plik) and stan()["stan"] == "wylaczona" and not stan()["powod"]
+        chrome.write_bytes(b"x")
+        czekaj(lambda: len(starty(plik)) == 1 and stan().get("stan") == "dziala", opis="start po włączeniu")
+        assert starty(plik)[0]["argv"][-3:] == ["--korzen", str(u.root), "--zastap"]
+        pid = stan()["pid"]
+        jk.zapisz_ustawienia(u, wlaczony=False)
+        czekaj(lambda: stan().get("stan") == "wylaczona" and nadzorca._odcisk(pid) is None, opis="stop po wyłączeniu")
+        time.sleep(0.6)
+        assert len(starty(plik)) == 1                                     # wyłączona nie jest ponawiana
+        jk.zapisz_ustawienia(u, wlaczony=True)
+        czekaj(lambda: len(starty(plik)) == 2 and stan().get("stan") == "dziala", opis="start po ponownym włączeniu")
+    assert nadzorca._odcisk(starty(plik)[1]["pid"]) is None
+
+
 @contextmanager
 def atrapa_kontroli_bramy(dane: Path, odpowiedz: dict):
     """Serwer jak gateway/control_socket.py Hermesa: jedna linia JSON tam i z powrotem na połączenie."""
