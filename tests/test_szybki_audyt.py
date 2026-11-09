@@ -90,6 +90,24 @@ def test_bez_przegladarki_raport_mowi_o_pominietych_zrzutach(strona, tmp_path):
     assert re.search(r"^\| Telefon i komputer.*\| ⚠️ \| nie sprawdzone", raport, re.M)
 
 
+def test_strona_glowna_za_przekierowaniem_meta_refresh(tmp_path):
+    # korzeń jak w stronach wielojęzycznych: index.html tylko przekierowuje na /pl/ (seo_check go pomija)
+    k = tmp_path / "public_html"
+    (k / "pl").mkdir(parents=True)
+    (k / "index.html").write_text('<!doctype html><html><head><meta http-equiv="refresh" content="0; url=/pl/">'
+                                  '<meta name="robots" content="noindex"></head><body></body></html>', encoding="utf-8")
+    (k / "pl" / "styl.css").write_text("x" * 50_000, encoding="utf-8")
+    (k / "pl" / "index.html").write_text(
+        '<!doctype html><html lang="pl"><head><title>Strona główna przykładowej firmy w Polsce</title>'
+        '<meta name="robots" content="noindex"><link rel="stylesheet" href="styl.css"></head>'
+        '<body><h1>Witaj</h1></body></html>', encoding="utf-8")
+    r, a, raport = uruchom(k, tmp_path / "out", "--bez-zrzutow")
+    assert r.returncode == 0, r.stderr
+    g = a["waga_glownej"]
+    assert g["plik"] == "pl/index.html" and g["css"] == 50_000
+    assert "Usuń `noindex` ze strony głównej (pl/index.html)" in raport   # noindex celu, nie samego przekierowania
+
+
 def test_brak_katalogu_to_blad(tmp_path):
     r = subprocess.run([sys.executable, str(SKRYPT), str(tmp_path / "nie-ma"), "--out", str(tmp_path / "out")],
                        capture_output=True, text=True, encoding="utf-8")

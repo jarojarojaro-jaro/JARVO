@@ -24,6 +24,8 @@ import functools
 import http.server
 import json
 import os
+import posixpath
+import re
 import shutil
 import subprocess
 import sys
@@ -199,17 +201,40 @@ def ocen_obrazy(katalog: Path, udostepniane: set[str]) -> dict:
     }
 
 
+META_REFRESH = re.compile(r"""<meta[^>]+http-equiv\s*=\s*["']?refresh["']?[^>]*content\s*=\s*["']?\s*\d+\s*;\s*url\s*=\s*([^"'>\s]+)""",
+                          re.I)
+
+
+def strona_glowna(katalog: Path, parsery: dict[str, Strona]) -> str | None:
+    """Plik strony głównej: index.html, a gdy to tylko przekierowanie meta refresh (seo_check go pomija, np. `/` →
+    `/pl/`), cel przekierowania; bez index.html pierwszy z pl/ i en/."""
+    if "index.html" in parsery:
+        return "index.html"
+    korzen = katalog / "index.html"
+    if korzen.is_file():
+        m = META_REFRESH.search(korzen.read_text(encoding="utf-8", errors="replace")[:20000])
+        if m:
+            cel = m.group(1).split("#")[0].split("?")[0]
+            if not re.match(r"^[a-z]+:", cel, re.I):
+                rel = posixpath.normpath(cel.lstrip("./") if not cel.startswith("/") else cel.lstrip("/")).lstrip("/")
+                for kandydat in (f"{rel}/index.html", rel, f"{rel}.html"):
+                    if kandydat in parsery:
+                        return kandydat
+    return next((k for k in ("pl/index.html", "en/index.html") if k in parsery), None)
+
+
 def ocen_glowna(katalog: Path, parsery: dict[str, Strona], domeny: set[str]) -> dict | None:
-    p = parsery.get("index.html")
-    if p is None:
+    plik = strona_glowna(katalog, parsery)
+    if plik is None:
         return None
+    p = parsery[plik]
     zasoby = {"css": [x.get("href", "") for x in p.links if "stylesheet" in x.get("rel", "").lower()],
               "js": p.skrypty, "obrazy": [i.get("src", "") for i in p.imgs]}
-    w = {"html": (katalog / "index.html").stat().st_size, "css": 0, "js": 0, "obrazy": 0, "zewnetrzne": 0}
+    w = {"plik": plik, "html": (katalog / plik).stat().st_size, "css": 0, "js": 0, "obrazy": 0, "zewnetrzne": 0}
     widziane: set[Path] = set()
     for typ, hrefy in zasoby.items():
         for href in hrefy:
-            cel = lokalny(katalog, "index.html", href, domeny)
+            cel = lokalny(katalog, plik, href, domeny)
             if cel is None and href.strip() and not href.startswith("data:"):
                 w["zewnetrzne"] += 1
             elif cel and cel.is_file() and cel not in widziane:
@@ -412,7 +437,7 @@ def wiersze_i_poprawki(a: dict) -> tuple[list[dict], list[dict]]:
 
     g = a["waga_glownej"]
     if g is None:
-        wiersz("Waga strony głównej", "uwaga", "brak index.html w katalogu")
+        wiersz("Waga strony głównej", "uwaga", "nie znalazłem strony głównej (index.html ani pl/, en/)")
     else:
         opis = f"{kb(g['razem'])}: HTML {kb(g['html'])}, CSS {kb(g['css'])}, JS {kb(g['js'])}, obrazy {kb(g['obrazy'])}"
         if g["zewnetrzne"]:
@@ -421,7 +446,7 @@ def wiersze_i_poprawki(a: dict) -> tuple[list[dict], list[dict]]:
         wiersz("Waga strony głównej", status, opis)
         if status != "ok":
             najw = max(("css", "js", "obrazy"), key=lambda k: g[k])
-            popraw(85 if status == "blad" else 55, f"Odchudź stronę główną (index.html: {kb(g['razem'])}, cel < 1 MB); "
+            popraw(85 if status == "blad" else 55, f"Odchudź stronę główną ({g['plik']}: {kb(g['razem'])}, cel < 1 MB); "
                                                    f"najwięcej ważą {najw.upper() if najw != 'obrazy' else najw}: {kb(g[najw])}.")
 
     z = a["responsywnosc"]
@@ -453,12 +478,13 @@ def wiersze_i_poprawki(a: dict) -> tuple[list[dict], list[dict]]:
                             ("bez_canonical", "bez canonical"), ("zly_canonical", "zły canonical")):
         if i[klucz]:
             czesci.append(f"{etykieta} ({gdzie(i[klucz])})")
-    glowna_noindex = "index.html" in i["noindex"]
+    glowna = (a["waga_glownej"] or {}).get("plik", "index.html")
+    glowna_noindex = glowna in i["noindex"]
     status = "blad" if glowna_noindex or i["bez_viewport"] else "uwaga" if czesci else "ok"
     wiersz("Indeksowanie (robots.txt, sitemap, canonical, lang, viewport)", status,
            "; ".join(czesci) or "robots.txt, sitemap, canonical, lang i viewport w porządku")
     if glowna_noindex:
-        popraw(95, "Usuń `noindex` ze strony głównej (index.html): Google jej nie pokaże.")
+        popraw(95, f"Usuń `noindex` ze strony głównej ({glowna}): Google jej nie pokaże.")
     elif i["noindex"]:
         popraw(20, f"Sprawdź, czy `noindex` jest celowy ({gdzie(i['noindex'])}): te strony nie trafią do Google.")
     if i["bez_viewport"]:
