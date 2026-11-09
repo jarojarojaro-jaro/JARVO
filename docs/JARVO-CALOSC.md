@@ -60,7 +60,7 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 |---|---|---|---|---|---|
 | 🛰️ `jarvo` | **Main Judge** — intake, misje, karty, sędziowanie, raporty, patrol, wgrywanie stron właściciela na hosting za zgodą | `@jarvo` | Mostek dowodzenia (`bridge`) | general | 15 |
 | 🔎 `jarvo-sherlock` | **Researcher-detektyw** — wieloźródłowy research, weryfikacja faktów, raporty z cytatami z rejestru źródeł sprawdzanymi przed oddaniem, transkrypcja filmu z linku | `@sherlock` | Gabinet śledczy (`study`) | sherlock | 8 |
-| 🌐 `jarvo-web` | **Web Senior Dev** — strony/landingi (z inspiracjami z branży: Inspo + własna baza), SEO techniczne, bezpieczeństwo aplikacji, wydajność, wdrożenie | `@web` | Pracownia webowa (`devlab`) | web | 10 |
+| 🌐 `jarvo-web` | **Web Senior Dev** — strony/landingi (z inspiracjami z branży: Inspo + własna baza), SEO techniczne, bezpieczeństwo aplikacji, wydajność, wdrożenie | `@web` | Pracownia webowa (`devlab`) | web | 11 |
 | 🎬 `jarvo-studio` | **Marketing i kreacja** — grafiki social, obrazy AI, żywe obrazy (pętla 5 s, warstwy PSD), copy PL, kampanie, kalendarze | `@studio` | Atelier kreatywne (`atelier`) | studio | 7 |
 | 🎥 `jarvo-wideo` | **Wideograf** — krótkie filmy (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, dwa ekrany (split screen), typografia jak z montażu, filmy z kodu, 15 stylów motion design, 8 gramatyk explainera, 35 stylów malarskich, losowanie ruchów z biblioteki 273 technik, żywe schematy, maskotka | `@wideo` | Studio filmowe (`filmstudio`) | wideo | 22 |
 | 📈 `jarvo-ads` | **Specjalista Ads** — Meta + Google Ads, kampanie, testy A/B/C, raporty; przygotowuje paczkę, publikujesz Ty | `@ads` | Sala operacyjna (`office`) | ads | 11 |

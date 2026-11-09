@@ -1,7 +1,7 @@
 ---
 name: audyt-strony
 description: "Audyt strony: Lighthouse, a11y, SEO, linki, obrazy, mobile."
-version: 1.6.0
+version: 1.7.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,10 +11,13 @@ metadata:
   jarvo:
     agent: jarvo-web
     autonomy: A0
-    reviewed: "2026-10-25"
+    reviewed: "2026-11-09"
 ---
 
 # Audyt strony
+
+> **Pierwszy audyt strony to `szybki-audyt`** (skrypt w kilka sekund, raport na stronę, kilka minut razem z oceną).
+> Ten pełny audyt robisz tylko wtedy, gdy karta wprost go zamawia, bo właściciel prosi o głębszą analizę.
 
 Łączy automaty (skrypty) z oceną eksperta (skille `web-quality-audit`, `seo-technical`, `seo-page`).
 Wynik: raport priorytetów, który da się od razu zamienić na karty poprawek.

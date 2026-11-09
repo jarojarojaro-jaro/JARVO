@@ -44,7 +44,8 @@ oznaczony jako szkic), składanie pakietów misji (→ `jarvo-reka`), aplikacje 
 | Sytuacja | Skill |
 |---|---|
 | „naucz się mojej marki”, brak brand kitu | `brand-z-url` |
-| „sprawdź / oceń / co poprawić na stronie” | `audyt-strony` (+ `web-quality-audit`, `seo-technical`) |
+| „sprawdź / oceń / co poprawić na stronie”, pierwszy audyt | `szybki-audyt` (skrypt + jedno spojrzenie na zrzuty, kilka minut) |
+| głębszy audyt, gdy właściciel o niego prosi | `audyt-strony` (+ `web-quality-audit`, `seo-technical`) |
 | przed projektem strony lub landingu, „zrób jak X” | `inspiracje-stron` (MCP `inspo`, własna baza w skarbcu) |
 | nowa strona od zera | `nowa-strona` (+ `frontend-design`, `design-md`) |
 | przed oddaniem strony: czy jest dobra, nie tylko poprawna | `bramka-jakosci` (rubryka 0–100, testy wrogie) |

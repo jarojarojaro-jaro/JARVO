@@ -2,11 +2,12 @@
 /**
  * Zrzuty strony na wielu szerokościach + wykrywanie poziomego przewijania.
  *
- *   node screenshots.cjs <url> <outdir> [--widths 375,768,1440] [--full]
+ *   node screenshots.cjs <url> <outdir> [--widths 375,768,1440] [--full] [--montaz plik.jpg [--montaz-szer 1200]]
  *
  * Używa playwright-core z Chromium z CHROME_PATH (chrome-headless-shell z instalacji Jarva), w obrazie
  * Hermesa zapasowo z /etc/hermes/agent-browser-executable-path.
- * Wynik: <outdir>/<szerokość>.png + <outdir>/screenshots.json
+ * Wynik: <outdir>/<szerokość>.png + <outdir>/screenshots.json; z --montaz także wszystkie zrzuty obok siebie
+ * w jednym JPEG o szerokości --montaz-szer (jedno wywołanie wzroku zamiast kilku; szybki_audyt.py bez Pillow).
  */
 const fs = require('fs');
 const path = require('path');
@@ -38,7 +39,7 @@ function argsPiaskownicy() {
 (async () => {
   const [url, outdir] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
   if (!url || !outdir) {
-    console.error('Użycie: node screenshots.cjs <url> <outdir> [--widths 375,768,1440] [--full]');
+    console.error('Użycie: node screenshots.cjs <url> <outdir> [--widths 375,768,1440] [--full] [--montaz plik.jpg]');
     process.exit(2);
   }
   const widths = arg('--widths', '375,768,1440').split(',').map(Number);
@@ -67,6 +68,22 @@ function argsPiaskownicy() {
         horizontal_scroll: metrics.scrollWidth > metrics.innerWidth + 1,
         scroll_width: metrics.scrollWidth, overflowing_elements: metrics.overflowing, title: metrics.title,
       });
+      await page.close();
+    }
+    const montaz = arg('--montaz');
+    if (montaz) {
+      const szer = Number(arg('--montaz-szer', '1200'));
+      const page = await browser.newPage({ viewport: { width: szer, height: 800 }, deviceScaleFactor: 1 });
+      const imgs = report.results
+        .map((r) => `<img src="data:image/png;base64,${fs.readFileSync(r.file).toString('base64')}">`).join('');
+      await page.setContent(`<body style="margin:0;background:#999"><div id="m" style="display:flex;gap:12px;width:max-content;background:#999">${imgs}</div></body>`);
+      await page.evaluate(async (s) => {
+        const im = [...document.images];
+        await Promise.all(im.map((i) => i.decode()));
+        const h = Math.round((s - 12 * (im.length - 1)) / im.reduce((a, i) => a + i.naturalWidth / i.naturalHeight, 0));
+        im.forEach((i) => { i.style.height = `${h}px`; });
+      }, szer);
+      await (await page.$('#m')).screenshot({ path: montaz, type: 'jpeg', quality: 80 });
       await page.close();
     }
   } finally {
