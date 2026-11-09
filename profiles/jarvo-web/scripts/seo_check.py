@@ -67,6 +67,7 @@ class PageParser(HTMLParser):
         self.html_attrs: dict = {}
         self.title = ""
         self._in_title = False
+        self._svg = 0                  # głębokość <svg>: jego <title> to opis grafiki, nie tytuł strony
         self._in_ld = False
         self._ld_buf: list[str] = []
         self._heading: str | None = None
@@ -79,10 +80,12 @@ class PageParser(HTMLParser):
             self.landmarki[tag] += 1
         elif role in LANDMARKI.values():
             self.landmarki[next(t for t, r in LANDMARKI.items() if r == role)] += 1
+        if tag == "svg":
+            self._svg += 1
         if tag == "html":
             self.html_attrs = a
         elif tag == "title":
-            self._in_title = True
+            self._in_title = self._svg == 0
         elif tag == "meta":
             self.meta.append(a)
         elif tag == "link":
@@ -97,7 +100,9 @@ class PageParser(HTMLParser):
             self._heading, self._heading_buf = tag, []
 
     def handle_endtag(self, tag):
-        if tag == "title":
+        if tag == "svg":
+            self._svg = max(0, self._svg - 1)
+        elif tag == "title":
             self._in_title = False
         elif tag == "script" and self._in_ld:
             self.scripts_ld.append("".join(self._ld_buf))

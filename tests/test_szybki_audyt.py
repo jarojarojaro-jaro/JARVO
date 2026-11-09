@@ -108,6 +108,20 @@ def test_strona_glowna_za_przekierowaniem_meta_refresh(tmp_path):
     assert "Usuń `noindex` ze strony głównej (pl/index.html)" in raport   # noindex celu, nie samego przekierowania
 
 
+def test_title_w_wykresie_svg_nie_jest_tytulem_strony(tmp_path):
+    # 9.11 enigmalabz.com: <title> wewnątrz <svg> (opis wykresu) doklejał się do tytułu strony: 124 zamiast 49 znaków
+    k = tmp_path / "public_html"
+    k.mkdir()
+    tytul = "Karta graficzna: pomiary przed i po zmianie"
+    (k / "index.html").write_text(
+        HEAD.format(title=tytul, desc=OPIS, trasa="") + '<body><h1>Pomiary</h1><svg role="img"><title>Długi kontekst, '
+        'model testowy 27B: 8k tokenów, wynik w tokenach na sekundę dla obu wariantów</title><rect/></svg></body></html>',
+        encoding="utf-8")
+    r, a, raport = uruchom(k, tmp_path / "out", "--bez-zrzutow")
+    assert r.returncode == 0, r.stderr
+    assert "title poza" not in raport and "Długi kontekst" not in json.dumps(a, ensure_ascii=False)
+
+
 def test_brak_katalogu_to_blad(tmp_path):
     r = subprocess.run([sys.executable, str(SKRYPT), str(tmp_path / "nie-ma"), "--out", str(tmp_path / "out")],
                        capture_output=True, text=True, encoding="utf-8")
