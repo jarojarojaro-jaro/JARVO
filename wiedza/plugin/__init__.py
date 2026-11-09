@@ -765,7 +765,7 @@ def _karta_z_bazy(db: Path, task_id: str) -> Dict[str, Any]:
         conn.row_factory = sqlite3.Row
         try:
             cols = {r[1] for r in conn.execute("PRAGMA table_info(tasks)")}
-            chce = [c for c in ("title", "body", "workspace_path", "result", "assignee") if c in cols]
+            chce = [c for c in ("title", "body", "workspace_path", "result", "assignee", "skills") if c in cols]
             if not chce:
                 return {}
             row = conn.execute(f"SELECT {', '.join(chce)} FROM tasks WHERE id = ?", (task_id,)).fetchone()
@@ -791,6 +791,8 @@ def _karta_z_bazy(db: Path, task_id: str) -> Dict[str, Any]:
 # 5) oddanie karty z dziurami w wyniku („[TU WPISZ…]”, lorem ipsum, JARVO-TODO w plikach out/) wraca do wykonawcy:
 #    treść zastępcza to praca niegotowa (strona-wizytówka 26.10: 25 dziur, sędzia zaakceptował). Sherlock oddaje
 #    tylko z rejestrem źródeł `out/zrodla.json` (SOUL, zasada 9; 26.10: dwa raporty bez rejestru i bez `verify`).
+# 6) szybki skill karty ma twardy budżet wzroku (`vision_analyze`, `browser_vision`) na sesję: wykonawca i recenzent
+#    osobno. Tekst skilla nie wystarczył (9.11: szybkie audyty z 3–7 wywołaniami wzroku po 36–120 s, sędzia 1–5).
 LIMITY_GENERACJI = {"video_generate": ("JARVO_LIMIT_WIDEO_AI", 3), "image_generate": ("JARVO_LIMIT_OBRAZY_AI", 12)}
 _LOGOWANIE_RE = re.compile(r"(?i)\b(has[łl]o|password|passwd|pin)\b(?:\s+[^\s\d!@#$%^&*]{1,12}){0,3}?\s*(?:[:=]|to\b|jest\b)?"
                            r"\s*\S*[\d!@#$%^&*]\S*")
@@ -1000,6 +1002,75 @@ def _zamkniecie_bez_oceny(args: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             "(kanban_request_review z summary i metadata: artifacts, dod_check, risks). Zamyka sędzia po sprawdzeniu."}
 
 
+# skill przypięty do karty → (wykonawca, recenzent): najwięcej wywołań wzroku na sesję; inne skille bez limitu
+BUDZET_WZROKU = {"szybki-audyt": (2, 1)}
+NARZEDZIA_WZROKU = ("vision_analyze", "browser_vision")
+_wzrok_lock = threading.Lock()
+_wzrok_licznik: Dict[tuple, int] = {}
+_wzrok_karty: Dict[tuple, tuple] = {}
+
+
+def _karta_wzroku(db: Path, karta: str, run_id: str) -> tuple:
+    """(skille karty, czy bieżący przebieg to ocena) z bazy kanbana, tylko odczyt. Ocenę Hermes zapisuje w zdarzeniu
+    `claimed` przebiegu (`source_status: review`, claim_review_task); bez zdarzenia decyduje profil recenzenta."""
+    skille = _json_lista(_karta_z_bazy(db, karta).get("skills"))
+    ocena = None
+    if run_id and db.exists():
+        try:
+            conn = sqlite3.connect(Path(os.path.abspath(db)).as_uri() + "?mode=ro", uri=True, timeout=2)
+            try:
+                row = conn.execute("SELECT payload FROM task_events WHERE task_id = ? AND kind = 'claimed' AND run_id = ? "
+                                   "ORDER BY id DESC LIMIT 1", (karta, int(run_id))).fetchone()
+            finally:
+                conn.close()
+            if row:
+                ocena = (json.loads(row[0] or "{}") or {}).get("source_status") == "review"
+        except (sqlite3.Error, ValueError, TypeError, AttributeError):
+            pass
+    return skille, ocena
+
+
+def _json_lista(v: Any) -> List[str]:
+    try:
+        lista = json.loads(v) if isinstance(v, str) else v
+    except ValueError:
+        return []
+    return [str(s).strip().rsplit("/", 1)[-1] for s in lista if str(s).strip()] if isinstance(lista, list) else []
+
+
+def _budzet_wzroku(tool_name: str, session_id: str) -> Optional[Dict[str, Any]]:
+    """Blokada wywołania wzroku ponad budżet skilla karty (BUDZET_WZROKU); None = wywołanie idzie dalej. Licznik
+    w pamięci procesu: pracownik kanbana (i recenzent) to osobny proces na każdy przebieg karty."""
+    karta = (os.environ.get("HERMES_KANBAN_TASK") or "").strip()
+    if not karta:
+        return None
+    run_id = (os.environ.get("HERMES_KANBAN_RUN_ID") or "").strip()
+    home = _hermes_home()
+    db = Path(os.environ.get("HERMES_KANBAN_DB") or _korzen(home) / "kanban.db")
+    with _wzrok_lock:
+        klucz_karty = (str(db), karta, run_id)
+        if klucz_karty not in _wzrok_karty:
+            _wzrok_karty[klucz_karty] = _karta_wzroku(db, karta, run_id)
+        skille, ocena = _wzrok_karty[klucz_karty]
+        skill = next((s for s in skille if s in BUDZET_WZROKU), None)
+        if not skill:
+            return None
+        recenzent = ocena if ocena is not None else _profil(home) == recenzent_floty()
+        limit = BUDZET_WZROKU[skill][1 if recenzent else 0]
+        klucz = (karta, run_id or session_id, "recenzent" if recenzent else "wykonawca")
+        n = _wzrok_licznik.get(klucz, 0)
+        if n < limit:
+            _wzrok_licznik[klucz] = n + 1
+            return None
+    if recenzent:
+        return {"action": "block", "message": f"Limit wzroku przy ocenie karty `{skill}` wyczerpany ({tool_name}: "
+                f"{n}/{limit}, jedno spojrzenie na zrzuty.jpg). Kolejnego wywołania nie będzie: podejrzany problem "
+                "wizualny zapisz słowami w werdykcie (caveats: „Uwagi wizualne” albo „Do głębszej analizy”) i wydaj werdykt."}
+    return {"action": "block", "message": f"Limit wzroku na karcie `{skill}` wyczerpany ({tool_name}: {n}/{limit}: "
+            "montaż zrzuty.jpg i jedno przybliżenie). Kolejnego wywołania nie będzie: podejrzany problem wizualny "
+            "zapisz słowami w raport.md, w „## Uwagi wizualne” albo w linii „Do głębszej analizy”, i oddaj kartę."}
+
+
 def straznik(tool_name: str = "", args: Optional[Dict[str, Any]] = None, task_id: str = "", session_id: str = "",
              **_kw: Any) -> Optional[Dict[str, Any]]:
     """Hak pre_tool_call: {"action": "block"|"approve", "message"}, {"action": "modify", "args"} (dopisany recenzent
@@ -1018,6 +1089,8 @@ def straznik(tool_name: str = "", args: Optional[Dict[str, Any]] = None, task_id
             return _recenzent_oddania(args)
         elif tool_name == "kanban_complete":
             return _zamkniecie_bez_oceny(args)
+        elif tool_name in NARZEDZIA_WZROKU:
+            return _budzet_wzroku(tool_name, session_id)
     except Exception as e:                       # strażnik nie może zatrzymać zwykłej pracy własnym błędem
         logger.debug("jarvo-wiedza: strażnik %s: %s", tool_name, e)
     return None

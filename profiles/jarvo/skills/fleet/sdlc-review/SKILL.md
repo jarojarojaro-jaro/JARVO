@@ -1,7 +1,7 @@
 ---
 name: sdlc-review
 description: "Sędzia: niezależna ocena karty z toru review wobec DoD."
-version: 2.8.0
+version: 2.9.0
 author: "Jarvo (na bazie Hermes Agent sdlc-review: Jakub Wolniewicz + Hermes Agent, MIT)"
 license: MIT
 platforms: [linux, macos, windows]
@@ -36,7 +36,10 @@ Karta ze skillem albo DoD `szybki-audyt` (albo oznaczona jako szybkie sprawdzeni
    w `audyt.json`; zrzuty są (`zrzuty.jpg`) albo raport podaje powód ich braku. Do tego: każda poprawka mówi
    gdzie (plik albo liczba) i co zrobić.
 3. Wzrok **tylko** wtedy, gdy raport twierdzi, że układ jest zepsuty (❌ w „Telefon i komputer” albo uwagi
-   wizualne): jedno wywołanie na `zrzuty.jpg`.
+   wizualne): jedno wywołanie na `zrzuty.jpg`. Na karcie ze skillem `szybki-audyt` to twardy limit: drugie
+   wywołanie wzroku (`vision_analyze`, `browser_vision`) strażnik wtyczki `jarvo-wiedza` blokuje. Czego nie
+   rozstrzygnie jedno spojrzenie, zapisz słowami w werdykcie (`caveats`: „Uwagi wizualne” albo „Do głębszej
+   analizy”), bez przybliżania pojedynczych zrzutów.
 4. Niczego nie uruchamiasz drugi raz (skrypt, Lighthouse, axe, crawl). Test wartości 4c tylko w zakresie
    „poprawki są konkretne”.
 5. Werdykt: akceptacja albo raz poprawki z dokładną listą. Druga porażka = akceptacja z uwagą w `caveats`;

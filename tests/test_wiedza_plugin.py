@@ -367,6 +367,61 @@ def test_straznik_sherlock_oddaje_tylko_z_rejestrem_zrodel(tmp_path, monkeypatch
     assert pl.straznik(tool_name="kanban_request_review", args={"summary": "Audyt"})["action"] == "modify"
 
 
+def _baza_kart(db: Path, karty: dict, ocena: dict = None) -> None:
+    """kanban.db jak Hermesa: karty {id: skills} i zdarzenia `claimed` przebiegów {(id, run): source_status}."""
+    db.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db)
+    conn.execute("CREATE TABLE tasks(id TEXT PRIMARY KEY, title TEXT, body TEXT, skills TEXT, status TEXT)")
+    conn.execute("CREATE TABLE task_events(id INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT, run_id INTEGER, kind TEXT, "
+                 "payload TEXT, created_at INTEGER)")
+    for tid, skille in karty.items():
+        conn.execute("INSERT INTO tasks VALUES (?, 'Audyt', '', ?, 'running')", (tid, json.dumps(skille) if skille is not None else None))
+    for (tid, run), zrodlo in (ocena or {}).items():
+        conn.execute("INSERT INTO task_events(task_id, run_id, kind, payload, created_at) VALUES (?, ?, 'claimed', ?, 0)",
+                     (tid, run, json.dumps({"source_status": zrodlo})))
+    conn.commit()
+    conn.close()
+
+
+def test_straznik_budzet_wzroku_szybkiego_audytu(tmp_path, monkeypatch):
+    """9.11: szybkie audyty Webu z 3–7 wywołaniami wzroku (36–120 s każde), sędzia 1–5 na kartę, choć skill mówi
+    o jednym. Karta ze skillem szybki-audyt: wykonawca 2 (montaż i jedno przybliżenie), recenzent 1; inne bez limitu."""
+    db = tmp_path / "kanban.db"
+    _baza_kart(db, {"t_szybki": ["szybki-audyt"], "t_pelny": ["audyt-strony"], "t_bez": None},
+               {("t_szybki", 1): "ready", ("t_szybki", 2): "review"})
+    monkeypatch.setattr(pl, "recenzent_floty", lambda: "jarvo")
+    monkeypatch.setenv("HERMES_KANBAN_DB", str(db))
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "jarvo-web"))
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "t_szybki")
+    monkeypatch.setenv("HERMES_KANBAN_RUN_ID", "1")
+    assert pl.straznik(tool_name="vision_analyze", args={"image_url": "out/zrzuty.jpg"}) is None
+    assert pl.straznik(tool_name="vision_analyze", args={"image_url": "out/zrzuty/1440.png"}) is None
+    for narzedzie in ("vision_analyze", "browser_vision"):                       # wspólny budżet obu narzędzi
+        w = pl.straznik(tool_name=narzedzie, args={"image_url": "out/zrzuty/390.png"})
+        assert w["action"] == "block" and "2/2" in w["message"] and "Uwagi wizualne" in w["message"]
+        assert "Do głębszej analizy" in w["message"] and "oddaj kartę" in w["message"]
+    assert pl.straznik(tool_name="web_search", args={}) is None                  # inne narzędzia bez zmian
+    # ocena tej karty (Hermes: claimed z source_status=review): recenzent 1 wywołanie
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "jarvo"))
+    monkeypatch.setenv("HERMES_KANBAN_RUN_ID", "2")
+    assert pl.straznik(tool_name="vision_analyze", args={"image_url": "out/zrzuty.jpg"}) is None
+    w = pl.straznik(tool_name="vision_analyze", args={"image_url": "out/zrzuty/390.png"})
+    assert w["action"] == "block" and "1/1" in w["message"] and "werdykt" in w["message"]
+    # ocena bez zdarzenia w bazie: rolę daje profil recenzenta floty
+    monkeypatch.setenv("HERMES_KANBAN_RUN_ID", "3")
+    assert pl.straznik(tool_name="vision_analyze", args={}) is None
+    assert pl.straznik(tool_name="browser_vision", args={})["action"] == "block"
+    # karta bez szybkiego skilla i rozmowa poza kartą: nigdy blokady
+    for karta in ("t_pelny", "t_bez", "t_brak"):
+        monkeypatch.setenv("HERMES_KANBAN_TASK", karta)
+        for profil in ("jarvo-web", "jarvo"):
+            monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / profil))
+            for _ in range(5):
+                assert pl.straznik(tool_name="vision_analyze", args={}) is None, (karta, profil)
+    monkeypatch.delenv("HERMES_KANBAN_TASK")
+    for _ in range(5):
+        assert pl.straznik(tool_name="vision_analyze", args={}) is None
+
 
 def test_recenzent_floty_z_pliku_wtyczki(tmp_path, monkeypatch):
     sys.path.insert(0, str(REPO / "scripts"))

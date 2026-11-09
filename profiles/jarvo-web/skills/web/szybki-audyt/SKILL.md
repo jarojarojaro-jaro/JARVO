@@ -1,7 +1,7 @@
 ---
 name: szybki-audyt
 description: "Pierwszy audyt strony: podstawy w kilka minut, raport 1 str."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -25,9 +25,13 @@ Budżet: ok. 6 wywołań narzędzi i 10 minut.
 ## Kroki
 1. `@@PY@@ "$HERMES_HOME/scripts/szybki_audyt.py" <katalog strony> --out out/`: klon repo strony
    (`public_html` z `.strona.json`, z niego domena) albo `dist/` projektu. Ok. 3–10 s; tworzy `out/raport.md`,
-   `out/audyt.json`, `out/zrzuty/` i `out/zrzuty.jpg` (telefon 390 px i komputer 1440 px obok siebie).
+   `out/audyt.json`, `out/zrzuty/` i `out/zrzuty.jpg` (telefon 390 px i komputer 1440 px obok siebie, razem 1600 px).
 2. **Jedno** wywołanie wzroku na `out/zrzuty.jpg`. Coś wyraźnie zepsute (nakładające się elementy, ucięty
    tekst, pusty ekran)? Dopisz do `raport.md` sekcję `## Uwagi wizualne` z najwyżej 2 punktami. Nic → nic nie dopisujesz.
+   Twardy limit karty: **2 wywołania wzroku** (`vision_analyze` i `browser_vision` razem): montaż i najwyżej jedno
+   przybliżenie (`out/zrzuty/390.png` albo `1440.png`), gdy montaż pokazuje podejrzany problem. Trzecie blokuje
+   strażnik wtyczki `jarvo-wiedza`; czego nie rozstrzygniesz, zapisz słowami jako podejrzenie w „Uwagi wizualne”
+   albo „Do głębszej analizy” i oddaj kartę.
 3. Dopisz na końcu `raport.md` jedną linię `Do głębszej analizy: …` (tematy spoza podstaw, np. dostępność,
    Core Web Vitals na żywo, treści).
 4. Oddaj kartę: `raport.md` i `audyt.json` w `out/` karty.

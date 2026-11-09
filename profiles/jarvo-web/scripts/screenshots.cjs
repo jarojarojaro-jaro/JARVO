@@ -2,7 +2,7 @@
 /**
  * Zrzuty strony na wielu szerokościach + wykrywanie poziomego przewijania.
  *
- *   node screenshots.cjs <url> <outdir> [--widths 375,768,1440] [--full] [--montaz plik.jpg [--montaz-szer 1200]]
+ *   node screenshots.cjs <url> <outdir> [--widths 375,768,1440] [--full] [--montaz plik.jpg [--montaz-szer 1600]]
  *
  * Używa playwright-core z Chromium z CHROME_PATH (chrome-headless-shell z instalacji Jarva), w obrazie
  * Hermesa zapasowo z /etc/hermes/agent-browser-executable-path.
@@ -72,7 +72,7 @@ function argsPiaskownicy() {
     }
     const montaz = arg('--montaz');
     if (montaz) {
-      const szer = Number(arg('--montaz-szer', '1200'));
+      const szer = Number(arg('--montaz-szer', '1600'));
       const page = await browser.newPage({ viewport: { width: szer, height: 800 }, deviceScaleFactor: 1 });
       const imgs = report.results
         .map((r) => `<img src="data:image/png;base64,${fs.readFileSync(r.file).toString('base64')}">`).join('');

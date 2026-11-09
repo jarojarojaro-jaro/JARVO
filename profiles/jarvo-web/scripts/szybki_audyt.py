@@ -49,7 +49,7 @@ OBRAZ_STARY_UWAGA = 100 * KB                  # JPEG/PNG/GIF/BMP/TIFF cięższy 
 GLOWNA_UWAGA = 1024 * KB                      # waga strony głównej > 1 MB = ⚠️
 GLOWNA_BLAD = 2048 * KB                       # > 2 MB = ❌
 SZER_TELEFON, SZER_KOMPUTER = 390, 1440       # przewijanie w bok na telefonie = ❌, na komputerze = ⚠️
-MONTAZ_SZER = 1200                            # zrzuty.jpg: oba zrzuty obok siebie, razem tyle pikseli
+MONTAZ_SZER = 1600                            # zrzuty.jpg: oba zrzuty obok siebie, razem tyle pikseli (hero czytelne bez przybliżenia)
 ZRZUTY_LIMIT_S = 90
 POPRAWEK = 5
 

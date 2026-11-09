@@ -172,7 +172,8 @@ z branży klienta (katalog Inspo albo własna baza w skarbcu) i zapisuje, co z n
 - [T] `szybki-audyt`: pierwszy audyt strony, podstawy w kilka minut: `szybki_audyt.py` na lokalnej kopii (title
   i description, H1/H2, alt, waga i format obrazów, waga strony głównej, przewijanie w bok na 390 i 1440 px,
   indeksowanie, Open Graph, martwe linki wewnętrzne), raport na stronę z 5 najważniejszymi poprawkami, jedno
-  spojrzenie na montaż zrzutów; sędzia ocenia go w jednej lekkiej rundzie
+  spojrzenie na montaż zrzutów (1600 px); sędzia ocenia go w jednej lekkiej rundzie. Twardy limit wzroku na
+  kartę (strażnik `jarvo-wiedza`): wykonawca 2 wywołania, sędzia 1
 - [T] `audyt-strony` (głęboki, tylko na prośbę właściciela): Lighthouse, dostępność (axe), SEO, obrazy i responsywność (zrzuty na kilku
   szerokościach), wynik jako raport z priorytetami; aplikacja z bazą i API: lista wydajności backendu (11 punktów:
   indeksy, polityki RLS, N+1, stronicowanie, praca w tle, region serwera przy bazie, cache, strumień odpowiedzi AI)
