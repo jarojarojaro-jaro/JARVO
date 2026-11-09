@@ -112,7 +112,7 @@ from multiprocessing import connection
 from pathlib import Path
 from typing import Callable
 
-from . import przenosne, srodowisko
+from . import przenosne, sprzatanie_kart, srodowisko
 from .sciezki import LINUX, MACOS, WINDOWS, BladUkladu, Uklad, uklad
 
 KOD_RESTART = 75          # EX_TEMPFAIL: brama (i panel przy zajętym porcie) prosi o restart
@@ -1353,7 +1353,8 @@ class Nadzorca:
                  przerwa_restartu: float = 5.0, przerwa_min: float = 5.0, przerwa_max: float = 300.0,
                  reset_po: float = 600.0, szybki_restart: float = 60.0, limit_stopu: float = 30.0,
                  limit_kolejnosci: float = 60.0, co_ile_gotowosc: float = 1.0, co_ile_zycie: float = 30.0,
-                 co_ile_rotacja: float = 5.0, co_ile_znacznik: float = 1.0, takt: float = 0.25,
+                 co_ile_rotacja: float = 5.0, co_ile_znacznik: float = 1.0, co_ile_sprzatanie: float = 300.0,
+                 takt: float = 0.25,
                  log_max: int = 10 * 2 ** 20, log_kopie: int = 3, kanal: bool = True,
                  szanuj_zatrzymanie: bool = False, log: Callable[[str], None] | None = None):
         nazwy = [x.nazwa for x in uslugi]
@@ -1368,7 +1369,7 @@ class Nadzorca:
         self.reset_po, self.szybki_restart = reset_po, szybki_restart
         self.limit_stopu, self.limit_kolejnosci = limit_stopu, limit_kolejnosci
         self.co_ile_gotowosc, self.co_ile_zycie, self.co_ile_rotacja = co_ile_gotowosc, co_ile_zycie, co_ile_rotacja
-        self.co_ile_znacznik = co_ile_znacznik
+        self.co_ile_znacznik, self.co_ile_sprzatanie = co_ile_znacznik, co_ile_sprzatanie
         self.takt = takt
         self._stany = {x.nazwa: _Stan(x, _Dziennik(u.logi / f"{x.nazwa}.log", log_max, log_kopie))
                        for x in sorted(uslugi, key=lambda x: x.kolejnosc)}
@@ -1496,7 +1497,7 @@ class Nadzorca:
         self._od, self._odcisk_wlasny = time.time(), _odcisk(os.getpid())
 
     def _petla(self) -> None:
-        ostatnia_rotacja = ostatni_zapis = ostatni_znacznik = time.monotonic()
+        ostatnia_rotacja = ostatni_zapis = ostatni_znacznik = ostatnie_sprzatanie = time.monotonic()
         while True:
             teraz = time.monotonic()
             if self._calosc and teraz > self._koniec_calosci:
@@ -1516,6 +1517,10 @@ class Nadzorca:
                 if teraz - ostatnia_rotacja >= self.co_ile_rotacja:
                     ostatnia_rotacja = teraz
                     self._rotuj_logi()
+                if (LINUX and self.co_ile_sprzatanie > 0 and not self._calosc
+                        and teraz - ostatnie_sprzatanie >= self.co_ile_sprzatanie):
+                    ostatnie_sprzatanie = teraz
+                    self._sprzataj_karty()
                 if self._brudny or teraz - ostatni_zapis >= 30:
                     ostatni_zapis = teraz
                     self._zapisz_stan()
@@ -1529,6 +1534,14 @@ class Nadzorca:
             except Exception as e:            # jeden błąd nie może zostawić usług bez nadzoru
                 self._log(f"nadzorca: błąd pętli: {type(e).__name__}: {str(e)[:200]}")
                 time.sleep(min(self.takt * 4, 1.0))
+
+    def _sprzataj_karty(self) -> None:
+        """Zatrzymuje scope'y pracowników kart, których przebieg już się skończył (`sprzatanie_kart`): procesy
+        puszczone przez agenta w tle nie przeżywają karty."""
+        dane = Path(self.env.get("HERMES_HOME") or self.u.dane)
+        for nazwa, po in sprzatanie_kart.sprzataj(dane):
+            self._log(f"nadzorca: zatrzymałem {nazwa}: przebieg karty skończył się {int(po // 60)} min temu, "
+                      "a jego procesy dalej działały")
 
     def _obsluz_polecenia(self) -> None:
         while True:
