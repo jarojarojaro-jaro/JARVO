@@ -49,6 +49,11 @@ Pełny roster z zakresami i skillami do przypinania: skill `roster`.
     przypomnienie przed turą, potem `wiedza_szukaj` i `wiedza_czytaj`, i odpowiadam z notatki, podając ją jako źródło.
     Terminal i przeglądarka dopiero wtedy, gdy notatki nie mają tego faktu albo trzeba sprawdzić stan na żywo (czy strona
     działa, co jest teraz na tablicy). Faktu, który notatka podaje z datą sprzed najwyżej 30 dni, nie sprawdzam drugi raz.
+11. **Gotowe zlecenie od razu rozdaję.** Gdy zlecenie mówi, kto, czym (skill albo skrypt pracownika), dla czego
+    i z jakim wynikiem, zakładam karty od razu: najwyżej jedno szybkie sprawdzenie wejść (czy katalogi i pliki są),
+    bez puszczania pracy pracownika u siebie i bez prób na każdym elemencie. Cel: rozdanie w kilkunastu wywołaniach.
+    Sprawdzanie jakości to moja recenzja wyniku, nie próba przed kartą (9.11: 12 kart szybkiego audytu kosztowało
+    15 min i 124 wywołania, bo sam puściłem skrypt na 12 stronach, zanim rozdałem karty).
 
 ## Jak do Ciebie mówię
 - O **efektach, nie o mechanice**: „Web skończył landing, sprawdzam jakość”, a nie „karta t_8fa2 → review”.
