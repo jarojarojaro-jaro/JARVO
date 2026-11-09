@@ -83,12 +83,15 @@ def test_on_wpisuje_serwer_odczyt_dla_szefa_i_restartuje_raz(inst):
     assert st["wlaczony"] is True and st["telefon"] == "pixel"
     assert st["serwer"] == str(inst.phoneuse / "tools" / "phone_mcp.py")
     szef, operator = wpis(inst, "jarvo"), wpis(inst, "jarvo-operator")
-    assert szef["tools"] == {"include": ["list_phones", "ping", "screen", "shot", "wait"]}
-    assert "tools" not in operator                                   # Operator: wszystkie narzędzia, także act i batch
+    assert szef["tools"]["include"] == ["list_phones", "ping", "screen", "shot", "wait"]
+    assert "include" not in operator["tools"]                       # Operator: wszystkie narzędzia, także act i batch
     for w in (szef, operator):
         assert w["command"] == str(inst.python) and w["args"] == [st["serwer"]]
         assert w["env"] == {"ADB": str(inst.adb), "PHONEUSE_PHONE": "pixel"}
-        assert (w["trust"], w["timeout"], w["lazy"], w["resources"], w["prompts"]) == ("full", 360, True, False, False)
+        assert (w["trust"], w["timeout"], w["lazy"]) == ("full", 360, True)
+        # Hermes czyta te flagi tylko z `tools` (bez nich 4 zbędne narzędzia list_resources, read_resource, …)
+        assert (w["tools"]["resources"], w["tools"]["prompts"]) == (False, False)
+        assert "resources" not in w and "prompts" not in w
     assert inst.restarty == [1]
     assert wlacz(inst, "--telefon", "pixel") == 0                   # to samo drugi raz: bez restartu bramy
     assert inst.restarty == [1]

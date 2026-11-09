@@ -132,7 +132,9 @@ def wpis_serwera(st: dict, agent: str, adb: Path | str | None) -> dict:
                   "trust": "full",
                   "timeout": 360,          # samonaprawa łącza w body.py trwa do 300 s (PHONEUSE mcp_setup.HEAL_S)
                   "connect_timeout": 60, "lazy": True, "idle_timeout_seconds": 900,
-                  "resources": False, "prompts": False}
+                  # resources/prompts Hermes czyta tylko z `tools` (mcp_tool_registration._select_utility_schemas);
+                  # na wierzchu wpisu nie działały: 4 zbędne narzędzia (list_resources, …) w schemacie każdej tury
+                  "tools": {"resources": False, "prompts": False}}
     env = {}
     if adb:
         env["ADB"] = str(adb)
@@ -141,7 +143,7 @@ def wpis_serwera(st: dict, agent: str, adb: Path | str | None) -> dict:
     if env:
         wpis["env"] = env
     if PROFILE[agent] is not None:
-        wpis["tools"] = {"include": list(PROFILE[agent])}
+        wpis["tools"]["include"] = list(PROFILE[agent])
     return wpis
 
 

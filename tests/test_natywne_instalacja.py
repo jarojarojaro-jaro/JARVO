@@ -525,7 +525,7 @@ def test_ustawienia_profili_z_telefonem_przezywaja_force_config(tmp_path, monkey
     ust = json.loads(json.dumps(flota.ustawienia_profili(u, agenci)))       # tak, jak zapisuje je zainstaluj_flote
     szef, operator = ust["profile"]["jarvo"][telefon.KLUCZ], ust["profile"]["jarvo-operator"][telefon.KLUCZ]
     assert szef["tools"]["include"] == list(telefon.NARZEDZIA_ODCZYTU) and "act" not in szef["tools"]["include"]
-    assert "tools" not in operator and operator["env"] == {"ADB": str(adb)}   # bez --telefon: bez PHONEUSE_PHONE
+    assert "include" not in operator["tools"] and operator["env"] == {"ADB": str(adb)}   # bez --telefon: bez PHONEUSE_PHONE
     assert telefon.KLUCZ not in ust["profile"].get("jarvo-web", {})
     if WINDOWS:                                                               # klucze powłoki zostają obok
         assert "terminal.shell_init_files" in ust["profile"]["jarvo"]
