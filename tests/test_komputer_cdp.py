@@ -563,6 +563,56 @@ def test_file_i_siec_lokalna_zablokowane(przegl):
     assert proxy.statystyki.zablokowane > przed
 
 
+def test_adres_zakazany_cofniety_bez_zdarzen_strony(przegl):
+    """Chrome for Testing 156 nie wstrzymuje pierwszej nawigacji karty z Target.createTarget do
+    Runtime.runIfWaitingForDebugger (chrome-headless-shell 153 tak): gdy podpięcie karty się spóźniło, file:///
+    wczytywał się przed Fetch.enable i Page.enable, bez Fetch.requestPaused i zdarzeń Page.*, i zostawał w karcie.
+    Cofnięcie idzie też po zmianie celu (Target.targetInfoChanged, zdarzenie przeglądarki): karta bez Fetch i Page
+    przechodzi na file:/// i wraca na pustą stronę."""
+    st, _, _ = przegl
+    nr = otworz(st, "https://sklep.jarvo.test/sklep.html")
+    okno = st.okno(nr)
+
+    def adres():
+        try:
+            return js(st, nr, "location.href")
+        except cdp.BladCDP:
+            return None                                  # strona w trakcie nawigacji
+    przed = st.statystyki["nawigacje_zablokowane"]
+    st.b.wyslij("Fetch.disable", {}, okno.sesja)
+    st.b.wyslij("Page.disable", {}, okno.sesja)
+    try:
+        st.b.wyslij("Page.navigate", {"url": "file:///"}, okno.sesja)
+        for _ in range(40):
+            if adres() == "about:blank":
+                break
+            time.sleep(0.25)
+        assert adres() == "about:blank" and okno.url == "about:blank"
+        assert st.statystyki["nawigacje_zablokowane"] > przed
+    finally:
+        st.b.wyslij("Page.enable", {}, okno.sesja)
+        st.b.wyslij("Fetch.enable", {"patterns": st._wzorce_fetch()}, okno.sesja)
+
+
+def test_karta_zamknieta_w_trakcie_przygotowania_bez_czekania(przegl, monkeypatch):
+    """Samotest proxy usługi otwiera kartę i zamyka ją zaraz po odmowie filtra. Chrome nie odpowiada na polecenia
+    odłączonej sesji, więc przygotowanie tej karty (Page.enable…) czekało 4 × 15 s i zostawiało w komputer.log
+    cztery wpisy „nie odpowiedziała w czasie”. Odłączenie kończy je od razu (cdp.KoniecCelu), bez wpisu."""
+    st, proxy, _ = przegl
+    logi: list = []
+    monkeypatch.setattr(st, "log", logi.append)
+    monkeypatch.setattr(sterownik_cdp, "CZAS_PRZYGOTOWANIA", 2.0)
+    przed = proxy.statystyki.zablokowane
+    cel = st.b.wyslij("Target.createTarget", {"url": f"https://127.0.0.1:{wolny_port()}/jarvo-samotest"})["targetId"]
+    koniec = time.monotonic() + 15
+    while time.monotonic() < koniec and proxy.statystyki.zablokowane == przed:
+        time.sleep(0.01)
+    st.b.wyslij("Target.closeTarget", {"targetId": cel}, czas=5)
+    time.sleep(3)
+    assert proxy.statystyki.zablokowane > przed and cel not in st._po_celu
+    assert not [x for x in logi if "nie odpowiedziała" in x], logi
+
+
 def test_postoj_przenosi_strony_na_pusta_karte(przegl):
     """Postój: karta ze stroną (także z pytaniem strony przed wyjściem) przechodzi na about:blank, a strona zostaje
     w historii karty; pusta karta nie jest ruszana drugi raz."""

@@ -1,7 +1,7 @@
 """CDP przez potok (komputer/cdp.py) bez przeglądarki: atrapa przeglądarki w Pythonie czyta polecenia i pisze
 odpowiedzi tak jak Chrome z --remote-debugging-pipe (POSIX: deskryptory 3 i 4 z posix_spawn; Windows: uchwyty
-z --remote-debugging-io-pipes). Sprawdza rozmowę, zdarzenia, polecenia bez czekania, koniec przeglądarki i to,
-że przeglądarka nie dostaje portu DevTools."""
+z --remote-debugging-io-pipes). Sprawdza rozmowę, zdarzenia, polecenia bez czekania, odłączenie sesji, koniec
+przeglądarki i to, że przeglądarka nie dostaje portu DevTools."""
 from __future__ import annotations
 
 import os
@@ -45,6 +45,8 @@ ATRAPA = textwrap.dedent('''
                 continue
             if m["method"] == "Test.cisza":
                 continue
+            if m["method"] == "Test.odlacz":            # cel zamknięty: zdarzenie przeglądarki o odłączeniu sesji
+                wyslij({"method": "Target.detachedFromTarget", "params": {"sessionId": m["params"]["sesja"]}})
             wyslij({"method": "Test.zdarzenie", "params": {"n": m["id"]}, "sessionId": m.get("sessionId")})
             wyslij({"id": m["id"], "result": {"echo": m["method"], "argv": sys.argv[1:], "params": m.get("params")}})
 ''')
@@ -103,6 +105,24 @@ def test_padnieta_przegladarka_konczy_czekajacych(program):
     with pytest.raises(cdp.KoniecPrzegladarki):
         o.wynik(15)
     b.zamknij(5)
+
+
+def test_odlaczona_sesja_konczy_swoje_polecenia_od_razu(program):
+    """Chrome nie odpowiada na polecenia sesji, która się odłączyła (karta zamknięta w trakcie przygotowania, np.
+    karta samotestu proxy): Target.detachedFromTarget kończy je od razu (KoniecCelu), polecenia innych sesji czekają."""
+    b = cdp.Przegladarka(program, [])
+    b.start()
+    try:
+        tej, innej = b.nadaj("Test.cisza", sesja="S1"), b.nadaj("Test.cisza", sesja="S2")
+        start = time.monotonic()
+        b.wyslij("Test.odlacz", {"sesja": "S1"})
+        with pytest.raises(cdp.KoniecCelu):
+            tej.wynik(15)
+        assert time.monotonic() - start < 5 and not innej.gotowe(0.2)
+        with pytest.raises(cdp.BladCDP, match="nie odpowiedziała"):
+            innej.wynik(0.1)
+    finally:
+        b.zamknij(5)
 
 
 @pytest.mark.posix_only

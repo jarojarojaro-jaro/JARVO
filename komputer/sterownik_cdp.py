@@ -112,6 +112,7 @@ PODNIESIENIA = 3                   # ponownych wczytań padniętej karty na minu
 PODGLAD_BEZCZYNNOSC = 20.0         # s bez pytania o klatkę: screencast staje (nie zużywa procesora bez widza)
 PUSTE_ADRESY = ("", "about:blank")  # karta bez strony: nie ma czego parkować
 CZAS_POSTOJU = 5.0                 # s na przejście jednej karty na pustą stronę przy postoju
+CZAS_PRZYGOTOWANIA = 15.0         # s na odpowiedzi przygotowania nowego celu (_przygotuj_cel), razem, nie na każde
 MAKS_TEKST_WLASCICIELA = 4000
 MAKS_PLIKOW = 10
 # strona testowa (usługa z --strona-testowa): dwie witryny, żeby ramka płatności była z innego procesu (OOPIF)
@@ -324,6 +325,7 @@ class Okno:
         self.laduje = 0.0                           # chwila startu ładowania głównej ramki (0: nie ładuje)
         self.stan: dict | None = None               # drzewo z ostatniej migawki albo paragonu: stan przed działaniem
         self.przed: dict = {}                       # liczniki sprzed działania (okna, pobrania)
+        self.gotowe = threading.Event()             # przygotowanie karty skończone (_przygotuj_cel): Fetch, Page, UA
 
 
 class Sterownik:
@@ -351,6 +353,7 @@ class Sterownik:
         self._pobrania_start = 0                    # pobrań rozpoczętych (paragon: działanie zaczęło pobieranie)
         self.statystyki = {"pobrane": 0, "odrzucone": 0, "nawigacje_zablokowane": 0, "wejscie_wlasciciela": 0}
         self._nowe_okno = threading.Condition(self._lock)
+        self._zawracane: set[str | None] = set()    # sesje, które _zawroc właśnie cofa na pustą stronę
         self.ua: str | None = None
         # podgląd (Page.startScreencast): karta, ostatnia klatka i jej numer, czas ostatniego pytania
         self._podglad: dict[str, Any] = {"okno": None, "klatka": None, "nr": 0, "pytanie": 0.0,
@@ -386,6 +389,13 @@ class Sterownik:
         return wzorce
 
     def _przygotuj_cel(self, sesja: str, info: dict, rodzic: str | None) -> None:
+        """Nowy cel (karta, ramka z innego procesu): Fetch, Page, Accessibility, automatyczne podpinanie ramek
+        i user-agent bez HeadlessChrome, potem wznowienie (Runtime.runIfWaitingForDebugger). Polecenia idą naraz,
+        a na odpowiedzi czekamy razem najwyżej CZAS_PRZYGOTOWANIA s: Chrome for Testing odpowiada na Page.enable
+        dopiero po pierwszym dokumencie karty, a cel zamknięty w trakcie (karta samotestu proxy usługi) nie odpowiada
+        wcale (cdp.KoniecCelu przy odłączeniu, bez czekania). Na końcu karta jest gotowa (`Okno.gotowe`), a adres
+        zakazany, który zdążyła wczytać przed Page.enable (pełny Chrome nie wstrzymuje pierwszej nawigacji karty
+        z Target.createTarget do wznowienia), cofamy na pustą stronę."""
         typ = info.get("type")
         polecenia = [("Fetch.enable", {"patterns": self._wzorce_fetch()}), ("Page.enable", {}),
                      ("Page.setInterceptFileChooserDialog", {"enabled": self.w_tle}),
@@ -394,21 +404,31 @@ class Sterownik:
         if typ == "page" and self.ua and "HeadlessChrome" in self.ua:
             polecenia.append(("Emulation.setUserAgentOverride", {"userAgent": self.ua.replace("HeadlessChrome",
                                                                                               "Chrome")}))
+        polecenia.append(("Runtime.runIfWaitingForDebugger", {}))
         oczekiwania = []
         for metoda, params in polecenia:
             try:
                 oczekiwania.append(self.b.nadaj(metoda, params, sesja))
             except cdp.BladCDP:
                 return
-        try:
-            self.b.nadaj("Runtime.runIfWaitingForDebugger", {}, sesja)
-        except cdp.BladCDP:
-            return
+        koniec, bledy = time.monotonic() + CZAS_PRZYGOTOWANIA, []
         for o in oczekiwania:
             try:
-                o.wynik(15)
+                o.wynik(max(0.0, koniec - time.monotonic()))
+            except cdp.KoniecCelu:
+                return                                   # cel zamknięty w trakcie: nie ma czego przygotować
             except cdp.BladCDP as e:
-                self.log(f"sterownik: {o.metoda} dla {typ}: {e.tekst[:120]}")
+                bledy.append(f"{o.metoda}: {e.tekst[:120]}")
+        if bledy:
+            self.log(f"sterownik: przygotowanie celu {typ}: {'; '.join(bledy)}")
+        okno = self._okno_sesji(sesja) if typ == "page" and rodzic is None else None
+        if okno is None:
+            return
+        with self._lock:
+            okno.gotowe.set()
+            self._nowe_okno.notify_all()
+        if okno.url.lower().startswith(SCHEMATY_ZAKAZANE):
+            self._zawroc(sesja, okno.url)
 
     # ------------------------------------------------------------------ zdarzenia CDP
 
@@ -419,11 +439,15 @@ class Sterownik:
             self._odlaczony(p.get("sessionId"))
         elif metoda == "Target.targetInfoChanged":
             info = p.get("targetInfo") or {}
+            url = str(info.get("url") or "")
             with self._lock:
-                nr = self._po_celu.get(info.get("targetId"))
-                if nr in self._okna:
-                    self._okna[nr].tytul = str(info.get("title") or "")
-                    self._okna[nr].url = str(info.get("url") or "")
+                okno = self._okna.get(self._po_celu.get(info.get("targetId"), -1))
+                if okno is not None:
+                    okno.tytul, okno.url = str(info.get("title") or ""), url
+            if okno is not None and url.lower().startswith(SCHEMATY_ZAKAZANE):
+                # zdarzenie przeglądarki, niezależne od Page.enable karty: dokument wczytany, zanim karta była
+                # przygotowana, nie daje zdarzeń Page.*, a zmiana celu przychodzi zawsze
+                threading.Thread(target=self._zawroc, args=(okno.sesja, url), daemon=True).start()
         elif metoda == "Page.javascriptDialogOpening":
             okno = self._okno_sesji(sesja)
             if okno is not None:
@@ -563,13 +587,21 @@ class Sterownik:
         return None
 
     def _zawroc(self, sesja: str | None, url: str) -> None:
-        """Adres spoza http(s) w karcie (file:, chrome:, devtools:, view-source:): z powrotem na pustą stronę."""
-        self.statystyki["nawigacje_zablokowane"] += 1
-        self.log(f"sterownik: zablokowany adres {url.split(':', 1)[0]}: w karcie")
+        """Adres spoza http(s) w karcie (file:, chrome:, devtools:, view-source:): z powrotem na pustą stronę. Jedną
+        nawigację zgłasza kilka zdarzeń (start nawigacji, zmiana celu), więc cofanie w toku dla sesji wystarcza."""
+        with self._lock:
+            if sesja in self._zawracane:
+                return
+            self._zawracane.add(sesja)
         try:
+            self.statystyki["nawigacje_zablokowane"] += 1
+            self.log(f"sterownik: zablokowany adres {url.split(':', 1)[0]}: w karcie")
             self.b.wyslij("Page.navigate", {"url": "about:blank"}, sesja, czas=10)
         except cdp.BladCDP:
             pass
+        finally:
+            with self._lock:
+                self._zawracane.discard(sesja)
 
     def _zadanie_fetch(self, p: dict, sesja: str | None) -> None:
         ident, url = p.get("requestId"), str((p.get("request") or {}).get("url") or "")
@@ -585,7 +617,7 @@ class Sterownik:
                     "responseHeaders": [{"name": k, "value": v} for k, v in naglowki.items()]}, sesja)
                 return
             self.b.wyslij("Fetch.continueRequest", {"requestId": ident}, sesja)
-        except cdp.KoniecPrzegladarki:
+        except (cdp.KoniecPrzegladarki, cdp.KoniecCelu):
             pass
         except cdp.BladCDP as e:                  # wstrzymane żądanie bez odpowiedzi trzyma nawigację karty
             self.log(f"sterownik: żądanie {re.sub(r'[?#].*$', '', url)[:120]}: {e.tekst[:120]}")
@@ -2155,20 +2187,33 @@ class Sterownik:
         return _wynik(f"wartość ustawiona: {wynik.get('wartosc')}", effect="confirmed", path="cdp")
 
     def launch_app(self, args: dict) -> dict:
+        """Adresy w nowych kartach. Karta powstaje pusta, a adres dostaje (Page.navigate) dopiero po przygotowaniu
+        (_przygotuj_cel): pełny Chrome (Chrome for Testing 156) nie wstrzymuje pierwszej nawigacji karty
+        z Target.createTarget do Runtime.runIfWaitingForDebugger, więc adres podany od razu wczytywał się przed
+        Fetch.enable, Page.enable i zmianą user-agenta (file:/// zostawał w karcie, pierwsze żądanie miało
+        user-agenta HeadlessChrome)."""
         okna = []
         for url in [str(u) for u in args.get("urls") or []][:8]:
             przed = {o.nr for o in self.okna()}
-            cel = self.b.wyslij("Target.createTarget", {"url": url})
-            # podpięcie nowej karty (Fetch, Network, zasady) na Windows arm64 z przeglądarką x64 w emulacji trwa
-            # dłużej niż 10 s (CI natywnie, WARM): bez niej wynik nie miał nowej karty
-            koniec = time.monotonic() + 30
+            cel = self.b.wyslij("Target.createTarget", {"url": "about:blank"}).get("targetId")
+            # przygotowanie nowej karty na Windows arm64 z przeglądarką x64 w emulacji trwa dłużej niż 10 s (CI
+            # natywnie, WARM); karta zamknięta w trakcie znika z okien
+            koniec, okno, byla = time.monotonic() + 30, None, False
             with self._lock:
-                while cel.get("targetId") not in self._po_celu and time.monotonic() < koniec:
+                while time.monotonic() < koniec:
+                    okno = self._okna.get(self._po_celu.get(cel, -1))
+                    if (okno is not None and okno.gotowe.is_set()) or (okno is None and byla):
+                        break
+                    byla = byla or okno is not None
                     self._nowe_okno.wait(0.2)
-                nr = self._po_celu.get(cel.get("targetId"))
-            if nr is not None and nr not in przed:
-                self._aktywne = nr
-                okna.append({"window_id": nr, "title": "", "url": url})
+            if okno is None or okno.nr in przed:
+                continue
+            try:
+                self.b.wyslij("Page.navigate", {"url": url}, okno.sesja, czas=CZAS_NAWIGACJI)
+            except cdp.BladCDP as e:
+                self.log(f"sterownik: nowa karta {okno.nr}: {e.tekst[:120]}")
+            self._aktywne = okno.nr
+            okna.append({"window_id": okno.nr, "title": "", "url": url})
         if not okna:
             okna = [{"window_id": o.nr, "title": o.tytul, "url": o.url} for o in self.okna()]
         return _wynik(f"{APLIKACJA}: {len(okna)} okien", pid=self.pid, name=APLIKACJA, bundle_id="chromium",

@@ -13,7 +13,9 @@ inny program właściciela ani agent z terminalem nie podłączy się do niej po
   przed startem: przeglądarka ma tylko 0–4.
 
 Wątek czytający rozdziela odpowiedzi (po `id`) i zdarzenia; zdarzenia idą do słuchaczy z osobnego wątku, więc
-słuchacz może sam wysłać polecenie i czekać na odpowiedź.
+słuchacz może sam wysłać polecenie i czekać na odpowiedź. Chrome nie odpowiada na polecenia sesji, która się odłączyła
+(karta zamknięta, ramka usunięta), więc `Target.detachedFromTarget` kończy od razu polecenia tej sesji (KoniecCelu),
+zamiast zostawić je do limitu czasu.
 """
 from __future__ import annotations
 
@@ -30,6 +32,7 @@ from typing import Any, Callable
 WINDOWS = os.name == "nt"
 MAKS_WIADOMOSC = 64 << 20          # zrzut ekranu w base64 bywa duży; większa wiadomość = błąd protokołu
 CZAS_POLECENIA = 30.0
+_ODLACZONA = object()              # odpowiedź-znacznik: sesja polecenia odłączyła się, zanim przyszła odpowiedź
 
 
 class BladCDP(RuntimeError):
@@ -42,6 +45,10 @@ class BladCDP(RuntimeError):
 
 class KoniecPrzegladarki(BladCDP):
     """Potok CDP się zamknął: przeglądarka skończyła pracę albo padła."""
+
+
+class KoniecCelu(BladCDP):
+    """Sesja celu (karta, ramka) się odłączyła: polecenie tej sesji już nie dostanie odpowiedzi."""
 
 
 class _ProcesPosix:
@@ -246,7 +253,7 @@ class Przegladarka:
             wiadomosc["sessionId"] = sesja
         gotowe = threading.Event()
         with self._lock:
-            self._czeka[ident] = [gotowe, None]
+            self._czeka[ident] = [gotowe, None, sesja]
         try:
             self._zapisz(json.dumps(wiadomosc, ensure_ascii=False).encode("utf-8") + b"\0")
         except OSError as e:
@@ -261,9 +268,11 @@ class Przegladarka:
                 self._czeka.pop(ident, None)
             raise BladCDP(metoda, "przeglądarka nie odpowiedziała w czasie")
         with self._lock:
-            odp = self._czeka.pop(ident, [None, None])[1]
+            odp = self._czeka.pop(ident, [None, None, None])[1]
         if odp is None:
             raise KoniecPrzegladarki(metoda, "przeglądarka zakończyła pracę")
+        if odp is _ODLACZONA:
+            raise KoniecCelu(metoda, "cel zamknięty (sesja odłączona przed odpowiedzią)")
         if "error" in odp:
             blad = odp["error"] if isinstance(odp["error"], dict) else {}
             raise BladCDP(metoda, str(blad.get("message") or "błąd"), blad.get("code"))
@@ -309,7 +318,18 @@ class Przegladarka:
                     wpis[0].set()
             return
         if isinstance(msg.get("method"), str):
-            self._zdarzenia.put((msg["method"], msg.get("params") or {}, msg.get("sessionId")))
+            params = msg.get("params") or {}
+            if msg["method"] == "Target.detachedFromTarget" and params.get("sessionId"):
+                self._odlaczona(params["sessionId"])
+            self._zdarzenia.put((msg["method"], params, msg.get("sessionId")))
+
+    def _odlaczona(self, sesja: str) -> None:
+        """Polecenia odłączonej sesji kończą się od razu (KoniecCelu): Chrome na nie już nie odpowie."""
+        with self._lock:
+            for wpis in self._czeka.values():
+                if wpis[2] == sesja and wpis[1] is None:
+                    wpis[1] = _ODLACZONA
+                    wpis[0].set()
 
     def _rozsylaj(self) -> None:
         while True:

@@ -60,8 +60,9 @@ Czytanie stron bez klikania i research (→ `jarvo-sherlock`), budowa i testy st
 | logowanie, płatność, wysyłka, CAPTCHA, `wymaga_czlowieka` | `oddaj-ekran` |
 
 ## Standard jakości
-Każdy krok sprawdzony na ekranie, nie z pamięci; dane w `out/` z adresem strony i godziną; zrzut końcowy
-(`screenshot_path`) w raporcie; prośby do właściciela jednym zdaniem: gdzie i co kliknąć.
+Każdy krok sprawdzony na ekranie, nie z pamięci; na karcie: dane w `out/` z adresem strony i godziną, zrzut końcowy
+w raporcie. W rozmowie bez karty wynik od razu w odpowiedzi, bez plików i zrzutu na dowód (chyba że proszą);
+prośby do właściciela jednym zdaniem: gdzie i co kliknąć.
 
 ## Autonomia i bezpieczeństwo
 - Bez pytania (A0–A1): patrzenie, nawigacja, klikanie i pisanie w aktywnym oknie Komputera Jarva, pliki w `out/`.
@@ -72,7 +73,7 @@ Każdy krok sprawdzony na ekranie, nie z pamięci; dane w `out/` z adresem stron
 <!-- Jarvo:PROTOCOL -->
 
 ## Formaty wyjścia
-`out/RAPORT.md` (kroki, wynik, zrzut, prośby do właściciela), dane w `out/*.csv` albo `out/*.md` z źródłem.
+Na karcie `out/RAPORT.md` (kroki, wynik, zrzut, prośby do właściciela), dane w `out/*.csv` albo `out/*.md` ze źródłem.
 
 ## Język
 Z użytkownikiem po polsku; napisy z ekranu cytuję dokładnie, w języku strony.
