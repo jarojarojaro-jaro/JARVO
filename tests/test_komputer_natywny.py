@@ -78,7 +78,7 @@ class Sterownik:
     def okno(self, nr):
         return object() if nr == 3 else None
 
-    def obsluz_mcp(self, msg: dict, konfig: dict) -> dict | None:
+    def obsluz_mcp(self, msg: dict, konfig: dict, wykonaj=None) -> dict | None:
         ident, metoda = msg.get("id"), msg.get("method")
         if ident is None:
             return None
@@ -166,9 +166,13 @@ def env_natywny(root: Path) -> dict:
 
 
 class Klient:
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, grupa: str | None = None):
+        env = env_natywny(root)
+        env.pop("JARVO_KOMPUTER_GRUPA", None)
+        if grupa:
+            env["JARVO_KOMPUTER_GRUPA"] = grupa            # grupa ekranu procesu Hermesa (wtyczka jarvo-komputer)
         self.p = subprocess.Popen([sys.executable, "-I", str(BRAMKA), "mcp"], stdin=subprocess.PIPE,
-                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env_natywny(root))
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
         self.n = 0
 
     def rpc(self, metoda, params=None):
@@ -558,6 +562,38 @@ def test_sesje_rownolegle_jedna_przy_ekranie(usluga):
     assert not usluga.wejscie.sesje
 
 
+def test_grupa_ekranu_jednego_procesu_dzieli_ekran(usluga):
+    """computer_use i narzędzie `komputer` jednego procesu Hermesa (ta sama JARVO_KOMPUTER_GRUPA w otoczeniu bramek)
+    nie odmawiają sobie `zajete`; sesja innego procesu dalej czeka. Zły klucz grupy wejście pomija."""
+    k1, k2, k3, k4 = (Klient(usluga.root, grupa="a" * 32), Klient(usluga.root, grupa="a" * 32),
+                      Klient(usluga.root, grupa="b" * 32), Klient(usluga.root, grupa="za krótki"))
+    try:
+        wyniki = []
+        for k in (k1, k2, k3, k4):
+            el = {e["label"]: e for e in k.narzedzie("get_window_state", {"pid": PID, "window_id": 3})[
+                "structuredContent"]["elements"]}
+            wyniki.append(k.narzedzie("click", {"pid": PID, "window_id": 3,
+                                                "element_token": el["Dodaj do koszyka"]["element_token"]}))
+        assert not wyniki[0].get("isError") and not wyniki[1].get("isError")
+        assert wyniki[2]["structuredContent"]["rule"] == "zajete" and wyniki[3]["structuredContent"]["rule"] == "zajete"
+    finally:
+        for k in (k1, k2, k3, k4):
+            k.zamknij()
+
+
+def test_paczka_przy_pauzie_nie_idzie_do_sterownika(usluga):
+    """run_steps przy pauzie: odmowa `wstrzymane` od razu, sterownik nie dostaje ani paczki, ani kroku."""
+    kanal.zapytaj(kanal.adres(usluga.root, "ster"), {"polecenie": "pauza", "powod": "Zaloguj się do sklepu"})
+    k = Klient(usluga.root)
+    try:
+        przed = len(usluga.sterownik.wywolania)
+        w = k.narzedzie("run_steps", {"steps": [{"click": {"text": "Dodaj do koszyka"}}]})
+        assert w["isError"] and w["structuredContent"]["code"] == "wstrzymane"
+        assert len(usluga.sterownik.wywolania) == przed
+    finally:
+        k.zamknij()
+
+
 def test_brama_w_kontenerze_bez_zmian(tmp_path):
     """JARVO_KOMPUTER_GNIAZDO (kontener) ma pierwszeństwo przed JARVO_ROOT: manifest i gniazdo jak dotąd."""
     env = {**os.environ, "JARVO_ROOT": str(tmp_path), "JARVO_KOMPUTER_GNIAZDO": "/nie/ma/cua.sock"}
@@ -781,3 +817,37 @@ def test_postoj_po_ostatniej_sesji_a_nie_w_trakcie(usluga, monkeypatch):
         assert parkowania == [1, 1, 1]
     finally:
         sesja.close()
+
+
+def test_paczka_zla_forma_odrzucona_przed_pierwszym_krokiem(tmp_path):
+    """run_steps sprawdza wszystkie kroki przed pierwszym (zły krok 2 nic nie zmienia), a bez wejścia (bez `wykonaj`,
+    czyli bez oceny każdego kroku twardymi zasadami) sterownik paczki nie wykona wcale."""
+    from komputer import sterownik_cdp
+    st = sterownik_cdp.Sterownik(None, pobrane=tmp_path)
+    wykonane: list = []
+
+    def wykonaj(nazwa, args):
+        wykonane.append(nazwa)
+        return {}
+    for args, tekst in (({"steps": []}, "od 1 do 20"), ({"steps": [{"click": {"text": "OK"}}] * 21}, "od 1 do 20"),
+                        ({"steps": [{"click": {"text": "OK"}}, {"get_window_state": {}}]}, "krok 2: get_window_state"),
+                        ({"steps": [{"click": {"text": "OK", "element_index": 3}}]}, "nie oba"),
+                        ({"steps": [{"click": {}, "type_text": {}}]}, "jedno działanie"),
+                        ({"steps": [{"run_steps": {"steps": []}}]}, "nie może być krokiem"),
+                        ({"steps": [{"wait_for": {"text": "x", "url": "y"}}]}, "albo `url`"),
+                        ({"steps": [{"navigate": {"url": "https://x.pl", "text": "Szukaj"}}]}, "nie ma celu napisem"),
+                        ({"steps": [{"click": {"text": "OK"}}], "stop_on": "nigdy"}, "stop_on")):
+        w = st.wywolaj("run_steps", args, {}, wykonaj)
+        sc = w["structuredContent"]
+        assert w["isError"] and sc["code"] == "invalid_batch" and sc["executed"] == 0 and tekst in sc["message"], (
+            args, sc)
+    assert wykonane == []
+    plan, obserwacja, stop = st._plan_paczki({"window_id": 4, "snapshot_id": "s1", "observe": True, "steps": [
+        {"type": {"name": "Szukaj", "text": "ekspres\n"}}, {"key": {"key": "Return"}},
+        {"click": {"element_index": 7}, "wait_for": {"text": "Wyniki", "timeout_ms": 99999}}]})
+    assert [k["tool"] for k in plan] == ["type_text", "press_key", "click"] and obserwacja == {} and stop
+    assert plan[0]["szukaj"][:2] == ("Szukaj", "") and plan[0]["args"]["text"] == "ekspres\n"
+    assert plan[2]["args"] == {"window_id": 4, "element_index": 7, "snapshot_id": "s1"}
+    assert plan[2]["czekaj"] == ("Wyniki", False, "", sterownik_cdp.CZEKANIE_WARUNKU_MAKS)   # limit przycięty do 30 s
+    assert st.wywolaj("run_steps", {"steps": [{"click": {"text": "OK"}}]}, {})["structuredContent"]["code"] == \
+        "narzedzie"

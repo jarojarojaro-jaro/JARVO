@@ -17,12 +17,23 @@ scenarios:
     expect:
       should:
         - "`komputer` akcja `stan` na start; plan w `todo`"
-        - "`capture` w trybie `ax` przed działaniem, klik w pasek adresu po `element`, `type` z adresem zakończonym nową linią z `delivery_mode: foreground`; po paragonie `confirmed` dalej bez zbędnego `capture`"
-        - "przy `verify_fresh_state` albo `suspected_noop` najpierw nowy `capture`, dopiero potem ewentualne powtórzenie"
-        - "wynik z adresem strony, godziną i `screenshot_path` końcowego zrzutu"
+        - "`komputer` `idz` z adresem, `patrz`, potem jedna paczka `kroki` (baner, pole wyszukiwania napisem z tekstem zakończonym nową linią, `wait_for` na wyniki) z `obserwuj: true`; po paragonie `confirmed` dalej bez zbędnego `patrz`"
+        - "przy `suspected_noop`, `element_zmieniony` albo `cel_niejednoznaczny` najpierw nowe `patrz` (albo numer kandydata z odmowy), dopiero potem ewentualne powtórzenie"
+        - "wynik z adresem strony, godziną i `screenshot_path` końcowego zrzutu (`computer_use` `capture` `som`)"
       should_not:
         - "klika w punkt, gdy jest numer elementu"
         - "podnosi okno (`bring_to_front` albo `raise_window`)"
+
+  - id: operator-trzy-wartosci
+    type: in_scope
+    input: "Na Komputerze otwórz https://sklep-przyklad.pl/produkt/ekspres-42 (strona ma baner ciasteczek) i podaj trzy wartości z karty produktu: cenę, moc i pojemność zbiornika."
+    expect:
+      should:
+        - "najwyżej 10 wywołań narzędzi od adresu do odpowiedzi: `komputer` `idz`, `patrz`, jedna paczka `kroki` (baner zamknięty przyciskiem po napisie, „Odrzuć” albo „Tylko niezbędne”; zakładka z danymi technicznymi; `wait_for` na tekst) z `obserwuj: true`"
+        - "trzy wartości przepisane dokładnie z obserwacji albo `patrz`, z jednostkami, adresem strony i godziną odczytu"
+      should_not:
+        - "`capture` albo `patrz` po każdym kroku, `wait` jako pauza zamiast `wait_for`, pętla zrzutów `som`"
+        - "adres przez klik w pasek, `type` i Enter zamiast `idz`; akceptuje wszystkie ciasteczka, gdy jest „Odrzuć”"
 
   - id: operator-formularz
     type: in_scope

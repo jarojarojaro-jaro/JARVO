@@ -440,9 +440,12 @@ def test_wtyczka_operatora_przez_ster(komputer, monkeypatch):
         def register_tool(self, **kw):
             narzedzia.append(kw)
 
+    monkeypatch.setenv("JARVO_KOMPUTER_GRUPA", "g" * 32)                       # register ustawia ją tylko, gdy jej nie ma
     pl.register(Ctx())
+    assert os.environ["JARVO_KOMPUTER_GRUPA"] == "g" * 32
     assert [n["name"] for n in narzedzia] == ["komputer"] and narzedzia[0]["toolset"] == "komputer"
-    assert narzedzia[0]["schema"]["parameters"]["properties"]["akcja"]["enum"] == ["stan", "dziennik", "oddaj"]
+    assert narzedzia[0]["schema"]["parameters"]["properties"]["akcja"]["enum"] == [
+        "stan", "dziennik", "oddaj", "idz", "patrz", "kroki", "czekaj"]
     obsluz = narzedzia[0]["handler"]
     stan = json.loads(obsluz({"akcja": "stan"}))
     assert stan["ok"] and stan["dziala"] and not stan["wstrzymane"] and "pauza" not in stan
@@ -450,7 +453,7 @@ def test_wtyczka_operatora_przez_ster(komputer, monkeypatch):
     assert "blad" in json.loads(obsluz({"akcja": "oddaj", "prosba": "zrób"}))     # prośba bez treści
     assert "blad" in json.loads(obsluz({"akcja": "wznow"}))
     odp = json.loads(obsluz({"akcja": "oddaj", "prosba": "Zaloguj się do panelu sklepu,\nkliknij Dalej"}))
-    assert odp["wstrzymane"] and odp["kto_wstrzymal"].startswith("Operator") and "capture" in odp["dalej"]
+    assert odp["wstrzymane"] and odp["kto_wstrzymal"].startswith("Operator") and "patrz" in odp["dalej"]
     assert odp["pauza"] == "Operator czeka na właściciela: Zaloguj się do panelu sklepu, kliknij Dalej"
     assert ster(wejscie.STER, "stan")["wstrzymane"] is True                   # narzędzie nie wysyła wznow
     wpisy = json.loads(obsluz({"akcja": "dziennik", "n": 5}))["wpisy"]

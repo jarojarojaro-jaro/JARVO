@@ -13,6 +13,9 @@ ekranie naraz) i te same twarde zasady (`infra/komputer/zasady.py`) z zasadami n
     terminalem: to granica wobec Operatora (bez terminala) i wobec stron, nie wobec właściciela.
 Działanie agenta zasady oceniają dopiero, gdy sterownik skończył poprzednie wywołanie tej sesji (wiadomości wysłane
 jedna za drugą bez czekania na wynik nie ocenią fokusu sprzed kliknięcia, które jeszcze czeka w kolejce).
+Paczka `run_steps` (do 20 kroków) nie omija zasad: sterownik woła przed każdym krokiem `SesjaNatywna._krok`, czyli
+tę samą ocenę co dla pojedynczego wywołania (z limitem działań liczonym na krok), i kończy paczkę na pierwszej
+odmowie albo kroku dla właściciela. Paczek JSON-RPC (lista wiadomości) wejście dalej nie przyjmuje.
 
 Ekran w HQ (J10), polecenia kanału `ster` z tokenem właściciela:
   klatka    ostatnia klatka podglądu aktywnej karty (Page.startScreencast, JPEG w base64); `po` = numer klatki,
@@ -210,7 +213,15 @@ class KontekstCDP(wejscie.KontekstSesji):
 
 
 class SesjaNatywna(wejscie.Sesja):
-    """Jedno połączenie z kanałem `cua`: agent ↔ zasady (rdzeń z kontenera) ↔ sterownik CDP w tym procesie."""
+    """Jedno połączenie z kanałem `cua`: agent ↔ zasady (rdzeń z kontenera) ↔ sterownik CDP w tym procesie.
+
+    Paczka `run_steps` (sterownik_cdp.run_steps) przechodzi tu jako jedno wywołanie, ale sterownik wykonuje każdy
+    jej krok przez `_krok`: tę samą drogę co pojedyncze wywołanie od agenta (twarde zasady z pauzą, ekranem jednej
+    sesji i limitem działań na minutę, świeży element, wpis w dzienniku, migawki sesji, ukrywanie sekretów), na
+    stronie po poprzednim kroku. Odmowa kroku wraca jako jego wynik, sterownik go nie wykonuje i kończy paczkę.
+    Paczki JSON-RPC (lista wiadomości) rdzeń dalej odrzuca."""
+
+    DOSTEPNE = zasady.DOSTEPNE | {"run_steps"}
 
     def __init__(self, strumien, wej: "WejscieNatywne") -> None:
         super().__init__(strumien, wej)
@@ -243,7 +254,7 @@ class SesjaNatywna(wejscie.Sesja):
             try:
                 if sterownik is None:
                     raise RuntimeError("przeglądarka Jarva właśnie startuje")
-                odp = sterownik.obsluz_mcp(msg, self._konfig)
+                odp = sterownik.obsluz_mcp(msg, self._konfig, self._krok)
             except Exception as e:  # noqa: BLE001 - błąd sterownika to błąd wywołania, nie koniec sesji
                 odp = None if msg.get("id") is None else {
                     "jsonrpc": "2.0", "id": msg.get("id"),
@@ -275,9 +286,16 @@ class SesjaNatywna(wejscie.Sesja):
             msg = self._po_odpowiedzi(msg)
         self.do_agenta(msg)
 
+    def _w_pracowniku(self) -> bool:
+        """Wywołanie z wątku sterownika tej sesji, czyli krok paczki run_steps w toku."""
+        return threading.current_thread() is self._pracownik
+
     def _ocen(self, nazwa: str, args) -> zasady.Werdykt:
-        # zasady patrzą na stronę po poprzednim działaniu, a nie przed nim (np. klik w pole hasła jeszcze w kolejce)
-        if nazwa in zasady.DZIALANIA and not self._czekaj_na_sterownik():
+        if nazwa == "run_steps":
+            return self._ocen_paczke(args)
+        # zasady patrzą na stronę po poprzednim działaniu, a nie przed nim (np. klik w pole hasła jeszcze w kolejce);
+        # krok paczki ocenia się w wątku sterownika, kiedy poprzedni krok już się skończył
+        if nazwa in zasady.DZIALANIA and not self._w_pracowniku() and not self._czekaj_na_sterownik():
             return zasady.Werdykt(zasady.ODMOWA, "zajete", "poprzednie działanie jeszcze trwa; poczekaj na jego "
                                   "wynik i spróbuj znowu")
         try:
@@ -288,6 +306,42 @@ class SesjaNatywna(wejscie.Sesja):
         if w is not None:
             return w
         return super()._ocen(nazwa, args)
+
+    def _ocen_paczke(self, args: dict) -> zasady.Werdykt:
+        """Sama paczka: przy pauzie nie idzie wcale; inaczej przechodzi do sterownika, a każdy jej krok ocenia
+        `_krok` przed wykonaniem (paczka bez wejścia nie działa: sterownik bez `wykonaj` odmawia)."""
+        if self.ctx.wstrzymane:
+            powod = self.ctx.powod_pauzy or "właściciel zatrzymał Komputer"
+            return zasady.Werdykt(zasady.WSTRZYMANE, "wstrzymane", f"{powod}; patrzeć wolno, działać nie")
+        kroki = args.get("steps")
+        return zasady.Werdykt(zasady.TAK, cel=f"{len(kroki) if isinstance(kroki, list) else 0} kroków")
+
+    def _krok(self, nazwa: str, args: dict) -> dict:
+        """Jeden krok paczki (także migawka do celu napisem i obserwacja), wołany przez sterownik w jego wątku przed
+        każdym krokiem: ocena zasad (pauza, ekran jednej sesji, limit działań), świeży element, dziennik, sterownik,
+        migawka w kontekście sesji i sekrety ukryte. Odmowa: wynik odmowy, sterownik kroku nie dostaje."""
+        if nazwa not in zasady.DOSTEPNE:                    # paczka w paczce i narzędzia spoza listy
+            w = zasady.Werdykt(zasady.ODMOWA, "narzedzie", f"{nazwa} nie może być krokiem paczki")
+        else:
+            w = self._ocen(nazwa, args)
+            if w.wolno and nazwa in zasady.DZIALANIA:
+                w, args = self._swiezy_element(args, w)
+        self._zapisz(nazwa, args, w)
+        if not w.wolno:
+            return zasady.wynik_odmowy(w)
+        sterownik = self.wejscie.sterownik
+        if sterownik is None:
+            return zasady.wynik_odmowy(zasady.Werdykt(zasady.ODMOWA, "przegladarka", "przeglądarka Jarva właśnie "
+                                                                                     "startuje"))
+        return self._po_wyniku(nazwa, args, sterownik.wywolaj(nazwa, args, self._konfig))
+
+    def _zapytaj_sterownik(self, nazwa: str, args: dict) -> dict | None:
+        # krok paczki: sterownik wykonuje paczkę w tym samym wątku, więc świeża migawka idzie do niego wprost
+        # (przez kolejkę czekałaby na koniec paczki)
+        if self._w_pracowniku():
+            sterownik = self.wejscie.sterownik
+            return None if sterownik is None else {"result": sterownik.wywolaj(nazwa, args, self._konfig)}
+        return super()._zapytaj_sterownik(nazwa, args)
 
     def zamknij(self) -> None:
         # agent mógł wysłać wszystko i zamknąć swoją stronę: odpowiedzi na wiadomości w kolejce jeszcze do niego idą
@@ -312,8 +366,9 @@ class WejscieNatywne:
         self.polecenie_uslugi = polecenie_uslugi or (lambda _co, _p: {"ok": False, "blad": "brak usługi"})
 
     def koniec_sesji(self, sesja) -> None:
-        self.ekran.zwolnij(sesja.nr)
         with self._lock:
+            if not any(s is not sesja and s.klucz_ekranu == sesja.klucz_ekranu for s in self.sesje):
+                self.ekran.zwolnij(sesja.klucz_ekranu)   # ostatnia sesja grupy ekranu: ekran wolny od razu
             if sesja in self.sesje:
                 self.sesje.discard(sesja)
                 log(f"sesja {sesja.nr}: koniec")

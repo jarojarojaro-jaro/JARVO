@@ -7,6 +7,7 @@ sterownika tak samo jak w usłudze."""
 from __future__ import annotations
 
 import base64
+import json
 import os
 import shutil
 import socket
@@ -21,7 +22,7 @@ import pytest
 from conftest import REPO
 
 sys.path.insert(0, str(REPO))
-from komputer import cdp, filtr, przegladarka, sterownik_cdp, zasady_natywne  # noqa: E402
+from komputer import cdp, filtr, kanal, przegladarka, sterownik_cdp, wejscie_natywne, zasady_natywne  # noqa: E402
 
 zasady = zasady_natywne.zasady
 PROGRAM = os.environ.get("JARVO_KOMPUTER_CHROME_PROBA") or ""
@@ -573,3 +574,229 @@ def test_postoj_przenosi_strony_na_pusta_karte(przegl):
     historia = st.b.wyslij("Page.getNavigationHistory", {}, st.okno(nr).sesja)
     assert "sklep.html" in historia["entries"][historia["currentIndex"] - 1]["url"]
     assert st.zaparkuj() == 0 and st.wlasciciel_przy_oknie() is False
+
+
+# ---------------------------------------------------------------------- jak telefon: paczka, czekanie, nawigacja
+
+@pytest.fixture
+def wejscie(przegl, tmp_path):
+    """Wejście natywne z twardymi zasadami na prawdziwym sterowniku (jak w usłudze, bez kanałów)."""
+    st, _, _ = przegl
+    w = wejscie_natywne.WejscieNatywne(tmp_path / "komputer", "token-wlasciciela-testowy")
+    w.sterownik = st
+    yield w
+
+
+class Mcp:
+    """Agent na kanale `cua` (para gniazd): wiadomości MCP przez SesjaNatywna (zasady, dziennik) do sterownika."""
+
+    def __init__(self, wej):
+        self.a, b = socket.socketpair()
+        self.a.settimeout(150)
+        sesja = wejscie_natywne.SesjaNatywna(b, wej)
+        wej.sesje.add(sesja)
+        threading.Thread(target=sesja.obsluz, daemon=True).start()
+        self.n, self.bufor = 0, b""
+
+    def narzedzie(self, nazwa: str, args: dict) -> dict:
+        self.n += 1
+        self.a.sendall((json.dumps({"jsonrpc": "2.0", "id": self.n, "method": "tools/call",
+                                    "params": {"name": nazwa, "arguments": args}}) + "\n").encode())
+        while True:
+            while b"\n" not in self.bufor:
+                k = self.a.recv(1 << 16)
+                assert k, "wejście zamknęło sesję"
+                self.bufor += k
+            linia, self.bufor = self.bufor.split(b"\n", 1)
+            odp = json.loads(linia)
+            if odp.get("id") == self.n:
+                return odp["result"]
+
+    def zamknij(self):
+        self.a.close()
+
+
+def test_paczka_staje_na_kroku_platnosci_a_dalszych_nie_wykonuje(przegl, wejscie):
+    """run_steps przez wejście: zasady oceniają każdy krok na stronie po poprzednim. Okno zgody otwarte i zamknięte
+    po napisie, a krok „Zapłać 129 zł” (poza ekranem) robi właściciel: paczka kończy się na nim z `czlowiek`,
+    a następny krok nie idzie. W dzienniku sama paczka i każdy krok."""
+    st, _, _ = przegl
+    nr = otworz(st, "https://sklep.jarvo.test/dluga.html")
+    k = Mcp(wejscie)
+    try:
+        w = k.narzedzie("run_steps", {"window_id": nr, "steps": [
+            {"click": {"text": "Pokaż zgodę"}},
+            {"click": {"text": "Odrzucam", "role": "button"}},
+            {"tool": "click", "args": {"name": "Zapłać 129 zł"}},
+            {"click": {"text": "Przycisk na górze"}}]})
+    finally:
+        k.zamknij()
+    sc = w["structuredContent"]
+    assert w["isError"] and (sc["total"], sc["executed"], sc["failed_step"]) == (4, 3, 2), sc
+    assert (sc["decision"], sc["code"], sc["rule"], sc["next_step"]) == ("czlowiek", "wymaga_czlowieka",
+                                                                         "przycisk_wrazliwy", "ask_owner")
+    assert [r["ok"] for r in sc["steps"]] == [True, True, False]
+    assert sc["steps"][1]["target"]["role"] == "push button"
+    assert "zniknęło: dialog „Zgoda na ciasteczka”" in sc["steps"][1]["message"], sc["steps"][1]
+    assert "niewykonane: 1" in w["content"][0]["text"]
+    assert js(st, nr, "getComputedStyle(document.getElementById('zgoda')).display") == "none"
+    assert js(st, nr, "document.getElementById('wynik').textContent") == "Nic nie kliknięto"    # krok 4 nie poszedł
+    wpisy = list(wejscie.dziennik.ostatnie)
+    assert any(x["narzedzie"] == "run_steps" and x["decyzja"] == "tak" for x in wpisy)
+    assert [x["decyzja"] for x in wpisy if x["narzedzie"] == "click"] == ["tak", "tak", "czlowiek"]
+
+
+def test_cel_napisem_niejednoznaczny_albo_bez_dopasowania_to_odmowa_bez_dzialania(przegl, wejscie):
+    """Napis pasujący do kilku elementów (dwa przyciski z „Zapłać”) albo do żadnego: odmowa kroku z kandydatami
+    i numerami z migawki, nic nie kliknięte, kolejne kroki nie idą; numer z odmowy działa w następnej paczce."""
+    st, _, _ = przegl
+    nr = otworz(st, "https://sklep.jarvo.test/sklep.html")
+    przyciski = js(st, nr, "document.querySelectorAll('button').length")
+    k = Mcp(wejscie)
+    try:
+        w = k.narzedzie("run_steps", {"window_id": nr, "steps": [{"click": {"text": "zapłać"}},
+                                                                 {"click": {"text": "Pokaż baner"}}]})
+        sc = w["structuredContent"]
+        assert w["isError"] and (sc["executed"], sc["failed_step"]) == (1, 0) and "decision" not in sc, sc
+        krok = sc["steps"][0]
+        assert (krok["code"], krok["phase"]) == ("cel_niejednoznaczny", "find")
+        assert sorted(e["label"][:12] for e in krok["kandydaci"]) == ["Zapłać 129 z", "Zapłać klucz"]
+        assert "[ukryte przez Komputer Jarva]" in json.dumps(krok, ensure_ascii=False)    # klucz z napisu ukryty
+        w = k.narzedzie("run_steps", {"window_id": nr, "steps": [
+            {"click": {"text": "Nie ma takiego przycisku"}, "timeout_ms": 300}]})
+        assert w["structuredContent"]["steps"][0]["code"] == "brak_celu"
+        assert js(st, nr, "document.querySelectorAll('button').length") == przyciski       # „Pokaż baner” nie poszedł
+        # dokładny napis wygrywa z fragmentem: „Szukaj” to przycisk, nie pole „Szukaj w sklepie”
+        w = k.narzedzie("run_steps", {"window_id": nr, "steps": [{"click": {"text": "Szukaj"}}]})
+        assert not w["isError"] and w["structuredContent"]["steps"][0]["target"]["role"] == "push button", w
+        # klucz z numerem kandydata: przycisk z kluczem nie jest wrażliwy, ale „Zapłać 129 zł” jest
+        zaplac = next(e for e in krok["kandydaci"] if e["label"].startswith("Zapłać 129"))
+        w = k.narzedzie("run_steps", {"window_id": nr, "snapshot_id": krok["snapshot_id"],
+                                      "steps": [{"click": {"element_index": zaplac["element_index"]}}]})
+        assert w["structuredContent"]["decision"] == "czlowiek", w
+    finally:
+        k.zamknij()
+
+
+def test_wait_for_tekst_po_chwili_zniknienie_adres_i_czysty_limit(przegl, wejscie):
+    """wait_for liczy w sterowniku: tekst, który strona dopisze po 1,5 s, jest; tekstu, którego nie będzie, nie ma
+    po limicie (błąd `czas_minal`, bez wyjątku); zniknięcie i adres. W paczce wait_for przed klikiem czeka na
+    przycisk, który pojawi się później."""
+    st, _, _ = przegl
+    nr = otworz(st, "https://sklep.jarvo.test/dluga.html")
+    js(st, nr, "setTimeout(() => document.body.insertAdjacentHTML('afterbegin', '<p>Gotowe po chwili</p>'), 1500); 1")
+    k = Mcp(wejscie)
+    try:
+        w = k.narzedzie("wait_for", {"window_id": nr, "text": "gotowe  PO chwili", "timeout_ms": 8000})
+        sc = w["structuredContent"]
+        assert not w["isError"] and sc["met"] is True and 1000 <= sc["waited_ms"] < 8000, sc
+        start = time.monotonic()
+        w = k.narzedzie("wait_for", {"window_id": nr, "text": "Tego tekstu nie będzie", "timeout_ms": 700})
+        sc = w["structuredContent"]
+        assert w["isError"] and sc["code"] == "czas_minal" and sc["met"] is False and sc["waited_ms"] >= 700, sc
+        assert time.monotonic() - start < 5
+        w = k.narzedzie("wait_for", {"window_id": nr, "text": "Gotowe po chwili", "gone": True, "timeout_ms": 300})
+        assert w["structuredContent"]["code"] == "czas_minal" and "nadal jest" in w["structuredContent"]["message"]
+        w = k.narzedzie("wait_for", {"window_id": nr, "url": "https://sklep.jarvo.test/*.html"})
+        assert not w["isError"], w
+        assert k.narzedzie("wait_for", {"window_id": nr})["structuredContent"]["code"] == "warunek"
+        js(st, nr, "setTimeout(() => { const b = document.createElement('button'); b.textContent = 'Późny przycisk';"
+                   " b.onclick = () => wynik('Kliknięto późny'); document.body.prepend(b); }, 1000); 1")
+        w = k.narzedzie("run_steps", {"window_id": nr, "steps": [
+            {"click": {"text": "Późny przycisk"}, "wait_for": {"text": "Późny przycisk", "timeout_ms": 8000}}]})
+        assert not w["isError"] and w["structuredContent"]["steps"][0]["wait_for"]["met"], w
+        assert js(st, nr, "document.getElementById('wynik').textContent") == "Kliknięto późny"
+    finally:
+        k.zamknij()
+
+
+def test_navigate_adres_zablokowany_przez_zasady_a_dozwolony_z_paragonem(przegl, wejscie):
+    """navigate oceniają te same zasady co adres wpisany w pasek: file:, javascript:, chrome: i klucz w adresie
+    nie przechodzą (sterownik ich nie dostaje), także jako krok paczki, która wtedy staje. Adres http(s): przejście
+    z paragonem `adres: …` i wpisem w dzienniku z samą nazwą serwera."""
+    st, _, _ = przegl
+    nr = otworz(st, "https://sklep.jarvo.test/sklep.html")
+    przyciski = js(st, nr, "document.querySelectorAll('button').length")
+    k = Mcp(wejscie)
+    try:
+        for url, zasada in (("file:///etc/passwd", "adres"), ("javascript:alert(1)", "adres"),
+                            ("chrome://settings", "adres"),
+                            ("https://sklep.jarvo.test/?k=sk-proj-ABCDEFGHIJKLMNOPQRSTUVWX1234567890", "sekret")):
+            w = k.narzedzie("navigate", {"window_id": nr, "url": url})
+            sc = w["structuredContent"]
+            assert w["isError"] and (sc["decision"], sc["rule"]) == ("odmowa", zasada), (url, sc)
+        assert st.okno(nr).url == "https://sklep.jarvo.test/sklep.html"
+        w = k.narzedzie("run_steps", {"window_id": nr, "steps": [{"navigate": {"url": "file:///etc/passwd"}},
+                                                                 {"click": {"text": "Pokaż baner"}}]})
+        sc = w["structuredContent"]
+        assert (sc["failed_step"], sc["executed"], sc["rule"]) == (0, 1, "adres"), sc
+        assert js(st, nr, "document.querySelectorAll('button').length") == przyciski
+        w = k.narzedzie("navigate", {"window_id": nr, "url": "https://sklep.jarvo.test/formularz.html"})
+        sc = w["structuredContent"]
+        assert not w["isError"] and sc["effect"] == "confirmed" and "adres: sklep.jarvo.test/formularz.html" in sc[
+            "message"] and sc["title"] == "Zamówienie testowe Jarvo", sc
+        w = k.narzedzie("navigate", {"window_id": nr, "url": "https://sklep.jarvo.test/formularz.html"})
+        assert w["structuredContent"]["effect"] == "confirmed" and "wczytana od nowa" in w["structuredContent"][
+            "message"], w                                  # ten sam adres jeszcze raz: przejście, nie `suspected_noop`
+    finally:
+        k.zamknij()
+    wpisy = [x for x in wejscie.dziennik.ostatnie if x["narzedzie"] == "navigate"]
+    assert [x["decyzja"] for x in wpisy] == ["odmowa"] * 5 + ["tak"] * 2 and wpisy[-1]["cel"] == "sklep.jarvo.test"
+    assert "sk-proj" not in json.dumps(wpisy)
+
+
+def _wtyczka():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("jarvo_test_wtyczka_cdp", REPO / "komputer" / "plugin" /
+                                                  "__init__.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def test_wtyczka_operatora_idz_patrz_kroki_przez_bramke(przegl, monkeypatch):
+    """Droga Operatora do stron: narzędzie `komputer` (wtyczka) przez bramkę floty i kanał `cua` do wejścia
+    z zasadami: idz, patrz (okno zgody na górze), kroki z celem napisem i obserwacją (nowy tekst z `*`), czekaj;
+    krok płatności kończy paczkę z radą `oddaj`. Cztery wywołania od adresu do odczytu."""
+    from jarvo import komputer as jk
+    from jarvo import sciezki
+    st, _, _ = przegl
+    root = Path(tempfile.mkdtemp(prefix="jkw"))          # krótka ścieżka: gniazdo unix ma limit ok. 100 bajtów
+    kanal.katalog_stanu(root).mkdir(parents=True)
+    (kanal.katalog_stanu(root) / "usluga.json").write_text(json.dumps({"pid": os.getpid()}), encoding="utf-8")
+    wej = wejscie_natywne.WejscieNatywne(root / "dane", "token-wlasciciela-testowy")
+    wej.sterownik = st
+    serwer = kanal.Serwer(kanal.adres(root, "cua"), wej.obsluz_cua, "cua").start()
+    u = sciezki.Uklad(root=root, program=root / "program", dane=root / "dane", stan=root / "stan",
+                      logi=root / "logi", cache=root / "cache", build=root / "build")
+    u.bin_floty.mkdir(parents=True)
+    monkeypatch.setenv("HERMES_CUA_DRIVER_CMD", str(jk.nakladka_bramki(u, REPO, Path(sys.executable))))
+    monkeypatch.setenv("JARVO_ROOT", str(root))
+    monkeypatch.delenv("JARVO_KOMPUTER_GNIAZDO", raising=False)
+    monkeypatch.setenv("JARVO_KOMPUTER_GRUPA", "grupa-testowa-wtyczki-0123456789")
+    wt = _wtyczka()
+    try:
+        odp = wt.obsluz({"akcja": "idz", "adres": "https://sklep.jarvo.test/dluga.html?z=wtyczka"}, session_id="s1")
+        assert odp.startswith("ok: okno") and "Długa strona Jarvo" in odp and \
+            "adres: sklep.jarvo.test/dluga.html?z=wtyczka" in odp, odp
+        js(st, st.aktywne_okno(), "document.getElementById('zgoda').style.display = 'block'")
+        odp = wt.obsluz({"akcja": "patrz"}, session_id="s1")
+        assert "[1] dialog „Zgoda na ciasteczka”" in odp and "„Przycisk na górze”" not in odp, odp
+        odp = wt.obsluz({"akcja": "kroki", "obserwuj": True, "kroki": [
+            {"click": {"text": "Odrzucam"}}, {"click": {"text": "Przycisk na górze"}},
+            {"wait_for": {"text": "Kliknięto górę"}}]}, session_id="s1")
+        assert "run_steps: 3/3 kroków ok" in odp and "obserwacja po krokach:" in odp, odp
+        nowe = [linia for linia in odp.splitlines() if linia.lstrip().startswith("*[")]
+        assert len(nowe) == 1 and "paragraph „Kliknięto górę”" in nowe[0], odp      # tylko to, czego nie było
+        assert "dialog „Zgoda na ciasteczka”" not in odp.split("obserwacja po krokach:")[1]
+        odp = wt.obsluz({"akcja": "czekaj", "tekst": "Kliknięto górę", "sekundy": 2}, session_id="s1")
+        assert odp.startswith("ok: wait_for"), odp
+        odp = wt.obsluz({"akcja": "kroki", "kroki": [{"click": {"text": "Zapłać 129 zł"}},
+                                                     {"click": {"text": "Nic nie robi"}}]}, session_id="s1")
+        assert "BŁĄD wymaga_czlowieka" in odp and "akcja=oddaj" in odp and "niewykonane: 1" in odp, odp
+        odp = wt.obsluz({"akcja": "idz", "adres": "file:///etc/passwd"}, session_id="s1")
+        assert odp.startswith("BŁĄD zablokowane") and "Dalej:" in odp, odp
+    finally:
+        wt._zamknij_wszystkie()
+        serwer.zamknij()
+        shutil.rmtree(root, ignore_errors=True)

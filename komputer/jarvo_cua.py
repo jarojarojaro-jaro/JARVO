@@ -22,12 +22,16 @@ Kontener: gniazdo `JARVO_KOMPUTER_GNIAZDO` (domyślnie /opt/jarvo/komputer/cua.s
 potok nazwany z DACL właściciela na Windows, gniazdo 0600 na macOS i Linuksie), a potok musi trzymać proces usługi
 z `<stan>/komputer/usluga.json`. Manifest podaje wtedy jako polecenie MCP Pythona z tą bramką, bo Windows nie
 uruchomi pliku .py wprost.
+Przed rozmową bramka wysyła wejściu powiadomienie `notifications/jarvo/grupa` z kluczem z JARVO_KOMPUTER_GRUPA
+(ustawia go wtyczka jarvo-komputer w procesie Hermesa): computer_use i narzędzie `komputer` jednego procesu agenta
+dzielą wtedy ekran (wejście nie odmawia im sobie nawzajem `zajete`).
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import time
 
@@ -43,6 +47,7 @@ BEZ_KANALU_NATYWNIE = ("Komputer Jarva działa, ale jego kanał sterownika nie o
 KOD_ODMOWY = 64                        # EX_USAGE: czasownik zablokowany przez bramkę
 KOD_BRAK_KOMPUTERA = 69                # EX_UNAVAILABLE
 PO_KONCU_WEJSCIA = 2.0                 # s: ostatnie odpowiedzi po zamknięciu stdin przez Hermesa (potok bez półzamknięcia)
+GRUPA_ENV = "JARVO_KOMPUTER_GRUPA"     # grupa ekranu procesu agenta (infra/komputer/wejscie.py: GRUPA)
 
 POMOC = """cua-driver (bramka Jarvo)
 
@@ -131,6 +136,15 @@ def komputer_dostepny() -> bool:
     return odpowiada(GNIAZDO)
 
 
+def powiadomienie_grupy() -> bytes:
+    """Wiersz MCP z grupą ekranu procesu agenta dla wejścia (pusty bez poprawnego klucza w JARVO_KOMPUTER_GRUPA)."""
+    grupa = os.environ.get(GRUPA_ENV, "")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", grupa):
+        return b""
+    return (json.dumps({"jsonrpc": "2.0", "method": "notifications/jarvo/grupa", "params": {"grupa": grupa}})
+            + "\n").encode()
+
+
 def pompuj(sciezka: str) -> int:
     """MCP na stdin/stdout ↔ gniazdo wejścia Komputera, bajt w bajt, aż jedna strona zamknie połączenie."""
     import socket
@@ -138,6 +152,7 @@ def pompuj(sciezka: str) -> int:
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
         s.connect(sciezka)
+        s.sendall(powiadomienie_grupy())
     except OSError as e:
         print(f"{powod_braku()} ({e.strerror})", file=sys.stderr)
         return KOD_BRAK_KOMPUTERA
@@ -175,7 +190,8 @@ def pompuj_natywnie(root: str) -> int:
     kanal = _kanal()
     try:
         s = kanal.polacz(kanal.adres(root, "cua"), 5.0, kanal.pid_uslugi(root))
-    except kanal.BladKanalu as e:
+        s.sendall(powiadomienie_grupy())
+    except (kanal.BladKanalu, OSError) as e:
         print(f"{powod_braku()} ({e})", file=sys.stderr)
         return KOD_BRAK_KOMPUTERA
     koniec_wejscia: list[float] = []

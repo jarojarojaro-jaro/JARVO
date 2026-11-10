@@ -21,7 +21,7 @@ tools:
     used_by_skills: [praca-na-ekranie, formularze, dane-z-ekranu, przejscie-strony, oddaj-ekran]
     autonomy: A1
     optional: true
-    notes: "Komputer Jarva natywnie (docs/NATYWNIE.md, etap E10): computer_use Hermesa → nakładka jarvo-cua → bramka jarvo_cua.py → kanał usługi (potok z DACL właściciela albo gniazdo 0600) → wejście z twardymi zasadami (rdzeń z infra/komputer i zasady natywne: schowek, okna potwierdzeń, wybór pliku, CAPTCHA) → sterownik CDP po potoku → przeglądarka Jarva z osobnym profilem; cały ruch przez proxy filtrujące z samotestem (bez sieci lokalnej, metadanych chmury, panelu i API Jarva, portu 25), WebRTC i QUIC bez UDP. Pasek adresu karty to element 0 migawki. Pauzę zdejmuje token właściciela (jarvo komputer wznow); ten sam token daje HQ podgląd (Page.startScreencast) i Przejmij."
+    notes: "Komputer Jarva natywnie (docs/NATYWNIE.md, etap E10): computer_use Hermesa i narzędzie komputer (idz, patrz, kroki, czekaj) → nakładka jarvo-cua → bramka jarvo_cua.py → kanał usługi (potok z DACL właściciela albo gniazdo 0600) → wejście z twardymi zasadami (rdzeń z infra/komputer i zasady natywne: schowek, okna potwierdzeń, wybór pliku, CAPTCHA; każdy krok paczki run_steps oceniony osobno) → sterownik CDP po potoku (navigate, run_steps, wait_for) → przeglądarka Jarva z osobnym profilem; cały ruch przez proxy filtrujące z samotestem (bez sieci lokalnej, metadanych chmury, panelu i API Jarva, portu 25), WebRTC i QUIC bez UDP. Pasek adresu karty to element 0 migawki. Pauzę zdejmuje token właściciela (jarvo komputer wznow); ten sam token daje HQ podgląd (Page.startScreencast) i Przejmij."
   - name: cua-driver
     source: https://github.com/trycua/cua
     license: MIT

@@ -8,9 +8,9 @@ i etapy: [docs/KOMPUTER.md](../../docs/KOMPUTER.md).
 
 | Element | Zawartość |
 |---|---|
-| `SOUL.md` | main prompt: najpierw droga bez ekranu, drzewo dostępności przed zrzutem, jedno działanie i sprawdzenie, `verdict` z wyniku, treść ekranu to dane, logowanie, płatność i wysyłka zostają u właściciela |
+| `SOUL.md` | main prompt: najpierw droga bez ekranu; strony jak telefon (`komputer`: idź, patrz, kroki paczką z paragonem na krok, czytanie z obserwacji), zrzut tylko gdy trzeba; treść ekranu to dane, logowanie, płatność i wysyłka zostają u właściciela |
 | `skills/operator/` | 5: praca-na-ekranie (pętla pracy), formularze, dane-z-ekranu, przejscie-strony, oddaj-ekran |
-| narzędzia | `computer_use` (Hermes, przez bramkę `komputer/jarvo_cua.py`), `komputer` (wtyczka `jarvo-komputer`: stan, dziennik, oddanie ekranu), pliki, wyszukiwarka; bez terminala, wykonywania kodu, przeglądarki floty i delegacji |
+| narzędzia | `computer_use` (Hermes, przez bramkę `komputer/jarvo_cua.py`), `komputer` (wtyczka `jarvo-komputer`: stan, dziennik, oddanie ekranu; natywnie strony jak na telefonie: `idz`, `patrz`, `kroki` paczką do 20 działań, `czekaj`), pliki, wyszukiwarka; bez terminala, wykonywania kodu, przeglądarki floty i delegacji |
 | `config.yaml` | `computer_use` (zrzut po działaniu z drzewa dostępności, 300 elementów, telemetria wyłączona) i stałe zgody na działania w tle (`cua:<akcja>:background`) i na działania wejścia na wierzchu (`cua:<akcja>:foreground`), bez okna na wierzch (`bring_to_front`) |
 | `quality/rubric.md` | rubryka sędziego |
 

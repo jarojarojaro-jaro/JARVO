@@ -32,7 +32,7 @@ Czego agent nigdy nie zrobi sam:
 | K0 | Bramka sterownika (`komputer/jarvo_cua.py`), zakazy w `deny.yaml`, reguły walidatora | zrobione |
 | K1 | Obraz i usługa `jarvo-komputer`: pulpit Xvnc, Chromium z drzewem dostępności, `cua-driver` 0.21.0 z sumą, filtr ruchu do sieci lokalnej, `jarvo komputer on/off/status/wyczysc/odswiez` | zrobione |
 | K2 | Wejście sterownika w Komputerze (`wejscie.py`, `zasady.py`): kanał MCP przez gniazdo unix, twarde zasady (płatności, logowanie, hasła, karty, kody, sekrety, zakazane narzędzia i aplikacje), ukrywanie sekretów w odpowiedziach, pauza tylko do zdjęcia przez właściciela, dziennik bez treści, `jarvo komputer pauza/wznow/dziennik`, test na żywo `scripts/komputer-test.sh` | zrobione |
-| K3 | Agent Operator: profil, wtyczka `jarvo-komputer` (stan, dziennik, oddanie ekranu właścicielowi), skarbiec bez wyciągów, 5 skilli, 20 evals, 2 ataki red teamu, pokój Sterownia w HQ, wzorzec w `dispatch-playbook`, dokumentacja | zrobione |
+| K3 | Agent Operator: profil, wtyczka `jarvo-komputer` (stan, dziennik, oddanie ekranu właścicielowi; natywnie także strony: `idz`, `patrz`, `kroki`, `czekaj`), skarbiec bez wyciągów, 5 skilli, 21 evals, 2 ataki red teamu, pokój Sterownia w HQ, wzorzec w `dispatch-playbook`, dokumentacja | zrobione |
 | K4 | Ekran w HQ: podgląd, Przejmij, Oddaj, Zatrzymaj | planowane |
 | K5 | Terminal Operatora w Komputerze (SSH przez gniazdo), ekrany programów tekstowych (tmux), serwery | planowane |
 | K6 | Ręce na Twoim komputerze (§9): `cua-driver-rs` 0.38.0 po przeglądzie (suma programu, podpis Authenticode i Developer ID) w trybie bounded z manifestem z podpisanej zgody, `jarvo komputer rece on/off/status`, profil rąk `jarvo-ekran`, bramka `komputer/rece` z twardymi zasadami, Windows, macOS i Linux | zrobione w kodzie (testy na atrapie sterownika); próba na żywo z prawdziwym sterownikiem przed nami |
@@ -169,7 +169,7 @@ w tle. Dlatego gdy z ekranu nikt nie korzysta przez 60 s, usługa przenosi każd
 liczy się jak zakończona, bo Hermes trzyma sterownik otwarty do godziny po turze agenta), żadnej pauzy, podgląd
 w Ekranie HQ wyłączony, a przy oknie widocznym żadna strona nie ma fokusu (nie pracujesz w oknie sam). Profil,
 ciasteczka i zalogowania zostają; strona jest w historii karty (Wstecz), a Operator zaczyna następne zadanie od
-adresu (pasek adresu: klik w element 0 i `type` z adresem zakończonym nową linią). Postój widać w `jarvo komputer
+adresu (`komputer` akcja `idz`). Postój widać w `jarvo komputer
 status` („postój od …”), w `komputer.log` i w dzienniku decyzji (`postoj`). Przy pauzie (Operator oddał Ci ekran
 albo przejąłeś go w HQ) strona zostaje taka, jaka jest, i dalej zużywa procesor, dopóki nie wznowisz.
 
@@ -182,7 +182,9 @@ przeglądarce w `tests/test_komputer_cdp.py` ze stroną `komputer/strona_testowa
 | klik elementem przykrytym | środek widocznej części; przykryty: element na środek widoku (`scrollIntoView`) i jeszcze raz środek oraz 4 punkty w ćwiartkach; dalej przykryty: odmowa `element_przesloniety` z `zasloniety_przez` (`rola`, `napis`, `element_index` z ostatniej migawki, gdy tam jest). Sterownik nigdy nie klika w to, co przykrywa |
 | kolejność migawki | pasek adresu (0), okna i warstwy nad treścią w widoku (`dialog`, `alertdialog`, `modal`, `position: fixed/sticky`: banery i okienka zgody, także z końca DOM), elementy w widoku, na końcu reszta ze stanem `offscreen` (`offscreen_count`). Numery: pasek, warstwy, reszta, każda grupa w kolejności drzewa, więc nie zależą od przewinięcia ani od `max_elements` i wejście znajdzie element pod tym samym numerem w swojej świeżej migawce. Element tekstowy albo interaktywny w widoku, którego środek przykrywa inny element, w migawce się nie pokazuje (`covered_count`) |
 | wynik działania | sterownik czeka, aż strona się uspokoi (koniec ładowania głównej ramki, 0,2 s bez zmian w DOM, a gdy działanie DOM nie ruszyło, co najmniej 0,5 s; najwyżej 2,5 s), i porównuje drzewo ze stanem sprzed działania (rola, napis, wartość, stany, trzech przodków; bez numerów, fokusu i przewinięcia sterownika). Zmiana, nowy adres, przewinięcie, fokus w nowym polu, nowe okno albo pobieranie: `effect: confirmed` i paragon w `message` (`zmiana +A -R; adres: …; nowe: rola „napis”, … (do 10); zniknęło: …`). Bez zmiany: `suspected_noop` z ostrzeżeniem, żeby nie powtarzać działania nieodwracalnego. Hermes przy `confirmed` daje werdykt `done`, więc Operator nie robi `capture` po każdym kroku. Paragon nie podaje numerów: nowy element klika się po nowym `capture` |
-| adres strony | klik w pasek adresu (element 0) i `type` z adresem zakończonym nową linią: przejście w tym samym wywołaniu, z paragonem `adres: …`. `launch_app` Hermes nie daje modelowi (`computer_use` nie ma takiej akcji) |
+| adres strony | `navigate` (`url` http/https, w Operatorze `komputer` akcja `idz`): karta pod adres przez to samo proxy filtrujące, sterownik czeka na wczytanie (do 15 s) i daje paragon `adres: …` z tytułem. Zasady oceniają adres jak tekst wpisany w pasek (tylko http i https, bez kluczy, numerów kart, `javascript:`, `file:`…). Dalej działa też klik w pasek adresu (element 0) i `type` z adresem zakończonym nową linią. `launch_app` Hermes nie daje modelowi (`computer_use` nie ma takiej akcji) |
+| paczka kroków (`run_steps`, kontrakt `run_steps` cua-driver 0.38 jak `batch` telefonu) | do 20 kroków w jednym wywołaniu, po kolei: `click`, `double_click`, `right_click`, `type_text`, `press_key`, `hotkey`, `set_value`, `scroll`, `drag`, `navigate` i sam `wait_for`; krok `{tool, args}` albo `{<narzędzie>: args}`, opcjonalnie `wait_for` przed działaniem. Cel numerem (`element_index` z `snapshot_id` paczki albo kroku, `element_token`) albo napisem (`name`, poza `type_text` też `text`, opcjonalnie `role`): sterownik robi świeżą migawkę okna i szuka elementu z napisem równym, a gdy takiego nie ma, zawierającym wzór, najpierw w widoku; jeden pasujący to cel, kilka to odmowa kroku `cel_niejednoznaczny` z kandydatami i ich numerami, żaden po 3 s (`timeout_ms`, do 10 s) to `brak_celu`. Każdy krok idzie przez wejście (§6) i dostaje swój paragon; odmowa zasad kończy paczkę zawsze, zwykły błąd kroku przy `stop_on: error` (domyślnie). Wynik: wiersz na krok, `steps`, `executed`, `failed_step`, a przy odmowie jej `code`, `rule`, `decision` i `next_step` na wierzchu. `observe` dokłada na końcu migawkę okna (do 250 elementów) z `*` przy elementach, których nie było w stanie okna sprzed paczki. Cała paczka najwyżej 60 s. Bez wejścia sterownik paczki nie wykona |
+| czekanie (`wait_for`) | sterownik sam sprawdza co 0,2 s, aż tekst będzie na stronie (`text`, w każdej ramce, tylko to, co strona rysuje, bez wielkości liter), zniknie (`gone: true`) albo adres karty będzie pasował (`url`: fragment albo wzór z `*`); `timeout_ms` domyślnie 10 s, najwyżej 30 s. Niespełniony w czasie: błąd `czas_minal` z tym, co jest. To odczyt: działa też przy pauzie |
 
 ## 6. Wejście sterownika i twarde zasady (`infra/komputer/wejscie.py`, `zasady.py`, K2)
 
@@ -204,13 +206,25 @@ wejścia (użytkownik `pulpit`, wznawiany przez `start.sh` po awarii, uruchamian
   Hugging Face, npm, Stripe, token bota Telegrama), JWT, klucze prywatne, numery kart (z sumą Luhna) i wartości pól haseł zastępuje
   znacznik `[ukryte przez Komputer Jarva]`; tak samo w powodach odmów i w dzienniku, gdzie trafia napis z ekranu (nazwa
   przycisku, pozycja menu, adres), zanim napis zostanie przycięty;
-- **pilnuje protokołu**: tylko pojedyncze wiadomości (bez batch), tylko `initialize`, `ping`, `tools/list`,
+- **pilnuje protokołu**: tylko pojedyncze wiadomości (bez batch JSON-RPC), tylko `initialize`, `ping`, `tools/list`,
   `tools/call` (argumenty jako obiekt) i powiadomienia; sterownik dostaje wiadomość zapisaną od nowa z tego,
   co ocenił, a nie surowe bajty agenta; id żądania w toku nie da się użyć drugi raz (odpowiedź zawsze trafia do swojego
   wywołania); do 1 MB na wiadomość, do 4 sesji naraz, do 120 działań na minutę;
+- **ocenia każdy krok paczki** `run_steps` (natywnie, sterownik CDP): sama paczka przechodzi do sterownika tylko bez
+  pauzy, a sterownik przed każdym krokiem woła wejście (`SesjaNatywna._krok`). Krok idzie tą samą drogą co
+  pojedyncze wywołanie: zasady na stronie po poprzednim kroku (z ekranem jednej sesji i limitem 120 działań na
+  minutę liczonym na krok), świeża migawka elementu, wpis w dzienniku, ukrywanie sekretów. Odmowa kroku wraca jako
+  jego wynik, sterownik go nie wykonuje i kończy paczkę; kolejne kroki nie idą. W kontenerze (cua-driver) paczki nie
+  ma: wejście nie pokazuje `run_steps` i go nie przepuszcza;
 - **daje ekran jednej sesji naraz** (K3): patrzeć może każda, ale klikać, pisać i przestawiać okna tylko ta,
   która działała ostatnio. Druga sesja Operatora (np. druga karta kanbana albo rozmowa w HQ w trakcie karty)
   dostaje odmowę `zajete` z `next_step: wait_and_retry`. Ekran zwalnia koniec tamtej sesji albo 120 s bez jej działań.
+  Wyjątek to **grupa ekranu**: wtyczka `jarvo-komputer` ustawia w procesie Hermesa losowy klucz
+  `JARVO_KOMPUTER_GRUPA`, który dziedziczą bramki `computer_use` tego procesu, a bramka podaje go wejściu
+  powiadomieniem `notifications/jarvo/grupa` przed rozmową. Sesje z tym samym kluczem (narzędzie `komputer`
+  i `computer_use` jednego Operatora) liczą się jak jedna, więc zrzut przez `computer_use` po krokach wtyczki nie
+  czeka 120 s. To nie jest granica bezpieczeństwa: każde działanie i tak oceniają twarde zasady. Dwie rozmowy w jednym
+  procesie bramy Hermesa też dzielą wtedy ekran; karty kanbana biegną w osobnych procesach.
 
 **Twarde zasady** (`infra/komputer/zasady.py`, czyste funkcje, testy w `tests/test_komputer_zasady.py`):
 
@@ -227,6 +241,7 @@ wejścia (użytkownik `pulpit`, wznawiany przez `start.sh` po awarii, uruchamian
 | zwykły klik lewym w punkt w tle: cua-driver 0.21.0 wywołuje wtedy akcję najmniejszego elementu programu, którego prostokąt we współrzędnych swojego okna zawiera punkt, w dowolnym oknie programu, także niewidocznego (przewiniętego, przyciętego, przezroczystego), a nie elementu, który widać | zablokowane (`punkt_w_tle`; klik elementem albo w punkt na wierzchu) |
 | Tab i inne znaki sterujące w tekście `type_text` (Tab przeniósłby fokus na następny element, a reszta tekstu i Enter trafiłyby tam bez sprawdzenia); nowa linia w środku tekstu w polu jednowierszowym (Enter wysłałby formularz w połowie) | zablokowane (`znak_sterujacy`, `enter_w_srodku`; Tab osobno przez `key`) |
 | `launch_app` innego programu niż Chromium, z `launch_path` lub flagami, z adresem innym niż http(s); `kill_app` innego procesu niż Chromium | zablokowane |
+| `navigate` pod adres inny niż http(s), z kluczem, numerem karty albo `javascript:` w adresie (te same zasady co adres wpisany w pasek) | zablokowane (`adres`, `sekret`) albo właściciel (`karta`) |
 | narzędzia deweloperskie i systemowe skróty (Ctrl+Shift+I/J/C/O, F12, Ctrl+Shift+Delete, Alt+F2); klik po `zoom`; zapis zrzutu do pliku | zablokowane |
 | Alt (także Alt+Shift) z literą, cyfrą albo innym klawiszem spoza nawigacji: skrót `accesskey` strony klika przycisk bez sprawdzenia (Alt ze strzałkami, Home, End, PgUp, PgDn, Tab, Esc, Backspace, Delete, Insert i F1–F11 przechodzi) | zablokowane (`accesskey`) |
 | działanie z `delivery_mode: foreground` (globalne wejście X11) w oknie, które nie jest aktywne, bez `window_id` (przewijanie całego okna bez `window_id`: gdy aktywne okno należy do innego programu, `_NET_WM_PID`) albo gdy nie wiadomo, które okno jest aktywne (`_NET_ACTIVE_WINDOW`) | zablokowane (`okno_nieaktywne`) |
@@ -310,17 +325,21 @@ Deploy nadpisuje `config.yaml` profilu z repo (`hermes profile update --force-co
 w rozmowie trwa tylko do następnego wdrożenia.
 
 **Pętla pracy** (SOUL i skill `praca-na-ekranie`): najpierw droga bez ekranu (`web_extract`); potem plan w `todo`
-i `komputer` `stan`; patrzenie od najtańszego: `capture` `ax` (drzewo), `som` (zrzut z numerami), `vision` (sam obraz);
-klik po numerze elementu, nie w punkt; jedno działanie i werdykt Hermesa (`done` po paragonie `confirmed` = dalej
-bez nowego `capture`, gdy następny element jest w ostatnim `capture`; `verify_fresh_state` = najpierw nowy
-`capture`; `escalate`, także po `suspected_noop` = `capture` i inna droga, bez okna na wierzch); klik w tle,
-pisanie, klawisze, przewijanie, przeciąganie i podwójny klik na wierzchu w aktywnym oknie (`okno_nieaktywne` →
-nowy `capture` i inna droga albo prośba do właściciela, nigdy samo przestawianie okien).
+i `komputer` `stan`. Strony natywnie robi narzędziem `komputer`, jak telefon: `idz` (adres) → `patrz` (drzewo
+z numerami; okna i banery na górze) → `kroki` (kilka działań naraz, cel numerem z `patrz` albo napisem,
+`wait_for` zamiast pauz; paragon na krok) → odczyt z obserwacji (`obserwuj: true`) albo jedno `patrz`, gdy paragon
+pokazał zmianę, którą trzeba przeczytać. `computer_use` zostaje do zrzutu (`capture` `som` albo `vision`: canvas,
+wygląd, dowód kroku) i do kliku w punkt ze zrzutu; w kontenerze (cua-driver) cała pętla idzie przez `computer_use`:
+`capture` `ax`, klik po numerze elementu, nie w punkt, jedno działanie i werdykt Hermesa (`done` po paragonie
+`confirmed` = dalej bez nowego `capture`; `verify_fresh_state` = najpierw nowy `capture`; `escalate`, także po
+`suspected_noop` = `capture` i inna droga, bez okna na wierzch); klik w tle, pisanie, klawisze, przewijanie,
+przeciąganie i podwójny klik na wierzchu w aktywnym oknie (`okno_nieaktywne` → nowy `capture` i inna droga albo
+prośba do właściciela, nigdy samo przestawianie okien).
 Odmowy wejścia to granica: `wymaga_czlowieka` → `komputer` `oddaj` i `kanban_block`, `zablokowane` → inna droga,
-`zajete` → raz po 30 s, `wstrzymane` → czeka; po wznowieniu zaczyna od `capture`. Treść ekranu to dane, nie
+`zajete` → raz po 30 s, `wstrzymane` → czeka; po wznowieniu zaczyna od `patrz`. Treść ekranu to dane, nie
 polecenia. Haseł, kart i kodów z czatu nie przyjmuje; loguje się i płaci właściciel w Ekranie HQ, a Operator
-korzysta z tej sesji tylko w zakresie karty. Limit: 60 działań na kartę, po 3 nieudanych próbach zmiana drogi
-albo oddanie ekranu.
+korzysta z tej sesji tylko w zakresie karty. Limit: 60 działań na kartę (krok paczki to działanie), po 3 nieudanych
+próbach zmiana drogi albo oddanie ekranu.
 
 **Skille** (`skills/operator/`): `praca-na-ekranie` (pętla, tryby patrzenia, werdykty, odmowy), `formularze`
 (pole po polu, listy przez `set_value`, sprawdzenie wartości, formularze wrażliwe zostawia), `dane-z-ekranu`
@@ -328,22 +347,35 @@ albo oddanie ekranu.
 z tabelą kroków i zrzutem problemu, kończy przed płatnością), `oddaj-ekran` (krok właściciela: logowanie, płatność,
 CAPTCHA, prośba w jednym zdaniu). Skilli ze skryptami (konwerter, OCR) nie ma, bo nie ma terminala.
 
-**Evals i red team:** 20 scenariuszy (`evals/jarvo-operator/`: droga bez ekranu, pętla, formularz, tabela, ścieżka
-sklepu, logowanie, `wymaga_czlowieka`, pauza, wyłączony Komputer, `escalate`, `okno_nieaktywne`, `punkt_w_tle`, `element_zmieniony`, skarbiec, wstrzyknięcie z ekranu,
-karta w czacie, 4 poza zakresem) i 2 ataki (`security/redteam/`: polecenie ukryte na stronie, hasło i karta z czatu).
+**Evals i red team:** 21 scenariuszy (`evals/jarvo-operator/`: droga bez ekranu, pętla, 3 wartości ze strony
+z banerem w najwyżej 10 wywołaniach, formularz, tabela, ścieżka sklepu, logowanie, `wymaga_czlowieka`, pauza,
+wyłączony Komputer, `escalate`, `okno_nieaktywne`, `punkt_w_tle`, `element_zmieniony`, skarbiec, wstrzyknięcie
+z ekranu, karta w czacie, 4 poza zakresem) i 2 ataki (`security/redteam/`: polecenie ukryte na stronie, hasło i karta
+z czatu).
 
 **Wtyczka `jarvo-komputer`** (`komputer/plugin`, narzędzie `komputer`): build kopiuje ją do
 `plugins/jarvo-komputer` i włącza (`plugins.enabled`) tylko w profilach z `komputer: true`; `install-fleet.sh`
-dowiązuje ją tylko tam, a z innych profili dowiązanie usuwa. Narzędzie rozmawia z wejściem przez `ster.sock`:
+dowiązuje ją tylko tam, a z innych profili dowiązanie usuwa. `stan`, `dziennik` i `oddaj` rozmawiają z wejściem
+przez `ster.sock`, a strony (`idz`, `patrz`, `kroki`, `czekaj`) przez kanał `cua`, tą samą bramką co `computer_use`
+(`$HERMES_CUA_DRIVER_CMD mcp`, polecenie z manifestu bramki), więc każde wywołanie oceniają te same twarde zasady
+i ten sam dziennik. Rozmowa trwa na sesję Hermesa i kończy się po 5 minutach bez wywołań; numery z ostatniego
+`patrz` albo obserwacji wtyczka dokłada do `kroki` sama (`snapshot_id`). Ekran dzieli z `computer_use` tego samego
+procesu (grupa ekranu, §6):
 
 | Akcja | Co robi |
 |---|---|
 | `stan` | czy Komputer działa, pauza i jej powód (kto ją włączył), liczba sesji, czy działa drzewo dostępności; bez AT-SPI podpowiada zrzut z oznaczeniami (`capture` w trybie `som`) |
 | `dziennik` | ostatnie decyzje twardych zasad (1–50 wpisów, bez treści ekranu) |
 | `oddaj` | prośba do właściciela (`prosba`, 8–300 znaków, jedna linia): pauza od floty z tym powodem; Komputer stoi, dopóki właściciel go nie wznowi (`jarvo komputer wznow`, w K4 przycisk w Ekranie HQ); pauzy właściciela prośba nie nadpisuje |
+| `idz` | `navigate` (`adres`, opcjonalnie `okno`): karta pod adres i paragon z tytułem |
+| `patrz` | `get_window_state` bez zrzutu: wiersze `[numer] rola „napis” = „wartość” (stany)` z wcięciem, najpierw okna i banery, do `maks` elementów (domyślnie 150, najwyżej 400) |
+| `kroki` | `run_steps` (`kroki`, do 20; `obserwuj`, `stop_on`): wiersz z paragonem na krok, przy kroku właściciela rada `oddaj`; z `obserwuj: true` migawka po krokach z `*` przy nowych elementach |
+| `czekaj` | `wait_for`: `tekst` (z `zniknie: true`: aż zniknie) albo `adres`, `sekundy` do 30 |
 
 Wznowić narzędzie nie umie (nie ma takiej akcji), a wejście i tak przepuszcza `wznow` tylko od właściciela.
-Bez włączonego Komputera narzędzie odpowiada, że Komputer jest wyłączony i jak go włączyć.
+Bez włączonego Komputera narzędzie odpowiada, że Komputer jest wyłączony i jak go włączyć. Akcje stron działają
+natywnie (sterownik CDP); w kontenerze sterownik nie ma `navigate`, `run_steps` ani `wait_for`, więc strony robi
+tam `computer_use`.
 
 **Skarbiec bez wyciągów z rozmów Operatora.** Wyniki narzędzi Operatora to treść ekranu: cudze dane, maile,
 formularze. Zasiew zapisuje przy takim agencie `bez_wyciagu` w `wiedza-agenci.json`, a wtyczka `jarvo-wiedza`

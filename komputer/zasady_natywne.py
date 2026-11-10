@@ -111,8 +111,9 @@ def ocen(nazwa: str, args: Optional[dict], ctx) -> Optional[zasady.Werdykt]:
                                   "wkleja z niego i go nie zmienia; tekst wpisz przez type_text")
         if skrot in SKROTY_PRZEGLADARKI:
             return zasady.Werdykt(zasady.ODMOWA, "skrot_przegladarki", f"skrót {'+'.join(skrot)} steruje oknem "
-                                  "przeglądarki (pasek adresu, karty, pliki, druk, ustawienia); adres otwórz paskiem "
-                                  "adresu (element 0 migawki: klik, type, Enter), launch_app albo linkiem na stronie")
+                                  "przeglądarki (pasek adresu, karty, pliki, druk, ustawienia); adres otwórz przez "
+                                  "navigate, paskiem adresu (element 0 migawki: klik, type, Enter), launch_app albo "
+                                  "linkiem na stronie")
     celowane = zasady._celowane(args)
     if nazwa in ("click", "double_click", "drag", "right_click"):
         el = ctx.cel("click", args) if celowane else None

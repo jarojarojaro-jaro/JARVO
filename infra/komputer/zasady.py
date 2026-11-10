@@ -38,6 +38,7 @@ ODCZYT = frozenset({
     "list_apps", "list_windows", "get_window_state", "verify_state", "get_screen_size", "get_desktop_state",
     "get_cursor_position", "get_agent_cursor_state", "check_permissions", "health_report", "get_config",
     "get_accessibility_tree", "zoom", "get_session", "list_sessions", "get_session_state",
+    "wait_for",                     # sterownik CDP: czekanie na tekst albo adres, bez działania na stronie
 })
 SESJA = frozenset({
     "start_session", "end_session", "escalate_session", "set_agent_cursor_enabled", "set_agent_cursor_motion",
@@ -46,6 +47,7 @@ SESJA = frozenset({
 DZIALANIA = frozenset({
     "click", "double_click", "right_click", "drag", "scroll", "type_text", "press_key", "hotkey", "set_value",
     "launch_app", "kill_app", "invoke_menu",
+    "navigate",                     # sterownik CDP: karta pod adres (zasady jak tekst w pasku adresu)
 })
 DOSTEPNE = ODCZYT | SESJA | DZIALANIA
 # zmieniają tylko stan sesji sterownika, nie ekran: wolno je też przy pauzie
@@ -500,6 +502,15 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
             if czesci.scheme not in {"http", "https"} or not czesci.netloc:
                 return _odmowa("adres", f"launch_app: tylko adresy http i https, nie {_pokaz(str(u), 40)}")
         return Werdykt(TAK, cel=", ".join(urlsplit(str(u)).netloc for u in args.get("urls") or []))
+
+    if nazwa == "navigate":
+        # te same zasady co adres wpisany w pasek (tekst: sekrety, karty, javascript:, file:…) i tylko http(s);
+        # sieć lokalną i ten komputer odcina potem proxy przeglądarki
+        url = str(args.get("url") or "").strip()
+        czesci = urlsplit(url)
+        if czesci.scheme.lower() not in {"http", "https"} or not czesci.netloc:
+            return _odmowa("adres", f"navigate: tylko adresy http i https, nie {_pokaz(url, 40)}")
+        return _sprawdz_tekst(url, None) or Werdykt(TAK, cel=czesci.hostname or "")
 
     if nazwa == "kill_app":
         try:

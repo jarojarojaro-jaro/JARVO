@@ -26,6 +26,13 @@ Po działaniu sterownik czeka, aż strona się uspokoi (koniec ładowania, CISZA
 CZEKANIE_MAKS s), i porównuje drzewo z drzewem sprzed działania: paragon `zmiana +A -R; adres; nowe: …` daje
 `effect: confirmed`, brak zmiany `suspected_noop`.
 
+Jak telefon (PHONEUSE) i cua-driver 0.38: `run_steps` to do MAKS_KROKOW działań w jednym wywołaniu, z celem numerem
+albo napisem (`name`, poza type_text też `text`; kilka pasujących albo żaden = odmowa kroku z kandydatami) i z
+`wait_for` przed działaniem. Każdy krok idzie przez `wykonaj` od wejścia (twarde zasady przed każdym krokiem, na
+stronie po poprzednim), a odmowa zatrzymuje paczkę; bez wejścia sterownik paczki nie wykona. `wait_for` czeka
+w sterowniku na tekst, jego zniknięcie albo adres (najwyżej CZEKANIE_WARUNKU_MAKS s), `navigate` przenosi kartę pod
+adres http(s) przez to samo proxy co pasek adresu.
+
 Okna przeglądarki JavaScript (alert, confirm, prompt, beforeunload) są w migawce oknem `dialog` z przyciskami OK
 i Anuluj; wybór pliku w trybie w tle jest przechwycony (Page.setInterceptFileChooserDialog) i robi go człowiek.
 
@@ -45,6 +52,7 @@ widocznym któraś strona ma fokus. Kiedy parkować, decyduje usługa (usluga.py
 from __future__ import annotations
 
 import base64
+import fnmatch
 import json
 import mimetypes
 import os
@@ -70,6 +78,28 @@ CZEKANIE_BEZ_ZMIAN = 0.5           # s: tyle czekamy na pierwszą zmianę (odpow
 STAN_WAZNY = 2.0                   # s: tyle drzewo okna służy za stan sprzed działania (dalej nowe przed działaniem)
 PARAGON_WIERSZE = 10               # nowych elementów w paragonie
 STANY_PARAGONU = ("checked", "expanded", "selected", "disabled")   # stany, których zmiana to efekt działania
+# paczka kroków (run_steps, kontrakt cua-driver 0.38), czekanie na warunek (wait_for) i przejście pod adres (navigate)
+MAKS_KROKOW = 20                   # kroków w jednym run_steps (jak batch telefonu PHONEUSE; cua-driver 0.38 ma 64)
+CZAS_PACZKI = 60.0                 # s na całą paczkę z czekaniem (jak run_steps cua-driver 0.38)
+CZEKANIE_WARUNKU = 10.0            # s: domyślny limit wait_for
+CZEKANIE_WARUNKU_MAKS = 30.0       # s: najdłuższy wait_for (sterownik sprawdza warunek sam, co CO_ILE_WARUNEK s)
+CO_ILE_WARUNEK = 0.2
+CZAS_SZUKANIA = 3.0                # s: tyle krok z celem napisem czeka, aż element się pokaże (cua: timeout_ms)
+CZAS_SZUKANIA_MAKS = 10.0
+CZAS_NAWIGACJI = 15.0              # s na wczytanie strony po navigate
+OBSERWACJA_MAKS = 250              # elementów w obserwacji na końcu paczki (jak observe cua-driver 0.38)
+KANDYDACI = 5                      # elementów w odmowie niejednoznacznego celu napisem
+KROKI_PACZKI = frozenset({"click", "double_click", "right_click", "type_text", "press_key", "hotkey", "set_value",
+                          "scroll", "drag", "navigate"})
+ALIASY_KROKOW = {"type": "type_text", "key": "press_key", "press": "press_key", "keypress": "press_key",
+                 "set": "set_value", "goto": "navigate"}
+POLA_KROKU = frozenset({"tool", "args", "wait_for", "timeout_ms"})
+# `role` celu napisem: krótkie nazwy (jak w cua-driver) → role migawki; inna wartość to rola migawki wprost
+ROLE_CELU = {"button": {"push button", "toggle button"}, "link": {"link"}, "textfield": {"entry", "password text"},
+             "textbox": {"entry", "password text"}, "input": {"entry", "password text"}, "checkbox": {"check box"},
+             "radio": {"radio button"}, "combobox": {"combo box"}, "select": {"combo box", "list box"},
+             "menuitem": {"menu item", "check menu item", "radio menu item"}, "tab": {"page tab"},
+             "heading": {"heading"}, "dialog": {"dialog", "alert"}}
 EDYTOWALNE = frozenset({"entry", "password text", "combo box", "spin button"})
 MAKS_RAMEK = 20
 MAKS_MIGAWEK = 32
@@ -92,8 +122,10 @@ SCHEMATY_ZAKAZANE = ("file:", "chrome:", "chrome-untrusted:", "devtools:", "view
 INSTRUKCJE = ("Przeglądarka Jarva (Chromium) sterowana przez CDP: okno to karta przeglądarki, elementy z drzewa "
               "dostępności strony (najpierw okna i banery, potem to, co widać, na końcu elementy poza ekranem). "
               "Klikaj elementem (element_token z get_window_state). Wynik działania ma paragon (effect confirmed albo "
-              "suspected_noop). Adres strony: klik w element „Pasek adresu i wyszukiwania” (numer 0) i type "
-              "z adresem zakończonym nową linią.")
+              "suspected_noop). Adres strony: navigate z adresem http(s) (albo klik w element „Pasek adresu "
+              "i wyszukiwania”, numer 0, i type z adresem zakończonym nową linią). Kilka działań naraz: run_steps "
+              "(do 20 kroków, cel numerem albo napisem, każdy krok oceniają twarde zasady, paczka staje na pierwszej "
+              "odmowie); czekanie na tekst albo adres: wait_for (do 30 s).")
 # Pasek adresu karty: drzewo dostępności CDP zawiera tylko stronę, więc sterownik dokłada pasek jako element 0 z tą
 # samą nazwą co w Chromium z pulpitu (skill praca-na-ekranie: klik w pasek, type z adresem i nową linią na końcu;
 # osobny key return też działa)
@@ -150,7 +182,7 @@ KLAWISZE = {
 }
 AKTYWUJACE = frozenset({"return", "enter", "kp_enter", "iso_enter", "space", "kp_space", " "})   # jak zasady.py
 DZIALANIA_AGENTA = frozenset({"click", "double_click", "right_click", "drag", "scroll", "type_text", "press_key",
-                              "hotkey", "set_value"})
+                              "hotkey", "set_value", "navigate"})
 MODYFIKATORY = {"alt": (1, "Alt", "AltLeft", 18), "option": (1, "Alt", "AltLeft", 18),
                 "ctrl": (2, "Control", "ControlLeft", 17), "control": (2, "Control", "ControlLeft", 17),
                 "cmd": (4, "Meta", "MetaLeft", 91), "command": (4, "Meta", "MetaLeft", 91),
@@ -211,6 +243,13 @@ JS_CISZA = """function(zeruj){
   s.nowy = false;
   if (zeruj) s.n = 0;
   return w;
+}"""
+# Czy tekst jest na stronie (ramka): innerText, czyli tylko to, co strona rysuje; bez wielkości liter i nadmiarowych
+# spacji. Odizolowany świat, więc strona nie podmieni funkcji.
+JS_JEST_TEKST = """function(t){
+  const n = s => String(s || '').toLowerCase().replace(/\\s+/g, ' ').trim();
+  const b = document.body;
+  return b ? n(b.innerText).includes(n(t)) : false;
 }"""
 
 
@@ -1244,9 +1283,7 @@ class Sterownik:
                                   "message": "strona czeka na wybór pliku: robi go właściciel"}
         sid = self._rejestruj(okno, elementy, mapa)
         sc.update(snapshot_id=sid, elements=elementy, element_count=len(elementy))
-        linie = [f"{len(elementy)} elements", f'- AXWindow "{okno.tytul}"']
-        linie += [f"{'  ' * (el['depth'] + 1)}- [{el['element_index']}] {el['role']} \"{el['label'][:80]}\""
-                  + (" (offscreen)" if "offscreen" in el.get("states", ()) else "") for el in elementy[:400]]
+        linie = self._linie_migawki(okno.tytul, elementy)
         tresc.append({"type": "text", "text": "\n".join(linie)})
         if zrzut and not okno.dialog:
             tresc.append({"type": "image", "data": dane, "mimeType": "image/png"})
@@ -2498,10 +2535,447 @@ class Sterownik:
         except cdp.BladCDP as e:
             return {"ok": False, "blad": f"przeglądarka: {e.tekst[:200]}"}
 
+    # ------------------------------------------------------------------ paczka kroków, czekanie, nawigacja
+
+    @staticmethod
+    def _linie_migawki(tytul: str, elementy: list[dict], nowe: set | frozenset = frozenset()) -> list[str]:
+        """Migawka tekstem jak w cua-driver (`- [numer] rola "napis"`); `nowe`: numery oznaczone `*` (obserwacja
+        paczki: elementy, których nie było w stanie okna sprzed paczki)."""
+        linie = [f"{len(elementy)} elements", f'- AXWindow "{tytul}"']
+        linie += [f"{'  ' * (int(el.get('depth') or 0) + 1)}- {'*' if el.get('element_index') in nowe else ''}"
+                  f"[{el.get('element_index')}] {el.get('role')} \"{str(el.get('label') or '')[:80]}\""
+                  + (" (offscreen)" if "offscreen" in (el.get("states") or ()) else "") for el in elementy[:400]]
+        return linie
+
+    @staticmethod
+    def _warunek(args: dict) -> tuple[str, bool, str, float]:
+        """(tekst, zniknięcie, adres, limit w s) z argumentów wait_for; BladSterownika przy złej formie. Limit ponad
+        CZEKANIE_WARUNKU_MAKS s jest przycinany."""
+        tekst = _napis(args.get("text"))[:MAKS_NAPIS] if isinstance(args.get("text"), str) else ""
+        adres = args.get("url").strip()[:500] if isinstance(args.get("url"), str) else ""
+        znika = args.get("gone", False)
+        if not isinstance(znika, bool):
+            raise BladSterownika("warunek", "wait_for: `gone` to true albo false")
+        if bool(tekst) == bool(adres):
+            raise BladSterownika("warunek", "wait_for: podaj `text` (z `gone: true`: czekaj, aż zniknie) albo `url`")
+        if znika and not tekst:
+            raise BladSterownika("warunek", "wait_for: `gone` tylko z `text`")
+        ms = args.get("timeout_ms")
+        if ms is None:
+            return tekst, znika, adres, CZEKANIE_WARUNKU
+        if isinstance(ms, bool) or not isinstance(ms, (int, float)) or ms < 0:
+            raise BladSterownika("warunek", f"wait_for: `timeout_ms` to liczba milisekund (najwyżej "
+                                            f"{int(CZEKANIE_WARUNKU_MAKS * 1000)})")
+        return tekst, znika, adres, min(float(ms) / 1000, CZEKANIE_WARUNKU_MAKS)
+
+    @staticmethod
+    def _pasuje_adres(url: str, wzor: str) -> bool:
+        """Adres karty pasuje do wzoru: fragment adresu albo wzór z `*` (cały adres), bez wielkości liter."""
+        url, wzor = url.lower(), wzor.lower()
+        return fnmatch.fnmatchcase(url, wzor) if "*" in wzor else wzor in url
+
+    def _jest_tekst(self, okno: Okno, tekst: str) -> bool | None:
+        """Czy tekst jest na stronie karty (każda ramka, także z innego procesu; tylko to, co strona rysuje) albo
+        w otwartym oknie JavaScript; None, gdy żadnej ramki nie dało się odczytać (strona się ładuje)."""
+        if okno.dialog:
+            return " ".join(tekst.lower().split()) in " ".join(str(okno.dialog.get("wiadomosc") or "").lower().split())
+        try:
+            ramki = self._ramki_okna(okno)
+        except (cdp.BladCDP, KeyError):
+            return None
+        odczytane = False
+        for r in ramki:
+            try:
+                ctx = self._swiat(okno, r["sesja"], r["ramka"])
+                w = self.b.wyslij("Runtime.callFunctionOn", {
+                    "functionDeclaration": JS_JEST_TEKST, "executionContextId": ctx, "arguments": [{"value": tekst}],
+                    "returnByValue": True}, r["sesja"], czas=2)
+            except (cdp.BladCDP, KeyError):
+                okno.swiaty.pop((r["sesja"], r["ramka"]), None)    # świat zniknął z nawigacją: następnym razem nowy
+                continue
+            if w.get("exceptionDetails"):
+                continue
+            odczytane = True
+            if (w.get("result") or {}).get("value") is True:
+                return True
+        return False if odczytane else None
+
+    def _czekaj(self, okno: Okno, tekst: str, znika: bool, adres: str, limit: float) -> tuple[bool, float, str]:
+        """Warunek wait_for sprawdzany w sterowniku co CO_ILE_WARUNEK s, najwyżej `limit` s: (spełniony, ile s,
+        opis wyniku). Okno JavaScript kończy czekanie (strona stoi, dopóki ktoś go nie zamknie)."""
+        start = time.monotonic()
+        while True:
+            if adres:
+                self._odswiez_tytul(okno)
+                jest = self._pasuje_adres(okno.url, adres)
+            else:
+                t = self._jest_tekst(okno, tekst)
+                jest = t is not None and t is not znika
+            ile = time.monotonic() - start
+            if jest:
+                if adres:
+                    return True, ile, f"adres karty pasuje do „{adres[:80]}” ({okno.url[:120]})"
+                return True, ile, (f"tekstu „{tekst[:60]}” nie ma na stronie" if znika
+                                   else f"tekst „{tekst[:60]}” jest na stronie")
+            if okno.dialog or ile >= limit or self.okno(okno.nr) is None:
+                if adres:
+                    opis = f"adres karty ({okno.url[:120]}) nie pasuje do „{adres[:80]}”"
+                else:
+                    opis = (f"tekst „{tekst[:60]}” nadal jest na stronie" if znika
+                            else f"tekstu „{tekst[:60]}” nie ma na stronie")
+                if okno.dialog:
+                    opis += "; strona czeka na okno JavaScript (zrób get_window_state)"
+                return False, ile, opis
+            time.sleep(CO_ILE_WARUNEK)
+
+    def wait_for(self, args: dict) -> dict:
+        """Czekanie na warunek w sterowniku, bez kolejnych wywołań modelu: tekst na stronie (`text`), jego zniknięcie
+        (`gone: true`) albo adres karty (`url`: fragment albo wzór z `*`); `timeout_ms` domyślnie CZEKANIE_WARUNKU s,
+        najwyżej CZEKANIE_WARUNKU_MAKS s. Niespełniony w czasie: błąd `czas_minal` z tym, co jest."""
+        okno = self._okno_z(args)
+        tekst, znika, adres, limit = self._warunek(args)
+        ok, ile, opis = self._czekaj(okno, tekst, znika, adres, limit)
+        if ok:
+            return _wynik(f"wait_for: {opis} (po {ile:.1f} s)", met=True, waited_ms=round(ile * 1000),
+                          window_id=okno.nr, url=okno.url)
+        return _blad("czas_minal", f"wait_for: po {ile:.1f} s {opis}", met=False, waited_ms=round(ile * 1000),
+                     window_id=okno.nr, url=okno.url)
+
+    def navigate(self, args: dict) -> dict:
+        """Karta pod adres http(s), przez proxy filtrujące przeglądarki jak adres z paska, i paragon po wczytaniu
+        strony (najwyżej CZAS_NAWIGACJI s ładowania, potem uspokojenie jak po każdym działaniu). Adres zasady oceniają
+        tak jak tekst wpisany w pasek (zasady.py: navigate)."""
+        okno = self._okno_z(args)
+        url = str(args.get("url") or "").strip()
+        czesci = urlsplit(url)
+        if czesci.scheme.lower() not in ("http", "https") or not czesci.netloc:
+            return _blad("adres", "navigate: tylko pełne adresy http:// i https://")
+        if okno.dialog:
+            return _blad("cel", "strona czeka na okno JavaScript: najpierw OK albo Anuluj (zrób get_window_state)")
+        okno.pasek = None
+        self._przed(okno)
+        wynik = self.b.wyslij("Page.navigate", {"url": url}, okno.sesja, czas=CZAS_NAWIGACJI)
+        if wynik.get("errorText"):
+            return _blad("nawigacja", f"strona {czesci.hostname or ''} się nie otworzyła ({wynik['errorText']}): adres "
+                                      "nie odpowiada albo filtr ruchu Komputera go nie przepuszcza (sieć lokalna, ten "
+                                      "komputer)", url=okno.url)
+        koniec = time.monotonic() + CZAS_NAWIGACJI
+        while okno.laduje and time.monotonic() < koniec and not okno.dialog:
+            time.sleep(0.05)
+        self._odswiez_tytul(okno)
+        tekst = f"przejście pod {czesci.netloc}"
+        wynik_dzialania = self._po_dzialaniu(okno, tekst, str(args.get("delivery_mode") or "background"),
+                                             window_id=okno.nr, title=okno.tytul, url=okno.url)
+        sc = wynik_dzialania["structuredContent"]
+        if sc.get("effect") == "suspected_noop" and wynik.get("loaderId"):
+            # ten sam adres wczytany od nowa (nowy dokument), a strona wygląda tak samo: przejście się udało
+            sc["effect"] = "confirmed"
+            sc["message"] = wynik_dzialania["content"][0]["text"] = f"{tekst}; strona wczytana od nowa, bez zmian"
+        return wynik_dzialania
+
+    def _plan_paczki(self, args: dict) -> tuple[list[dict], dict | None, bool]:
+        """Kroki paczki sprawdzone przed pierwszym (zły krok 4 nic nie zmienia): [{"tool" (None: sam wait_for),
+        "args", "czekaj" (warunek wait_for przed działaniem), "szukaj" (napis, rola, limit s: cel napisem)}],
+        obserwacja na końcu (argumenty get_window_state albo None) i czy zwykły błąd kroku zatrzymuje paczkę
+        (`stop_on`). Domyślne `pid`, `window_id` i `session` paczki dostaje każdy krok, `delivery_mode` i `snapshot_id`
+        (do `element_index`) kroki z celem. Cel napisem: `name` (cua-driver) albo `text` (poza type_text, gdzie
+        `text` to wpisywany tekst), opcjonalnie `role`; nie razem z numerem ani punktem."""
+        kroki = args.get("steps")
+        if not isinstance(kroki, list) or not 1 <= len(kroki) <= MAKS_KROKOW:
+            raise BladSterownika("invalid_batch", f"`steps`: lista od 1 do {MAKS_KROKOW} kroków")
+        stop = args.get("stop_on", "error")
+        if stop not in ("error", "refusal"):
+            raise BladSterownika("invalid_batch", "`stop_on`: error (domyślnie: każdy nieudany krok zatrzymuje paczkę) "
+                                                  "albo refusal (tylko odmowa twardych zasad)")
+        obs = args.get("observe")
+        if obs is None or obs is False:
+            obserwacja = None
+        elif obs is True or isinstance(obs, dict):
+            obserwacja = {} if obs is True else dict(obs)
+            if set(obserwacja) - {"include_screenshot", "max_elements", "window_id"}:
+                raise BladSterownika("invalid_batch", "`observe`: include_screenshot, max_elements, window_id")
+        else:
+            raise BladSterownika("invalid_batch", "`observe`: true albo obiekt z argumentami get_window_state")
+        domyslne = {k: args[k] for k in ("pid", "window_id", "session") if args.get(k) is not None}
+        plan = []
+        for i, krok in enumerate(kroki):
+            def zly(tekst: str, i=i) -> BladSterownika:
+                return BladSterownika("invalid_batch", f"krok {i + 1}: {tekst}", krok=i)
+            if not isinstance(krok, dict):
+                raise zly("krok to obiekt {tool, args} albo {<narzędzie>: args}")
+            akcje = [k for k in krok if k not in POLA_KROKU]
+            if "tool" in krok and not akcje:
+                nazwa, a = krok["tool"], krok.get("args", {})
+            elif "tool" not in krok and "args" not in krok and len(akcje) == 1:
+                nazwa, a = akcje[0], krok[akcje[0]]
+            elif not akcje and set(krok) <= {"wait_for", "timeout_ms"} and "wait_for" in krok:
+                nazwa, a = None, {}
+            else:
+                raise zly("jeden krok to jedno działanie: {tool, args} albo {<narzędzie>: args}, opcjonalnie "
+                          "z wait_for i timeout_ms")
+            nazwa = ALIASY_KROKOW.get(nazwa, nazwa) if isinstance(nazwa, str) else nazwa
+            czekaj = krok.get("wait_for")
+            if nazwa == "wait_for":
+                if czekaj is not None:
+                    raise zly("wait_for podany dwa razy")
+                nazwa, czekaj, a = None, a, {}
+            if nazwa is not None and nazwa not in KROKI_PACZKI:
+                raise zly(f"{nazwa} nie może być krokiem paczki (działania: {', '.join(sorted(KROKI_PACZKI))} "
+                          "i wait_for; odczyt strony to `observe` na końcu paczki)")
+            if not isinstance(a, dict):
+                raise zly("argumenty kroku to obiekt")
+            if czekaj is not None:
+                if not isinstance(czekaj, dict):
+                    raise zly("wait_for to obiekt {text, gone, url, timeout_ms}")
+                try:
+                    czekaj = self._warunek(czekaj)
+                except BladSterownika as e:
+                    raise zly(e.tekst) from None
+            a = {**domyslne, **a}
+            if nazwa not in (None, "navigate"):
+                if args.get("delivery_mode") is not None:
+                    a.setdefault("delivery_mode", args["delivery_mode"])
+                if args.get("snapshot_id") and not a.get("element_token") and (
+                        a.get("element_index") is not None or a.get("from_element") is not None):
+                    a.setdefault("snapshot_id", args["snapshot_id"])
+            wzor = a.pop("name", None)
+            if nazwa != "type_text" and "text" in a:      # poza type_text `text` to napis celu (jak cel telefonu)
+                if wzor is not None:
+                    raise zly("cel napisem: `name` albo `text`, nie oba")
+                wzor = a.pop("text")
+            rola = a.pop("role", None)
+            szukaj = None
+            if wzor is not None or rola is not None:
+                if not isinstance(wzor, str) or not _napis(wzor):
+                    raise zly("cel napisem: `name` (albo `text`) z napisem elementu, opcjonalnie `role`")
+                if rola is not None and (not isinstance(rola, str) or not rola.strip()):
+                    raise zly("`role` to nazwa roli (button, link, textfield, checkbox…)")
+                if nazwa in (None, "navigate", "drag"):
+                    raise zly(f"{nazwa or 'wait_for'} nie ma celu napisem")
+                if a.get("element_token") or a.get("element_index") is not None or a.get("x") is not None \
+                        or a.get("y") is not None:
+                    raise zly("cel numerem albo napisem, nie oba")
+                a.pop("snapshot_id", None)
+                ms = krok.get("timeout_ms")
+                if ms is not None and (isinstance(ms, bool) or not isinstance(ms, (int, float)) or ms < 0):
+                    raise zly(f"`timeout_ms` to liczba milisekund (najwyżej {int(CZAS_SZUKANIA_MAKS * 1000)})")
+                limit = CZAS_SZUKANIA if ms is None else min(float(ms) / 1000, CZAS_SZUKANIA_MAKS)
+                szukaj = (_napis(wzor)[:MAKS_NAPIS], (rola or "").strip().lower(), limit)
+            plan.append({"tool": nazwa, "args": a, "czekaj": czekaj, "szukaj": szukaj})
+        return plan, obserwacja, stop == "error"
+
+    def _cel_napisem(self, okno: Okno, wzor: str, rola: str, limit: float,
+                     wykonaj: Callable[[str, dict], dict]) -> tuple[dict | None, dict]:
+        """Element kroku po napisie w świeżej migawce okna, zrobionej przez `wykonaj` (wejście ją zapamiętuje, więc
+        krok oceni tak jak klik numerem). Kandydaci: elementy migawki (widoczne, nieprzykryte; bez paska adresu)
+        z napisem równym wzorowi, a gdy takich nie ma, z napisem, który go zawiera; z nich te w widoku, a gdy w widoku
+        nie ma żadnego, te poza nim (sterownik je przewinie). Jeden: ({"element_token"}, opis celu). Kilka: odmowa
+        `cel_niejednoznaczny` z kandydatami (numery z tej migawki); żaden po `limit` s: `brak_celu`."""
+        role = ROLE_CELU.get(rola, {rola}) if rola else None
+        szukany = wzor.casefold()
+        koniec = time.monotonic() + limit
+        while True:
+            w = wykonaj("get_window_state", {"pid": self.pid, "window_id": okno.nr, "include_screenshot": False})
+            sc = w.get("structuredContent") if isinstance(w.get("structuredContent"), dict) else {}
+            sid = sc.get("snapshot_id")
+            if w.get("isError") or not isinstance(sid, str) or not isinstance(sc.get("elements"), list):
+                return None, {"code": str(sc.get("code") or "migawka"),
+                              "message": f"nie udało się odczytać okna: {sc.get('message') or ''}"[:300]}
+            elementy = [e for e in sc["elements"] if isinstance(e, dict) and e.get("element_index") not in (None, 0)
+                        and (role is None or e.get("role") in role)]
+            pasujace: list[dict] = []
+            for rowny in (True, False):
+                pas = [e for e in elementy if (_napis(e.get("label")).casefold() == szukany if rowny
+                                               else szukany in _napis(e.get("label")).casefold())]
+                pasujace = [e for e in pas if "offscreen" not in (e.get("states") or ())] or pas
+                if pasujace:
+                    break
+            if len(pasujace) == 1:
+                e = pasujace[0]
+                token = e.get("element_token") if isinstance(e.get("element_token"), str) and e.get(
+                    "element_token") else f"{sid}:{e['element_index']}"
+                return {"element_token": token}, {"element_index": e["element_index"], "role": e.get("role"),
+                                                  "label": str(e.get("label") or "")[:120], "snapshot_id": sid}
+            if pasujace:
+                kandydaci = [{"element_index": e["element_index"], "role": e.get("role"),
+                              "label": str(e.get("label") or "")[:80]} for e in pasujace[:KANDYDACI]]
+                lista = ", ".join(f"[{k['element_index']}] {k['role']} „{k['label'][:40]}”" for k in kandydaci)
+                return None, {"code": "cel_niejednoznaczny", "snapshot_id": sid, "kandydaci": kandydaci,
+                              "message": f"„{wzor[:60]}” pasuje do {len(pasujace)} elementów ({lista}"
+                                         f"{', …' if len(pasujace) > KANDYDACI else ''}); nic nie zrobione: wskaż "
+                                         f"jeden numerem (element_index z migawki {sid}) albo dokładniejszym "
+                                         "napisem lub rolą"}
+            if time.monotonic() >= koniec:
+                return None, {"code": "brak_celu", "snapshot_id": sid,
+                              "message": f"żaden element{' z rolą ' + rola if rola else ''} nie ma napisu "
+                                         f"„{wzor[:60]}” (szukane {limit:.1f} s); nic nie zrobione"}
+            time.sleep(0.3)
+
+    def _krok_paczki(self, i: int, krok: dict, start: float,
+                     wykonaj: Callable[[str, dict], dict]) -> tuple[dict, str]:
+        """Jeden krok paczki: limit czasu paczki, okno, wait_for przed działaniem, cel napisem i działanie przez
+        `wykonaj`. (raport kroku, wiersz wyniku)."""
+        nazwa, a = krok["tool"], dict(krok["args"])
+        etykieta = nazwa or "wait_for"
+        raport: dict[str, Any] = {"index": i, "tool": etykieta}
+
+        def blad(faza: str, kod: str, tekst: str, **dane: Any) -> tuple[dict, str]:
+            raport.update(ok=False, phase=faza, code=kod, message=tekst, **dane)
+            return raport, f"{i + 1}. {etykieta}: BŁĄD {kod}: {tekst}"
+
+        if time.monotonic() - start >= CZAS_PACZKI:
+            return blad("time_budget", "czas_paczki", f"paczka zużyła {CZAS_PACZKI:.0f} s przed tym krokiem")
+        a.setdefault("pid", self.pid)
+        if a.get("window_id") is None:
+            a["window_id"] = self.aktywne_okno()
+        okno = self.okno(a["window_id"])
+        if okno is None:
+            return blad("find", "okno", "nie ma takiego okna przeglądarki; zrób list_windows")
+        raport["window_id"] = okno.nr
+        cel = ""
+        try:
+            if krok["czekaj"]:
+                ok, ile, opis = self._czekaj(okno, *krok["czekaj"])
+                raport["wait_for"] = {"met": ok, "waited_ms": round(ile * 1000)}
+                if not ok:
+                    return blad("wait_for", "czas_minal", f"po {ile:.1f} s {opis}")
+                if nazwa is None:
+                    raport.update(ok=True, message=f"{opis} (po {ile:.1f} s)")
+                    return raport, f"{i + 1}. wait_for: {raport['message']}"
+            if krok["szukaj"]:
+                znaleziony, opis_celu = self._cel_napisem(okno, *krok["szukaj"], wykonaj)
+                if znaleziony is None:
+                    return blad("find", opis_celu.pop("code"), opis_celu.pop("message"), **opis_celu)
+                a.update(znaleziony)
+                raport["target"] = opis_celu
+                cel = f" [{opis_celu['element_index']}] {opis_celu['role']} „{opis_celu['label'][:60]}”"
+            wynik = wykonaj(nazwa, a)
+        except BladSterownika as e:
+            return blad("action", e.kod, e.tekst, **e.dane)
+        except cdp.BladCDP as e:
+            return blad("action", "cdp", f"przeglądarka: {e.tekst[:200]}")
+        sc = wynik.get("structuredContent") if isinstance(wynik.get("structuredContent"), dict) else {}
+        tekst = str(sc.get("message") or next((c.get("text") for c in wynik.get("content") or []
+                                                if isinstance(c, dict) and c.get("type") == "text"), "") or "")
+        ok = not wynik.get("isError")
+        raport.update(ok=ok, message=tekst[:600])
+        for k in ("effect", "code", "rule", "decision", "next_step", "zasloniety_przez", "dialog"):
+            if k in sc:
+                raport[k] = sc[k]
+        if not ok:
+            raport["phase"] = "action"
+        return raport, f"{i + 1}. {nazwa}{cel}: {'' if ok else 'BŁĄD ' + str(sc.get('code') or 'blad') + ': '}{tekst}"
+
+    def run_steps(self, args: dict, konfig: dict, wykonaj: Callable[[str, dict], dict]) -> dict:
+        """Paczka kroków w jednym wywołaniu (kontrakt run_steps cua-driver 0.38, najwyżej MAKS_KROKOW kroków
+        i CZAS_PACZKI s). Każdy krok, także migawka do celu napisem i obserwacja na końcu, idzie przez `wykonaj`:
+        w usłudze to wejście, czyli ta sama droga co pojedyncze wywołanie (twarde zasady na stronie po poprzednim
+        kroku, świeży element, dziennik, ukrywanie sekretów). Odmowa zasad (`decision` w wyniku kroku: czlowiek,
+        odmowa, wstrzymane) zatrzymuje paczkę zawsze, a zwykły błąd kroku przy `stop_on: error` (domyślnie); kroki
+        po zatrzymaniu nie idą. Wynik: wiersz z paragonem na krok, structuredContent {ok, total, executed,
+        failed_step, steps, observation}; przy zatrzymaniu `code`, `rule`, `decision` i `next_step` kroku na
+        wierzchu (np. wymaga_czlowieka). `observe`: migawka okna po ostatnim kroku z `*` przy elementach, których
+        nie było w stanie okna sprzed paczki (różnica od ostatniego odczytu albo działania)."""
+        try:
+            plan, obserwacja, stop_bledu = self._plan_paczki(args)
+        except BladSterownika as e:
+            return _blad("invalid_batch", f"run_steps odrzucone przed pierwszym krokiem: {e.tekst}", executed=0,
+                         failed_step=e.dane.get("krok"))
+        start = time.monotonic()
+        nr_paczki = args.get("window_id") if args.get("window_id") is not None else self.aktywne_okno()
+        okno_paczki = self.okno(nr_paczki)
+        stan = okno_paczki.stan if okno_paczki is not None else None
+        baza = Counter(stan["klucze"]) if stan else None
+        raporty: list[dict] = []
+        linie: list[str] = []
+        zatrzymany = None
+        ostatnie_okno = nr_paczki
+        for i, krok in enumerate(plan):
+            raport, linia = self._krok_paczki(i, krok, start, wykonaj)
+            raporty.append(raport)
+            linie.append(linia)
+            ostatnie_okno = raport.get("window_id", ostatnie_okno)
+            if not raport["ok"] and (raport.get("decision") or stop_bledu or raport.get("phase") == "time_budget"):
+                zatrzymany = i
+                break
+        n, bledy = len(plan), sum(not r["ok"] for r in raporty)
+        if zatrzymany is not None:
+            naglowek = (f"run_steps: krok {zatrzymany + 1} z {n} zatrzymał paczkę; wykonane przed nim: {zatrzymany}, "
+                        f"niewykonane: {n - zatrzymany - 1}")
+        elif bledy:
+            naglowek = f"run_steps: {n} kroków, {bledy} z błędem (stop_on: refusal, więc paczka szła dalej)"
+        else:
+            naglowek = f"run_steps: {n}/{n} kroków ok"
+        sc: dict[str, Any] = {"ok": not bledy, "message": naglowek, "total": n, "executed": len(raporty),
+                              "failed_step": zatrzymany, "steps": raporty,
+                              "elapsed_ms": round((time.monotonic() - start) * 1000)}
+        if zatrzymany is not None:
+            for k in ("code", "rule", "decision", "next_step"):
+                if k in raporty[zatrzymany]:
+                    sc[k] = raporty[zatrzymany][k]
+        obrazy: list[dict] = []
+        if obserwacja is not None:
+            nr = obserwacja.get("window_id") if obserwacja.get("window_id") is not None else ostatnie_okno
+            maks = obserwacja.get("max_elements")
+            w = wykonaj("get_window_state", {
+                "pid": self.pid, "window_id": nr, "include_screenshot": obserwacja.get("include_screenshot") is True,
+                "max_elements": maks if isinstance(maks, int) and not isinstance(maks, bool) and maks > 0
+                else OBSERWACJA_MAKS})
+            osc = w.get("structuredContent") if isinstance(w.get("structuredContent"), dict) else {}
+            if w.get("isError") or not isinstance(osc.get("elements"), list):
+                sc["observation"] = {"ok": False, "message": str(osc.get("message") or "brak odczytu okna")[:300]}
+                linie.append(f"obserwacja: BŁĄD {sc['observation']['message']}")
+            else:
+                elementy = osc["elements"]
+                nowe = self._nowe_od(baza, osc) if baza is not None and nr == nr_paczki else set()
+                for el in elementy:
+                    if isinstance(el, dict) and el.get("element_index") in nowe:
+                        el["new"] = True
+                sc["observation"] = {"ok": True, "elements": elementy, **{k: osc[k] for k in (
+                    "snapshot_id", "window_id", "title", "url", "element_count", "offscreen_count", "covered_count",
+                    "dialog", "file_chooser") if k in osc}}
+                if baza is not None and nr == nr_paczki:
+                    sc["observation"]["new_count"] = len(nowe)
+                linie.append(f"obserwacja: okno {nr} „{osc.get('title') or ''}” {osc.get('url') or ''}; migawka "
+                             f"{osc.get('snapshot_id')}" + (f"; nowe od stanu sprzed paczki (*): {len(nowe)}"
+                                                           if "new_count" in sc["observation"] else ""))
+                linie += self._linie_migawki(str(osc.get("title") or ""), elementy, nowe)
+                obrazy = [c for c in w.get("content") or [] if isinstance(c, dict) and c.get("type") == "image"]
+        return {"content": [{"type": "text", "text": "\n".join([naglowek, *linie])}, *obrazy],
+                "structuredContent": sc, "isError": zatrzymany is not None}
+
+    def _nowe_od(self, baza: Counter, osc: dict) -> set:
+        """Numery elementów obserwacji, których nie było w stanie okna sprzed paczki: ten sam klucz co paragon
+        (_klucz: rola, napis, wartość, stany, trzech przodków) na napisach sprzed ukrycia sekretów (migawka
+        w sterowniku), więc ukryty klucz w napisie nie robi z elementu nowego. Elementów bez napisu (kontenery)
+        nie oznaczamy: przy kilku takich samych nie wiadomo, który doszedł."""
+        with self._lock:
+            m = self._migawki.get(str(osc.get("snapshot_id") or ""))
+        surowe = (m or {}).get("role") or {}
+        po_nr = {}
+        for el in osc.get("elements") or []:
+            if isinstance(el, dict) and el.get("element_index") is not None:
+                rola, napis = surowe.get(el["element_index"], (el.get("role"), el.get("label")))
+                po_nr[el["element_index"]] = {**el, "role": rola, "label": str(napis or "")}
+        zostalo = Counter(baza)
+        nowe = set()
+        for nr, el in po_nr.items():
+            if nr == 0:
+                continue
+            k = self._klucz(el, po_nr)
+            if zostalo[k] > 0:
+                zostalo[k] -= 1
+            elif el["label"]:
+                nowe.add(nr)
+        return nowe
+
     # ------------------------------------------------------------------ MCP
 
-    def wywolaj(self, nazwa: str, args: dict, konfig: dict) -> dict:
-        """Jedno narzędzie MCP; wynik w formacie tools/call (content, structuredContent, isError)."""
+    def wywolaj(self, nazwa: str, args: dict, konfig: dict,
+                wykonaj: Callable[[str, dict], dict] | None = None) -> dict:
+        """Jedno narzędzie MCP; wynik w formacie tools/call (content, structuredContent, isError). `wykonaj`: droga
+        jednego kroku run_steps (wejście: twarde zasady przed każdym krokiem); bez niej run_steps nie działa, bo
+        kroki nie przeszłyby przez zasady."""
         args = args if isinstance(args, dict) else {}
         if nazwa in DZIALANIA_AGENTA:
             # wybór pliku z wcześniejszego działania (albo kliknięcia właściciela) nie należy do tego wywołania;
@@ -2511,6 +2985,15 @@ class Sterownik:
         try:
             if nazwa == "get_window_state":
                 return self.get_window_state(args, konfig)
+            if nazwa == "run_steps":
+                if wykonaj is None:
+                    return _blad("narzedzie", "run_steps działa tylko przez wejście Komputera (zasady oceniają każdy "
+                                              "krok)")
+                return self.run_steps(args, konfig, wykonaj)
+            if nazwa == "wait_for":
+                return self.wait_for(args)
+            if nazwa == "navigate":
+                return self.navigate(args)
             if nazwa in ("click", "double_click", "right_click"):
                 return self.click(args, nazwa)
             if nazwa == "drag":
@@ -2561,8 +3044,8 @@ class Sterownik:
         except cdp.BladCDP as e:
             return _blad("cdp", f"przeglądarka: {e.tekst[:200]}")
 
-    def obsluz_mcp(self, msg: dict, konfig: dict) -> dict | None:
-        """Wiadomość JSON-RPC MCP od wejścia; odpowiedź (None dla powiadomień)."""
+    def obsluz_mcp(self, msg: dict, konfig: dict, wykonaj: Callable[[str, dict], dict] | None = None) -> dict | None:
+        """Wiadomość JSON-RPC MCP od wejścia; odpowiedź (None dla powiadomień). `wykonaj`: jak w `wywolaj`."""
         ident, metoda = msg.get("id"), msg.get("method")
         if ident is None or metoda is None:
             return None
@@ -2576,7 +3059,7 @@ class Sterownik:
         elif metoda == "tools/list":
             wynik = {"tools": NARZEDZIA}
         elif metoda == "tools/call":
-            wynik = self.wywolaj(str(params.get("name") or ""), params.get("arguments") or {}, konfig)
+            wynik = self.wywolaj(str(params.get("name") or ""), params.get("arguments") or {}, konfig, wykonaj)
         else:
             return {"jsonrpc": "2.0", "id": ident, "error": {"code": -32601, "message": f"metoda {metoda}"}}
         return {"jsonrpc": "2.0", "id": ident, "result": wynik}
@@ -2640,4 +3123,25 @@ NARZEDZIA = [
         name=_STR, bundle_id=_STR, urls=_MOD, session=_STR, launch_path=_STR, additional_arguments=_MOD,
         creates_new_application_instance={"type": "boolean"})},
     {"name": "kill_app", "description": "Zamyka karty przeglądarki Jarva.", "inputSchema": _schemat(pid=_INT)},
+    {"name": "navigate", "description": "Karta pod adres http(s) przez proxy filtrujące; paragon po wczytaniu strony.",
+     "inputSchema": {**_schemat(url=_STR, pid=_INT, window_id=_INT, session=_STR), "required": ["url"]}},
+    {"name": "wait_for", "description": (
+        "Czeka w sterowniku, aż tekst będzie na stronie (`gone: true`: aż zniknie) albo adres karty będzie pasował "
+        "(`url`: fragment albo wzór z *); timeout_ms domyślnie 10000, najwyżej 30000."), "inputSchema": _schemat(
+        pid=_INT, window_id=_INT, text=_STR, gone={"type": "boolean"}, url=_STR,
+        timeout_ms={"type": "integer", "minimum": 0, "maximum": int(CZEKANIE_WARUNKU_MAKS * 1000)}, session=_STR)},
+    {"name": "run_steps", "description": (
+        f"Do {MAKS_KROKOW} kroków w jednym wywołaniu, po kolei; każdy krok oceniają twarde zasady wejścia przed nim, "
+        "na stronie po poprzednim kroku. Krok: {tool, args} albo {<narzędzie>: args} (click, double_click, "
+        "right_click, type_text, press_key, hotkey, set_value, scroll, drag, navigate), opcjonalnie wait_for "
+        "(warunek przed działaniem) i timeout_ms (szukanie celu napisem, najwyżej 10000); sam {wait_for: {...}} to "
+        "krok czekania. Cel: element_index (z snapshot_id paczki albo kroku), element_token albo napis: name "
+        "(albo text poza type_text) i opcjonalnie role; kilka pasujących albo żaden = odmowa kroku z kandydatami. "
+        "Odmowa zasad zatrzymuje paczkę zawsze (kolejne kroki nie idą), zwykły błąd przy stop_on=error. observe: "
+        "migawka na końcu z * przy nowych elementach."), "inputSchema": {
+        "type": "object", "required": ["steps"], "additionalProperties": True, "properties": {
+            "steps": {"type": "array", "minItems": 1, "maxItems": MAKS_KROKOW, "items": {"type": "object"}},
+            "stop_on": {"type": "string", "enum": ["error", "refusal"]},
+            "observe": {"type": ["boolean", "object"]}, "pid": _INT, "window_id": _INT, "snapshot_id": _STR,
+            "delivery_mode": _TRYB, "session": _STR}}},
 ]

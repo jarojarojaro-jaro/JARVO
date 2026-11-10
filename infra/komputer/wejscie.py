@@ -10,7 +10,9 @@ uruchamia `cua-driver mcp` dopiero przy pierwszej wiadomości i przepuszcza rozm
   - cel kliknięcia i pole z fokusem bierzemy z migawek sterownika i na żywo z AT-SPI (zdarzenia fokusu,
     element w punkcie), nie z deklaracji agenta,
   - działanie na element numerem z migawki idzie dalej dopiero po sprawdzeniu tego numeru w świeżej migawce okna
-    (sterownik szuka elementu po numerze w drzewie z chwili działania).
+    (sterownik szuka elementu po numerze w drzewie z chwili działania),
+  - zmieniać ekran może jedna sesja naraz (`zajete` przez ZAJETE_S s); sesje z tą samą grupą ekranu (powiadomienie
+    GRUPA od bramki: computer_use i narzędzie `komputer` jednego procesu agenta) liczą się jak jedna.
 Na gnieździe ster.sock polecenia JSON: stan, pauza, wznow, dziennik. Pauzę włączy każdy, kto widzi gniazdo
 (flota, HQ), wznowić może tylko właściciel: proces pulpitu albo root w tym kontenerze (jarvo komputer wznow),
 sprawdzane po SO_PEERCRED, więc agent z terminalem we flocie nie zdejmie sobie pauzy. Dziennik
@@ -21,6 +23,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import signal
 import socket
 import struct
@@ -62,6 +65,12 @@ PROBY_TRAFIENIA = 3             # zapytań o element w punkcie: dwa zgodne z rz�
 PAUZA_TRAFIENIA = 0.12          # s między nimi: Chromium najpierw zgaduje z drzewa, potem pyta silnik strony
 WEWNETRZNE = "jarvo-wejscie:"   # id zapytań wejścia do sterownika (świeża migawka); agentowi zastrzeżone
 CZAS_MIGAWKI = 30               # s na świeżą migawkę (sterownik sam kończy przejście drzewa po 25 s)
+# Grupa ekranu: sesje jednego procesu agenta (computer_use Hermesa i narzędzie `komputer` Operatora, każde przez
+# bramkę jarvo_cua.py) dzielą ekran zamiast odmawiać sobie `zajete`. Bramka wysyła to powiadomienie przed rozmową,
+# z kluczem ze zmiennej JARVO_KOMPUTER_GRUPA, którą ustawia wtyczka jarvo-komputer w procesie Hermesa. To nie jest
+# granica bezpieczeństwa: każdy krok i tak oceniają twarde zasady, a grupa tylko nie każe czekać 120 s.
+GRUPA = "notifications/jarvo/grupa"
+WZOR_GRUPY = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 
 
 def wolno_wznowic(uid: int) -> bool:
@@ -371,19 +380,20 @@ class Ekran:
                 pass
             self.pauza = None
 
-    def zajmij(self, nr: int) -> float | None:
-        """Sesja `nr` chce zmienić ekran: None, gdy wolno (ekran jest odtąd jej), albo ile sekund temu działała
-        sesja, która go zajmuje. Ekran zwalnia koniec tamtej sesji albo ZAJETE_S bez jej działań."""
+    def zajmij(self, klucz) -> float | None:
+        """Sesja (klucz: numer sesji albo jej grupa ekranu) chce zmienić ekran: None, gdy wolno (ekran jest odtąd
+        jej), albo ile sekund temu działała sesja, która go zajmuje. Ekran zwalnia koniec tamtej sesji (ostatniej
+        z grupy) albo ZAJETE_S bez jej działań."""
         teraz = time.monotonic()
         with self._lock:
-            if self._zajete and self._zajete[0] != nr and teraz - self._zajete[1] < ZAJETE_S:
+            if self._zajete and self._zajete[0] != klucz and teraz - self._zajete[1] < ZAJETE_S:
                 return teraz - self._zajete[1]
-            self._zajete = (nr, teraz)
+            self._zajete = (klucz, teraz)
             return None
 
-    def zwolnij(self, nr: int) -> None:
+    def zwolnij(self, klucz) -> None:
         with self._lock:
-            if self._zajete and self._zajete[0] == nr:
+            if self._zajete and self._zajete[0] == klucz:
                 self._zajete = None
 
     def limit(self) -> bool:
@@ -636,6 +646,7 @@ class Sesja:
     """Jedno połączenie z cua.sock: agent ↔ wejście ↔ cua-driver mcp."""
 
     licznik = 0
+    DOSTEPNE = zasady.DOSTEPNE                      # narzędzia, które sesja pokazuje w tools/list i zapamiętuje
 
     def __init__(self, gniazdo: socket.socket, wejscie: "Wejscie") -> None:
         Sesja.licznik += 1
@@ -650,6 +661,12 @@ class Sesja:
         self._wewn: dict[str, list] = {}              # id zapytania wejścia -> [zdarzenie, odpowiedź]
         self._wewn_n = 0
         self._wewn_lock = threading.Lock()
+        self.grupa: str | None = None                 # grupa ekranu (GRUPA) od bramki, pierwsza wygrywa
+
+    @property
+    def klucz_ekranu(self):
+        """Kto zajmuje ekran: grupa ekranu sesji albo sama sesja."""
+        return ("grupa", self.grupa) if self.grupa else self.nr
 
     # --- wysyłanie
     def do_agenta(self, wiadomosc: dict) -> None:
@@ -709,6 +726,11 @@ class Sesja:
                             "error": {"code": -32600, "message": "batch wyłączony w Komputerze Jarva"}})
             return
         metoda, ident = msg.get("method"), msg.get("id")
+        if metoda == GRUPA and ident is None:   # powiadomienie bramki: grupa ekranu procesu agenta
+            grupa = (msg.get("params") or {}).get("grupa") if isinstance(msg.get("params"), dict) else None
+            if self.grupa is None and isinstance(grupa, str) and WZOR_GRUPY.match(grupa):
+                self.grupa = grupa
+            return
         if metoda is None:                      # odpowiedź agenta na żądanie sterownika
             self.do_sterownika(msg)
             return
@@ -751,7 +773,7 @@ class Sesja:
             log(f"sesja {self.nr}: błąd zasady dla {nazwa}: {e!r}")
             return zasady.Werdykt(zasady.ODMOWA, "blad_zasady", "wewnętrzny błąd zasad; działanie wstrzymane")
         if w.wolno and nazwa in zasady.ZMIANY_EKRANU:
-            temu = self.wejscie.ekran.zajmij(self.nr)
+            temu = self.wejscie.ekran.zajmij(self.klucz_ekranu)
             if temu is not None:
                 return zasady.Werdykt(zasady.ODMOWA, "zajete",
                                       f"ekranem steruje teraz inna sesja Operatora (działała {int(temu)} s temu); "
@@ -880,23 +902,29 @@ class Sesja:
         if nazwa == "initialize":
             wynik["instructions"] = str(wynik.get("instructions") or "") + zasady.INSTRUKCJE
         elif nazwa == "tools/list":
-            wynik["tools"] = [t for t in wynik.get("tools") or [] if t.get("name") in zasady.DOSTEPNE]
+            wynik["tools"] = [t for t in wynik.get("tools") or [] if t.get("name") in self.DOSTEPNE]
         else:                                       # każda inna odpowiedź traci sekrety, także bez znanego id
-            sc = wynik.get("structuredContent")
-            if nazwa in zasady.DOSTEPNE and not wynik.get("isError"):
-                self.ctx.zapamietaj(nazwa, args, sc if isinstance(sc, dict) else {})
-            ukryte = 0
-            for c in wynik.get("content") or []:
-                if isinstance(c, dict) and c.get("type") == "text" and isinstance(c.get("text"), str):
-                    c["text"], n = zasady.ukryj_sekrety(c["text"])
-                    ukryte += n
-            if sc is not None:
-                wynik["structuredContent"], n = zasady.ukryj_w_strukturze(sc)
-                ukryte += n
-            if ukryte:
-                self.wejscie.dziennik.zapisz({"sesja": self.nr, "narzedzie": nazwa, "decyzja": "ukryte",
-                                              "sekrety": ukryte})
+            msg["result"] = self._po_wyniku(nazwa, args, wynik)
         return msg
+
+    def _po_wyniku(self, nazwa: str | None, args: dict, wynik: dict) -> dict:
+        """Wynik narzędzia w drodze do agenta: migawka do kontekstu zasad (numery elementów), sekrety ukryte
+        w tekście i w drzewie, wpis w dzienniku o ukryciu. Także wynik kroku paczki (wejscie_natywne)."""
+        sc = wynik.get("structuredContent")
+        if nazwa in self.DOSTEPNE and not wynik.get("isError"):
+            self.ctx.zapamietaj(nazwa, args, sc if isinstance(sc, dict) else {})
+        ukryte = 0
+        for c in wynik.get("content") or []:
+            if isinstance(c, dict) and c.get("type") == "text" and isinstance(c.get("text"), str):
+                c["text"], n = zasady.ukryj_sekrety(c["text"])
+                ukryte += n
+        if sc is not None:
+            wynik["structuredContent"], n = zasady.ukryj_w_strukturze(sc)
+            ukryte += n
+        if ukryte:
+            self.wejscie.dziennik.zapisz({"sesja": self.nr, "narzedzie": nazwa, "decyzja": "ukryte",
+                                          "sekrety": ukryte})
+        return wynik
 
     def zamknij(self) -> None:
         self._koniec.set()
@@ -936,8 +964,9 @@ class Wejscie:
                                DO_NOT_TRACK="1", CUA_DRIVER_RS_UPDATE_CHECK="false", RUST_LOG="error")
 
     def koniec_sesji(self, sesja: Sesja) -> None:
-        self.ekran.zwolnij(sesja.nr)
         with self._lock:
+            if not any(s is not sesja and s.klucz_ekranu == sesja.klucz_ekranu for s in self.sesje):
+                self.ekran.zwolnij(sesja.klucz_ekranu)   # ostatnia sesja grupy: ekran wolny od razu
             if sesja in self.sesje:
                 self.sesje.discard(sesja)
                 log(f"sesja {sesja.nr}: koniec")
