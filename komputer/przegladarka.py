@@ -83,8 +83,13 @@ def flagi(*, profil: Path, port_proxy: int | None, okno: bool, ekran: tuple[int,
          "--disable-extensions", "--disable-component-extensions-with-background-pages", "--disable-default-apps",
          "--no-service-autorun", "--no-pings", "--disable-quic", "--deny-permission-prompts",
          "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+         # WebUI* i SpareRenderer: bez ukrytych kart przycisku przeładowania i podpowiedzi paska oraz zapasowego
+         # renderera (pomiar 10.11 na CfT 156: 7 procesów zamiast 10, bezczynnie ok. -31% PSS, ze stroną ok. -60 MB;
+         # logowanie, ciasteczka, pobieranie, CDP i zrzuty bez zmian). Nazwy eksperymentalne: przy podbiciu pinu
+         # sprawdzić, że /json/list po starcie ma tylko about:blank.
          "--disable-features=MediaRouter,GlobalMediaControls,DialMediaRouteProvider,CastMediaRouteProvider,"
-         "Translate,AutofillServerCommunication,OptimizationHints,InterestFeedContentSuggestions",
+         "Translate,AutofillServerCommunication,OptimizationHints,WebUIReloadButton,WebUIOmniboxPopup,"
+         "WebUIOmniboxAimPopup,SpareRendererForSitePerProcess",
          f"--lang={jezyk}", f"--accept-lang={jezyk}-PL,{jezyk},en-US,en" if jezyk == "pl" else f"--accept-lang={jezyk}",
          f"--window-size={ekran[0]},{ekran[1]}"]
     if port_proxy:

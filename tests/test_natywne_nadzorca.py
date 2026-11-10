@@ -990,6 +990,23 @@ def test_komputer_dziala_tylko_wlaczony_i_z_przegladarka(u, tmp_path):
     assert nadzorca._odcisk(starty(plik)[1]["pid"]) is None
 
 
+def test_nadzorca_przepina_bramke_komputera_na_biezaca_wersje(u, tmp_path):
+    """Bramka HERMES_CUA_DRIVER_CMD wskazuje kod jednej wersji, a `jarvo update` usuwa starsze: po drugiej
+    aktualizacji Operator dostawał „can't open file …/app/<stara>/komputer/jarvo_cua.py”. Nadzorca nowej wersji
+    zapisuje bramkę na swój kod."""
+    from jarvo import komputer as jk
+    stara, nowa = tmp_path / "app-stara", tmp_path / "app-nowa"
+    for app in (stara, nowa):
+        (app / "komputer").mkdir(parents=True)
+        (app / "komputer" / "usluga.py").write_text(ATRAPA_KOMPUTERA, encoding="utf-8")
+    u.bin_floty.mkdir(parents=True, exist_ok=True)
+    nakladka = jk.nakladka_bramki(u, stara, tmp_path / "python")
+    shutil.rmtree(stara)                                       # sprzątanie starych wersji po aktualizacji
+    assert nadzorca.usluga_komputera(u, dict(os.environ), nowa) is not None
+    tresc = nakladka.read_text(encoding="utf-8")
+    assert str(nowa / "komputer" / "jarvo_cua.py") in tresc and str(stara) not in tresc
+
+
 @contextmanager
 def atrapa_kontroli_bramy(dane: Path, odpowiedz: dict):
     """Serwer jak gateway/control_socket.py Hermesa: jedna linia JSON tam i z powrotem na połączenie."""

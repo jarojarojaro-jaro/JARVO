@@ -1299,6 +1299,10 @@ def usluga_komputera(u: Uklad, env: dict[str, str], app: str | Path | None) -> U
     from . import komputer
     from .instalator import python_jarva
     env_uslugi = komputer.env_uslugi(env)
+    try:                                  # bramka HERMES_CUA_DRIVER_CMD na kod tej wersji (stare usuwa `jarvo update`)
+        komputer.nakladka_bramki(u, Path(str(app)), python_jarva(u))
+    except OSError:
+        pass                              # bez zapisu zostaje poprzednia; `jarvo komputer on` zapisze ją ponownie
     argv = [str(python_jarva(u)), "-I", "-X", "utf8", str(skrypt), "--korzen", str(u.root), "--zastap"]
     return Usluga(KOMPUTER, argv, cwd=u.stan, env=env_uslugi, gotowa=partial(komputer_gotowy, u), kolejnosc=2,
                   limit_stopu=LIMIT_STOPU_KOMPUTERA, wlaczona=partial(komputer.do_startu, u, env_uslugi))

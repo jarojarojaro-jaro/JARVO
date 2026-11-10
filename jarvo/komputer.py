@@ -218,7 +218,9 @@ def przegladarka_do_startu(u: Uklad, app: Path, env: dict, log=print) -> str:
 
 def nakladka_bramki(u: Uklad, app: Path, python: Path) -> Path:
     """`<program>/bin-floty/jarvo-cua(.cmd)`: bramka komputer/jarvo_cua.py Pythonem Jarva. Na nią wskazuje
-    HERMES_CUA_DRIVER_CMD procesów floty (jarvo/srodowisko.py)."""
+    HERMES_CUA_DRIVER_CMD procesów floty (jarvo/srodowisko.py). Ścieżka prowadzi do kodu jednej wersji, a `jarvo
+    update` usuwa stare wersje, więc nakładkę zapisują: `on` (także przy działającej usłudze) i nadzorca przy każdym
+    starcie (usluga_komputera); bez tego po drugiej aktualizacji bramka wskazywała nieistniejący plik."""
     bramka = app / "komputer" / "jarvo_cua.py"
     if WINDOWS:
         # cmd.exe czyta plik w stronie kodowej OEM: same znaki ASCII (ścieżki <program> są ASCII, c1)
@@ -330,6 +332,7 @@ def polecenie_on(u: Uklad, a, ot: instalator.Otoczenie) -> int:
     okno = a.okno if a.okno is not None else bool(ustawienia(u).get("okno"))
     ekran = _ekran(ot.env) if okno else {}
     if stan:
+        nakladka_bramki(u, app, instalator.python_jarva(u))
         zapisz_ustawienia(u, wlaczony=True, okno=okno, **ekran)
         uslugi = stan.get("usluga") or {}
         if bool(uslugi.get("okno")) != okno:
