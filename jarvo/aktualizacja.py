@@ -424,7 +424,9 @@ def _pobierz_plik(adres: str, cel: Path, klucz: str | None, log: Callable[[str],
     ostatni: Exception | None = None
     for proba in range(3):
         try:
-            with _otworz(adres, klucz=klucz, accept="application/octet-stream", czas=60) as odp, \
+            # API `tarball` przyjmuje tylko typy GitHuba (octet-stream = HTTP 415) i przekierowuje na codeload
+            accept = "application/vnd.github+json" if adres.startswith(API + "/") else "application/octet-stream"
+            with _otworz(adres, klucz=klucz, accept=accept, czas=60) as odp, \
                     open(czesc, "wb") as f:
                 razem, nastepny = 0, 10 << 20
                 for kawalek in iter(lambda: odp.read(1 << 16), b""):

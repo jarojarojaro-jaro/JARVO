@@ -282,6 +282,8 @@ class _GitHub(BaseHTTPRequestHandler):
         if p.path == f"{api}/commits":
             return self._odpowiedz(200, json.dumps(s.lista).encode("utf-8"), {"Content-Type": "application/json"})
         if p.path.startswith(f"{api}/tarball/"):
+            if "github" not in (self.headers.get("Accept") or ""):      # jak api.github.com: octet-stream = 415
+                return self._odpowiedz(415, b"{}")
             sha = p.path.rsplit("/", 1)[1]
             return self._odpowiedz(302, b"", {"Location": f"/codeload/{REPO_GH}/tar.gz/{sha}?token=tymczasowy"})
         if p.path.startswith(f"/codeload/{REPO_GH}/tar.gz/"):
