@@ -472,11 +472,12 @@ def formularz(k: Klient, pid: int) -> None:
     po = ((ster(root, "stan").get("usluga") or {}).get("pobrania") or {})
     sprawdz(po.get("pobrane", 0) == przed.get("pobrane", 0) + 1, "pobranie faktury PDF: zapisane w katalogu Komputera")
     sprawdz(po.get("odrzucone", 0) == przed.get("odrzucone", 0) + 1, "pobranie instalatora .exe: odrzucone")
-    # baner przykrywa przycisk: klik elementem nie trafi w baner
+    # baner przykrywa link: zasłonięty środek znika z migawki, a klik numerem sprzed banera nie trafi w baner
     k.narzedzie("click", {"pid": pid, "window_id": wid, "element_token": el["Pokaż baner"]["element_token"]})
-    el = migawka()
+    po = migawka()
     w = k.narzedzie("click", {"pid": pid, "window_id": wid, "element_token": el["Pobierz fakturę"]["element_token"]})
-    sprawdz(kod(w) == "element_przesloniety", "klik w link przykryty banerem strony: nie klika banera", tekst(w))
+    sprawdz("Pobierz fakturę" not in po and (zasada(w) == "element_zmieniony" or kod(w) == "element_przesloniety"),
+            "link przykryty banerem strony: nie ma go w migawce, a klik nie klika banera", tekst(w))
 
 
 def pulapka_fokusu(k: Klient, pid: int) -> None:

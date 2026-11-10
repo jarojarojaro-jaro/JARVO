@@ -1,7 +1,7 @@
 ---
 name: praca-na-ekranie
 description: "Pętla pracy na ekranie: patrz, działaj, sprawdź"
-version: 1.1.0
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,12 +11,12 @@ metadata:
   jarvo:
     agent: jarvo-operator
     autonomy: A1
-    reviewed: "2026-10-25"
+    reviewed: "2026-11-10"
 ---
 
 # Praca na ekranie
 
-Każde zadanie na Komputerze Jarva idzie tą samą pętlą: **patrz → jedno działanie → sprawdź → następne**.
+Każde zadanie na Komputerze Jarva idzie tą samą pętlą: **patrz → jedno działanie → paragon → następne**.
 Ekran to ostatnia droga: zanim klikniesz, sprawdź, czy nie wystarczy `web_extract` (sama treść strony), plik
 od właściciela albo inny agent (przez Jarva).
 
@@ -34,14 +34,22 @@ od właściciela albo inny agent (przez Jarva).
 | `capture` `mode: som` | drzewo nie wystarcza (canvas, ikony bez napisu, układ ma znaczenie) | zrzut z numerami |
 | `capture` `mode: vision` | ocena wyglądu (czy baner zasłania przycisk, czy wykres ma dane) | zrzut |
 
-Odpowiedź pokazuje do 100 elementów; reszta drzewa jest w pliku `elements_file` (czytasz `read_file`) albo
-zawężasz widok (przewiń, `app`). Zrzut z obrazem ma `screenshot_path`: to Twój dowód kroku.
+Odpowiedź pokazuje do 100 elementów, w kolejności: pasek adresu (0), okna i banery nad stroną (okno zgody,
+ciasteczka, czat; zamknij je najpierw), to, co widać, na końcu elementy poza ekranem (`bounds` poniżej wysokości
+zrzutu: `scroll` albo klik elementem, który sterownik sam przewinie). Element przykryty banerem się nie pokazuje.
+Reszta drzewa jest w pliku `elements_file` (czytasz `read_file`) albo zawężasz widok (przewiń, `app`). Zrzut
+z obrazem ma `screenshot_path`: to Twój dowód kroku.
 
 ## Działanie
 - Klik po `element` z ostatniego `capture`. Punkt `coordinate` tylko, gdy elementu nie ma (np. canvas), i tylko ze
   świeżego zrzutu `som`. Nigdy element i punkt naraz.
-- Adres strony: klik w pasek adresu (element „Pasek adresu i wyszukiwania”), `type` z adresem, `key` `return`.
-- Przewijanie: `scroll` `direction` + `amount`; po przewinięciu nowy `capture` (numery elementów się zmieniają).
+- Adres strony: klik w pasek adresu (element „Pasek adresu i wyszukiwania”, numer 0), potem `type` z adresem
+  zakończonym nową linią (`"https://…\n"`): przejście w tym samym wywołaniu, paragon pokaże `adres: …`.
+- Przewijanie: `scroll` `direction` + `amount`; paragon pokaże przewinięcie, nowe elementy zobaczysz w `capture`
+  (numery elementów od przewinięcia się nie zmieniają).
+- Odmowa `element_przesloniety`: `zasloniety_przez` mówi, co leży na wierzchu (rola, napis, numer elementu).
+  Zamknij to zwykłym przyciskiem (np. „Zamknij”, „Tylko niezbędne”, jak w skillu `formularze`) i kliknij jeszcze
+  raz; nie przechodź na zrzut `som` ani klik w punkt.
 - Odmowa `element_zmieniony`: wejście sprawdziło numer w świeżym drzewie i leży pod nim już inny element (strona
   coś dodała, usunęła albo zmieniła od Twojego `capture`). Nowy `capture` i ten sam element po nowym numerze; nie
   klikaj w punkt, żeby to ominąć.
@@ -58,12 +66,17 @@ zawężasz widok (przewiń, `app`). Zrzut z obrazem ma `screenshot_path`: to Tw�
   to zgoda człowieka; bez niego odmowa).
 - `wait` (do 30 s) zamiast powtarzania, gdy strona się ładuje.
 
-## Sprawdzenie i `verdict`
-Po każdym działaniu, które coś zmienia, dodaj `capture_after: true` (sprawdzenie z drzewa dostępności) albo zrób
-nowy `capture`. Wynik ma `verdict.decision`:
-- `done`: efekt potwierdzony, idziesz dalej.
-- `verify_fresh_state`: wejście doszło, efekt nieznany. **Najpierw `capture`**, porównaj z oczekiwanym stanem,
-  dopiero potem ewentualnie powtórz. Nie powtarzaj pisania ani kliknięcia „na wszelki wypadek”.
+## Paragon i `verdict`
+Wynik działania ma `effect`, paragon w `message` i `verdict.decision`:
+- `done` (`effect: confirmed`): paragon mówi, co się zmieniło: `zmiana +A -R; adres: …; nowe: rola „napis”, …;
+  zniknęło: …`. Zgadza się z tym, czego oczekujesz → następne działanie **bez nowego `capture`**, jeśli następny
+  element masz w ostatnim `capture` (wejście samo sprawdzi numer; `element_zmieniony` → nowy `capture`). Element
+  z `nowe:` klikasz po nowym `capture` (paragon nie ma numerów). `capture_after: true` tylko wtedy, gdy i tak
+  potrzebujesz całego widoku (odczyt danych, dowód kroku).
+- `verify_fresh_state` (`effect: unverifiable`): wejście doszło, efekt nieznany. **Najpierw `capture`**, porównaj
+  z oczekiwanym stanem, dopiero potem ewentualnie powtórz. Nie powtarzaj pisania ani kliknięcia „na wszelki wypadek”.
+- `escalate` z `effect: suspected_noop`: strona się nie zmieniła. Najpierw `capture`: może efekt przyszedł później
+  albo element nic nie robi. Działania nieodwracalnego nie powtarzasz.
 - `escalate`: działanie chyba nie trafiło. `recommended: px` → raz klik w punkt ze świeżego zrzutu `som`
   z `delivery_mode: foreground` w aktywnym oknie.
   `recommended: foreground` → raz to samo z `delivery_mode: foreground` w tym samym, aktywnym oknie (bez

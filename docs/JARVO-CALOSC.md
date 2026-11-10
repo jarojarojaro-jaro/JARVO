@@ -74,7 +74,8 @@ Operator ekranu, etap K3 z [KOMPUTER.md](KOMPUTER.md). Narzędzie `computer_use`
 `komputer/jarvo_cua.py` do wejścia Komputera Jarva (twarde zasady, ukrywanie sekretów, dziennik); wtyczka
 `jarvo-komputer` daje narzędzie `komputer` (`stan`, `dziennik`, `oddaj`: prośba do właściciela jako pauza z powodem).
 Pętla z `praca-na-ekranie`: najpierw droga bez ekranu (`web_extract`), potem `capture` `ax` → `som` → `vision`, klik
-po numerze elementu, `capture_after` po każdym działaniu i werdykt (`verify_fresh_state`, `escalate`). Skille:
+po numerze elementu, paragon sterownika po każdym działaniu (`confirmed` ze zmianą = dalej bez `capture`,
+`suspected_noop` i `verify_fresh_state` = najpierw `capture`) i werdykt (`escalate`). Skille:
 `praca-na-ekranie`, `formularze`, `dane-z-ekranu`, `przejscie-strony`, `oddaj-ekran`. Konfiguracja: toolsety
 `computer_use`, `komputer`, `file`, `web`, `memory`, `skills`, `todo`, `session_search` (na Telegramie też `clarify`;
 w cronie bez ekranu), bez terminala, wykonywania kodu, przeglądarki Hermesa i delegowania; `computer_use`:

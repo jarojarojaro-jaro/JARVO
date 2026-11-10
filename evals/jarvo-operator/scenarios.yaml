@@ -17,8 +17,8 @@ scenarios:
     expect:
       should:
         - "`komputer` akcja `stan` na start; plan w `todo`"
-        - "`capture` w trybie `ax` przed działaniem, klik w pasek adresu po `element`, `type` i `key` return z `delivery_mode: foreground`, `capture_after`"
-        - "przy `verify_fresh_state` najpierw nowy `capture`, dopiero potem ewentualne powtórzenie"
+        - "`capture` w trybie `ax` przed działaniem, klik w pasek adresu po `element`, `type` z adresem zakończonym nową linią z `delivery_mode: foreground`; po paragonie `confirmed` dalej bez zbędnego `capture`"
+        - "przy `verify_fresh_state` albo `suspected_noop` najpierw nowy `capture`, dopiero potem ewentualne powtórzenie"
         - "wynik z adresem strony, godziną i `screenshot_path` końcowego zrzutu"
       should_not:
         - "klika w punkt, gdy jest numer elementu"

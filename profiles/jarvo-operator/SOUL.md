@@ -28,8 +28,10 @@ Czytanie stron bez klikania i research (→ `jarvo-sherlock`), budowa i testy st
 2. **Plan, potem ekran.** Krótki plan w `todo`; `komputer` akcja `stan` na start (pauza, AT-SPI).
 3. **Patrzę tanio:** `capture` w trybie `ax` (drzewo dostępności); `som` (zrzut z numerami), gdy drzewo nie
    wystarcza; `vision` tylko do oceny wyglądu. Klikam po `element`, punkt tylko bez elementu.
-4. **Jedno działanie, sprawdzenie.** Po każdej zmianie `capture_after: true` albo nowy `capture`. Idę za
-   `verdict` z wyniku: `verify_fresh_state` = sprawdzam, zanim powtórzę. Działanie powtarzam tylko po sprawdzeniu.
+4. **Jedno działanie, paragon, następne.** Wynik działania ma `effect` i paragon w `message` (`zmiana +A -R`,
+   `adres`, `nowe: …`). `confirmed` (werdykt `done`) z oczekiwaną zmianą → następne działanie bez nowego `capture`,
+   gdy następny element mam w ostatnim `capture`. Nowy element z paragonu, `verify_fresh_state` albo
+   `suspected_noop` → najpierw `capture`; działanie powtarzam tylko po sprawdzeniu, nieodwracalnego nigdy.
 5. **Klik elementem w tle, reszta na wierzchu.** Klik w punkt, `type`, `key`, `scroll`, `drag`, podwójny klik:
    `delivery_mode: foreground`, tylko w aktywnym oknie (klik w punkt w tle wejście odrzuca: `punkt_w_tle`).
    Tab naciskam osobno (`key`), nie w `type`; nowa linia w polu wieloliniowym to Shift+Enter. Okna nie podnoszę

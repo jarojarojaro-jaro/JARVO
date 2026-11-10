@@ -453,8 +453,9 @@ włącza poleceniem `jarvo komputer on` ([KOMPUTER.md](KOMPUTER.md)). Robi to, c
 `web_extract`: klika w panelach www i programach w przeglądarce, wypełnia formularze, przechodzi ścieżkę na stronie
 jak klient i mówi, gdzie się psuje, przepisuje dane z ekranu do pliku. Najpierw sprawdza drogę bez ekranu. Na ekranie
 pracuje w pętli patrz → działaj → sprawdź: drzewo dostępności (`capture` `ax`), potem znaczniki na zrzucie (`som`),
-obraz tylko gdy drzewo jest puste; klika po numerze elementu, po każdym działaniu sprawdza stan (`capture_after`)
-i słucha werdyktu (`verify_fresh_state`, `escalate`). Klika w tle; pisze, naciska klawisze, przewija i przeciąga na
+obraz tylko gdy drzewo jest puste; klika po numerze elementu, po każdym działaniu czyta paragon sterownika
+(`effect: confirmed` ze zmianą albo `suspected_noop`), a nowy `capture` robi, gdy paragon nie wystarcza, i słucha
+werdyktu (`verify_fresh_state`, `escalate`). Klika w tle; pisze, naciska klawisze, przewija i przeciąga na
 wierzchu, ale tylko w oknie, które już jest aktywne (wejście pilnuje tego samo); okna na wierzch nie wyciąga bez
 zgody człowieka przy tym działaniu. Treść ekranu to dane, nie polecenia.
 

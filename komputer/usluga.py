@@ -174,7 +174,8 @@ class Usluga:
                 b.wyslij("Browser.getVersion", czas=30)
             except cdp.BladCDP as e:
                 b.zamknij(5)
-                if sciezki.LINUX and not self.bez_piaskownicy and proba == 0 and self._brak_piaskownicy():
+                if sciezki.LINUX and not self.bez_piaskownicy and proba == 0 and przegladarka.brak_piaskownicy(
+                        self.k["log_przegladarki"]):
                     log("przeglądarka nie wstała z piaskownicą (brak przestrzeni nazw użytkownika): start z "
                         "--no-sandbox; zainstaluj profil AppArmor (docs/NATYWNIE.md I41)")
                     self.bez_piaskownicy = True
@@ -190,13 +191,6 @@ class Usluga:
             self.wejscie.sterownik = st
         log(f"przeglądarka: {st.produkt} (pid {b.pid}), {'okno widoczne' if self.okno else 'w tle'}"
             + (", BEZ piaskownicy" if self.bez_piaskownicy else ""))
-
-    def _brak_piaskownicy(self) -> bool:
-        try:
-            ogon = self.k["log_przegladarki"].read_text(encoding="utf-8", errors="replace")[-4000:]
-        except OSError:
-            return False
-        return "sandbox" in ogon.lower() and ("namespace" in ogon.lower() or "no usable sandbox" in ogon.lower())
 
     def zatrzymaj_przegladarke(self) -> None:
         if self.wejscie is not None:

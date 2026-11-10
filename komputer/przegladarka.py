@@ -105,6 +105,16 @@ def flagi(*, profil: Path, port_proxy: int | None, okno: bool, ekran: tuple[int,
     return f
 
 
+def brak_piaskownicy(log: Path) -> bool:
+    """Linux: przeglądarka nie wstała, bo jądro nie daje przestrzeni nazw użytkownika (AppArmor, I41); poznać to
+    po końcu jej dziennika. Wtedy start z `bez_piaskownicy` (usługa i testy sterownika robią to tak samo)."""
+    try:
+        ogon = log.read_text(encoding="utf-8", errors="replace")[-4000:].lower()
+    except OSError:
+        return False
+    return "sandbox" in ogon and ("namespace" in ogon or "no usable sandbox" in ogon)
+
+
 def preferencje(pobrane: Path) -> dict:
     """Część `Default/Preferences` profilu, którą ustawiamy przed każdym startem (reszta należy do przeglądarki)."""
     return {

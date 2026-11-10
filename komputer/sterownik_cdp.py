@@ -3,19 +3,28 @@
 Hermes (computer_use) i bramka `komputer/jarvo_cua.py` rozmawiają z nim jak z `cua-driver mcp`: te same nazwy
 narzędzi i argumentów, `structuredContent.elements` z `element_index`, `parent_index`, `depth`, `role`, `label`,
 `frame` i `element_token` (`<snapshot_id>:<numer>`), obraz zrzutu jako część `image`, a wynik działania z `effect`
-(`confirmed` albo `unverifiable`) i `path: cdp`. Okno = karta przeglądarki (window_id to numer karty), pid = proces
-przeglądarki, aplikacja nazywa się „Chromium” (zasady.py: uruchamiamy tylko Chromium).
+(`confirmed`, `suspected_noop` albo `unverifiable`) i `path: cdp`. Okno = karta przeglądarki (window_id to numer
+karty), pid = proces przeglądarki, aplikacja nazywa się „Chromium” (zasady.py: uruchamiamy tylko Chromium).
 
 Role z drzewa dostępności Chromium (Accessibility.getFullAXTree) zamieniamy na słownik zasad (role AT-SPI z kontenera:
 `push button`, `entry`, `password text`, `form`, `document web`…), a pole hasła rozpoznajemy po atrybucie `type`
 z DOMSnapshot (w drzewie dostępności to zwykły `textbox`). Ramki z tej samej domeny i ramki z innych procesów (OOPIF,
-np. formularz płatności w ramce) trafiają do jednej migawki z przesunięciem do układu okna.
+np. formularz płatności w ramce) trafiają do jednej migawki z przesunięciem do układu okna. Kolejność migawki:
+najpierw okna i warstwy nad treścią (`dialog`, `modal`, `position: fixed/sticky`: banery), potem elementy w widoku,
+na końcu reszta ze stanem `offscreen`. Numery nadaje kolejność drzewa z warstwami na początku, więc nie zależą od
+przewinięcia; element, którego środek przykrywa inny element, w migawce się nie pokazuje.
 
 Dla twardych zasad (wejscie_natywne.KontekstCDP) sterownik opisuje element na żywo: rola, nazwa, atrybuty HTML,
 przodkowie, czy pole leży w formularzu i jakie ma on przyciski (Accessibility.queryAXTree), element w punkcie
-(DOM.getNodeForLocation, prawdziwe trafienie silnika strony) i pole z fokusem (document.activeElement w odizolowanym
-świecie, przez ramki i shadow DOM). Klik elementem trafia w środek jego prostokąta tylko wtedy, gdy w tym punkcie leży
-ten element albo jego potomek (inaczej odmowa `element_przesloniety`: baner albo okienko nad przyciskiem).
+(DOM.getNodeForLocation w układzie dokumentu, czyli punkt okna plus przewinięcie, bez warstw z
+`pointer-events: none`: prawdziwe trafienie silnika strony) i pole z fokusem (document.activeElement w odizolowanym
+świecie, przez ramki i shadow DOM). Klik elementem trafia w środek jego widocznej części tylko wtedy, gdy w tym
+punkcie leży ten element albo jego potomek; przykryty element sterownik przewija na środek widoku i sprawdza jeszcze
+cztery punkty, a dopiero potem odmawia (`element_przesloniety` z `zasloniety_przez`: baner albo okienko).
+
+Po działaniu sterownik czeka, aż strona się uspokoi (koniec ładowania, CISZA s bez zmian w DOM, najwyżej
+CZEKANIE_MAKS s), i porównuje drzewo z drzewem sprzed działania: paragon `zmiana +A -R; adres; nowe: …` daje
+`effect: confirmed`, brak zmiany `suspected_noop`.
 
 Okna przeglądarki JavaScript (alert, confirm, prompt, beforeunload) są w migawce oknem `dialog` z przyciskami OK
 i Anuluj; wybór pliku w trybie w tle jest przechwycony (Page.setInterceptFileChooserDialog) i robi go człowiek.
@@ -44,7 +53,7 @@ import secrets
 import struct
 import threading
 import time
-from collections import OrderedDict
+from collections import Counter, OrderedDict
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import quote_plus, urlsplit
@@ -53,7 +62,15 @@ from . import cdp, przegladarka
 
 WERSJA = "0.21.0"                  # kontrakt cua-driver, który przyjmuje Hermes (≥ 0.20), bramka podaje tę samą
 APLIKACJA = "Chromium"
-MAKS_ELEMENTOW = 2000              # jak domyślny limit przejścia drzewa cua-driver
+MAKS_ELEMENTOW = 2000              # jak domyślny limit przejścia drzewa cua-driver (odpowiedź get_window_state)
+MAKS_PRZEJSCIE = 5000              # elementów w przejściu drzewa (numery i kolejność nie zależą od max_elements)
+CISZA = 0.2                        # s bez zmian w DOM: strona uspokojona po działaniu (jak PHONEUSE)
+CZEKANIE_MAKS = 2.5                # s: najdłużej czekamy na uspokojenie strony po działaniu
+CZEKANIE_BEZ_ZMIAN = 0.5           # s: tyle czekamy na pierwszą zmianę (odpowiedź z sieci, timer strony)
+STAN_WAZNY = 2.0                   # s: tyle drzewo okna służy za stan sprzed działania (dalej nowe przed działaniem)
+PARAGON_WIERSZE = 10               # nowych elementów w paragonie
+STANY_PARAGONU = ("checked", "expanded", "selected", "disabled")   # stany, których zmiana to efekt działania
+EDYTOWALNE = frozenset({"entry", "password text", "combo box", "spin button"})
 MAKS_RAMEK = 20
 MAKS_MIGAWEK = 32
 MAKS_NAPIS = 300
@@ -73,10 +90,13 @@ WZORCE_TESTOWE = ("https://*.jarvo.test/*", "https://jarvo-platnosci.test/*")
 SCHEMATY_ZAKAZANE = ("file:", "chrome:", "chrome-untrusted:", "devtools:", "view-source:", "chrome-extension:",
                      "chrome-search:", "edge:")
 INSTRUKCJE = ("Przeglądarka Jarva (Chromium) sterowana przez CDP: okno to karta przeglądarki, elementy z drzewa "
-              "dostępności strony. Klikaj elementem (element_token z get_window_state). Adres strony: klik w element "
-              "„Pasek adresu i wyszukiwania” (numer 0), type z adresem, key return.")
+              "dostępności strony (najpierw okna i banery, potem to, co widać, na końcu elementy poza ekranem). "
+              "Klikaj elementem (element_token z get_window_state). Wynik działania ma paragon (effect confirmed albo "
+              "suspected_noop). Adres strony: klik w element „Pasek adresu i wyszukiwania” (numer 0) i type "
+              "z adresem zakończonym nową linią.")
 # Pasek adresu karty: drzewo dostępności CDP zawiera tylko stronę, więc sterownik dokłada pasek jako element 0 z tą
-# samą nazwą co w Chromium z pulpitu (skill praca-na-ekranie: klik w pasek, type z adresem, key return)
+# samą nazwą co w Chromium z pulpitu (skill praca-na-ekranie: klik w pasek, type z adresem i nową linią na końcu;
+# osobny key return też działa)
 PASEK = "Pasek adresu i wyszukiwania"
 WYSZUKIWARKA = "https://www.google.com/search?q="          # jak domyślny silnik Chromium dla tekstu bez adresu
 
@@ -175,12 +195,29 @@ JS_WARTOSC = """function(v){
 }"""
 JS_WARTOSC_FOKUSU = """function(){ const e = this; return ('value' in e) ? String(e.value).slice(-400)
   : (e.isContentEditable ? String(e.innerText).slice(-400) : null); }"""
+JS_NA_SRODEK = "function(){ this.scrollIntoView({block: 'center', inline: 'center', behavior: 'instant'}); }"
+JS_ZASLONA = """function(){ const e = this.nodeType === 1 ? this : this.parentElement;
+  return e ? {tag: (e.tagName || '').toLowerCase(), tekst: String(e.innerText || '').slice(0, 200)} : null; }"""
+# Zmiany DOM od założenia obserwatora (odizolowany świat: strona go nie widzi): czas ciszy w ms i liczba zmian;
+# `nowy` = pierwszy odczyt w tym dokumencie (po przejściu na nową stronę)
+JS_CISZA = """function(zeruj){
+  let s = globalThis.__jarvoCisza;
+  if (!s || s.d !== document) {
+    s = globalThis.__jarvoCisza = {d: document, t: performance.now(), n: 0, nowy: true};
+    new MutationObserver(m => { s.t = performance.now(); s.n += m.length; }).observe(document,
+      {subtree: true, childList: true, attributes: true, characterData: true});
+  }
+  const w = {cisza: performance.now() - s.t, n: s.n, nowy: s.nowy, stan: document.readyState};
+  s.nowy = false;
+  if (zeruj) s.n = 0;
+  return w;
+}"""
 
 
 class BladSterownika(RuntimeError):
-    def __init__(self, kod: str, tekst: str):
+    def __init__(self, kod: str, tekst: str, **dane: Any):
         super().__init__(tekst)
-        self.kod, self.tekst = kod, tekst
+        self.kod, self.tekst, self.dane = kod, tekst, dane
 
 
 def _wynik(tekst: str, **sc: Any) -> dict:
@@ -188,9 +225,9 @@ def _wynik(tekst: str, **sc: Any) -> dict:
             "isError": False}
 
 
-def _blad(kod: str, tekst: str) -> dict:
+def _blad(kod: str, tekst: str, **sc: Any) -> dict:
     return {"content": [{"type": "text", "text": tekst}], "isError": True,
-            "structuredContent": {"ok": False, "code": kod, "message": tekst}}
+            "structuredContent": {"ok": False, "code": kod, "message": tekst, **sc}}
 
 
 def _rozmiar_png(dane: bytes) -> tuple[int, int]:
@@ -245,6 +282,9 @@ class Okno:
         self.utworzone = time.monotonic()
         self.trafienia: dict[tuple, tuple] = {}     # (x, y) -> (czas, sesja, backendNodeId) z oceny zasad
         self.padniecia: list[float] = []            # chwile padnięcia procesu karty (podnoszenie, najwyżej 3 na minutę)
+        self.laduje = 0.0                           # chwila startu ładowania głównej ramki (0: nie ładuje)
+        self.stan: dict | None = None               # drzewo z ostatniej migawki albo paragonu: stan przed działaniem
+        self.przed: dict = {}                       # liczniki sprzed działania (okna, pobrania)
 
 
 class Sterownik:
@@ -269,6 +309,7 @@ class Sterownik:
         self._aktywne: int | None = None
         self._migawki: OrderedDict[str, dict] = OrderedDict()
         self._pobrania: dict[str, dict] = {}
+        self._pobrania_start = 0                    # pobrań rozpoczętych (paragon: działanie zaczęło pobieranie)
         self.statystyki = {"pobrane": 0, "odrzucone": 0, "nawigacje_zablokowane": 0, "wejscie_wlasciciela": 0}
         self._nowe_okno = threading.Condition(self._lock)
         self.ua: str | None = None
@@ -371,8 +412,12 @@ class Sterownik:
                     okno.swiaty.pop((sesja, ramka), None)
                     if okno.sesja == sesja and not (p.get("frame") or {}).get("parentId"):
                         okno.pasek = None              # nowa strona w karcie: fokus na stronie, nie w pasku
+            elif "samedocument" not in str(p.get("navigationType") or "").lower():
+                self._ladowanie(sesja, p.get("frameId"), True)   # przejście na nowy dokument: strona się ładuje
             if url.lower().startswith(SCHEMATY_ZAKAZANE):
                 threading.Thread(target=self._zawroc, args=(sesja, url), daemon=True).start()
+        elif metoda in ("Page.frameStartedLoading", "Page.frameStoppedLoading"):
+            self._ladowanie(sesja, p.get("frameId"), metoda == "Page.frameStartedLoading")
         elif metoda == "Runtime.executionContextsCleared":
             okno = self._okno_sesji(sesja)
             if okno is not None:
@@ -392,6 +437,13 @@ class Sterownik:
                 self.log("sterownik: karta przeglądarki padła")
                 return
             threading.Thread(target=self._podnies, args=(okno,), daemon=True).start()
+
+    def _ladowanie(self, sesja: str | None, ramka, start: bool) -> None:
+        """Ładowanie głównej ramki karty (frameId głównej ramki = targetId karty): po działaniu sterownik czeka na
+        jego koniec, zanim porówna stronę."""
+        okno = self._okno_sesji(sesja)
+        if okno is not None and ramka == okno.target_id:
+            okno.laduje = time.monotonic() if start else 0.0
 
     def _dolaczony(self, p: dict, rodzic: str | None) -> None:
         info, sesja = p.get("targetInfo") or {}, p.get("sessionId")
@@ -522,6 +574,9 @@ class Sterownik:
 
     def _pobranie_start(self, p: dict) -> None:
         guid, nazwa = str(p.get("guid") or ""), str(p.get("suggestedFilename") or "pobrany-plik")
+        self._pobrania_start += 1
+        for okno in self.okna():
+            okno.laduje = 0.0                        # przejście zamienione w pobieranie: nowej strony nie będzie
         if przegladarka.wykonywalny(nazwa):
             self._pobrania[guid] = {"nazwa": nazwa, "odrzucone": True}
             self.statystyki["odrzucone"] += 1
@@ -656,18 +711,22 @@ class Sterownik:
         return wynik
 
     def _snapshot(self, sesja: str) -> dict:
-        """DOMSnapshot sesji: backendNodeId -> {"bounds", "doc", "tag", "atr", "dokument"}; dokumenty z przewinięciem."""
+        """DOMSnapshot sesji: backendNodeId -> {"bounds", "doc", "tag", "atr", "style", "zawartosc", "rodzic"};
+        dokumenty z przewinięciem. `rodzic` korzenia dokumentu ramki to jej właściciel (iframe), więc po rodzicach
+        da się przejść z ramki do strony. Styl: obramowanie i dopełnienie (przesunięcie ramki) i `position`."""
         s = self.b.wyslij("DOMSnapshot.captureSnapshot", {
-            "computedStyles": ["border-left-width", "border-top-width", "padding-left", "padding-top"],
+            "computedStyles": ["border-left-width", "border-top-width", "padding-left", "padding-top", "position"],
             "includeDOMRects": True}, sesja)
         napisy = s.get("strings") or []
 
         def napis(i):
             return napisy[i] if isinstance(i, int) and 0 <= i < len(napisy) else ""
-        wezly, dokumenty = {}, []
+        wezly, dokumenty, korzenie = {}, [], []
         for di, d in enumerate(s.get("documents") or []):
             n = d.get("nodes") or {}
             backend = n.get("backendNodeId") or []
+            rodzice = n.get("parentIndex") or []
+            korzenie.append(backend[0] if backend else None)
             nazwy = n.get("nodeName") or []
             atrybuty = n.get("attributes") or []
             zawartosc = dict(zip((n.get("contentDocumentIndex") or {}).get("index") or [],
@@ -688,8 +747,14 @@ class Sterownik:
                 lista = atrybuty[ni] if ni < len(atrybuty) else []
                 for k in range(0, len(lista) - 1, 2):
                     atr[napis(lista[k]).lower()] = napis(lista[k + 1])
+                pi = rodzice[ni] if ni < len(rodzice) else -1
                 wezly[bid] = {"doc": di, "tag": napis(nazwy[ni]).lower() if ni < len(nazwy) else "", "atr": atr,
-                              "bounds": granice.get(ni), "style": style.get(ni), "zawartosc": zawartosc.get(ni)}
+                              "bounds": granice.get(ni), "style": style.get(ni), "zawartosc": zawartosc.get(ni),
+                              "rodzic": backend[pi] if isinstance(pi, int) and 0 <= pi < len(backend) else None}
+        for bid, w in list(wezly.items()):
+            j = w["zawartosc"]
+            if j is not None and j < len(korzenie) and korzenie[j] in wezly:
+                wezly[korzenie[j]]["rodzic"] = bid
         return {"wezly": wezly, "dokumenty": dokumenty}
 
     @staticmethod
@@ -748,8 +813,18 @@ class Sterownik:
                 break
         return wynik
 
-    def _elementy(self, okno: Okno, maks: int) -> tuple[list[dict], dict]:
-        """Elementy migawki (kolejność drzewa) i mapa numer -> (sesja, backendNodeId)."""
+    def _elementy(self, okno: Okno, zasloniete: bool = True) -> tuple[list[dict], dict, dict]:
+        """Elementy migawki w kolejności dla agenta, mapa numer -> (sesja, backendNodeId, frameId) i podsumowanie
+        {"poza": ile poza widokiem, "zasloniete": ile pominiętych, "przewiniecie": (x, y) strony, "wszystkie":
+        pasek i każdy element drzewa po numerze, także przykryte (stan do paragonu)}. `zasloniete=False`: bez
+        sprawdzania przykrycia (stan do paragonu go nie potrzebuje).
+
+        Kolejność: pasek adresu (0), okna i warstwy nad treścią w widoku (`dialog`, `alertdialog`, `modal`,
+        `position: fixed/sticky`: banery i okienka zgody, także gdy leżą na końcu DOM), potem elementy w widoku,
+        na końcu reszta ze stanem `offscreen`. Numery: pasek, warstwy, reszta, w każdej grupie kolejność drzewa;
+        nie zależą od przewinięcia ani od max_elements, więc wejście znajdzie ten sam element pod tym samym numerem
+        w świeżej migawce. Element tekstowy albo interaktywny w widoku, którego środek przykrywa inny element
+        (DOM.getNodeForLocation jak przy kliknięciu), w migawce się nie pokazuje: agent widzi to, co zasłania."""
         ramki = self._ramki_okna(okno)
         snapy: dict[str, dict] = {}
         for r in ramki:
@@ -785,11 +860,17 @@ class Sterownik:
                     except cdp.BladCDP:
                         continue
 
-        elementy: list[dict] = [self._element_paska(okno)]          # pasek adresu: element 0 każdej migawki
-        mapa: dict[int, tuple] = {0: ("pasek", None, None)}
-        odwiedzone_ramki: set[str] = set()
+        sesja_wlasciciela: dict[str, tuple] = {}    # sesja ramki OOPIF -> (sesja rodzica, backendNodeId iframe)
+        for (sesja_rodzica, wbid), fid in wlasciciele.items():
+            if sesja_ramki.get(fid) not in (None, sesja_rodzica):
+                sesja_wlasciciela[sesja_ramki[fid]] = (sesja_rodzica, wbid)
 
-        def granice(sesja: str, bid: int | None) -> dict | None:
+        surowe: list[dict] = []          # w kolejności drzewa: {"el", "rodzic" (pozycja), "cel", "nakladka", "prost"}
+        odwiedzone_ramki: set[str] = set()
+        przyklejone: dict[tuple, bool] = {}
+
+        def prostokat(sesja: str, bid: int | None) -> tuple | None:
+            """Prostokąt elementu w układzie okna (piksele CSS)."""
             w = snapy.get(sesja, {}).get("wezly", {}).get(bid) if bid is not None else None
             if not w or not w.get("bounds"):
                 return None
@@ -798,8 +879,26 @@ class Sterownik:
             if dx is None:
                 return None
             x, y, sz, wy = w["bounds"]
-            k = okno.skala
-            return {"x": round((x + dx) * k), "y": round((y + dy) * k), "w": round(sz * k), "h": round(wy * k)}
+            return x + dx, y + dy, sz, wy
+
+        def przyklejony(sesja: str, bid: int | None) -> bool:
+            """Element albo jego przodek w dokumencie ma position: fixed albo sticky (warstwa nad treścią)."""
+            wezly, droga, wynik = snapy.get(sesja, {}).get("wezly", {}), [], False
+            while bid is not None and len(droga) < 512:
+                if (sesja, bid) in przyklejone:
+                    wynik = przyklejone[(sesja, bid)]
+                    break
+                w = wezly.get(bid)
+                if w is None:
+                    break
+                droga.append(bid)
+                if (w.get("style") or [""] * 5)[4:5] in (["fixed"], ["sticky"]):
+                    wynik = True
+                    break
+                bid = w.get("rodzic")
+            for b in droga:
+                przyklejone[(sesja, b)] = wynik
+            return wynik
 
         def tekst_dzieci(wezel: dict, po_id: dict, glebokosc: int = 0) -> str:
             """Tekst akapitu, nagłówka albo komórki bez nazwy; bez etykiet pól (<label>: to już nazwa pola)."""
@@ -816,8 +915,8 @@ class Sterownik:
             return " ".join(c for c in czesci if c.strip())
 
         def przejdz(sesja: str, ramka: str, wezel: dict, po_id: dict, rodzic: int | None, glebokosc: int,
-                    rola_rodzica: str, surowy_rodzic: str = "") -> None:
-            if len(elementy) >= maks or glebokosc > 60:
+                    rola_rodzica: str, surowy_rodzic: str = "", nakladka: bool = False) -> None:
+            if len(surowe) >= MAKS_PRZEJSCIE or glebokosc > 60:
                 return
             r_cdp = str((wezel.get("role") or {}).get("value") or "")
             r_low = r_cdp.lower()
@@ -829,6 +928,8 @@ class Sterownik:
                 rola = "document frame"
             nazwa = _napis((wezel.get("name") or {}).get("value"))
             wlasnosci = {p["name"]: (p.get("value") or {}).get("value") for p in wezel.get("properties") or []}
+            nakladka = (nakladka or r_low in ("dialog", "alertdialog") or wlasnosci.get("modal") is True
+                        or przyklejony(sesja, bid))
             pominiety = wezel.get("ignored") or r_low in POMIJANE
             if r_low == "statictext":
                 # tekst etykiety pola (<label>) jest już nazwą pola; tekst przycisku, linku i akapitu w ich nazwie
@@ -845,15 +946,17 @@ class Sterownik:
                 pominiety = True
             nr = rodzic
             if not pominiety:
-                nr = len(elementy)
-                el: dict[str, Any] = {"element_index": nr, "depth": glebokosc, "role": rola,
+                nr = len(surowe)
+                el: dict[str, Any] = {"element_index": 0, "depth": glebokosc, "role": rola,
                                       "label": nazwa[:MAKS_NAPIS], "in_web_content": rola != "document web"
                                       or rodzic is not None}
                 if rodzic is not None:
-                    el["parent_index"] = rodzic
-                ramka_el = granice(sesja, bid)
-                if ramka_el:
-                    el["frame"] = ramka_el
+                    el["parent_index"] = rodzic         # pozycja w `surowe`; numer nadawany po przejściu
+                prost = prostokat(sesja, bid)
+                if prost:
+                    k = okno.skala
+                    el["frame"] = {"x": round(prost[0] * k), "y": round(prost[1] * k), "w": round(prost[2] * k),
+                                   "h": round(prost[3] * k)}
                 wartosc = (wezel.get("value") or {}).get("value")
                 if wartosc not in (None, "") and rola not in ("password text",) and rola in INTERAKTYWNE:
                     el["value"] = str(wartosc)[:200]
@@ -866,8 +969,8 @@ class Sterownik:
                 if stany:
                     el["states"] = stany
                 el["element_token"] = ""                 # uzupełniane po nadaniu numeru migawki
-                elementy.append(el)
-                mapa[nr] = (sesja, bid, ramka)
+                surowe.append({"el": el, "rodzic": rodzic, "cel": (sesja, bid, ramka), "nakladka": nakladka,
+                               "prost": prost})
                 glebokosc += 1
             # zawartość ramki pod jej właścicielem (iframe)
             fid = wlasciciele.get((sesja, bid))
@@ -876,12 +979,13 @@ class Sterownik:
                 wezly = drzewa[fid]
                 po = {n["nodeId"]: n for n in wezly}
                 korzen = next((n for n in wezly if not n.get("parentId")), wezly[0])
-                przejdz(sesja_ramki.get(fid, sesja), fid, korzen, po, nr, glebokosc, rola)
+                przejdz(sesja_ramki.get(fid, sesja), fid, korzen, po, nr, glebokosc, rola, nakladka=nakladka)
                 return
             for cid in wezel.get("childIds") or []:
                 d = po_id.get(cid)
                 if d is not None:
-                    przejdz(sesja, ramka, d, po_id, nr, glebokosc, rola if not pominiety else rola_rodzica, r_low)
+                    przejdz(sesja, ramka, d, po_id, nr, glebokosc, rola if not pominiety else rola_rodzica, r_low,
+                            nakladka)
 
         glowna = ramki[0]["ramka"]
         wezly = drzewa.get(glowna) or []
@@ -890,7 +994,113 @@ class Sterownik:
             korzen = next((n for n in wezly if not n.get("parentId")), wezly[0])
             odwiedzone_ramki.add(glowna)
             przejdz(okno.sesja, glowna, korzen, po, None, 0, "")
-        return elementy, mapa
+
+        # numery: pasek 0, warstwy nad treścią, reszta (w każdej grupie kolejność drzewa)
+        kolejnosc = [i for i, s in enumerate(surowe) if s["nakladka"]] + [
+            i for i, s in enumerate(surowe) if not s["nakladka"]]
+        numer = {i: n + 1 for n, i in enumerate(kolejnosc)}
+        for i, s in enumerate(surowe):
+            s["el"]["element_index"] = numer[i]
+            if s["rodzic"] is not None:
+                s["el"]["parent_index"] = numer[s["rodzic"]]
+        sz, wy = okno.rozmiar if okno.zmierzone else self._zmierz(okno)
+
+        def w_widoku(p: tuple | None) -> bool:
+            return p is None or (p[0] + p[2] >= 0 and p[0] <= sz and p[1] + p[3] >= 0 and p[1] <= wy)
+        kandydaci = [i for i, s in enumerate(surowe) if not s["nakladka"] and s["prost"] and s["cel"][1] is not None
+                     and w_widoku(s["prost"]) and (s["el"]["role"] in INTERAKTYWNE or s["el"]["role"] in TEKSTOWE
+                                                    or s["el"]["role"] in ("static", "image"))]
+        pominiete = self._zasloniete(okno, snapy, przes, sesja_wlasciciela, surowe, kandydaci) if zasloniete else set()
+        warstwy, widok, poza = [], [], []
+        for i in kolejnosc:
+            s = surowe[i]
+            if i in pominiete:
+                continue
+            if not w_widoku(s["prost"]):
+                s["el"].setdefault("states", []).append("offscreen")
+                poza.append(s)
+            else:
+                (warstwy if s["nakladka"] else widok).append(s)
+        elementy: list[dict] = [self._element_paska(okno)]          # pasek adresu: element 0 każdej migawki
+        mapa: dict[int, tuple] = {0: ("pasek", None, None)}
+        for s in warstwy + widok + poza:
+            elementy.append(s["el"])
+            mapa[s["el"]["element_index"]] = s["cel"]
+        d0 = (snapy.get(okno.sesja, {}).get("dokumenty") or [{"przewiniecie": (0, 0)}])[0]
+        return elementy, mapa, {"poza": len(poza), "zasloniete": len(pominiete), "przewiniecie": d0["przewiniecie"],
+                                "wszystkie": [elementy[0]] + [surowe[i]["el"] for i in kolejnosc]}
+
+    def _zasloniete(self, okno: Okno, snapy: dict, przes: dict, sesja_wlasciciela: dict, surowe: list[dict],
+                    kandydaci: list[int]) -> set[int]:
+        """Pozycje elementów, których środek widocznej części przykrywa inny element: w punkcie leży węzeł, który
+        nie jest ani tym elementem, ani jego potomkiem, ani przodkiem. Pytania idą do przeglądarki naraz (potok),
+        w układzie dokumentu (punkt okna plus przewinięcie), bez warstw z pointer-events: none. Element w ramce
+        z innego procesu: najpierw trafienie w jej iframe na stronie, potem w samej ramce."""
+        sz, wy = okno.rozmiar
+        glowny = snapy.get(okno.sesja) or {"wezly": {}, "dokumenty": []}
+        sx, sy = (glowny["dokumenty"] or [{"przewiniecie": (0, 0)}])[0]["przewiniecie"]
+
+        def pytanie(sesja: str, x: float, y: float):
+            return self.b.nadaj("DOM.getNodeForLocation", {"x": round(x), "y": round(y),
+                                                           "includeUserAgentShadowDOM": False,
+                                                           "ignorePointerEventsNone": False}, sesja)
+
+        def trafiony(o) -> int | None:
+            try:
+                return o.wynik(5).get("backendNodeId")
+            except cdp.BladCDP:
+                return None                              # brak węzła albo odpowiedzi: elementu nie pomijamy
+
+        def przodkowie(wezly: dict, bid: int | None) -> set:
+            wynik: set = set()
+            while bid is not None and bid not in wynik and len(wynik) < 512:
+                wynik.add(bid)
+                bid = (wezly.get(bid) or {}).get("rodzic")
+            return wynik
+
+        def przykryty(wezly: dict, bid: int, tbid: int | None) -> bool:
+            if tbid is None or tbid not in wezly:
+                return False
+            return bid not in przodkowie(wezly, tbid) and tbid not in przodkowie(wezly, bid)
+
+        pierwsze, drugie, wynik = [], [], set()
+        for i in kandydaci:
+            x, y, w, h = surowe[i]["prost"]
+            x0, x1, y0, y1 = max(x, 0), min(x + w, sz - 1), max(y, 0), min(y + h, wy - 1)
+            if x1 - x0 < 1 or y1 - y0 < 1:
+                continue
+            cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+            try:
+                pierwsze.append((i, cx, cy, pytanie(okno.sesja, cx + sx, cy + sy)))
+            except cdp.BladCDP:
+                break
+        for i, cx, cy, o in pierwsze:
+            tbid = trafiony(o)
+            sesja, bid, _ = surowe[i]["cel"]
+            if sesja == okno.sesja:
+                if przykryty(glowny["wezly"], bid, tbid):
+                    wynik.add(i)
+                continue
+            wl = sesja_wlasciciela.get(sesja)
+            if wl is None or wl[0] != okno.sesja or tbid is None:
+                continue                                 # ramka w ramce: tylko sprawdzenie przy kliknięciu
+            if tbid != wl[1]:
+                if przykryty(glowny["wezly"], wl[1], tbid):
+                    wynik.add(i)                         # na iframe leży coś innego
+                continue
+            w = snapy.get(sesja, {}).get("wezly", {}).get(bid)
+            d = snapy[sesja]["dokumenty"][w["doc"]] if w else None
+            dx, dy = przes.get((sesja, d["ramka"]), (None, None)) if d else (None, None)
+            if dx is None:
+                continue
+            try:
+                drugie.append((i, sesja, bid, pytanie(sesja, cx - dx, cy - dy)))
+            except cdp.BladCDP:
+                continue
+        for i, sesja, bid, o in drugie:
+            if przykryty(snapy[sesja]["wezly"], bid, trafiony(o)):
+                wynik.add(i)
+        return wynik
 
     @staticmethod
     def _element_paska(okno: Okno) -> dict:
@@ -922,8 +1132,9 @@ class Sterownik:
         okno.pasek = None
         if url is None:
             return _blad("adres", "pasek adresu przyjmuje adresy http:// i https:// (albo tekst do wyszukania)")
+        self._przed(okno)
         self.b.wyslij("Page.navigate", {"url": url}, okno.sesja, czas=15)
-        return _wynik(f"przejście pod {urlsplit(url).netloc}", effect="unverifiable", path="cdp", delivery=delivery)
+        return self._po_dzialaniu(okno, f"przejście pod {urlsplit(url).netloc}", delivery)
 
     def _klawisz_w_pasku(self, okno: Okno, klawisz: str, mody: list, delivery: str) -> dict:
         k = klawisz.strip().lower()
@@ -1001,6 +1212,8 @@ class Sterownik:
         return elementy
 
     def get_window_state(self, args: dict, konfig: dict) -> dict:
+        """Migawka okna: elementy w kolejności dla agenta (_elementy) przycięte do max_elements i zrzut. Pełne drzewo
+        zostaje stanem okna, z którym paragon następnego działania porówna stronę."""
         okno = self._okno_z(args)
         maks = args.get("max_elements")
         maks = maks if isinstance(maks, int) and not isinstance(maks, bool) and maks > 0 else MAKS_ELEMENTOW
@@ -1020,7 +1233,11 @@ class Sterownik:
                 except cdp.BladCDP as e:               # drzewo i bez zrzutu: agent patrzy trybem ax
                     zrzut = False
                     sc["screenshot_error"] = f"zrzut się nie udał ({e.tekst[:80]})"
-            elementy, mapa = self._elementy(okno, maks)
+            wszystkie, pelna, info = self._elementy(okno)
+            okno.stan = self._stan_z(okno, info)
+            elementy = wszystkie[:maks]
+            mapa = {el["element_index"]: pelna[el["element_index"]] for el in elementy}
+            sc.update(offscreen_count=info["poza"], covered_count=info["zasloniete"])
         wybor = okno.wybor_wlasciciela
         if wybor and time.monotonic() - wybor["czas"] < 300:
             sc["file_chooser"] = {"mode": wybor.get("tryb"),
@@ -1029,11 +1246,149 @@ class Sterownik:
         sc.update(snapshot_id=sid, elements=elementy, element_count=len(elementy))
         linie = [f"{len(elementy)} elements", f'- AXWindow "{okno.tytul}"']
         linie += [f"{'  ' * (el['depth'] + 1)}- [{el['element_index']}] {el['role']} \"{el['label'][:80]}\""
-                  for el in elementy[:400]]
+                  + (" (offscreen)" if "offscreen" in el.get("states", ()) else "") for el in elementy[:400]]
         tresc.append({"type": "text", "text": "\n".join(linie)})
         if zrzut and not okno.dialog:
             tresc.append({"type": "image", "data": dane, "mimeType": "image/png"})
         return {"content": tresc, "structuredContent": sc, "isError": False}
+
+    # ------------------------------------------------------------------ paragon po działaniu
+
+    @staticmethod
+    def _klucz(el: dict, po_nr: dict) -> tuple:
+        """Element do porównania stanów: rola, napis, wartość, stany paragonu i trzech przodków (rola, napis).
+        Bez numeru, fokusu i `offscreen`: samo przewinięcie ani przejście fokusu na przycisk nie są zmianą."""
+        przodkowie, p = [], el.get("parent_index")
+        while p is not None and len(przodkowie) < 3:
+            a = po_nr.get(p)
+            if a is None:
+                break
+            przodkowie.append((a["role"], a["label"][:60]))
+            p = a.get("parent_index")
+        stany = tuple(s for s in el.get("states", ()) if s in STANY_PARAGONU)
+        return el["role"], el["label"][:120], str(el.get("value", ""))[:120], stany, tuple(przodkowie)
+
+    def _stan_z(self, okno: Okno, info: dict) -> dict:
+        """Stan okna do paragonu: klucze wszystkich elementów drzewa (także przykrytych i poza widokiem, więc samo
+        przewinięcie strony ich nie zmienia; bez paska adresu), element z fokusem, adres, przewinięcie."""
+        elementy = info["wszystkie"]
+        po_nr = {el["element_index"]: el for el in elementy}
+        klucze: Counter = Counter()
+        wiersze: dict[tuple, dict] = {}
+        fokus = None
+        for el in elementy[1:]:
+            k = self._klucz(el, po_nr)
+            klucze[k] += 1
+            wiersze.setdefault(k, el)
+            if "focused" in el.get("states", ()):
+                fokus = k
+        return {"klucze": klucze, "wiersze": wiersze, "fokus": fokus, "url": okno.url,
+                "przewiniecie": tuple(info.get("przewiniecie") or (0, 0)), "czas": time.monotonic()}
+
+    def _stan(self, okno: Okno) -> dict | None:
+        """Świeży stan okna (drzewo bez zrzutu); None, gdy strony nie da się odczytać."""
+        if okno.dialog:
+            return None
+        try:
+            self._odswiez_tytul(okno)
+            _, _, info = self._elementy(okno, zasloniete=False)
+        except (cdp.BladCDP, BladSterownika, KeyError, IndexError, TypeError):
+            return None
+        return self._stan_z(okno, info)
+
+    def _cisza(self, okno: Okno, zeruj: bool = False) -> dict | None:
+        """Zmiany DOM głównej ramki od założenia obserwatora (JS_CISZA); None, gdy strona nie odpowiada (ładuje się,
+        okno JavaScript)."""
+        for _ in range(2):
+            try:
+                ctx = self._swiat(okno, okno.sesja)
+                w = self.b.wyslij("Runtime.callFunctionOn", {"functionDeclaration": JS_CISZA, "executionContextId": ctx,
+                                                             "arguments": [{"value": zeruj}], "returnByValue": True},
+                                  okno.sesja, czas=1)
+                if not w.get("exceptionDetails"):
+                    return (w.get("result") or {}).get("value")
+            except cdp.BladCDP:
+                pass
+            for klucz in [k for k in okno.swiaty if k[0] == okno.sesja]:
+                okno.swiaty.pop(klucz, None)           # świat zniknął z nawigacją: następna próba zakłada nowy
+        return None
+
+    def _przed(self, okno: Okno) -> None:
+        """Tuż przed wejściem: obserwator zmian DOM, liczniki okien i pobrań oraz stan strony do paragonu (świeży
+        stan z ostatnich STAN_WAZNY s, np. migawka wejścia sprzed kliknięcia elementem, zostaje)."""
+        okno.przed = {"okna": len(self.okna()), "pobrania": self._pobrania_start}
+        if okno.dialog:
+            return
+        self._cisza(okno, zeruj=True)
+        if okno.stan is None or time.monotonic() - okno.stan["czas"] > STAN_WAZNY or okno.stan["url"] != okno.url:
+            okno.stan = self._stan(okno)
+        else:
+            self._przewiniecie_stanu(okno)
+
+    def _przewiniecie_stanu(self, okno: Okno) -> None:
+        """Przewinięcie w stanie sprzed działania na bieżące: przewinięcie, które zrobił sam sterownik (klik
+        elementem poza widokiem), to nie efekt działania."""
+        if okno.stan is not None:
+            try:
+                okno.stan["przewiniecie"] = self._przewiniecie(okno.sesja)
+            except cdp.BladCDP:
+                pass
+
+    def _uspokoj(self, okno: Okno) -> None:
+        """Czekanie po działaniu, aż strona się uspokoi: główna ramka nie ładuje się, od ostatniej zmiany DOM minęło
+        CISZA s, a gdy działanie nie ruszyło DOM, co najmniej CZEKANIE_BEZ_ZMIAN s; najwyżej CZEKANIE_MAKS s.
+        Okno JavaScript i wybór pliku kończą czekanie od razu."""
+        start = time.monotonic()
+        while not okno.dialog and not okno.wybor_pliku:
+            teraz = time.monotonic()
+            if teraz - start >= CZEKANIE_MAKS:
+                return
+            if okno.laduje and teraz - okno.laduje < 10:
+                time.sleep(0.05)
+                continue
+            c = self._cisza(okno)
+            if c and c.get("stan") != "loading" and c.get("cisza", 0) >= CISZA * 1000 and (
+                    c.get("n") or c.get("nowy") or teraz - start >= CZEKANIE_BEZ_ZMIAN):
+                return
+            time.sleep(0.05)
+
+    def _paragon(self, okno: Okno, tekst: str) -> tuple[str, str]:
+        """(effect, tekst wyniku): porównanie stanu sprzed działania ze świeżym. Zmiana drzewa, adresu, przewinięcia,
+        fokus w nowym polu, nowe okno albo pobieranie = `confirmed` z paragonem; brak zmiany = `suspected_noop`;
+        bez stanu sprzed działania albo bez odczytu strony = `unverifiable`."""
+        stary, nowy = okno.stan, self._stan(okno)
+        okno.stan = nowy
+        if nowy is None or stary is None:
+            return "unverifiable", tekst
+        dodane, usuniete = nowy["klucze"] - stary["klucze"], stary["klucze"] - nowy["klucze"]
+        czesci = []
+        if nowy["url"] != stary["url"]:
+            czesci.append(f"adres: {nowy['url'].split('://', 1)[-1]}"[:160])
+        if any(abs(a - b) >= 1 for a, b in zip(nowy["przewiniecie"], stary["przewiniecie"])):
+            czesci.append(f"przewinięcie: y {round(stary['przewiniecie'][1])}→{round(nowy['przewiniecie'][1])}")
+        if nowy["fokus"] and nowy["fokus"] != stary["fokus"] and nowy["fokus"][0] in EDYTOWALNE:
+            czesci.append(f"fokus: {nowy['fokus'][0]} „{nowy['fokus'][1][:60]}”")
+        if len(self.okna()) > okno.przed.get("okna", len(self.okna())):
+            czesci.append("nowe okno (list_windows)")
+        if self._pobrania_start > okno.przed.get("pobrania", self._pobrania_start):
+            czesci.append("pobieranie pliku")
+        a, r = sum(dodane.values()), sum(usuniete.values())
+        if not (a or r or czesci):
+            return "suspected_noop", (f"{tekst}; brak widocznej zmiany na stronie: zrób capture, zanim powtórzysz; "
+                                      "działania nieodwracalnego nie powtarzaj")
+
+        def opis(k: tuple) -> str:
+            return f"{k[0]} „{k[1][:60]}”" if k[1] else k[0]
+        # nowe elementy: najpierw te w widoku (bez stanu offscreen)
+        nowe = sorted(dodane, key=lambda k: "offscreen" in nowy["wiersze"][k].get("states", ()))
+        czesci.insert(0, f"zmiana +{a} -{r}")
+        if nowe:
+            czesci.append("nowe: " + ", ".join(opis(k) for k in nowe[:PARAGON_WIERSZE])
+                          + (f" (+{len(nowe) - PARAGON_WIERSZE})" if len(nowe) > PARAGON_WIERSZE else ""))
+        if usuniete:
+            czesci.append("zniknęło: " + ", ".join(opis(k) for k in list(usuniete)[:3])
+                          + (f" (+{len(usuniete) - 3})" if len(usuniete) > 3 else ""))
+        return "confirmed", f"{tekst}; " + "; ".join(czesci)
 
     # ------------------------------------------------------------------ opis elementu dla zasad
 
@@ -1152,18 +1507,27 @@ class Sterownik:
             pass
         return okno.rozmiar
 
+    def _przewiniecie(self, sesja: str) -> tuple[float, float]:
+        """Przewinięcie dokumentu sesji (strony albo ramki z innego procesu, każda ma swoje) w pikselach CSS."""
+        v = self.b.wyslij("Page.getLayoutMetrics", {}, sesja, czas=5).get("cssLayoutViewport") or {}
+        return float(v.get("pageX") or 0), float(v.get("pageY") or 0)
+
     def _trafienie(self, okno: Okno, x: float, y: float) -> tuple[str, int, str | None] | None:
         """(sesja, backendNodeId, frameId) elementu, który dostanie kliknięcie w punkcie okna (piksele CSS), także
-        w ramce z innego procesu; None poza obszarem strony albo bez odpowiedzi."""
+        w ramce z innego procesu; None poza obszarem strony albo bez odpowiedzi. DOM.getNodeForLocation liczy x, y
+        w układzie dokumentu (Chromium odejmuje przewinięcie), więc do punktu okna dodajemy przewinięcie dokumentu
+        tej sesji; warstwy z `pointer-events: none` pomija jak prawdziwe kliknięcie (obudowy banerów i powiadomień
+        na cały ekran). Ten sam element opisują twarde zasady przy kliku w punkt."""
         sz, wy = okno.rozmiar if okno.zmierzone else self._zmierz(okno)
         if not (0 <= x < sz and 0 <= y < wy):
             return None
         sesja, lx, ly = okno.sesja, x, y
         for _ in range(4):
             try:
-                t = self.b.wyslij("DOM.getNodeForLocation", {"x": int(lx), "y": int(ly),
+                px, py = self._przewiniecie(sesja)
+                t = self.b.wyslij("DOM.getNodeForLocation", {"x": round(lx + px), "y": round(ly + py),
                                                              "includeUserAgentShadowDOM": False,
-                                                             "ignorePointerEventsNone": True}, sesja, czas=5)
+                                                             "ignorePointerEventsNone": False}, sesja, czas=5)
             except cdp.BladCDP:
                 return None
             bid = t.get("backendNodeId")
@@ -1186,7 +1550,9 @@ class Sterownik:
 
     def opis_w_punkcie(self, nr, x, y) -> dict | None:
         """Element w punkcie (x, y) okna `nr` w pikselach zrzutu, opisany na żywo; zapamiętany do sprawdzenia przy
-        samym kliknięciu."""
+        samym kliknięciu. To element, który dostanie kliknięcie (_trafienie: układ dokumentu, bez warstw
+        z pointer-events: none), więc twarde zasady oceniają to, w co Chrome naprawdę kliknie, także na przewiniętej
+        stronie."""
         okno = self.okno(nr)
         if okno is None:
             return None
@@ -1321,8 +1687,10 @@ class Sterownik:
                 if okno.dialog:
                     return
 
-    def _punkt_celu(self, okno: Okno, args: dict, nazwa: str) -> tuple[float, float, tuple | None]:
-        """Punkt kliknięcia w pikselach CSS okna i element (sesja, backendNodeId), gdy działanie wskazuje element."""
+    def _punkt_celu(self, okno: Okno, args: dict, nazwa: str, przed: bool = False) -> tuple[float, float, tuple | None]:
+        """Punkt kliknięcia w pikselach CSS okna i element (sesja, backendNodeId), gdy działanie wskazuje element.
+        `przed`: stan strony do paragonu (_przed) bierzemy przed sprawdzeniem punktu, a nie między sprawdzeniem
+        a wejściem: sprawdzenie, w co trafi kliknięcie, zostaje tuż przed samym kliknięciem."""
         token = args.get("element_token")
         sid, indeks = (str(token).rpartition(":")[0], str(token).rpartition(":")[2]) if token else (
             args.get("snapshot_id"), args.get("element_index"))
@@ -1348,11 +1716,18 @@ class Sterownik:
                 raise BladSterownika("cel", "ten element nie ma węzła strony")
             if nazwa == "set_value":                     # wartość bez kliknięcia: punkt niepotrzebny
                 return -1.0, -1.0, (sesja, bid, ramka)
-            return (*self._srodek(okno, sesja, bid, ramka), (sesja, bid, ramka))
+            if przed:
+                self._przed(okno)
+            punkt = self._srodek(okno, sesja, bid, ramka)
+            if przed:
+                self._przewiniecie_stanu(okno)       # przewinięcie do elementu to nie efekt działania
+            return (*punkt, (sesja, bid, ramka))
         x, y = args.get("x"), args.get("y")
         if x is None or y is None:
             raise BladSterownika("cel", f"{nazwa} wymaga elementu (element_token) albo punktu (x, y)")
         cx, cy = float(x) / okno.skala, float(y) / okno.skala
+        if przed:
+            self._przed(okno)
         trafienie = okno.trafienia.pop((round(cx), round(cy)), None)
         if trafienie and time.monotonic() - trafienie[0] < 10:
             teraz = self._trafienie(okno, cx, cy)
@@ -1362,11 +1737,41 @@ class Sterownik:
         return cx, cy, None
 
     def _srodek(self, okno: Okno, sesja: str, bid: int, ramka: str | None) -> tuple[float, float]:
-        """Środek widocznej części elementu w układzie okna; sprawdza, że to on dostanie kliknięcie."""
+        """Punkt kliknięcia elementu w układzie okna: środek jego widocznej części, gdy kliknięcie w tym punkcie
+        dostanie ten element albo jego potomek. Środek przykryty: element na środek widoku (scrollIntoView, jak
+        Playwright i browser-use) i jeszcze raz środek oraz cztery punkty widocznej części; dalej przykryty → odmowa
+        `element_przesloniety` z `zasloniety_przez` (rola, napis i numer z ostatniej migawki tego, co leży na
+        wierzchu). Nigdy nie klika w to, co przykrywa."""
+        cel = (sesja, bid, ramka)
         try:
             self.b.wyslij("DOM.scrollIntoViewIfNeeded", {"backendNodeId": bid}, sesja, czas=5)
         except cdp.BladCDP:
             pass
+        punkt, widoczny, zaslona = self._punkt_elementu(okno, cel, False)
+        if punkt is None and widoczny:
+            try:
+                self._js(sesja, self._obiekt(okno, sesja, bid, ramka), JS_NA_SRODEK)
+            except (cdp.BladCDP, BladSterownika):
+                pass
+            punkt, widoczny, zaslona = self._punkt_elementu(okno, cel, True)
+        if punkt is not None:
+            return punkt
+        if not widoczny:
+            raise BladSterownika("niewidoczny", "element jest poza widokiem albo nie ma wymiarów; przewiń stronę")
+        opis = self._opis_zaslony(okno, zaslona)
+        kto = f"{opis['rola'] or 'element'} „{opis['napis'][:80]}”" if opis["napis"] else (opis["rola"]
+                                                                                            or "inny element")
+        if opis.get("element_index") is not None:
+            kto += f" (element {opis['element_index']})"
+        raise BladSterownika("element_przesloniety", f"w miejscu tego elementu leży {kto}: baner, okienko albo "
+                                                     "nakładka strony; zamknij je albo zrób get_window_state",
+                             zasloniety_przez=opis)
+
+    def _punkt_elementu(self, okno: Okno, cel: tuple, wiecej: bool) -> tuple[tuple | None, bool, tuple | None]:
+        """(punkt, widoczny, zasłona): pierwszy punkt widocznej części elementu (środek, z `wiecej` jeszcze cztery
+        punkty w ćwiartkach), w którym kliknięcie dostanie ten element; zasłona = trafienie w pierwszym punkcie,
+        gdy żaden nie pasuje."""
+        sesja, bid, ramka = cel
         try:
             quady = self.b.wyslij("DOM.getContentQuads", {"backendNodeId": bid}, sesja).get("quads") or []
         except cdp.BladCDP:
@@ -1386,14 +1791,63 @@ class Sterownik:
             xs, ys = [q[i] + dx for i in (0, 2, 4, 6)], [q[i] + dy for i in (1, 3, 5, 7)]
             x0, x1 = max(min(xs), 0), min(max(xs), sz - 1)
             y0, y1 = max(min(ys), 0), min(max(ys), wy - 1)
-            if x1 - x0 >= 1 and y1 - y0 >= 1:
-                x, y = (x0 + x1) / 2, (y0 + y1) / 2
+            if x1 - x0 < 1 or y1 - y0 < 1:
+                continue
+            punkty = [((x0 + x1) / 2, (y0 + y1) / 2)]
+            if wiecej:
+                punkty += [(x0 + (x1 - x0) * a, y0 + (y1 - y0) * b) for a, b in ((.25, .25), (.75, .25),
+                                                                                  (.25, .75), (.75, .75))]
+            zaslona = None
+            for i, (x, y) in enumerate(punkty):
                 trafienie = self._trafienie(okno, x, y)
-                if trafienie is None or not self._zawiera(okno, (sesja, bid, ramka), trafienie):
-                    raise BladSterownika("element_przesloniety", "w miejscu tego elementu leży inny (baner, okienko "
-                                                                 "albo nakładka strony); zrób get_window_state")
-                return x, y
-        raise BladSterownika("niewidoczny", "element jest poza widokiem albo nie ma wymiarów; przewiń stronę")
+                if trafienie is not None and self._zawiera(okno, cel, trafienie):
+                    return (x, y), True, None
+                if i == 0:
+                    zaslona = trafienie
+            return None, True, zaslona
+        return None, False, None
+
+    def _opis_zaslony(self, okno: Okno, trafienie: tuple | None) -> dict:
+        """Co leży na wierzchu w miejscu elementu: {"rola", "napis", "element_index"?}. Numer i rola z ostatniej
+        migawki okna (pierwszy przodek trafionego węzła, który w niej jest, poza samym dokumentem), inaczej rola
+        z drzewa dostępności albo znacznik HTML, a napis z drzewa albo tekst elementu."""
+        opis: dict[str, Any] = {"rola": "", "napis": ""}
+        if trafienie is None:
+            return opis
+        ts, tbid, tramka = trafienie
+        with self._lock:
+            m = next((m for m in reversed(self._migawki.values()) if m["okno"] == okno.nr), None)
+        w_migawce = {(c[0], c[1]): nr for nr, c in (m["mapa"].items() if m else ()) if c and c[0] == ts}
+        try:
+            wezly = self.b.wyslij("Accessibility.getPartialAXTree", {"backendNodeId": tbid, "fetchRelatives": True},
+                                  ts, czas=5).get("nodes") or []
+            po_id = {n["nodeId"]: n for n in wezly}
+            n = next((n for n in wezly if n.get("backendDOMNodeId") == tbid), None)
+            for _ in range(64):
+                if n is None:
+                    break
+                r = str((n.get("role") or {}).get("value") or "").lower()
+                if r in ("rootwebarea", "webarea"):
+                    break
+                nr = w_migawce.get((ts, n.get("backendDOMNodeId")))
+                if nr is not None:
+                    opis["element_index"] = nr
+                    opis["rola"], opis["napis"] = m["role"].get(nr, ("", ""))
+                    break
+                if not opis["rola"] and not n.get("ignored") and r not in POMIJANE:
+                    opis["rola"] = rola_zasad(r)
+                    opis["napis"] = _napis((n.get("name") or {}).get("value"))
+                n = po_id.get(n.get("parentId"))
+        except cdp.BladCDP:
+            pass
+        if not opis["rola"] or not opis["napis"]:
+            try:
+                dom = self._js(ts, self._obiekt(okno, ts, tbid, tramka), JS_ZASLONA) or {}
+                opis["rola"] = opis["rola"] or str(dom.get("tag") or "")
+                opis["napis"] = opis["napis"] or _napis(dom.get("tekst"))[:MAKS_NAPIS]
+            except (cdp.BladCDP, BladSterownika):
+                pass
+        return opis
 
     def _zawiera(self, okno: Okno, cel: tuple, trafienie: tuple) -> bool:
         """Czy trafiony węzeł to cel albo jego potomek (także w shadow DOM)."""
@@ -1456,15 +1910,9 @@ class Sterownik:
         return _wynik(f"okno JavaScript zamknięte ({'OK' if przyjmij else 'Anuluj'})", effect="confirmed", path="cdp")
 
     def _po_dzialaniu(self, okno: Okno, tekst: str, delivery: str, **sc) -> dict:
-        if not okno.dialog and not okno.wybor_pliku:
-            # okno JavaScript i wybór pliku przychodzą zdarzeniem chwilę po kliknięciu: krótka runda przez kartę
-            try:
-                self.b.wyslij("Runtime.evaluate", {"expression": "0", "returnByValue": True}, okno.sesja, czas=2)
-            except cdp.BladCDP:
-                pass
-            koniec = time.monotonic() + 0.15
-            while time.monotonic() < koniec and not okno.dialog and not okno.wybor_pliku:
-                time.sleep(0.02)
+        """Wynik działania: czekanie na uspokojenie strony (_uspokoj) i paragon (_paragon) z `effect`. Okno
+        JavaScript (zdarzenie chwilę po kliknięciu) to efekt potwierdzony; wybór pliku robi właściciel."""
+        self._uspokoj(okno)
         if okno.wybor_pliku and not okno.dialog:
             okno.wybor_pliku = None
             komunikat = "Strona otworzyła wybór pliku: plik wybiera właściciel (Komputer Jarva)."
@@ -1473,14 +1921,17 @@ class Sterownik:
                                           "decision": "czlowiek", "next_step": "ask_owner", "message": komunikat}}
         if okno.dialog:
             sc["dialog"] = {"type": okno.dialog["typ"]}
-            tekst += "; strona otworzyła okno JavaScript (zrób get_window_state)"
-        return _wynik(tekst, path="cdp", delivery=delivery, **{"effect": "unverifiable", **sc})
+            okno.stan = None                           # strona stoi pod oknem: następne działanie weźmie nowy stan
+            return _wynik(f"{tekst}; strona otworzyła okno JavaScript (zrób get_window_state)", path="cdp",
+                          delivery=delivery, **{"effect": "confirmed", **sc})
+        efekt, tekst = self._paragon(okno, tekst)
+        return _wynik(tekst, path="cdp", delivery=delivery, **{"effect": efekt, **sc})
 
     # ------------------------------------------------------------------ narzędzia
 
     def click(self, args: dict, nazwa: str = "click") -> dict:
         okno = self._okno_z(args)
-        x, y, el = self._punkt_celu(okno, args, nazwa)
+        x, y, el = self._punkt_celu(okno, args, nazwa, przed=True)
         if el and el[0] == "dialog":
             opis = self._opis_dialogu(okno, el[1]) or {}
             if opis.get("rola") != "push button":
@@ -1506,12 +1957,13 @@ class Sterownik:
         okno = self._okno_z(args)
         if args.get("from_element") is not None:
             a = self._punkt_celu(okno, {"snapshot_id": args.get("snapshot_id"), "element_index": args["from_element"]},
-                                 "drag")
+                                 "drag", przed=True)
             b = self._punkt_celu(okno, {"snapshot_id": args.get("snapshot_id"), "element_index": args.get("to_element")},
                                  "drag")
         else:
-            a = self._punkt_celu(okno, {"x": args.get("from_x"), "y": args.get("from_y")}, "drag")
+            a = self._punkt_celu(okno, {"x": args.get("from_x"), "y": args.get("from_y")}, "drag", przed=True)
             b = self._punkt_celu(okno, {"x": args.get("to_x"), "y": args.get("to_y")}, "drag")
+        self._przewiniecie_stanu(okno)
         mody = self._mody(args.get("modifier"))
         okno.pasek = None
         self._wejscie(okno, "Input.dispatchMouseEvent", {"type": "mouseMoved", "x": a[0], "y": a[1], "modifiers": mody})
@@ -1530,9 +1982,10 @@ class Sterownik:
         okno = self._okno_z(args)
         if args.get("element_token") or args.get("element_index") is not None or (
                 args.get("x") is not None and args.get("y") is not None):
-            x, y, _ = self._punkt_celu(okno, args, "scroll")
+            x, y, _ = self._punkt_celu(okno, args, "scroll", przed=True)
         else:
             x, y = okno.rozmiar[0] / 2, okno.rozmiar[1] / 2
+            self._przed(okno)
         try:
             ile = max(1, min(50, int(args.get("amount") or 3)))
         except (TypeError, ValueError):
@@ -1567,7 +2020,7 @@ class Sterownik:
         delivery = str(args.get("delivery_mode") or "background")
         if args.get("element_token") or args.get("element_index") is not None or (
                 args.get("x") is not None and args.get("y") is not None):
-            x, y, el = self._punkt_celu(okno, args, "type_text")
+            x, y, el = self._punkt_celu(okno, args, "type_text", przed=True)
             if el is not None and el[0] == "pasek":
                 okno.pasek = ""                        # klik w pasek zaznacza adres, tekst go zastępuje
                 return self._pisz_w_pasek(okno, tekst, delivery)
@@ -1575,10 +2028,13 @@ class Sterownik:
             self._mysz(okno, x, y)
             if tekst:
                 self._sprawdz_fokus_w(okno, el if el is not None else self._trafienie(okno, x, y))
-        elif tekst:
-            self._sprawdz_fokus(okno)
-            if okno.pasek is not None:
-                return self._pisz_w_pasek(okno, tekst, delivery)
+        else:
+            if okno.pasek is None:
+                self._przed(okno)
+            if tekst:
+                self._sprawdz_fokus(okno)
+                if okno.pasek is not None:
+                    return self._pisz_w_pasek(okno, tekst, delivery)
         linie = re.split(r"(\r\n|\n|\r)", tekst)
         for czesc in linie:
             if czesc in ("\r\n", "\n", "\r"):
@@ -1589,11 +2045,14 @@ class Sterownik:
                 self._wejscie(okno, "Input.insertText", {"text": czesc})
         ostatni = next((c for c in reversed(linie) if c not in ("\r\n", "\n", "\r") and c), "")
         wartosc = self._wartosc_fokusu(okno) if ostatni and not okno.dialog else None
-        efekt = "confirmed" if wartosc is not None and ostatni and ostatni in wartosc else "unverifiable"
+        potwierdzone = wartosc is not None and ostatni and ostatni in wartosc
         wynik = self._po_dzialaniu(okno, f"wpisano {len(tekst)} znaków", str(args.get("delivery_mode")
                                                                                 or "background"))
-        if not wynik.get("isError"):
-            wynik["structuredContent"]["effect"] = efekt
+        if potwierdzone and not wynik.get("isError"):
+            sc = wynik["structuredContent"]
+            if sc["effect"] != "confirmed":               # np. pole hasła: wartości nie ma w drzewie
+                sc["message"] = wynik["content"][0]["text"] = f"wpisano {len(tekst)} znaków; wartość pola sprawdzona"
+            sc["effect"] = "confirmed"                     # wartość pola sprawdzona wprost
         return wynik
 
     def press_key(self, args: dict, hotkey: bool = False) -> dict:
@@ -1621,7 +2080,7 @@ class Sterownik:
         aktywujacy = klawisz.strip().lower() in AKTYWUJACE or drukowany
         delivery = str(args.get("delivery_mode") or "background")
         if args.get("element_token") or args.get("element_index") is not None:
-            x, y, el = self._punkt_celu(okno, args, "press_key")
+            x, y, el = self._punkt_celu(okno, args, "press_key", przed=True)
             if el is not None and el[0] == "pasek":
                 okno.pasek = okno.pasek if okno.pasek is not None else ""
                 return self._klawisz_w_pasku(okno, klawisz, mody, delivery)
@@ -1630,6 +2089,8 @@ class Sterownik:
             if aktywujacy:
                 self._sprawdz_fokus_w(okno, el)
         else:
+            if okno.pasek is None:
+                self._przed(okno)
             if aktywujacy:
                 self._sprawdz_fokus(okno)
             if okno.pasek is not None:
@@ -2094,7 +2555,7 @@ class Sterownik:
                 return _wynik("ok", session=args.get("session"))
             return _blad("narzedzie", f"narzędzia {nazwa} sterownik CDP nie ma")
         except BladSterownika as e:
-            return _blad(e.kod, e.tekst)
+            return _blad(e.kod, e.tekst, **e.dane)
         except cdp.KoniecPrzegladarki:
             return _blad("przegladarka", "przeglądarka Jarva nie działa (usługa uruchomi ją ponownie)")
         except cdp.BladCDP as e:

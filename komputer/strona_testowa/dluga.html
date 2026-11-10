@@ -1,0 +1,26 @@
+<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Długa strona Jarvo</title>
+<style>body{font:16px sans-serif;margin:24px}.odstep{height:1400px}
+#warstwa{position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none}
+#zgoda{position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.4);display:none}
+#zgoda div{position:absolute;left:0;right:0;bottom:0;background:#ffd;padding:16px}</style></head><body>
+<h1>Długa strona</h1>
+<p id="wynik">Nic nie kliknięto</p>
+<p><button type="button" onclick="wynik('Kliknięto górę')">Przycisk na górze</button>
+<button type="button">Nic nie robi</button>
+<button type="button" onclick="document.getElementById('zgoda').style.display='block'">Pokaż zgodę</button></p>
+<div class="odstep"></div>
+<p><button type="button" onclick="wynik('Kliknięto dół')">Przycisk na dole</button></p>
+<form onsubmit="return false"><p><label>Kod rabatowy <input name="kod"></label></p>
+<button type="submit">Zapłać 129 zł</button></form>
+<div class="odstep"></div>
+<p>Koniec strony</p>
+<!-- warstwa na cały ekran bez zdarzeń wskaźnika (obudowa powiadomień): kliknięcie przez nią przechodzi -->
+<div id="warstwa"></div>
+<!-- okno zgody na końcu DOM: przykrywa całą stronę -->
+<div id="zgoda" role="dialog" aria-modal="true" aria-label="Zgoda na ciasteczka"><div>
+<p>Ta strona używa ciasteczek.</p>
+<button type="button" onclick="document.getElementById('zgoda').style.display='none'">Akceptuję</button>
+<button type="button" onclick="document.getElementById('zgoda').style.display='none'">Odrzucam</button>
+</div></div>
+<script>function wynik(t){ document.getElementById('wynik').textContent = t; }</script>
+</body></html>

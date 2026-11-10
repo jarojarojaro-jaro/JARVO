@@ -169,9 +169,20 @@ w tle. Dlatego gdy z ekranu nikt nie korzysta przez 60 s, usługa przenosi każd
 liczy się jak zakończona, bo Hermes trzyma sterownik otwarty do godziny po turze agenta), żadnej pauzy, podgląd
 w Ekranie HQ wyłączony, a przy oknie widocznym żadna strona nie ma fokusu (nie pracujesz w oknie sam). Profil,
 ciasteczka i zalogowania zostają; strona jest w historii karty (Wstecz), a Operator zaczyna następne zadanie od
-adresu (`launch_app` z `urls`). Postój widać w `jarvo komputer status` („postój od …”), w `komputer.log`
-i w dzienniku decyzji (`postoj`). Przy pauzie (Operator oddał Ci ekran albo przejąłeś go w HQ) strona zostaje taka,
-jaka jest, i dalej zużywa procesor, dopóki nie wznowisz.
+adresu (pasek adresu: klik w element 0 i `type` z adresem zakończonym nową linią). Postój widać w `jarvo komputer
+status` („postój od …”), w `komputer.log` i w dzienniku decyzji (`postoj`). Przy pauzie (Operator oddał Ci ekran
+albo przejąłeś go w HQ) strona zostaje taka, jaka jest, i dalej zużywa procesor, dopóki nie wznowisz.
+
+**Sterownik CDP: punkt kliknięcia, kolejność migawki i paragon** (`komputer/sterownik_cdp.py`, testy na prawdziwej
+przeglądarce w `tests/test_komputer_cdp.py` ze stroną `komputer/strona_testowa/dluga.html`):
+
+| Co | Jak |
+|---|---|
+| element w punkcie (klik elementem i klik w punkt, twarde zasady) | `DOM.getNodeForLocation` w układzie dokumentu: punkt okna plus przewinięcie dokumentu tej sesji (`Page.getLayoutMetrics`, ramka z innego procesu ma swoje), bez warstw z `pointer-events: none`, czyli ten element, który dostanie prawdziwe kliknięcie. Dotąd sterownik pytał o punkt w układzie okna i trafiał w takie warstwy: każdy klik elementem na przewiniętej stronie albo pod obudową banera kończył się fałszywym `element_przesloniety`, a klik w punkt zasady oceniały po innym elemencie niż ten, który kliknąłby Chrome (klik w punkt w „Zapłać” po przewinięciu: teraz `przycisk_wrazliwy`, robi właściciel) |
+| klik elementem przykrytym | środek widocznej części; przykryty: element na środek widoku (`scrollIntoView`) i jeszcze raz środek oraz 4 punkty w ćwiartkach; dalej przykryty: odmowa `element_przesloniety` z `zasloniety_przez` (`rola`, `napis`, `element_index` z ostatniej migawki, gdy tam jest). Sterownik nigdy nie klika w to, co przykrywa |
+| kolejność migawki | pasek adresu (0), okna i warstwy nad treścią w widoku (`dialog`, `alertdialog`, `modal`, `position: fixed/sticky`: banery i okienka zgody, także z końca DOM), elementy w widoku, na końcu reszta ze stanem `offscreen` (`offscreen_count`). Numery: pasek, warstwy, reszta, każda grupa w kolejności drzewa, więc nie zależą od przewinięcia ani od `max_elements` i wejście znajdzie element pod tym samym numerem w swojej świeżej migawce. Element tekstowy albo interaktywny w widoku, którego środek przykrywa inny element, w migawce się nie pokazuje (`covered_count`) |
+| wynik działania | sterownik czeka, aż strona się uspokoi (koniec ładowania głównej ramki, 0,2 s bez zmian w DOM, a gdy działanie DOM nie ruszyło, co najmniej 0,5 s; najwyżej 2,5 s), i porównuje drzewo ze stanem sprzed działania (rola, napis, wartość, stany, trzech przodków; bez numerów, fokusu i przewinięcia sterownika). Zmiana, nowy adres, przewinięcie, fokus w nowym polu, nowe okno albo pobieranie: `effect: confirmed` i paragon w `message` (`zmiana +A -R; adres: …; nowe: rola „napis”, … (do 10); zniknęło: …`). Bez zmiany: `suspected_noop` z ostrzeżeniem, żeby nie powtarzać działania nieodwracalnego. Hermes przy `confirmed` daje werdykt `done`, więc Operator nie robi `capture` po każdym kroku. Paragon nie podaje numerów: nowy element klika się po nowym `capture` |
+| adres strony | klik w pasek adresu (element 0) i `type` z adresem zakończonym nową linią: przejście w tym samym wywołaniu, z paragonem `adres: …`. `launch_app` Hermes nie daje modelowi (`computer_use` nie ma takiej akcji) |
 
 ## 6. Wejście sterownika i twarde zasady (`infra/komputer/wejscie.py`, `zasady.py`, K2)
 
@@ -300,8 +311,9 @@ w rozmowie trwa tylko do następnego wdrożenia.
 
 **Pętla pracy** (SOUL i skill `praca-na-ekranie`): najpierw droga bez ekranu (`web_extract`); potem plan w `todo`
 i `komputer` `stan`; patrzenie od najtańszego: `capture` `ax` (drzewo), `som` (zrzut z numerami), `vision` (sam obraz);
-klik po numerze elementu, nie w punkt; jedno działanie, potem sprawdzenie (`capture_after`) i werdykt Hermesa
-(`verify_fresh_state` = najpierw nowy `capture`; `escalate` = inna droga, bez okna na wierzch); klik w tle,
+klik po numerze elementu, nie w punkt; jedno działanie i werdykt Hermesa (`done` po paragonie `confirmed` = dalej
+bez nowego `capture`, gdy następny element jest w ostatnim `capture`; `verify_fresh_state` = najpierw nowy
+`capture`; `escalate`, także po `suspected_noop` = `capture` i inna droga, bez okna na wierzch); klik w tle,
 pisanie, klawisze, przewijanie, przeciąganie i podwójny klik na wierzchu w aktywnym oknie (`okno_nieaktywne` →
 nowy `capture` i inna droga albo prośba do właściciela, nigdy samo przestawianie okien).
 Odmowy wejścia to granica: `wymaga_czlowieka` → `komputer` `oddaj` i `kanban_block`, `zablokowane` → inna droga,

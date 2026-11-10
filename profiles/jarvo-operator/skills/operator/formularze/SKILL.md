@@ -1,7 +1,7 @@
 ---
 name: formularze
 description: "Formularz na ekranie: pola, listy, sprawdzenie wartości"
-version: 1.1.0
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-operator
     autonomy: A1
-    reviewed: "2026-10-25"
+    reviewed: "2026-11-10"
 ---
 
 # Formularze
@@ -44,17 +44,20 @@ w takim formularzu (`formularz_wrazliwy`).
 - Skrótów Alt+litera (accesskey strony) nie używasz: wejście je odrzuca (`accesskey`); klikasz przycisk elementem.
 - Schowek należy do właściciela: nie wklejasz (Ctrl+V, Shift+Insert) i nie kopiujesz (`schowek`), tekst piszesz
   przez `type`. Skróty okna przeglądarki (pasek adresu, nowa karta, otwórz plik, zapisz, drukuj) wejście odrzuca
-  (`skrot_przegladarki`): adres otwierasz przez `launch_app` z `urls` albo linkiem na stronie.
+  (`skrot_przegladarki`): adres otwierasz paskiem adresu (element 0: klik, `type` z adresem i nową linią na końcu)
+  albo linkiem na stronie.
 - Pole wyboru pliku (załącznik, zdjęcie, faktura) wypełnia właściciel (`wybor_pliku`): przygotuj resztę
   formularza i `oddaj-ekran` z nazwą pliku, który ma wybrać.
-- Baner albo nakładka strony przykrywa pole lub przycisk (`element_przesloniety`): zamknij ją zwykłym przyciskiem
-  (np. „Zamknij”, „Tylko niezbędne”), przewiń, zrób nowy `capture` i dopiero wtedy klikaj.
+- Baner albo nakładka strony przykrywa pole lub przycisk (`element_przesloniety`, w `zasloniety_przez` co leży na
+  wierzchu): zamknij ją zwykłym przyciskiem (np. „Zamknij”, „Tylko niezbędne”) i dopiero wtedy klikaj.
 - Zgody i regulaminy (`check box` z „Akceptuję”, „Zgadzam się”): zaznacza właściciel, chyba że karta wprost mówi
   inaczej dla tej jednej zgody; zgody marketingowe zawsze zostawiasz puste.
 
 ## Sprawdzenie
-Po każdym polu `capture_after: true`: wartość w drzewie ma być ta, którą wpisałeś (bez obciętych znaków, z polskimi
-literami). Strona pokazuje błąd pola („Nieprawidłowy NIP”) → popraw raz według komunikatu; drugi błąd → raport.
+Po każdym polu wynik `type`: `effect: confirmed` = sterownik odczytał pole i jest w nim Twój tekst; inaczej
+`capture_after: true` i wartość w drzewie ma być ta, którą wpisałeś (bez obciętych znaków, z polskimi literami).
+Strona pokazuje błąd pola („Nieprawidłowy NIP”; paragon pokaże go w `nowe:`) → popraw raz według komunikatu;
+drugi błąd → raport.
 Na koniec pełny `capture` `som` całego formularza (przewiń, jeśli długi) i porównanie z mapą z `todo`.
 
 ## Wysłanie

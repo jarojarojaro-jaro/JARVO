@@ -1,7 +1,9 @@
 """Sterownik CDP na prawdziwej przeglądarce (docs/NATYWNIE.md J02, J05, J06, J07): chrome-headless-shell albo Chrome
 for Testing z manifestu, wskazany w JARVO_KOMPUTER_CHROME_PROBA (pobrany pobieraczem z sumą). Bez niej testy są
-pomijane. Strona testowa (komputer/strona_testowa) przychodzi przez Fetch.fulfillRequest pod https://*.jarvo.test/,
-ramka płatności z drugiej witryny (OOPIF). Zasady oceniają opisy ze sterownika tak samo jak w usłudze."""
+pomijane. Na Linuksie bez przestrzeni nazw użytkownika (AppArmor) przeglądarka wstaje z --no-sandbox, tak samo jak
+w usłudze (przegladarka.brak_piaskownicy). Strona testowa (komputer/strona_testowa) przychodzi przez
+Fetch.fulfillRequest pod https://*.jarvo.test/, ramka płatności z drugiej witryny (OOPIF). Zasady oceniają opisy ze
+sterownika tak samo jak w usłudze."""
 from __future__ import annotations
 
 import base64
@@ -81,9 +83,18 @@ def przegl():
     proxy.start()
     profil, pobrane = katalog / "profil", katalog / "pobrane"
     przegladarka.przygotuj_profil(profil, pobrane)
-    b = cdp.Przegladarka(PROGRAM, przegladarka.flagi(profil=profil, port_proxy=proxy.port, okno=False),
-                         log=katalog / "przegladarka.log")
-    b.start()
+    log = katalog / "przegladarka.log"
+    for bez_piaskownicy in (False, True):            # jak usługa: Linux bez przestrzeni nazw użytkownika (I41)
+        b = cdp.Przegladarka(PROGRAM, przegladarka.flagi(profil=profil, port_proxy=proxy.port, okno=False,
+                                                         bez_piaskownicy=bez_piaskownicy), log=log)
+        b.start()
+        try:
+            b.wyslij("Browser.getVersion", czas=30)
+            break
+        except cdp.BladCDP:
+            b.zamknij(5)
+            if bez_piaskownicy or not (przegladarka.LINUX and przegladarka.brak_piaskownicy(log)):
+                raise
     st = sterownik_cdp.Sterownik(b, pobrane=pobrane, strona_testowa=STRONA)
     st.start()
     yield st, proxy, pobrane
@@ -181,7 +192,8 @@ def test_okno_potwierdzenia_wybor_pliku_baner_i_pobrania(przegl):
     assert w["isError"] and w["structuredContent"]["rule"] == "wybor_pliku"
     przed = dict(st.statystyki)
     for etykieta in ("Pobierz fakturę", "Pobierz instalator"):
-        st.wywolaj("click", {**cel, "element_token": el[etykieta]["element_token"]}, {})
+        w = st.wywolaj("click", {**cel, "element_token": el[etykieta]["element_token"]}, {})
+        assert w["structuredContent"]["effect"] == "confirmed" and "pobieranie pliku" in w["content"][0]["text"], w
     for _ in range(40):
         if st.statystyki["pobrane"] > przed["pobrane"] and st.statystyki["odrzucone"] > przed["odrzucone"]:
             break
@@ -190,9 +202,11 @@ def test_okno_potwierdzenia_wybor_pliku_baner_i_pobrania(przegl):
     assert any(p.name.startswith("faktura") for p in pobrane.iterdir())
     assert not any(p.suffix == ".exe" for p in pobrane.rglob("*"))
     st.wywolaj("click", {**cel, "element_token": el["Pokaż baner"]["element_token"]}, {})
-    _, el = migawka(st, nr)
-    w = st.wywolaj("click", {**cel, "element_token": el["Pobierz fakturę"]["element_token"]}, {})
+    _, po = migawka(st, nr)
+    assert "Pobierz fakturę" not in po and "Ten baner przykrywa dół strony" in po    # środek pod banerem: pominięty
+    w = st.wywolaj("click", {**cel, "element_token": el["Pobierz fakturę"]["element_token"]}, {})  # numer sprzed banera
     assert w["structuredContent"]["code"] == "element_przesloniety"
+    assert w["structuredContent"]["zasloniety_przez"]["napis"] == "Ten baner przykrywa dół strony"
 
 
 def test_padnieta_karta_wraca_po_ponownym_wczytaniu(przegl):
@@ -237,6 +251,78 @@ def test_klik_w_punkt_trafia_w_element_strony(przegl):
     assert w.kod == "przycisk_wrazliwy"
     w = ocen(ctx, "click", {"pid": st.pid, "window_id": nr, "x": 99999, "y": 5, "delivery_mode": "foreground"})
     assert w.kod == "nieznany_cel"
+
+
+def test_klik_elementem_na_przewinietej_stronie_i_pod_warstwa_bez_zdarzen(przegl):
+    """Długa strona: przycisk 1500 px niżej (sterownik przewija stronę) i przycisk pod warstwą na cały ekran
+    z pointer-events: none. Dotąd sprawdzenie punktu pytało o układ okna zamiast dokumentu i trafiało w warstwę,
+    więc oba kliknięcia kończyły się fałszywym `element_przesloniety`. Paragon: zmiana strony = `confirmed`,
+    przycisk bez działania = `suspected_noop`."""
+    st, _, _ = przegl
+    nr = otworz(st, "https://sklep.jarvo.test/dluga.html")
+    cel = {"pid": st.pid, "window_id": nr}
+    sc, el = migawka(st, nr)
+    assert "offscreen" in el["Przycisk na dole"]["states"] and "offscreen" not in el["Przycisk na górze"].get(
+        "states", [])
+    pozycja = {e["label"]: i for i, e in enumerate(sc["elements"])}
+    assert pozycja["Przycisk na górze"] < pozycja["Przycisk na dole"] < pozycja["Koniec strony"]
+    w = st.wywolaj("click", {**cel, "element_token": el["Przycisk na dole"]["element_token"]}, {})
+    assert not w["isError"] and w["structuredContent"]["effect"] == "confirmed", w
+    assert "nowe: paragraph „Kliknięto dół”" in w["structuredContent"]["message"]
+    assert js(st, nr, "document.getElementById('wynik').textContent") == "Kliknięto dół" and js(st, nr, "scrollY") > 0
+    w = st.wywolaj("click", {**cel, "element_token": el["Przycisk na górze"]["element_token"]}, {})
+    assert w["structuredContent"]["effect"] == "confirmed", w
+    assert js(st, nr, "document.getElementById('wynik').textContent") == "Kliknięto górę"
+    w = st.wywolaj("click", {**cel, "element_token": el["Nic nie robi"]["element_token"]}, {})
+    assert w["structuredContent"]["effect"] == "suspected_noop", w
+    assert "nie powtarzaj" in w["structuredContent"]["message"]
+
+
+def test_okno_zgody_na_gorze_migawki_a_przykryty_element_z_zasloniety_przez(przegl):
+    """Okno zgody leży na końcu DOM i przykrywa całą stronę: w migawce jest zaraz po pasku adresu (numery poniżej
+    10), elementy pod nim znikają, a klik elementem numerem sprzed okna kończy się odmową z tym, co zasłania."""
+    st, _, _ = przegl
+    nr = otworz(st, "https://sklep.jarvo.test/dluga.html")
+    cel = {"pid": st.pid, "window_id": nr}
+    _, el = migawka(st, nr)
+    w = st.wywolaj("click", {**cel, "element_token": el["Pokaż zgodę"]["element_token"]}, {})
+    assert w["structuredContent"]["effect"] == "confirmed" and "dialog „Zgoda na ciasteczka”" in w["content"][0][
+        "text"], w
+    sc, po = migawka(st, nr)
+    assert [e["label"] for e in sc["elements"][1:5]] == ["Zgoda na ciasteczka", "Ta strona używa ciasteczek.",
+                                                         "Akceptuję", "Odrzucam"]
+    assert po["Akceptuję"]["element_index"] < 10 and po["Zgoda na ciasteczka"]["role"] == "dialog"
+    assert "Przycisk na górze" not in po and sc["covered_count"] > 0
+    w = st.wywolaj("click", {**cel, "element_token": el["Przycisk na górze"]["element_token"]}, {})
+    assert w["isError"] and w["structuredContent"]["code"] == "element_przesloniety", w
+    assert w["structuredContent"]["zasloniety_przez"] == {"rola": "dialog", "napis": "Zgoda na ciasteczka",
+                                                          "element_index": po["Zgoda na ciasteczka"]["element_index"]}
+    assert js(st, nr, "document.getElementById('wynik').textContent") == "Nic nie kliknięto"
+    w = st.wywolaj("click", {**cel, "element_token": po["Akceptuję"]["element_token"]}, {})
+    assert w["structuredContent"]["effect"] == "confirmed" and "zniknęło: dialog „Zgoda na ciasteczka”" in w[
+        "structuredContent"]["message"], w
+    _, po = migawka(st, nr)
+    assert "Przycisk na górze" in po and "Akceptuję" not in po
+
+
+def test_klik_w_punkt_w_zaplac_po_przewinieciu_wymaga_czlowieka(przegl):
+    """Zasady oceniają klik w punkt po elemencie, który Chrome naprawdę kliknie: na przewiniętej stronie pod
+    przezroczystą warstwą bez zdarzeń wskaźnika w punkcie leży „Zapłać 129 zł”, więc klik robi człowiek. Dotąd
+    sterownik opisywał zasadom element o przewinięcie wyżej albo warstwę i klik w płatność mógł przejść."""
+    st, _, _ = przegl
+    nr = otworz(st, "https://sklep.jarvo.test/dluga.html")
+    ctx = Ctx(st)
+    js(st, nr, "document.querySelector('button[type=submit]').scrollIntoView({block: 'center'})")
+    assert js(st, nr, "scrollY") > 1000
+    _, el = migawka(st, nr)
+    f = el["Zapłać 129 zł"]["frame"]
+    assert "offscreen" not in el["Zapłać 129 zł"].get("states", [])
+    punkt = {"pid": st.pid, "window_id": nr, "x": f["x"] + f["w"] / 2, "y": f["y"] + f["h"] / 2,
+             "delivery_mode": "foreground"}
+    opis = st.opis_w_punkcie(nr, punkt["x"], punkt["y"])
+    assert (opis["rola"], opis["nazwa"]) == ("push button", "Zapłać 129 zł"), opis
+    w = ocen(ctx, "click", punkt)
+    assert (w.decyzja, w.kod) == (zasady.CZLOWIEK, "przycisk_wrazliwy"), (w.kod, w.powod)
 
 
 def test_natywny_test_komputera_na_zywo(tmp_path):
@@ -380,7 +466,8 @@ def test_podglad_i_wejscie_wlasciciela(przegl):
 
 def test_pasek_adresu_jak_w_chromium_z_pulpitu(przegl):
     """Element 0 migawki to pasek adresu (ta sama nazwa co w Chromium z pulpitu): klik, type z adresem, key return
-    otwiera stronę bez zmian w poleceniach Operatora; adresy spoza http(s) nie przechodzą."""
+    otwiera stronę bez zmian w poleceniach Operatora, a type z nową linią na końcu robi to w jednym wywołaniu
+    (paragon `adres: …`); adresy spoza http(s) nie przechodzą."""
     st, _, _ = przegl
     nr = otworz(st, "https://sklep.jarvo.test/sklep.html")
     ctx = Ctx(st)
@@ -397,7 +484,9 @@ def test_pasek_adresu_jak_w_chromium_z_pulpitu(przegl):
     assert st.wywolaj("type_text", pisz, {})["structuredContent"]["effect"] == "confirmed"
     enter = {**cel, "delivery_mode": "foreground", "key": "Return"}
     assert ocen(ctx, "press_key", enter).wolno
-    assert not st.wywolaj("press_key", enter, {}).get("isError")
+    w = st.wywolaj("press_key", enter, {})
+    assert w["structuredContent"]["effect"] == "confirmed" and "adres: sklep.jarvo.test/formularz.html" in w[
+        "structuredContent"]["message"], w
     for _ in range(40):
         st.wywolaj("list_windows", {}, {})
         if st.okno(nr).tytul == "Zamówienie testowe Jarvo":
@@ -409,6 +498,13 @@ def test_pasek_adresu_jak_w_chromium_z_pulpitu(przegl):
     assert not ocen(ctx, "type_text", {**pisz, "text": "javascript:alert(1)"}).wolno
     w = st.wywolaj("type_text", {**pisz, "text": "file:///C:/Windows/win.ini\n"}, {})
     assert w["isError"] and w["structuredContent"]["code"] == "adres" and st.okno(nr).url.startswith("https://")
+    # adres w dwóch krokach: klik w pasek i `type` z nową linią na końcu (Enter w tym samym wywołaniu)
+    st.wywolaj("click", klik | {"element_token": migawka(st, nr)[0]["elements"][0]["element_token"]}, {})
+    jednym = {**pisz, "text": "sklep.jarvo.test/dluga.html\n"}
+    assert ocen(ctx, "type_text", jednym).wolno
+    w = st.wywolaj("type_text", jednym, {})
+    assert w["structuredContent"]["effect"] == "confirmed" and "adres: sklep.jarvo.test/dluga.html" in w[
+        "structuredContent"]["message"], w
 
 
 def test_skrypt_strony_przenosi_fokus_do_hasla(przegl):
