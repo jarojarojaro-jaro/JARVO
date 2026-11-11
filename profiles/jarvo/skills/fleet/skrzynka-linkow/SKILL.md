@@ -65,8 +65,8 @@ blokad: bez logowania, bez ciasteczek konta, bez innych usług pobierania.
 Ostatnie słowo wiadomości to „one” (wielkość liter bez znaczenia; z linkiem albo bez): właściciel chce zgłębić rzecz
 jednorazowo, poza główną pracą. Może z tego coś wyjść, może nie; liczy się, żeby po latach dało się to odtworzyć.
 1. **Otwarcie.** Z linkiem: kroki 1–5, w szkicu dodatkowo tag `poboczny`. Załóż teczkę `write_file`
-   `@@WORKSPACES_DIR@@/jarvo/poboczne/RRRR-MM-DD-<temat-krótko>.md`: temat, link, data, komentarz właściciela,
-   `status: otwarty`. Odpowiedz: ocena (2–3 zdania), 2–3 kierunki do zgłębienia (np. research, test, film, koszt)
+   `@@MISSIONS_DIR@@/poboczne/RRRR-MM-DD-<temat-krótko>.md` (datę masz w rozmowie, bez terminala): temat, link, data,
+   komentarz właściciela, `status: otwarty`. Odpowiedz: ocena (2–3 zdania), 2–3 kierunki do zgłębienia (np. research, test, film, koszt)
    i jedno zdanie: „Temat poboczny otwarty, piszmy dalej; „zamknij” kończy i zapisuje”.
 2. **Rozmowa.** Odpowiadasz jak zwykle. Pracę, którą właściciel zleci (research, test), zlecasz zwykłą ścieżką `intake`
    jako misję z tytułem zaczynającym się od `[poboczna]`; idzie po głównej pracy, nie wypycha jej. Bez osobnego agenta.
