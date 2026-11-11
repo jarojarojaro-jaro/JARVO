@@ -276,6 +276,23 @@ def test_straznik_pamieci_bez_danych_logowania():
     assert pl.straznik(tool_name="web_search", args={"query": "hasło Wiosna2026!"}) is None    # inne narzędzia bez zmian
 
 
+def test_straznik_notatki_skarbca_tylko_przez_kompilacje(srodowisko, monkeypatch):
+    """11.11 Jarvo poprawił notatkę `patch`-em (bez LOG, gita i indeksu). write_file i patch w notatkę, hub, LOG albo
+    skrzynkę: blokada z drogą przez wiedza_zapisz; własne formaty skilli i pliki poza skarbcem idą dalej."""
+    root, home, sk, p = srodowisko
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    kn = root / "jarvo" / "knowledge"
+    notatka = str(kn / "agenci/jarvo-web/lightpanda nie renderuje three.js.md")
+    w = pl.straznik(tool_name="patch", args={"path": notatka, "old_string": "a", "new_string": "b"})
+    assert w and w["action"] == "block" and "wiedza_zapisz" in w["message"]
+    assert pl.straznik(tool_name="write_file", args={"path": str(kn / "INDEX.md"), "content": "x"})["action"] == "block"
+    v4a = f"*** Begin Patch\n*** Update File: {notatka}\n@@\n-a\n+b\n*** End Patch"
+    assert pl.straznik(tool_name="patch", args={"mode": "patch", "patch": v4a})["action"] == "block"
+    for wolny in ("brands/acme/BRAND.md", "fleet/lekcje.md", "user/USER.md", "inspiracje/strony/x/y.md", "wideo/muzyka/a.md"):
+        assert pl.straznik(tool_name="write_file", args={"path": str(kn / wolny), "content": "x"}) is None, wolny
+    assert pl.straznik(tool_name="write_file", args={"path": str(root / "jarvo" / "workspaces" / "raport.md"), "content": "x"}) is None
+
+
 def test_straznik_limit_generacji_na_karte(tmp_path, monkeypatch):
     monkeypatch.setenv("JARVO_STATE_DIR", str(tmp_path / "state"))
     monkeypatch.setenv("JARVO_LIMIT_WIDEO_AI", "2")

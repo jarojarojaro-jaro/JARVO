@@ -1113,6 +1113,32 @@ def _budzet_wzroku(tool_name: str, session_id: str) -> Optional[Dict[str, Any]]:
             "zapisz słowami w raport.md, w „## Uwagi wizualne” albo w linii „Do głębszej analizy”, i oddaj kartę."}
 
 
+# Pliki skarbca, które agenci piszą sami (SCHEMA zasada 9: własne formaty skilli; reszta tylko przez kompilację)
+WOLNE_W_SKARBCU = ("brands/", "inspiracje/", "wideo/", "fleet/lekcje.md", "user/USER.md")
+_V4A_PLIK_RE = re.compile(r"^\*\*\* (?:Update|Add|Delete) File: (.+)$", re.M)
+
+
+def _zapis_w_skarbcu(args: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """write_file albo patch w notatkę skarbca (poza WOLNE_W_SKARBCU): blokada z drogą przez szkic. Notatka zmieniona
+    narzędziem plików nie ma wpisu w LOG, punktu zapisu git ani nowego indeksu i wektorów (11.11: Jarvo poprawił
+    słowa właściciela `patch`-em w notatce, a podwójne streszczenie z kompilacji zostało)."""
+    korzen = Path(os.path.realpath(_sciezki(_hermes_home())[0]))
+    for s in [args.get("path"), *_V4A_PLIK_RE.findall(str(args.get("patch") or ""))]:
+        if not isinstance(s, str) or not s.strip():
+            continue
+        try:
+            rel = Path(os.path.realpath(os.path.expanduser(s.strip()))).relative_to(korzen).as_posix()
+        except ValueError:
+            continue
+        if rel != "." and not any(rel == w.rstrip("/") or rel.startswith(w) for w in WOLNE_W_SKARBCU):
+            return {"action": "block", "message": f"`{rel}` w skarbcu pisze tylko kompilacja (SCHEMA, zasada 9). Poprawkę "
+                    "albo nowy fakt zapisz `wiedza_zapisz` (szkic; kompilacja zaktualizuje notatkę w kilka minut i "
+                    "powiedz, że zmiana wejdzie po kompilacji), a słowa właściciela, które mają obowiązywać zawsze, "
+                    "`wiedza_orzeczenie`."}
+    return None
+
+
+
 def straznik(tool_name: str = "", args: Optional[Dict[str, Any]] = None, task_id: str = "", session_id: str = "",
              **_kw: Any) -> Optional[Dict[str, Any]]:
     """Hak pre_tool_call: {"action": "block"|"approve", "message"}, {"action": "modify", "args"} (dopisany recenzent
@@ -1133,6 +1159,8 @@ def straznik(tool_name: str = "", args: Optional[Dict[str, Any]] = None, task_id
             return _zamkniecie_bez_oceny(args)
         elif tool_name in NARZEDZIA_WZROKU:
             return _budzet_wzroku(tool_name, session_id)
+        elif tool_name in ("write_file", "patch"):
+            return _zapis_w_skarbcu(args)
     except Exception as e:                       # strażnik nie może zatrzymać zwykłej pracy własnym błędem
         logger.debug("jarvo-wiedza: strażnik %s: %s", tool_name, e)
     return None
