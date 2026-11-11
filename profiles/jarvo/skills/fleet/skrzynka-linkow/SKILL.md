@@ -71,7 +71,8 @@ jednorazowo, poza główną pracą. Może z tego coś wyjść, może nie; liczy 
 2. **Rozmowa.** Odpowiadasz jak zwykle. Pracę, którą właściciel zleci (research, test), zlecasz zwykłą ścieżką `intake`
    jako misję z tytułem zaczynającym się od `[poboczna]`; idzie po głównej pracy, nie wypycha jej. Bez osobnego agenta.
 3. **Zamknięcie: właściciel pisze „zamknij”** (też „koniec tematu”, „zamknij temat X” po czasie; brak rozmowy w kontekście
-   = `session_search`). Uzupełnij teczkę (`status: zamknięty`) sekcjami: **Co i po co**, **Ustalenia** (fakty, liczby
+   = `session_search`). Przeczytaj teczkę (`read_file`; Hermes nie nadpisze nieprzeczytanego pliku) i uzupełnij ją
+   (`status: zamknięty`) sekcjami: **Co i po co**, **Ustalenia** (fakty, liczby
    z datami), **Wynik**, **Ocena** (`ciekawe` / `odłożone` / `nie warto, bo …`), **Jak odtworzyć** (linki, koszt, sprzęt,
    polecenia, pliki, misja). Potem jeden szkic `wiedza_zapisz(typ="projekt", tagi=["poboczny", …])`: 50–150 słów
    z oceną, najważniejszym ustaleniem i ścieżką teczki; `zrodlo` = link (bez linku: „rozmowa z właścicielem RRRR-MM-DD”).
