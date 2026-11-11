@@ -16,8 +16,8 @@ i state/wiedza-lint.json pokazują stan po kompilacji, a raport przebiegu ma lic
 dalsze czekają bez zmiany licznika (Hermes po przekroczeniu czasu wyłącza dostawcę na 10 min, więc reszta partii padłaby
 od razu i po trzech takich przebiegach wypadła do `zrobione/`); zła odpowiedź na jeden szkic (bez JSON) liczy się tylko jemu.
 
-Uruchomienie: wątek wtyczki jarvo-wiedza (przy szkicach: najnowszy ≥ 5 min albo najstarszy ≥ 15 min; co noc, także
-nadrabiane po uśpieniu), przycisk
+Uruchomienie: hak wtyczki jarvo-wiedza na tik dyspozytora kanbana w bramie (przy szkicach: najnowszy ≥ 5 min albo
+najstarszy ≥ 15 min; co noc, także nadrabiane po uśpieniu), przycisk
 w zakładce Wiedza i `jarvo wiedza kompiluj` (jarvo/wiedza_cli.py) wołają ten plik Pythonem z venvu Hermesa, bez basha
 (na Windows bash z Pythona to WSL). Ręcznie w kontenerze: scripts/wiedza-kompiluj.sh [--na-sucho] [--limit N].
 Model: zadanie pomocnicze Hermesa `jarvo_wiedza` (auxiliary.jarvo_wiedza.model, poziom frontier) w HERMES_HOME profilu
@@ -114,6 +114,14 @@ def _json_z_odpowiedzi(text: str) -> Optional[dict]:
         except ValueError:
             continue
     return None
+
+
+def bez_ramy(t: str) -> str:
+    """Treść bez nagłówka `# …`, pogrubionego streszczenia i sekcji „Powiązane”: te części dokłada _tresc_notatki,
+    a model w „tresc” bywa, że zwraca całą notatkę (11.11: streszczenie dwa razy w notatce o telefonach)."""
+    t = re.sub(r"^\s*# [^\n]*\n", "", t, count=1)
+    t = re.sub(r"^\s*\*\*[^\n]*\*\*\s*\n", "", t, count=1)
+    return re.split(r"^## Powiązane\s*$", t, maxsplit=1, flags=re.M)[0].strip()
 
 
 class Kompilacja:
@@ -360,10 +368,7 @@ class Kompilacja:
 
     def tresc_wlasciwa(self, n) -> str:
         """Treść notatki bez nagłówka, pogrubionego streszczenia, bloków generowanych i sekcji „Powiązane”."""
-        t = self.lib.GEN_RE.sub("", n.tresc)
-        t = re.sub(r"^\s*# [^\n]*\n", "", t, count=1)
-        t = re.sub(r"^\s*\*\*[^\n]*\*\*\s*\n", "", t, count=1)
-        return re.split(r"^## Powiązane\s*$", t, maxsplit=1, flags=re.M)[0].strip()
+        return bez_ramy(self.lib.GEN_RE.sub("", n.tresc))
 
     def nowe_zdania(self, n, tresc: str) -> List[str]:
         """Zdania `tresc`, których istniejąca notatka nie ma (≥ 80% rdzeni zdania już jest w notatce = zdanie znane)."""
@@ -386,7 +391,7 @@ class Kompilacja:
             return f"odrzucony ({powod or 'bez powodu'})"
         tytul = " ".join(str(wynik.get("tytul") or szkic["tytul"]).split())[:120]
         streszczenie = str(wynik.get("streszczenie") or tytul)
-        tresc = str(wynik.get("tresc") or szkic["tresc"]).strip()
+        tresc = bez_ramy(str(wynik.get("tresc") or "")) or str(szkic["tresc"]).strip()
         if lib.zawiera_sekret(tytul + "\n" + streszczenie + "\n" + tresc):
             self.raport["odrzucone"] += 1
             return "odrzucony (sekret w treści)"

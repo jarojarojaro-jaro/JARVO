@@ -9,8 +9,9 @@ profilu ma `memory.provider: jarvo-wiedza`). Co robi:
     użytkownika z tej tury),
   - lustro wpisów `memory` (MEMORY.md/USER.md) do skrzynki,
   - wyciąg z rozmowy głównym modelem (zadanie pomocnicze `jarvo_wiedza`, model poziomu frontier) na koniec sesji, przed
-    kompresją i po 30 minutach ciszy; wynik: zrodla/rozmowy/ (surowy wyciąg) + szkic w skrzynce,
+    kompresją i po 10 minutach ciszy; wynik: zrodla/rozmowy/ (surowy wyciąg) + szkic w skrzynce,
   - hak `kanban_task_completed`: raporty z out/ zamkniętej karty do zrodla/karty/ i szkic (0 tokenów),
+  - hak `on_kanban_dispatch_tick` (brama, co 30 s): kompilacja skrzynki osobnym procesem, gdy pora (tik_kompilacji),
   - narzędzie `schemat` (schemat.py) tylko dla agentów z SCHEMAT_DLA (Jarvo, rozmowa z właścicielem): SVG → PNG w rozmowie.
     Hermes ładuje tę wtyczkę jako dostawcę pamięci (wyłączną), więc narzędzia idą przez get_tool_schemas, nie register_tool.
 Agenci nie piszą notatek: notatki, INDEX i huby pisze kompilacja (etap 4) i `wiedza.py`.
@@ -90,10 +91,6 @@ def _modul(nazwa: str, plik: str):
 
 def _lib():
     return _modul("jarvo_wiedza_lib", "wiedza.py")
-
-
-def _kompilacja():
-    return _modul("jarvo_wiedza_kompilacja", "kompilacja.py")
 
 
 def _schemat():
@@ -184,10 +181,6 @@ def wywolaj_model(system: str, user: str, max_tokens: int = 1200) -> str:
     resp = call_llm(task=ZADANIE_AUX, messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
                     max_tokens=max_tokens, temperature=0.2)
     return _tresc_odpowiedzi(resp)
-
-
-def model_kompilacji(system: str, user: str) -> str:
-    return wywolaj_model(system, user, max_tokens=2000)
 
 
 def _dosc_tresci(teksty: List[str]) -> bool:
@@ -615,13 +608,8 @@ class SkarbiecProvider(MemoryProvider):
 
     def _petla_ciszy(self) -> None:
         """Co minutę: sesja bez nowej tury przez CISZA_S z nowymi wiadomościami wartymi wyciągu (_dosc_tresci) → wyciąg
-        (człowiek nie musi pisać /new); do tego kompilacja skrzynki, gdy pora (_moze_kompilowac). Blokada w state/
-        pilnuje, żeby z dziesięciu profili gatewaya kompilował jeden."""
+        (człowiek nie musi pisać /new). Kompilację skrzynki odpala hak tiku dyspozytora (tik_kompilacji), nie ten wątek."""
         while not self._stop.wait(60):
-            try:
-                self._moze_kompilowac() and self.kompiluj("harmonogram")
-            except Exception as e:
-                logger.debug("jarvo-wiedza: harmonogram kompilacji: %s", e)
             try:
                 for sid, b in self._sesje_po_ciszy():
                     msgs = []
@@ -640,46 +628,6 @@ class SkarbiecProvider(MemoryProvider):
         with self._lock:
             return [(sid, dict(b)) for sid, b in self._bufor.items()
                     if b["tury"] and teraz - b["ts"] >= CISZA_S and _dosc_tresci([u for u, _a in b["tury"][b["wyciagnieto"]:]])]
-
-    # ---- kompilacja (jeden piszący)
-    def _stan_kompilacji(self) -> tuple[float, bool]:
-        """(czas ostatniej kompilacji, czy przerwał ją błąd wywołania modelu) z state/wiedza-kompilacja.json."""
-        try:
-            d = json.loads((self._stan / "wiedza-kompilacja.json").read_text(encoding="utf-8"))
-            return float(d.get("ostatnia") or 0), bool((d.get("raport") or {}).get("przerwana"))
-        except (OSError, ValueError, TypeError, AttributeError):
-            return 0.0, False
-
-    def _moze_kompilowac(self, teraz: Optional[float] = None) -> bool:
-        """Szkice w skrzynce i: najnowszy ma ≥ SZKIC_SPOKOJ_S (seria z jednej rozmowy już się skończyła) albo najstarszy
-        ≥ SZKIC_NAJSTARSZY_S, albo nocny przebieg, którego jeszcze nie było (ostatnia kompilacja przed ostatnią porą
-        KOMPILACJA_NOC; komputer uśpiony o 03:10 nadrabia go raz po wybudzeniu, docs/NATYWNIE.md K03). Po przebiegu
-        przerwanym błędem wywołania modelu czeka KOMPILACJA_PO_AWARII_S. Bez szkiców nigdy (0 wywołań modelu)."""
-        if self._kontekst != "primary" or not self._skarbiec or not (self._skarbiec / "skrzynka").is_dir():
-            return False
-        czasy = [p.stat().st_mtime for p in (self._skarbiec / "skrzynka").glob("*.md") if p.is_file()]
-        if not czasy:
-            return False
-        teraz = time.time() if teraz is None else teraz
-        ostatnia, przerwana = self._stan_kompilacji()
-        if ostatnia < ostatnia_noc(teraz):
-            return True
-        if przerwana and teraz - ostatnia < KOMPILACJA_PO_AWARII_S:
-            return False
-        return teraz - max(czasy) >= SZKIC_SPOKOJ_S or teraz - min(czasy) >= SZKIC_NAJSTARSZY_S
-
-    def kompiluj(self, powod: str = "ręcznie") -> Dict[str, Any]:
-        """Przebieg kompilacji skrzynki głównym modelem (wiedza/kompilacja.py); zwraca raport."""
-        sk = self._sk()
-        if sk is None:
-            return {"error": "brak skarbca"}
-        K = _kompilacja().Kompilacja
-        raport = K(sk, self.model_kompilacji if hasattr(self, "model_kompilacji") else model_kompilacji).uruchom()
-        if raport.get("szkice") and not raport.get("zablokowana"):
-            logger.info("jarvo-wiedza: kompilacja (%s): %s szkiców → %s nowych, %s aktualizacji, %s sprzecznych, %s odrzuconych, %s błędów",
-                        powod, raport["szkice"], raport["nowe"], raport["aktualizacje"], raport["sprzeczne"], raport["odrzucone"], raport["bledy"])
-            self._cache = ("", 0.0, "")
-        return raport
 
     def _wyciag(self, messages: List[Dict[str, Any]], sid: str, *, od_tury: int, powod: str) -> Optional[Dict[str, Any]]:
         if (self._meta.get(self._agent) or {}).get("bez_wyciagu"):
@@ -712,6 +660,100 @@ class SkarbiecProvider(MemoryProvider):
             logger.info("jarvo-wiedza: szkic odrzucony: %s", e)
             return None
         return {"zrodlo": rel_zrodlo, "wyciag": tresc, "tury": tury}
+
+
+# ------------------------------------------------------------------------------------------------ kompilacja (harmonogram)
+
+_kompilacja_trwa = threading.Lock()      # jedna kompilacja z haka naraz w tym procesie (drugą i tak odbije blokada skarbca)
+
+
+def _stan_kompilacji(stan: Path) -> tuple[float, bool]:
+    """(czas ostatniej kompilacji, czy przerwał ją błąd wywołania modelu) z state/wiedza-kompilacja.json."""
+    try:
+        d = json.loads((stan / "wiedza-kompilacja.json").read_text(encoding="utf-8"))
+        return float(d.get("ostatnia") or 0), bool((d.get("raport") or {}).get("przerwana"))
+    except (OSError, ValueError, TypeError, AttributeError):
+        return 0.0, False
+
+
+def pora_kompilacji(skarbiec: Path, stan: Path, teraz: float) -> bool:
+    """Szkice w skrzynce i: najnowszy ma ≥ SZKIC_SPOKOJ_S (seria z jednej rozmowy już się skończyła) albo najstarszy
+    ≥ SZKIC_NAJSTARSZY_S, albo nocny przebieg, którego jeszcze nie było (ostatnia kompilacja przed ostatnią porą
+    KOMPILACJA_NOC; komputer uśpiony o 03:10 nadrabia go raz po wybudzeniu, docs/NATYWNIE.md K03). Po przebiegu
+    przerwanym błędem wywołania modelu czeka KOMPILACJA_PO_AWARII_S. Bez szkiców nigdy (0 wywołań modelu)."""
+    if not (skarbiec / "skrzynka").is_dir():
+        return False
+    czasy = [p.stat().st_mtime for p in (skarbiec / "skrzynka").glob("*.md") if p.is_file()]
+    if not czasy:
+        return False
+    ostatnia, przerwana = _stan_kompilacji(stan)
+    if ostatnia < ostatnia_noc(teraz):
+        return True
+    if przerwana and teraz - ostatnia < KOMPILACJA_PO_AWARII_S:
+        return False
+    return teraz - max(czasy) >= SZKIC_SPOKOJ_S or teraz - min(czasy) >= SZKIC_NAJSTARSZY_S
+
+
+def polecenie_kompilacji(hermes_home: str) -> Optional[tuple[List[str], Dict[str, str], Optional[str]]]:
+    """(argv, środowisko, katalog) przebiegu kompilacji jak `jarvo wiedza kompiluj` i przycisk w zakładce Wiedza:
+    kompilacja.py Pythonem procesu (venv Hermesa) w trybie izolowanym, z HERMES_HOME profilu jarvo (model zadania
+    jarvo_wiedza; brama działa z HERMES_HOME hosta, który tego zadania nie ma), w katalogu Hermesa. None bez pliku."""
+    k = next((p for p in (_HERE / "kompilacja.py", _HERE.parent / "kompilacja.py") if p.is_file()), None)
+    if k is None:
+        return None
+    skarbiec, stan = _sciezki(hermes_home)
+    env = {**os.environ, "JARVO_WIEDZA_PROFIL": "jarvo", "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+    profil = _korzen(hermes_home) / "profiles" / "jarvo"
+    if profil.is_dir():
+        env["HERMES_HOME"] = str(profil)
+    src = os.environ.get("HERMES_SRC") or "/opt/hermes"
+    return ([sys.executable, "-I", "-X", "utf8", str(k), "--skarbiec", str(skarbiec), "--stan", str(stan), "--profil",
+             "jarvo", "--json"], env, src if Path(src).is_dir() else None)
+
+
+def _kompiluj_w_tle(argv: List[str], env: Dict[str, str], cwd: Optional[str]) -> None:
+    """Przebieg kompilacji w osobnym procesie; wynik do logu bramy. Zwalnia _kompilacja_trwa."""
+    import subprocess
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=3600,
+                           env=env, cwd=cwd, stdin=subprocess.DEVNULL,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        raport: Dict[str, Any] = {}
+        with contextlib.suppress(ValueError):
+            raport = json.loads(r.stdout) if r.stdout.strip() else {}
+        if r.returncode:
+            ogon = (r.stderr.strip().splitlines() or [f"kod {r.returncode}"])[-1]
+            logger.warning("jarvo-wiedza: kompilacja (harmonogram) nieudana: %s", ogon[:300])
+        elif isinstance(raport, dict) and raport.get("szkice") and not raport.get("zablokowana"):
+            logger.info("jarvo-wiedza: kompilacja (harmonogram): %s szkiców → %s nowych, %s aktualizacji, %s sprzecznych, "
+                        "%s odrzuconych, %s błędów", raport["szkice"], raport.get("nowe"), raport.get("aktualizacje"),
+                        raport.get("sprzeczne"), raport.get("odrzucone"), raport.get("bledy"))
+    except Exception as e:
+        logger.warning("jarvo-wiedza: kompilacja (harmonogram): %s: %s", type(e).__name__, e)
+    finally:
+        _kompilacja_trwa.release()
+
+
+def tik_kompilacji(**_kwargs) -> None:
+    """Hak on_kanban_dispatch_tick: dyspozytor kanbana tyka w bramie co 30 s od jej startu, także gdy nikt nie
+    rozmawia. Gdy pora (pora_kompilacji), przebieg kompilacji rusza w tle (polecenie_kompilacji); jeden naraz.
+    Dotąd harmonogram był w wątku ciszy dostawcy pamięci, który startuje dopiero z pierwszą rozmową w bramie: po
+    restarcie bramy bez rozmowy w HQ szkice z `jarvo chat`, kart i rutyn czekały bez końca (serwer 10–11.11)."""
+    try:
+        home = _hermes_home()
+        skarbiec, stan = _sciezki(home)
+        if not pora_kompilacji(skarbiec, stan, time.time()):
+            return
+        polecenie = polecenie_kompilacji(home)
+        if polecenie is None or not _kompilacja_trwa.acquire(blocking=False):
+            return
+        try:
+            threading.Thread(target=_kompiluj_w_tle, args=polecenie, name="jarvo-wiedza-kompilacja", daemon=True).start()
+        except BaseException:
+            _kompilacja_trwa.release()
+            raise
+    except Exception as e:                       # hak nie może psuć tiku dyspozytora
+        logger.debug("jarvo-wiedza: harmonogram kompilacji: %s", e)
 
 
 # ------------------------------------------------------------------------------------------------ hak kanbana
@@ -1105,6 +1147,10 @@ def register(ctx) -> None:
         ctx.register_hook("kanban_task_completed", karta_zamknieta)
     except Exception as e:
         logger.debug("jarvo-wiedza: hak kanbana nie zarejestrowany: %s", e)
+    try:
+        ctx.register_hook("on_kanban_dispatch_tick", tik_kompilacji)
+    except Exception as e:
+        logger.debug("jarvo-wiedza: harmonogram kompilacji nie zarejestrowany: %s", e)
     try:
         ctx.register_hook("pre_tool_call", straznik)
     except Exception as e:

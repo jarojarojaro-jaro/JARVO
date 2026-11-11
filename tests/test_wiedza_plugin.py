@@ -517,44 +517,78 @@ def test_nocny_przebieg_nadrabiany_po_uspieniu(srodowisko):
     """Laptop uśpiony o 03:10: nocny przebieg nie przepada do następnej nocy, tylko rusza raz po wybudzeniu; potem
     obowiązuje zwykły rytm (szkice odstane, test_harmonogram_kompilacji_po_szkicach). Bez szkiców nic nie rusza."""
     root, home, sk, p = srodowisko
-    stan = root / "jarvo" / "state" / "wiedza-kompilacja.json"
+    kn, st = root / "jarvo" / "knowledge", root / "jarvo" / "state"
 
     def ostatnia(t):
-        stan.write_text(json.dumps({"ostatnia": t}), encoding="utf-8")
+        (st / "wiedza-kompilacja.json").write_text(json.dumps({"ostatnia": t}), encoding="utf-8")
     ostatnia(_chwila("2026-10-20 02:50"))
-    assert not p._moze_kompilowac(_chwila("2026-10-20 07:30"))           # skrzynka pusta
+    assert not pl.pora_kompilacji(kn, st, _chwila("2026-10-20 07:30"))          # skrzynka pusta
     rel = w.zapisz_szkic(sk, "fakt", "Nocny fakt", "Treść.", "karta t_5", "jarvo-web")
     os.utime(sk.plik(rel), (_chwila("2026-10-20 03:02"),) * 2)
-    assert p._moze_kompilowac(_chwila("2026-10-20 03:05")) is False       # szkic świeży, przed porą nocną
-    assert p._moze_kompilowac(_chwila("2026-10-20 03:11"))                # pora nocna (dawniej tylko okno 10 min)
-    assert p._moze_kompilowac(_chwila("2026-10-20 07:30"))                # po wybudzeniu: nadrabia
+    assert pl.pora_kompilacji(kn, st, _chwila("2026-10-20 03:05")) is False      # szkic świeży, przed porą nocną
+    assert pl.pora_kompilacji(kn, st, _chwila("2026-10-20 03:11"))               # pora nocna (dawniej tylko okno 10 min)
+    assert pl.pora_kompilacji(kn, st, _chwila("2026-10-20 07:30"))               # po wybudzeniu: nadrabia
     ostatnia(_chwila("2026-10-20 07:31"))
     os.utime(sk.plik(rel), (_chwila("2026-10-20 07:58"),) * 2)
-    assert not p._moze_kompilowac(_chwila("2026-10-20 08:00"))           # po nadrobieniu: zwykły rytm
-    p._kontekst = "subagent"
-    assert not p._moze_kompilowac(_chwila("2026-10-20 08:32"))           # tylko kontekst główny (jedna kompilacja)
+    assert not pl.pora_kompilacji(kn, st, _chwila("2026-10-20 08:00"))          # po nadrobieniu: zwykły rytm
 
 
 def test_harmonogram_kompilacji_po_szkicach(srodowisko):
     """Kompilacja rusza, gdy najnowszy szkic ma ≥ 5 min (seria z rozmowy skończona) albo najstarszy ≥ 15 min (ciągły
     dopływ), a nie najwyżej raz na godzinę; po przebiegu przerwanym błędem modelu czeka 15 min; bez szkiców nigdy."""
     root, home, sk, p = srodowisko
-    stan = root / "jarvo" / "state" / "wiedza-kompilacja.json"
+    kn, st = root / "jarvo" / "knowledge", root / "jarvo" / "state"
+    stan = st / "wiedza-kompilacja.json"
     t0 = _chwila("2026-10-20 10:00")
     stan.write_text(json.dumps({"ostatnia": t0}), encoding="utf-8")
-    assert not p._moze_kompilowac(t0 + 3600)                                # pusta skrzynka: 0 wywołań modelu
+    assert not pl.pora_kompilacji(kn, st, t0 + 3600)                                # pusta skrzynka: 0 wywołań modelu
     a = sk.plik(w.zapisz_szkic(sk, "fakt", "Fakt A", "Treść.", "karta t_1", "jarvo-web"))
     os.utime(a, (t0 + 60,) * 2)
-    assert not p._moze_kompilowac(t0 + 60 + pl.SZKIC_SPOKOJ_S - 1)         # szkic świeży: może dojść następny
-    assert p._moze_kompilowac(t0 + 60 + pl.SZKIC_SPOKOJ_S)                  # 5 min spokoju
+    assert not pl.pora_kompilacji(kn, st, t0 + 60 + pl.SZKIC_SPOKOJ_S - 1)         # szkic świeży: może dojść następny
+    assert pl.pora_kompilacji(kn, st, t0 + 60 + pl.SZKIC_SPOKOJ_S)                  # 5 min spokoju
     b = sk.plik(w.zapisz_szkic(sk, "fakt", "Fakt B", "Treść.", "karta t_2", "jarvo-web"))
-    for minuta in range(1, 15):                                            # szkic co minutę: najnowszy zawsze świeży
+    for minuta in range(1, 15):                                                    # szkic co minutę: najnowszy zawsze świeży
         os.utime(b, (t0 + 60 + minuta * 60,) * 2)
-        assert not p._moze_kompilowac(t0 + 60 + minuta * 60 + 30)
-    assert p._moze_kompilowac(t0 + 60 + pl.SZKIC_NAJSTARSZY_S)              # najstarszy 15 min: kompilujemy mimo dopływu
+        assert not pl.pora_kompilacji(kn, st, t0 + 60 + minuta * 60 + 30)
+    assert pl.pora_kompilacji(kn, st, t0 + 60 + pl.SZKIC_NAJSTARSZY_S)              # najstarszy 15 min: mimo dopływu
     stan.write_text(json.dumps({"ostatnia": t0 + 1200, "raport": {"przerwana": "TimeoutError"}}), encoding="utf-8")
-    assert not p._moze_kompilowac(t0 + 1200 + pl.KOMPILACJA_PO_AWARII_S - 1)  # dostawca wyłączony: nie palimy prób
-    assert p._moze_kompilowac(t0 + 1200 + pl.KOMPILACJA_PO_AWARII_S)
+    assert not pl.pora_kompilacji(kn, st, t0 + 1200 + pl.KOMPILACJA_PO_AWARII_S - 1)  # dostawca wyłączony: nie palimy prób
+    assert pl.pora_kompilacji(kn, st, t0 + 1200 + pl.KOMPILACJA_PO_AWARII_S)
+
+
+def test_tik_dyspozytora_kompiluje_bez_rozmowy_w_bramie(srodowisko, monkeypatch):
+    """Brama po restarcie bez żadnej rozmowy (dostawca pamięci nie zainicjowany): tik dyspozytora sam puszcza jedną
+    kompilację, gdy szkice odstały, z HERMES_HOME profilu jarvo; drugi tik w trakcie przebiegu nie puszcza drugiej."""
+    import subprocess
+    import threading
+    root, home, sk, p = srodowisko
+    (root / "profiles" / "jarvo").mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(root))                   # brama: HERMES_HOME hosta, nie profilu
+    (root / "jarvo" / "state" / "wiedza-kompilacja.json").write_text(json.dumps({"ostatnia": time.time()}), encoding="utf-8")
+    puszczone, trwa, koniec = [], threading.Event(), threading.Event()
+
+    def run(argv, **kw):
+        puszczone.append((argv, kw["env"].get("HERMES_HOME")))
+        trwa.set()
+        koniec.wait(10)
+        return subprocess.CompletedProcess(argv, 0, stdout=json.dumps({"szkice": 1, "nowe": 1}), stderr="")
+    monkeypatch.setattr(subprocess, "run", run)
+    pl.tik_kompilacji(board="default", outcome="idle")
+    assert puszczone == []                                          # pusta skrzynka: nic
+    stary = time.time() - pl.SZKIC_SPOKOJ_S - 5
+    os.utime(sk.plik(w.zapisz_szkic(sk, "fakt", "Arsenał", "Trzy telefony.", "rozmowa", "jarvo")), (stary, stary))
+    pl.tik_kompilacji(board="default", outcome="idle")
+    assert trwa.wait(5)
+    pl.tik_kompilacji(board="default", outcome="idle")             # przebieg trwa: drugiego nie ma
+    koniec.set()
+    for _ in range(100):
+        if not pl._kompilacja_trwa.locked():
+            break
+        time.sleep(0.02)
+    assert len(puszczone) == 1
+    argv, hermes_home = puszczone[0]
+    assert hermes_home == str(root / "profiles" / "jarvo")
+    assert argv[argv.index("--skarbiec") + 1] == str(root / "jarvo" / "knowledge") and "--json" in argv
 
 
 def test_progi_wyciagu(srodowisko, monkeypatch):

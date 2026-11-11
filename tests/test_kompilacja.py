@@ -176,6 +176,21 @@ def test_nowa_aktualizacja_sprzecznosc_odrzucenie(sk):
     ix.zamknij()
 
 
+def test_tresc_modelu_z_naglowkiem_i_streszczeniem_nie_dubluje_ramy(sk):
+    """Model w „tresc” oddaje całą notatkę (nagłówek, pogrubione streszczenie, Powiązane): w zapisanej notatce każda
+    z tych części jest raz (11.11 notatka o telefonach miała streszczenie dwa razy)."""
+    szkic(sk, "fakt", "Audyt strony: obrazy", "Linkinator sprawdza także obrazy.", zrodlo="karta t_12")
+    model = model_z([{"wyniki": [{"decyzja": "aktualizacja", "sciezka": "pojecia/audyt strony", "typ": "pojecie",
+                                  "tytul": "Audyt strony", "streszczenie": "Audyt strony to Lighthouse, axe i linkinator",
+                                  "tresc": "# Audyt strony\n\n**Audyt strony to Lighthouse, axe i linkinator.**\n\n"
+                                           "Linkinator sprawdza linki i obrazy.\n\n## Powiązane\n- [[pojecia/_hub-pojecia]]\n",
+                                  "tagi": [], "linki": [], "wazne_do": None, "powod": "uzupełnienie"}]}])
+    assert k.Kompilacja(sk, model).uruchom()["aktualizacje"] == 1
+    _, tresc = w.podziel((sk.root / "pojecia/audyt strony.md").read_text(encoding="utf-8"))
+    assert tresc.count("# Audyt strony") == 1 and tresc.count("**Audyt strony to Lighthouse, axe i linkinator.**") == 1
+    assert tresc.count("## Powiązane") == 1 and "Linkinator sprawdza linki i obrazy." in tresc
+
+
 def test_rozmowa_daje_kilka_notatek_i_zly_folder_jest_poprawiany(sk):
     szkic(sk, "rozmowa", "Landing Acme w Astro", "## Decyzje\n- landing w Astro\n## Fakty\n- Acme sprzedaje kotły", zrodlo="zrodla/rozmowy/x")
     model = model_z([{"wyniki": [
