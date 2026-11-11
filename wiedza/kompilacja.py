@@ -398,7 +398,13 @@ class Kompilacja:
         typ = str(wynik.get("typ") or szkic["typ"])
         if typ not in lib.TYPY or typ in ("hub", "orzeczenia", "zrodlo"):
             typ = szkic["typ"] if szkic["typ"] in lib.TYPY else "fakt"
-        tagi = [str(t).strip() for t in (wynik.get("tagi") or szkic.get("tagi") or []) if str(t).strip()][:8]
+        # Tagi szkicu zostają (np. `skrzynka-linkow`, `poboczny`: po nich właściciel wyciąga swoje rzeczy), kompilator dokłada swoje.
+        wg_klucza: dict = {}
+        for t in [*(szkic.get("tagi") or []), *(wynik.get("tagi") or [])]:
+            t = str(t).strip()
+            if t:
+                wg_klucza.setdefault(lib.bez_ogonkow(t).lower(), t)
+        tagi = list(wg_klucza.values())[:8]
         aliasy = [" ".join(str(a).replace(",", " ").split())[:40] for a in (wynik.get("aliasy") or [])
                   if isinstance(wynik.get("aliasy"), list) and str(a).strip() and not lib.zawiera_sekret(str(a))][:8]
         wazne_do = str(wynik.get("wazne_do") or "").strip()

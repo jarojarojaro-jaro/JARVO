@@ -157,9 +157,9 @@ def test_nowa_aktualizacja_sprzecznosc_odrzucenie(sk):
     assert fm2["status"] == "sprzeczna" and fm2["zrodlo"] == "karta t_1; karta t_10" and fm2["zmieniono"] == "2026-09-30" and fm2["utworzono"] == "2026-09-01"
     assert "Zrzuty stron z WebGL robimy Chromium." in tresc2 and "## Sprzeczność (2026-09-30)" in tresc2 and "(źródło: karta t_10)" in tresc2
     assert tresc2.index("## Sprzeczność") < tresc2.index("## Powiązane")
-    # aktualizacja: stare linki ręczne zostają, nowe dochodzą, tagi scalone
+    # aktualizacja: stare linki ręczne zostają, nowe dochodzą, tagi scalone (stare, szkicu, kompilatora)
     fm3, tresc3 = w.podziel((sk.root / "pojecia/audyt strony.md").read_text(encoding="utf-8"))
-    assert fm3["tagi"] == ["test", "seo"] and fm3["zrodlo"] == "karta t_1; karta t_11" and "Linkinator sprawdza linki i obrazy." in tresc3
+    assert fm3["tagi"] == ["test", "web", "seo"] and fm3["zrodlo"] == "karta t_1; karta t_11" and "Linkinator sprawdza linki i obrazy." in tresc3
     assert "[[agenci/jarvo-web/_hub-web]]" in tresc3 and "- hub: [[pojecia/_hub-pojecia]]" in tresc3
     # szkice przeniesione, INDEX i listy hubów odświeżone, LOG, git
     assert not list((sk.root / "skrzynka").glob("*.md")) and len(list((sk.root / "skrzynka/zrobione").glob("*.md"))) == 4

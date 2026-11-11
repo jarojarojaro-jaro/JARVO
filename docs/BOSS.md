@@ -192,6 +192,10 @@ Przejęte z kontraktu firstmate i dostosowane do nas:
 - **Skrzynka linków** (skill `skrzynka-linkow`): link z telefonu (wpis X, film YouTube, strona), także z komentarzem,
   Jarvo pobiera narzędziem `pobierz_link`, ocenia (co to, czemu ważne dla Twoich firm, temat, działanie) i zawsze
   zapisuje szkic w skarbcu z tagiem `skrzynka-linkow`; odpowiada 2–4 zdaniami. Film i transkrypcja tylko, gdy trzeba.
+  **Temat poboczny:** wiadomość zakończona słowem „one” (z linkiem albo bez) otwiera jednorazowy temat poza główną pracą:
+  rozmawiasz, ile chcesz (pracę Jarvo zleca jako misję `[poboczna]`), a „zamknij” kończy: Jarvo zapisuje teczkę
+  `workspaces/jarvo/poboczne/…` (ustalenia, wynik, ocena, jak odtworzyć) i jedną notatkę `projekty/` z tagiem `poboczny`;
+  potem `/new` czyści rozmowę.
 - **Prosty polski** (skill `prosty-polski`, wzór: ASD-STE100 z dokumentacji lotniczej „w 80%”): zdanie do 20–25 słów,
   akapit do 6 zdań, jedna czynność w zdaniu, strona czynna, zwykłe słowa zamiast urzędowych (słownik w skillu),
   ostrzeżenie: najpierw co zrobić, potem ryzyko (⛔ strata pieniędzy, danych, konta; ⚠ gorszy wynik). Te same limity liczy
