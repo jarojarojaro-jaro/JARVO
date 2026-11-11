@@ -125,8 +125,16 @@ def _dane_bez_hermesa() -> str:
 
 
 def _hermes_home() -> str:
-    """HERMES_HOME procesu; bez zmiennej katalog domowy Hermesa (hermes_constants), poza Hermesem korzeń
-    Jarva albo /opt/data (kontener)."""
+    """HERMES_HOME tego agenta: najpierw nadpisanie z kontekstu Hermesa (brama obsługuje wiele profili w jednym
+    procesie, a jej zmienna HERMES_HOME wskazuje korzeń danych), potem zmienna procesu, potem katalog domowy
+    Hermesa; poza Hermesem korzeń Jarva albo /opt/data (kontener)."""
+    try:
+        from hermes_constants import get_hermes_home_override
+        nadpisanie = get_hermes_home_override()
+        if nadpisanie:
+            return nadpisanie
+    except Exception:
+        pass
     if os.environ.get("HERMES_HOME"):
         return os.environ["HERMES_HOME"]
     try:
@@ -451,7 +459,10 @@ class SkarbiecProvider(MemoryProvider):
 
     # ---- narzędzia
     def get_tool_schemas(self) -> List[Dict[str, Any]]:
-        return self._narzedzia_skarbca() + (_narzedzia_jarva() if self._agent in SCHEMAT_DLA else [])
+        """Hermes bierze schematy (i trasę wywołań) w add_provider, ZANIM wywoła initialize(): agent z HERMES_HOME
+        tej sesji, nie z initialize (11.11: `schemat` i `pobierz_link` nie były wystawione, „Unknown tool”)."""
+        agent = self._agent if self._home else _profil(_hermes_home())
+        return self._narzedzia_skarbca() + (_narzedzia_jarva() if agent in SCHEMAT_DLA else [])
 
     def _narzedzia_skarbca(self) -> List[Dict[str, Any]]:
         return [

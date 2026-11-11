@@ -499,6 +499,15 @@ def test_schemat_tylko_dla_jarva(srodowisko, tmp_path, monkeypatch):
     assert (root / "jarvo" / "workspaces" / "jarvo" / "schematy").is_dir()
 
 
+def test_narzedzia_jarva_przed_initialize_jak_w_hermesie(tmp_path, monkeypatch):
+    """Hermes pyta o schematy w add_provider, przed initialize() (i z nich buduje trasę wywołań): Jarvo widzi
+    `pobierz_link` i `schemat` od razu po HERMES_HOME profilu, wykonawca nie. 11.11 na żywo: „Unknown tool”."""
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "data" / "profiles" / "jarvo"))
+    assert [s["name"] for s in pl.SkarbiecProvider().get_tool_schemas()][-2:] == ["schemat", "pobierz_link"]
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "data" / "profiles" / "jarvo-web"))
+    assert "pobierz_link" not in {s["name"] for s in pl.SkarbiecProvider().get_tool_schemas()}
+
+
 def test_awaria_schematu_nie_zabiera_skarbca(srodowisko, tmp_path, monkeypatch):
     """Zepsuty schemat.py (brak pliku, błąd w kodzie): Jarvo traci tylko `schemat`, narzędzia wiedza_* zostają."""
     root, _home, _sk, _p = srodowisko
