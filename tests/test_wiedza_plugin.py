@@ -525,9 +525,9 @@ def _chwila(tekst: str) -> float:
 
 def test_ostatnia_pora_nocnego_przebiegu():
     """Ostatnia pora 03:10 nie później niż teraz: przed 03:10 to wczorajsza, po niej dzisiejsza (czas lokalny)."""
-    assert pl.ostatnia_noc(_chwila("2026-10-20 02:59")) == _chwila("2026-10-19 03:10")
-    assert pl.ostatnia_noc(_chwila("2026-10-20 03:10")) == _chwila("2026-10-20 03:10")
-    assert pl.ostatnia_noc(_chwila("2026-10-20 23:00")) == _chwila("2026-10-20 03:10")
+    assert w.ostatnia_noc(_chwila("2026-10-20 02:59")) == _chwila("2026-10-19 03:10")
+    assert w.ostatnia_noc(_chwila("2026-10-20 03:10")) == _chwila("2026-10-20 03:10")
+    assert w.ostatnia_noc(_chwila("2026-10-20 23:00")) == _chwila("2026-10-20 03:10")
 
 
 def test_nocny_przebieg_nadrabiany_po_uspieniu(srodowisko):
@@ -539,15 +539,15 @@ def test_nocny_przebieg_nadrabiany_po_uspieniu(srodowisko):
     def ostatnia(t):
         (st / "wiedza-kompilacja.json").write_text(json.dumps({"ostatnia": t}), encoding="utf-8")
     ostatnia(_chwila("2026-10-20 02:50"))
-    assert not pl.pora_kompilacji(kn, st, _chwila("2026-10-20 07:30"))          # skrzynka pusta
+    assert not w.pora_kompilacji(kn, st, _chwila("2026-10-20 07:30"))          # skrzynka pusta
     rel = w.zapisz_szkic(sk, "fakt", "Nocny fakt", "Treść.", "karta t_5", "jarvo-web")
     os.utime(sk.plik(rel), (_chwila("2026-10-20 03:02"),) * 2)
-    assert pl.pora_kompilacji(kn, st, _chwila("2026-10-20 03:05")) is False      # szkic świeży, przed porą nocną
-    assert pl.pora_kompilacji(kn, st, _chwila("2026-10-20 03:11"))               # pora nocna (dawniej tylko okno 10 min)
-    assert pl.pora_kompilacji(kn, st, _chwila("2026-10-20 07:30"))               # po wybudzeniu: nadrabia
+    assert w.pora_kompilacji(kn, st, _chwila("2026-10-20 03:05")) is False      # szkic świeży, przed porą nocną
+    assert w.pora_kompilacji(kn, st, _chwila("2026-10-20 03:11"))               # pora nocna (dawniej tylko okno 10 min)
+    assert w.pora_kompilacji(kn, st, _chwila("2026-10-20 07:30"))               # po wybudzeniu: nadrabia
     ostatnia(_chwila("2026-10-20 07:31"))
     os.utime(sk.plik(rel), (_chwila("2026-10-20 07:58"),) * 2)
-    assert not pl.pora_kompilacji(kn, st, _chwila("2026-10-20 08:00"))          # po nadrobieniu: zwykły rytm
+    assert not w.pora_kompilacji(kn, st, _chwila("2026-10-20 08:00"))          # po nadrobieniu: zwykły rytm
 
 
 def test_harmonogram_kompilacji_po_szkicach(srodowisko):
@@ -558,19 +558,19 @@ def test_harmonogram_kompilacji_po_szkicach(srodowisko):
     stan = st / "wiedza-kompilacja.json"
     t0 = _chwila("2026-10-20 10:00")
     stan.write_text(json.dumps({"ostatnia": t0}), encoding="utf-8")
-    assert not pl.pora_kompilacji(kn, st, t0 + 3600)                                # pusta skrzynka: 0 wywołań modelu
+    assert not w.pora_kompilacji(kn, st, t0 + 3600)                                # pusta skrzynka: 0 wywołań modelu
     a = sk.plik(w.zapisz_szkic(sk, "fakt", "Fakt A", "Treść.", "karta t_1", "jarvo-web"))
     os.utime(a, (t0 + 60,) * 2)
-    assert not pl.pora_kompilacji(kn, st, t0 + 60 + pl.SZKIC_SPOKOJ_S - 1)         # szkic świeży: może dojść następny
-    assert pl.pora_kompilacji(kn, st, t0 + 60 + pl.SZKIC_SPOKOJ_S)                  # 5 min spokoju
+    assert not w.pora_kompilacji(kn, st, t0 + 60 + w.SZKIC_SPOKOJ_S - 1)           # szkic świeży: może dojść następny
+    assert w.pora_kompilacji(kn, st, t0 + 60 + w.SZKIC_SPOKOJ_S)                    # 5 min spokoju
     b = sk.plik(w.zapisz_szkic(sk, "fakt", "Fakt B", "Treść.", "karta t_2", "jarvo-web"))
     for minuta in range(1, 15):                                                    # szkic co minutę: najnowszy zawsze świeży
         os.utime(b, (t0 + 60 + minuta * 60,) * 2)
-        assert not pl.pora_kompilacji(kn, st, t0 + 60 + minuta * 60 + 30)
-    assert pl.pora_kompilacji(kn, st, t0 + 60 + pl.SZKIC_NAJSTARSZY_S)              # najstarszy 15 min: mimo dopływu
+        assert not w.pora_kompilacji(kn, st, t0 + 60 + minuta * 60 + 30)
+    assert w.pora_kompilacji(kn, st, t0 + 60 + w.SZKIC_NAJSTARSZY_S)                # najstarszy 15 min: mimo dopływu
     stan.write_text(json.dumps({"ostatnia": t0 + 1200, "raport": {"przerwana": "TimeoutError"}}), encoding="utf-8")
-    assert not pl.pora_kompilacji(kn, st, t0 + 1200 + pl.KOMPILACJA_PO_AWARII_S - 1)  # dostawca wyłączony: nie palimy prób
-    assert pl.pora_kompilacji(kn, st, t0 + 1200 + pl.KOMPILACJA_PO_AWARII_S)
+    assert not w.pora_kompilacji(kn, st, t0 + 1200 + w.KOMPILACJA_PO_AWARII_S - 1)  # dostawca wyłączony: nie palimy prób
+    assert w.pora_kompilacji(kn, st, t0 + 1200 + w.KOMPILACJA_PO_AWARII_S)
 
 
 def test_tik_dyspozytora_kompiluje_bez_rozmowy_w_bramie(srodowisko, monkeypatch):
@@ -592,7 +592,7 @@ def test_tik_dyspozytora_kompiluje_bez_rozmowy_w_bramie(srodowisko, monkeypatch)
     monkeypatch.setattr(subprocess, "run", run)
     pl.tik_kompilacji(board="default", outcome="idle")
     assert puszczone == []                                          # pusta skrzynka: nic
-    stary = time.time() - pl.SZKIC_SPOKOJ_S - 5
+    stary = time.time() - w.SZKIC_SPOKOJ_S - 5
     os.utime(sk.plik(w.zapisz_szkic(sk, "fakt", "Arsenał", "Trzy telefony.", "rozmowa", "jarvo")), (stary, stary))
     pl.tik_kompilacji(board="default", outcome="idle")
     assert trwa.wait(5)

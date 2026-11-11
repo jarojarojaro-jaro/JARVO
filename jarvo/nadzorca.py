@@ -1402,7 +1402,7 @@ class Nadzorca:
                  reset_po: float = 600.0, szybki_restart: float = 60.0, limit_stopu: float = 30.0,
                  limit_kolejnosci: float = 60.0, co_ile_gotowosc: float = 1.0, co_ile_zycie: float = 30.0,
                  co_ile_rotacja: float = 5.0, co_ile_znacznik: float = 1.0, co_ile_sprzatanie: float = 300.0,
-                 co_ile_wlaczona: float = 1.0, takt: float = 0.25,
+                 co_ile_kompilacja: float = 60.0, co_ile_wlaczona: float = 1.0, takt: float = 0.25,
                  log_max: int = 10 * 2 ** 20, log_kopie: int = 3, kanal: bool = True,
                  szanuj_zatrzymanie: bool = False, log: Callable[[str], None] | None = None):
         nazwy = [x.nazwa for x in uslugi]
@@ -1418,7 +1418,8 @@ class Nadzorca:
         self.limit_stopu, self.limit_kolejnosci = limit_stopu, limit_kolejnosci
         self.co_ile_gotowosc, self.co_ile_zycie, self.co_ile_rotacja = co_ile_gotowosc, co_ile_zycie, co_ile_rotacja
         self.co_ile_znacznik, self.co_ile_sprzatanie = co_ile_znacznik, co_ile_sprzatanie
-        self.co_ile_wlaczona, self.takt = co_ile_wlaczona, takt
+        self.co_ile_kompilacja, self.co_ile_wlaczona, self.takt = co_ile_kompilacja, co_ile_wlaczona, takt
+        self._kompilacja: subprocess.Popen | None = None
         self._stany = {x.nazwa: _Stan(x, _Dziennik(u.logi / f"{x.nazwa}.log", log_max, log_kopie))
                        for x in sorted(uslugi, key=lambda x: x.kolejnosc)}
         self._dziennik = _Dziennik(u.logi / "nadzorca.log", log_max, log_kopie)
@@ -1545,7 +1546,7 @@ class Nadzorca:
         self._od, self._odcisk_wlasny = time.time(), _odcisk(os.getpid())
 
     def _petla(self) -> None:
-        ostatnia_rotacja = ostatni_zapis = ostatni_znacznik = ostatnie_sprzatanie = time.monotonic()
+        ostatnia_rotacja = ostatni_zapis = ostatni_znacznik = ostatnie_sprzatanie = ostatnia_kompilacja = time.monotonic()
         while True:
             teraz = time.monotonic()
             if self._calosc and teraz > self._koniec_calosci:
@@ -1569,6 +1570,10 @@ class Nadzorca:
                         and teraz - ostatnie_sprzatanie >= self.co_ile_sprzatanie):
                     ostatnie_sprzatanie = teraz
                     self._sprzataj_karty()
+                if (self.co_ile_kompilacja > 0 and not self._stop.is_set()
+                        and teraz - ostatnia_kompilacja >= self.co_ile_kompilacja):
+                    ostatnia_kompilacja = teraz
+                    self._kompiluj_skarbiec()
                 if self._brudny or teraz - ostatni_zapis >= 30:
                     ostatni_zapis = teraz
                     self._zapisz_stan()
@@ -1590,6 +1595,27 @@ class Nadzorca:
         for nazwa, po in sprzatanie_kart.sprzataj(dane):
             self._log(f"nadzorca: zatrzymałem {nazwa}: przebieg karty skończył się {int(po // 60)} min temu, "
                       "a jego procesy dalej działały")
+
+    def _kompiluj_skarbiec(self) -> None:
+        """Kompilacja skrzynki skarbca, gdy pora (wiedza_cli.pora_kompilacji: szkice odstane 5 min albo najstarszy
+        15 min, noc 03:10), osobnym procesem jak `jarvo wiedza kompiluj`; jeden przebieg naraz, wynik do dziennika.
+        Nadzorca działa od startu komputera, a wtyczka skarbca jest w bramie dopiero od pierwszej sesji agenta: bez
+        tego szkice z `jarvo chat`, kart i rutyn czekały po restarcie bramy na rozmowę w HQ (11.11)."""
+        from . import wiedza_cli
+        p = self._kompilacja
+        if p is not None:
+            if p.poll() is None:
+                return
+            self._kompilacja = None
+            self._log(f"nadzorca: kompilacja skarbca: {wiedza_cli.opis_kompilacji(self.u, p.returncode)}")
+            return
+        if not wiedza_cli.pora_kompilacji(self.u):
+            return
+        argv, env, cwd = wiedza_cli.polecenie_kompilacji(self.u, self.env, [])
+        self._kompilacja = subprocess.Popen(argv, env=env, cwd=str(cwd) if cwd else None, stdin=subprocess.DEVNULL,
+                                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        self._log(f"nadzorca: kompilacja skarbca: szkice czekają, start (pid {self._kompilacja.pid})")
 
     def _obsluz_polecenia(self) -> None:
         while True:

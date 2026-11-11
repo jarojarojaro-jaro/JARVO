@@ -16,8 +16,8 @@ i state/wiedza-lint.json pokazują stan po kompilacji, a raport przebiegu ma lic
 dalsze czekają bez zmiany licznika (Hermes po przekroczeniu czasu wyłącza dostawcę na 10 min, więc reszta partii padłaby
 od razu i po trzech takich przebiegach wypadła do `zrobione/`); zła odpowiedź na jeden szkic (bez JSON) liczy się tylko jemu.
 
-Uruchomienie: hak wtyczki jarvo-wiedza na tik dyspozytora kanbana w bramie (przy szkicach: najnowszy ≥ 5 min albo
-najstarszy ≥ 15 min; co noc, także nadrabiane po uśpieniu), przycisk
+Uruchomienie: nadzorca Jarva co minutę (natywnie), a w bramie bez nadzorcy (VPS) hak wtyczki na tik dyspozytora
+kanbana (przy szkicach: najnowszy ≥ 5 min albo najstarszy ≥ 15 min; co noc, także nadrabiane po uśpieniu), przycisk
 w zakładce Wiedza i `jarvo wiedza kompiluj` (jarvo/wiedza_cli.py) wołają ten plik Pythonem z venvu Hermesa, bez basha
 (na Windows bash z Pythona to WSL). Ręcznie w kontenerze: scripts/wiedza-kompiluj.sh [--na-sucho] [--limit N].
 Model: zadanie pomocnicze Hermesa `jarvo_wiedza` (auxiliary.jarvo_wiedza.model, poziom frontier) w HERMES_HOME profilu

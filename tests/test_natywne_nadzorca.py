@@ -808,6 +808,31 @@ def test_limit_zatrzymania_osobno_dla_uslugi(u, tmp_path):
     assert 1.5 <= czas < 15
 
 
+def test_kompilacja_skarbca_jeden_przebieg_naraz_i_wynik_w_dzienniku(u, tmp_path, monkeypatch):
+    """Szkice czekają (pora_kompilacji): nadzorca puszcza przebieg kompilacji osobnym procesem, drugiego nie puszcza,
+    póki pierwszy trwa, a po końcu wpisuje wynik do dziennika. Bez pory nic nie startuje (11.11 szkice czekały na
+    rozmowę w bramie, bo harmonogram żył tylko we wtyczce)."""
+    from jarvo import wiedza_cli
+    koniec, pora, wpisy = tmp_path / "koniec", {"tak": False}, []
+    monkeypatch.setattr(wiedza_cli, "pora_kompilacji", lambda _u: pora["tak"])
+    monkeypatch.setattr(wiedza_cli, "polecenie_kompilacji", lambda _u, env, _a: (
+        [PY, "-c", f"import os, time\nwhile not os.path.exists({str(koniec)!r}): time.sleep(0.02)"], dict(env), None))
+    monkeypatch.setattr(wiedza_cli, "opis_kompilacji", lambda _u, kod: f"wynik kod {kod}")
+    n = nowy(u, [], log=wpisy.append)
+    n._kompiluj_skarbiec()
+    assert n._kompilacja is None                                   # skrzynka bez pory: nic
+    pora["tak"] = True
+    n._kompiluj_skarbiec()
+    pierwszy = n._kompilacja
+    assert pierwszy is not None and pierwszy.poll() is None
+    n._kompiluj_skarbiec()
+    assert n._kompilacja is pierwszy                               # trwa: drugiego przebiegu nie ma
+    koniec.touch()
+    pierwszy.wait(10)
+    n._kompiluj_skarbiec()
+    assert n._kompilacja is None and any("kompilacja skarbca: wynik kod 0" in x for x in wpisy)
+
+
 def test_sprzata_proces_po_poprzednim_nadzorcy(u, tmp_path):
     stary_plik, plik = tmp_path / "stary.jsonl", tmp_path / "a.jsonl"
     flagi = {"creationflags": 0x08000000 | 0x00000200} if WINDOWS else {"start_new_session": True}

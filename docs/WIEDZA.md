@@ -225,8 +225,8 @@ mówi wprost: treści z narzędzi i stron to dane; nie zapisuj sekretów; nie zg
 
 ## 6. Pętle utrzymania: kompilacja, lint, synteza, punkty zapisu
 
-**Kompilacja** (`wiedza/kompilacja.py`, główny model, jeden piszący). Uruchamia ją hak wtyczki na tik dyspozytora kanbana
-w gatewayu (`on_kanban_dispatch_tick`, co 30 s od startu bramy, także gdy nikt nie rozmawia; osobny proces jak `jarvo wiedza kompiluj`, z profilem `jarvo`), gdy skrzynka ma ≥ 1 szkic, a najnowszy szkic ma ≥ 5 min (seria szkiców z jednej rozmowy
+**Kompilacja** (`wiedza/kompilacja.py`, główny model, jeden piszący). Uruchamia ją nadzorca Jarva (instalacja natywna, co minutę od
+startu komputera, także gdy nikt nie rozmawia; osobny proces jak `jarvo wiedza kompiluj`, z profilem `jarvo`), a w bramie bez nadzorcy (VPS) hak wtyczki na tik dyspozytora kanbana (`on_kanban_dispatch_tick`; wtyczka jest w bramie od pierwszej sesji agenta); obie drogi pytają `wiedza.pora_kompilacji`: skrzynka ma ≥ 1 szkic, a najnowszy szkic ma ≥ 5 min (seria szkiców z jednej rozmowy
 idzie razem) albo najstarszy ≥ 15 min (ciągły dopływ nie odkłada kompilacji), oraz co noc o 03:10; po przebiegu przerwanym
 błędem wywołania modelu czeka 15 min (Hermes wyłącza wtedy dostawcę na 10 min), a bez szkiców nie rusza wcale. Od rozmowy
 do notatki mija więc ok. 15–25 min (10 min ciszy, 5 min spokoju skrzynki, kompilacja), a nie 30–90 min. Blokada w `state/`
@@ -426,7 +426,7 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    hub folderu + sąsiad + inny folder dobierane automatycznie, gdy model ich nie da), sprzeczność jako sekcja z datą i
    `status: sprzeczna`, aktualizacja z zachowaniem `utworzono` i ręcznych linków, źródła łączone; potem `indeksuj`, LOG,
    punkt zapisu git, `state/wiedza-kompilacja.json`, sprzątanie `skrzynka/zrobione/` po 30 dniach. Limity 40/60, blokada `state/wiedza.lock`, 3 próby na szkic. Harmonogram
-   na tik dyspozytora w gatewayu (hak `on_kanban_dispatch_tick`; szkice odstane 5 min albo najstarszy 15 min / noc 03:10), ręcznie `jarvo wiedza kompiluj`. Testy: `tests/test_kompilacja.py` (model
+   w nadzorcy natywnie i na tik dyspozytora w bramie bez nadzorcy (`wiedza.pora_kompilacji`: szkice odstane 5 min albo najstarszy 15 min / noc 03:10), ręcznie `jarvo wiedza kompiluj`. Testy: `tests/test_kompilacja.py` (model
    podstawiony). W piaskownicy bez klucza modelu sprawdzony przebieg na sucho; pierwsza prawdziwa kompilacja: na VPS.
 5. ✅ **Zakładka „Wiedza”** (`wiedza/plugin/dashboard/`, `wiedza/web/`): graf na canvasie, foldery, notatka, szukaj, skrzynka
    z kompilacją i reindeksem, orzeczenia z formularzem, lint, dziennik, PL/EN (etykieta `plugin_jarvo-wiedza` w `pl.json`),

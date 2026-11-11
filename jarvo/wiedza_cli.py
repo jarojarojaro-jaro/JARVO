@@ -189,6 +189,29 @@ def polecenie_kompilacji(u: Uklad, env: dict, argumenty: list[str]) -> tuple[lis
     return argv, e, (checkout if checkout and checkout.is_dir() else None)
 
 
+def pora_kompilacji(u: Uklad, teraz: float | None = None) -> bool:
+    """Czy nadzorca ma puścić kompilację skarbca: Jarvo zainstalowane z Hermesem i profilem jarvo (model kompilacji),
+    skarbiec jest, a wiedza.pora_kompilacji (szkice odstane 5 min albo najstarszy 15 min, noc 03:10, przerwa po
+    awarii modelu) mówi „tak”. Bez szkiców nic nie czyta poza katalogiem skrzynki."""
+    if not (skarbiec(u).is_dir() and profil(u).is_dir() and _zainstalowane(u) and _python_hermesa(u)):
+        return False
+    return bool(wiedza_lib(_app(u)).pora_kompilacji(skarbiec(u), stan_skarbca(u),
+                                                    time.time() if teraz is None else teraz))
+
+
+def opis_kompilacji(u: Uklad, kod: int) -> str:
+    """Jedna linia do dziennika nadzorcy o skończonym przebiegu kompilacja.py (bez --json): kod 1 = skarbiec zajęty,
+    2 = brak modelu, 0 = raport z state/wiedza-kompilacja.json."""
+    if kod == 1:
+        return "skarbiec zajęty (inny przebieg albo zasiew), następna próba za minutę"
+    if kod:
+        return f"nieudana (kod {kod}); szczegóły: jarvo wiedza kompiluj"
+    r = (_json(stan_skarbca(u) / "wiedza-kompilacja.json") or {}).get("raport") or {}
+    return (f"{r.get('szkice', 0)} szkiców → {r.get('nowe', 0)} nowych, {r.get('aktualizacje', 0)} aktualizacji, "
+            f"{r.get('sprzeczne', 0)} sprzecznych, {r.get('odrzucone', 0)} odrzuconych, {r.get('bledy', 0)} błędów"
+            + (f"; przerwana: {r['przerwana']}" if r.get("przerwana") else ""))
+
+
 def _na_pierwszym_planie(argv: list[str], env: dict, cwd: Path | None) -> int:
     """Proces w tym terminalu (wyjście wprost na ekran), bez okna na Windows."""
     return subprocess.call(argv, env=env, cwd=str(cwd) if cwd else None, stdin=subprocess.DEVNULL,

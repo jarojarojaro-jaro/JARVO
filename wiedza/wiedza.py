@@ -249,6 +249,51 @@ def znacznik_blokady(stan: str | Path) -> dict | None:
     return {"pid": pid, "wiek_s": round(wiek, 1), "zywy": zywy, "aktualny": zywy and wiek < BLOKADA_STARA_S}
 
 
+# harmonogram kompilacji (docs/WIEDZA.md §6): ta sama reguła dla nadzorcy (natywnie, od startu komputera) i haka tiku
+# dyspozytora w bramie (gdy wtyczka jest tam załadowana, np. VPS)
+SZKIC_SPOKOJ_S = 5 * 60               # kompilacja, gdy najnowszy szkic ma tyle (seria szkiców z jednej rozmowy idzie razem)…
+SZKIC_NAJSTARSZY_S = 15 * 60          # …albo najstarszy tyle (ciągły dopływ szkiców nie odkłada kompilacji w nieskończoność)
+KOMPILACJA_PO_AWARII_S = 15 * 60      # po przebiegu przerwanym błędem wywołania modelu (Hermes wyłącza dostawcę na 10 min)
+KOMPILACJA_NOC = (3, 10)              # godzina, minuta: nocny przebieg (czas lokalny komputera, w kontenerze jego strefa);
+                                      # komputer uśpiony o tej porze nadrabia przebieg raz, po wybudzeniu
+STAN_KOMPILACJI = "wiedza-kompilacja.json"    # state/: czas i raport ostatniej kompilacji (pisze kompilacja.py)
+
+
+def ostatnia_noc(teraz: float, pora: tuple = KOMPILACJA_NOC) -> float:
+    """Ostatnia pora nocnego przebiegu nie później niż `teraz` (dziś o 03:10 albo wczoraj), w czasie lokalnym."""
+    chwila = dt.datetime.fromtimestamp(teraz)
+    noc = chwila.replace(hour=pora[0], minute=pora[1], second=0, microsecond=0)
+    if noc > chwila:
+        noc -= dt.timedelta(days=1)
+    return noc.timestamp()
+
+
+def stan_kompilacji(stan: str | Path) -> tuple[float, bool]:
+    """(czas ostatniej kompilacji, czy przerwał ją błąd wywołania modelu) z state/wiedza-kompilacja.json."""
+    try:
+        d = json.loads((Path(stan) / STAN_KOMPILACJI).read_text(encoding="utf-8"))
+        return float(d.get("ostatnia") or 0), bool((d.get("raport") or {}).get("przerwana"))
+    except (OSError, ValueError, TypeError, AttributeError):
+        return 0.0, False
+
+
+def pora_kompilacji(skarbiec: str | Path, stan: str | Path, teraz: float) -> bool:
+    """Szkice w skrzynce i: najnowszy ma ≥ SZKIC_SPOKOJ_S (seria z jednej rozmowy już się skończyła) albo najstarszy
+    ≥ SZKIC_NAJSTARSZY_S, albo nocny przebieg, którego jeszcze nie było (ostatnia kompilacja przed ostatnią porą
+    KOMPILACJA_NOC; komputer uśpiony o 03:10 nadrabia go raz po wybudzeniu, docs/NATYWNIE.md K03). Po przebiegu
+    przerwanym błędem wywołania modelu czeka KOMPILACJA_PO_AWARII_S. Bez szkiców nigdy (0 wywołań modelu)."""
+    skrzynka = Path(skarbiec) / "skrzynka"
+    czasy = [p.stat().st_mtime for p in skrzynka.glob("*.md") if p.is_file()] if skrzynka.is_dir() else []
+    if not czasy:
+        return False
+    ostatnia, przerwana = stan_kompilacji(stan)
+    if ostatnia < ostatnia_noc(teraz):
+        return True
+    if przerwana and teraz - ostatnia < KOMPILACJA_PO_AWARII_S:
+        return False
+    return teraz - max(czasy) >= SZKIC_SPOKOJ_S or teraz - min(czasy) >= SZKIC_NAJSTARSZY_S
+
+
 def _sprobuj_zamek(f) -> bool | None:
     """Jedna próba blokady systemu bez czekania: True wzięta, False zajęta, None system plików bez blokad."""
     try:
