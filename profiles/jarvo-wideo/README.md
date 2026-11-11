@@ -20,8 +20,9 @@ w osobnym przebiegu), 11 s filmu ≈ 15–20 s renderu. Mocniejszy serwer: `JARV
 `JARVO_WIDEO_ROWNOLEGLE=2` (sceny naraz). Pełne rendery (`film.py`, `projekt.py`, `html_wideo.py wideo`): najwyżej
 `JARVO_RENDER_MIEJSCA=2` naraz, kolejny obok trwającego przy wolnej pamięci ≥ `JARVO_RENDER_WOLNA=30` %. Cache ujęć i scen: `/opt/data/jarvo/cache/wideo` (`film.py cache --starsze-niz 14`).
 
-Koder H.264 (`wideo_lib.koder_wideo`; `film.py`, `montaz.py`, `napisy.py --wypal`, `dwa_ekrany.py`, `html_wideo.py`
-do MP4, `maskotka.py`, `demo_strony.py`): gdy działa karta graficzna z VA-API (serwer z Intelem Gen9:
+Koder H.264 (`edytor.koder_wideo`, w skryptach `wl.ed.koder_wideo`; `film.py`, `montaz.py`, `napisy.py --wypal`,
+`dwa_ekrany.py`, `html_wideo.py` do MP4, `maskotka.py`, `demo_strony.py`, `projekt.py render` i eksport edytora HQ):
+gdy działa karta graficzna z VA-API (serwer z Intelem Gen9:
 `/dev/dri/renderD128`), obraz koduje karta (`h264_vaapi`, stały qp), a procesor tylko dekoduje i filtruje; bez niej
 (VPS, Windows, macOS, komputer bez karty) x264 z ustawieniami jak dotąd. Wybór raz na proces próbnym kodowaniem kilku
 klatek na karcie, nie samym plikiem urządzenia. `JARVO_WIDEO_KODER=cpu` wymusza procesor, `vaapi` kartę (bez próby),

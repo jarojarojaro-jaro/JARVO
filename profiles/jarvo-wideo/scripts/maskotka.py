@@ -119,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
     baza = Image.open(HERE / "robot-front.png").convert("RGBA")
     oczy = Image.open(HERE / "robot-eyes.png").convert("RGBA")
     surowy = out.with_suffix(".bez-napisow.mp4") if not a.bez_napisow else out
-    kod = wl.koder_wideo(18, limity=False)
+    kod = wl.ed.koder_wideo(18, limity=False)
     obraz = kod.obraz()                   # surowe RGB z potoku: karta dostaje je przez hwupload, x264 bez filtrów
     ff = subprocess.Popen([wl.need("ffmpeg"), "-v", "error", "-y", *kod.wejscie, "-f", "rawvideo", "-pix_fmt", "rgb24",
                            "-s", f"{W}x{H}", "-r", str(a.fps), "-i", "-", "-i", str(mowa.audio),

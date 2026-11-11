@@ -683,3 +683,95 @@ console.log(JSON.stringify({a, b}));""")
     assert b["attachments"] == [] and b["images"] == [] and "Uwagi na osi" not in b["message"] and "uwaga <film>" not in b["message"]
     assert "Prośba: dodaj lektora" in b["message"] and "film.edycja.json" in b["message"]
     assert "skill `typografia-edit`" in b["message"] and "typografia.py pokaz / popraw / paleta / style / sylwetki <film>" in b["message"]
+
+
+# ------------------------------------------------------------------ koder H.264 (wspólny z Wideografem)
+
+@pytest.fixture
+def proba_karty():
+    """Wybór kodera od zera: wynik próby karty z innego testu nie przechodzi dalej."""
+    ed.karta_vaapi.cache_clear()
+    yield
+    ed.karta_vaapi.cache_clear()
+
+
+def test_koder_wideo_wybor(monkeypatch, proba_karty):
+    """auto: karta tylko po udanym próbnym kodowaniu (raz na proces), inaczej x264 z ustawieniami miejsca wywołania;
+    cpu i vaapi wymuszają bez próby."""
+    proby, wynik = [], {"kod": 1}
+    monkeypatch.setattr(ed, "karty_vaapi", lambda: ["/dev/dri/renderD128"])
+    monkeypatch.setattr(ed.subprocess, "run",
+                        lambda cmd, **kw: proby.append(cmd) or subprocess.CompletedProcess(cmd, wynik["kod"], b"", b""))
+    monkeypatch.setattr(ed.shutil, "which", lambda nazwa: f"/usr/bin/{nazwa}")
+    x264 = ["-c:v", "libx264", "-preset", "medium", "-crf", "19", "-pix_fmt", "yuv420p", *ed.ENC_LIMITS]
+
+    monkeypatch.setenv("JARVO_WIDEO_KODER", "auto")                     # próba nieudana → procesor
+    kod = ed.koder_wideo(19)
+    assert (kod.rodzaj, kod.wejscie, kod.wyjscie, kod.obraz("x")) == ("cpu", [], x264, "x")
+    assert len(proby) == 1 and "h264_vaapi" in proby[0]
+    assert ed.koder_wideo(18).rodzaj == "cpu" and len(proby) == 1         # wynik próby zapamiętany
+
+    monkeypatch.setenv("JARVO_WIDEO_KODER", "cpu")
+    wynik["kod"] = 0
+    ed.karta_vaapi.cache_clear()
+    assert ed.koder_wideo(19).wyjscie == x264 and len(proby) == 1
+    assert ed.koder_wideo(28, "ultrafast", limity=False).wyjscie == \
+        ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "-pix_fmt", "yuv420p"]
+
+    monkeypatch.setenv("JARVO_WIDEO_KODER", "vaapi")
+    kod = ed.koder_wideo(19)
+    assert kod.rodzaj == "vaapi" and kod.wejscie == ["-vaapi_device", "/dev/dri/renderD128"] and len(proby) == 1
+    assert kod.obraz("scale=out_range=tv") == "scale=out_range=tv,format=nv12,hwupload"
+    assert kod.obraz() == "format=nv12,hwupload"
+    assert kod.wyjscie[:2] == ["-c:v", "h264_vaapi"] and "-pix_fmt" not in kod.wyjscie   # piksele już na karcie
+
+    monkeypatch.setenv("JARVO_WIDEO_KODER", "auto")                     # próba udana → karta
+    assert ed.koder_wideo(19).rodzaj == "vaapi" and len(proby) == 2
+    ed.karta_vaapi.cache_clear()
+    monkeypatch.setattr(ed, "karty_vaapi", lambda: [])                  # Windows, macOS, brak karty: bez próby
+    assert ed.koder_wideo(19).rodzaj == "cpu" and len(proby) == 2
+    monkeypatch.setenv("JARVO_WIDEO_KODER", "gpu")
+    with pytest.raises(SystemExit):
+        ed.koder_wideo(19)
+
+
+def test_eksport_koder_karta_albo_x264(tmp_path, monkeypatch, proba_karty):
+    """Eksport edytora (i projekt.py --render): bez karty x264 jak dotąd (veryfast, crf 20, yuv420p); na karcie
+    urządzenie przed wejściami, upload na końcu łańcucha obrazu i ten obraz w -map."""
+    f = _files(tmp_path)
+    p = ed.normalize({"clips": [{"src": str(f["a.mp4"]), "in": 0, "out": 2}]}, _resolver(tmp_path))
+    monkeypatch.setenv("JARVO_WIDEO_KODER", "auto")
+    monkeypatch.setattr(ed, "karty_vaapi", lambda: [])                  # bez karty: auto = x264
+    cmd = ed.build_command(p, {str(f["a.mp4"]): True}, [], tmp_path / "o.mp4")
+    i = cmd.index("-c:v")
+    assert cmd[i:i + 8] == ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
+    assert "-vaapi_device" not in cmd and "hwupload" not in cmd[cmd.index("-filter_complex") + 1]
+
+    monkeypatch.setenv("JARVO_WIDEO_KODER", "vaapi")
+    cmd = ed.build_command(p, {str(f["a.mp4"]): True}, [], tmp_path / "o.mp4")
+    graph = cmd[cmd.index("-filter_complex") + 1]
+    assert cmd.index("-vaapi_device") < cmd.index("-i") and graph.endswith("format=nv12,hwupload[vkod]")
+    assert cmd[cmd.index("-map") + 1] == "[vkod]" and cmd[cmd.index("-c:v") + 1] == "h264_vaapi"
+    assert "-pix_fmt" not in cmd[cmd.index("-filter_complex"):]
+
+
+@pytest.mark.skipif(not HAS_FF, reason="brak ffmpeg")
+def test_eksport_na_karcie_naprawde(tmp_path, monkeypatch, proba_karty):
+    """Komputer z kartą (VA-API): auto eksportuje kartą; film to H.264 yuv420p z dźwiękiem, tyle sekund co projekt.
+    Bez karty test się pomija (tam auto = x264, sprawdzone wyżej)."""
+    monkeypatch.setenv("JARVO_WIDEO_KODER", "auto")
+    if ed.karta_vaapi() is None:
+        pytest.skip("brak karty z koderem H.264 przez VA-API")
+    src, out = tmp_path / "a.mp4", tmp_path / "o.mp4"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=320x240:r=30:d=2",
+                    "-f", "lavfi", "-i", "sine=d=2", "-shortest", "-pix_fmt", "yuv420p", str(src)], check=True)
+    p = ed.normalize({"canvas": {"w": 320, "h": 240, "fps": 30},
+                      "clips": [{"src": str(src), "in": 0, "out": 1.5}]}, _resolver(tmp_path))
+    r = subprocess.run(ed.build_command(p, {str(src): True}, [], out), capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    info = ed.probe(out)
+    assert ed.koder_wideo(20, "veryfast").rodzaj == "vaapi" and abs(info["duration"] - 1.5) < 0.1 and info["audio"]
+    res = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                          "stream=codec_name,pix_fmt", "-of", "json", str(out)],
+                         capture_output=True, text=True, encoding="utf-8", check=True)
+    assert json.loads(res.stdout)["streams"][0] == {"codec_name": "h264", "pix_fmt": "yuv420p"}

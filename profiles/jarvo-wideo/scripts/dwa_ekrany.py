@@ -242,7 +242,7 @@ def zloz(a: Path, b: Path, out: Path, uklad: str | None = None, fmt: str = "9:16
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         nakladka(uklad, w, h, sloty, podpisy, tlo, kreska_kolor).save(tmp / "nakladka.png")
-        kod = wl.koder_wideo(19)
+        kod = wl.ed.koder_wideo(19)
         args = [*wejscie(a, sek), *wejscie(b, sek), "-loop", "1", "-framerate", str(wl.FPS), "-t", f"{sek:.3f}",
                 "-i", str(tmp / "nakladka.png")]
         fc = [okno_filtr(i, p, sloty[i][2], sloty[i][3], xy[i], sek) for i, p in enumerate(pliki)]

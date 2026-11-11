@@ -15,12 +15,14 @@ Projekt montażu to mały JSON (zapisywany obok filmu jako `<nazwa>.edycja.json`
 Klipy leżą jeden za drugim (ścieżka główna jak w CapCut), napisy i muzyka mają własny czas.
 Przejście leży na środku cięcia i nie skraca filmu: klip A gra dalej za cięciem, klip B zaczyna przed nim
 (materiał spoza przycięcia; gdy go brak, stoi skrajna klatka), więc napisy i muzyka zostają na miejscu.
-Eksport: jeden przebieg ffmpeg (klipy → concat albo xfade/acrossfade → nakładki PNG → miks audio), plik obok oryginału.
+Eksport: jeden przebieg ffmpeg (klipy → concat albo xfade/acrossfade → nakładki PNG → miks audio), plik obok oryginału;
+H.264 kartą graficzną przez VA-API, gdy działa, inaczej x264 (koder_wideo, wspólny ze skryptami Wideografa).
 Napisy rasteryzuje przeglądarka tą samą funkcją, którą rysuje podgląd, więc eksport wygląda jak podgląd.
 """
 
 from __future__ import annotations
 
+import functools
 import json
 import math
 import os
@@ -28,7 +30,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 VIDEO_EXT = {".mp4", ".webm", ".mov", ".mkv", ".m4v"}
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp"}
@@ -1152,6 +1154,87 @@ def xfade_graph(tr: list[dict | None], dlug: list[float], F: int) -> list[str]:
     return graph
 
 
+# ------------------------------------------------------------------ koder H.264
+# Wspólny z Wideografem (wideo_lib bierze ten moduł jako `ed`): eksport edytora, projekt.py i skrypty filmów.
+
+# RAM na VPS 8 GB: x264 domyślnie bierze wątki i bufory lookahead ze wszystkich rdzeni (~0,65 GB samego kodera
+# przy 1080×1920, a z filtrami ~0,9 GB). 2 wątki + lookahead 10 ≈ 0,3 GB kodera; jakość przy CRF 19–20 bez różnicy.
+# Więcej rdzeni i RAM-u: JARVO_WIDEO_WATKI=4.
+THREADS = os.environ.get("JARVO_WIDEO_WATKI", "2")
+ENC_LIMITS = ["-threads", THREADS, "-filter_threads", "2", "-x264-params", "rc-lookahead=10"]
+# Karta graficzna (VA-API, h264_vaapi; zmierzone na Intelu Gen9) koduje H.264 bez rdzeni procesora potrzebnych
+# agentom. auto: karta, gdy próbne kodowanie na niej przechodzi (raz na proces); bez niej (komputer bez karty Intela,
+# Windows, macOS, VPS) x264 z dotychczasowymi ustawieniami. JARVO_WIDEO_KODER=cpu albo vaapi wymusza.
+KODER_ENV = "JARVO_WIDEO_KODER"
+KODERY = ("auto", "vaapi", "cpu")
+KARTA_DOMYSLNA = "/dev/dri/renderD128"
+VAAPI_KONIEC = "format=nv12,hwupload"    # klatki 4:2:0 (NV12 = yuv420p w innym układzie) do pamięci karty
+# qp karty = crf x264 + przesunięcie presetu x264, z pomiaru na dwóch prawdziwych filmach (tabela w README Wideografa):
+# medium: najwyższy qp z VMAF nie niższym niż x264 (±0,1) na obu; veryfast (sceny przed montażem, eksport edytora)
+# qp o 1 niżej od takiego progu; szkic (ultrafast) qp = crf, bo jakość szkicu może być niższa.
+VAAPI_QP_PLUS = {"medium": 2, "veryfast": 4, "ultrafast": 0}
+
+
+class Koder(NamedTuple):
+    """Koder H.264 jednego polecenia ffmpeg: `wejscie` przed pierwszym -i (urządzenie karty), `obraz(łańcuch)` zamyka
+    łańcuch filtrów obrazu (karta: klatki do jej pamięci), `wyjscie` po filtrach (kodek, jakość, piksele).
+    NamedTuple, nie dataclass: HQ i testy ładują edytor z pliku, nie zawsze jako moduł w sys.modules."""
+    rodzaj: str                                       # "vaapi" | "cpu"
+    wejscie: list[str]
+    wyjscie: list[str]
+    koniec: str = ""
+
+    def obraz(self, lancuch: str = "") -> str:
+        return ",".join(x for x in (lancuch, self.koniec) if x)
+
+
+def vaapi_qp(crf: int, preset: str) -> int:
+    """Stały qp karty o jakości x264 `-preset preset -crf crf` (VAAPI_QP_PLUS)."""
+    return crf + VAAPI_QP_PLUS[preset]
+
+
+def _vaapi_wyjscie(crf: int, preset: str, limity: bool) -> list[str]:
+    return ["-c:v", "h264_vaapi", "-rc_mode", "CQP", "-qp", str(vaapi_qp(crf, preset)),
+            *(["-filter_threads", "2"] if limity else [])]
+
+
+def karty_vaapi() -> list[str]:
+    d = Path("/dev/dri")
+    return sorted(str(p) for p in d.glob("renderD*")) if d.is_dir() else []
+
+
+@functools.lru_cache(maxsize=1)
+def karta_vaapi() -> str | None:
+    """Pierwsza karta, na której h264_vaapi naprawdę koduje (kilka klatek 64×64 z ustawieniami koder_wideo), albo None.
+    Raz na proces. Sam plik urządzenia nie wystarcza: brak sterownika, karta bez kodera H.264, ffmpeg bez VA-API."""
+    ffmpeg = shutil.which("ffmpeg")
+    for karta in karty_vaapi() if ffmpeg else []:
+        try:
+            r = subprocess.run([ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-vaapi_device", karta,
+                                "-f", "lavfi", "-i", "color=c=black:s=64x64:r=30:d=0.1", "-vf", VAAPI_KONIEC,
+                                *_vaapi_wyjscie(18, "medium", True), "-f", "null", "-"],
+                               capture_output=True, timeout=30)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if r.returncode == 0:
+            return karta
+    return None
+
+
+def koder_wideo(crf: int, preset: str = "medium", limity: bool = True) -> Koder:
+    """H.264 o jakości x264 `-preset preset -crf crf`: h264_vaapi na karcie graficznej albo libx264 z tymi
+    ustawieniami (dotychczasowe kodowanie). `limity`: wątki x264 i lookahead z ENC_LIMITS. Wybór: JARVO_WIDEO_KODER."""
+    tryb = (os.environ.get(KODER_ENV) or "auto").strip().lower()
+    if tryb not in KODERY:
+        raise SystemExit(f"{KODER_ENV}={tryb!r}: dozwolone {' | '.join(KODERY)}")
+    karta = (karta_vaapi() if tryb == "auto" else
+             (karty_vaapi() or [KARTA_DOMYSLNA])[0] if tryb == "vaapi" else None)
+    if karta:
+        return Koder("vaapi", ["-vaapi_device", karta], _vaapi_wyjscie(crf, preset, limity), VAAPI_KONIEC)
+    return Koder("cpu", [], ["-c:v", "libx264", "-preset", preset, "-crf", str(crf), "-pix_fmt", "yuv420p",
+                             *(ENC_LIMITS if limity else [])])
+
+
 def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
                   ffmpeg: str = "ffmpeg", karaoke: Path | None = None, typo: dict | None = None,
                   maska: Path | None = None, sdr: dict | None = None, szum: dict | None = None) -> list[str]:
@@ -1162,7 +1245,9 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
     `maska` = lista concat sylwetek (maska_concat): osoba z filmu wraca nad warstwę „tyl”, więc napis jest za nią.
     Wirtualna kamera typografii (`p["typo"]["kamera"]`, kamera_filter) przesuwa film i sylwetkę tym samym ruchem."""
     W, H, F = p["canvas"]["w"], p["canvas"]["h"], p["canvas"]["fps"]
-    args = [ffmpeg, "-nostdin", "-hide_banner", "-y", "-loglevel", "error", "-progress", "pipe:1", "-nostats"]
+    kod = koder_wideo(20, "veryfast", limity=False)
+    args = [ffmpeg, "-nostdin", "-hide_banner", "-y", "-loglevel", "error", "-progress", "pipe:1", "-nostats",
+            *kod.wejscie]
     graph: list[str] = []
     n = 0
     seg_labels = []
@@ -1298,9 +1383,11 @@ def build_command(p: dict, has_audio: dict, text_pngs: list[Path], out: Path,
                      f"{LIMITER_EKSPORTU}[amx]")
         alast = "amx"
 
+    if kod.koniec:                       # karta: klatki do jej pamięci na samym końcu łańcucha obrazu
+        graph.append(f"[{vlast}]{kod.obraz()}[vkod]")
+        vlast = "vkod"
     args += ["-filter_complex", ";".join(graph), "-map", f"[{vlast}]", "-map", f"[{alast}]",
-             "-t", _f(p["duration"]), "-r", str(F),
-             "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
+             "-t", _f(p["duration"]), "-r", str(F), *kod.wyjscie,
              "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out)]
     return args
 

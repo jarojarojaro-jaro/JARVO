@@ -202,7 +202,7 @@ def encode_cmd(pattern: str, fps: float, out: Path, alfa: bool) -> list[str]:
         raise SystemExit(f"nieobsługiwany format wyjścia {ext!r} (.mp4 | .mov | .webm | .gif)")
     if alfa:
         raise SystemExit("--alfa: MP4 (H.264) nie ma przezroczystości; użyj .mov (ProRes 4444) albo .webm")
-    kod = wl.koder_wideo(18)
+    kod = wl.ed.koder_wideo(18)
     return ["ffmpeg", "-y", *kod.wejscie, "-framerate", f"{fps:g}", "-i", pattern,
             "-vf", kod.obraz(f"pad=ceil(iw/2)*2:ceil(ih/2)*2,{wl.TV_RANGE}"), *kod.wyjscie, "-movflags", "+faststart",
             str(out)]

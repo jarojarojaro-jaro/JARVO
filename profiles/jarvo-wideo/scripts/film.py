@@ -290,7 +290,7 @@ def fit_filter(w: int, h: int, mode: str) -> str:
 
 def render_scene(src: dict, uj: dict, w: int, h: int, dur: float, draft: bool) -> Path:
     """Scena → klip o dokładnej długości, rozdzielczości i fps (bez dźwięku). Cache po treści."""
-    kod = wl.koder_wideo(28 if draft else 18, "ultrafast" if draft else "veryfast")
+    kod = wl.ed.koder_wideo(28 if draft else 18, "ultrafast" if draft else "veryfast")
     enc = [*kod.wyjscie, "-g", str(wl.FPS * 2), "-an"]
     mode = uj.get("dopasuj", "przytnij")
     key_src = wl.file_key(src["plik"]) if src.get("plik") else [src.get("kolor")]
@@ -391,7 +391,7 @@ def mix_audio(voice: Path | None, music: Path | None, music_vol: float, total: f
 
 def assemble(clips: list[Path], durs: list[float], total: float, w: int, h: int, build: Path, out: Path,
              audio: Path, ass: Path | None, logo: Path | None, logo_pos: str, fade: bool, draft: bool) -> None:
-    kod = wl.koder_wideo(30 if draft else 20, "ultrafast" if draft else "medium")
+    kod = wl.ed.koder_wideo(30 if draft else 20, "ultrafast" if draft else "medium")
     inputs: list[str] = [*kod.wejscie]
     for c in clips:   # dekoder H.264 domyślnie bierze wątki (i bufory klatek) ze wszystkich rdzeni: 1 wątek na scenę
         inputs += ["-threads", "1", "-i", str(c)]

@@ -96,7 +96,7 @@ def cut(src: Path, ranges: list[tuple[float, float]], out: Path) -> Path:
             labels.append(f"[a{i}]")
     n = len(ranges)
     fc.append("".join(labels) + f"concat=n={n}:v=1:a={1 if audio else 0}[vc]" + ("[a]" if audio else ""))
-    kod = wl.koder_wideo(19)
+    kod = wl.ed.koder_wideo(19)
     fc.append(f"[vc]{kod.obraz(wl.z_sdr(sdr, wl.TV_RANGE))}[v]")
     maps = ["-map", "[v]"] + (["-map", "[a]"] if audio else [])
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -109,7 +109,7 @@ def reframe(src: Path, out: Path, fmt: str, x: float, mode: str) -> Path:
     w, h = wl.parse_format(fmt)
     x = min(1.0, max(0.0, x))
     sdr = wl.sdr(src)                  # HDR → zwykły obraz po kadrze (w kadrze 1080 p, nie w 4K źródła)
-    kod = wl.koder_wideo(19)
+    kod = wl.ed.koder_wideo(19)
     if mode == "rozmyte":
         fc = (f"[0:v]split[a][b];[a]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},boxblur=24:2,"
               f"eq=brightness=-0.08[bg];[b]scale={w}:{h}:force_original_aspect_ratio=decrease[fg];"
@@ -194,7 +194,7 @@ def fix(src: Path, out: Path, fps: int | None = None) -> Path:
     """Film z zewnętrznego silnika → standard platform: yuv420p w zakresie TV, H.264, AAC, faststart (dźwięk bez zmian).
     `fps`: stały klatkaż z pełną długością (wl.stala_klatka): klip o zmiennym klatkażu (ManimGX) przed sklejaniem."""
     audio = ["-c:a", "aac", "-b:a", "192k"] if has_audio(src) else []
-    kod = wl.koder_wideo(18)
+    kod = wl.ed.koder_wideo(18)
     vf, czas = wl.z_sdr(wl.sdr(src), wl.TV_RANGE), []
     if fps:
         sek = wl.duration(src)
@@ -306,7 +306,7 @@ def stabilize(src: Path, out: Path, sila: str, statyw: bool = False, zoom: float
             r = DESHAKE[sila]
             ruch = f"deshake=rx={r}:ry={r}"
         vf = ",".join(x for x in (skala, sdr, ruch, ODSTRZ, wl.TV_RANGE) if x)
-        kod = wl.koder_wideo(19)
+        kod = wl.ed.koder_wideo(19)
         wl.run(["ffmpeg", "-y", *kod.wejscie, "-i", str(src.resolve()), "-vf", kod.obraz(vf), "-map", "0:v:0",
                 "-map", "0:a:0?", *kod.wyjscie, *AAC, str(out)], cwd=Path(tmp))
     stats = {"sila": sila, "metoda": "vidstab" if vidstab else "deshake", "statyw": statyw, "rozmiar": f"{w}x{h}",

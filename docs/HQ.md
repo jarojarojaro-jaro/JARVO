@@ -357,7 +357,9 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   i liczby elementów), składa jeden przebieg ffmpeg (klipy → concat albo xfade przy przejściach → nakładki → miks
   z limiterem: szczyt −2 dBFS bez podnoszenia całości, liczony na 4× próbkowaniu, `edytor.LIMITER_EKSPORTU`, więc
   po AAC szczyt prawdziwy zostaje pod −1 dBTP, jak chcą platformy i `qa_wideo.py`), H.264 + AAC,
-  `+faststart`. Jedno zadanie naraz, postęp z `-progress`, przerwanie zabija proces. Plik powstaje jako `.part`
+  `+faststart`. H.264 koduje karta graficzna przez VA-API, gdy działa (próbne kodowanie raz na proces), inaczej x264
+  jak dotąd (`edytor.koder_wideo`, wspólny ze skryptami Wideografa; `JARVO_WIDEO_KODER=cpu|vaapi|auto`).
+  Jedno zadanie naraz, postęp z `-progress`, przerwanie zabija proces. Plik powstaje jako `.part`
   i dopiero gotowy dostaje nazwę `film-edycja[-N].mp4`: nic nie jest nadpisywane.
   Kadr ma krótszy bok najwyżej 1080 px przy proporcjach źródła (nagranie 4K z iPhone'a 2160×3840 → 1080×1920;
   `edytor.kadr_eksportu` = `edKadr` w `45-edytor.js`, tak samo `projekt.py`): platformy i tak pokazują najwyżej 1080p,

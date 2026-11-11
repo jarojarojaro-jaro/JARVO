@@ -366,7 +366,7 @@ def graj(sc: dict, nagranie: bool, katalog: Path | None = None, pasek: bool = Tr
 def do_mp4(webm: Path, mp4: Path, start: float, dlugosc: float, rozmiar: list[int]) -> None:
     mp4.parent.mkdir(parents=True, exist_ok=True)
     w, h = rozmiar
-    kod = wl.koder_wideo(20, limity=False)
+    kod = wl.ed.koder_wideo(20, limity=False)
     cmd = ["ffmpeg", "-loglevel", "error", "-y", *kod.wejscie, "-ss", f"{start:.3f}", "-i", str(webm), "-t", f"{dlugosc:.3f}",
            "-vf", kod.obraz(f"scale={w}:{h}:flags=lanczos,setsar=1"), "-r", "30", *kod.wyjscie,
            "-movflags", "+faststart", "-an", str(mp4)]
