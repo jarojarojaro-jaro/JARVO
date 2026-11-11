@@ -52,6 +52,7 @@ LIMIT_NOTATEK = 5
 DZIENNIK_PRZYPOMNIEN = "wiedza-przypomnienia.jsonl"   # w state/: co agent dostał ze skarbca przed turą (do sprawdzenia w zakładce i w pliku)
 DZIENNIK_MAX_B = 5_000_000
 TYPY_SZKICU = ["fakt", "decyzja", "lekcja", "podmiot", "pojecie", "projekt"]
+POLA_SZKICU = {"typ", "tytul", "tresc", "zrodlo", "tagi"}             # argumenty wiedza_zapisz (schemat niżej)
 
 WYCIAG_SYSTEM = (
     "Jesteś sekretarzem floty agentów Jarvo. Dostajesz zapis rozmowy agenta z użytkownikiem. Wypisz tylko to, co przyda "
@@ -494,6 +495,11 @@ class SkarbiecProvider(MemoryProvider):
             if tool_name == "wiedza_zapisz":
                 if self._kontekst not in ("primary", "cron"):
                     return json.dumps({"error": "szkice zgłasza główna sesja albo rutyna, nie subagent"}, ensure_ascii=False)
+                obce = sorted(set(args) - POLA_SZKICU)
+                if obce:      # 11.11: `source`/`tags` zamiast `zrodlo`/`tagi` dawało 5 prób z samym „szkic musi mieć źródło”
+                    return json.dumps({"error": f"nieznane pola: {', '.join(obce)}; pola wiedza_zapisz to: "
+                                                f"{', '.join(sorted(POLA_SZKICU))} (źródło w `zrodlo`, tagi w `tagi`)"},
+                                      ensure_ascii=False)
                 rel = _lib().zapisz_szkic(sk, str(args.get("typ") or "fakt"), str(args.get("tytul") or ""), str(args.get("tresc") or ""),
                                           str(args.get("zrodlo") or ""), self._agent, list(args.get("tagi") or []), skad=f"sesja {self._session_id}")
                 return json.dumps({"szkic": rel, "info": "szkic czeka na kompilację; nie jest jeszcze notatką"}, ensure_ascii=False)

@@ -133,6 +133,9 @@ def test_narzedzia(srodowisko):
     fm, _ = w.podziel((sk.root / f"{z['szkic']}.md").read_text(encoding="utf-8"))
     assert fm["agent"] == "jarvo-web" and fm["skad"] == "sesja sesja-123" and fm["typ"] == "lekcja"
     assert "sekret" in json.loads(p.handle_tool_call("wiedza_zapisz", {"typ": "fakt", "tytul": "x", "tresc": "token: " + "ab12" * 6, "zrodlo": "y"}))["error"]
+    zle = json.loads(p.handle_tool_call("wiedza_zapisz", {"typ": "fakt", "tytul": "x", "tresc": "y", "source": "rozmowa", "tags": ["a"]}))
+    assert "source, tags" in zle["error"] and "zrodlo" in zle["error"]                      # 11.11: 5 ślepych prób
+    assert len(list((sk.root / "skrzynka").glob("*.md"))) == 1                              # nic nie zapisano
     assert "error" in json.loads(p.handle_tool_call("nie_ma", {}))
 
 
