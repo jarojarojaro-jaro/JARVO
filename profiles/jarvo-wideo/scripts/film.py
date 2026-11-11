@@ -290,8 +290,8 @@ def fit_filter(w: int, h: int, mode: str) -> str:
 
 def render_scene(src: dict, uj: dict, w: int, h: int, dur: float, draft: bool) -> Path:
     """Scena → klip o dokładnej długości, rozdzielczości i fps (bez dźwięku). Cache po treści."""
-    enc = ["-c:v", "libx264", "-preset", "ultrafast" if draft else "veryfast", "-crf", "28" if draft else "18",
-           "-pix_fmt", "yuv420p", "-g", str(wl.FPS * 2), *wl.ENC_LIMITS, "-an"]
+    kod = wl.koder_wideo(28 if draft else 18, "ultrafast" if draft else "veryfast")
+    enc = [*kod.wyjscie, "-g", str(wl.FPS * 2), "-an"]
     mode = uj.get("dopasuj", "przytnij")
     key_src = wl.file_key(src["plik"]) if src.get("plik") else [src.get("kolor")]
     end = uj.get("koniec", "petla")
@@ -304,7 +304,8 @@ def render_scene(src: dict, uj: dict, w: int, h: int, dur: float, draft: bool) -
     tmp = out.with_suffix(".part.mp4")
     if src["typ"] == "kolor":
         c = src["kolor"].lstrip("#")
-        wl.run(["ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c=0x{c}:s={w}x{h}:r={wl.FPS}:d={dur:.3f}", "-vf", wl.TV_RANGE, *enc, str(tmp)])
+        wl.run(["ffmpeg", "-y", *kod.wejscie, "-f", "lavfi", "-i", f"color=c=0x{c}:s={w}x{h}:r={wl.FPS}:d={dur:.3f}",
+                "-vf", kod.obraz(wl.TV_RANGE), *enc, str(tmp)])
     elif src["typ"] == "zdjecie":
         frames = max(1, int(round(dur * wl.FPS)))
         big_w, big_h = (w, h) if draft else (wl.even(w * 1.6), wl.even(h * 1.6))
@@ -320,7 +321,8 @@ def render_scene(src: dict, uj: dict, w: int, h: int, dur: float, draft: bool) -
             zexpr, xexpr, yexpr = f"min({1 + z},1+{z}*on/{frames})", "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"
         vf = (f"scale={big_w}:{big_h}:force_original_aspect_ratio=increase,crop={big_w}:{big_h},"
               f"zoompan=z='{zexpr}':x='{xexpr}':y='{yexpr}':d={frames}:s={w}x{h}:fps={wl.FPS},{wl.TV_RANGE},setsar=1")
-        wl.run(["ffmpeg", "-y", "-i", str(src["plik"]), "-vf", vf, "-frames:v", str(frames), *enc, str(tmp)])
+        wl.run(["ffmpeg", "-y", *kod.wejscie, "-i", str(src["plik"]), "-vf", kod.obraz(vf), "-frames:v", str(frames), *enc,
+                str(tmp)])
     else:
         start = float(uj.get("od", 0) or 0)
         src_dur = wl.duration(src["plik"])
@@ -331,12 +333,13 @@ def render_scene(src: dict, uj: dict, w: int, h: int, dur: float, draft: bool) -
         loop = ["-stream_loop", "-1"] if short and end != "stop" else []
         hold = "" if loop else f"tpad=stop_mode=clone:stop_duration={dur:.3f},"
         fit = fit_filter(w, h, mode)
-        chain = f"{hold}{wl.z_sdr(fit, sdr)},fps={wl.FPS},{wl.TV_RANGE},setsar=1"
+        chain = kod.obraz(f"{hold}{wl.z_sdr(fit, sdr)},fps={wl.FPS},{wl.TV_RANGE},setsar=1")
         if mode == "rozmyte":
             args = ["-filter_complex", f"[0:v]{chain}[v]", "-map", "[v]"]
         else:
             args = ["-vf", chain]
-        wl.run(["ffmpeg", "-y", *loop, "-ss", f"{start:.3f}", "-i", str(src["plik"]), "-t", f"{dur:.3f}", *args, *enc, str(tmp)])
+        wl.run(["ffmpeg", "-y", *kod.wejscie, *loop, "-ss", f"{start:.3f}", "-i", str(src["plik"]), "-t", f"{dur:.3f}", *args,
+                *enc, str(tmp)])
     tmp.replace(out)
     return out
 
@@ -388,7 +391,8 @@ def mix_audio(voice: Path | None, music: Path | None, music_vol: float, total: f
 
 def assemble(clips: list[Path], durs: list[float], total: float, w: int, h: int, build: Path, out: Path,
              audio: Path, ass: Path | None, logo: Path | None, logo_pos: str, fade: bool, draft: bool) -> None:
-    inputs: list[str] = []
+    kod = wl.koder_wideo(30 if draft else 20, "ultrafast" if draft else "medium")
+    inputs: list[str] = [*kod.wejscie]
     for c in clips:   # dekoder H.264 domyślnie bierze wątki (i bufory klatek) ze wszystkich rdzeni: 1 wątek na scenę
         inputs += ["-threads", "1", "-i", str(c)]
     n = len(clips)
@@ -423,10 +427,9 @@ def assemble(clips: list[Path], durs: list[float], total: float, w: int, h: int,
         fc.append(f"[{idx}:v]scale={lw}:-1[lg];{vlast}[lg]overlay={pos}[vl]")
         vlast = "[vl]"
         idx += 1
-    fc.append(f"{vlast}{wl.TV_RANGE}[vout]")
+    fc.append(f"{vlast}{kod.obraz(wl.TV_RANGE)}[vout]")
     inputs += ["-i", str(audio)]
-    enc = ["-c:v", "libx264", "-preset", "ultrafast" if draft else "medium", "-crf", "30" if draft else "20",
-           "-profile:v", "high", "-pix_fmt", "yuv420p", "-r", str(wl.FPS), *wl.ENC_LIMITS,
+    enc = [*kod.wyjscie, "-profile:v", "high", "-r", str(wl.FPS),
            "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart"]
     tmp = out.with_suffix(".part.mp4")
     wl.run(["ffmpeg", "-y", *inputs, "-filter_complex", ";".join(fc), "-map", "[vout]", "-map", f"{idx}:a",

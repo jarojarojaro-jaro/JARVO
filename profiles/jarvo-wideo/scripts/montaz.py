@@ -43,8 +43,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import wideo_lib as wl  # noqa: E402
 
-ENC = ["-c:v", "libx264", "-preset", "medium", "-crf", "19", "-pix_fmt", "yuv420p", *wl.ENC_LIMITS, "-c:a", "aac",
-       "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart"]
+AAC = ["-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart"]
 
 
 def parse_time(s: str) -> float:
@@ -97,10 +96,12 @@ def cut(src: Path, ranges: list[tuple[float, float]], out: Path) -> Path:
             labels.append(f"[a{i}]")
     n = len(ranges)
     fc.append("".join(labels) + f"concat=n={n}:v=1:a={1 if audio else 0}[vc]" + ("[a]" if audio else ""))
-    fc.append(f"[vc]{wl.z_sdr(sdr, wl.TV_RANGE)}[v]")
+    kod = wl.koder_wideo(19)
+    fc.append(f"[vc]{kod.obraz(wl.z_sdr(sdr, wl.TV_RANGE))}[v]")
     maps = ["-map", "[v]"] + (["-map", "[a]"] if audio else [])
     out.parent.mkdir(parents=True, exist_ok=True)
-    wl.run(["ffmpeg", "-y", "-i", str(src), "-filter_complex", ";".join(fc), *maps, *ENC, str(out)])
+    wl.run(["ffmpeg", "-y", *kod.wejscie, "-i", str(src), "-filter_complex", ";".join(fc), *maps, *kod.wyjscie, *AAC,
+            str(out)])
     return out
 
 
@@ -108,16 +109,17 @@ def reframe(src: Path, out: Path, fmt: str, x: float, mode: str) -> Path:
     w, h = wl.parse_format(fmt)
     x = min(1.0, max(0.0, x))
     sdr = wl.sdr(src)                  # HDR → zwykły obraz po kadrze (w kadrze 1080 p, nie w 4K źródła)
+    kod = wl.koder_wideo(19)
     if mode == "rozmyte":
         fc = (f"[0:v]split[a][b];[a]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},boxblur=24:2,"
               f"eq=brightness=-0.08[bg];[b]scale={w}:{h}:force_original_aspect_ratio=decrease[fg];"
-              f"[bg][fg]overlay=(W-w)/2:(H-h)/2,{wl.z_sdr('setsar=1', sdr)},{wl.TV_RANGE}[v]")
+              f"[bg][fg]overlay=(W-w)/2:(H-h)/2,{wl.z_sdr('setsar=1', sdr)},{kod.obraz(wl.TV_RANGE)}[v]")
     else:
         fc = (f"[0:v]scale={w}:{h}:force_original_aspect_ratio=increase:flags=lanczos,"
-              f"crop={w}:{h}:x=(iw-{w})*{x:.3f}:y=(ih-{h})/2,{wl.z_sdr('setsar=1', sdr)},{wl.TV_RANGE}[v]")
+              f"crop={w}:{h}:x=(iw-{w})*{x:.3f}:y=(ih-{h})/2,{wl.z_sdr('setsar=1', sdr)},{kod.obraz(wl.TV_RANGE)}[v]")
     maps = ["-map", "[v]"] + (["-map", "0:a"] if has_audio(src) else [])
     out.parent.mkdir(parents=True, exist_ok=True)
-    wl.run(["ffmpeg", "-y", "-i", str(src), "-filter_complex", fc, *maps, *ENC, str(out)])
+    wl.run(["ffmpeg", "-y", *kod.wejscie, "-i", str(src), "-filter_complex", fc, *maps, *kod.wyjscie, *AAC, str(out)])
     return out
 
 
@@ -192,14 +194,15 @@ def fix(src: Path, out: Path, fps: int | None = None) -> Path:
     """Film z zewnętrznego silnika → standard platform: yuv420p w zakresie TV, H.264, AAC, faststart (dźwięk bez zmian).
     `fps`: stały klatkaż z pełną długością (wl.stala_klatka): klip o zmiennym klatkażu (ManimGX) przed sklejaniem."""
     audio = ["-c:a", "aac", "-b:a", "192k"] if has_audio(src) else []
+    kod = wl.koder_wideo(18)
     vf, czas = wl.z_sdr(wl.sdr(src), wl.TV_RANGE), []
     if fps:
         sek = wl.duration(src)
         vf = f"{wl.stala_klatka(fps, sek)},{vf}"
         czas = ["-t", f"{max(1, round(sek * fps)) / fps:.6f}"]     # pełne klatki: tyle, ile trwa klip w kontenerze
     out.parent.mkdir(parents=True, exist_ok=True)
-    wl.run(["ffmpeg", "-y", "-i", str(src), "-vf", vf, "-c:v", "libx264", "-preset", "medium", "-crf", "18",
-            *wl.ENC_LIMITS, *audio, *czas, "-movflags", "+faststart", str(out)])
+    wl.run(["ffmpeg", "-y", *kod.wejscie, "-i", str(src), "-vf", kod.obraz(vf), *kod.wyjscie, *audio, *czas,
+            "-movflags", "+faststart", str(out)])
     return out
 
 
@@ -303,8 +306,9 @@ def stabilize(src: Path, out: Path, sila: str, statyw: bool = False, zoom: float
             r = DESHAKE[sila]
             ruch = f"deshake=rx={r}:ry={r}"
         vf = ",".join(x for x in (skala, sdr, ruch, ODSTRZ, wl.TV_RANGE) if x)
-        wl.run(["ffmpeg", "-y", "-i", str(src.resolve()), "-vf", vf, "-map", "0:v:0", "-map", "0:a:0?", *ENC, str(out)],
-               cwd=Path(tmp))
+        kod = wl.koder_wideo(19)
+        wl.run(["ffmpeg", "-y", *kod.wejscie, "-i", str(src.resolve()), "-vf", kod.obraz(vf), "-map", "0:v:0",
+                "-map", "0:a:0?", *kod.wyjscie, *AAC, str(out)], cwd=Path(tmp))
     stats = {"sila": sila, "metoda": "vidstab" if vidstab else "deshake", "statyw": statyw, "rozmiar": f"{w}x{h}",
              "sek": round(wl.duration(out), 2)}
     if przed is not None:

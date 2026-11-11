@@ -42,6 +42,7 @@ from urllib.parse import urljoin, urlsplit
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import narzedzia as nz  # noqa: E402
+import wideo_lib as wl  # noqa: E402
 
 TYPY = ("napis", "idz", "klik", "wpisz", "wybierz", "przewin", "najedz", "czekaj")
 PAUZY = {"start": 2.0, "idz": 3.0, "klik": 2.0, "wpisz": 1.0, "wybierz": 1.5, "przewin": 1.5, "najedz": 0.6,
@@ -365,8 +366,9 @@ def graj(sc: dict, nagranie: bool, katalog: Path | None = None, pasek: bool = Tr
 def do_mp4(webm: Path, mp4: Path, start: float, dlugosc: float, rozmiar: list[int]) -> None:
     mp4.parent.mkdir(parents=True, exist_ok=True)
     w, h = rozmiar
-    cmd = ["ffmpeg", "-loglevel", "error", "-y", "-ss", f"{start:.3f}", "-i", str(webm), "-t", f"{dlugosc:.3f}",
-           "-vf", f"scale={w}:{h}:flags=lanczos,setsar=1", "-r", "30", "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
+    kod = wl.koder_wideo(20, limity=False)
+    cmd = ["ffmpeg", "-loglevel", "error", "-y", *kod.wejscie, "-ss", f"{start:.3f}", "-i", str(webm), "-t", f"{dlugosc:.3f}",
+           "-vf", kod.obraz(f"scale={w}:{h}:flags=lanczos,setsar=1"), "-r", "30", *kod.wyjscie,
            "-movflags", "+faststart", "-an", str(mp4)]
     subprocess.run(cmd, check=True)
 

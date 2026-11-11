@@ -30,8 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import wideo_lib as wl  # noqa: E402
 
-ENC = ["-c:v", "libx264", "-preset", "medium", "-crf", "19", "-pix_fmt", "yuv420p", *wl.ENC_LIMITS, "-c:a", "aac",
-       "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart"]
+AAC = ["-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart"]
 UKLADY = ("obok", "gora-dol", "przed-po", "telefony")
 SEK_ZDJECIA = 6.0                       # dwa zdjęcia, bez --sek
 KRESKA = 0.006                          # grubość kreski podziału (część krótszego boku)
@@ -243,6 +242,7 @@ def zloz(a: Path, b: Path, out: Path, uklad: str | None = None, fmt: str = "9:16
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         nakladka(uklad, w, h, sloty, podpisy, tlo, kreska_kolor).save(tmp / "nakladka.png")
+        kod = wl.koder_wideo(19)
         args = [*wejscie(a, sek), *wejscie(b, sek), "-loop", "1", "-framerate", str(wl.FPS), "-t", f"{sek:.3f}",
                 "-i", str(tmp / "nakladka.png")]
         fc = [okno_filtr(i, p, sloty[i][2], sloty[i][3], xy[i], sek) for i, p in enumerate(pliki)]
@@ -261,13 +261,13 @@ def zloz(a: Path, b: Path, out: Path, uklad: str | None = None, fmt: str = "9:16
             fc += [f"[3:v]format=gray,crop={w}:{h}:x='{w}*({u})':y=0[m]",           # biel z prawej od kreski = B
                    "[o1][m]alphamerge[ob]", "[o0][ob]overlay=0:0[p1]",
                    f"[p1][4:v]overlay=x='{w}*(1-({u}))-{(k + 8) / 2:.1f}':y=0[p2]",
-                   f"[p2][2:v]overlay=0:0,{wl.TV_RANGE}[v]"]
+                   f"[p2][2:v]overlay=0:0,{kod.obraz(wl.TV_RANGE)}[v]"]
         else:
             tlo_ff = "0x" + tlo.strip().lstrip("#")
             fc += [f"color=c={tlo_ff}:s={w}x{h}:r={wl.FPS}:d={sek:.3f}[bg]",
                    f"[bg][o0]overlay={sloty[0][0]}:{sloty[0][1]}[p0]",
                    f"[p0][o1]overlay={sloty[1][0]}:{sloty[1][1]}[p1]",
-                   f"[p1][2:v]overlay=0:0,{wl.TV_RANGE}[v]"]
+                   f"[p1][2:v]overlay=0:0,{kod.obraz(wl.TV_RANGE)}[v]"]
         maps = ["-map", "[v]"]
         if len(audio) == 2:
             fc.append("[0:a][1:a]amix=inputs=2:duration=longest:normalize=1,apad[a]")
@@ -275,7 +275,8 @@ def zloz(a: Path, b: Path, out: Path, uklad: str | None = None, fmt: str = "9:16
         elif audio:
             fc.append(f"[{audio[0]}:a]apad[a]")
             maps += ["-map", "[a]"]
-        wl.run(["ffmpeg", "-y", *args, "-filter_complex", ";".join(fc), *maps, "-t", f"{sek:.3f}", *ENC, str(out)])
+        wl.run(["ffmpeg", "-y", *kod.wejscie, *args, "-filter_complex", ";".join(fc), *maps, "-t", f"{sek:.3f}",
+                *kod.wyjscie, *AAC, str(out)])
     stats = {"uklad": uklad, "format": fmt, "rozmiar": f"{w}x{h}", "sek": round(wl.duration(out), 2),
              "okna": [list(s) for s in sloty[:1 if uklad == "przed-po" else 2]],
              "dzwiek": "brak" if not audio else "oba" if len(audio) == 2 else "ab"[audio[0]], "uwagi": []}

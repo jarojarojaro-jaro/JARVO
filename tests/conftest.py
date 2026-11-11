@@ -23,6 +23,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))      # tests/atrapy.py
 # import wtyczki HQ w testach nie startuje silnika rozmów (wątek tła, rozmowy.db w /opt/data, dziennik w pliku);
 # testy silnika budują go same na katalogu tymczasowym (tests/test_silnik_rozmow.py)
 os.environ.setdefault("JARVO_HQ_SILNIK", "0")
+# koder wideo Wideografa w testach to x264: polecenia ffmpeg nie zależą od karty graficznej komputera, a atrapy
+# subprocess.run nie udają próby karty (wl.karta_vaapi); wybór kodera sprawdzają testy z jawnym JARVO_WIDEO_KODER
+os.environ.setdefault("JARVO_WIDEO_KODER", "cpu")
 
 WINDOWS = os.name == "nt"
 LINUX = sys.platform.startswith("linux")

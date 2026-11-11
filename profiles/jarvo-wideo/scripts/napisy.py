@@ -74,9 +74,9 @@ def main(argv: list[str] | None = None) -> int:
                 extra = ":fontsdir=fonts"
             audio = ["-c:a", "copy"] if wl.probe(video)["audio"] else []
             vf = wl.z_sdr(wl.sdr(video), f"ass=n.ass{extra}")      # film HDR: napisy na obrazie po przeliczeniu
-            wl.run(["ffmpeg", "-y", "-i", str(video.resolve()), "-vf", f"{vf},{wl.TV_RANGE}", "-c:v", "libx264", "-preset", "medium",
-                    "-crf", "19", "-pix_fmt", "yuv420p", *wl.ENC_LIMITS, *audio, "-movflags", "+faststart", str(out.resolve())],
-                   cwd=Path(tmp))
+            kod = wl.koder_wideo(19)
+            wl.run(["ffmpeg", "-y", *kod.wejscie, "-i", str(video.resolve()), "-vf", kod.obraz(f"{vf},{wl.TV_RANGE}"),
+                    *kod.wyjscie, *audio, "-movflags", "+faststart", str(out.resolve())], cwd=Path(tmp))
         result["wideo"] = str(out)
     print(json.dumps(result, ensure_ascii=False))
     return 0

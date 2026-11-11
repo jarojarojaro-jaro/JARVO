@@ -19,3 +19,38 @@ Zasoby (VPS 4 vCPU / 8 GB): render filmu 1080×1920 zajmuje chwilowo 0,5–0,65 
 w osobnym przebiegu), 11 s filmu ≈ 15–20 s renderu. Mocniejszy serwer: `JARVO_WIDEO_WATKI=4`,
 `JARVO_WIDEO_ROWNOLEGLE=2` (sceny naraz). Pełne rendery (`film.py`, `projekt.py`, `html_wideo.py wideo`): najwyżej
 `JARVO_RENDER_MIEJSCA=2` naraz, kolejny obok trwającego przy wolnej pamięci ≥ `JARVO_RENDER_WOLNA=30` %. Cache ujęć i scen: `/opt/data/jarvo/cache/wideo` (`film.py cache --starsze-niz 14`).
+
+Koder H.264 (`wideo_lib.koder_wideo`; `film.py`, `montaz.py`, `napisy.py --wypal`, `dwa_ekrany.py`, `html_wideo.py`
+do MP4, `maskotka.py`, `demo_strony.py`): gdy działa karta graficzna z VA-API (serwer z Intelem Gen9:
+`/dev/dri/renderD128`), obraz koduje karta (`h264_vaapi`, stały qp), a procesor tylko dekoduje i filtruje; bez niej
+(VPS, Windows, macOS, komputer bez karty) x264 z ustawieniami jak dotąd. Wybór raz na proces próbnym kodowaniem kilku
+klatek na karcie, nie samym plikiem urządzenia. `JARVO_WIDEO_KODER=cpu` wymusza procesor, `vaapi` kartę (bez próby),
+domyślnie `auto`. Wynik jak dotąd: H.264 High, yuv420p w zakresie TV, faststart, ten sam dźwięk. ProRes i WebM
+(`html_wideo.py --alfa`) bez zmian.
+
+qp karty z pomiaru (2026-11-11; 10 s dwóch prawdziwych filmów z serwera, bezstratna referencja FFV1, FFmpeg 9.0.2
+Jarva, 2 rdzenie, x264 z `ENC_LIMITS`): medium crf N → qp N+2 (najwyższy qp z VMAF równym x264, ±0,1), veryfast
+(sceny przed montażem, kodowane drugi raz) crf N → qp N+4, szkic (ultrafast) qp = crf.
+
+| Film | Koder | Mb/s | SSIM | VMAF | Czas |
+|---|---|---|---|---|---|
+| motyl 1080×1080 (anidoodle) | x264 medium crf18 | 2,55 | 0,9765 | 97,2 | 11,5 s |
+| motyl | karta qp20 | 4,37 | 0,9742 | 97,2 | 4,4 s |
+| motyl | x264 medium crf20 | 2,17 | 0,9757 | 96,7 | 10,8 s |
+| motyl | karta qp22 (też za veryfast crf18) | 3,73 | 0,9730 | 96,6 | 4,4 s |
+| motyl | x264 veryfast crf18 | 3,04 | 0,9759 | 96,0 | 6,6 s |
+| motyl | x264 ultrafast crf28 (szkic) | 3,75 | 0,9647 | 93,6 | 4,7 s |
+| motyl | karta qp28 (szkic) | 1,89 | 0,9642 | 93,4 | 4,4 s |
+| lekcja 1080×1656 | x264 medium crf18 | 0,58 | 0,9950 | 96,5 | 14,7 s |
+| lekcja | karta qp20 | 0,64 | 0,9946 | 96,7 | 8,3 s |
+| lekcja | x264 medium crf20 | 0,47 | 0,9941 | 96,1 | 13,6 s |
+| lekcja | karta qp22 (też za veryfast crf18) | 0,57 | 0,9942 | 96,5 | 8,2 s |
+| lekcja | x264 veryfast crf18 | 0,82 | 0,9949 | 95,9 | 12,0 s |
+| lekcja | x264 ultrafast crf28 (szkic) | 0,32 | 0,9946 | 96,4 | 8,6 s |
+| lekcja | karta qp28 (szkic) | 0,41 | 0,9920 | 94,6 | 8,2 s |
+
+Pliki finału (medium) są 1,1–1,8× większe, scen 0,7–1,2×, szkicu 0,5–1,3×. SSIM karty jest o ~0,002 niższy przy
+tym samym VMAF; równy SSIM wymagałby qp 16–18 i plików 2–3× większych. Rate control ICQ nie daje mniejszych plików
+niż CQP przy tym samym VMAF, bez klatek B pliki rosną o 6–27 %, a szybszy tryb karty (`-quality 7`) nie skraca czasu. Czas karty
+w tabeli to głównie dekodowanie źródła FFV1; na zwykłym przebiegu (`napisy.py --wypal`, 12 s 1080×1920 z H.264)
+karta: 2,4 s i 4,1 s procesora, x264: 27,9 s i 51,4 s procesora, plik 10,4 MB wobec 10,3 MB.
