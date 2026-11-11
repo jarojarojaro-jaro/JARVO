@@ -83,6 +83,8 @@ def sr(tmp_path, monkeypatch):
     monkeypatch.setattr(z, "_baza", lambda task_id: os.environ.get("TERMINAL_CWD"))
     monkeypatch.setattr(z, "_terminal_cwd", lambda: os.environ.get("TERMINAL_CWD", ""))
     monkeypatch.setattr(z, "_dom", lambda: str(s.dom))
+    monkeypatch.setattr(z, "_domy", lambda: [str(s.dom)])                 # strażnik kasowania: tylko dom testu
+    monkeypatch.setattr(z, "_tymczasowe", lambda: [str(tmp_path / "temp")])
     monkeypatch.setattr(z, "_podagent", lambda: bool(os.environ.get("HERMES_DELEGATED_CHILD_CONTEXT")))
     monkeypatch.setattr(z, "_env_sesji", lambda nazwa: os.environ.get(nazwa, ""))
     monkeypatch.setattr(z, "_TRYB_W_PROCESIE", {})
@@ -727,3 +729,209 @@ def test_rozbior_polecen_powloki():
     assert not z._sed_bezpieczny("s/a/b/w plik") and not z._sed_bezpieczny("1e rm -rf /")
     assert z.sciezki_latki({"mode": "patch", "patch": "*** Move File: a.py -> b/c.py\n*** Update File: d.py\n"}) == \
         ["d.py", "a.py", "b/c.py"]
+
+
+# ------------------------------------------------------------------------------------------------ strażnik kasowania
+
+TRYBY_PRACY = ["pytaj", "projekt", "yolo", "kanban", "cron"]
+
+
+def q(p) -> str:
+    return "'" + Path(p).as_posix() + "'"
+
+
+def tryb_pracy(sr, monkeypatch, tryb):
+    """Tryb z człowiekiem, YOLO albo praca bez człowieka; Hermes „zapytałby sam”, a właściciel dał stałą zgodę:
+    masowego kasowania nie przepuszcza ani jedno, ani drugie."""
+    monkeypatch.setattr(z, "_hermes_niebezpieczne", lambda polecenie: True)
+    monkeypatch.setattr(z, "_hermes_dozwolone_na_stale", lambda polecenie: True)
+    if tryb in ("pytaj", "projekt"):
+        ustaw_tryb(monkeypatch, tryb)
+    elif tryb == "yolo":
+        ustaw_tryb(monkeypatch, "pelny")
+        monkeypatch.setattr(z, "_yolo", lambda: True)
+    else:
+        bez_czlowieka(sr, monkeypatch, tryb)
+
+
+def drzewo(sr):
+    """Dom właściciela z projektami i kluczami, projekt czatu (repozytorium z wynikami budowania), klon w temp."""
+    for p in (sr.dom / "dev" / "projekt-a" / ".git", sr.dom / "dev" / "projekt-a" / "src",
+              sr.dom / "dev" / "projekt-a" / "node_modules" / "x", sr.dom / "strony" / "site" / ".git",
+              sr.dom / "jarvo-testy", sr.dom / ".config" / "app", sr.dom / ".phoneuse", sr.dom / ".ssh",
+              sr.proj / ".git", sr.proj / "node_modules" / "pkg", sr.proj / "dist", sr.proj / ".svelte-kit",
+              sr.proj / "src" / "__pycache__", sr.proj / "build", sr.tmp / "temp" / "klon" / ".git",
+              sr.wiedza / "skrzynka" / "stare", sr.ws_root / "jarvo" / "t_1" / "out", sr.home / "sessions"):
+        p.mkdir(parents=True, exist_ok=True)
+    for p, tresc in ((sr.dom / ".ssh" / "config", "Host x\n"), (sr.dom / ".config" / "app" / "x.json", "{}\n"),
+                     (sr.dom / ".phoneuse" / "stan", "x\n"), (sr.dom / ".bashrc", "export X=1\n"),
+                     (sr.proj / "AGENTS.md", "# Zasady\n"), (sr.proj / "src" / "stary.py", "x = 1\n"),
+                     (sr.proj / "src" / "__pycache__" / "a.pyc", "x"), (sr.proj / ".git" / "config", "[core]\n"),
+                     (sr.proj / "build" / "a.o", "x"), (sr.home / "sessions" / "s1.json", "{}")):
+        p.write_text(tresc, encoding="utf-8")
+
+
+BLOKOWANE = [
+    # rm w każdej kolejności flag, długie flagi, flagi po celach, owijki, sztuczki z cudzysłowem
+    ("rm -rf ~/dev", None), ("rm -r -f ~/dev/projekt-a", None), ("rm --recursive --force ~/strony", None),
+    ("rm ~/dev/projekt-a -rf", None), ("rm -fR ~", None), ("rm -rf ~/dev/*", None), ("/bin/rm -rf ~/jarvo-testy", None),
+    ("sudo -u root rm -rf ~/dev", None), ("\\rm -rf ~/dev", None), ("r''m -rf ~/strony/site", None),
+    ("command rm -rf ~/dev", None), ("nice -n 5 timeout 10 rm -rf ~/dev", None), ("rm -rf ~/strony/site/.git", None),
+    ("rm -rf ~/dev/projekt-a/../projekt-a", None),
+    # klucze, tokeny i konfiguracja: także pojedyncze pliki
+    ("rm -rf ~/.ssh", None), ("rm ~/.ssh/config", None), ("rm -f ~/.config/app/x.json", None), ("rm -rf ~/.phoneuse", None),
+    ("rm ~/.bashrc", None),
+    # dane Jarva, skarbiec, misje i katalogi kart w całości
+    ("rm -rf ~/.local", None), ("rm -rf {dane}/profiles", None), ("rm -rf {home}/sessions", None),
+    ("rm -rf {wiedza}", None), ("rm -rf {misje}", None), ("rm -rf {ws}", None), ("rm -rf {ws}/*", None),
+    # find
+    ("find ~/dev -delete", None), ("find ~/dev -exec rm -rf {{}} +", None), ("find ~/.ssh -name 'id_*' -delete", None),
+    ("find ~ -name '*.log' -delete", None), ("find ~/dev -name '*' -delete", None),
+    ("find ~/strony ! -name x -delete", None), ("find ~/dev -type d -print0 | xargs -0 rm -rf", None),
+    # Python, inne języki i powłoki w powłoce
+    ("python3 -c 'import shutil; shutil.rmtree(\"{dom_p}/dev\")'", None),
+    ("python3 - <<'EOF'\nimport os, shutil\nshutil.rmtree(os.path.expanduser('~/dev'))\nEOF", None),
+    ("python3 <<EOF\nfrom pathlib import Path\nimport shutil\nshutil.rmtree(Path.home() / 'strony')\nEOF", None),
+    ("python3 -c 'import os; os.removedirs(\"{dom_p}/jarvo-testy\")'", None),
+    ("python3 -c 'import shutil,sys; shutil.rmtree(sys.argv[1])' ~/dev", "nie da się ustalić"),
+    ("python3 -c 'from shutil import rmtree as r; r(\"/x\")'", "pod inną nazwą"),
+    ("python3 -c 'import subprocess; subprocess.run([\"rm\", \"-rf\", \"{dom_p}/dev\"])'", None),
+    ("uv run python -c 'import os; os.system(\"rm -rf ~/dev\")'", None),
+    ("node -e \"require('fs').rmSync('{dom_p}/dev', {{recursive: true}})\"", None),
+    ("bash -c 'rm -rf ~/dev'", None), ("sh -lc \"rm -rf $HOME/strony\"", None), ("eval 'rm -rf ~/dev'", None),
+    ("echo $(rm -rf ~/dev)", None), ("(cd ~ && rm -rf dev)", None), ("cd ~/dev && rm -rf ./*", None),
+    ("bash <<'EOF'\nrm -rf ~/dev\nEOF", None), ("D=~/dev; rm -rf $D", None),
+    # cele, których nie da się ustalić, przy -r albo -f
+    ("rm -rf $NIEZNANA_ZM", "nie da się ustalić"), ("rm -rf \"$(cat lista.txt)\"", "nie da się ustalić"),
+    ("for d in a b; do rm -rf $d; done", "nie da się ustalić"), ("rm -f $NIEZNANA_ZM/plik", "nie da się ustalić"),
+    ("ls | xargs rm", "z wejścia"), ("bash -c \"rm -rf $NIEZNANA_ZM\"", "nieznaną treścią"),
+    # rsync --delete, git, truncate, dd, mkfs, przekierowania
+    ("rsync -a --delete /tmp/pusty/ ~/dev/", None), ("rsync -a --delete-after {proj_p}/dist/ ~/strony/site/", None),
+    ("git -C {proj_p} clean -fdx", None), ("git -C ~/dev/projekt-a reset --hard HEAD~3", None),
+    ("cd ~/dev/projekt-a && git reset --hard", None), ("cd {proj_p} && git push --force origin main", None),
+    ("git -C {proj_p} push -f", None), ("git -C {proj_p} push --mirror backup", None),
+    ("git -C {proj_p} push origin +main", None), ("git -C $NIEZNANA_ZM reset --hard", "repozytorium"),
+    ("truncate -s 0 ~/.ssh/config", None), ("dd if=/dev/zero of=~/.ssh/config", None),
+    ("dd if=/dev/zero of=/dev/sda bs=1M", "dysk"), ("mkfs.ext4 /dev/sdb1", "dysk"), ("sudo wipefs -a /dev/sdb", "dysk"),
+    (": > ~/.ssh/config", None), ("> ~/.bashrc", None), ("cat /dev/null > ~/.ssh/config", None),
+    ("echo nowy > ~/.config/app/x.json", None), ("cp /dev/null ~/.bashrc", None), ("echo x | tee ~/.bashrc", None),
+    ("truncate -s 0 {proj_p}/AGENTS.md", None), ("echo x > {proj_p}/.git/config", None),
+]
+
+
+def polecenie_z(sr, wzor):
+    return wzor.format(dane=q(sr.dane), home=q(sr.home), wiedza=q(sr.wiedza), misje=q(sr.misje), ws=q(sr.ws_root),
+                       dom_p=sr.dom.as_posix(), proj_p=sr.proj.as_posix())
+
+
+@pytest.mark.parametrize("tryb", TRYBY_PRACY)
+@pytest.mark.parametrize("wzor,fragment", BLOKOWANE, ids=[b[0][:60] for b in BLOKOWANE])
+def test_masowe_kasowanie_zablokowane_w_kazdym_trybie(sr, monkeypatch, tryb, wzor, fragment):
+    drzewo(sr)
+    tryb_pracy(sr, monkeypatch, tryb)
+    polecenie = polecenie_z(sr, wzor)
+    w = hak("terminal", command=polecenie)
+    assert akcja(w) == "block" and "masowe kasowanie" in w["message"], (polecenie, w)
+    assert "nie da się jej zatwierdzić" in w["message"]
+    if fragment:
+        assert fragment in w["message"], w["message"]
+    if tryb == "kanban":
+        assert 'kanban_block(kind="needs_input"' in w["message"]
+    else:
+        assert "poproś właściciela" in w["message"] and "skasuj konkretne pliki" in w["message"]
+
+
+DOZWOLONE = [
+    "cd {proj_p} && rm -rf node_modules dist .svelte-kit src/__pycache__",
+    "cd {proj_p} && rm -f src/stary.py && rm src/__pycache__/a.pyc",
+    "cd {proj_p} && rm -rf build/*",
+    "cd {proj_p} && find . -name __pycache__ -type d -exec rm -rf {{}} +",
+    "find {proj_p} -name '*.pyc' -delete",
+    "find ~/dev -name node_modules -prune -exec rm -rf {{}} +",
+    "rm -rf ~/dev/projekt-a/node_modules ~/dev/projekt-a/src",
+    "rm -rf {temp_p}/klon", "cd {temp_p}/klon && git clean -fdx && git reset --hard",
+    "rm -rf {ws}/jarvo/t_1/out", "rm -rf {ws}/jarvo/t_1", "git -C {ws}/jarvo/t_1 reset --hard",
+    "rm -rf {wiedza}/skrzynka/stare",
+    "python3 -c 'import shutil, tempfile; d = tempfile.mkdtemp(); shutil.rmtree(d)'",
+    "python3 - <<'EOF'\nimport shutil, tempfile\nwith tempfile.TemporaryDirectory() as d:\n    shutil.rmtree(d)\nEOF",
+    "python3 -c 'import shutil; shutil.rmtree(\"{proj_p}/dist\")'",
+    "cd {proj_p} && git clean -n && git reset --soft HEAD~1 && git push origin main",
+    "truncate -s +1M {proj_p}/build/a.o", "echo x >> ~/.bashrc", "echo x > {proj_p}/src/stary.py",
+    "rsync -a --delete {proj_p}/dist/ {temp_p}/site/", "rsync -a --delete dist/ serwer:/var/www/",
+    "grep -rn rmtree {proj_p}/src", "cat > {proj_p}/raport.md <<'EOF'\nrm -rf ~/dev\nshutil.rmtree('/')\nEOF",
+    "for f in *.tmp; do rm \"$f\"; done", "rm \"$NIEZNANA_ZM\"",
+]
+
+
+@pytest.mark.parametrize("tryb", TRYBY_PRACY)
+@pytest.mark.parametrize("wzor", DOZWOLONE, ids=[d[:60] for d in DOZWOLONE])
+def test_zwykle_sprzatanie_bez_blokady_kasowania(sr, monkeypatch, tryb, wzor):
+    drzewo(sr)
+    tryb_pracy(sr, monkeypatch, tryb)
+    polecenie = wzor.format(proj_p=sr.proj.as_posix(), temp_p=(sr.tmp / "temp").as_posix(), ws=q(sr.ws_root),
+                            wiedza=q(sr.wiedza))
+    w = hak("terminal", command=polecenie)
+    assert w is None or "masowe kasowanie" not in w["message"], (polecenie, w)
+
+
+@pytest.mark.wymaga_symlinku
+def test_kasowanie_dowiazania_to_nie_kasowanie_celu(sr, monkeypatch):
+    drzewo(sr)
+    tryb_pracy(sr, monkeypatch, "projekt")
+    os.symlink(sr.dom / "dev", sr.proj / "link", target_is_directory=True)
+    assert hak("terminal", command=f"cd {q(sr.proj)} && rm -rf link") is None          # znika samo łącze
+    assert akcja(hak("terminal", command=f"cd {q(sr.proj)} && rm -rf link/")) == "block"   # treść ~/dev
+
+
+def test_repozytorium_w_srodku_kasowanego_katalogu(sr, monkeypatch):
+    drzewo(sr)
+    tryb_pracy(sr, monkeypatch, "projekt")
+    (sr.poza / "klienci" / "firma-x" / ".git").mkdir(parents=True)
+    w = hak("terminal", command=f"rm -rf {q(sr.poza / 'klienci')}")
+    assert akcja(w) == "block" and "firma-x" in w["message"]
+    assert hak("terminal", command=f"rm -rf {q(sr.poza / 'klienci' / 'firma-x' / 'node_modules')}") is None
+
+
+@pytest.mark.parametrize("tryb", TRYBY_PRACY)
+def test_execute_code_i_proces_w_tle_z_kasowaniem(sr, monkeypatch, tryb):
+    drzewo(sr)
+    tryb_pracy(sr, monkeypatch, tryb)
+    kod = f"import shutil\nshutil.rmtree('{sr.dom.as_posix()}/dev')\n"
+    w = hak("execute_code", code=kod)
+    assert akcja(w) == "block" and "masowe kasowanie" in w["message"]
+    w = hak("process_manage", action="write", session_id="proc_1", data="rm -rf ~/dev\n")
+    assert akcja(w) == "block" and "masowe kasowanie" in w["message"]
+    w = hak("execute_code", code="print(1)")
+    assert w is None or "masowe kasowanie" not in w["message"]
+
+
+@pytest.mark.parametrize("tryb", TRYBY_PRACY)
+def test_write_file_i_patch_nie_oprozniaja_chronionych_plikow(sr, monkeypatch, tryb):
+    drzewo(sr)
+    tryb_pracy(sr, monkeypatch, tryb)
+    for sciezka in (sr.dom / ".ssh" / "config", sr.dom / ".bashrc", sr.proj / "AGENTS.md", sr.home / "sessions" / "s1.json"):
+        w = hak("write_file", path=str(sciezka), content="")
+        assert akcja(w) == "block" and "masowe kasowanie" in w["message"] and sciezka.name in w["message"], sciezka
+    w = hak("patch", path=str(sr.dom / ".bashrc"), old_string="export X=1\n", new_string="")
+    assert akcja(w) == "block" and "patch" in w["message"]
+    latka = f"*** Begin Patch\n*** Delete File: {sr.dom.as_posix()}/.ssh/config\n*** End Patch\n"
+    assert akcja(hak("patch", mode="patch", patch=latka)) == "block"
+    for args in ({"path": str(sr.proj / "src" / "stary.py"), "content": ""},
+                 {"path": str(sr.proj / "AGENTS.md"), "content": "# Nowe zasady\n"}):
+        w = hak("write_file", **args)
+        assert w is None or "masowe kasowanie" not in w["message"], args
+    w = hak("patch", path=str(sr.dom / ".bashrc"), old_string="X=1", new_string="X=2")
+    assert w is None or "masowe kasowanie" not in w["message"]
+
+
+def test_blokada_kasowania_w_dzienniku(sr, monkeypatch, caplog):
+    drzewo(sr)
+    tryb_pracy(sr, monkeypatch, "yolo")
+    with caplog.at_level("WARNING", logger=z.__name__):
+        assert akcja(hak("terminal", command="rm -rf ~/dev")) == "block"
+    assert any("zablokowane kasowanie" in r.getMessage() and "YOLO" in r.getMessage() for r in caplog.records)
+
+
+def test_rozbior_zachowuje_tresc_heredocow():
+    polecenia, _ = z._rozbierz("python3 - <<'EOF'\nimport shutil\nEOF\ncat <<-X\n\tlinia\n\tX\n")
+    assert polecenia[0].heredoki == ["import shutil"] and polecenia[1].heredoki == ["linia"]

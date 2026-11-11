@@ -24,8 +24,23 @@ Bez człowieka (karta kanbana, cron, -q, podagent delegate_task, webhook, sesja 
 nigdy approve. Zapisy w katalogu karty, skarbcu (JARVO_KNOWLEDGE_DIR) i misjach (JARVO_MISSIONS_DIR) oraz to, co
 tryb przepuszcza bez pytania w folderze projektu (projekt i pełny), idą dalej; reszta zapisów to block z poradą
 (na karcie: kanban_block(kind="needs_input")). Polecenia, których celów nie da się ustalić, zostają polityce Hermesa
-(approvals.cron_mode, single_query_mode: deny), bo terminal i tak uruchomi dowolny skrypt.
+(approvals.cron_mode, single_query_mode: deny), bo terminal i tak uruchomi dowolny skrypt; wyjątek to kasowanie
+rekurencyjne albo wymuszone (strażnik kasowania niżej).
 Błąd w haku = block (nie przepuszczamy przy błędzie, odwrotnie niż strażnik jarvo-wiedza).
+Strażnik kasowania (przed wszystkim innym, w każdym trybie, z człowiekiem, bez niego i pod YOLO, bez pytania i bez
+omijania przez command_allowlist): block dla masowego kasowania i niszczenia danych. Chronione w całości (samo miejsce
+i wszystko nad nim): katalog domowy, ~/dev, ~/strony, ~/jarvo-testy, każde repozytorium git (poza katalogami
+tymczasowymi i kart), skarbiec, misje i katalogi robocze kart; w całości i w środku: ~/.ssh, ~/.config, ~/.phoneuse;
+dane i kod Jarva (poza skarbcem, misjami, katalogami kart i HOME terminala) bez kasowania drzew i nadpisywania plików.
+Formy: rm -r/-f (każda kolejność flag, długie flagi, flagi po celach, owijki sudo/env/nice/timeout/xargs), find -delete
+i -exec rm (bez zawężenia nazwą albo czasem), shutil.rmtree/os.removedirs/os.system/subprocess w python -c, heredocu,
+here-stringu i execute_code, fs.rmSync/rimraf/rmtree w node/perl/ruby -e, bash -c, eval, $(…), rsync --delete,
+git clean -f, git reset --hard i git push --force/-f/--mirror/+gałąź w chronionym repozytorium, truncate, dd of=,
+mkfs/wipefs, `>`, tee i cp /dev/null na chroniony plik, write_file z pustą treścią, patch usuwający całą treść i V4A
+`*** Delete File`. Rekurencyjne albo wymuszone kasowanie, którego celów nie da się ustalić (zmienna, $(…), xargs,
+glob w nieznanym katalogu), też block. Wolno: sprzątanie katalogu karty i katalogów tymczasowych, wyniki budowania
+w projekcie (node_modules, dist, .svelte-kit, __pycache__), podkatalogi i pojedyncze pliki w drzewie roboczym,
+zawężone find. Blokada idzie do logu (logger.warning) i ma w treści poradę, co zrobić zamiast.
 
 Jak to działa w Hermesie f97608f (sprawdzone w kodzie, plik:linia):
   - hermes_cli/plugins.py:1854-1906: dyrektywy pre_tool_call; block (z niepustym message) wygrywa z approve, a z wielu
@@ -75,6 +90,8 @@ Instalacja (build.py, install_fleet.py, `jarvo chat --tryb`) to etap E4: zgody/R
 """
 # bez `from __future__ import annotations`: dataclass z adnotacjami-napisami wymaga modułu w sys.modules, a wtyczkę
 # może wczytać ktoś inny niż loader Hermesa (który go tam wpisuje, hermes_cli/plugins_loader.py:651)
+import ast
+import collections
 import glob as _glob
 import hashlib
 import itertools
@@ -83,7 +100,9 @@ import logging
 import ntpath
 import os
 import re
+import shlex
 import sys
+import tempfile
 import threading
 import time
 import unicodedata
@@ -632,6 +651,7 @@ class _Polecenie:
     slowa: List[_Slowo] = field(default_factory=list)
     przekierowania: List[Tuple[str, _Slowo]] = field(default_factory=list)
     lacznik: str = ""
+    heredoki: List[str] = field(default_factory=list)   # treść heredoców (dane; strażnik kasowania czyta kod w nich)
 
 
 _SEPARATORY = ("&&", "||", ";;", "|&", ";", "|", "&", "(", ")")
@@ -682,10 +702,11 @@ def _koniec_backticku(t: str, i: int) -> int:
 
 
 def _rozbierz(tekst: str) -> Tuple[List[_Polecenie], bool]:
-    """Polecenie powłoki → (proste polecenia, złożone). Treść heredoców pomija (to dane)."""
+    """Polecenie powłoki → (proste polecenia, złożone). Treść heredoców to dane: nie rozbieramy jej, tylko zapisujemy
+    przy poleceniu (`heredoki`), bo dla python3 albo bash to kod."""
     polecenia: List[_Polecenie] = []
     stan: Dict[str, Any] = {"biez": _Polecenie(), "czesci": [], "w_slowie": False, "oczekuje": None, "zlozone": False}
-    heredoki: List[Tuple[str, bool, bool]] = []
+    heredoki: List[Tuple[str, bool, bool, _Polecenie]] = []
     i, n = 0, len(tekst)
 
     def dodaj(rodzaj: str, t: str) -> None:
@@ -706,7 +727,7 @@ def _rozbierz(tekst: str) -> Tuple[List[_Polecenie], bool]:
             stan["oczekuje"] = None
             if op in ("<<", "<<-"):
                 cytowany = any(r in ("s", "d") for r, _ in slowo.czesci)
-                heredoki.append((slowo.surowe(), op == "<<-", cytowany))
+                heredoki.append((slowo.surowe(), op == "<<-", cytowany, stan["biez"]))
             else:
                 stan["biez"].przekierowania.append((op, slowo))
         else:
@@ -769,15 +790,18 @@ def _rozbierz(tekst: str) -> Tuple[List[_Polecenie], bool]:
         raise _Skladnia("niezamknięty cudzysłów")
 
     def wczytaj_heredoki(i: int) -> int:
-        for ogr, bez_tabow, cytowany in heredoki:
+        for ogr, bez_tabow, cytowany, wlasciciel in heredoki:
+            linie: List[str] = []
             while i < n:
                 j = tekst.find("\n", i)
                 linia = (tekst[i:] if j < 0 else tekst[i:j]).rstrip("\r")
                 i = n if j < 0 else j + 1
                 if (linia.lstrip("\t") if bez_tabow else linia) == ogr:
                     break
+                linie.append(linia.lstrip("\t") if bez_tabow else linia)
                 if not cytowany and ("$(" in linia or "`" in linia):
                     stan["zlozone"] = True
+            wlasciciel.heredoki.append("\n".join(linie))
         heredoki.clear()
         return i
 
@@ -1471,22 +1495,31 @@ def _jedno_slowo(slowo: _Slowo, wartosci: Any) -> bool:
     return len(slowo.czesci) == 1 and slowo.czesci[0][0] == "u" and slowo.czesci[0][1] in wartosci
 
 
-def _analizuj_terminal(polecenie: str, cwd0: Optional[str], dom: str) -> _Analiza:
-    """Cele zapisu, programy spoza listy tylko do odczytu i to, czego nie da się ocenić; cwd idzie za `cd`."""
+def _analizuj_terminal(polecenie: str, cwd0: Optional[str], dom: str, kasowania: Optional[List["_Kasowanie"]] = None,
+                       glebokosc: int = 0) -> _Analiza:
+    """Cele zapisu, programy spoza listy tylko do odczytu i to, czego nie da się ocenić; cwd idzie za `cd`.
+    `kasowania`: lista, do której strażnik kasowania zbiera usunięcia i nadpisania (także z $(…), bash -c, python -c
+    i heredoców); `glebokosc` liczy te zagnieżdżenia."""
     a = _Analiza()
     if len(polecenie) > _MAX_POLECENIA:
         a.nieznane, a.tylko_odczyt = True, False
+        if kasowania is not None:
+            _kasowanie_nierozebrane(polecenie, "polecenie za długie, żeby je rozebrać", kasowania)
         return a
     try:
         polecenia, zlozone = _rozbierz(polecenie)
-    except _Skladnia:
+    except _Skladnia as e:
         a.nieznane, a.tylko_odczyt = True, False
+        if kasowania is not None:
+            _kasowanie_nierozebrane(polecenie, f"polecenia nie da się rozebrać ({e})", kasowania)
         return a
     a.nieznane = zlozone
     cwd: Optional[str] = cwd0
     zmienne: Dict[str, Optional[str]] = {"PWD": cwd0}
     w_potoku = False
     for p in polecenia:
+        if kasowania is not None:
+            _kasowania_podstawien(p, cwd, dom, kasowania, glebokosc)
         slowa = list(p.slowa)
         przypisania: List[_Slowo] = []
         while slowa and slowa[0].czesci[0][0] == "u" and _PRZYPISANIE.match(slowa[0].czesci[0][1]):
@@ -1523,6 +1556,8 @@ def _analizuj_terminal(polecenie: str, cwd0: Optional[str], dom: str) -> _Analiz
                         prog = prog[: -len(rozsz)]
                 argi = [x for s in slowa[1:] for x in _argumenty(s, zmienne, dom)]
                 rodzaj, cele, niez = _klasyfikuj(prog, goly, argi)
+                if kasowania is not None:
+                    _kasowania_polecenia(prog, argi, p, cwd, dom, kasowania, glebokosc)
                 a.nieznane = a.nieznane or niez
                 if rodzaj == "inne":
                     a.inne.append(_maskuj(prog)[:40])
@@ -1562,6 +1597,10 @@ def _analizuj_terminal(polecenie: str, cwd0: Optional[str], dom: str) -> _Analiz
             t = cel.zwykle()
             if op == ">&" and t is not None and (t.isdigit() or t == "-"):
                 continue                      # >&2, >&-: deskryptor, nie plik
+            if kasowania is not None and op in _NADPISUJACE:
+                for x in _argumenty(cel, zmienne, dom):
+                    _dodaj_cel(kasowania, x, cwd, dom, f"przekierowanie {op}", "oproznij",
+                               pusto=_bez_tresci(slowa, zmienne, dom))
             cele += _argumenty(cel, zmienne, dom)
         zapisy = [(cel.pokaz, _sciezki_arg(cel, cwd, dom)) for cel in cele]
         zapisy = [(pokaz, s) for pokaz, s in zapisy if s != []]      # /dev/null, '' to nie zapis
@@ -1572,6 +1611,958 @@ def _analizuj_terminal(polecenie: str, cwd0: Optional[str], dom: str) -> _Analiz
     if a.nieznane:
         a.tylko_odczyt = False
     return a
+
+
+# ------------------------------------------------------------------------------------------------ strażnik kasowania
+# Masowe kasowanie i niszczenie danych blokujemy w każdym trybie: z człowiekiem (pytaj, projekt), bez niego (karta,
+# cron, -q, podagent) i pod YOLO, przed resztą oceny, bez pytania i bez omijania przez command_allowlist albo zgodę
+# „zawsze”. Hermes łapie sam tylko część form (tools/approval_detection.py: detect_dangerous_command pyta o rm -r,
+# find -delete, git reset --hard bez -C, git clean -f, git push --force, python -c; twarda blokada detect_hardline_command
+# tylko dla /, katalogów systemowych, samego ~ i mkfs), a pod YOLO, przy approvals.mode: off, po zgodzie „zawsze” albo
+# zgodzie strażnika smart przepuszcza je bez człowieka. rsync --delete, truncate, git push --mirror, git -C … reset
+# --hard i unlink nie są dla Hermesa groźne wcale.
+
+_NADPISUJACE = frozenset({">", ">|", "&>", ">&"})
+# katalogi, w których nie szukamy zagnieżdżonych repozytoriów git (wyniki budowania i zależności: duże, odtwarzalne)
+_WYNIKI_BUDOWANIA = frozenset({"node_modules", "dist", "build", ".svelte-kit", "__pycache__", ".next", ".nuxt",
+                               ".turbo", ".parcel-cache", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox",
+                               ".nox", "coverage", "htmlcov", "target", ".gradle", ".venv", "venv", ".cache"})
+_SKAN_KATALOGOW = 3000            # ile katalogów najwyżej przeglądamy, szukając repozytorium w kasowanym drzewie
+_SKAN_GLEBOKOSC = 4
+_MAX_ZAGNIEZDZEN = 4              # $(…), bash -c, python -c z os.system… w sobie
+_POWLOKI = frozenset({"sh", "bash", "zsh", "dash", "ksh", "ash", "mksh", "yash"})
+_PYTHON = re.compile(r"^(?:python|pypy|py)(?:\d+(?:\.\d+)*)?w?$")
+_INNE_JEZYKI = {"node": ("-e", "--eval", "-p", "--print"), "bun": ("-e", "--eval", "-p", "--print"),
+                "deno": ("eval",), "perl": ("-e", "-E"), "ruby": ("-e",), "php": ("-r",)}
+_KASUJACE_PROGRAMY = frozenset({"rm", "shred", "unlink"})
+_FORMATUJACE = re.compile(r"^(?:mkfs(?:\..+)?|mke2fs|mkswap|wipefs|blkdiscard|mkntfs|mkdosfs|newfs(?:_.+)?)$")
+# owijki, pod którymi działa inny program: (krótkie opcje z wartością, długie opcje z wartością, ile pozycyjnych
+# argumentów owijki przed programem)
+_OWIJKI: Dict[str, Tuple[str, Tuple[str, ...], int]] = {
+    "sudo": ("ugCDhprtUT", ("--user", "--group", "--chdir", "--host", "--prompt", "--role", "--type", "--other-user",
+                            "--close-from", "--command-timeout"), 0),
+    "doas": ("uC", (), 0), "env": ("uCS", ("--unset", "--chdir", "--split-string"), 0),
+    "nice": ("n", ("--adjustment",), 0), "ionice": ("cnpPu", ("--class", "--classdata", "--pid", "--pgid", "--uid"), 0),
+    "nohup": ("", (), 0), "time": ("fo", ("--format", "--output"), 0), "exec": ("a", (), 0), "builtin": ("", (), 0),
+    "command": ("", (), 0), "stdbuf": ("ioe", ("--input", "--output", "--error"), 0), "setsid": ("", (), 0),
+    "chronic": ("", (), 0), "unbuffer": ("", (), 0), "busybox": ("", (), 0), "catchsegv": ("", (), 0),
+    "timeout": ("sk", ("--signal", "--kill-after"), 1), "flock": ("wE", ("--timeout", "--conflict-exit-code"), 1),
+    "taskset": ("", (), 1), "chrt": ("", (), 1),
+    "xargs": ("adEILnPs", ("--arg-file", "--delimiter", "--eof", "--replace", "--max-lines", "--max-args",
+                           "--max-procs", "--max-chars", "--process-slot-var"), 0),
+}
+_URUCHAMIACZE = frozenset({"uv", "poetry", "pipenv", "pdm", "rye", "hatch"})       # `uv run python -c …`
+_URUCHAMIACZE_Z_WARTOSCIA = frozenset({"--with", "--python", "-p", "--directory", "--project", "--package", "--extra",
+                                       "--group", "--env-file", "--index", "-e", "--env"})
+_FIND_NAZWY = frozenset({"-name", "-iname", "-path", "-ipath", "-wholename", "-iwholename", "-regex", "-iregex",
+                         "-lname", "-ilname"})
+_FIND_FILTRY = frozenset({"-newer", "-anewer", "-cnewer", "-mtime", "-mmin", "-atime", "-amin", "-ctime", "-cmin",
+                          "-size", "-user", "-group", "-uid", "-gid", "-perm", "-links", "-inum", "-samefile", "-used",
+                          "-newermt", "-newerct", "-newerat", "-fstype"})
+_FIND_FILTRY_BEZ_WARTOSCI = frozenset({"-empty", "-nouser", "-nogroup", "-executable", "-readable", "-writable"})
+_FIND_Z_WARTOSCIA = frozenset({"-maxdepth", "-mindepth", "-type", "-xtype", "-printf", "-fprint", "-fprintf",
+                               "-fprint0", "-fls", "-regextype", "-D"})
+_RSYNC_Z_WARTOSCIA = frozenset({
+    "-e", "--rsh", "--rsync-path", "--exclude", "--include", "--filter", "-f", "--files-from", "--exclude-from",
+    "--include-from", "--link-dest", "--compare-dest", "--copy-dest", "--backup-dir", "--suffix", "--chmod", "--chown",
+    "--usermap", "--groupmap", "--log-file", "--log-file-format", "--partial-dir", "--temp-dir", "-T", "--timeout",
+    "--contimeout", "--port", "--password-file", "--bwlimit", "--max-size", "--min-size", "--max-delete",
+    "--out-format", "--info", "--debug", "-B", "--block-size", "-M", "--remote-option", "--iconv", "--checksum-choice",
+    "--compress-choice", "--compress-level", "--skip-compress", "--modify-window", "--sockopts", "--outbuf",
+    "--stop-after", "--stop-at", "--write-batch", "--only-write-batch", "--read-batch", "--protocol", "--address",
+    "--checksum-seed", "--copy-as", "--early-input"})
+# słowa, po których w poleceniu, którego nie umiemy rozebrać, widać kasowanie
+_KASUJACE_RE = re.compile(
+    r"(?<![\w.-])(?:rm|shred|unlink|truncate|wipefs|mkfs(?:\.\w+)?|rmtree|removedirs|rm_rf|rmSync)(?![\w-])"
+    r"|(?<![\w-])-delete\b|--del(?:ete)?\b|\bgit\b[^\n]*?\b(?:clean|reset|push)\b|\bdd\b[^\n]*?\bof=")
+_OBCE_KASOWANIE = re.compile(
+    r"(?:\.(?:rmSync|rmdirSync|rm|rmdir)\b|\brimraf(?:\.sync)?|\bFileUtils\.(?:rm_rf|rm_r|remove_dir|"
+    r"remove_entry(?:_secure)?)|\brmtree|\bremove_tree|\bDeno\.remove)\s*\(?\s*(?:(['\"])([^'\"\n]*)\1)?")
+_PY_SCIEZKI = frozenset({"Path", "PurePath", "PosixPath", "WindowsPath", "PurePosixPath", "PureWindowsPath", "fspath",
+                         "str", "abspath", "realpath", "normpath", "expanduser", "join"})
+_PY_METODY = frozenset({"expanduser", "resolve", "absolute", "as_posix", "__fspath__", "__str__"})
+_PY_POWLOKA = frozenset({"system", "popen", "run", "call", "check_call", "check_output", "Popen", "getoutput",
+                         "getstatusoutput"})
+
+
+@dataclass
+class _Kasowanie:
+    """Jedno usunięcie albo nadpisanie znalezione w poleceniu, kodzie albo zapisie pliku."""
+    forma: str                       # jak kasuje (do komunikatu): rm -rf, find -delete, rmtree (Python), git clean…
+    rodzaj: str                      # usun | zawartosc | filtr | plik | oproznij | repo | urzadzenie | xargs
+    sciezki: Optional[List[str]]     # rzeczywiste ścieżki; None = nie wiadomo (zmienna, $(…), nieznany katalog)
+    pokaz: str                       # argument do komunikatu
+    rekurencyjne: bool = False
+    wymuszone: bool = False
+    pusto: bool = False              # oproznij: po zmianie plik na pewno jest pusty
+    uwaga: str = ""                  # powód, gdy celu nie da się ustalić
+
+
+@dataclass
+class _Krytyczne:
+    """Miejsca, których nie wolno skasować hurtem (klucze do porównań + opis do komunikatu)."""
+    cale: List[Tuple[str, str]]       # chronione w całości: samo miejsce i wszystko nad nim
+    wnetrze: List[Tuple[str, str]]    # chronione całe i w środku: także pojedyncze pliki
+    jarvo: List[Tuple[str, str]]      # dane i kod Jarva: w środku bez kasowania drzew i nadpisywania plików
+    robocze: List[str]                # wyjątki w danych Jarva: skarbiec, misje, katalogi kart, HOME terminala
+    jednorazowe: List[str]            # katalogi tymczasowe i kart: repozytoria git w nich nie są chronione
+    konfig_k: Optional[str] = None
+
+
+def _domy() -> List[str]:
+    """Katalogi domowe: HOME terminala (przy terminal.home_mode: profile w danych Jarva) i właściciela."""
+    wynik: List[str] = []
+    for d in (_dom(), os.path.expanduser("~"), os.environ.get("HOME", ""), os.environ.get("USERPROFILE", "")):
+        r = _realna(d, None) if d else None
+        if r and r not in wynik:
+            wynik.append(r)
+    return wynik
+
+
+def _tymczasowe() -> List[str]:
+    """Katalogi tymczasowe (istniejące), w których klon repozytorium można skasować."""
+    wynik: List[str] = []
+    for d in (tempfile.gettempdir(), os.environ.get("TMPDIR", ""), "/tmp", "/var/tmp"):
+        r = _realna(d, None) if d else None
+        if r and os.path.isdir(r) and r not in wynik:
+            wynik.append(r)
+    return wynik
+
+
+def _krytyczne(m: _Miejsca) -> _Krytyczne:
+    cale: List[Tuple[str, str]] = []
+    wnetrze: List[Tuple[str, str]] = []
+    jarvo: List[Tuple[str, str]] = []
+
+    def dodaj(lista: List[Tuple[str, str]], sciezka: Any, opis: str) -> None:
+        k = _k_realny(sciezka)
+        if k and all(k != x for x, _ in lista):
+            lista.append((k, opis))
+
+    for d in _domy():
+        dodaj(cale, d, "katalog domowy")
+        for nazwa in ("dev", "strony", "jarvo-testy"):
+            dodaj(cale, os.path.join(d, nazwa), f"~/{nazwa}")
+        for nazwa in (".ssh", ".config", ".phoneuse"):
+            dodaj(wnetrze, os.path.join(d, nazwa), f"~/{nazwa}")
+        for sciezka in (os.path.join(d, ".local", "share", "jarvo"), os.path.join(d, ".jarvo")):
+            dodaj(jarvo, sciezka, "dane Jarva")
+    if os.environ.get("LOCALAPPDATA"):
+        dodaj(jarvo, os.path.join(os.environ["LOCALAPPDATA"], "Jarvo"), "dane Jarva")
+    home = _hermes_home()
+    korzen = _korzen_danych(home)
+    for sciezka in (home, korzen, os.environ.get("JARVO_ROOT"), os.environ.get("HERMES_SRC")):
+        dodaj(jarvo, sciezka, "dane Jarva")
+    ws = korzen / "jarvo" / "workspaces"
+    for sciezka, opis in ((m.wiedza, "skarbiec wiedzy"), (m.misje, "misje"), (ws, "katalogi robocze kart")):
+        dodaj(cale, sciezka, opis)
+    for r, _ in list(jarvo):                     # układ instalacji (<korzeń>/dane/jarvo/…), gdy HERMES_HOME jest inny
+        for dane in (os.path.join(r, "dane", "jarvo"), os.path.join(r, "jarvo")):
+            for nazwa, opis in (("knowledge", "skarbiec wiedzy"), ("missions", "misje"),
+                                ("workspaces", "katalogi robocze kart")):
+                if os.path.isdir(os.path.join(dane, nazwa)):
+                    dodaj(cale, os.path.join(dane, nazwa), opis)
+    robocze = [k for k, _ in cale if any(_wewnatrz(k, j) for j, _ in jarvo)]
+    jednorazowe = [k for k in (_k_realny(t) for t in _tymczasowe()) if k] + \
+        [k for k, opis in cale if opis == "katalogi robocze kart"]
+    return _Krytyczne(cale, wnetrze, jarvo, robocze, jednorazowe, m.konfig_k)
+
+
+def _korzen_repo(p: str) -> Optional[str]:
+    """Katalog repozytorium git, w którym leży p (z `.git` w środku albo repozytorium bez drzewa roboczego)."""
+    d = p
+    for _ in range(64):
+        if os.path.lexists(os.path.join(d, ".git")):
+            return d
+        if os.path.isfile(os.path.join(d, "HEAD")) and os.path.isdir(os.path.join(d, "objects")):
+            return d
+        wyzej = os.path.dirname(d)
+        if wyzej == d:
+            return None
+        d = wyzej
+    return None
+
+
+def _repo_w_srodku(katalog: str) -> Optional[str]:
+    """Pierwsze repozytorium git w drzewie (bez dowiązań i wyników budowania); przegląd ograniczony, więc w ogromnym
+    drzewie może go nie znaleźć."""
+    kolejka = collections.deque([(katalog, 0)])
+    odwiedzone = 0
+    while kolejka:
+        d, gl = kolejka.popleft()
+        try:
+            with os.scandir(d) as it:
+                wpisy = list(it)
+        except OSError:
+            continue
+        if any(e.name == ".git" for e in wpisy):
+            return d
+        for e in wpisy:
+            try:
+                if e.name in _WYNIKI_BUDOWANIA or not e.is_dir(follow_symlinks=False):
+                    continue
+            except OSError:
+                continue
+            odwiedzone += 1
+            if odwiedzone > _SKAN_KATALOGOW:
+                return None
+            if gl + 1 <= _SKAN_GLEBOKOSC:
+                kolejka.append((e.path, gl + 1))
+    return None
+
+
+def _nazwa_programu(nazwa: str) -> str:
+    prog = re.split(r"[\\/]", nazwa)[-1].lower()
+    for rozsz in (".exe", ".cmd", ".bat", ".com"):
+        if prog.endswith(rozsz) and len(prog) > len(rozsz):
+            return prog[: -len(rozsz)]
+    return prog
+
+
+def _caly_glob(tekst: str) -> bool:
+    """Glob, który bierze wszystko w katalogu (`*`, `.*`, `*.*`, `?*`) jako ostatni składnik ścieżki."""
+    skl = [c for c in re.split(r"[\\/]+", tekst) if c]
+    idx = next((i for i, c in enumerate(skl) if any(ch in c for ch in _ODGLOB)), None)
+    return (idx is not None and idx == len(skl) - 1
+            and re.fullmatch("\\.?[\ue000\ue001]+(?:\\.[\ue000\ue001]+)?", skl[idx]) is not None)
+
+
+def _lacze(plaski: str, cwd: Optional[str], dom: str) -> Optional[str]:
+    """Ścieżka samego dowiązania (bez rozwiązania ostatniego składnika), gdy cel nim jest: rm kasuje wtedy łącze."""
+    nazwa = os.path.basename(plaski.rstrip("/\\"))
+    if nazwa in ("", ".", ".."):
+        return None
+    rodzic = _realna(os.path.dirname(plaski.rstrip("/\\")) or ".", cwd, powloka=True, dom=dom)
+    if rodzic is None:
+        return None
+    sciezka = os.path.join(rodzic, nazwa)
+    return sciezka if os.path.islink(sciezka) else None
+
+
+def _dodaj_cel(wynik: List[_Kasowanie], arg: "_Arg", cwd: Optional[str], dom: str, forma: str, rodzaj: str, *,
+               rek: bool = False, wym: bool = False, pusto: bool = False) -> None:
+    """Cel kasowania (słowo po rozwinięciu) → _Kasowanie z rzeczywistymi ścieżkami; glob: dopasowania, a glob na
+    wszystko w katalogu (albo ze 100 trafieniami) to też skasowanie zawartości tego katalogu."""
+    t = arg.tekst
+    if t is None:
+        wynik.append(_Kasowanie(forma, rodzaj, None, arg.pokaz, rek, wym, pusto))
+        return
+    if t == "" or t in _URZADZENIA_PUSTE:
+        return
+    if any(ch in t for ch in _ODGLOB):
+        sc = _sciezki_celu(t, cwd, dom)
+        if sc is None:
+            wynik.append(_Kasowanie(forma, rodzaj, None, arg.pokaz, rek, wym, pusto))
+            return
+        baza, trafienia = sc[0], sc[1:]
+        if rodzaj in ("usun", "zawartosc", "filtr") and (_caly_glob(t) or len(trafienia) >= _MAX_DOPASOWAN):
+            wynik.append(_Kasowanie(forma, "zawartosc", [baza], arg.pokaz, True, wym))
+        if trafienia:
+            wynik.append(_Kasowanie(forma, rodzaj, trafienia, arg.pokaz, rek, wym, pusto))
+        return
+    plaski = arg.plaski or ""
+    if rodzaj in ("usun", "plik") and not plaski.endswith(("/", "\\")):
+        lacze = _lacze(plaski, cwd, dom)
+        if lacze:
+            wynik.append(_Kasowanie(forma, "plik", [lacze], arg.pokaz))
+            return
+    r = _realna(plaski, cwd, powloka=True, dom=dom)
+    wynik.append(_Kasowanie(forma, rodzaj, [r] if r else None, arg.pokaz, rek, wym, pusto))
+
+
+def _kasowanie_nierozebrane(tekst: str, powod: str, wynik: List[_Kasowanie]) -> None:
+    """Polecenie albo kod, którego nie rozbieramy: jeśli widać w nim kasowanie, to kasowanie o nieznanych celach."""
+    if _KASUJACE_RE.search(tekst):
+        wynik.append(_Kasowanie("kasowanie", "usun", None, _poczatek(tekst, 80), True, True,
+                                uwaga=f"{powod}, a widać w nim kasowanie"))
+
+
+def _zagniezdzone_polecenie(tekst: str, cwd: Optional[str], dom: str, wynik: List[_Kasowanie], glebokosc: int) -> None:
+    if glebokosc >= _MAX_ZAGNIEZDZEN:
+        _kasowanie_nierozebrane(tekst, "polecenie zagnieżdżone zbyt głęboko", wynik)
+        return
+    _analizuj_terminal(tekst, cwd, dom, wynik, glebokosc + 1)
+
+
+def _kasowania_podstawien(p: _Polecenie, cwd: Optional[str], dom: str, wynik: List[_Kasowanie],
+                          glebokosc: int) -> None:
+    """Polecenia w $(…), `…`, <(…) i >(…) (także w przypisaniach i celach przekierowań) wykonują się naprawdę."""
+    for slowo in list(p.slowa) + [s for _, s in p.przekierowania]:
+        for rodzaj, t in slowo.czesci:
+            if rodzaj != "x":
+                continue
+            if t.startswith(("$(", "<(", ">(")):
+                _zagniezdzone_polecenie(t[2:-1], cwd, dom, wynik, glebokosc)
+            elif t.startswith("`"):
+                _zagniezdzone_polecenie(t[1:-1], cwd, dom, wynik, glebokosc)
+
+
+def _kod_z_wejscia(p: _Polecenie) -> List[str]:
+    """Treść heredoców i here-stringów (<<<) polecenia: dla python3, bash i node to kod."""
+    wynik = list(p.heredoki)
+    for op, slowo in p.przekierowania:
+        if op == "<<<":
+            t = slowo.zwykle()
+            if t is not None:
+                wynik.append(t)
+    return wynik
+
+
+def _bez_tresci(slowa: List[_Slowo], zmienne: Dict[str, Optional[str]], dom: str) -> bool:
+    """Czy przekierowanie `>` zapisze pusty plik (`> f`, `: > f`, `true > f`, `cat /dev/null > f`, `echo -n > f`)."""
+    if not slowa:
+        return True
+    nazwa = _plaski(slowa[0], zmienne, dom)
+    if nazwa is None:
+        return False
+    prog = _nazwa_programu(nazwa)
+    reszta = [_plaski(s, zmienne, dom) for s in slowa[1:]]
+    if prog in (":", "true", "false"):
+        return True
+    if prog == "cat":
+        return bool(reszta) and all(r in _URZADZENIA_PUSTE for r in reszta)
+    if prog == "echo":
+        return bool(reszta) and all(r == "-n" for r in reszta)
+    if prog == "printf":
+        return all(r == "" for r in reszta)
+    return False
+
+
+def _pomin_opcje(argi: List["_Arg"], krotkie: str, dlugie: Tuple[str, ...], *, przypisania: bool = False) -> int:
+    """Indeks pierwszego argumentu po opcjach owijki (z wartościami opcji, `--` i przypisaniami env)."""
+    i = 0
+    while i < len(argi):
+        t = argi[i].plaski
+        if t is None:
+            return i
+        if przypisania and _PRZYPISANIE.match(t):
+            i += 1
+            continue
+        if t == "--":
+            return i + 1
+        if not t.startswith("-") or t == "-":
+            return i
+        if t.startswith("--"):
+            i += 2 if (t in dlugie and "=" not in t) else 1
+            continue
+        i += 1
+        for j, litera in enumerate(t[1:], start=1):
+            if litera in krotkie:
+                if not t[j + 1:]:
+                    i += 1
+                break
+    return i
+
+
+def _bez_owijek(prog: str, argi: List["_Arg"], cwd: Optional[str], dom: str
+                ) -> Tuple[str, List["_Arg"], Optional[str], bool]:
+    """Program spod sudo, env, nice, timeout, xargs, `uv run`…: (program, argumenty, katalog, czy spod xargs)."""
+    xargs = False
+    for _ in range(8):
+        if prog in _URUCHAMIACZE and argi and argi[0].plaski == "run":
+            i = 1
+            while i < len(argi) and (argi[i].plaski or "").startswith("-"):
+                i += 2 if argi[i].plaski in _URUCHAMIACZE_Z_WARTOSCIA else 1
+        elif prog in _OWIJKI:
+            if prog == "command" and argi and argi[0].plaski in ("-v", "-V"):
+                return "", [], cwd, xargs
+            krotkie, dlugie, pozycyjne = _OWIJKI[prog]
+            if prog == "env":
+                for j, a in enumerate(argi):         # env -C katalog: program rusza gdzie indziej
+                    if a.plaski in ("-C", "--chdir") or (a.plaski or "").startswith("--chdir="):
+                        cwd = None
+            xargs = xargs or prog == "xargs"
+            i = _pomin_opcje(argi, krotkie, dlugie, przypisania=prog in ("env", "sudo", "doas")) + pozycyjne
+        else:
+            break
+        if i >= len(argi) or argi[i].plaski is None:
+            return "", [], cwd, xargs
+        prog, argi = _nazwa_programu(argi[i].plaski), argi[i + 1:]
+    return prog, argi, cwd, xargs
+
+
+def _rm(argi: List["_Arg"], cwd: Optional[str], dom: str, wynik: List[_Kasowanie]) -> None:
+    """rm: flagi w dowolnej kolejności, także po celach (GNU) i w długiej postaci; -r/-R/--recursive, -f/--force."""
+    rek = wym = po_kreskach = False
+    cele: List[_Arg] = []
+    for a in argi:
+        t = a.plaski
+        if t is None or po_kreskach or t == "-" or not t.startswith("-"):
+            cele.append(a)
+        elif t == "--":
+            po_kreskach = True
+        elif t.startswith("--"):
+            rek = rek or t == "--recursive"
+            wym = wym or t == "--force"
+        else:
+            rek = rek or "r" in t or "R" in t
+            wym = wym or "f" in t
+    forma = "rm -" + ("r" if rek else "") + ("f" if wym else "") if (rek or wym) else "rm"
+    for a in cele:
+        _dodaj_cel(wynik, a, cwd, dom, forma, "usun" if rek else "plik", rek=rek, wym=wym)
+
+
+def _czysty_wzorzec(v: Optional[str]) -> bool:
+    """Wzorzec find, który pasuje do wszystkiego (`*`, `.*`, `*.*`; dla -regex `.*`)."""
+    return v is not None and (re.fullmatch(r"\.?[*?]+(?:\.[*?]+)?", v) is not None or v in (".*", ".+", "^.*$"))
+
+
+def _find(argi: List["_Arg"], cwd: Optional[str], dom: str, wynik: List[_Kasowanie]) -> None:
+    """find … -delete / -exec rm: bez zawężenia (nazwa, czas, rozmiar) kasuje całe drzewo od punktu startu."""
+    i = 0
+    while i < len(argi) and argi[i].plaski in ("-H", "-L", "-P") or (i < len(argi)
+                                                                     and (argi[i].plaski or "").startswith("-O")):
+        i += 1
+    starty: List[_Arg] = []
+    while i < len(argi) and not ((argi[i].plaski or "x")[0] in "-(!)" or argi[i].plaski == ","):
+        starty.append(argi[i])
+        i += 1
+    wyr = argi[i:]
+    kasuje = rek = filtr = negacja = False
+    j = 0
+    while j < len(wyr):
+        t = wyr[j].plaski
+        if t == "-delete":
+            kasuje = True
+        elif t in ("-exec", "-execdir", "-ok", "-okdir"):
+            k = j + 1
+            while k < len(wyr) and wyr[k].plaski not in (";", "+"):
+                k += 1
+            polecenie = wyr[j + 1:k]
+            nazwa = _nazwa_programu(polecenie[0].plaski or "") if polecenie else ""
+            tekst = " ".join(a.plaski or a.pokaz for a in polecenie)
+            if nazwa in _KASUJACE_PROGRAMY or (nazwa in _POWLOKI and _KASUJACE_RE.search(tekst)):
+                kasuje = True
+                rek = rek or any(re.fullmatch(r"-[a-zA-Z]*[rR][a-zA-Z]*|--recursive", a.plaski or "")
+                                 for a in polecenie[1:])
+            j = k
+        elif t in ("!", "-not", "-o", "-or"):
+            negacja = True
+        elif t in _FIND_NAZWY:
+            filtr = filtr or not _czysty_wzorzec(wyr[j + 1].plaski if j + 1 < len(wyr) else None)
+            j += 1
+        elif t in _FIND_FILTRY:
+            filtr = True
+            j += 1
+        elif t in _FIND_FILTRY_BEZ_WARTOSCI:
+            filtr = True
+        elif t in _FIND_Z_WARTOSCIA:
+            j += 1
+        j += 1
+    if not kasuje:
+        return
+    rodzaj = "filtr" if filtr and not negacja else "usun"
+    forma = "find -delete" if not rek else "find -exec rm -r"
+    for a in starty or [_Arg(".", ".")]:
+        _dodaj_cel(wynik, a, cwd, dom, forma, rodzaj, rek=True, wym=True)
+
+
+def _rsync(argi: List["_Arg"], cwd: Optional[str], dom: str, wynik: List[_Kasowanie]) -> None:
+    """rsync --delete (--del, --delete-*): kasuje w katalogu docelowym wszystko, czego nie ma w źródle."""
+    teksty = [a.plaski for a in argi]
+    if not any(t and (t == "--del" or t.startswith("--delete")) for t in teksty):
+        return
+    poz: List[_Arg] = []
+    i = 0
+    while i < len(argi):
+        t = teksty[i]
+        if t is not None and t.startswith("-"):
+            i += 2 if (t in _RSYNC_Z_WARTOSCIA and "=" not in t) else 1
+            continue
+        poz.append(argi[i])
+        i += 1
+    if len(poz) < 2:
+        return
+    cel, zrodla = poz[-1], poz[:-1]
+    if cel.plaski is not None and (re.match(r"^[^/\\]*:", cel.plaski) and not re.match(r"^[A-Za-z]:[\\/]",
+                                                                                         cel.plaski)):
+        return                                    # host:ścieżka, rsync://: kasuje na innym komputerze
+    for z in zrodla:
+        zt = z.plaski
+        if cel.tekst is None or zt is None or zt.endswith(("/", "\\", "/.")) or zt == ".":
+            efekt = _Arg(cel.tekst, cel.pokaz)
+        else:
+            efekt = _Arg(cel.tekst.rstrip("/\\") + "/" + re.split(r"[\\/:]", zt.rstrip("/\\"))[-1], cel.pokaz)
+        _dodaj_cel(wynik, efekt, cwd, dom, "rsync --delete", "zawartosc", rek=True, wym=True)
+
+
+def _git(argi: List["_Arg"], cwd: Optional[str], dom: str, wynik: List[_Kasowanie]) -> None:
+    """git clean -f, git reset --hard, git push --force/-f/--mirror/+gałąź (także z -C, --git-dir, --work-tree)."""
+    sciezka, i, n = cwd, 0, len(argi)
+    while i < n:
+        t = argi[i].plaski
+        if t is None:
+            sciezka, i = None, i + 1
+            continue
+        if t == "-C":
+            x = argi[i + 1].plaski if i + 1 < n else None
+            sciezka = _realna(x, sciezka, powloka=True, dom=dom) if x and sciezka else None
+            i += 2
+            continue
+        if t.startswith(("--git-dir", "--work-tree")):
+            if "=" in t:
+                x, i = t.split("=", 1)[1], i + 1
+            else:
+                x, i = (argi[i + 1].plaski if i + 1 < n else None), i + 2
+            r = _realna(x, sciezka, powloka=True, dom=dom) if x else None
+            if r and t.startswith("--git-dir") and os.path.basename(r) == ".git":
+                r = os.path.dirname(r)
+            sciezka = r
+            continue
+        if t in ("-c", "--namespace", "--exec-path", "--config-env", "--super-prefix"):
+            i += 2
+            continue
+        if t.startswith("-"):
+            i += 1
+            continue
+        break
+    if i >= n:
+        return
+    pod, reszta = argi[i].plaski, [a.plaski for a in argi[i + 1:]]
+    krotkie = [x for x in reszta if x and x.startswith("-") and not x.startswith("--")]
+    forma = ""
+    if pod == "clean":
+        sila = None in reszta or "--force" in reszta or any("f" in x[1:] for x in krotkie)
+        proba = "--dry-run" in reszta or any("n" in x[1:] for x in krotkie)
+        forma = "git clean -f" if sila and not proba else ""
+    elif pod == "reset":
+        forma = "git reset --hard" if any(x and len(x) >= 3 and "--hard".startswith(x) for x in reszta) else ""
+    elif pod == "push":
+        if "--mirror" in reszta:
+            forma = "git push --mirror"
+        elif any(x and (x.startswith("--force") or (x.startswith("+") and len(x) > 1)) for x in reszta) or \
+                any("f" in x[1:] for x in krotkie):
+            forma = "git push --force"
+    if forma:
+        wynik.append(_Kasowanie(forma, "repo", [sciezka] if sciezka else None, forma, True, True,
+                                uwaga="nie wiadomo, w którym repozytorium (katalog ze zmiennej albo po `cd -`)"))
+
+
+def _kasowania_polecenia(prog: str, argi: List["_Arg"], p: _Polecenie, cwd: Optional[str], dom: str,
+                         wynik: List[_Kasowanie], glebokosc: int) -> None:
+    """Usunięcia i nadpisania jednego prostego polecenia (po rozwinięciu słów), także spod owijek i w kodzie."""
+    prog, argi, cwd, xargs = _bez_owijek(prog, argi, cwd, dom)
+    if not prog:
+        return
+    if xargs and (prog in _KASUJACE_PROGRAMY or prog in _POWLOKI):
+        wynik.append(_Kasowanie(f"xargs {prog}", "xargs", None, _poczatek(" ".join(a.pokaz for a in argi), 80)))
+    teksty = [a.plaski for a in argi]
+    if prog == "rm":
+        _rm(argi, cwd, dom, wynik)
+    elif prog == "unlink":
+        for a in argi:
+            if not (a.plaski or "").startswith("-"):
+                _dodaj_cel(wynik, a, cwd, dom, "unlink", "plik")
+    elif prog == "shred":
+        poz, _, _ = _opcje(argi, "ns", {"--iterations", "--size", "--random-source"})
+        for a in poz:
+            if (a.plaski or "").startswith("/dev/") and a.plaski not in _URZADZENIA_PUSTE:
+                wynik.append(_Kasowanie("shred", "urzadzenie", None, a.pokaz))
+            else:
+                _dodaj_cel(wynik, a, cwd, dom, "shred", "oproznij", pusto=True)
+    elif prog == "find":
+        _find(argi, cwd, dom, wynik)
+    elif prog == "rsync":
+        _rsync(argi, cwd, dom, wynik)
+    elif prog == "git":
+        _git(argi, cwd, dom, wynik)
+    elif prog == "truncate":
+        poz, wart, _ = _opcje(argi, "sr", {"--size", "--reference"})
+        rozmiar = [x.plaski for x in wart.get("s", []) + wart.get("--size", [])]
+        if any(r and r.startswith("+") for r in rozmiar):
+            return                                 # truncate -s +N wydłuża plik
+        pusto = any(r is not None and re.fullmatch(r"0+[a-zA-Z]*", r) for r in rozmiar)
+        for a in poz:
+            _dodaj_cel(wynik, a, cwd, dom, "truncate", "oproznij", pusto=pusto)
+    elif prog == "dd":
+        for a in argi:
+            if a.plaski and a.plaski.startswith("of="):
+                cel = _Arg(a.tekst[3:] if a.tekst else None, a.pokaz)
+                if (cel.plaski or "").startswith("/dev/") and cel.plaski not in _URZADZENIA_PUSTE:
+                    wynik.append(_Kasowanie("dd of=", "urzadzenie", None, a.pokaz))
+                else:
+                    _dodaj_cel(wynik, cel, cwd, dom, "dd of=", "oproznij")
+    elif _FORMATUJACE.match(prog):
+        wynik.append(_Kasowanie(prog, "urzadzenie", None, _poczatek(" ".join(a.pokaz for a in argi), 80)))
+    elif prog == "tee":
+        if not any(t is not None and (t == "--append" or re.fullmatch(r"-[a-z]*a[a-z]*", t)) for t in teksty):
+            for a in argi:
+                if not (a.plaski or "").startswith("-"):
+                    _dodaj_cel(wynik, a, cwd, dom, "tee", "oproznij")
+    elif prog == "cp":
+        poz, wart, _ = _opcje(argi, *_OPCJE_Z_WARTOSCIA["cp"])
+        katalog = wart.get("t", []) + wart.get("--target-directory", [])
+        zrodla = poz if katalog else poz[:-1]
+        if any(a.plaski in _URZADZENIA_PUSTE for a in zrodla) and (katalog or len(poz) >= 2):
+            for a in katalog or poz[-1:]:
+                _dodaj_cel(wynik, a, cwd, dom, "cp /dev/null", "oproznij", pusto=True)
+    elif prog in _POWLOKI:
+        i = 0
+        while i < len(argi):
+            t = argi[i].plaski
+            if t is None:
+                return
+            if t.startswith("-") and not t.startswith("--") and "c" in t[1:]:
+                if i + 1 < len(argi):
+                    kod = argi[i + 1]
+                    if kod.plaski is None:
+                        _kasowanie_nierozebrane(kod.pokaz, "polecenie z nieznaną treścią ($…)", wynik)
+                    else:
+                        _zagniezdzone_polecenie(kod.plaski, cwd, dom, wynik, glebokosc)
+                return
+            if not t.startswith(("-", "+")):
+                return                             # skrypt z pliku: nie czytamy go
+            i += 2 if t in ("-o", "+o", "-O", "+O", "--rcfile", "--init-file") else 1
+        for tresc in _kod_z_wejscia(p):
+            _zagniezdzone_polecenie(tresc, cwd, dom, wynik, glebokosc)
+    elif prog == "eval":
+        if any(t is None for t in teksty):
+            _kasowanie_nierozebrane(" ".join(a.pokaz for a in argi), "eval z nieznaną treścią ($…)", wynik)
+        else:
+            _zagniezdzone_polecenie(" ".join(t for t in teksty if t is not None), cwd, dom, wynik, glebokosc)
+    elif _PYTHON.match(prog):
+        i = 0
+        while i < len(argi):
+            t = argi[i].plaski
+            if t is None or t == "-m" or not t.startswith("-"):
+                return                             # moduł, skrypt z pliku albo nieznany argument
+            if t == "-":
+                break
+            if re.fullmatch(r"-[a-zA-Z]*c", t):
+                if i + 1 < len(argi):
+                    kod = argi[i + 1]
+                    if kod.plaski is None:
+                        _kasowanie_nierozebrane(kod.pokaz, "kod Pythona z nieznaną treścią ($…)", wynik)
+                    else:
+                        _kasowania_pythona(kod.plaski, cwd, dom, wynik, glebokosc)
+                return
+            i += 2 if t in ("-X", "-W", "-Q") else 1
+        for tresc in _kod_z_wejscia(p):
+            _kasowania_pythona(tresc, cwd, dom, wynik, glebokosc)
+    elif prog in _INNE_JEZYKI:
+        flagi = _INNE_JEZYKI[prog]
+        kody = [k for k in _kod_z_wejscia(p)]
+        for i, a in enumerate(argi[:-1]):
+            t = a.plaski
+            if t is not None and (t in flagi or (prog in ("perl", "ruby") and re.fullmatch(r"-[a-zA-Z]*[eE]", t))):
+                kody.append(argi[i + 1].plaski if argi[i + 1].plaski is not None else argi[i + 1].pokaz)
+        for kod in kody:
+            _kasowania_obcego_kodu(kod, prog, cwd, dom, wynik)
+
+
+def _kasowania_obcego_kodu(kod: str, prog: str, cwd: Optional[str], dom: str, wynik: List[_Kasowanie]) -> None:
+    """node/bun/deno/perl/ruby/php: fs.rmSync, rimraf, rmtree, remove_tree, FileUtils.rm_rf z dosłowną ścieżką."""
+    for m in _OBCE_KASOWANIE.finditer(kod):
+        sciezka = m.group(2) if m.group(1) else None
+        _dodaj_cel(wynik, _Arg(sciezka, _maskuj(m.group(0))[:80]), cwd, dom, f"{prog}: {m.group(0).split('(')[0].strip()}",
+                   "usun", rek=True, wym=True)
+
+
+def _py_nazwa(n: Any) -> str:
+    """Nazwa z kropkami (os.path.join, shutil.rmtree); "" gdy u podstawy nie stoi nazwa."""
+    czesci: List[str] = []
+    while isinstance(n, ast.Attribute):
+        czesci.append(n.attr)
+        n = n.value
+    if not isinstance(n, ast.Name):
+        return ""
+    czesci.append(n.id)
+    return ".".join(reversed(czesci))
+
+
+class _PyWartosci:
+    """Wartości napisów w kodzie Pythona bez jego uruchamiania: stałe, f-napisy ze znanymi zmiennymi, Path(…) / „x”,
+    os.path.join, expanduser, Path.home(), os.environ["HOME"], tempfile.mkdtemp(). Reszta = None (nie wiadomo)."""
+
+    def __init__(self, cwd: Optional[str], dom: str) -> None:
+        self.cwd, self.dom = cwd, dom
+        tmp = _tymczasowe()
+        self.tmp = os.path.join(tmp[0] if tmp else tempfile.gettempdir(), "jarvo-zgody-tmp")
+        self.zm: Dict[str, Optional[str]] = {}
+
+    def _env(self, nazwa: Optional[str]) -> Optional[str]:
+        if nazwa in ("HOME", "USERPROFILE"):
+            return self.dom
+        if nazwa in ("TMPDIR", "TEMP", "TMP"):
+            return self.tmp
+        if nazwa == "PWD":
+            return self.cwd
+        return os.environ.get(nazwa) if nazwa and _ZMIENNE_ZNANE.match(nazwa) else None
+
+    def zbierz(self, drzewo: Any) -> None:
+        """Przypisania w kolejności z kodu; nazwa przypisana dwa razy różnie, w pętli albo jako parametr = None."""
+        wiazania: List[Tuple[int, int, str, Any, bool]] = []      # (linia, kolumna, nazwa, wyrażenie, tymczasowy)
+
+        def nazwy(cel: Any) -> List[str]:
+            return [w.id for w in ast.walk(cel) if isinstance(w, ast.Name)]
+
+        for w in ast.walk(drzewo):
+            poz = (getattr(w, "lineno", 0), getattr(w, "col_offset", 0))
+            if isinstance(w, ast.Assign):
+                for cel in w.targets:
+                    for nz in nazwy(cel):
+                        wiazania.append((*poz, nz, w.value if isinstance(cel, ast.Name) else None, False))
+            elif isinstance(w, (ast.AnnAssign, ast.NamedExpr)) and isinstance(w.target, ast.Name):
+                wiazania.append((*poz, w.target.id, w.value, False))
+            elif isinstance(w, (ast.AugAssign, ast.For, ast.AsyncFor, ast.comprehension)):
+                for nz in nazwy(w.target):
+                    wiazania.append((*poz, nz, None, False))
+            elif isinstance(w, ast.withitem) and w.optional_vars is not None:
+                tymczasowy = isinstance(w.context_expr, ast.Call) and \
+                    _py_nazwa(w.context_expr.func).endswith("TemporaryDirectory")
+                for nz in nazwy(w.optional_vars):
+                    wiazania.append((getattr(w.context_expr, "lineno", 0), 0, nz, None, tymczasowy))
+            elif isinstance(w, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+                for a in w.args.args + w.args.posonlyargs + w.args.kwonlyargs + \
+                        [x for x in (w.args.vararg, w.args.kwarg) if x]:
+                    wiazania.append((*poz, a.arg, None, False))
+            elif isinstance(w, ast.ExceptHandler) and w.name:
+                wiazania.append((*poz, w.name, None, False))
+        for _, _, nz, wyr, tymczasowy in sorted(wiazania, key=lambda x: (x[0], x[1])):
+            wartosc = self.tmp if tymczasowy else (self.wartosc(wyr) if wyr is not None else None)
+            self.zm[nz] = wartosc if (nz not in self.zm or self.zm[nz] == wartosc) else None
+
+    def wartosc(self, n: Any, gl: int = 0) -> Optional[str]:
+        if n is None or gl > 30:
+            return None
+        w = lambda x: self.wartosc(x, gl + 1)          # noqa: E731
+        if isinstance(n, ast.Constant):
+            return n.value if isinstance(n.value, str) else None
+        if isinstance(n, ast.JoinedStr):
+            czesci = []
+            for v in n.values:
+                x = str(v.value) if isinstance(v, ast.Constant) else (w(v.value) if isinstance(v, ast.FormattedValue)
+                                                                       else None)
+                if x is None:
+                    return None
+                czesci.append(x)
+            return "".join(czesci)
+        if isinstance(n, ast.Name):
+            return self.zm.get(n.id)
+        if isinstance(n, ast.BinOp) and isinstance(n.op, (ast.Div, ast.Add)):
+            a, b = w(n.left), w(n.right)
+            if a is None or b is None:
+                return None
+            return os.path.join(a, b) if isinstance(n.op, ast.Div) else a + b
+        if isinstance(n, ast.Subscript) and _py_nazwa(n.value) in ("os.environ", "environ"):
+            return self._env(w(n.slice))
+        if isinstance(n, ast.Attribute) and n.attr == "parent":
+            x = w(n.value)
+            return os.path.dirname(x.rstrip("/\\")) if x else None
+        if not isinstance(n, ast.Call):
+            return None
+        f, pelna = n.func, _py_nazwa(n.func)
+        argi = [w(a) for a in n.args]
+        if isinstance(f, ast.Attribute) and f.attr in _PY_METODY and not n.args:
+            return w(f.value)                           # Path(…).expanduser(), p.resolve()
+        if isinstance(f, ast.Attribute) and f.attr == "joinpath":
+            baza = w(f.value)
+            return None if baza is None or None in argi else os.path.join(baza, *argi)
+        if pelna in ("Path.home", "pathlib.Path.home"):
+            return self.dom
+        if pelna in ("Path.cwd", "pathlib.Path.cwd", "os.getcwd"):
+            return self.cwd
+        if pelna in ("os.environ.get", "environ.get", "os.getenv", "getenv") and argi:
+            return self._env(argi[0]) or (argi[1] if len(argi) > 1 else None)
+        if pelna.rsplit(".", 1)[-1] in ("mkdtemp", "gettempdir") and pelna.startswith(("tempfile.", "mkdtemp",
+                                                                                         "gettempdir")):
+            return self.tmp
+        ostatnia = pelna.rsplit(".", 1)[-1] if pelna else ""
+        if ostatnia in _PY_SCIEZKI:
+            if not n.args:
+                return self.cwd if ostatnia.endswith("Path") else None
+            return None if None in argi else os.path.join(*argi)
+        return None
+
+    def polecenie(self, n: Any) -> Optional[str]:
+        """Polecenie powłoki z os.system(…)/subprocess.run(…): napis albo lista (nieznany element → $(:))."""
+        if isinstance(n, (ast.List, ast.Tuple)):
+            czesci = [self.wartosc(e) for e in n.elts]
+            return " ".join(shlex.quote(c) if c is not None else "$(:)" for c in czesci) if czesci else None
+        return self.wartosc(n)
+
+
+def _kasowania_pythona(kod: str, cwd: Optional[str], dom: str, wynik: List[_Kasowanie], glebokosc: int) -> None:
+    """shutil.rmtree, os.removedirs, os.remove/unlink, Path.unlink i os.system/subprocess w kodzie Pythona."""
+    try:
+        drzewo = ast.parse(kod)
+    except (SyntaxError, ValueError, RecursionError, MemoryError):
+        _kasowanie_nierozebrane(kod, "kodu Pythona nie da się rozebrać", wynik)
+        return
+    ocena = _PyWartosci(cwd, dom)
+    ocena.zbierz(drzewo)
+    drzewa = 0
+    for w in ast.walk(drzewo):
+        if not isinstance(w, ast.Call):
+            continue
+        f, pelna = w.func, _py_nazwa(w.func)
+        ostatnia = f.attr if isinstance(f, ast.Attribute) else (f.id if isinstance(f, ast.Name) else "")
+        arg0 = w.args[0] if w.args else next((k.value for k in w.keywords if k.arg in ("path", "name", "args", "cmd")),
+                                             None)
+        pokaz = _maskuj(ast.unparse(arg0) if arg0 is not None else "?")[:80]
+        if ostatnia in ("rmtree", "removedirs"):
+            drzewa += 1
+            _dodaj_cel(wynik, _Arg(ocena.wartosc(arg0), pokaz), cwd, dom, f"{ostatnia} (Python)", "usun", rek=True,
+                       wym=True)
+        elif pelna in ("os.remove", "os.unlink", "remove", "unlink"):
+            sciezka = ocena.wartosc(arg0)
+            if sciezka:
+                _dodaj_cel(wynik, _Arg(sciezka, pokaz), cwd, dom, f"{pelna} (Python)", "plik")
+        elif isinstance(f, ast.Attribute) and f.attr == "unlink":
+            sciezka = ocena.wartosc(f.value)
+            if sciezka:
+                _dodaj_cel(wynik, _Arg(sciezka, sciezka), cwd, dom, "Path.unlink (Python)", "plik")
+        elif ostatnia in _PY_POWLOKA and arg0 is not None:
+            polecenie = ocena.polecenie(arg0)
+            if polecenie:
+                _zagniezdzone_polecenie(polecenie, cwd, dom, wynik, glebokosc)
+    if not drzewa and re.search(r"\b(?:rmtree|removedirs)\b", kod):
+        wynik.append(_Kasowanie("rmtree (Python)", "usun", None, "rmtree", True, True,
+                                uwaga="rmtree albo removedirs pod inną nazwą, więc nie wiadomo, co skasuje"))
+
+
+def _powod_kasowania(ks: _Kasowanie, kr: _Krytyczne) -> Optional[str]:
+    """Dlaczego to kasowanie jest masowe albo niszczy chronione dane; None = wolno."""
+    if ks.rodzaj == "urzadzenie":
+        return f"`{ks.pokaz}`: formatowanie albo zapis wprost na dysk niszczy cały system plików"
+    if ks.rodzaj == "xargs":
+        return f"{ks.forma} bierze cele z wejścia (potoku), więc nie wiadomo, co skasuje"
+    if ks.sciezki is None:
+        if ks.rekurencyjne or ks.wymuszone or ks.rodzaj in ("zawartosc", "filtr", "repo"):
+            return f"`{ks.pokaz}`: " + (ks.uwaga or "nie da się ustalić, co skasuje (zmienna, $(…), glob albo nieznany "
+                                                   "katalog), a kasowanie jest rekurencyjne albo wymuszone (-r/-f)")
+        return None
+    for p in ks.sciezki:
+        powod = _powod_sciezki(ks, p, kr)
+        if powod:
+            return powod
+    return None
+
+
+def _powod_sciezki(ks: _Kasowanie, p: str, kr: _Krytyczne) -> Optional[str]:
+    k = _klucz(p)
+    nad = lambda lista: next((opis for r, opis in lista if _wewnatrz(r, k)), None)     # noqa: E731  k = r albo nad r
+    w = lambda lista: next((opis for r, opis in lista if _wewnatrz(k, r)), None)       # noqa: E731
+    roboczy = any(_wewnatrz(k, r) for r in kr.robocze)
+    jednorazowy = any(_wewnatrz(k, r) for r in kr.jednorazowe)
+    pokaz = _pokaz(p)
+    if ks.rodzaj == "repo":
+        repo = _korzen_repo(p)
+        if repo is None or any(_wewnatrz(_klucz(repo), r) for r in kr.jednorazowe):
+            return None
+        return f"{ks.forma} w repozytorium {_pokaz(repo)} niszczy niezatwierdzoną pracę albo historię"
+    if ks.rodzaj in ("oproznij", "plik"):
+        if not os.path.lexists(p) or (ks.rodzaj == "oproznij" and not os.path.isfile(p)):
+            return None
+        nazwa = _skladnik(os.path.basename(k))
+        opis = w(kr.wnetrze) or ("dane Jarva" if ks.rodzaj == "oproznij" and not roboczy and w(kr.jarvo) else None)
+        if not opis and nazwa in CHRONIONE_PLIKI:
+            opis = os.path.basename(p)
+        if ks.rodzaj == "oproznij" and not opis:
+            if ".git" in _skladniki(k, None)[:-1]:
+                opis = "wnętrze .git"
+            elif ks.pusto and nazwa in PLIKI_INSTRUKCJI:
+                opis = f"plik instrukcji {os.path.basename(p)}"
+            elif kr.konfig_k and k == kr.konfig_k:
+                opis = "config.yaml Hermesa"
+        if not opis:
+            return None
+        co = "usunie" if ks.rodzaj == "plik" else "opróżni albo nadpisze"
+        return f"`{ks.forma}` {co} chroniony plik {pokaz} ({opis})"
+    opis = nad(kr.wnetrze)
+    if opis:
+        return f"`{ks.forma}` skasuje {pokaz}, a w nim {opis} (klucze, tokeny, konfiguracja)"
+    opis = w(kr.wnetrze)
+    if opis:
+        return f"`{ks.forma}` skasuje {pokaz} w {opis} (klucze, tokeny, konfiguracja)"
+    opis = nad(kr.jarvo)
+    if opis:
+        return f"`{ks.forma}` skasuje {pokaz}, a w nim {opis} (profile, sesje, kod Jarva)"
+    if not roboczy and w(kr.jarvo):
+        return f"`{ks.forma}` skasuje {pokaz} w danych Jarva (profile, sesje, kod Jarva)"
+    if ks.rodzaj == "filtr":
+        return None                     # zawężone find w projekcie, skarbcu albo misjach: wolno
+    opis = nad(kr.cale)
+    if opis:
+        cale = any(r == k for r, _ in kr.cale)
+        return (f"`{ks.forma}` skasuje {'całe chronione miejsce' if cale else 'katalog nad chronionym miejscem'} "
+                f"{pokaz} ({opis})")
+    if jednorazowy or not os.path.isdir(p):
+        return None
+    if _skladnik(os.path.basename(k)) == ".git":
+        return f"`{ks.forma}` skasuje historię repozytorium {pokaz}"
+    if os.path.lexists(os.path.join(p, ".git")):
+        return f"`{ks.forma}` skasuje całe repozytorium git {pokaz} (projekt z historią)"
+    zagniezdzone = _repo_w_srodku(p)
+    if zagniezdzone:
+        return f"`{ks.forma}` skasuje {pokaz}, a w środku jest repozytorium git {_pokaz(zagniezdzone)}"
+    return None
+
+
+def _rada_kasowania(kasowania: List[_Kasowanie], m: _Miejsca) -> str:
+    rady: List[str] = []
+    formy = {k.forma for k in kasowania}
+    if any(f.startswith("git ") for f in formy):
+        rady.append("przy git zamiast reset --hard i clean użyj `git stash` albo nowej gałęzi, a zamiast push --force "
+                    "zwykłego push albo nowej gałęzi")
+    if any(k.rodzaj == "oproznij" for k in kasowania):
+        rady.append("chroniony plik zmieniaj konkretnymi liniami (patch) albo dopisuj (`>>`), nie opróżniaj go")
+    if any(k.sciezki is None for k in kasowania):
+        rady.append("podaj jawne ścieżki (bez zmiennych, $(…), xargs i globów spoza projektu)")
+    rady.append("skasuj konkretne pliki albo wyniki budowania w projekcie (node_modules, dist, .svelte-kit, "
+                "__pycache__) po ścieżce")
+    if m.bez_czl == "kanban":
+        rady.append("a jeśli naprawdę trzeba usunąć całość, zatrzymaj kartę: kanban_block(kind=\"needs_input\", "
+                    "reason=\"potrzebne kasowanie …: zrobi je właściciel\")")
+    elif m.bez_czl == "podagent":
+        rady.append("a jeśli naprawdę trzeba usunąć całość, opisz to w wyniku: właściciel zrobi to sam")
+    else:
+        rady.append("a jeśli naprawdę trzeba usunąć całość, poproś właściciela, żeby zrobił to sam")
+    return "; ".join(rady) + "."
+
+
+def _straznik_kasowania(narzedzie: str, kasowania: List[_Kasowanie], m: _Miejsca) -> Optional[Dict[str, str]]:
+    """Blokada masowego kasowania i niszczenia danych: w każdym trybie, z człowiekiem i pod YOLO, bez pytania."""
+    if not kasowania:
+        return None
+    kr = _krytyczne(m)
+    zle = [(k, p) for k in kasowania for p in [_powod_kasowania(k, kr)] if p]
+    if not zle:
+        return None
+    powody = "; ".join(dict.fromkeys(p for _, p in zle[:3])) + (f" (i {len(zle) - 3} innych)" if len(zle) > 3 else "")
+    kontekst = KONTEKSTY.get(m.bez_czl or "", "pełny (YOLO)" if m.yolo else f"tryb {m.tryb} z człowiekiem")
+    logger.warning("jarvo-zgody: zablokowane kasowanie (%s, %s): %s", narzedzie, kontekst, _maskuj(powody)[:600])
+    return _blok(f"masowe kasowanie albo zniszczenie danych ({narzedzie}): {_maskuj(powody)}. Ta blokada działa w "
+                 "każdym trybie (z człowiekiem, na karcie, w rutynie i pod YOLO) i nie da się jej zatwierdzić. "
+                 f"Co zrobić: {_rada_kasowania([k for k, _ in zle], m)}")
+
+
+def _kasowania_zapisu(narzedzie: str, args: Dict[str, Any], baza: Optional[str], dom: str) -> List[_Kasowanie]:
+    """write_file z pustą treścią, patch zastępujący (prawie) całą treść pustą i V4A `*** Delete File:`."""
+    wynik: List[_Kasowanie] = []
+    p = args.get("path")
+    sciezka = _realna(p, baza) if isinstance(p, str) and p.strip() else None
+    if narzedzie == "write_file":
+        tresc = args.get("content")
+        if sciezka and isinstance(tresc, str) and not tresc.strip():
+            wynik.append(_Kasowanie("write_file z pustą treścią", "oproznij", [sciezka], p, pusto=True))
+        return wynik
+    stare, nowe = args.get("old_string"), args.get("new_string")
+    if sciezka and isinstance(stare, str) and stare.strip() and (nowe is None or (isinstance(nowe, str)
+                                                                                  and not nowe.strip())):
+        try:
+            rozmiar = os.path.getsize(sciezka)
+        except OSError:
+            rozmiar = -1
+        if rozmiar >= 0 and len(stare.encode("utf-8", "surrogatepass")) * 2 >= rozmiar:
+            wynik.append(_Kasowanie("patch usuwający treść", "oproznij", [sciezka], p, pusto=True))
+    latka = args.get("patch")
+    if isinstance(latka, str):
+        for nazwa in re.findall(r"^\*\*\*\s*Delete\s+File:\s*(.+?)\s*$", latka.replace("\r\n", "\n"), re.M):
+            r = _realna(nazwa, baza)
+            if r:
+                wynik.append(_Kasowanie("patch *** Delete File", "oproznij", [r], nazwa, pusto=True))
+    return wynik
 
 
 # ------------------------------------------------------------------------------------------------ decyzje
@@ -1683,7 +2674,11 @@ def _terminal(args: Dict[str, Any], m: _Miejsca, task_id: str) -> Optional[Dict[
     if isinstance(wd, str) and wd.strip():
         baza = _realna(wd, baza)
     dom = _dom()
-    a = _analizuj_terminal(polecenie, baza, dom)
+    kasowania: List[_Kasowanie] = []
+    a = _analizuj_terminal(polecenie, baza, dom, kasowania)
+    straznik = _straznik_kasowania("terminal", kasowania, m)
+    if straznik:
+        return straznik   # masowe kasowanie: w każdym trybie, przed zgodami Hermesa i command_allowlist
     werdykty: List[_Werdykt] = []
     for pokaz, sciezki in a.cele:
         if sciezki is None:
@@ -1784,6 +2779,10 @@ def _decyzja(tool_name: str, args: Dict[str, Any], task_id: str) -> Optional[Dic
     bez_czl = bez_czlowieka()
     tryb, _ = tryb_zgod()
     m = _miejsca(tryb, bez_czl, yolo and not bez_czl)
+    if tool_name in ("write_file", "patch"):
+        straznik = _straznik_kasowania(tool_name, _kasowania_zapisu(tool_name, args, _baza(task_id), _dom()), m)
+        if straznik:
+            return straznik
     if tool_name == "write_file":
         p = args.get("path")
         return _zapis_plikow(tool_name, [p] if isinstance(p, str) and p.strip() else [], m, task_id)
@@ -1791,6 +2790,14 @@ def _decyzja(tool_name: str, args: Dict[str, Any], task_id: str) -> Optional[Dic
         return _zapis_plikow(tool_name, sciezki_latki(args), m, task_id)
     if tool_name == "terminal":
         return _terminal(args, m, task_id)
+    kasowania: List[_Kasowanie] = []
+    if tool_name == "execute_code":
+        _kasowania_pythona(str(args.get("code") or ""), _baza(task_id), _dom(), kasowania, 0)
+    elif tool_name == "process_manage" and isinstance(args.get("data"), str):
+        _analizuj_terminal(args["data"], None, _dom(), kasowania)       # wejście procesu w tle (np. powłoki)
+    straznik = _straznik_kasowania(tool_name, kasowania, m)
+    if straznik:
+        return straznik
     if tool_name == "execute_code":
         if bez_czl:
             return _blok(f"execute_code to dowolny kod, a {KONTEKSTY.get(bez_czl, bez_czl)} działa bez człowieka. "
