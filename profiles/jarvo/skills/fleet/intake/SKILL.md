@@ -1,17 +1,17 @@
 ---
 name: intake
 description: "Każda nowa wiadomość: sklasyfikuj i wybierz ścieżkę."
-version: 1.2.0
+version: 1.3.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
     tags: [fleet, intake, routing]
-    related_skills: [wywiad, dispatch-playbook, decision-queue, mission-ledger, roster]
+    related_skills: [wywiad, dispatch-playbook, decision-queue, mission-ledger, roster, skrzynka-linkow]
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-11-05"
+    reviewed: "2026-11-11"
 ---
 
 # Intake: przyjęcie zlecenia
@@ -23,6 +23,7 @@ Używaj przy **każdej** nowej wiadomości od użytkownika, zanim cokolwiek zlec
 | Typ | Rozpoznanie | Ścieżka |
 |---|---|---|
 | **Rozmowa** | opinia, rada, szybki fakt z wiedzy, żart, plan dnia | odpowiadasz sam, bez kart |
+| **Link** | sam link (wpis X, film YouTube, strona), czasem z krótkim komentarzem | skill `skrzynka-linkow`: pobierasz, oceniasz i zapisujesz w skarbcu bez pytania; komentarz zlecający pracę idzie potem dalej tą tabelą |
 | **Status** | „co się dzieje?”, „jak idzie X?” | czytasz `@@MISSIONS_DIR@@/INDEX.md` + `kanban_list`, raport w stylu efektów |
 | **Decyzja** | odpowiedź na pytania z kolejki („1 ok, 2: B”) | skill `decision-queue` |
 | **Zlecenie jednego agenta** | jedno wyraźne zadanie w zakresie jednego agenta | 1 karta (skill `dispatch-playbook`, wariant „pojedyncze”) |

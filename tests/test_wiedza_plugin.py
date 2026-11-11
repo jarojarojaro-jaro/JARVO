@@ -480,15 +480,17 @@ def test_licznik_generacji_pod_blokada_miedzyprocesowa(tmp_path, monkeypatch):
 
 
 def test_schemat_tylko_dla_jarva(srodowisko, tmp_path, monkeypatch):
-    """Narzędzie `schemat` (SVG → PNG) dostaje tylko Jarvo; wykonawcy mają same narzędzia skarbca."""
+    """Narzędzia `schemat` (SVG → PNG) i `pobierz_link` (skrzynka linków) dostaje tylko Jarvo; wykonawcy mają same
+    narzędzia skarbca."""
     root, _home, _sk, p = srodowisko
     assert "schemat" not in {s["name"] for s in p.get_tool_schemas()}
     assert "nieznane narzędzie" in p.handle_tool_call("schemat", {"svg": "<svg/>", "tytul": "x"})
+    assert "nieznane narzędzie" in p.handle_tool_call("pobierz_link", {"linki": ["https://example.com"]})
     (root / "profiles" / "jarvo").mkdir(parents=True)
     j = pl.SkarbiecProvider()
     j.initialize("sesja-j", hermes_home=str(root / "profiles" / "jarvo"), platform="telegram", agent_context="primary")
     nazwy = [s["name"] for s in j.get_tool_schemas()]
-    assert nazwy[-1] == "schemat" and len(nazwy) == 5
+    assert nazwy[-2:] == ["schemat", "pobierz_link"] and len(nazwy) == 6
     monkeypatch.setenv("JARVO_CHROMIUM", str(tmp_path / "nie-ma"))
     monkeypatch.delenv("HERMES_HOME", raising=False)
     monkeypatch.delenv("JARVO_SCHEMATY_DIR", raising=False)
@@ -508,7 +510,10 @@ def test_awaria_schematu_nie_zabiera_skarbca(srodowisko, tmp_path, monkeypatch):
         raise SyntaxError("zepsuty schemat.py")
     monkeypatch.setattr(pl, "_schemat", zepsuty)
     nazwy = [s["name"] for s in j.get_tool_schemas()]
-    assert nazwy == ["wiedza_szukaj", "wiedza_czytaj", "wiedza_zapisz", "wiedza_orzeczenie"]
+    assert nazwy == ["wiedza_szukaj", "wiedza_czytaj", "wiedza_zapisz", "wiedza_orzeczenie", "pobierz_link"]
+    monkeypatch.setattr(pl, "_linki", zepsuty)
+    assert "niedostępne" in json.loads(j.handle_tool_call("pobierz_link", {"linki": ["https://example.com"]}))["error"]
+    assert [s["name"] for s in j.get_tool_schemas()][4:] == []
     assert "niedostępne" in json.loads(j.handle_tool_call("schemat", {"svg": "<svg/>", "tytul": "x"}))["error"]
     assert "wyniki" in json.loads(j.handle_tool_call("wiedza_szukaj", {"zapytanie": "marka"}))
     # nieudany import nie zostaje w sys.modules jako pusty moduł

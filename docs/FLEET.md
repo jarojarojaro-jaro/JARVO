@@ -11,7 +11,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 
 | Agent | Main prompt | Workflowy własne | Skille zewnętrzne | Skrypty | Evals |
 |---|---|---|---|---|---|
-| `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [15 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 3 (`writing-for-agents`, mattpocock; wspólne `konwersja-plikow` i `odczyt-ekranu`) | patrol, brief, przegląd, raport floty, liczby floty, świeżość, linter kontraktu, prosty polski, księga lekcji, poczekalnia skilli, wgrywanie stron | [28](../evals/jarvo/scenarios.yaml) |
+| `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [16 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 3 (`writing-for-agents`, mattpocock; wspólne `konwersja-plikow` i `odczyt-ekranu`) | patrol, brief, przegląd, raport floty, liczby floty, świeżość, linter kontraktu, prosty polski, księga lekcji, poczekalnia skilli, wgrywanie stron, skrzynka linków | [28](../evals/jarvo/scenarios.yaml) |
 | `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [8 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 18 (Hermes, marketingskills, wspólne `transkrypcja-filmu`, `konwersja-plikow`, `odczyt-ekranu` i `ostrozna-przegladarka`) | search_fanout, extract, sources (rejestr cytowań), fakty (brief do filmu) | [16](../evals/jarvo-sherlock/scenarios.yaml) |
 | `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [11 w `skills/web/`](../profiles/jarvo-web/skills/web) | 62 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólne `graf-kodu`, `izometria`, `warsztat-3d`, `konwersja-plikow` i `odczyt-ekranu`) | audit, szybki_audyt, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [20](../evals/jarvo-web/scenarios.yaml) |
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [7 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 28 (marketingskills, Anthropic, Hermes, impeccable, lemo-wake, wspólne `hooki`, `izometria`, `konwersja-plikow` i `odczyt-ekranu`) | render_html, check_media, lemo_wake | [15](../evals/jarvo-studio/scenarios.yaml) |
@@ -108,7 +108,10 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
   `complete` albo `request_changes` z konkretnymi uwagami,
 - raport: jedno podsumowanie z linkami do wyników, ryzykami i decyzjami do podjęcia,
 - wgrywanie stron właściciela na hosting (`wgrywanie-stron`, `wgraj.py`): plan z odciskiem, Twoje „tak” dla tego
-  odcisku, wgranie z kopią na serwerze i weryfikacją sumami, cofnięcie do tagu.
+  odcisku, wgranie z kopią na serwerze i weryfikacją sumami, cofnięcie do tagu,
+- skrzynka linków (`skrzynka-linkow`, narzędzie `pobierz_link`, `pobierz_link.py`): wpis X, film YouTube albo strona
+  od Ciebie (zwykle z Telegrama) → treść (fxtwitter, `yt-dlp -J`, trafilatura; film 360p i transkrypcja tylko gdy
+  trzeba), krótka ocena, szkic w skarbcu z tagami tematów i 2–4 zdania odpowiedzi; wysłanie linku to polecenie zapisu.
 
 **Nie robi:** żadnej pracy dziedzinowej. Nie pisze stron, nie robi researchu, nie projektuje grafik.
 
@@ -130,13 +133,14 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 `mission-ledger` (dziennik misji i raport końcowy), `decision-queue`, `sdlc-review` (sędzia; rubryki agentów
 `references/rubric-<agent>.md` generowane z ich `quality/rubric.md`), `patrol`, `daily-brief`, `weekly-review`,
 `onboarding-interview`, `fleet-improvement`, [A2] `wgrywanie-stron` (strony właściciela na hosting po SSH: plan,
-zgoda na odcisk, wgranie z kopią i weryfikacją sumami, cofnięcie; `wgraj.py`), [T] `roster` (generowany z `fleet.yaml`: kto istnieje i co umie);
+zgoda na odcisk, wgranie z kopią i weryfikacją sumami, cofnięcie; `wgraj.py`), `skrzynka-linkow` (link od właściciela:
+pobranie narzędziem `pobierz_link`, ocena, szkic w skarbcu zawsze; `pobierz_link.py`), [T] `roster` (generowany z `fleet.yaml`: kto istnieje i co umie);
 [Z] `writing-for-agents` (mattpocock/skills: warsztat pisania SOUL i skilli, dla `fleet-improvement`), wspólny
 `konwersja-plikow` (zamiana pliku od ręki, bez karty dla snajpera) i `odczyt-ekranu` (tekst z obrazu; na czacie bez
 terminala, więc odczyt robi Ręka).
 
 **Toolsety:** na Telegramie `kanban`, `memory`, `file`, `web`, `session_search`, `clarify`, `todo`, `skills`, `cronjob`,
-bez terminala; narzędzie `schemat` (SVG → PNG w rozmowie) daje mu wtyczka `jarvo-wiedza` razem z narzędziami skarbca; w czacie HQ (`api_server`) to samo bez `clarify`. Pracownik-sędzia (CLI) ma dodatkowo `terminal`, `browser` i `vision` do weryfikacji wyników.
+bez terminala; narzędzia `schemat` (SVG → PNG w rozmowie) i `pobierz_link` (skrzynka linków: skrypt profilu w venvie narzędzi) daje mu wtyczka `jarvo-wiedza` razem z narzędziami skarbca; w czacie HQ (`api_server`) to samo bez `clarify`. Pracownik-sędzia (CLI) ma dodatkowo `terminal`, `browser` i `vision` do weryfikacji wyników.
 Pracy dziedzinowej nie wykonuje (zasada SOUL, nie brak narzędzi).
 
 ---

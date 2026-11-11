@@ -189,6 +189,9 @@ Przejęte z kontraktu firstmate i dostosowane do nas:
 - **Schemat zamiast ściany tekstu** (skill `schemat`): przepływ, warstwy, oś czasu albo porównanie Jarvo rysuje sam
   w rozmowie (SVG → PNG narzędziem `schemat`, kilka sekund, bez kart) i dodaje 1–3 zdania. Film wyjaśniający to
   osobna karta dla Wideografa (wzorzec „Wyjaśnij mi filmem”).
+- **Skrzynka linków** (skill `skrzynka-linkow`): link z telefonu (wpis X, film YouTube, strona), także z komentarzem,
+  Jarvo pobiera narzędziem `pobierz_link`, ocenia (co to, czemu ważne dla Twoich firm, temat, działanie) i zawsze
+  zapisuje szkic w skarbcu z tagiem `skrzynka-linkow`; odpowiada 2–4 zdaniami. Film i transkrypcja tylko, gdy trzeba.
 - **Prosty polski** (skill `prosty-polski`, wzór: ASD-STE100 z dokumentacji lotniczej „w 80%”): zdanie do 20–25 słów,
   akapit do 6 zdań, jedna czynność w zdaniu, strona czynna, zwykłe słowa zamiast urzędowych (słownik w skillu),
   ostrzeżenie: najpierw co zrobić, potem ryzyko (⛔ strata pieniędzy, danych, konta; ⚠ gorszy wynik). Te same limity liczy

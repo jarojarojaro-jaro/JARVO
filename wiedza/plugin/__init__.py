@@ -13,7 +13,8 @@ profilu ma `memory.provider: jarvo-wiedza`). Co robi:
   - hak `kanban_task_completed`: raporty z out/ zamkniętej karty do zrodla/karty/ i szkic (0 tokenów),
   - hak `on_kanban_dispatch_tick` (brama, co 30 s): kompilacja skrzynki osobnym procesem, gdy pora (tik_kompilacji;
     natywnie od startu robi to nadzorca, tu droga bramy bez nadzorcy),
-  - narzędzie `schemat` (schemat.py) tylko dla agentów z SCHEMAT_DLA (Jarvo, rozmowa z właścicielem): SVG → PNG w rozmowie.
+  - narzędzia tylko dla agentów z SCHEMAT_DLA (Jarvo, rozmowa z właścicielem, bez terminala): `schemat` (schemat.py,
+    SVG → PNG w rozmowie) i `pobierz_link` (linki.py: link od właściciela → treść do analizy, skill `skrzynka-linkow`).
     Hermes ładuje tę wtyczkę jako dostawcę pamięci (wyłączną), więc narzędzia idą przez get_tool_schemas, nie register_tool.
 Agenci nie piszą notatek: notatki, INDEX i huby pisze kompilacja (etap 4) i `wiedza.py`.
 """
@@ -38,7 +39,8 @@ from agent.memory_provider import MemoryProvider, is_trivial_prompt, spawn_conte
 
 logger = logging.getLogger(__name__)
 _HERE = Path(__file__).resolve().parent
-# narzędzie `schemat` (SVG → PNG w rozmowie) mają tylko ci agenci: Jarvo rozmawia z właścicielem, wykonawcy robią grafiki sami
+# narzędzia `schemat` (SVG → PNG w rozmowie) i `pobierz_link` (skrzynka linków) mają tylko ci agenci: Jarvo rozmawia
+# z właścicielem bez terminala, wykonawcy robią grafiki i research sami
 SCHEMAT_DLA = {"jarvo"}
 NAZWA = "jarvo-wiedza"
 ZADANIE_AUX = "jarvo_wiedza"          # auxiliary.jarvo_wiedza.model = poziom frontier (scripts/build.py)
@@ -94,13 +96,20 @@ def _schemat():
     return _modul("jarvo_schemat", "schemat.py")
 
 
-def _schemat_schema() -> List[Dict[str, Any]]:
-    """Schemat narzędzia `schemat`; jego awaria (brak pliku, błąd w kodzie) nie zabiera narzędzi skarbca."""
-    try:
-        return [_schemat().SCHEMA]
-    except Exception as exc:
-        logger.warning("jarvo-wiedza: narzędzie schemat niedostępne: %s", exc)
-        return []
+def _linki():
+    return _modul("jarvo_linki", "linki.py")
+
+
+def _narzedzia_jarva() -> List[Dict[str, Any]]:
+    """Schematy narzędzi Jarva (`schemat`, `pobierz_link`); awaria jednego modułu (brak pliku, błąd w kodzie) zabiera
+    tylko jego narzędzie, nie narzędzia skarbca ani drugie."""
+    schematy = []
+    for nazwa, modul in (("schemat", _schemat), ("pobierz_link", _linki)):
+        try:
+            schematy.append(modul().SCHEMA)
+        except Exception as exc:
+            logger.warning("jarvo-wiedza: narzędzie %s niedostępne: %s", nazwa, exc)
+    return schematy
 
 
 def _dane_bez_hermesa() -> str:
@@ -442,7 +451,7 @@ class SkarbiecProvider(MemoryProvider):
 
     # ---- narzędzia
     def get_tool_schemas(self) -> List[Dict[str, Any]]:
-        return self._narzedzia_skarbca() + (_schemat_schema() if self._agent in SCHEMAT_DLA else [])
+        return self._narzedzia_skarbca() + (_narzedzia_jarva() if self._agent in SCHEMAT_DLA else [])
 
     def _narzedzia_skarbca(self) -> List[Dict[str, Any]]:
         return [
@@ -483,6 +492,11 @@ class SkarbiecProvider(MemoryProvider):
                 return _schemat().obsluz(args, hermes_home=self._home or None)
             except Exception as exc:
                 return json.dumps({"error": f"Narzędzie schemat niedostępne: {exc}"[:300]}, ensure_ascii=False)
+        if tool_name == "pobierz_link" and self._agent in SCHEMAT_DLA:   # linki nie potrzebują skarbca
+            try:
+                return _linki().obsluz(args, hermes_home=self._home or None)
+            except Exception as exc:
+                return json.dumps({"error": f"Narzędzie pobierz_link niedostępne: {exc}"[:300]}, ensure_ascii=False)
         sk = self._sk()
         if sk is None:
             return json.dumps({"error": "skarbiec wiedzy niedostępny (brak katalogu)"}, ensure_ascii=False)

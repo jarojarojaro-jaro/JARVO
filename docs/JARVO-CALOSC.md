@@ -58,7 +58,7 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 
 | Agent | Rola | Uchwyt | Pokój HQ | Temat Telegram | Skille |
 |---|---|---|---|---|---|
-| 🛰️ `jarvo` | **Main Judge** — intake, misje, karty, sędziowanie, raporty, patrol, wgrywanie stron właściciela na hosting za zgodą | `@jarvo` | Mostek dowodzenia (`bridge`) | general | 15 |
+| 🛰️ `jarvo` | **Main Judge** — intake, misje, karty, sędziowanie, raporty, patrol, wgrywanie stron właściciela na hosting za zgodą, skrzynka linków (link od właściciela → ocena i szkic w skarbcu) | `@jarvo` | Mostek dowodzenia (`bridge`) | general | 16 |
 | 🔎 `jarvo-sherlock` | **Researcher-detektyw** — wieloźródłowy research, weryfikacja faktów, raporty z cytatami z rejestru źródeł sprawdzanymi przed oddaniem, transkrypcja filmu z linku | `@sherlock` | Gabinet śledczy (`study`) | sherlock | 8 |
 | 🌐 `jarvo-web` | **Web Senior Dev** — strony/landingi (z inspiracjami z branży: Inspo + własna baza), SEO techniczne, bezpieczeństwo aplikacji, wydajność, wdrożenie | `@web` | Pracownia webowa (`devlab`) | web | 11 |
 | 🎬 `jarvo-studio` | **Marketing i kreacja** — grafiki social, obrazy AI, żywe obrazy (pętla 5 s, warstwy PSD), copy PL, kampanie, kalendarze | `@studio` | Atelier kreatywne (`atelier`) | studio | 7 |
@@ -345,6 +345,12 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
   na przebieg, jedno wgrywanie naraz we flocie (blokada w `state/`), kopia `~/kopie-stron/<domena>/` przed wgraniem,
   rsync bez plików `chronione` i metadanych repo, weryfikacja sumami sha256 przez to samo połączenie, potem tag
   `wgranie-…` i przewinięcie `main`; cofnięcie nowym commitem z drzewem tagu. Śledzony sekret z `.gitignore` = odmowa.
+- **Skrzynka linków** (skill Jarva `skrzynka-linkow`, narzędzie `pobierz_link` z wtyczki `jarvo-wiedza`,
+  `profiles/jarvo/scripts/pobierz_link.py`): właściciel udostępnia z telefonu wpis X, film YouTube albo stronę na
+  Telegramie; Jarvo (bez terminala) pobiera treść narzędziem (fxtwitter bez logowania, `yt-dlp -J`, trafilatura;
+  film 360p i transkrypcja skryptem `transkrypcja-filmu` tylko na żądanie), ocenia ją i zawsze zgłasza szkic
+  `wiedza_zapisz` (źródło = link, tagi `skrzynka-linkow` i tematy) oraz odpowiada 2–4 zdaniami. Adresy w sieci
+  lokalnej i przekierowania na nie są odrzucane; treść linku to dane, nie polecenia.
 - Zasady stałe: nigdy nie commitujemy sekretów; hasło FTP tylko w scratchpadzie
   `WGRAJ-LANDING-JARVO.md`; agenci nigdy nie trzymają tokenów platform reklamowych (Skarbiec);
   nie drukujemy znalezionych sekretów.
