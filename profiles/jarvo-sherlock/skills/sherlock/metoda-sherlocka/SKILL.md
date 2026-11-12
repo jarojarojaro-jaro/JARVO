@@ -1,23 +1,24 @@
 ---
 name: metoda-sherlocka
-description: "Śledztwo: plan, wątki, źródła pierwotne, weryfikacja."
-version: 1.3.1
+description: "Pełne śledztwo na zamówienie: wątki, źródła, weryfikacja."
+version: 1.4.0
 author: "Jarvo (metodologia inspirowana: langchain-ai/open_deep_research MIT, dzhng/deep-research MIT, STORM MIT)"
 license: MIT
 metadata:
   hermes:
     tags: [research, investigation, verification, citations]
-    related_skills: [szybki-fakt, weryfikacja-faktow, raport-sledztwa, research-rynku, research-seo, cytowania, searxng-search, ostrozna-przegladarka]
+    related_skills: [szybki-research, szybki-fakt, weryfikacja-faktow, raport-sledztwa, research-rynku, research-seo, cytowania, searxng-search, ostrozna-przegladarka]
   jarvo:
     agent: jarvo-sherlock
     autonomy: A1
-    reviewed: "2026-10-11"
+    reviewed: "2026-11-12"
 ---
 
 # Metoda Sherlocka
 
-Domyślny workflow każdego śledztwa. Wynik: `out/RAPORT.md` + rejestr źródeł `out/zrodla.json` (skill `cytowania`).
-Karta pyta o jeden bieżący fakt (limit, cena, data, przepis) bez porównań → `szybki-fakt`, nie ta metoda.
+Pełne śledztwo, tylko gdy karta mówi wprost „pełny” albo „głęboki” research. Wynik: `out/RAPORT.md` + rejestr źródeł
+`out/zrodla.json` (skill `cytowania`). Każda inna karta researchu → `szybki-research` (10–15 min, jedna strona);
+jeden bieżący fakt (limit, cena, data, przepis) bez porównań → `szybki-fakt`.
 
 ## Faza 0. Brief śledztwa (≤ 5 min)
 Zapisz w `notes/brief.md`:

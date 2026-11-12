@@ -580,6 +580,22 @@ def test_telefon_confirm_pod_yolo_block(sr, monkeypatch):
     assert akcja(hak("mcp__phone__screen", phone="first")) == "block"   # Operator pod YOLO: telefon jak computer_use
 
 
+# ------------------------------------------------------------------------------------------------ werdykty na kartach
+
+@pytest.mark.parametrize("narzedzie", sorted(z.WERDYKTY_KART))
+def test_rozmowa_nie_ocenia_karty_w_toku(sr, monkeypatch, narzedzie):
+    statusy = {"t_w_toku": "running", "t_ocena": "review", "t_stoi": "blocked", "t_gotowa": "ready"}
+    monkeypatch.setattr(z, "_status_karty", lambda tid, tablica: statusy.get(tid))
+    for tid in ("t_w_toku", "t_ocena"):
+        w = hak(narzedzie, task_id=tid, summary="Zaakceptowane")
+        assert akcja(w) == "block" and tid in w["message"] and "[SILENT]" in w["message"]
+    assert hak(narzedzie, task_id="t_stoi", summary="Przeniesione do t_9") is None   # przeniesienie zablokowanej karty
+    assert hak(narzedzie, task_id="t_gotowa") is None
+    assert hak(narzedzie, task_id="t_nieznana") is None                               # brak statusu: bez blokady
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "t_ocena")                                # pracownik karty (tor review)
+    assert hak(narzedzie, task_id="t_ocena", summary="Zaakceptowane") is None
+
+
 
 # ------------------------------------------------------------------------------------------------ błąd = blokada
 

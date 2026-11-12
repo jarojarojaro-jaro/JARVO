@@ -74,6 +74,10 @@ security:
 kanban:
   auto_subscribe_on_create: true
 
-# Branding terminala: skórka Jarvo (branding/skin-jarvo.yaml)
+# Branding terminala: skórka Jarvo (branding/skin-jarvo.yaml). Telegram bez komunikatów pośrednich („Sprawdzam…”
+# przy każdym kroku): 12.11 w jednej rozmowie poszło ich ok. 110; właściciel dostaje odpowiedź, wynik i pytania.
 display:
   skin: jarvo
+  platforms:
+    telegram:
+      interim_assistant_messages: false

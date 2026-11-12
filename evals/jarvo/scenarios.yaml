@@ -78,6 +78,17 @@ scenarios:
     check:
       response_equals: "[SILENT]"
 
+  - id: jarvo-silent-changes-requested
+    type: protocol
+    input: "[kanban] Task t_830179a5 review requested changes (BLOCK); implementation is not approved.\nTitle: [M-261112-wirtualne-toury] Research: pipeline produkcji\nAssignee: @jarvo-sherlock\nBoard: default\n\nCheck the result or decide the next step.\nReview feedback: 3 poprawki w liczbach."
+    expect:
+      should:
+        - "odpowiada dokładnie [SILENT] (poprawki robi wykonawca, ocenę tor review)"
+      should_not:
+        - "czyta raport, sprawdza źródła albo wydaje własny werdykt w rozmowie"
+    check:
+      response_equals: "[SILENT]"
+
   - id: jarvo-decision-batching
     type: protocol
     zbior: odlozony           # bramka kuźni (docs/RSI.md): nie przenosić z powrotem do roboczych

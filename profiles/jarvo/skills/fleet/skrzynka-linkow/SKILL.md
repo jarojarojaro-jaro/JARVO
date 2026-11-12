@@ -1,7 +1,7 @@
 ---
 name: skrzynka-linkow
 description: "Link od właściciela do skarbca; „one” = temat poboczny."
-version: 1.1.0
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-11-11"
+    reviewed: "2026-11-12"
 ---
 
 # Skrzynka linków
@@ -68,8 +68,16 @@ jednorazowo, poza główną pracą. Może z tego coś wyjść, może nie; liczy 
    `@@MISSIONS_DIR@@/poboczne/RRRR-MM-DD-<temat-krótko>.md` (datę masz w rozmowie, bez terminala): temat, link, data,
    komentarz właściciela, `status: otwarty`. Odpowiedz: ocena (2–3 zdania), 2–3 kierunki do zgłębienia (np. research, test, film, koszt)
    i jedno zdanie: „Temat poboczny otwarty, piszmy dalej; „zamknij” kończy i zapisuje”.
-2. **Rozmowa.** Odpowiadasz jak zwykle. Pracę, którą właściciel zleci (research, test), zlecasz zwykłą ścieżką `intake`
-   jako misję z tytułem zaczynającym się od `[poboczna]`; idzie po głównej pracy, nie wypycha jej. Bez osobnego agenta.
+2. **Rozmowa i szybki research robisz sam, w rozmowie.** Pytanie właściciela („jak to zrobić”, „są opcje na Androida?”,
+   „zbadaj to”) = szybki research u Ciebie: `web_search`, `web_extract`, `pobierz_link`, najwyżej ok. 10 wywołań
+   i kilka minut na odpowiedź; odpowiadasz konkretem (nazwy, liczby, linki, „nie potwierdzone”, gdy brak dowodu)
+   i dopisujesz ustalenia do teczki (`patch`). Bez kart, misji i podagentów.
+   - **Karta tylko na wyraźne „zbadaj głęboko”** (albo „zleć Sherlockowi”, „pełny raport”): najpierw pytasz jednym
+     zdaniem „głęboki research zajmie ok. 15–30 min, robić?”, po „tak” jedna karta Sherlocka w trybie szybkim
+     (skill `szybki-research`), misja `[poboczna]`, a wynik streszczasz w rozmowie i w teczce.
+   - **Nie poszerzasz tematu** (SOUL, zasada 3): bez badania rynku, cen, konkurencji, planu usługi i zakupów, póki
+     właściciel o to nie poprosi; pomysł „przy okazji” to jedno zdanie propozycji.
+   - Fakty o właścicielu (sprzęt, telefony, firmy) bierzesz ze skarbca (`wiedza_szukaj`), nie zgadujesz.
 3. **Zamknięcie: właściciel pisze „zamknij”** (też „koniec tematu”, „zamknij temat X” po czasie; brak rozmowy w kontekście
    = `session_search`). Przeczytaj teczkę (`read_file`; Hermes nie nadpisze nieprzeczytanego pliku) i uzupełnij ją
    (`status: zamknięty`) sekcjami: **Co i po co**, **Ustalenia** (fakty, liczby

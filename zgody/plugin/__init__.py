@@ -2766,6 +2766,42 @@ def _telefon(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[str, str]]:
                    "Zgoda = Twoje „tak” dla tej jednej akcji.", f"{akcja}\n{os.urandom(8).hex()}")
 
 
+# Werdykt na karcie (zakończenie, oddanie do oceny, poprawki, blokada) w trakcie pracy albo oceny wydaje tylko
+# pracownik karty (tor review: osobny pracownik-sędzia). 12.11 Jarvo w czacie z właścicielem, budzony zdarzeniami
+# tablicy (Hermes subskrybuje czat przy kanban_create w trybie notify+wake), oceniał te same karty co tor review:
+# sprzeczne werdykty, wycofania i godzina wiadomości na Telegramie.
+WERDYKTY_KART = frozenset({"kanban_complete", "kanban_request_review", "kanban_request_changes", "kanban_block"})
+KARTA_W_TOKU = frozenset({"running", "review"})
+
+
+def _status_karty(tid: str, tablica: Optional[str]) -> Optional[str]:
+    """Status karty z bazy kanbana Hermesa; None, gdy nie da się go odczytać (wtedy nie blokujemy)."""
+    try:
+        from hermes_cli import kanban_db as kb
+        from hermes_cli import kanban_db_connect as kbc
+        with kbc.connect_closing(board=tablica) as conn:
+            karta = kb.get_task(conn, tid)
+        return getattr(karta, "status", None)
+    except Exception:
+        logger.debug("jarvo-zgody: nie odczytałem statusu karty %s", tid, exc_info=True)
+        return None
+
+
+def _werdykt_z_rozmowy(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[str, str]]:
+    """Rozmowa (bez HERMES_KANBAN_TASK) nie wydaje werdyktu na karcie, nad którą pracuje albo którą ocenia pracownik."""
+    if os.environ.get("HERMES_KANBAN_TASK", "").strip():
+        return None
+    tid = str(args.get("task_id") or "").strip()
+    if not tid:
+        return None
+    status = _status_karty(tid, str(args.get("board") or "").strip() or None)
+    if status not in KARTA_W_TOKU:
+        return None
+    return _blok(f"karta {tid} jest w toku ({status}): pracuje nad nią albo ocenia ją pracownik karty (tor review). "
+                 "Werdykt wydaje tylko on, rozmowa nie ocenia kart. Zdarzenie tablicy w rozmowie przemilcz ([SILENT]); "
+                 "uwagę właściciela do karty przekaż przez kanban_comment.")
+
+
 def _decyzja(tool_name: str, args: Dict[str, Any], task_id: str) -> Optional[Dict[str, str]]:
     yolo = _yolo()
     if yolo and _profil(_hermes_home()) == OPERATOR and not (tool_name in OPERATOR_PRZY_YOLO
@@ -2774,6 +2810,8 @@ def _decyzja(tool_name: str, args: Dict[str, Any], task_id: str) -> Optional[Dic
                      "ograniczeń. Uruchom czat bez --yolo albo wpisz /yolo, żeby je wyłączyć.")
     if tool_name in TELEFON_POTWIERDZENIA:
         return _telefon(tool_name, args)
+    if tool_name in WERDYKTY_KART:
+        return _werdykt_z_rozmowy(tool_name, args)
     if tool_name not in OBSLUGIWANE:
         return None
     bez_czl = bez_czlowieka()

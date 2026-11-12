@@ -11,8 +11,8 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 
 | Agent | Main prompt | Workflowy własne | Skille zewnętrzne | Skrypty | Evals |
 |---|---|---|---|---|---|
-| `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [16 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 3 (`writing-for-agents`, mattpocock; wspólne `konwersja-plikow` i `odczyt-ekranu`) | patrol, brief, przegląd, raport floty, liczby floty, świeżość, linter kontraktu, prosty polski, księga lekcji, poczekalnia skilli, wgrywanie stron, skrzynka linków | [28](../evals/jarvo/scenarios.yaml) |
-| `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [8 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 18 (Hermes, marketingskills, wspólne `transkrypcja-filmu`, `konwersja-plikow`, `odczyt-ekranu` i `ostrozna-przegladarka`) | search_fanout, extract, sources (rejestr cytowań), fakty (brief do filmu) | [16](../evals/jarvo-sherlock/scenarios.yaml) |
+| `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [16 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 3 (`writing-for-agents`, mattpocock; wspólne `konwersja-plikow` i `odczyt-ekranu`) | patrol, brief, przegląd, raport floty, liczby floty, świeżość, linter kontraktu, prosty polski, księga lekcji, poczekalnia skilli, wgrywanie stron, skrzynka linków | [29](../evals/jarvo/scenarios.yaml) |
+| `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [9 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 18 (Hermes, marketingskills, wspólne `transkrypcja-filmu`, `konwersja-plikow`, `odczyt-ekranu` i `ostrozna-przegladarka`) | search_fanout, extract, sources (rejestr cytowań), fakty (brief do filmu) | [16](../evals/jarvo-sherlock/scenarios.yaml) |
 | `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [11 w `skills/web/`](../profiles/jarvo-web/skills/web) | 62 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólne `graf-kodu`, `izometria`, `warsztat-3d`, `konwersja-plikow` i `odczyt-ekranu`) | audit, szybki_audyt, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [20](../evals/jarvo-web/scenarios.yaml) |
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [7 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 28 (marketingskills, Anthropic, Hermes, impeccable, lemo-wake, wspólne `hooki`, `izometria`, `konwersja-plikow` i `odczyt-ekranu`) | render_html, check_media, lemo_wake | [15](../evals/jarvo-studio/scenarios.yaml) |
 | `jarvo-wideo` | [SOUL](../profiles/jarvo-wideo/SOUL.md) | [22 w `skills/wideo/`](../profiles/jarvo-wideo/skills/wideo) | 64 (HyperFrames, GSAP, Three.js, Remotion, remocn, iart, screenwriting, marketingskills, live-panel, Hermes, wspólne `transkrypcja-filmu`, `hooki`, `izometria`, `warsztat-3d`, `konwersja-plikow`, `odczyt-ekranu` i inne) | film, stock, kadry, montaz, dwa_ekrany, napisy, qa_wideo, rytm, muzyka, narzedzia, html_wideo, pomiar, inspiracje, projekt, krytyka, assety, maskotka, lektor_linie, retime, klipy, twarze, demo_strony, typografia, maska, zywy_schemat, gramatyka, malarz, ruchy (+ wideo_lib; moduły JS stron: ruch, kreska, morph, crt, plotno, piksel, os_czasu, strona, ujecia, tokeny) | [40](../evals/jarvo-wideo/scenarios.yaml) |
@@ -214,7 +214,11 @@ zgodność z brand kitem.
 **Misja:** znajdzie wszystko i wszystkiego się dowie. Sprawdza wiele wątków i wiele źródeł,
 składa całość i **weryfikuje**, co jest prawdą.
 
-**Metoda Sherlocka (główny skill [T] `metoda-sherlocka`):**
+**Szybki research (domyślny, [T] `szybki-research`, 12.11):** 10–15 minut, ok. 20 wywołań, raport na jedną stronę
+(odpowiedź, 3–7 ustaleń z cytatami, rekomendacja, luki), bez podagentów; ocena Jarva w jednej rundzie, poprawki tylko
+za błąd faktu, który zmienia rekomendację. Pełna metoda poniżej tylko na zamówienie „pełny” albo „głęboki” research.
+
+**Metoda Sherlocka (pełne śledztwo na zamówienie, [T] `metoda-sherlocka`):**
 1. Rozbicie pytania na hipotezy i wątki.
 2. Równoległe śledztwo: `delegate_task` do subagentów, po jednym na wątek (w obrębie jego profilu).
 3. Wiele wyszukiwarek i typów źródeł: strony, dokumenty, fora, YouTube (transkrypcje), publikacje naukowe, rejestry.
@@ -231,7 +235,7 @@ składa całość i **weryfikuje**, co jest prawdą.
 - [Z] marketingskills `competitor-profiling`, `customer-research`; wspólny `transkrypcja-filmu` (`shared/skills/`):
   link albo plik filmu → tekst mowy (napisy platformy albo Parakeet), bez analizy obrazu; wspólny `ostrozna-przegladarka`:
   strona, która odmówiła zwykłej przeglądarce i nie ma kopii w archiwum, dostaje jedną próbę Camoufoxem (`ostrozna.py`)
-- [T] `metoda-sherlocka`, [T] `weryfikacja-faktow` (poziomy wiarygodności źródeł), [T] `szybki-fakt` (jedna runda, cytat),
+- [T] `szybki-research` (domyślny), [T] `metoda-sherlocka`, [T] `weryfikacja-faktow` (poziomy wiarygodności źródeł), [T] `szybki-fakt` (jedna runda, cytat),
   [T] `raport-sledztwa` (format raportu; brief do filmu `out/fakty.json` dla Wideografa, sprawdzany `fakty.py`), [T] `research-seo` (słowa kluczowe i konkurencja, dla `jarvo-web` i `jarvo-studio`),
   [T] `research-rynku` (gracze, oferty, ceny, opinie), [T] `monitoring` (rutyna cron zakładana przez Jarva),
   [T] `cytowania` (numer `[n]` z rejestru przy pobraniu strony, cytaty-dowody sprawdzane z tekstem strony,

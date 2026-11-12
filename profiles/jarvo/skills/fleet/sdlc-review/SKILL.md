@@ -1,7 +1,7 @@
 ---
 name: sdlc-review
 description: "Sędzia: niezależna ocena karty z toru review wobec DoD."
-version: 2.9.0
+version: 2.10.0
 author: "Jarvo (na bazie Hermes Agent sdlc-review: Jakub Wolniewicz + Hermes Agent, MIT)"
 license: MIT
 platforms: [linux, macos, windows]
@@ -13,7 +13,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A0
-    reviewed: "2026-11-09"
+    reviewed: "2026-11-12"
 environments:
   - kanban
 ---
@@ -44,6 +44,18 @@ Karta ze skillem albo DoD `szybki-audyt` (albo oznaczona jako szybkie sprawdzeni
    „poprawki są konkretne”.
 5. Werdykt: akceptacja albo raz poprawki z dokładną listą. Druga porażka = akceptacja z uwagą w `caveats`;
    na formalnościach nigdy nie eskalujesz.
+
+## Lekka ocena: `szybki-research`
+
+Karta Sherlocka ze skillem `szybki-research` (domyślny research) dostaje **jedną rundę**, budżet ok. 8 wywołań
+narzędzi i 10 minut. Pełna procedura niżej jej nie dotyczy (12.11: 9 rund oceny po 4–19 min na 3 kartach trwało
+dłużej niż sama praca).
+1. Przeczytaj `out/RAPORT.md` i wynik `sources.py verify out/RAPORT.md --dowody` (jedno wywołanie).
+2. Sprawdź: odpowiedź na pytanie z CEL w pierwszym akapicie; 2 kluczowe twierdzenia (te, na których stoi
+   rekomendacja) w zapisanym tekście źródła; komendy i wersje w przepisie, jeśli są (flaga z tej samej wersji).
+3. Poprawki **tylko** za błąd faktu, który zmienia rekomendację (źródło nie mówi tego, co przypisano; zła komenda;
+   zmyślony link). Zaokrąglenia, styl, układ, brak punktu „nice to have”: `caveats`, nie poprawki.
+4. Werdykt: akceptacja albo raz poprawki z dokładną listą; druga runda = akceptacja z uwagą w `caveats`.
 
 ## Procedura
 
@@ -101,7 +113,10 @@ Obowiązki bazowe z kroku 4 i test wartości z kroku 4c obowiązują w każdej r
 - konkurencja: czy to naprawdę konkurenci (ta sama funkcja, ten sam kupujący), a nie integratorzy, partnerzy czy
   firmy z innej kategorii; firma produktowa sprzedająca globalnie = konkurencja globalna, nie „z okolicy”,
 - sprawdź daty źródeł, czy są źródła pierwotne, czy sprzeczności są opisane, a nie przemilczane,
-- czy odpowiedź na pytanie z CEL jest jasna, z poziomem pewności; polskie znaki (raport bez ogonków = poprawki).
+- czy odpowiedź na pytanie z CEL jest jasna, z poziomem pewności; polskie znaki (raport bez ogonków = poprawki),
+- raport podaje komendy narzędzi: każdą flagę i ścieżkę sprawdź w kodzie albo dokumentacji **tej wersji, którą raport
+  każe pobrać** (tag wydania), nie w README ani na `main`: flaga z nowszej wersji to błąd, który wyjdzie dopiero przy
+  uruchomieniu (12.11: `--total-train-iters` z `main` przy wydaniu Brush v0.3.0, które zna `--total-steps`).
 
 **jarvo-studio (kreacja):**
 - wymiary i formaty plików (`@@PY@@ -c` z PIL albo `ffprobe`), rozmiar plików,

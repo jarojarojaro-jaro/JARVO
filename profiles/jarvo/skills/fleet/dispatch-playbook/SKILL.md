@@ -1,7 +1,7 @@
 ---
 name: dispatch-playbook
 description: "Rozdawanie pracy: karty z kontraktem, zależności, misje."
-version: 1.2.0
+version: 1.3.0
 author: Jarvo
 license: MIT
 metadata:
@@ -69,7 +69,7 @@ kanban_create(
 
 | Wzorzec | Karty |
 |---|---|
-| **Research → decyzja** | sherlock (raport) → Jarvo relacjonuje, pyta o decyzję |
+| **Research → decyzja** | sherlock (`szybki-research`: 10–15 min, raport na jedną stronę, DoD 2–4 punkty, bez tabel „wszystkiego” i CSV; `metoda-sherlocka` tylko, gdy właściciel zamówił pełny albo głęboki research) → Jarvo relacjonuje, pyta o decyzję |
 | **Landing produktu** | sherlock (rynek + słowa kluczowe) → web (landing) ∥ studio (grafiki + posty) ∥ wideo (film, opcjonalnie) → reka (złożenie) |
 | **Audyt + naprawa strony** | web (audyt) → [decyzja użytkownika, co naprawiać] → web (poprawki) |
 | **Kampania** | sherlock (grupa docelowa, konkurencja) → studio (pakiet + brief wideo) → wideo (filmy) → reka (złożenie + kalendarz) |
@@ -94,6 +94,7 @@ cel: jeden pakiet w `@@MISSIONS_DIR@@/<MISJA>/zlozenie/out/` (INDEX.md z opisem 
 | Zdarzenie | Twoja reakcja |
 |---|---|
 | `review_requested` | nic: recenzję robi tor review. Odpowiedź: `[SILENT]` |
+| `changes_requested` (ocena odesłała do poprawki) | nic: wykonawca poprawia, tor review oceni ponownie. Odpowiedź: `[SILENT]`. Nie oceniasz karty drugi raz w rozmowie (SOUL, zasada 12) |
 | `completed` karty pośredniej | zaktualizuj tabelę w MISSION.md. Odpowiedź: `[SILENT]` |
 | `completed` ostatniej karty misji (zwykle „złożenie”) | zamknij misję i wyślij raport końcowy (`mission-ledger`) |
 | `blocked` z `needs_input` | dodaj do kolejki decyzji i wyślij zbiorcze pytanie (`decision-queue`) |

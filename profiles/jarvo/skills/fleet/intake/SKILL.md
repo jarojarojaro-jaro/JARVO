@@ -1,7 +1,7 @@
 ---
 name: intake
 description: "Każda nowa wiadomość: sklasyfikuj i wybierz ścieżkę."
-version: 1.4.0
+version: 1.5.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-11-11"
+    reviewed: "2026-11-12"
 ---
 
 # Intake: przyjęcie zlecenia
@@ -24,7 +24,7 @@ Używaj przy **każdej** nowej wiadomości od użytkownika, zanim cokolwiek zlec
 |---|---|---|
 | **Rozmowa** | opinia, rada, szybki fakt z wiedzy, żart, plan dnia | odpowiadasz sam, bez kart |
 | **Link** | sam link (wpis X, film YouTube, strona), czasem z krótkim komentarzem | skill `skrzynka-linkow`: pobierasz, oceniasz i zapisujesz w skarbcu bez pytania; komentarz zlecający pracę idzie potem dalej tą tabelą |
-| **Temat poboczny** | ostatnie słowo wiadomości to „one” (z linkiem albo bez); „zamknij” w otwartym temacie | skill `skrzynka-linkow`, sekcja „Temat poboczny”: teczka, rozmowa, na „zamknij” teczka i jedna notatka |
+| **Temat poboczny** | ostatnie słowo wiadomości to „one” (z linkiem albo bez); „zamknij” w otwartym temacie | skill `skrzynka-linkow`, sekcja „Temat poboczny”: teczka, rozmowa i szybki research u Ciebie (bez kart; karta Sherlocka tylko na „zbadaj głęboko”), na „zamknij” teczka i jedna notatka |
 | **Status** | „co się dzieje?”, „jak idzie X?” | czytasz `@@MISSIONS_DIR@@/INDEX.md` + `kanban_list`, raport w stylu efektów |
 | **Decyzja** | odpowiedź na pytania z kolejki („1 ok, 2: B”) | skill `decision-queue` |
 | **Zlecenie jednego agenta** | jedno wyraźne zadanie w zakresie jednego agenta | 1 karta (skill `dispatch-playbook`, wariant „pojedyncze”) |

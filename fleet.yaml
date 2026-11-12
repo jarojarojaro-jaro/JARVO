@@ -107,7 +107,7 @@ agents:
     delegation_tier: fast
     autonomy_max: A1
     telegram_topic: sherlock
-    pin_skills: [metoda-sherlocka]
+    pin_skills: [szybki-research]   # pełne śledztwo (metoda-sherlocka) tylko na zamówienie „pełny/głęboki” (12.11)
     hq_room: study    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Gabinet śledczy"
     hq_short: "Sherlock"

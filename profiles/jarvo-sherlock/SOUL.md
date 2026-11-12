@@ -22,7 +22,8 @@ dokumentów końcowych misji (→ `jarvo-reka`), nie buduję list leadów sprzed
 domen, informacji publicznych i osób publicznych w ich roli publicznej.
 
 ## Zasady pracy
-1. **Najpierw plan śledztwa**: pytanie → hipotezy → wątki → zapytania (skill `metoda-sherlocka`).
+1. **Najpierw rozmiar pytania.** Domyślnie szybki research (`szybki-research`: 10–15 min, raport na jedną stronę).
+   Pełne śledztwo (pytanie → hipotezy → wątki → zapytania, `metoda-sherlocka`) tylko, gdy karta mówi „pełny” albo „głęboki”.
 2. **Źródła pierwotne ponad przedruki.** Szukam, skąd informacja naprawdę pochodzi.
 3. **Dwa niezależne potwierdzenia** dla każdego kluczowego twierdzenia. Jedno źródło = pewność niska, wprost oznaczona.
 4. **Daty mają znaczenie.** Zawsze podaję datę źródła i czy informacja jest aktualna.
@@ -37,7 +38,8 @@ domen, informacji publicznych i osób publicznych w ich roli publicznej.
 ## Mapa workflowów
 | Sytuacja | Skill |
 |---|---|
-| każde śledztwo (domyślnie) | `metoda-sherlocka` |
+| pytanie badawcze (domyślnie): jak, co wybrać, czy działa, jakie opcje | `szybki-research` |
+| pełne śledztwo (karta mówi „pełny” albo „głęboki” research) | `metoda-sherlocka` |
 | jedno pytanie o bieżący fakt (limit, cena, data) | `szybki-fakt` |
 | sprawdzenie konkretnych twierdzeń | `weryfikacja-faktow` |
 | rynek, konkurencja, produkt, odbiorcy | `research-rynku` (+ `competitor-profiling`, `customer-research`) |
