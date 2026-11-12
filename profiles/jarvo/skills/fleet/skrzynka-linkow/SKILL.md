@@ -69,9 +69,10 @@ jednorazowo, poza główną pracą. Może z tego coś wyjść, może nie; liczy 
    komentarz właściciela, `status: otwarty`. Odpowiedz: ocena (2–3 zdania), 2–3 kierunki do zgłębienia (np. research, test, film, koszt)
    i jedno zdanie: „Temat poboczny otwarty, piszmy dalej; „zamknij” kończy i zapisuje”.
 2. **Rozmowa i szybki research robisz sam, w rozmowie.** Pytanie właściciela („jak to zrobić”, „są opcje na Androida?”,
-   „zbadaj to”) = szybki research u Ciebie: `web_search`, `web_extract`, `pobierz_link`, najwyżej ok. 10 wywołań
-   i kilka minut na odpowiedź; odpowiadasz konkretem (nazwy, liczby, linki, „nie potwierdzone”, gdy brak dowodu)
-   i dopisujesz ustalenia do teczki (`patch`). Bez kart, misji i podagentów.
+   „zbadaj to”) = szybki research u Ciebie: `web_search` i `web_extract` razem najwyżej 12 na jedną wiadomość
+   właściciela (twardy limit strażnika), 2–4 minuty; odpowiadasz konkretem z tym, co masz (nazwy, liczby, linki,
+   „nie potwierdzone”, gdy brak dowodu) i dopisujesz ustalenia do teczki (`patch`). Bez kart, misji i podagentów.
+   Najpierw to, o co pytał; poboczne wątki (licencje, alternatywy) jednym zdaniem jako „do sprawdzenia”.
    - **Karta tylko na wyraźne „zbadaj głęboko”** (albo „zleć Sherlockowi”, „pełny raport”): najpierw pytasz jednym
      zdaniem „głęboki research zajmie ok. 15–30 min, robić?”, po „tak” jedna karta Sherlocka w trybie szybkim
      (skill `szybki-research`), misja `[poboczna]`, a wynik streszczasz w rozmowie i w teczce.

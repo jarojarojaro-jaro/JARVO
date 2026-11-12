@@ -508,6 +508,18 @@ def test_sciezki_nfc_na_macos(skarbiec):
     assert sk.rel(sk.plik(oczekiwana)) == oczekiwana and sk.wczytaj(oczekiwana).tytul == "Żółć"
 
 
+def test_wczytaj_sciezke_bez_polskich_znakow(skarbiec):
+    """Model podaje ścieżkę bez ogonków („przegladarce”): wczytaj znajduje notatkę z ogonkami w tym samym folderze."""
+    sk = skarbiec
+    (sk.root / "pojecia").mkdir(exist_ok=True)
+    (sk.root / "pojecia" / "spacer 3d w przeglądarce.md").write_text("# Spacer 3D w przeglądarce\n\n**Splat.**\n",
+                                                                       encoding="utf-8", newline="\n")
+    n = sk.wczytaj("pojecia/spacer 3d w przegladarce")
+    assert n.sciezka == "pojecia/spacer 3d w przeglądarce" and n.tytul == "Spacer 3D w przeglądarce"
+    with pytest.raises(FileNotFoundError):
+        sk.wczytaj("pojecia/nie ma takiej")
+
+
 def test_domyslny_skarbiec(monkeypatch, tmp_path):
     """Bez --skarbiec: JARVO_KNOWLEDGE_DIR; potem <dane>/jarvo/knowledge z HERMES_HOME (profil: dwa katalogi wyżej) na
     każdym systemie (kontener ma HERMES_HOME=/opt/data, więc jak dotąd), z JARVO_ROOT, a bez obu z domyślnego korzenia

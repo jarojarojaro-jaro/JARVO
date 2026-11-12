@@ -600,6 +600,11 @@ class Skarbiec:
     # ---- czytanie
     def wczytaj(self, rel: str) -> Notatka:
         p = self.plik(rel)
+        if not p.exists():
+            # model pisze ścieżkę bez polskich znaków („przegladarce”); 12.11 dwa nieudane wiedza_czytaj z rzędu
+            klucz = bez_ogonkow(p.name).lower()
+            p = next((q for q in sorted(p.parent.glob("*.md")) if bez_ogonkow(q.name).lower() == klucz), p) \
+                if p.parent.is_dir() else p
         text = p.read_text(encoding="utf-8", errors="replace")
         fm, tresc = podziel(text)
         m = re.search(r"^# (.+)$", tresc, re.M)

@@ -1103,6 +1103,33 @@ def _budzet_wzroku(tool_name: str, session_id: str) -> Optional[Dict[str, Any]]:
             "zapisz słowami w raport.md, w „## Uwagi wizualne” albo w linii „Do głębszej analizy”, i oddaj kartę."}
 
 
+# Szybki research w rozmowie (Jarvo, temat poboczny): wyszukiwania i czytane strony na jedną wiadomość właściciela.
+# 12.11 po zasadzie „ok. 10 wywołań” jedna odpowiedź kosztowała 7 min i ok. 45 wyszukiwań i stron. Głębiej = karta.
+BUDZET_RESEARCHU_W_ROZMOWIE = 12
+NARZEDZIA_RESEARCHU = ("web_search", "web_extract")
+_research_lock = threading.Lock()
+_research_licznik: Dict[str, int] = {}
+
+
+def _budzet_researchu(tool_name: str, session_id: str, turn_id: str) -> Optional[Dict[str, Any]]:
+    """Blokada wyszukiwania ponad budżet jednej tury Jarva poza kartą; None = wywołanie idzie dalej."""
+    if os.environ.get("HERMES_KANBAN_TASK", "").strip() or _profil(_hermes_home()) != recenzent_floty():
+        return None
+    klucz = turn_id or session_id
+    if not klucz:
+        return None
+    with _research_lock:
+        if len(_research_licznik) > 500:
+            _research_licznik.clear()
+        n = _research_licznik.get(klucz, 0)
+        if n < BUDZET_RESEARCHU_W_ROZMOWIE:
+            _research_licznik[klucz] = n + 1
+            return None
+    return {"action": "block", "message": f"Limit szybkiego researchu w rozmowie wyczerpany ({tool_name}: "
+            f"{n}/{BUDZET_RESEARCHU_W_ROZMOWIE} wyszukiwań i stron na jedną wiadomość). Odpowiedz teraz z tym, co masz "
+            "(luki nazwij wprost), a głębsze sprawdzenie zaproponuj jednym zdaniem: na „zbadaj głęboko” karta Sherlocka."}
+
+
 # Pliki skarbca, które agenci piszą sami (SCHEMA zasada 9: własne formaty skilli; reszta tylko przez kompilację)
 WOLNE_W_SKARBCU = ("brands/", "inspiracje/", "wideo/", "fleet/lekcje.md", "user/USER.md")
 _V4A_PLIK_RE = re.compile(r"^\*\*\* (?:Update|Add|Delete) File: (.+)$", re.M)
@@ -1130,7 +1157,7 @@ def _zapis_w_skarbcu(args: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 def straznik(tool_name: str = "", args: Optional[Dict[str, Any]] = None, task_id: str = "", session_id: str = "",
-             **_kw: Any) -> Optional[Dict[str, Any]]:
+             turn_id: str = "", **_kw: Any) -> Optional[Dict[str, Any]]:
     """Hak pre_tool_call: {"action": "block"|"approve", "message"}, {"action": "modify", "args"} (dopisany recenzent
     oddania) albo None (narzędzie idzie dalej)."""
     args = args if isinstance(args, dict) else {}
@@ -1149,6 +1176,8 @@ def straznik(tool_name: str = "", args: Optional[Dict[str, Any]] = None, task_id
             return _zamkniecie_bez_oceny(args)
         elif tool_name in NARZEDZIA_WZROKU:
             return _budzet_wzroku(tool_name, session_id)
+        elif tool_name in NARZEDZIA_RESEARCHU:
+            return _budzet_researchu(tool_name, session_id, turn_id)
         elif tool_name in ("write_file", "patch"):
             return _zapis_w_skarbcu(args)
     except Exception as e:                       # strażnik nie może zatrzymać zwykłej pracy własnym błędem

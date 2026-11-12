@@ -443,6 +443,28 @@ def test_straznik_budzet_wzroku_szybkiego_audytu(tmp_path, monkeypatch):
         assert pl.straznik(tool_name="vision_analyze", args={}) is None
 
 
+def test_straznik_budzet_researchu_w_rozmowie(tmp_path, monkeypatch):
+    """12.11: „szybki research” w rozmowie poszedł 7 min i ok. 45 wyszukiwań i stron. Jarvo poza kartą: 12 na turę;
+    nowa wiadomość właściciela (nowy turn_id) to nowy budżet; karta i inni agenci bez limitu."""
+    monkeypatch.setattr(pl, "recenzent_floty", lambda: "jarvo")
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "jarvo"))
+    for i in range(pl.BUDZET_RESEARCHU_W_ROZMOWIE):
+        narzedzie = "web_search" if i % 2 else "web_extract"
+        assert pl.straznik(tool_name=narzedzie, args={}, session_id="s1", turn_id="s1:t1") is None
+    w = pl.straznik(tool_name="web_search", args={}, session_id="s1", turn_id="s1:t1")
+    assert w["action"] == "block" and "zbadaj głęboko" in w["message"] and "12/12" in w["message"]
+    assert pl.straznik(tool_name="web_search", args={}, session_id="s1", turn_id="s1:t2") is None
+    assert pl.straznik(tool_name="pobierz_link", args={}, session_id="s1", turn_id="s1:t1") is None
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "t_1")                                 # karta: bez limitu rozmowy
+    for _ in range(pl.BUDZET_RESEARCHU_W_ROZMOWIE + 1):
+        assert pl.straznik(tool_name="web_search", args={}, session_id="s2", turn_id="s2:t1") is None
+    monkeypatch.delenv("HERMES_KANBAN_TASK")
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "jarvo-sherlock"))   # specjalista w rozmowie
+    for _ in range(pl.BUDZET_RESEARCHU_W_ROZMOWIE + 1):
+        assert pl.straznik(tool_name="web_extract", args={}, session_id="s3", turn_id="s3:t1") is None
+
+
 def test_recenzent_floty_z_pliku_wtyczki(tmp_path, monkeypatch):
     sys.path.insert(0, str(REPO / "scripts"))
     import build
