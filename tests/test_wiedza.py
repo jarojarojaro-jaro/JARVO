@@ -55,7 +55,8 @@ def test_zasiew_huby_orzeczenia_docs_git(skarbiec, tmp_path):
     sk = skarbiec
     huby = {p.name for p in sk.root.rglob("_hub-*.md")}
     assert huby == {"_hub-skarbiec.md", "_hub-agenci.md", "_hub-projekty.md", "_hub-marki.md", "_hub-inspiracje.md", "_hub-ty.md",
-                    "_hub-podmioty.md", "_hub-pojecia.md", "_hub-orzeczenia.md", "_hub-rozmowy.md", "_hub-jarvo.md", "_hub-web.md", "_hub-łowca.md"}
+                    "_hub-podmioty.md", "_hub-pojecia.md", "_hub-orzeczenia.md", "_hub-rozmowy.md", "_hub-briefy.md",
+                    "_hub-jarvo.md", "_hub-web.md", "_hub-łowca.md"}
     assert len(huby) == len({h for h in huby})                       # nazwy unikalne w całym skarbcu (etykiety w grafie)
     hub = (sk.root / "agenci/jarvo-web/_hub-web.md").read_text(encoding="utf-8")
     assert "[[fleet/skille/nowa-strona|nowa-strona]]: Nowa strona: od briefu do wdrożenia." in hub

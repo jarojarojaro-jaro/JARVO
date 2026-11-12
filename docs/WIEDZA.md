@@ -209,6 +209,8 @@ z jednym średnim skillem. Dla porównania MEMORY.md+USER.md to dziś do ~1400 t
   agent w trakcie pracy           ──wiedza_zapisz─────────────►  skrzynka/<agent>-<data>-<slug>.md
   Twoja korekta                   ──wiedza_orzeczenie / HQ────►  orzeczenia/<kto>.md          (od razu, bez kompilacji)
   plik / link od Ciebie           ──„zapisz to w wiedzy”──────►  zrodla/pliki/… (kopia, defuddle dla stron) + szkic
+  brief / przegląd tygodnia       ──briefy.py (nadzorca)──────►  briefy/B-RRRR-MM-DD.md (treść + tabela decyzji; odpowiedzi
+                                                                 dopisuje Jarvo, trwałe ustalenia → szkic `decyzja`)
   repo (docs, profile), fleet.yaml ──deploy: wiedza.py zasiej──►  zrodla/jarvo-repo/, huby agentów (0 tokenów)
                                                                          │
                                                        kompilacja (§6): skrzynka → notatki, INDEX, LOG, punkt zapisu git

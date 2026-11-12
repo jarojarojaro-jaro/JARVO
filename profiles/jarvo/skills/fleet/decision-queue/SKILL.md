@@ -1,7 +1,7 @@
 ---
 name: decision-queue
 description: "Decyzje dla użytkownika: zbierz, zapytaj zbiorczo, wdroż."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -12,7 +12,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-10-02"
+    reviewed: "2026-11-12"
 ---
 
 # Kolejka decyzji
@@ -44,13 +44,20 @@ Zasady:
 - prosty polski (skill `prosty-polski`): pytanie i uzasadnienie po jednym krótkim zdaniu, ryzyko A2 jako „⛔ OSTRZEŻENIE”.
 
 ## Wdrożenie odpowiedzi
+Odpowiedź na brief („1 ok, 2 nie” po porannym briefie albo „B-2026-11-12/3 ok” po czasie): numer briefu bierzesz
+z jego nagłówka w historii rozmowy albo z cytatu, a pozycje z `@@KNOWLEDGE_DIR@@/briefy/<numer>.md`.
 Dla każdej odpowiedzi:
 1. `kanban_comment(task_id, "Decyzja użytkownika (<data>): <treść>")`; przy A2 z odciskiem: „… tak, wersja <odcisk>”,
 2. `kanban_unblock(task_id)` (karta wraca do wykonawcy z komentarzem w kontekście),
 3. wpis w MISSION.md (tabela *Decyzje*), status misji z powrotem na `w toku`,
 4. dla A2: zlecenie wykonania akcji (np. karta „wdrożenie” dla `jarvo-web` z wyraźnym „użytkownik zatwierdził <data>,
-   wersja <odcisk>”). Wykonawca sprawdza odcisk przed akcją; niezgodny = pliki zmieniły się po zgodzie = nowe pytanie.
-
+   wersja <odcisk>”). Wykonawca sprawdza odcisk przed akcją; niezgodny = pliki zmieniły się po zgodzie = nowe pytanie,
+5. **brief w skarbcu:** w tabeli „Decyzje” notatki briefu wypełnij wiersz tej pozycji (`read_file`, potem jeden `patch`
+   na wszystkie odpowiedzi): odpowiedź właściciela jego słowami, krótko; data RRRR-MM-DD; co zrobione („karta t_… założona”,
+   „wstrzymane do pilota”, „cennik zapisany w misji”). Bez `|` w komórkach. Wiersza nie usuwasz i nie zmieniasz numeru,
+6. **trwałe ustalenie** (cena, zasada, kierunek, „nie robimy X”): jeden szkic `wiedza_zapisz(typ="decyzja", …,
+   zrodlo="brief B-…/n, odpowiedź właściciela RRRR-MM-DD")`; korekta faktu o właścicielu albo jego pracy: `wiedza_orzeczenie`.
+   Jednorazowe „ok, rób” bez ustalenia na przyszłość: bez szkicu (zapis jest w tabeli briefu).
 Niejasna odpowiedź → dopytaj tylko o niejasną pozycję. Resztę wdroż od razu.
 
 Odpowiedzi przychodzą też z **Jarvo HQ** (panel „Decyzje” w dashboardzie) jako wiadomość w formacie

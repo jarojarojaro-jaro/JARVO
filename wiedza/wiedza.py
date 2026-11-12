@@ -84,12 +84,13 @@ def _domyslny_skarbiec() -> str:
 DOMYSLNY_SKARBIEC = _domyslny_skarbiec()
 
 FOLDERY = ("zrodla/rozmowy", "zrodla/karty", "zrodla/pliki", "zrodla/jarvo-repo", "skrzynka/zrobione", "agenci",
-           "projekty", "brands", "inspiracje/strony", "user", "podmioty", "pojecia", "orzeczenia/marki", "rozmowy", "fleet")
+           "projekty", "brands", "inspiracje/strony", "user", "podmioty", "pojecia", "orzeczenia/marki", "rozmowy", "fleet",
+           "briefy")
 # folder → (nazwa pliku huba, tytuł)
 HUBY = {"": ("_hub-skarbiec", "Skarbiec wiedzy"), "agenci": ("_hub-agenci", "Agenci"), "projekty": ("_hub-projekty", "Projekty"),
         "brands": ("_hub-marki", "Marki"), "inspiracje": ("_hub-inspiracje", "Inspiracje"), "user": ("_hub-ty", "Ty"),
         "podmioty": ("_hub-podmioty", "Podmioty"), "pojecia": ("_hub-pojecia", "Pojęcia"), "orzeczenia": ("_hub-orzeczenia", "Orzeczenia"),
-        "rozmowy": ("_hub-rozmowy", "Rozmowy")}
+        "rozmowy": ("_hub-rozmowy", "Rozmowy"), "briefy": ("_hub-briefy", "Briefy")}
 OPISY_FOLDEROW = {
     "agenci": "Jeden katalog na agenta: hub (rola, skille, skrypty z `fleet.yaml`) i notatki o tym, czego się nauczył.",
     "projekty": "Jedna notatka na misję albo projekt: stan, decyzje, wyniki (linki do plików), marka, agenci.",
@@ -101,13 +102,15 @@ OPISY_FOLDEROW = {
     "pojecia": "Metody, wzorce, definicje, lekcje ogólne: jedna notatka na pojęcie.",
     "orzeczenia": "Korekty od człowieka, jedna datowana linia każda. Agent dostaje swoje orzeczenia przed każdą turą.",
     "rozmowy": "Skompilowane ustalenia z rozmów i kart: decyzje, fakty, pliki. Surowe wyciągi leżą w `zrodla/rozmowy/`.",
+    "briefy": ("Poranne briefy (`B-RRRR-MM-DD`) i przeglądy tygodnia (`T-RRRR-Wtt`) z treścią i tabelą decyzji: odpowiedź "
+               "właściciela, kiedy, co z nią zrobiono. Pisze skrypt `briefy.py`, odpowiedzi dopisuje Jarvo."),
 }
 POZA_WYSZUKIWANIEM = ("zrodla/", "skrzynka/")          # domyślnie nie wracają w wynikach (surowe i szkice)
 LUSTRO_REPO = "zrodla/jarvo-repo"                     # kopia repo przy wdrożeniu: poza wyszukiwaniem, ale w grafie
 LUSTRO_KATALOGI = ("profiles", "shared", "vendor")     # podkatalogi z `--repo` (płaskie *.md obok to docs/)
 PLIKI_SPECJALNE = {"INDEX.md", "LOG.md", "LINT.md", "SCHEMA.md"}
-# własne formaty (brand kit, karta strony referencyjnej z DESIGN.md dembrandta, USER.md, źródła, szkice)
-BEZ_FRONTMATTERU = ("brands/", "inspiracje/", "user/", "zrodla/", "skrzynka/")
+# własne formaty (brand kit, karta strony referencyjnej z DESIGN.md dembrandta, USER.md, źródła, szkice, archiwum briefów)
+BEZ_FRONTMATTERU = ("brands/", "inspiracje/", "user/", "zrodla/", "skrzynka/", "briefy/")
 TYPY = {"hub", "agent", "projekt", "podmiot", "pojecie", "fakt", "decyzja", "lekcja", "zrodlo", "rozmowa", "orzeczenia", "skill"}
 STATUSY = {"aktualna", "do-sprawdzenia", "sprzeczna", "przestarzala", "generowane"}
 WYMAGANE = ("typ", "utworzono", "zmieniono", "status")

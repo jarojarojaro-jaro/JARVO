@@ -175,7 +175,11 @@ Dzięki temu nie ginie.
   ```
 - Twoja odpowiedź → Jarvo dopisuje decyzję jako komentarz do karty, `kanban_unblock`,
   zapisuje w `MISSION.md` (sekcja *Decyzje*).
-- Nieodpowiedziane decyzje wracają w porannym briefie. Nigdy nie znikają same.
+- Nieodpowiedziane decyzje wracają w porannym briefie z dawnym numerem („(z B-2026-11-12/3)”). Nigdy nie znikają same.
+- **Archiwum briefów:** brief ma numer `B-RRRR-MM-DD`, decyzja `B-…/n`, przegląd tygodnia `T-RRRR-Wtt`. Skrypt `briefy.py`
+  (nadzorca co minutę, 0 tokenów) zapisuje każdy wysłany brief w skarbcu (`briefy/<numer>`, zakładka Wiedza i graf):
+  treść i tabela decyzji, w której Jarvo wypełnia Twoją odpowiedź, datę i to, co z nią zrobił. Trwałe ustalenia idą dalej
+  do skarbca jako notatki `decyzja` ze źródłem „brief B-…/n”, a przegląd tygodnia liczy briefy, odpowiedzi i zaległe.
 
 ---
 

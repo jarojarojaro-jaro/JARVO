@@ -10,6 +10,7 @@ Tryb testowy: --fixture plik.json z {"tasks": [...], "shows": {id: show_json}, "
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import subprocess
 import sys
@@ -19,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _sciezki  # noqa: E402  (katalogi z HERMES_HOME, nie z /opt)
+import briefy  # noqa: E402  (archiwum briefów w skarbcu: numery, decyzje bez odpowiedzi)
 import lekcje  # noqa: E402
 import liczby  # noqa: E402  (ta sama definicja jakości co w Jarvo HQ)
 import poczekalnia  # noqa: E402
@@ -95,6 +97,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     summary = summarize(data, now, window)
+    if not args.fixture:
+        try:                                    # wcześniejsze briefy do skarbca (droga bez nadzorcy), potem otwarte decyzje
+            briefy.synchronizuj()
+            summary["otwarte_decyzje"] = briefy.otwarte()
+        except OSError as exc:
+            summary["otwarte_decyzje_blad"] = str(exc)[:200]
+    teraz = dt.datetime.fromtimestamp(now)
+    summary["numer"] = briefy.identyfikator("jarvo-daily-brief" if args.mode == "daily" else "jarvo-weekly-review", teraz)
+    if args.mode == "weekly" and not args.fixture:
+        summary["briefy_tygodnia"] = briefy.tydzien(teraz.date())
     if args.mode == "weekly" and not args.fixture:
         # sześć liczb z tablicy i sesji (0 tokenów): eskalacje, awarie, cisza i tokeny obok jakości
         summary["liczby"] = liczby.policz(liczby.dane_domyslne(), now, 7)
@@ -104,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
         # księga lekcji (gotowe, przeterminowane, skutek wdrożonych z evals) i poczekalnia skilli agentów (docs/RSI.md §R1)
         summary["lekcje"] = lekcje.podsumuj(*lekcje.domyslne())
         summary["poczekalnia"] = poczekalnia.podsumuj(liczby.dane_domyslne())
-    empty = not (summary["finished"] or summary["blocked"] or summary["in_flight"])
+    empty = not (summary["finished"] or summary["blocked"] or summary["in_flight"] or summary.get("otwarte_decyzje"))
     if args.mode == "weekly" and not args.fixture and not empty:
         try:                                    # strona z liczbami tygodnia (0 tokenów); wiadomość niesie link
             summary["strona"] = raport_strona.zapisz(summary, now)

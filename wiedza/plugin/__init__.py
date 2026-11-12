@@ -1130,8 +1130,9 @@ def _budzet_researchu(tool_name: str, session_id: str, turn_id: str) -> Optional
             "(luki nazwij wprost), a głębsze sprawdzenie zaproponuj jednym zdaniem: na „zbadaj głęboko” karta Sherlocka."}
 
 
-# Pliki skarbca, które agenci piszą sami (SCHEMA zasada 9: własne formaty skilli; reszta tylko przez kompilację)
-WOLNE_W_SKARBCU = ("brands/", "inspiracje/", "wideo/", "fleet/lekcje.md", "user/USER.md")
+# Pliki skarbca, które agenci piszą sami (SCHEMA zasada 9: własne formaty skilli; reszta tylko przez kompilację).
+# `briefy/`: Jarvo dopisuje odpowiedzi właściciela w tabeli decyzji briefu (skill decision-queue).
+WOLNE_W_SKARBCU = ("brands/", "inspiracje/", "wideo/", "fleet/lekcje.md", "user/USER.md", "briefy/")
 _V4A_PLIK_RE = re.compile(r"^\*\*\* (?:Update|Add|Delete) File: (.+)$", re.M)
 
 

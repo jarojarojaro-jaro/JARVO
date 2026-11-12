@@ -412,9 +412,10 @@ class Kompilacja:
         cel = str(wynik.get("sciezka") or "").strip().strip("/")
         cel = cel[:-3] if cel.endswith(".md") else cel
         cel_istnieje = bool(cel) and self.sk.istnieje(cel) and not cel.startswith(("zrodla/", "skrzynka/"))
-        cel_hub = cel_istnieje and cel.rsplit("/", 1)[-1].startswith("_hub-")
+        # hubów i archiwum briefów (`briefy/`, pisze skrypt briefy.py i Jarvo w tabeli decyzji) nie nadpisujemy
+        cel_hub = cel_istnieje and (cel.rsplit("/", 1)[-1].startswith("_hub-") or cel.startswith("briefy/"))
         if decyzja in ("aktualizacja", "sprzecznosc") and (not cel_istnieje or cel_hub):
-            decyzja = "nowa"                                         # hubów nie nadpisujemy; brak celu = nowa notatka
+            decyzja = "nowa"                                         # brak celu albo cel chroniony = nowa notatka
         if decyzja == "nowa":
             sciezka = self.sciezka_nowej(wynik, szkic)
             if self.sk.istnieje(sciezka):

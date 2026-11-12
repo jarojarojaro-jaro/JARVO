@@ -1573,6 +1573,7 @@ class Nadzorca:
                 if (self.co_ile_kompilacja > 0 and not self._stop.is_set()
                         and teraz - ostatnia_kompilacja >= self.co_ile_kompilacja):
                     ostatnia_kompilacja = teraz
+                    self._archiwizuj_briefy()
                     self._kompiluj_skarbiec()
                 if self._brudny or teraz - ostatni_zapis >= 30:
                     ostatni_zapis = teraz
@@ -1595,6 +1596,22 @@ class Nadzorca:
         for nazwa, po in sprzatanie_kart.sprzataj(dane):
             self._log(f"nadzorca: zatrzymałem {nazwa}: przebieg karty skończył się {int(po // 60)} min temu, "
                       "a jego procesy dalej działały")
+
+    def _archiwizuj_briefy(self) -> None:
+        """Wysłany poranny brief albo przegląd tygodnia → notatka `briefy/<numer>` w skarbcu (wiedza_cli, 0 tokenów),
+        zanim właściciel odpowie; błąd nie zatrzymuje kompilacji ani usług (wpis w dzienniku raz na rodzaj błędu)."""
+        from . import wiedza_cli
+        try:
+            nowe = wiedza_cli.archiwizuj_briefy(self.u)
+        except Exception as e:
+            opis = f"{type(e).__name__}: {str(e)[:160]}"
+            if opis != getattr(self, "_blad_briefow", None):
+                self._blad_briefow = opis
+                self._log(f"nadzorca: archiwum briefów: {opis}")
+            return
+        self._blad_briefow = None
+        if nowe:
+            self._log(f"nadzorca: archiwum briefów: zapisane {', '.join(nowe)}")
 
     def _kompiluj_skarbiec(self) -> None:
         """Kompilacja skrzynki skarbca, gdy pora (wiedza_cli.pora_kompilacji: szkice odstane 5 min albo najstarszy

@@ -147,6 +147,25 @@ def wiedza_lib(app: Path):
     return mod
 
 
+def archiwizuj_briefy(u: Uklad) -> list[str]:
+    """Brakujące notatki `briefy/` z wysłanych porannych briefów i przeglądów tygodnia (skrypt profilu `briefy.py`,
+    0 tokenów; nadzorca co minutę). Zwraca nowe numery. Plik zmieniony po aktualizacji ładuje się od nowa."""
+    plik = profil(u) / "scripts" / "briefy.py"
+    if not (plik.is_file() and skarbiec(u).is_dir()):
+        return []
+    znacznik = (str(plik.resolve()), plik.stat().st_mtime_ns)
+    mod = sys.modules.get("jarvo_briefy")
+    if mod is None or getattr(mod, "_jarvo_znacznik", None) != znacznik:
+        spec = importlib.util.spec_from_file_location("jarvo_briefy", plik)
+        if spec is None or spec.loader is None:
+            return []
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        mod._jarvo_znacznik = znacznik
+        sys.modules["jarvo_briefy"] = mod
+    return list(mod.synchronizuj(skarbiec(u), profil(u) / "cron" / "output"))
+
+
 def _szkice(u: Uklad) -> int:
     kat = skarbiec(u) / "skrzynka"
     return sum(1 for p in kat.glob("*.md") if p.is_file()) if kat.is_dir() else 0

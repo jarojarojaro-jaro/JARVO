@@ -1,7 +1,7 @@
 ---
 name: weekly-review
 description: "Przegląd tygodnia: jakość floty, wnioski, propozycje."
-version: 1.5.0
+version: 1.6.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A0
-    reviewed: "2026-10-13"
+    reviewed: "2026-11-12"
 ---
 
 # Przegląd tygodnia
@@ -19,7 +19,8 @@ metadata:
 Rutyna cron (niedziela wieczorem). Skrypt `fleet_report.py --mode weekly` dał Ci dane z 7 dni,
 w tym `quality`: dla każdego agenta liczba zakończonych kart, recenzji, poprawek i akceptacji
 za pierwszym razem, oraz `liczby` (`liczby.py`, bez modelu): eskalacje (pytania, poza zakresem, porzucone),
-awarie pracownika, cisza (karty bez sygnału życia, blokady bez powodu) i tokeny każdego agenta.
+awarie pracownika, cisza (karty bez sygnału życia, blokady bez powodu) i tokeny każdego agenta, a `numer` przeglądu
+(`T-RRRR-Wtt`) idzie do nagłówka wiadomości; po wysłaniu skrypt `briefy.py` zapisze przegląd w `@@KNOWLEDGE_DIR@@/briefy/`.
 
 ## Co przygotować
 1. **Wynik tygodnia:** zamknięte misje (efekty, nie karty), co utknęło i dlaczego.
@@ -56,10 +57,13 @@ awarie pracownika, cisza (karty bez sygnału życia, blokady bez powodu) i token
 10. **Strona tygodnia:** `strona` z danych (`raport_strona.py`, bez modelu): te same liczby jako strona z kaflami
    i paskami (jakość i tokeny na agenta, zrobione, stoi, w toku). Wiadomość niesie `strona.link` w ostatniej linii;
    wniosków nie przepisuj na stronę, zostają w wiadomości. Brak `strona` albo `strona.blad` → bez linii, błąd w jednym zdaniu.
+11. **Briefy tygodnia:** `briefy_tygodnia` z danych (`briefy.py`, 0 tokenów): ile briefów, ile decyzji, ile z odpowiedzią
+   właściciela, ile przeniesionych do kolejnego briefu, w jednej linii. Decyzje bez odpowiedzi > 3 dni wymień z numerami
+   (np. B-2026-11-12/2). Brak briefów → pomiń.
 
 ## Format
 ```
-📊 Tydzień floty
+📊 Przegląd <numer> · Tydzień floty
 Zrobione: <2–4 linie>
 Jakość: sherlock 5/6 za 1. razem, web 3/5 (powtarza się: brak zrzutów mobile), studio 4/4
 Evals: web 0,82 (było 0,88, spadek po a1b2c3d), reszta bez zmian
@@ -67,6 +71,7 @@ Lekcje: 2 gotowe, 1 wdrożona pomogła (studio +0,1), 1 do usunięcia
 Poczekalnia: web chce dodać skill `zrzuty-mobile` (sam po zadaniu, skan czysty), odcisk 3f9c0a1b2d4e
 Skarbiec: +7 notatek, 1 sprzeczność do rozstrzygnięcia (link w zakładce Wiedza)
 Styl: 18/20 wiadomości prostym polskim (najczęściej: za długie zdania)
+Briefy: 4 (B-2026-11-09…12), 11 decyzji, 8 z odpowiedzią, 2 przeniesione; czeka B-2026-11-12/2 (5 dni)
 Proponuję ulepszyć:
 1. <agent>: <zmiana> (<dowód>)
 Decyzja: wdrożyć propozycje 1–2? Zatwierdzić skill z poczekalni? (nic nie wchodzi bez Twojego „ok”)
