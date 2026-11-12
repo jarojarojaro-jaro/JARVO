@@ -48,9 +48,12 @@ tts:
       voice_compatible: true
       timeout: 180
 
+# Telegram: bez „⚠️ Hermes is shutting down…” przy każdej aktualizacji Jarva (12.11 właściciel dostał to o 03:24,
+# przy `jarvo update` w nocy, gdy nic nie robił); rozmowy w toku nadzorca i tak wznawia sam.
 platforms:
   telegram:
     reply_to_mode: first
+    gateway_restart_notification: false
 
 approvals:
   mode: smart
