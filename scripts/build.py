@@ -948,6 +948,7 @@ with cj.use_cron_store(home):
             enabled_toolsets=s.get("enabled_toolsets"), no_agent=bool(s.get("no_agent", False)),
             reasoning_effort=s.get("reasoning_effort"), paused=bool(s.get("paused", False)),
             paused_reason=s.get("paused_reason"), model=s.get("model"), provider=s.get("provider"),
+            attach_to_session=s.get("attach_to_session"),
         )
         stable = s["id"]
         records = cj.load_jobs()

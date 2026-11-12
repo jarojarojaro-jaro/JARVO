@@ -208,6 +208,9 @@ def test_full_orchestrator_build_with_cron(tmp_path, monkeypatch):
     ids = {j["id"] for j in jobs}
     assert ids == {"jarvo-patrol", "jarvo-daily-brief", "jarvo-weekly-review", "jarvo-knowledge-freshness"}
     assert all(j.get("deliver") == "telegram:111111111" for j in jobs)
+    # wiadomości rutyn z pytaniami trafiają do historii rozmowy właściciela („1 ok, 2 nie” bez cytatu)
+    assert {j["id"] for j in jobs if j.get("attach_to_session") is True} == {
+        "jarvo-patrol", "jarvo-daily-brief", "jarvo-weekly-review"}
     manifest = json.loads((tmp_path / "out/BUILD.json").read_text(encoding="utf-8"))
     assert manifest["agents"][0]["cron_jobs"] == 4
 

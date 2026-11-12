@@ -4,6 +4,8 @@
 # (`hermes -p jarvo cron resume <id>`) po sprawdzeniu, że Telegram działa (scripts/install-fleet.sh --resume-cron).
 # Głęboko myśli tylko przegląd tygodnia (wnioski, lekcje). Patrol i brief: płytkie myślenie, bo skrypt już zebrał dane;
 # model zostaje modelem Jarva (przypięty tu nie poszedłby za zmianą modelu w panelu). Świeżość wiedzy bez modelu (no_agent).
+# `attach_to_session: true`: wiadomość rutyny trafia też do historii rozmowy z właścicielem, więc odpowiedź „1 ok, 2 nie”
+# bez cytowania jest zrozumiała (12.11: brief z 5 decyzjami był tylko w sesji crona, czat by go nie znał).
 
 jobs:
   - id: jarvo-patrol
@@ -14,6 +16,7 @@ jobs:
     skills: [patrol]
     enabled_toolsets: [kanban, file, memory, skills]
     deliver: "@@OWNER_DELIVER@@"
+    attach_to_session: true
     prompt: >-
       Patrol floty. Powyżej masz sygnały z tablicy i dziennika misji. Postępuj według skilla `patrol`.
       Napraw to, co możesz, sam. Jeśli nic nie wymaga uwagi użytkownika, odpowiedz dokładnie [SILENT].
@@ -27,6 +30,7 @@ jobs:
     skills: [daily-brief, decision-queue, prosty-polski]
     enabled_toolsets: [kanban, file, memory, skills]
     deliver: "@@OWNER_DELIVER@@"
+    attach_to_session: true
     prompt: >-
       Przygotuj poranny brief według skilla `daily-brief` na podstawie danych powyżej
       oraz @@MISSIONS_DIR@@/INDEX.md. Po polsku, maksymalnie 12 linii.
@@ -38,6 +42,7 @@ jobs:
     skills: [weekly-review, fleet-improvement, prosty-polski]
     enabled_toolsets: [kanban, file, memory, skills, session_search]
     deliver: "@@OWNER_DELIVER@@"
+    attach_to_session: true
     prompt: >-
       Przygotuj przegląd tygodnia według skilla `weekly-review` na podstawie danych powyżej.
       Propozycje ulepszeń tylko z dowodami. Brak aktywności → [SILENT].
