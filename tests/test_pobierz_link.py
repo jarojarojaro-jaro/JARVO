@@ -367,6 +367,35 @@ def test_narzedzie_pobierz_link(tmp_path, monkeypatch):
     assert link["argv"] == ["https://x.com/a/status/1", "-o", katalog, "--transkrypcja"]
 
 
+def test_narzedzie_mowi_ze_link_juz_byl(tmp_path, monkeypatch):
+    """12.11 ten sam wpis X po raz trzeci: teczka tematu pobocznego i notatka z tym adresem trafiają do wyniku jako
+    `znane` (na początku, ze statusem teczki), niezależnie od parametrów linku i twitter.com/x.com."""
+    home = tmp_path / "dane" / "profiles" / "jarvo"
+    (home / "scripts").mkdir(parents=True)
+    (home / "scripts" / "pobierz_link.py").write_text(ATRAPA_SKRYPTU, encoding="utf-8")
+    monkeypatch.delenv("JARVO_TOOLS_PYTHON", raising=False)
+    for zm in ("JARVO_MISSIONS_DIR", "JARVO_KNOWLEDGE_DIR"):
+        monkeypatch.delenv(zm, raising=False)
+    teczki = tmp_path / "dane" / "jarvo" / "missions" / "poboczne"
+    teczki.mkdir(parents=True)
+    (teczki / "2026-11-11-lidar.md").write_text("# Temat poboczny: LiDAR\n\n- **Status:** otwarty\n"
+                                                "- **Link:** https://x.com/laanlabs/status/21202\n", encoding="utf-8")
+    notatki = tmp_path / "dane" / "jarvo" / "knowledge" / "podmioty"
+    notatki.mkdir(parents=True)
+    (notatki / "tani lidar.md").write_text("---\nzrodlo: \"https://x.com/laanlabs/status/21202\"\n---\n# Tani LiDAR\n",
+                                           encoding="utf-8")
+    zrobione = tmp_path / "dane" / "jarvo" / "knowledge" / "skrzynka" / "zrobione"
+    zrobione.mkdir(parents=True)
+    (zrobione / "stary szkic.md").write_text("https://x.com/laanlabs/status/21202", encoding="utf-8")
+    wynik = L.obsluz({"linki": ["https://twitter.com/laanlabs/status/21202?s=52"]}, hermes_home=str(home))
+    assert wynik.startswith('{"znane":')
+    (z,) = json.loads(wynik)["znane"]
+    assert z["teczki"] == [{"plik": str(teczki / "2026-11-11-lidar.md"), "status": "otwarty"}]
+    assert z["notatki"] == ["podmioty/tani lidar"] and "przypomnienia" in json.loads(wynik)["znane_uwaga"]
+    nowy = json.loads(L.obsluz({"linki": ["https://x.com/inny/status/999"]}, hermes_home=str(home)))
+    assert "znane" not in nowy and nowy["linki"][0]["url"] == "https://x.com/inny/status/999"
+
+
 def test_narzedzie_walidacja_i_awarie(tmp_path, monkeypatch):
     assert "co najmniej jeden" in json.loads(L.obsluz({"linki": []}))["error"]
     assert "Najwyżej 5" in json.loads(L.obsluz({"linki": [f"https://e.pl/{i}" for i in range(6)]}))["error"]
