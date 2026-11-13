@@ -1,6 +1,6 @@
 """Skrzynki sesji zewnętrznych: wiadomość właściciela zakończona dopiskiem (np. „gpu”) idzie do innej sesji agenta.
 
-Właściciel ma poza flotą długie sesje agenta kodującego (np. sesja omp o kernelach GPU enigmalabz, przeniesiona na
+Właściciel ma poza flotą długie sesje agenta kodującego (np. sesja omp o kernelach GPU jego silnika, przeniesiona na
 serwer Jarva 13.11). Chce wysyłać do nich tweety i linki z telefonu tym samym botem: wiadomość zakończona słowem
 z `<dane>/jarvo/konfig/sesje.json` nie trafia do Jarva, tylko jako plik JSON do skrzynki tej sesji; bot odpowiada
 krótkim potwierdzeniem, a odpowiedź sesji wysyła jej własny proces (`jarvo telegram wyslij`).
