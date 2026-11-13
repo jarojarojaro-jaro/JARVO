@@ -331,7 +331,7 @@ class Usluga:
             log("BŁĄD: przeglądarka nie poszła przez filtr ruchu do panelu Jarva: Komputer nie wstaje")
             return KOD_FILTR
         log("filtr ruchu: przeglądarka idzie przez proxy (adres panelu Jarva odrzucony)")
-        self.wejscie = wejscie_natywne.WejscieNatywne(self.k["dane"], token, self.polecenie)
+        self.wejscie = wejscie_natywne.WejscieNatywne(self.k["dane"], token, self.polecenie, kanban=self.u.dane)
         self.wejscie.sterownik = self.sterownik
         for nazwa, obsluga in (("ster", self.wejscie.obsluz_ster), ("cua", self.wejscie.obsluz_cua)):
             self.serwery.append(kanal.Serwer(kanal.adres(self.u.root, nazwa), obsluga, nazwa).start())

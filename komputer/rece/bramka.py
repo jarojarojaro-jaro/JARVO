@@ -115,7 +115,7 @@ ROLE_ELEMENTU = ("role", "subrole", "role_description", "roleDescription", "cont
 FLAGI_HASLA = ("is_password", "isPassword", "password", "secure", "is_secure", "isSecure", "protected",
                "is_protected", "isProtected")
 ROLA_PRZYCISKU = re.compile(r"button|link|menu ?item|check ?box|radio|toggle|tab ?item|page ?tab|\btab\b", re.I)
-# jak komputer/zasady_natywne.py (CAPTCHA)
+# CAPTCHA na ekranie właściciela rozwiązuje właściciel (Komputer Jarva próbuje sam)
 CAPTCHA = re.compile(r"captcha|recaptcha|hcaptcha|turnstile|nie jestem robotem|i'?m not a robot|"
                      r"zweryfikuj,? że jesteś człowiekiem|verify (?:that )?you are (?:a )?human|"
                      r"potwierdź,? że jesteś człowiekiem", re.I)

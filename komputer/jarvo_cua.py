@@ -24,7 +24,9 @@ z `<stan>/komputer/usluga.json`. Manifest podaje wtedy jako polecenie MCP Python
 uruchomi pliku .py wprost.
 Przed rozmową bramka wysyła wejściu powiadomienie `notifications/jarvo/grupa` z kluczem z JARVO_KOMPUTER_GRUPA
 (ustawia go wtyczka jarvo-komputer w procesie Hermesa): computer_use i narzędzie `komputer` jednego procesu agenta
-dzielą wtedy ekran (wejście nie odmawia im sobie nawzajem `zajete`).
+dzielą wtedy ekran (wejście nie odmawia im sobie nawzajem `zajete`). Natywnie jeszcze wcześniej, jako pierwszą
+wiadomość, `notifications/jarvo/karta` z kartą kanbana pracownika (HERMES_KANBAN_TASK, HERMES_KANBAN_BOARD; ustawia
+je dispatcher Hermesa): wejście czyta z tej karty zgodę właściciela (komputer/zgoda_karty.py, docs/KOMPUTER.md §6).
 """
 
 from __future__ import annotations
@@ -48,6 +50,7 @@ KOD_ODMOWY = 64                        # EX_USAGE: czasownik zablokowany przez b
 KOD_BRAK_KOMPUTERA = 69                # EX_UNAVAILABLE
 PO_KONCU_WEJSCIA = 2.0                 # s: ostatnie odpowiedzi po zamknięciu stdin przez Hermesa (potok bez półzamknięcia)
 GRUPA_ENV = "JARVO_KOMPUTER_GRUPA"     # grupa ekranu procesu agenta (infra/komputer/wejscie.py: GRUPA)
+KARTA_ENV, TABLICA_ENV = "HERMES_KANBAN_TASK", "HERMES_KANBAN_BOARD"   # karta pracownika kanbana (Hermes)
 
 POMOC = """cua-driver (bramka Jarvo)
 
@@ -145,6 +148,17 @@ def powiadomienie_grupy() -> bytes:
             + "\n").encode()
 
 
+def powiadomienie_karty() -> bytes:
+    """Wiersz MCP z kartą kanbana pracownika dla wejścia natywnego (komputer/wejscie_natywne.py: KARTA); pusty poza
+    kartą albo przy złym numerze lub tablicy."""
+    karta = os.environ.get(KARTA_ENV, "").strip()
+    tablica = os.environ.get(TABLICA_ENV, "").strip().lower() or "default"
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", karta) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", tablica):
+        return b""
+    return (json.dumps({"jsonrpc": "2.0", "method": "notifications/jarvo/karta",
+                        "params": {"karta": karta, "tablica": tablica}}) + "\n").encode()
+
+
 def pompuj(sciezka: str) -> int:
     """MCP na stdin/stdout ↔ gniazdo wejścia Komputera, bajt w bajt, aż jedna strona zamknie połączenie."""
     import socket
@@ -190,7 +204,7 @@ def pompuj_natywnie(root: str) -> int:
     kanal = _kanal()
     try:
         s = kanal.polacz(kanal.adres(root, "cua"), 5.0, kanal.pid_uslugi(root))
-        s.sendall(powiadomienie_grupy())
+        s.sendall(powiadomienie_karty() + powiadomienie_grupy())     # karta: pierwsza wiadomość sesji
     except (kanal.BladKanalu, OSError) as e:
         print(f"{powod_braku()} ({e})", file=sys.stderr)
         return KOD_BRAK_KOMPUTERA

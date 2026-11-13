@@ -2739,6 +2739,29 @@ def _z_potwierdzeniem(x: Any, glebokosc: int = 0) -> bool:
     return False
 
 
+def _zgoda_karty_kanbana() -> bool:
+    """Karta pracownika (HERMES_KANBAN_TASK) ma poprawną linię `ZGODA WŁAŚCICIELA` (komputer/zgoda_karty.py, kopiowany
+    przy buildzie obok wtyczki; w repo katalog `komputer/`). Czyta treść karty z kanban.db tylko do odczytu; każdy
+    błąd = brak zgody."""
+    try:
+        nazwa = "jarvo_zgoda_karty"
+        zk = sys.modules.get(nazwa)
+        if zk is None:
+            plik = next((p for p in (_HERE / "zgoda_karty.py", _HERE.parent.parent / "komputer" / "zgoda_karty.py")
+                         if p.is_file()), None)
+            if plik is None:
+                return False
+            import importlib.util
+            spec = importlib.util.spec_from_file_location(nazwa, plik)
+            zk = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(zk)
+            sys.modules[nazwa] = zk
+        karta = os.environ.get("HERMES_KANBAN_TASK", "").strip()
+        return bool(karta and zk.zgoda_z_tresci(zk.tresc_karty(karta)))
+    except Exception:
+        return False
+
+
 def _telefon(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[str, str]]:
     """mcp__phone__act / batch z confirm: prośba z treścią akcji (zgoda człowieka = jego „tak”), bez człowieka
     i pod YOLO (Hermes zatwierdziłby sam) block. Bez confirm: None (bramka telefonu i tak zatrzyma ryzykowną akcję).
@@ -2747,6 +2770,8 @@ def _telefon(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[str, str]]:
         return None
     akcja = _poczatek(json.dumps(args, sort_keys=True, ensure_ascii=False, default=str), 240)
     bez_czl = bez_czlowieka()
+    if bez_czl == "kanban" and _zgoda_karty_kanbana():
+        return None                 # polecenie właściciela w karcie (linia ZGODA WŁAŚCICIELA) jest jego „tak”
     if bez_czl:
         if bez_czl == "kanban":
             rada = ("Nie wysyłaj confirm; zatrzymaj kartę: kanban_block(kind=\"needs_input\", reason=\"potrzebne „tak” "

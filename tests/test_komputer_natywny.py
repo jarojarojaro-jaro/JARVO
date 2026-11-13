@@ -144,7 +144,8 @@ def usluga():
     (stan / "usluga.json").write_text(json.dumps({"pid": os.getpid()}), encoding="utf-8")
     polecenia: list = []
     w = wejscie_natywne.WejscieNatywne(root / "dane" / "jarvo" / "komputer", token,
-                                       lambda co, p: polecenia.append(co) or {"ok": True, "co": co})
+                                       lambda co, p: polecenia.append(co) or {"ok": True, "co": co},
+                                       kanban=root / "dane")
     w.sterownik = Sterownik()
     serwery = [kanal.Serwer(kanal.adres(root, "ster"), w.obsluz_ster, "ster").start(),
                kanal.Serwer(kanal.adres(root, "cua"), w.obsluz_cua, "cua").start()]
@@ -166,11 +167,16 @@ def env_natywny(root: Path) -> dict:
 
 
 class Klient:
-    def __init__(self, root: Path, grupa: str | None = None):
+    def __init__(self, root: Path, grupa: str | None = None, karta: str | None = None, tablica: str | None = None):
         env = env_natywny(root)
-        env.pop("JARVO_KOMPUTER_GRUPA", None)
+        for k in ("JARVO_KOMPUTER_GRUPA", "HERMES_KANBAN_TASK", "HERMES_KANBAN_BOARD"):
+            env.pop(k, None)
         if grupa:
             env["JARVO_KOMPUTER_GRUPA"] = grupa            # grupa ekranu procesu Hermesa (wtyczka jarvo-komputer)
+        if karta:
+            env["HERMES_KANBAN_TASK"] = karta              # karta pracownika kanbana (dispatcher Hermesa)
+        if tablica:
+            env["HERMES_KANBAN_BOARD"] = tablica
         self.p = subprocess.Popen([sys.executable, "-I", str(BRAMKA), "mcp"], stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
         self.n = 0
@@ -241,8 +247,11 @@ def test_rozmowa_mcp_przez_brame_z_twardymi_zasadami(usluga):
 
         pisz = {"pid": PID, "window_id": 3, "delivery_mode": "foreground"}
         assert k.narzedzie("type_text", {**pisz, "text": "abc"})["structuredContent"]["rule"] == "brak_fokusu"
-        usluga.sterownik.fokus_pola = {"rola": "password text", "nazwa": "Hasło", "atrybuty": {}, "przodkowie": []}
+        usluga.sterownik.fokus_pola = {"rola": "entry", "nazwa": "Numer karty", "atrybuty": {}, "przodkowie": []}
         assert k.narzedzie("type_text", {**pisz, "text": "abc"})["structuredContent"]["code"] == "wymaga_czlowieka"
+        usluga.sterownik.fokus_pola = {"rola": "password text", "nazwa": "Hasło", "atrybuty": {}, "przodkowie": [],
+                                       "w_formularzu": False, "formularz": []}
+        assert not k.narzedzie("type_text", {**pisz, "text": "Lato2026!"}).get("isError")     # hasło wpisuje agent
         usluga.sterownik.fokus_pola = {"rola": "entry", "nazwa": "Uwagi", "atrybuty": {}, "przodkowie": [],
                                        "w_formularzu": False, "formularz": []}
         assert k.narzedzie("hotkey", {**pisz, "keys": ["ctrl", "v"]})["structuredContent"]["rule"] == "schowek"
@@ -256,7 +265,63 @@ def test_rozmowa_mcp_przez_brame_z_twardymi_zasadami(usluga):
     finally:
         k.zamknij()
     dziennik = json.dumps(list(usluga.wejscie.dziennik.ostatnie), ensure_ascii=False)
-    assert "Proszę o fakturę" not in dziennik and "czlowiek" in dziennik
+    assert "Proszę o fakturę" not in dziennik and "Lato2026!" not in dziennik and "czlowiek" in dziennik
+
+
+def _karta_w_kanbanie(baza: Path, karta: str, tresc: str) -> None:
+    import sqlite3
+    baza.parent.mkdir(parents=True, exist_ok=True)
+    con = sqlite3.connect(baza)
+    con.execute("CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, title TEXT, body TEXT)")
+    con.execute("INSERT OR REPLACE INTO tasks VALUES (?, 'Kup domenę', ?)", (karta, tresc))
+    con.commit()
+    con.close()
+
+
+def _zaplac(k: Klient) -> dict:
+    stan = k.narzedzie("get_window_state", {"pid": PID, "window_id": 3})
+    el = {e["label"]: e for e in stan["structuredContent"]["elements"]}
+    return k.narzedzie("click", {"pid": PID, "window_id": 3, "element_token": el["Zapłać 129 zł"]["element_token"]})
+
+
+def test_zgoda_z_karty_przez_bramke_i_wejscie(usluga):
+    """Droga zgody: HERMES_KANBAN_TASK (i tablica) w otoczeniu pracownika → bramka (pierwsza wiadomość sesji) →
+    wejście czyta linię ZGODA WŁAŚCICIELA z treści karty w `<dane>/kanban.db`."""
+    dane = usluga.root / "dane"
+    _karta_w_kanbanie(dane / "kanban.db", "t_zgoda", "Kup domenę jarvo.pl\n"
+                      "ZGODA WŁAŚCICIELA: płatność — „kup domenę do 60 zł” (2026-11-13)\n")
+    _karta_w_kanbanie(dane / "kanban.db", "t_bez", "Kup domenę jarvo.pl")
+    _karta_w_kanbanie(dane / "kanban" / "boards" / "sklep" / "kanban.db", "t_tab",
+                      "ZGODA WŁAŚCICIELA: wszystko — „rób co trzeba” (2026-11-13)")
+    for karta, tablica, wolno in (("t_zgoda", None, True), ("t_bez", None, False), (None, None, False),
+                                  ("t_tab", "sklep", True), ("t_tab", None, False), ("nie_ma", None, False)):
+        k = Klient(usluga.root, karta=karta, tablica=tablica)
+        try:
+            w = _zaplac(k)
+        finally:
+            k.zamknij()
+        assert (not w.get("isError")) is wolno, (karta, tablica, w)
+        if not wolno:
+            assert w["structuredContent"]["consent_category"] == "platnosc"
+    wpisy = [w for w in usluga.wejscie.dziennik.ostatnie if w.get("narzedzie") == "click"]
+    assert any(w.get("zgoda") == "platnosc" for w in wpisy)
+    assert "kup domenę do 60 zł" not in json.dumps(wpisy, ensure_ascii=False)       # dziennik bez treści karty
+
+
+def test_karta_tylko_jako_pierwsza_wiadomosc(usluga):
+    """Powiadomienie z kartą po rozpoczęciu rozmowy (nie od bramki) nie daje zgody."""
+    _karta_w_kanbanie(usluga.root / "dane" / "kanban.db", "t_zgoda",
+                      "ZGODA WŁAŚCICIELA: platnosc — „kup” (2026-11-13)")
+    k = Klient(usluga.root)
+    try:
+        k.rpc("initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "t"}})
+        k.p.stdin.write((json.dumps({"jsonrpc": "2.0", "method": wejscie_natywne.KARTA,
+                                     "params": {"karta": "t_zgoda", "tablica": "default"}}) + "\n").encode())
+        k.p.stdin.flush()
+        w = _zaplac(k)
+    finally:
+        k.zamknij()
+    assert w["structuredContent"]["code"] == "wymaga_czlowieka"
 
 
 def test_ster_pauza_wznowienie_tylko_z_tokenem(usluga):

@@ -81,8 +81,9 @@ approvals:
   single_query_mode: deny
   unattended_mode: deny
   smart_policy: >-
-    Always ESCALATE: logging into any website or app, payments, purchases, sending or publishing anything,
-    accepting terms or consents, changing account settings, solving CAPTCHAs, typing passwords, card numbers or codes.
+    Always ESCALATE: payments, purchases, sending messages to people or publishing anything, deleting an account,
+    unless the kanban card body has a line "ZGODA WŁAŚCICIELA" naming that category. Logging in, registering
+    accounts, typing passwords and verification codes for the owner's task are allowed.
   deny:
     - "rm -rf /*"
     - "* | sh"

@@ -160,15 +160,14 @@ def test_operator_wypelnia_formularz_a_wrazliwe_konczy_oddaj(przegl):
     _, el = migawka(st, nr)
     assert el["Imię i nazwisko"]["value"] == "Jan Kowalski"
     for etykieta, nazwa, args in (
-            ("Hasło do konta", "type_text", {"text": "tajne"}), ("Kod BLIK", "type_text", {"text": "123456"}),
-            ("Numer karty", "type_text", {"text": "4111"}), ("Zapłać 129 zł", "click", {}),
-            ("Zapłać kartą", "click", {}), ("Faktura (PDF)", "click", {})):
+            ("Kod BLIK", "type_text", {"text": "123456"}), ("Numer karty", "type_text", {"text": "4111"}),
+            ("Zapłać 129 zł", "click", {}), ("Zapłać kartą", "click", {}), ("Faktura (PDF)", "click", {})):
         w = ocen(ctx, nazwa, {**cel, "element_token": el[etykieta]["element_token"], **args})
         assert w.decyzja == zasady.CZLOWIEK, (etykieta, w.kod, w.powod)
-    # pole z fokusem na żywo: po kliknięciu w pole hasła pisanie bez celu też robi właściciel
+    # hasło agent wpisuje sam, także bez celu w polu z fokusem na żywo
+    assert ocen(ctx, "type_text", {**cel, "element_token": el["Hasło do konta"]["element_token"], "text": "x"}).wolno
     st.wywolaj("click", {**cel, "element_token": el["Hasło do konta"]["element_token"]}, {})
-    w = ocen(ctx, "type_text", {**cel, "delivery_mode": "foreground", "text": "tajne"})
-    assert (w.decyzja, w.kod) == (zasady.CZLOWIEK, "pole_wrazliwe")
+    assert ocen(ctx, "type_text", {**cel, "delivery_mode": "foreground", "text": "Lato2026!"}).wolno
     # Enter w polu e-mail wysłałby formularz z przyciskiem płatności
     st.wywolaj("click", {**cel, "element_token": el["E-mail"]["element_token"]}, {})
     w = ocen(ctx, "press_key", {**cel, "delivery_mode": "foreground", "key": "Return"})
@@ -531,14 +530,14 @@ def test_skrypt_strony_przenosi_fokus_do_hasla(przegl):
     st.wywolaj("click", {**cel, "element_token": el["Uwagi"]["element_token"]}, {})
     assert ocen(ctx, "type_text", {**cel, "text": "abc"}).wolno
     assert st.wywolaj("type_text", {**cel, "text": "abc"}, {})["structuredContent"]["effect"] == "confirmed"
-    # znak po znaku: w polu hasła robi właściciel, a fokus przeniesiony po ocenie zatrzymuje klawisz
+    # znak po znaku: fokus przeniesiony po ocenie zatrzymuje klawisz (hasło agent wpisuje sam, ale tylko tam,
+    # gdzie zasady oceniły pole)
     assert ocen(ctx, "press_key", {**cel, "key": "x"}).wolno
     js(st, nr, "document.querySelector('[name=haslo]').focus()")
     w = st.wywolaj("press_key", {**cel, "key": "x"}, {})
     assert w["structuredContent"]["code"] == "fokus_zmieniony" and js(st, nr, "document.querySelector("
                                                                          "'[name=haslo]').value") == ""
-    w = ocen(ctx, "press_key", {**cel, "key": "x"})
-    assert (w.decyzja, w.kod) == (zasady.CZLOWIEK, "pole_wrazliwe")
+    assert ocen(ctx, "press_key", {**cel, "key": "x"}).wolno
 
 
 def test_file_i_siec_lokalna_zablokowane(przegl):

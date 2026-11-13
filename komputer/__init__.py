@@ -8,10 +8,12 @@ sterowana przez CDP po potoku, z twardymi zasadami wejścia i filtrem ruchu w ap
   przegladarka.py      flagi, preferencje profilu, pobrane pliki i program przeglądarki
   sterownik_cdp.py     sterownik mówiący tym samym MCP co cua-driver (elements, element_token, effect; pasek adresu
                        jako element 0), podgląd dla HQ (Page.startScreencast) i wejście właściciela („Przejmij”)
-  zasady_natywne.py    słownik ról CDP dla zasad i zasady z J05 (schowek, okna potwierdzeń, wybór pliku, CAPTCHA,
-                       znak po znaku w polu hasła)
-  wejscie_natywne.py   wejście z twardymi zasadami: rdzeń z infra/komputer/wejscie.py i zasady.py, kontekst CDP;
-                       kanał `ster` z poleceniami właściciela (wznow, klatka, przejmij, wejscie, stop, okno, wyczysc)
+  zasady_natywne.py    słownik ról CDP dla zasad i zasady z J05 (schowek, okna potwierdzeń, wybór pliku,
+                       znak po znaku w polu karty)
+  zgoda_karty.py       zgoda właściciela z karty kanbana (linia ZGODA WŁAŚCICIELA, kanban.db tylko do odczytu)
+  wejscie_natywne.py   wejście z twardymi zasadami: rdzeń z infra/komputer/wejscie.py i zasady.py, kontekst CDP,
+                       zgoda z karty agenta (numer karty od bramki); kanał `ster` z poleceniami właściciela (wznow,
+                       klatka, przejmij, wejscie, stop, okno, wyczysc)
   usluga.py            proces usługi Komputera (proxy, przeglądarka, wejście, kanały, samotesty, postój bezczynnej
                        przeglądarki); pod nadzorcą Jarva jako usługa `komputer` (jarvo/nadzorca.py)
 Polecenie właściciela: `jarvo komputer` (jarvo/komputer.py).

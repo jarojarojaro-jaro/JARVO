@@ -53,6 +53,10 @@ def test_weekly_dokleja_strone(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(report, "load_live", lambda _w: tydzien)
     monkeypatch.setattr(report.liczby, "policz", lambda *_a: {})
     monkeypatch.setattr(report.prosty, "tydzien", lambda *_a: {})
+    # briefy czytają prawdziwy skarbiec (_sciezki): otwarta decyzja właściciela robiła „pusty” tydzień niepustym
+    monkeypatch.setattr(report.briefy, "synchronizuj", lambda *_a, **_k: [])
+    monkeypatch.setattr(report.briefy, "otwarte", lambda *_a, **_k: [])
+    monkeypatch.setattr(report.briefy, "tydzien", lambda *_a, **_k: [])
     monkeypatch.setattr(report.raport_strona, "zapisz", lambda dane, now: {"plik": "/x/tydzien.html", "link": "http://h/t/"})
     report.main(["--mode", "weekly", "--now", str(NOW)])
     out = capsys.readouterr().out

@@ -200,8 +200,9 @@ def przebieg(root: str) -> int:
 
     sprawdz(kod(klik("Dodaj do koszyka")) == "ok", "klik „Dodaj do koszyka”: przechodzi")
     w, el = stan_okna()
-    for etykieta in ("Kup teraz", "Zaloguj się", "Zapłać 129 zł"):
-        sprawdz(kod(klik(etykieta)) == "wymaga_czlowieka", f"klik „{etykieta}” elementem: wymaga człowieka")
+    for etykieta in ("Kup teraz", "Zapłać 129 zł"):
+        sprawdz(kod(klik(etykieta)) == "wymaga_czlowieka", f"klik „{etykieta}” elementem bez zgody w karcie: wymaga "
+                "człowieka")
     z_kluczem = f"Zapłać kluczem {UKRYTE}"
     if sprawdz(z_kluczem in el, f"drzewo dostępności ma „{z_kluczem}”"):
         w = klik(z_kluczem)
@@ -248,12 +249,11 @@ def przebieg(root: str) -> int:
     w = k.narzedzie("press_key", {**pisz, "key": "Return"})
     sprawdz(kod(w) == "ok", "Enter w wyszukiwarce (formularz bez płatności): przechodzi", tekst(w))
     sprawdz(kod(klik("Hasło")) == "ok", "klik w pole hasła: przechodzi (klik niczego nie wysyła)")
-    sprawdz(kod(k.narzedzie("type_text", {**pisz, "text": "tajne-haslo"})) == "wymaga_czlowieka",
-            "pisanie w polu hasła (fokus na żywo): wymaga człowieka")
-    sprawdz(zasada(k.narzedzie("press_key", {**pisz, "key": "t"})) == "pole_wrazliwe",
-            "hasło znak po znaku (press_key w polu hasła): wymaga człowieka")
-    sprawdz(kod(k.narzedzie("press_key", {**pisz, "key": "Return"})) == "wymaga_czlowieka",
-            "Enter w polu hasła: wymaga człowieka")
+    sprawdz(kod(k.narzedzie("type_text", {**pisz, "text": "tajne-haslo"})) == "ok",
+            "pisanie w polu hasła (fokus na żywo): przechodzi (logowanie agent robi sam)")
+    sprawdz(kod(k.narzedzie("press_key", {**pisz, "key": "t"})) == "ok", "hasło znak po znaku: przechodzi")
+    sprawdz(zasada(k.narzedzie("press_key", {**pisz, "key": "Return"})) == "formularz_wrazliwy",
+            "Enter w polu hasła wysłałby formularz z „Zapłać”: wymaga człowieka")
     klik("Numer karty")
     sprawdz(kod(k.narzedzie("type_text", {**pisz, "text": "1234"})) == "wymaga_czlowieka",
             "pisanie w polu „Numer karty”: wymaga człowieka")
@@ -420,9 +420,11 @@ def formularz(k: Klient, pid: int) -> None:
     sprawdz(kod(w) == "ok", "formularz: zaznaczenie regulaminu (zwykłe pole wyboru)", tekst(w))
     el = migawka()
     sprawdz(el.get("Imię i nazwisko", {}).get("value") == "Jan Kowalski", "formularz: wartość pola widać w migawce")
-    for etykieta in ("Hasło do konta", "Kod BLIK"):
-        w = k.narzedzie("type_text", {**pisz, "element_token": el[etykieta]["element_token"], "text": "123456"})
-        sprawdz(kod(w) == "wymaga_czlowieka", f"formularz: „{etykieta}” wpisuje właściciel", tekst(w))
+    w = k.narzedzie("type_text", {**pisz, "element_token": el["Hasło do konta"]["element_token"], "text": "123456"})
+    sprawdz(kod(w) == "ok", "formularz: „Hasło do konta” wpisuje Operator", tekst(w))
+    w = k.narzedzie("type_text", {**pisz, "element_token": el["Kod BLIK"]["element_token"], "text": "123456"})
+    sprawdz(kod(w) == "wymaga_czlowieka", "formularz: „Kod BLIK” bez zgody `platnosc` w karcie: wymaga człowieka",
+            tekst(w))
     # ramka płatności to inna witryna (osobny proces): na Windows arm64 z przeglądarką x64 w emulacji jej
     # przygotowanie trwa kilkanaście sekund (CI natywnie WARM: Page.enable ramki po 14 s), więc czekamy jak na kartę
     koniec = time.monotonic() + 45

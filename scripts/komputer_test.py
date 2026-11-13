@@ -178,8 +178,9 @@ def main() -> int:
 
     sprawdz(kod(klik("Dodaj do koszyka")) == "ok", "klik „Dodaj do koszyka”: przechodzi")
     w, el = stan()
-    for etykieta in ("Kup teraz", "Zaloguj się", "Zapłać 129 zł"):
-        sprawdz(kod(klik(etykieta)) == "wymaga_czlowieka", f"klik „{etykieta}” elementem: wymaga człowieka")
+    for etykieta in ("Kup teraz", "Zapłać 129 zł"):
+        sprawdz(kod(klik(etykieta)) == "wymaga_czlowieka", f"klik „{etykieta}” elementem bez zgody w karcie: wymaga "
+                "człowieka")
     z_kluczem = "Zapłać kluczem [ukryte przez Komputer Jarva]"     # nazwa przycisku w drzewie, już bez klucza
     if sprawdz(z_kluczem in el, f"drzewo dostępności ma „{z_kluczem}”"):
         w = klik(z_kluczem)
@@ -221,10 +222,10 @@ def main() -> int:
     sprawdz(kod(w) == "ok", "Enter w wyszukiwarce (formularz bez płatności): przechodzi", tekst(w))
     sprawdz(kod(klik("Hasło")) == "ok", "klik w pole hasła: przechodzi (klik niczego nie wysyła)")
     time.sleep(0.5)
-    sprawdz(kod(k.narzedzie("type_text", {**pisz, "text": "tajne-haslo"})) == "wymaga_czlowieka",
-            "pisanie w polu hasła (fokus z AT-SPI): wymaga człowieka")
+    sprawdz(kod(k.narzedzie("type_text", {**pisz, "text": "tajne-haslo"})) == "ok",
+            "pisanie w polu hasła (fokus z AT-SPI): przechodzi (logowanie agent robi sam)")
     sprawdz(kod(k.narzedzie("press_key", {**pisz, "key": "Return"})) == "wymaga_czlowieka",
-            "Enter w polu hasła: wymaga człowieka")
+            "Enter w polu hasła wysłałby formularz z „Zapłać”: wymaga człowieka")
     klik("Numer karty")
     time.sleep(0.5)
     sprawdz(kod(k.narzedzie("type_text", {**pisz, "text": "1234"})) == "wymaga_czlowieka",

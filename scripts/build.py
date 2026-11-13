@@ -1266,6 +1266,8 @@ def main(argv: list[str] | None = None) -> int:
     wtyczki = ["jarvo-hq", WIEDZA_PLUGIN, KOMPUTER_PLUGIN]
     if uklad.natywny:
         shutil.copytree(fl.REPO_ROOT / "zgody" / "plugin", zp, ignore=COPY_IGNORE)
+        # zgoda właściciela z karty (linia ZGODA WŁAŚCICIELA): ten sam parser co wejście Komputera, dla bramki telefonu
+        shutil.copy2(fl.REPO_ROOT / "komputer" / "zgoda_karty.py", zp / "zgoda_karty.py")
         wtyczki.append(ZGODY_PLUGIN)
         print(f"✓ plugins/{ZGODY_PLUGIN}: tryby zgód w każdym profilu i w hoście, profil czatu {fleet.orchestrator} "
               f"z approvals.mode {TRYB_ZGOD_CZATU}")

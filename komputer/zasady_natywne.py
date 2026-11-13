@@ -1,9 +1,10 @@
 """Twarde zasady Komputera natywnie (docs/NATYWNIE.md J05): `infra/komputer/zasady.py` bez zmian + to, czego
 przeglądarka na pulpicie właściciela wymaga ponad kontener.
 
-Rdzeń (płatność, zakup, logowanie, wysyłka, publikacja, hasła, karty, kody, sekrety, adresy, skróty narzędzi
-deweloperskich, accesskey, okno nieaktywne, pauza) ocenia zasady.ocen na opisie elementu ze sterownika CDP
-(role w słowniku zasad: sterownik_cdp.ROLE i rola_zasad). Ten moduł dokłada zasady, które ocenia się PRZED rdzeniem:
+Rdzeń (płatność, zakup, wysyłka, publikacja i usunięcie konta tylko ze zgodą właściciela w karcie, karty, sekrety,
+adresy, skróty narzędzi deweloperskich, accesskey, okno nieaktywne, pauza) ocenia zasady.ocen na opisie elementu ze
+sterownika CDP (role w słowniku zasad: sterownik_cdp.ROLE i rola_zasad). Logowanie, rejestrację, hasła, kody i CAPTCHA
+agent robi sam. Ten moduł dokłada zasady, które ocenia się PRZED rdzeniem:
   schowek            Ctrl/Cmd+V, Shift+Insert, Ctrl+Shift+V (wklejanie ze schowka właściciela: mógł tam skopiować
                      hasło) oraz Ctrl/Cmd+C, Ctrl/Cmd+X, Ctrl+Insert (agent nie zmienia schowka właściciela): odmowa
   skrot_przegladarki skróty, które w oknie przeglądarki otwierają pasek adresu, nową kartę lub okno, plik z dysku,
@@ -12,11 +13,9 @@ deweloperskich, accesskey, okno nieaktywne, pauza) ocenia zasady.ocen na opisie 
   okno_wrazliwe      OK (klik, Enter) w oknie JavaScript (confirm, prompt, beforeunload) z tekstem płatności,
                      zakupu, logowania, wysyłki, publikacji albo usunięcia konta: robi właściciel; Anuluj wolno
   wybor_pliku        klik, Enter albo spacja na polu wyboru pliku (<input type=file>): plik wybiera właściciel
-  captcha            klik albo pisanie w CAPTCHA (reCAPTCHA, hCaptcha, Turnstile, „Nie jestem robotem”): robi człowiek
-  pole_wrazliwe      pojedynczy znak przez press_key (także z Shift) w polu hasła, karty albo kodu: to też pisanie,
-                     więc robi je właściciel (rdzeń sprawdza tak tylko type_text); pole, którego nie da się
+  pole_wrazliwe      pojedynczy znak przez press_key (także z Shift) w polu karty, CVV albo BLIK bez zgody `platnosc`:
+                     to też pisanie (rdzeń sprawdza pole tylko przy type_text); pole, którego nie da się
                      sprawdzić: odmowa `nieznany_cel`
-Pauza (poza odczytem) zostaje dla rdzenia: ocena zwraca None i rdzeń odpowiada `wstrzymane`.
 """
 from __future__ import annotations
 
@@ -43,9 +42,6 @@ SKROTY_PRZEGLADARKI = frozenset(
        ("ctrl", "next"), ("ctrl", "pageup"), ("ctrl", "pagedown"), ("alt", "super", "left"), ("alt", "super", "right"),
        ("super", "comma"), ("super", ","), ("ctrl", "f4"), ("alt", "f4")}
     | {(m, str(i)) for m in ("ctrl", "super", "alt") for i in range(10)})
-CAPTCHA = re.compile(r"captcha|recaptcha|hcaptcha|turnstile|nie jestem robotem|i'?m not a robot|"
-                     r"zweryfikuj,? że jesteś człowiekiem|verify (?:that )?you are (?:a )?human|"
-                     r"potwierdź,? że jesteś człowiekiem", re.I)
 KLAWISZE_AKCEPTUJACE = zasady.KLAWISZE_ENTER
 # Tekst okna JavaScript, którego OK zatwierdza właściciel: rdzenie słów (okno pyta pełnym zdaniem: „Czy na pewno
 # zapłacić…?”, a zasady.WRAZLIWE szuka całych słów przycisków). Usunięcie samo w sobie nie (pozycja w koszyku),
@@ -61,14 +57,6 @@ def _skrot(args: dict, nazwa: str) -> tuple:
     klawisze = [args.get("key")] + list(args.get("modifiers") or []) if nazwa == "press_key" \
         else list(args.get("keys") or [])
     return zasady._skrot([k for k in klawisze if k])
-
-
-def _napisy(el: Optional[dict]) -> list[str]:
-    if not el:
-        return []
-    napisy = [str(el.get("nazwa") or "")]
-    napisy += [str(p.get("nazwa") or "") for p in (el.get("sciezka_przodkow") or el.get("przodkowie") or [])]
-    return [n for n in napisy if n]
 
 
 def _okno_js(el: Optional[dict]) -> Optional[zasady.Werdykt]:
@@ -92,13 +80,6 @@ def _plik(el: Optional[dict]) -> Optional[zasady.Werdykt]:
     return None
 
 
-def _captcha(el: Optional[dict]) -> Optional[zasady.Werdykt]:
-    for napis in _napisy(el):
-        if CAPTCHA.search(zasady._napis(napis)):
-            return zasady.Werdykt(zasady.CZLOWIEK, "captcha", "CAPTCHA rozwiązuje człowiek", zasady.opis(el))
-    return None
-
-
 def ocen(nazwa: str, args: Optional[dict], ctx) -> Optional[zasady.Werdykt]:
     """Werdykt zasady natywnej albo None (wtedy ocenia rdzeń: zasady.ocen)."""
     args = args if isinstance(args, dict) else {}
@@ -118,20 +99,21 @@ def ocen(nazwa: str, args: Optional[dict], ctx) -> Optional[zasady.Werdykt]:
     if nazwa in ("click", "double_click", "drag", "right_click"):
         el = ctx.cel("click", args) if celowane else None
         if el and not el.get("nieznany"):
-            return _okno_js(el) or (_plik(el) if nazwa != "right_click" else None) or _captcha(el)
+            return _okno_js(el) or (_plik(el) if nazwa != "right_click" else None)
         return None
     if nazwa in ("press_key", "hotkey"):
         skrot = _skrot(args, nazwa)
         if skrot and len(skrot[-1]) == 1 and not set(skrot[:-1]) - {"shift"}:
-            # znak po znaku to też pisanie: hasło albo kod BLIK wpisany klawiszami robi właściciel
+            # znak po znaku to też pisanie: numer karty albo kod BLIK wpisany klawiszami tylko ze zgodą `platnosc`
             el = ctx.cel(nazwa, args) if celowane else ctx.fokus(args)
             if el is not None and el.get("nieznany"):
                 return zasady.Werdykt(zasady.ODMOWA, "nieznany_cel", "nie wiem, gdzie trafi znak (fokus się zmienił "
                                       "albo pola nie da się sprawdzić); zrób get_window_state i kliknij pole")
-            powod = zasady.pole_wrazliwe(el)
-            if powod:
-                return zasady.Werdykt(zasady.CZLOWIEK, "pole_wrazliwe", f"{powod}: hasło, kartę i kody wpisuje "
-                                      "właściciel (także znak po znaku)", zasady.opis(el))
+            powod = zasady.pole_platnosci(el)
+            if powod and not zasady.Zgody(ctx).ma("platnosc"):
+                return zasady.Werdykt(zasady.CZLOWIEK, "pole_wrazliwe", f"{powod}: kartę, CVV i BLIK, także znak po "
+                                      f"znaku ({zasady._bez_zgody('platnosc')})", zasady.opis(el),
+                                      {"kategoria": "platnosc"})
             return None
         if not skrot or skrot[-1] not in zasady.KLAWISZE_AKTYWUJACE:
             return None
@@ -141,7 +123,7 @@ def ocen(nazwa: str, args: Optional[dict], ctx) -> Optional[zasady.Werdykt]:
                 zly = _okno_js(el)
                 if zly:
                     return zly
-            return _plik(el) or _captcha(el)
+            return _plik(el)
         return None
     if nazwa == "type_text":
         el = ctx.cel(nazwa, args) if celowane else ctx.fokus(args)
@@ -151,9 +133,8 @@ def ocen(nazwa: str, args: Optional[dict], ctx) -> Optional[zasady.Werdykt]:
                 zly = _okno_js({**el, "dialog": {**el["dialog"], "akceptuje": True}})
                 if zly:
                     return zly
-            return _captcha(el)
         return None
     if nazwa == "set_value":
         el = ctx.cel(nazwa, args)
-        return (_plik(el) or _captcha(el)) if el and not el.get("nieznany") else None
+        return _plik(el) if el and not el.get("nieznany") else None
     return None

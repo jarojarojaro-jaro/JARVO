@@ -205,6 +205,20 @@ JS_OPIS = """function(){
     formularz: !!f, wartosc: ('value' in e && t !== 'button') ? String(e.value).slice(0, 200) : null};
 }"""
 JS_FORMULARZ = "function(){ return this.form || (this.closest && this.closest('form')) || null; }"
+# Pola formularza i jego nazwa (zasady.formularz_logowania: wysyłka formularza logowania i rejestracji bez zgody)
+# (przez Element.prototype: pole formularza o nazwie „elements” albo „id” nie przesłoni metod formularza)
+JS_POLA_FORMULARZA = """function(){
+  const f = this, a = (e, n) => Element.prototype.getAttribute.call(e, n) || '';
+  const el = Array.from(Element.prototype.querySelectorAll.call(f, 'input,textarea,select')).slice(0, 40);
+  const pola = el.map(e => {
+    const t = String(e.localName || '').toLowerCase();
+    return {tag: t, typ: (a(e, 'type') || (t === 'input' ? 'text' : '')).toLowerCase(),
+      nazwa: a(e, 'name') || a(e, 'id'), autocomplete: a(e, 'autocomplete'), placeholder: a(e, 'placeholder'),
+      etykieta: a(e, 'aria-label')};
+  });
+  return {pola: pola,
+    opis: {nazwa: a(f, 'name'), id: a(f, 'id'), action: a(f, 'action'), etykieta: a(f, 'aria-label')}};
+}"""
 JS_FOKUS = """function(){
   let e = document.activeElement;
   for (let i = 0; i < 32 && e && e.shadowRoot && e.shadowRoot.activeElement; i++) e = e.shadowRoot.activeElement;
@@ -1514,7 +1528,10 @@ class Sterownik:
                         nazwa = _napis((n.get("name") or {}).get("value"))
                         if nazwa and not n.get("ignored"):
                             przyciski.append({"rola": "push button", "nazwa": nazwa})
-                el.update(w_formularzu=True, formularz=przyciski)
+                forma_js = (self._js(sesja, fid, JS_POLA_FORMULARZA) or {}) if fid else {}
+                el.update(w_formularzu=True, formularz=przyciski,
+                          pola_formularza=list(forma_js.get("pola") or [])[:40],
+                          opis_formularza=dict(forma_js.get("opis") or {}))
             else:
                 el.update(w_formularzu=False, formularz=[])
             return el

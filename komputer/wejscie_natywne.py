@@ -3,7 +3,7 @@
 Rdzeń jest ten sam co w kontenerze (`infra/komputer/wejscie.py`: sesja MCP, kontrola protokołu, migawki tej sesji,
 świeża migawka przed działaniem na element, ukrywanie sekretów, dziennik bez treści, limit działań, jedna sesja przy
 ekranie naraz) i te same twarde zasady (`infra/komputer/zasady.py`) z zasadami natywnymi przed nimi
-(`zasady_natywne.py`). Inne są trzy rzeczy:
+(`zasady_natywne.py`). Inne są cztery rzeczy:
   - kontekst zasad to KontekstCDP: element, punkt i fokus opisuje na żywo sterownik CDP (zamiast AT-SPI i X11);
   - sterownik działa w tym samym procesie (sterownik_cdp.Sterownik), więc wiadomość MCP po ocenie idzie do niego
     przez kolejkę sesji, a odpowiedź wraca tą samą drogą co w kontenerze (ukrywanie sekretów, migawki);
@@ -11,6 +11,9 @@ ekranie naraz) i te same twarde zasady (`infra/komputer/zasady.py`) z zasadami n
     i polecenia usługi (stop, okno, wyczyść) wymagają tokenu właściciela z `<stan>/komputer/wlasciciel.klucz`
     (`jarvo komputer wznow`, HQ po zalogowaniu). Token przeczyta każdy proces właściciela, także agent z pełnym
     terminalem: to granica wobec Operatora (bez terminala) i wobec stron, nie wobec właściciela.
+  - zgoda właściciela: bramka podaje pierwszą wiadomością sesji kartę agenta (`notifications/jarvo/karta`:
+    HERMES_KANBAN_TASK i HERMES_KANBAN_BOARD pracownika Hermesa), a kontekst czyta linię ZGODA WŁAŚCICIELA z treści
+    tej karty w `<dane>/kanban.db` (zgoda_karty.py, tylko do odczytu); strona i argumenty modelu zgody nie dają.
 Działanie agenta zasady oceniają dopiero, gdy sterownik skończył poprzednie wywołanie tej sesji (wiadomości wysłane
 jedna za drugą bez czekania na wynik nie ocenią fokusu sprzed kliknięcia, które jeszcze czeka w kolejce).
 Paczka `run_steps` (do 20 kroków) nie omija zasad: sterownik woła przed każdym krokiem `SesjaNatywna._krok`, czyli
@@ -48,12 +51,17 @@ if str(_INFRA) not in sys.path:
 import wejscie  # noqa: E402  (infra/komputer/wejscie.py: rdzeń sesji bez zmian)
 import zasady  # noqa: E402
 
-from . import kanal, zasady_natywne  # noqa: E402
+from . import kanal, zasady_natywne, zgoda_karty  # noqa: E402
 
 MAKS_DZIENNIK = 2 << 20
 MAKS_SESJE = wejscie.MAKS_SESJE
 CZAS_KOLEJKI = 60.0               # s czekania na koniec poprzedniego wywołania sesji, zanim zasady ocenią następne
 TYLKO_WLASCICIEL = ("wznow", "stop", "okno", "wyczysc", "restart", "klatka", "przejmij", "wejscie")
+# Bramka (jarvo_cua.py) podaje przed rozmową kartę kanbana, nad którą pracuje agent (HERMES_KANBAN_TASK i tablica
+# HERMES_KANBAN_BOARD z otoczenia pracownika Hermesa): zgodę właściciela z tej karty wejście czyta samo z kanban.db.
+# Pierwsze powiadomienie sesji wygrywa; model go nie wyśle (rozmawia przez narzędzia, nie wiadomościami MCP).
+KARTA = "notifications/jarvo/karta"
+CZAS_ZGODY = 5.0                  # s: zgoda karty czytana z kanban.db najwyżej raz na tyle sekund
 POWOD_PRZEJECIA = "przejął ekran w HQ"
 BEZ_WPISU = ("mysz", "kolko")     # działania właściciela bez wpisu w dzienniku (ruch myszy, przewijanie)
 
@@ -159,6 +167,11 @@ class KontekstCDP(wejscie.KontekstSesji):
     def __init__(self, ekran: EkranNatywny, wej: "WejscieNatywne") -> None:
         super().__init__(ekran)
         self._wej = wej
+        self.karta: tuple[str, str] | None = None     # (numer karty, tablica) od bramki (KARTA), pierwsza wygrywa
+
+    def zgody(self) -> frozenset:
+        """Zgoda właściciela z karty tej sesji (zasady.Kontekst.zgody); bez karty: brak zgód."""
+        return self._wej.zgody_karty(self.karta) if self.karta else frozenset()
 
     @property
     def sterownik(self):
@@ -232,10 +245,30 @@ class SesjaNatywna(wejscie.Sesja):
         self._w_toku = 0                              # wiadomości w kolejce sterownika i ta w obsłudze
         self._bezczynny = threading.Condition()
         self.ostatnio = time.monotonic()              # ostatnia wiadomość od agenta (postój: WejscieNatywne.w_uzyciu)
+        self._pierwsza = True                         # karta (KARTA) tylko jako pierwsza wiadomość sesji
 
     def _od_agenta(self, linia: bytes) -> None:
         self.ostatnio = time.monotonic()
+        pierwsza, self._pierwsza = self._pierwsza, False
+        if KARTA.encode() in linia:
+            try:
+                msg = json.loads(linia)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                msg = None
+            if isinstance(msg, dict) and msg.get("method") == KARTA and msg.get("id") is None:
+                if pierwsza:
+                    self._karta(msg.get("params"))
+                return
         super()._od_agenta(linia)
+
+    def _karta(self, params) -> None:
+        """Powiadomienie bramki z kartą agenta (pierwsza wiadomość sesji): numer i tablica sprawdzone wzorcem."""
+        params = params if isinstance(params, dict) else {}
+        karta, tablica = params.get("karta"), params.get("tablica") or "default"
+        if isinstance(karta, str) and zgoda_karty.KARTA.match(karta) \
+                and isinstance(tablica, str) and zgoda_karty.TABLICA.match(tablica):
+            self.ctx.karta = (karta, tablica)
+            log(f"sesja {self.nr}: karta {karta} (tablica {tablica})")
 
     def do_sterownika(self, wiadomosc: dict) -> None:
         if self._pracownik is None:
@@ -355,7 +388,7 @@ class WejscieNatywne:
     """Kanały `cua` (sesje MCP) i `ster` (stan, pauza, wznowienie, dziennik, polecenia usługi)."""
 
     def __init__(self, katalog_danych: Path, token: str,
-                 polecenie_uslugi: Callable[[str, dict], dict] | None = None) -> None:
+                 polecenie_uslugi: Callable[[str, dict], dict] | None = None, kanban: Path | None = None) -> None:
         self.sterownik = None                      # ustawia usługa po starcie (i po restarcie) przeglądarki
         self.dziennik = DziennikNatywny(Path(katalog_danych) / "dziennik.jsonl")
         self.ekran = EkranNatywny(self, Path(katalog_danych) / "pauza")
@@ -364,6 +397,26 @@ class WejscieNatywne:
         self.srodowisko: dict = {}
         self._token = token
         self.polecenie_uslugi = polecenie_uslugi or (lambda _co, _p: {"ok": False, "blad": "brak usługi"})
+        self.kanban = Path(kanban) if kanban is not None else None   # `<dane>` z kanban.db (None: bez zgód z kart)
+        self._zgody: dict[tuple[str, str], tuple[float, frozenset]] = {}
+
+    def zgody_karty(self, karta: tuple[str, str]) -> frozenset:
+        """Kategorie zgody właściciela z treści karty (numer, tablica) w `<kanban>`, czytane z kanban.db tylko do
+        odczytu najwyżej raz na CZAS_ZGODY s; nieczytelna baza albo brak karty: brak zgód."""
+        if self.kanban is None:
+            return frozenset()
+        teraz = time.monotonic()
+        with self._lock:
+            zapis = self._zgody.get(karta)
+            if zapis and teraz - zapis[0] < CZAS_ZGODY:
+                return zapis[1]
+        baza = zgoda_karty.sciezka_kanbana(self.kanban, karta[1])
+        zgody = zgoda_karty.zgoda_z_tresci(zgoda_karty.tresc_karty(karta[0], baza)) if baza else frozenset()
+        with self._lock:
+            if len(self._zgody) > 64:
+                self._zgody.clear()
+            self._zgody[karta] = (teraz, zgody)
+        return zgody
 
     def koniec_sesji(self, sesja) -> None:
         with self._lock:

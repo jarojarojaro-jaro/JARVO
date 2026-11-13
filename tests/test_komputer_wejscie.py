@@ -210,9 +210,9 @@ def test_rozmowa_mcp_odmowy_i_ukrywanie(komputer):
     w = k.narzedzie("type_text", {"pid": 7, "window_id": 3, "element_token": "s1:1", "text": "a@b.pl\n"})
     assert zasada(w) == "formularz_wrazliwy"                     # Enter w polu formularza z „Zapłać”
     assert zasada(k.narzedzie("type_text", {"pid": 7, "text": "abc"})) == "brak_fokusu"
-    Dostepnosc.fokus_pola = {"rola": "password text", "nazwa": "Hasło"}
+    Dostepnosc.fokus_pola = {"rola": "entry", "nazwa": "Numer karty"}
     try:
-        assert zasada(k.narzedzie("type_text", {"pid": 7, "text": "tajne"})) == "pole_wrazliwe"
+        assert zasada(k.narzedzie("type_text", {"pid": 7, "text": "4111"})) == "pole_wrazliwe"
     finally:
         Dostepnosc.fokus_pola = None
     assert len(komputer.do_sterownika()) == przed
@@ -462,7 +462,7 @@ def test_wtyczka_operatora_przez_ster(komputer, monkeypatch):
     monkeypatch.setattr(wejscie, "wolno_wznowic", lambda uid: True)
     ster(wejscie.STER, "pauza", powod="przerwa")                               # właściciel zatrzymał wcześniej
     monkeypatch.setattr(wejscie, "wolno_wznowic", lambda uid: False)
-    odp = json.loads(obsluz({"akcja": "oddaj", "prosba": "kliknij Zapłać w Ekranie HQ"}))
+    odp = json.loads(obsluz({"akcja": "oddaj", "prosba": "kliknij Zapłać w oknie Komputera"}))
     assert odp["kto_wstrzymal"] == "właściciel" and odp["dalej"].startswith("Właściciel już wstrzymał")
     monkeypatch.setattr(pl, "STER", os.path.join(komputer.sciezka, "brak.sock"))
     wyl = json.loads(obsluz({"akcja": "stan"}))

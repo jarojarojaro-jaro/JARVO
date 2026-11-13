@@ -101,7 +101,7 @@ def flagi(*, profil: Path, port_proxy: int | None, okno: bool, ekran: tuple[int,
         # tej samej strony w jednym procesie, a drugi widget w emulacji kończył się błędami mojo (Z42)
         f += ["--disable-gpu", "--disable-software-rasterizer", "--renderer-process-limit=100"]
     if MACOS:
-        f.append("--use-mock-keychain")              # bez okna pęku kluczy (hasła i tak są wyłączone)
+        f.append("--use-mock-keychain")              # bez okna pęku kluczy systemu
     if LINUX:
         f.append("--password-store=basic")
     if bez_piaskownicy:
@@ -123,9 +123,11 @@ def brak_piaskownicy(log: Path) -> bool:
 def preferencje(pobrane: Path) -> dict:
     """Część `Default/Preferences` profilu, którą ustawiamy przed każdym startem (reszta należy do przeglądarki)."""
     return {
-        "credentials_enable_service": False,
-        "credentials_enable_autosignin": False,
-        "profile": {"password_manager_enabled": False, "exit_type": "Normal", "exited_cleanly": True,
+        # menedżer haseł włączony (decyzja właściciela 13.11: konta robi Operator, hasło zostaje w profilu przeglądarki,
+        # nie w czacie ani pliku); na Linuksie `--password-store=basic`, więc bez okna pęku kluczy systemu
+        "credentials_enable_service": True,
+        "credentials_enable_autosignin": True,
+        "profile": {"password_manager_enabled": True, "exit_type": "Normal", "exited_cleanly": True,
                     "default_content_setting_values": {
                         "notifications": 2, "geolocation": 2, "media_stream_camera": 2, "media_stream_mic": 2,
                         "clipboard": 2, "midi_sysex": 2, "sensors": 2, "idle_detection": 2, "local_fonts": 2,

@@ -1,7 +1,7 @@
 ---
 name: formularze
 description: "Formularz na ekranie: pola, listy, sprawdzenie wartości"
-version: 1.3.0
+version: 1.4.0
 author: Jarvo
 license: MIT
 metadata:
@@ -16,9 +16,10 @@ metadata:
 
 # Formularze
 
-Wypełniasz formularz pole po polu i każde sprawdzasz. Wysłanie formularza, który loguje, płaci, zamawia, wysyła
-albo publikuje, robi właściciel: wejście Komputera i tak zatrzyma taki przycisk (`przycisk_wrazliwy`) i Enter
-w takim formularzu (`formularz_wrazliwy`).
+Wypełniasz formularz pole po polu i każde sprawdzasz. Logowanie i rejestrację wysyłasz sam (hasło i kod wpisujesz,
+hasło zapisujesz w menedżerze haseł przeglądarki). Formularz, który płaci, zamawia, wysyła wiadomość do ludzi albo
+publikuje, wysyłasz tylko z linią `ZGODA WŁAŚCICIELA` w karcie; bez niej wejście zatrzyma przycisk
+(`przycisk_wrazliwy`) i Enter (`formularz_wrazliwy`).
 
 ## Przed wypełnieniem
 1. Dane tylko z karty albo od właściciela. Czego brakuje, nie zmyślasz: pytasz (`clarify` na Telegramie) albo
@@ -68,6 +69,6 @@ przewiń, jeśli długi), gdy właściciel ma go sprawdzić.
 
 ## Wysłanie
 - Formularz zwykły (wyszukiwanie, filtr, kalkulator, zapis szkicu): wysyłasz sam.
-- Formularz wrażliwy (logowanie, rejestracja, zakup, płatność, wysyłka wiadomości, publikacja, zgoda): nie
-  wysyłasz. `oddaj-ekran` z prośbą „sprawdź formularz X i kliknij Y”, a w raporcie lista wpisanych pól (bez
-  danych wrażliwych).
+- Logowanie, rejestracja, kod weryfikacyjny: wysyłasz sam.
+- Płatność, zakup, wysyłka wiadomości, publikacja: tylko z linią `ZGODA WŁAŚCICIELA` w karcie; bez niej `oddaj-ekran`
+  z prośbą „sprawdź formularz X i kliknij Y”, a w raporcie lista wpisanych pól (bez haseł i kodów).

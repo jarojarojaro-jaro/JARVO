@@ -1,7 +1,7 @@
 ---
 name: skrzynka-linkow
 description: "Link od właściciela do skarbca; „one” = temat poboczny."
-version: 1.4.0
+version: 1.5.0
 author: Jarvo
 license: MIT
 metadata:
@@ -40,8 +40,12 @@ API ręcznie, nie otwierasz linku w przeglądarce: wszystko daje narzędzie `pob
 3. **Sprawdź skarbiec** jednym `wiedza_szukaj` (temat albo autor): czy to już było i czego dotyczy w firmach
    i projektach właściciela.
 4. **Oceń** krótko: co to jest; dlaczego może być ważne dla biznesów albo projektów właściciela (konkretnie, z nazwą
-   marki lub projektu, gdy pasuje; bez naciągania); temat; możliwe działanie (np. „do testu w kampanii X”, „zlecić
-   Sherlockowi sprawdzenie”, „tylko do wiadomości”). Działania nie zlecasz sam: proponujesz.
+   marki lub projektu, gdy pasuje; bez naciągania); temat; możliwe działanie.
+   **Zawsze zestaw z wąskimi gardłami z profilu właściciela** (sekcja „Wąskie gardła”: CPU serwera najwyżej 80%,
+   3 zadania naraz, testy kerneli na procesorze, render wideo, buildy i audyty) i powiedz wprost, które gardło to
+   rozwiązuje i jak („darmowe 4 vCPU = drugi procesor na render i testy kerneli”). Gdy rozwiązuje, jest darmowe
+   i odwracalne, **od razu zakładasz misję próby** (konto przez Operatora, pierwsze prawdziwe zadanie, pomiar
+   względem serwera) i mówisz, że ruszyło; płatne albo nieodwracalne: propozycja z kosztem.
 5. **Zapisz zawsze** jeden szkic na link: `wiedza_zapisz` z polami:
    - `typ`: `fakt` (wiadomość, liczba, ogłoszenie), `podmiot` (firma, narzędzie, człowiek w roli publicznej),
      `pojecie` (metoda, pomysł, wzorzec), `projekt` (dotyczy konkretnego projektu właściciela);
@@ -52,8 +56,8 @@ API ręcznie, nie otwierasz linku w przeglądarce: wszystko daje narzędzie `pob
    - `tagi`: `skrzynka-linkow`, rodzaj (`x`, `youtube`, `strona`) i 1–3 tematy małymi literami bez polskich znaków
      (np. `ai`, `marketing`, `sprzedaz`, `strony`, `wideo`, `reklama`, `narzedzia`, nazwa marki).
      Tematy to tagi tymczasowe, do czasu podziału na profile.
-6. **Odpowiedz** 2–4 krótkimi zdaniami po polsku (skill `prosty-polski`): co to jest, czemu może się przydać,
-   sugerowane działanie, i że szkic jest w skarbcu, a notatka pojawi się po kompilacji (kilka minut).
+6. **Odpowiedz** 2–4 krótkimi zdaniami po polsku (skill `prosty-polski`): co to jest, które nasze gardło rozwiązuje,
+   co już ruszyło (albo sugerowane działanie), i że szkic jest w skarbcu (notatka po kompilacji, kilka minut).
 
 ## Kilka linków
 Wszystkie w jednym `pobierz_link` (najwyżej 5; więcej = kolejne wywołanie). Szkic osobno dla każdego linku.

@@ -66,13 +66,32 @@ def load_live() -> dict:
             diagnostics.append(d)
     index_file = MISSIONS_DIR / "INDEX.md"
     index = index_file.read_text(encoding="utf-8") if index_file.exists() else ""
-    return {"tasks": tasks, "events": events, "diagnostics": diagnostics, "index": index,
+    raporty = []                                    # misje z aktywnych, które mają już raport końcowy w MISSION.md
+    for m in parse_index(index):
+        dziennik = MISSIONS_DIR / m["id"] / "MISSION.md"
+        try:
+            if ma_raport(dziennik.read_text(encoding="utf-8")):
+                raporty.append(m["id"])
+        except (OSError, UnicodeDecodeError):
+            pass
+    return {"tasks": tasks, "events": events, "diagnostics": diagnostics, "index": index, "raporty": raporty,
             **({} if index_file.exists() else {"index_brak": index_file.as_posix()})}
 
 
 # --------------------------------------------------------------------- analysis
 
 _ROW = re.compile(r"^\|\s*(?P<id>[MZ]-[^|]+?)\s*\|(?P<rest>.*)\|\s*$")
+
+_RAPORT = re.compile(r"^## Raport końcowy[ \t]*\n(?P<tresc>.*?)(?=^## |\Z)", re.M | re.S)
+
+
+def ma_raport(mission_md: str) -> bool:
+    """MISSION.md ma raport końcowy: sekcja „## Raport końcowy” z treścią, nie pusta i nie znacznik szablonu
+    („<wklejony przy zamknięciu>”). Raport w dzienniku = właściciel go dostał (mission-ledger: najpierw wiadomość)."""
+    m = _RAPORT.search(mission_md)
+    tresc = m.group("tresc").strip() if m else ""
+    return bool(tresc) and not (tresc.startswith("<") and tresc.endswith(">"))
+
 
 
 def parse_index(index_md: str) -> list[dict]:
@@ -156,13 +175,17 @@ def analyze(data: dict, now: float) -> list[dict]:
         add("mission_index_missing", "medium", "mission_index_missing",
             f"Brak dziennika misji {data['index_brak']}: patrol nie widzi misji. Odtwórz go z szablonu skilla "
             "mission-ledger (references/INDEX.template.md).")
+    raporty = set(data.get("raporty", []))
     for m in parse_index(data.get("index", "")):
         cards = m["cards"]
         if not cards:
             continue
         missing = [c for c in cards if c not in tasks]
         statuses = [tasks[c].get("status") for c in cards if c in tasks]
-        if statuses and all(s in {"done", "archived"} for s in statuses) and not missing:
+        # Raport już wysłany albo misja czeka na decyzję właściciela (pytania poszły, wracają w briefie): bez
+        # budzenia. Dawniej patrol budził Jarva i ten wysyłał ten sam raport drugi raz (13.11, Z-261113-instabox).
+        poinformowany = m["id"] in raporty or m["status"].lower().startswith("czeka na")
+        if statuses and all(s in {"done", "archived"} for s in statuses) and not missing and not poinformowany:
             add(f"mission_done:{m['id']}", "high", "mission_ready",
                 f"Misja {m['id']} („{m['title']}”): wszystkie karty zakończone, brak raportu końcowego.",
                 mission=m["id"])

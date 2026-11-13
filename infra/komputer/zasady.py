@@ -4,10 +4,13 @@ Czyste funkcje bez wejścia i wyjścia: wejscie.py woła `ocen` przy każdym wyw
 zanim sterownik je dostanie, i `ukryj_sekrety` na każdej odpowiedzi, zanim zobaczy ją agent.
 
 Decyzje:
-  tak         przepuść,
+  tak         przepuść (także logowanie, rejestracja, „Continue with Google”, zgoda OAuth, hasło, kod 2FA i SMS,
+              CAPTCHA),
   odmowa      zakazane zawsze (narzędzie wyłączone, sekret w tekście, zła aplikacja),
-  czlowiek    to kliknięcie albo wpis robi właściciel w Ekranie HQ (płatność, zakup, logowanie, wysyłka,
-              publikacja, hasło, karta, BLIK, kod 2FA),
+  czlowiek    krok nieodwracalny bez zgody właściciela w karcie (Zgody, ctx.zgody, komputer/zgoda_karty.py):
+              płatność, zakup, subskrypcja, karta i BLIK (`platnosc`), wysyłka (`wysylka`; formularz logowania
+              i rejestracji bez zgody),
+              publikacja (`publikacja`), usunięcie konta (`usuniecie_konta`); ze zgodą przechodzi,
   wstrzymane  Komputer zatrzymany (właściciel: jarvo komputer pauza; Operator: czeka na właściciela);
               patrzeć wolno, działać nie, wznawia tylko właściciel.
 Przy dwóch sesjach naraz zmieniać ekran może jedna (odmowa `zajete`, wejscie.py: Ekran.zajmij).
@@ -17,7 +20,8 @@ a przełączenie okna przez sterownik posłałoby klawisze tam, gdzie nikt nie p
 
 Cel działania (pole, przycisk) opisuje słownik z wejscie.py: rola i nazwa z drzewa dostępności, atrybuty HTML
 z AT-SPI (tag, html-input-name, text-input-type), przodkowie (rola, nazwa) do kilku poziomów w górę i przy polach
-przyciski formularza, w którym pole leży (Enter w polu wysyła formularz).
+przyciski formularza, w którym pole leży (Enter w polu wysyła formularz); natywnie też pola formularza i jego nazwa
+(`pola_formularza`, `opis_formularza`: formularz logowania).
 """
 
 from __future__ import annotations
@@ -72,32 +76,45 @@ def _wzorce(*w: str) -> re.Pattern:
     return re.compile(r"(?<!\w)(?:" + "|".join(w) + r")(?!\w)", re.I)
 
 
-# Napisy na przyciskach i linkach, których kliknięcie zostawiamy właścicielowi. Szukamy w całej etykiecie
-# („Kup teraz za 129 zł”), z granicami słów, po polsku i po angielsku.
-WRAZLIWE = _wzorce(
-    # płatność i zakup
+# Napisy na przyciskach i linkach w czterech kategoriach zgody właściciela (linia ZGODA WŁAŚCICIELA w karcie,
+# komputer/zgoda_karty.py). Szukamy w całej etykiecie („Kup teraz za 129 zł”), z granicami słów, po polsku
+# i po angielsku.
+_PLATNOSC = (
     r"kup(?:uj[eę])?", r"zam[oó]w(?:ienie)?", r"zamawiam", r"z[lł][oó][zż] zam[oó]wienie", r"zap[lł]a[cć]",
     r"p[lł]ac[eę]", r"zap[lł]ac[eę]", r"op[lł]a[cć]", r"przejd[zź] do (?:p[lł]atno[sś]ci|kasy)",
     r"p[lł]atno[sś][cć]", r"potwierd[zź] (?:zakup|p[lł]atno[sś][cć]|zam[oó]wienie|przelew)", r"blik",
     r"przelew", r"przelej", r"wp[lł]a[cć]", r"do[lł]aduj", r"subskrybuj", r"wykup", r"wesprzyj",
     r"darowizn[aęy]", r"dodaj kart[eęy]", r"buy", r"purchase", r"pay", r"check ?out",
     r"place (?:your )?order", r"(?:complete|confirm|submit) (?:order|payment|purchase)", r"subscribe",
-    r"donate", r"add (?:a )?(?:payment|card)", r"proceed to (?:checkout|payment)",
-    # logowanie, rejestracja, zgody na dostęp
+    r"donate", r"add (?:a )?(?:payment|card)", r"proceed to (?:checkout|payment)", r"top ?up",
+)
+_USUNIECIE_KONTA = (r"usu[nń] konto", r"delete (?:my )?account", r"zamknij konto", r"close (?:my )?account")
+_PUBLIKACJA = (r"opublikuj", r"publikuj", r"publish", r"post", r"tweet", r"udost[eę]pnij", r"share")
+_WYSYLKA = (r"wy[sś]lij", r"prze[sś]lij", r"send", r"submit")
+# logowanie, rejestracja i zgody na dostęp (OAuth): Komputer robi je sam; wzorce zostają w WRAZLIWE dla Rąk Jarva
+# (komputer/rece/bramka.py), a LOGOWANIE (z weryfikacją) rozpoznaje formularz logowania (wysyłka bez zgody)
+_LOGOWANIE = (
     r"zaloguj(?: si[eę])?", r"logowanie", r"zarejestruj(?: si[eę])?", r"za[lł][oó][zż] konto",
     r"utw[oó]rz konto", r"log ?in", r"sign ?in", r"sign ?up", r"register", r"create (?:an )?account",
     r"continue with (?:google|apple|facebook|microsoft)",
     r"kontynuuj (?:z|przez) (?:google|apple|facebook|microsoft)", r"autoryzuj", r"authori[sz]e",
-    # wysyłka i publikacja
-    r"wy[sś]lij", r"prze[sś]lij", r"send", r"submit", r"opublikuj", r"publikuj", r"publish", r"post",
-    r"tweet", r"udost[eę]pnij", r"share",
-    # nieodwracalne zmiany konta
-    r"usu[nń] konto", r"delete (?:my )?account", r"zamknij konto", r"close (?:my )?account",
 )
+
+# kategorie zgody w kolejności ważności: etykieta z kilku kategorii („Zapłać i wyślij”) należy do pierwszej
+KATEGORIE = ("platnosc", "usuniecie_konta", "publikacja", "wysylka")
+OPIS_KATEGORII = {"platnosc": "płatność, zakup, subskrypcja, darowizna, karta", "usuniecie_konta": "usunięcie konta",
+                  "publikacja": "publikacja", "wysylka": "wysyłka"}
+WZORCE_KATEGORII = {"platnosc": _wzorce(*_PLATNOSC), "usuniecie_konta": _wzorce(*_USUNIECIE_KONTA),
+                    "publikacja": _wzorce(*_PUBLIKACJA), "wysylka": _wzorce(*_WYSYLKA)}
+LOGOWANIE = _wzorce(*_LOGOWANIE, r"rejestracja", r"registration", r"continue with github",
+                    r"kontynuuj (?:z|przez) github", r"weryfikacja", r"verification", r"verify", r"zweryfikuj")
+
+# Ręce Jarva (ekran właściciela) i okna JavaScript: wszystko powyżej, także logowanie, zostawia właścicielowi.
+WRAZLIWE = _wzorce(*_PLATNOSC, *_LOGOWANIE, *_WYSYLKA, *_PUBLIKACJA, *_USUNIECIE_KONTA)
 # krótkie zgody, groźne tylko jako cała etykieta (ekran zgody OAuth); „Zezwól na wszystkie” to baner ciasteczek
 WRAZLIWE_CALE = re.compile(r"^\s*(?:allow|allow access|zezw[oó]l|zezw[oó]l na dost[eę]p|grant access)\s*$", re.I)
 
-# Pola, do których agent nie pisze: hasła, karty, kody jednorazowe, PIN, tokeny.
+# Ręce Jarva: pola, do których agent nie pisze (hasła, karty, kody jednorazowe, PIN, tokeny).
 POLE_WRAZLIWE = _wzorce(
     r"has[lł]o", r"password", r"passwd", r"pass(?:code|phrase)", r"pin", r"karta", r"karty", r"card",
     r"cc-?(?:number|num|csc|exp)", r"cardnumber", r"cvv2?", r"cvc", r"csc", r"blik", r"otp", r"2fa",
@@ -105,6 +122,23 @@ POLE_WRAZLIWE = _wzorce(
     r"kod (?:bezpiecze[nń]stwa|cvv|cvc|blik|sms|weryfikacyjny|jednorazowy|autoryzacyjny|potwierdzaj[aą]cy|"
     r"z aplikacji|dost[eę]pu)",
 )
+# Komputer Jarva: pola płatności (karta, CVV, BLIK) tylko ze zgodą `platnosc`; hasła i kody agent wpisuje sam.
+POLE_PLATNOSCI = _wzorce(
+    r"karta", r"karty", r"card", r"cc-?(?:number|num|csc|exp|name)", r"cardnumber", r"cvv2?", r"cvc", r"csc",
+    r"blik", r"security code", r"expiry", r"expiration", r"data wa[zż]no[sś]ci", r"numer karty",
+    r"kod (?:bezpiecze[nń]stwa|cvv|cvc|blik)",
+)
+# Pole hasła albo kodu (formularz logowania, rejestracji, weryfikacji): wysyłka bez zgody.
+POLE_LOGOWANIA = _wzorce(
+    r"has[lł]o", r"password", r"passwd", r"pass(?:code|phrase)", r"otp", r"2fa", r"mfa", r"totp",
+    r"two.?factor", r"one.?time(?:.code)?", r"verification code", r"kod (?:sms|weryfikacyjny|jednorazowy|"
+    r"autoryzacyjny|potwierdzaj[aą]cy|z aplikacji|dost[eę]pu)", r"current.password", r"new.password",
+)
+# Nazwa, id albo adres (action) formularza logowania i rejestracji, np. „login_form”, „/session”, „/signup”.
+FORMULARZ_LOGOWANIA = re.compile(r"log[ _-]?in|sign[ _-]?(?:in|up)|regist|rejestr|logowan|zaloguj|zarejestr|"
+                                 r"create[ _-]?account|utw[oó]rz konto|za[lł][oó][zż] konto|(?<![a-z])auth(?![a-z])|"
+                                 r"oauth|authenticat|authori[sz]|verif|weryfik|session|otp|2fa|mfa|two[ _-]?factor|"
+                                 r"password|has[lł]o", re.I)
 
 # Sekrety w tekście: wpisanie to odmowa, w odpowiedzi sterownika zastępujemy je znacznikiem.
 SEKRETY = re.compile("|".join([
@@ -178,6 +212,41 @@ class Kontekst(Protocol):
 
     def pid_okna(self, okno: int) -> Optional[int]:
         """Proces, do którego należy okno (X11 _NET_WM_PID), None gdy nieznany."""
+
+    def zgody(self) -> frozenset:
+        """Kategorie zgody właściciela z karty, nad którą pracuje agent (komputer/zgoda_karty.py). Czyta je zaufany
+        kod wejścia z treści karty w kanban.db, nigdy strona ani argumenty modelu. Kontekst bez tej metody: brak zgód.
+        Kategorie spoza KATEGORIE (np. `konto`) zasady Komputera pomijają: logowanie i rejestracja przechodzą bez
+        nich."""
+
+
+class Zgody:
+    """Zgody właściciela dla jednej oceny: ctx.zgody() czytane raz i tylko wtedy, gdy działanie ich potrzebuje;
+    `uzyte` trafiają do dziennika przy werdykcie tak."""
+
+    def __init__(self, ctx) -> None:
+        self._ctx = ctx
+        self._z: Optional[frozenset] = None
+        self.uzyte: list[str] = []
+
+    def ma(self, kategoria: str) -> bool:
+        if self._z is None:
+            czytaj = getattr(self._ctx, "zgody", None)
+            try:
+                z = czytaj() if callable(czytaj) else frozenset()
+            except Exception:  # noqa: BLE001 - nieczytelna zgoda to brak zgody, nigdy przepuszczenie
+                z = frozenset()
+            self._z = frozenset(k for k in (z or ()) if k in KATEGORIE)
+        if kategoria in self._z:
+            if kategoria not in self.uzyte:
+                self.uzyte.append(kategoria)
+            return True
+        return False
+
+    def brak(self, kategorie) -> Optional[str]:
+        """Pierwsza kategoria bez zgody właściciela albo None (wszystkie mają zgodę)."""
+        return next((k for k in kategorie if not self.ma(k)), None)
+
 
 
 def luhn(cyfry: str) -> bool:
@@ -261,37 +330,81 @@ def opis(el: Optional[dict]) -> str:
 
 
 def _wrazliwa_etykieta(tekst: str) -> bool:
+    """Etykieta z dowolnej grupy wrażliwej, także logowania i zgody OAuth (Ręce Jarva, okna JavaScript)."""
     tekst = _napis(tekst)
     return bool(tekst) and (bool(WRAZLIWE.search(tekst)) or bool(WRAZLIWE_CALE.match(tekst)))
 
 
-def przycisk_wrazliwy(el: Optional[dict]) -> Optional[str]:
-    """Etykieta przycisku albo linku, który zostawiamy właścicielowi: cel i jego przodkowie z rolą działania."""
+def kategoria(tekst: str) -> Optional[str]:
+    """Kategoria zgody (KATEGORIE) napisu przycisku, linku albo pozycji menu; None: agent klika sam."""
+    tekst = _napis(tekst)
+    if not tekst:
+        return None
+    return next((k for k in KATEGORIE if WZORCE_KATEGORII[k].search(tekst)), None)
+
+
+def _rola(el: dict) -> str:
+    return str(el.get("rola") or el.get("role") or "").lower()
+
+
+def formularz_logowania(el: Optional[dict]) -> bool:
+    """Element leży w formularzu logowania, rejestracji albo weryfikacji (jego wysyłka nie potrzebuje zgody):
+    formularz bez pola wieloliniowego (wiadomości), w którym jest pole hasła albo kodu jednorazowego, przycisk
+    logowania albo rejestracji, albo którego nazwa, id lub adres (action), nazwa w drzewie dostępności albo tytuł
+    strony mówią o logowaniu lub rejestracji."""
+    if not el or not w_formularzu(el):
+        return False
+    pola = [p for p in el.get("pola_formularza") or [] if isinstance(p, dict)]
+    if wieloliniowe(el) or any(str(p.get("tag") or "").lower() == "textarea" or p.get("wieloliniowy") for p in pola):
+        return False
+    atr = el.get("atrybuty") or {}
+    if _rola(el) in ROLE_HASLA or str(atr.get("text-input-type", "")).lower() == "password":
+        return True
+    for p in pola:
+        if str(p.get("typ") or "").lower() == "password":
+            return True
+        if any(a in str(p.get("autocomplete") or "").lower() for a in ("current-password", "new-password",
+                                                                       "one-time-code")):
+            return True
+        for k in ("nazwa", "etykieta", "placeholder"):
+            tekst = _napis(str(p.get(k) or "")).replace("_", " ")
+            if tekst and POLE_LOGOWANIA.search(tekst):
+                return True
+    forma = el.get("opis_formularza") if isinstance(el.get("opis_formularza"), dict) else {}
+    if any(FORMULARZ_LOGOWANIA.search(_napis(str(forma.get(k) or ""))) for k in ("nazwa", "id", "action", "etykieta")):
+        return True
+    for p in el.get("formularz") or []:
+        if LOGOWANIE.search(_etykieta(p)):
+            return True
+    return any(_rola(p) in ("form", "document web") and LOGOWANIE.search(_etykieta(p))
+               for p in el.get("sciezka_przodkow") or el.get("przodkowie") or [])
+
+
+def przycisk_wrazliwy(el: Optional[dict]) -> Optional[tuple[str, str]]:
+    """(etykieta, kategoria) przycisku albo linku, którego kliknięcie potrzebuje zgody właściciela: cel i jego
+    przodkowie z rolą działania. Wysyłka formularza logowania, rejestracji i weryfikacji zgody nie potrzebuje."""
     if not el:
         return None
-    if _wrazliwa_etykieta(_etykieta(el)):
-        return _etykieta(el)
-    for p in (el.get("przodkowie") or [])[:4]:
-        rola = str(p.get("rola") or p.get("role") or "").lower()
-        if rola in ROLE_DZIALANIA and _wrazliwa_etykieta(_etykieta(p)):
-            return _etykieta(p)
+    kandydaci = [el] + [p for p in (el.get("przodkowie") or [])[:4] if _rola(p) in ROLE_DZIALANIA]
+    for p in kandydaci:
+        kat = kategoria(_etykieta(p))
+        if kat and not (kat == "wysylka" and formularz_logowania(el)):
+            return _etykieta(p), kat
     return None
 
 
-def pole_wrazliwe(el: Optional[dict]) -> Optional[str]:
-    """Powód, dla którego do pola nie pisze agent (hasło, karta, kod), albo None."""
+def pole_platnosci(el: Optional[dict]) -> Optional[str]:
+    """Powód, dla którego do pola pisze agent tylko ze zgodą `platnosc` (karta, CVV, BLIK), albo None. Hasła
+    i kody (2FA, SMS, weryfikacja) agent wpisuje sam."""
     if not el:
         return None
     if el.get("nieznany"):
         return "pole, którego Komputer nie umie sprawdzić"
-    rola = str(el.get("rola") or el.get("role") or "").lower()
     atr = el.get("atrybuty") or {}
-    if rola in ROLE_HASLA or str(atr.get("text-input-type", "")).lower() == "password":
-        return "pole hasła"
     for tekst in (_etykieta(el), str(atr.get("html-input-name", "")), str(atr.get("autocomplete", "")),
                   str(atr.get("placeholder-text", ""))):
         tekst = _napis(tekst)
-        if tekst and POLE_WRAZLIWE.search(tekst.replace("_", " ")):
+        if tekst and POLE_PLATNOSCI.search(tekst.replace("_", " ")):
             return f"pole „{_pokaz(tekst, 40)}”"
     return None
 
@@ -306,24 +419,29 @@ def _skrot(klawisze: list) -> tuple:
     return tuple(mod + reszta)
 
 
-def _czlowiek(kod: str, powod: str, cel: str = "") -> Werdykt:
-    return Werdykt(CZLOWIEK, kod, powod, cel)
+def _czlowiek(kod: str, powod: str, cel: str = "", kategoria: str = "") -> Werdykt:
+    return Werdykt(CZLOWIEK, kod, powod, cel, {"kategoria": kategoria} if kategoria else {})
+
+
+def _bez_zgody(kategoria: str) -> str:
+    return f"{OPIS_KATEGORII[kategoria]}: tylko ze zgodą właściciela `{kategoria}` w karcie"
 
 
 def _odmowa(kod: str, powod: str, cel: str = "") -> Werdykt:
     return Werdykt(ODMOWA, kod, powod, cel)
 
 
-def _sprawdz_tekst(tekst: str, pole: Optional[dict]) -> Optional[Werdykt]:
+def _sprawdz_tekst(tekst: str, pole: Optional[dict], z: Zgody) -> Optional[Werdykt]:
     if SEKRETY.search(tekst):
         return _odmowa("sekret", "tekst wygląda na klucz, token albo klucz prywatny; sekretów nie wpisujemy", opis(pole))
-    if numery_kart(tekst):
-        return _czlowiek("karta", "numer karty płatniczej wpisuje właściciel", opis(pole))
+    if numery_kart(tekst) and not z.ma("platnosc"):
+        return _czlowiek("karta", f"numer karty płatniczej ({_bez_zgody('platnosc')})", opis(pole), "platnosc")
     if ADRES_ZAKAZANY.search(tekst):
         return _odmowa("adres", "adresy javascript:, data:, file:, chrome: i devtools: są wyłączone", opis(pole))
-    powod = pole_wrazliwe(pole)
-    if powod:
-        return _czlowiek("pole_wrazliwe", f"{powod}: hasło, kartę i kody wpisuje właściciel", opis(pole))
+    powod = pole_platnosci(pole)
+    if powod and not z.ma("platnosc"):
+        return _czlowiek("pole_wrazliwe", f"{powod}: kartę, CVV i BLIK ({_bez_zgody('platnosc')})", opis(pole),
+                         "platnosc")
     return None
 
 
@@ -346,26 +464,31 @@ def w_formularzu(el: Optional[dict]) -> Optional[bool]:
     return bool(el.get("formularz"))
 
 
-def formularz_wrazliwy(el: Optional[dict]) -> Optional[str]:
-    """Enter w polu formularza wysyła formularz: etykieta wrażliwego przycisku tego formularza (Zapłać, Zaloguj,
-    Wyślij), opis, gdy formularza nie da się sprawdzić, albo None."""
+def formularz_wrazliwy(el: Optional[dict], z: Zgody) -> Optional[tuple[str, str]]:
+    """Enter w polu formularza wysyła formularz: (etykieta przycisku tego formularza, kategoria bez zgody), np.
+    Zapłać bez `platnosc`, Wyślij bez `wysylka` (w formularzu logowania i rejestracji Wyślij przechodzi); formularz,
+    którego nie da się sprawdzić, potrzebuje zgód `platnosc` i `wysylka`; None: Enter wolno."""
     if not el:
         return None
     if w_formularzu(el) is None:
-        return "formularz, którego Komputer nie umie sprawdzić"
+        kat = z.brak(("platnosc", "wysylka"))
+        return ("formularz, którego Komputer nie umie sprawdzić", kat) if kat else None
     for p in el.get("formularz") or []:
-        rola = str(p.get("rola") or p.get("role") or "").lower()
-        if rola in {"push button", "button"} and _wrazliwa_etykieta(_etykieta(p)):
-            return _etykieta(p)
+        if _rola(p) not in {"push button", "button"}:
+            continue
+        kat = kategoria(_etykieta(p))
+        if kat and not (kat == "wysylka" and formularz_logowania(el)) and not z.ma(kat):
+            return _etykieta(p), kat
     return None
 
 
-def _sprawdz_enter(el: Optional[dict], mody: frozenset = frozenset()) -> Optional[Werdykt]:
+def _sprawdz_enter(el: Optional[dict], z: Zgody, mody: frozenset = frozenset()) -> Optional[Werdykt]:
     """Enter (także z modyfikatorami i jako nowa linia w type_text) w elemencie z fokusem albo w celu.
     W polu wieloliniowym Shift+Enter to zawsze nowa linia; zwykły Enter i Ctrl/Super+Enter traktujemy jak wysyłkę:
-    w formularzu z przyciskiem płatności, logowania albo wysyłki i w polu poza formularzem (czat, komentarz) robi to
-    właściciel. W polu jednowierszowym poza formularzem (wyszukiwarka) Enter przechodzi."""
-    zly = _sprawdz_aktywacje(el, "Enter na")
+    w formularzu z przyciskiem płatności, wysyłki albo publikacji i w polu poza formularzem (czat, komentarz)
+    potrzebuje zgody właściciela. W polu jednowierszowym poza formularzem (wyszukiwarka) i w formularzu logowania
+    Enter przechodzi."""
+    zly = _sprawdz_aktywacje(el, "Enter na", z)
     if zly:
         return zly
     wiele = wieloliniowe(el)
@@ -374,25 +497,26 @@ def _sprawdz_enter(el: Optional[dict], mody: frozenset = frozenset()) -> Optiona
         return None
     klawisz = "+".join(sorted(mody) + ["Enter"])
     nowa_linia = " (nową linię zrób Shift+Enter)" if wiele else ""
-    etykieta = formularz_wrazliwy(el)
-    if etykieta:
+    forma = formularz_wrazliwy(el, z)
+    if forma:
+        etykieta, kat = forma
         return _czlowiek("formularz_wrazliwy", f"{klawisz} w {opis(el)} wysyła formularz z przyciskiem "
-                         f"„{_pokaz(etykieta, 60)}” (płatność, logowanie, wysyłka): to robi właściciel{nowa_linia}", opis(el))
-    if w_formularzu(el) is False and (wiele or wysylka):
+                         f"„{_pokaz(etykieta, 60)}” ({_bez_zgody(kat)}){nowa_linia}", opis(el), kat)
+    if w_formularzu(el) is False and (wiele or wysylka) and not z.ma("wysylka"):
         return _czlowiek("wysylka_bez_formularza", f"{klawisz} w {opis(el)} poza formularzem (czat, komentarz, "
-                         f"edytor) zwykle wysyła wiadomość: to robi właściciel{nowa_linia}", opis(el))
+                         f"edytor) zwykle wysyła wiadomość ({_bez_zgody('wysylka')}){nowa_linia}", opis(el), "wysylka")
     return None
 
 
-def _sprawdz_aktywacje(el: Optional[dict], jak: str) -> Optional[Werdykt]:
-    """Klik, Enter albo spacja na elemencie: przycisk wrażliwy albo cel, którego nie da się sprawdzić."""
+def _sprawdz_aktywacje(el: Optional[dict], jak: str, z: Zgody) -> Optional[Werdykt]:
+    """Klik, Enter albo spacja na elemencie: przycisk bez zgody właściciela albo cel, którego nie da się sprawdzić."""
     if el and el.get("nieznany"):
         return _odmowa("nieznany_cel", f"{jak} elementu, którego Komputer nie umie sprawdzić; zrób świeży stan "
                        "okna (get_window_state) i wskaż element z niego")
-    etykieta = przycisk_wrazliwy(el)
-    if etykieta:
-        return _czlowiek("przycisk_wrazliwy", f"{jak} „{_pokaz(etykieta, 60)}” (płatność, zakup, logowanie, wysyłka "
-                         "albo publikacja) robi właściciel", opis(el))
+    przycisk = przycisk_wrazliwy(el)
+    if przycisk and not z.ma(przycisk[1]):
+        etykieta, kat = przycisk
+        return _czlowiek("przycisk_wrazliwy", f"{jak} „{_pokaz(etykieta, 60)}” ({_bez_zgody(kat)})", opis(el), kat)
     return None
 
 
@@ -469,8 +593,16 @@ def _na_wierzchu(nazwa: str, args: dict, ctx: Kontekst) -> Optional[Werdykt]:
 
 
 def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
-    """Decyzja dla jednego wywołania narzędzia sterownika."""
-    args = args if isinstance(args, dict) else {}
+    """Decyzja dla jednego wywołania narzędzia sterownika. Zgody właściciela (ctx.zgody) czyta tylko krok, który ich
+    potrzebuje; werdykt tak, który z nich skorzystał, ma w dzienniku `zgoda` (kategorie)."""
+    z = Zgody(ctx)
+    w = _ocen(nazwa, args if isinstance(args, dict) else {}, ctx, z)
+    if w.wolno and z.uzyte:
+        w.dane = {**w.dane, "zgoda": ",".join(z.uzyte)}
+    return w
+
+
+def _ocen(nazwa: str, args: dict, ctx: Kontekst, z: Zgody) -> Werdykt:
     if nazwa not in DOSTEPNE:
         return _odmowa("narzedzie", f"narzędzie {nazwa} jest wyłączone w Komputerze Jarva")
     if nazwa in ODCZYT:
@@ -510,7 +642,7 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
         czesci = urlsplit(url)
         if czesci.scheme.lower() not in {"http", "https"} or not czesci.netloc:
             return _odmowa("adres", f"navigate: tylko adresy http i https, nie {_pokaz(url, 40)}")
-        return _sprawdz_tekst(url, None) or Werdykt(TAK, cel=czesci.hostname or "")
+        return _sprawdz_tekst(url, None, z) or Werdykt(TAK, cel=czesci.hostname or "")
 
     if nazwa == "kill_app":
         try:
@@ -524,8 +656,10 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
     if nazwa == "invoke_menu":
         sciezka = [str(p) for p in args.get("path") or []]
         for p in sciezka:
-            if _wrazliwa_etykieta(p):
-                return _czlowiek("menu_wrazliwe", f"pozycję menu „{_pokaz(p, 60)}” wybiera właściciel", " › ".join(sciezka))
+            kat = kategoria(p)
+            if kat and not z.ma(kat):
+                return _czlowiek("menu_wrazliwe", f"pozycja menu „{_pokaz(p, 60)}” ({_bez_zgody(kat)})",
+                                 " › ".join(sciezka), kat)
         return Werdykt(TAK, cel=_pokaz(" › ".join(sciezka), 80))
 
     if nazwa in {"scroll", "right_click"}:
@@ -542,7 +676,7 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
                            "kliknij elementem (element_token z get_window_state) albo w punkt z delivery_mode "
                            "foreground w aktywnym oknie")
         el = ctx.cel(nazwa, args)
-        return _sprawdz_aktywacje(el, "kliknięcie") or Werdykt(TAK, cel=opis(el))
+        return _sprawdz_aktywacje(el, "kliknięcie", z) or Werdykt(TAK, cel=opis(el))
 
     if nazwa == "drag":
         # przeciągnięcie, które zaczyna się albo kończy na przycisku, jest kliknięciem (puszczenie myszy na tym samym
@@ -558,7 +692,7 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
         opisy = []
         for koniec in konce:
             el = ctx.cel("click", {**{k: v for k, v in args.items() if k in ("pid", "window_id", "scope")}, **koniec})
-            zly = _sprawdz_aktywacje(el, "przeciągnięcie na")
+            zly = _sprawdz_aktywacje(el, "przeciągnięcie na", z)
             if zly:
                 return zly
             opisy.append(opis(el))
@@ -579,15 +713,15 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
                            "dostępności nie odpowiedziało); zrób get_window_state, kliknij pole i pisz")
         if nazwa == "type_text" and (celowane or str((pole or {}).get("rola") or "").lower() in ROLE_DZIALANIA):
             # pisanie w cel to najpierw klik; spacja albo Enter na przycisku z fokusem go uruchamia
-            zly = _sprawdz_aktywacje(pole, "kliknięcie przed pisaniem w" if celowane else "pisanie na")
+            zly = _sprawdz_aktywacje(pole, "kliknięcie przed pisaniem w" if celowane else "pisanie na", z)
             if zly:
                 return zly
         if pole is None and tekst.strip():
-            # bez znanego pola nie piszemy: tekst mógłby trafić w pole hasła, którego nie widzimy
-            zly = _sprawdz_tekst(tekst, None)
+            # bez znanego pola nie piszemy: tekst mógłby trafić w pole karty, którego nie widzimy
+            zly = _sprawdz_tekst(tekst, None, z)
             return zly or _odmowa("brak_fokusu", "nie wiem, w które pole trafi tekst; kliknij najpierw pole, "
                                   "potem pisz")
-        zly = _sprawdz_tekst(tekst, pole)
+        zly = _sprawdz_tekst(tekst, pole, z)
         if zly:
             return zly
         if nazwa == "type_text" and ("\n" in tekst or "\r" in tekst):
@@ -595,7 +729,7 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
             if ("\n" in srodek or "\r" in srodek) and not wieloliniowe(pole):
                 return _odmowa("enter_w_srodku", "w polu jednowierszowym Enter tylko na końcu tekstu: po Enterze "
                                "strona i fokus mogą się zmienić; resztę napisz po nowym stanie okna")
-            zly = _sprawdz_enter(pole)
+            zly = _sprawdz_enter(pole, z)
             if zly:
                 return zly
         return Werdykt(TAK, cel=opis(pole), dane={"znaki": len(tekst)})
@@ -616,7 +750,7 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
                            "migawki albo użyj klawiszy nawigacji")
         celowane = _celowane(args)
         if celowane:
-            zly = _sprawdz_aktywacje(ctx.cel(nazwa, args), "kliknięcie przed klawiszem na")
+            zly = _sprawdz_aktywacje(ctx.cel(nazwa, args), "kliknięcie przed klawiszem na", z)
             if zly:
                 return zly
         if skrot[-1] in KLAWISZE_AKTYWUJACE:
@@ -624,10 +758,10 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
             if el is None:
                 return _odmowa("brak_fokusu", f"nie wiem, gdzie trafi {'+'.join(skrot)}; kliknij najpierw pole "
                                "albo przycisk, potem naciśnij klawisz")
-            if skrot[-1] in KLAWISZE_ENTER and not el.get("nieznany") and pole_wrazliwe(el):
-                return _czlowiek("pole_wrazliwe", f"Enter w {pole_wrazliwe(el)} wysyła dane logowania albo "
-                                 "płatności: to robi właściciel", opis(el))
-            zly = _sprawdz_enter(el, mody) if skrot[-1] in KLAWISZE_ENTER else _sprawdz_aktywacje(el, "spacja na")
+            if skrot[-1] in KLAWISZE_ENTER and not el.get("nieznany") and pole_platnosci(el) and not z.ma("platnosc"):
+                return _czlowiek("pole_wrazliwe", f"Enter w {pole_platnosci(el)} wysyła dane płatności "
+                                 f"({_bez_zgody('platnosc')})", opis(el), "platnosc")
+            zly = _sprawdz_enter(el, z, mody) if skrot[-1] in KLAWISZE_ENTER else _sprawdz_aktywacje(el, "spacja na", z)
             if zly:
                 return zly
             return Werdykt(TAK, cel=opis(el), dane={"klawisze": "+".join(skrot)})
@@ -635,19 +769,29 @@ def ocen(nazwa: str, args: Optional[dict], ctx: Kontekst) -> Werdykt:
             el = ctx.cel(nazwa, args) if celowane else ctx.fokus(args)
             if el is None:
                 return _odmowa("brak_fokusu", "nie wiem, gdzie trafi wklejenie; kliknij najpierw pole")
-            powod = pole_wrazliwe(el)
-            if powod:
-                return _czlowiek("pole_wrazliwe", f"wklejanie w {powod} robi właściciel", opis(el))
+            powod = pole_platnosci(el)
+            if powod and not z.ma("platnosc"):
+                return _czlowiek("pole_wrazliwe", f"wklejanie w {powod} ({_bez_zgody('platnosc')})", opis(el),
+                                 "platnosc")
         return Werdykt(TAK, dane={"klawisze": "+".join(skrot)})
 
     return _odmowa("narzedzie", f"narzędzie {nazwa} nie ma zasady w Komputerze Jarva")
 
 
+# Ekran HQ jeszcze nie działa: krok właściciela robi on sam w oknie Komputera na pulpicie serwera.
+GDZIE_WLASCICIEL = ("Okno Komputera Jarva (przeglądarka) jest na pulpicie serwera: właściciel łączy się przez VNC do "
+                    "pulpitu serwera (Tailscale), robi ten krok sam w tym oknie i oddaje ekran")
+
+
 def wynik_odmowy(w: Werdykt) -> dict:
     """Wynik MCP (tools/call) dla odmowy: agent widzi powód i co dalej, sterownik nie dostaje wywołania."""
+    kat = w.dane.get("kategoria") if w.decyzja == CZLOWIEK else None
     if w.decyzja == CZLOWIEK:
-        tekst = (f"To robi właściciel: {w.powod}. Poproś go, żeby zrobił to sam w Ekranie HQ (Komputer Jarva). "
-                 "Nie obchodź tej zasady innym kliknięciem, skrótem ani wpisem.")
+        tekst = f"To robi właściciel: {w.powod}. {GDZIE_WLASCICIEL}."
+        if kat:
+            tekst += (f" Albo właściciel zleca ten krok Jarvowi, a Jarvo wpisuje do karty linię „ZGODA WŁAŚCICIELA: "
+                      f"{kat} — „<polecenie właściciela>” (RRRR-MM-DD)” i karta rusza od nowa.")
+        tekst += " Nie obchodź tej zasady innym kliknięciem, skrótem ani wpisem."
         dalej = "ask_owner"
     elif w.decyzja == WSTRZYMANE:
         tekst = f"Komputer Jarva jest wstrzymany: {w.powod}. Poczekaj, aż właściciel go wznowi."
@@ -659,20 +803,25 @@ def wynik_odmowy(w: Werdykt) -> dict:
         tekst = f"Zablokowane przez Komputer Jarva: {w.powod}."
         dalej = "choose_another_way"
     kod = {CZLOWIEK: "wymaga_czlowieka", WSTRZYMANE: "wstrzymane"}.get(w.decyzja, "zablokowane")
-    return {"content": [{"type": "text", "text": tekst}], "isError": True,
-            "structuredContent": {"ok": False, "code": kod, "rule": w.kod, "decision": w.decyzja,
-                                  "message": tekst, "next_step": dalej}}
+    sc = {"ok": False, "code": kod, "rule": w.kod, "decision": w.decyzja, "message": tekst, "next_step": dalej}
+    if kat:
+        sc["consent_category"] = kat
+    return {"content": [{"type": "text", "text": tekst}], "isError": True, "structuredContent": sc}
 
 
 INSTRUKCJE = (
-    "\n\nKomputer Jarva (twarde zasady, sprawdzane przy każdym wywołaniu): płatności, zakupy, logowanie, rejestrację, "
-    "zgody na dostęp, wysyłkę i publikację oraz wpisywanie haseł, numerów kart, kodów BLIK i 2FA robi właściciel. "
-    "Takie wywołanie wraca z code=wymaga_czlowieka (decision=czlowiek): powiedz właścicielowi, co ma kliknąć w Ekranie "
-    "HQ, i poczekaj. Sekretów nie wpisujesz, a w drzewie i tekście są ukryte. Narzędzia page, browser_*, clipboard_*, "
-    "mouse_button_*, nagrywanie i aktualizacje są wyłączone; uruchamiasz tylko Chromium z adresami http i https. "
+    "\n\nKomputer Jarva (twarde zasady, sprawdzane przy każdym wywołaniu): logujesz się, zakładasz konta, klikasz "
+    "„Continue with Google/GitHub” i zgody OAuth, wpisujesz hasła i kody (2FA, SMS, weryfikacja), próbujesz CAPTCHA "
+    "i wysyłasz formularze logowania i rejestracji sam. Kroki nieodwracalne idą tylko ze zgodą właściciela wpisaną "
+    "przez Jarva w kartę (ZGODA WŁAŚCICIELA): płatność, zakup, subskrypcja, karta i BLIK (platnosc), wysyłka "
+    "wiadomości i formularzy (wysylka), publikacja (publikacja), usunięcie konta (usuniecie_konta). Bez zgody "
+    "wywołanie wraca z code=wymaga_czlowieka (decision=czlowiek, consent_category): powiedz, czego brakuje; właściciel "
+    "robi krok przez VNC do pulpitu serwera (Tailscale) albo daje zgodę w karcie. Sekretów (kluczy API, tokenów) nie "
+    "wpisujesz, a w drzewie i tekście są ukryte. Narzędzia page, browser_*, clipboard_*, mouse_button_*, nagrywanie "
+    "i aktualizacje są wyłączone; uruchamiasz tylko Chromium z adresami http i https. "
     "Tab naciskasz osobno (nie w type_text), nową linię w polu wieloliniowym robisz Shift+Enter, skrótów Alt+litera "
     "(accesskey) nie ma. Klikasz elementem; klik w punkt tylko z delivery_mode foreground w aktywnym oknie, gdy to "
     "okno, a nie okienko podręczne, leży w tym punkcie na wierzchu.\n"
-    "Jarvo Computer hard rules: payments, purchases, sign-in, sign-up, access grants, sending, publishing and typing "
-    "passwords, card numbers or one-time codes are left to the owner (decision=czlowiek)."
+    "Jarvo Computer hard rules: sign-in, sign-up, OAuth, passwords and one-time codes are allowed; payments, sending, "
+    "publishing and account deletion need the owner's consent line in the kanban card (decision=czlowiek without it)."
 )

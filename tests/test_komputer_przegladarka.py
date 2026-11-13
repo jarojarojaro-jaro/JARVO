@@ -46,11 +46,11 @@ def test_preferencje_profilu_scalone_z_przegladarka(tmp_path):
     (profil / "Default").mkdir(parents=True)
     (profil / "Default" / "Preferences").write_text(json.dumps({
         "profile": {"exit_type": "Crashed", "exited_cleanly": False, "name": "Jarvo"},
-        "credentials_enable_service": True, "extensions": {"x": 1}}), encoding="utf-8")
+        "credentials_enable_service": False, "extensions": {"x": 1}}), encoding="utf-8")
     (profil / "SingletonLock").write_text("x", encoding="utf-8")
     przegladarka.przygotuj_profil(profil, pobrane)
     p = json.loads((profil / "Default" / "Preferences").read_text(encoding="utf-8"))
-    assert p["credentials_enable_service"] is False and p["profile"]["password_manager_enabled"] is False
+    assert p["credentials_enable_service"] is True and p["profile"]["password_manager_enabled"] is True
     assert p["profile"]["exit_type"] == "Normal" and p["profile"]["exited_cleanly"] is True
     assert p["profile"]["name"] == "Jarvo" and p["extensions"] == {"x": 1}          # reszta przeglądarki zostaje
     assert p["autofill"]["credit_card_enabled"] is False and p["signin"]["allowed"] is False

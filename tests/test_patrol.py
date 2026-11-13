@@ -143,3 +143,18 @@ def test_main_broken_input_wakes_with_error(tmp_path, capsys):
     patrol.main(["--fixture", str(tmp_path / "brak.json"), "--now", str(NOW), "--state", str(tmp_path / "s.json")])
     verdict = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert verdict["wakeAgent"] is True and "patrol_error" in verdict["context"]
+
+
+def test_ma_raport_ignores_template_placeholder():
+    assert not patrol.ma_raport("# M\n\n## Raport końcowy\n<wklejony przy zamknięciu>\n")
+    assert not patrol.ma_raport("# M\n\n## Raport końcowy\n\n## Artefakty\n- out/a.md\n")
+    assert patrol.ma_raport("# M\n\n## Raport końcowy\n✅ Runbook gotowy.\nDo decyzji: rejestracja.\n\n## Inne\n")
+
+
+def test_mission_already_reported_or_waiting_does_not_wake_again():
+    """13.11 Z-261113-instabox: Jarvo wysłał raport i ustawił „czeka na decyzję”, a patrol budził go mimo to
+    (`mission_ready`) i właściciel dostał ten sam raport drugi raz."""
+    assert "mission_ready" in kinds(patrol.analyze(board(), NOW))
+    assert "mission_ready" not in kinds(patrol.analyze(board(raporty=["M-260926-done"]), NOW))
+    czeka = INDEX.replace("| M-260926-done | Stara misja | w toku |", "| M-260926-done | Stara misja | czeka na decyzję: rejestracja |")
+    assert "mission_ready" not in kinds(patrol.analyze(board(index=czeka), NOW))

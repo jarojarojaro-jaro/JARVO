@@ -3,8 +3,9 @@
 Rozmawia z wejściem Komputera przez gniazdo sterowania (`ster.sock`, docs/KOMPUTER.md §6):
   stan       czy Komputer działa, pauza i jej powód, ile sesji, czy działa drzewo dostępności (AT-SPI),
   dziennik   ostatnie decyzje twardych zasad (bez treści: narzędzie, decyzja, zasada, cel),
-  oddaj      prośba do właściciela: pauza z powodem („zaloguj się do panelu sklepu”). Komputer stoi, dopóki
-             właściciel go nie wznowi (`jarvo komputer wznow`, w K4 przycisk w Ekranie HQ).
+  oddaj      prośba do właściciela: pauza z powodem („kliknij Zapłać w oknie Komputera”). Komputer stoi, dopóki
+             właściciel go nie wznowi (`jarvo komputer wznow`); krok robi w oknie Komputera na pulpicie serwera
+             (VNC do pulpitu serwera, Tailscale).
 Wznowić agent nie może: wejście przepuszcza `wznow` tylko od właściciela (kontener: SO_PEERCRED; natywnie: token
 właściciela, którego narzędzie nie zna i nie wysyła).
 
@@ -130,7 +131,8 @@ SCHEMAT: Dict[str, Any] = {
         "properties": {
             "akcja": {"type": "string", "enum": ["stan", "dziennik", "oddaj", "idz", "patrz", "kroki", "czekaj"]},
             "prosba": {"type": "string", "description": (
-                "Dla akcja=oddaj: co właściciel ma zrobić w Ekranie HQ, jednym zdaniem (gdzie i co kliknąć). "
+                "Dla akcja=oddaj: co właściciel ma zrobić w oknie Komputera (VNC do pulpitu serwera, Tailscale), "
+                "jednym zdaniem (gdzie i co kliknąć). "
                 "Bez haseł, kodów i danych osobowych.")},
             "n": {"type": "integer", "description": f"Dla akcja=dziennik: ile ostatnich wpisów (1–{MAKS_WPISOW}, domyślnie 20)."},
             "adres": {"type": "string", "description": (
@@ -513,8 +515,9 @@ def obsluz(args: Dict[str, Any], **kontekst: Any) -> str:
     elif akcja == "oddaj":
         prosba = " ".join(str(args.get("prosba") or "").split())[:MAKS_PROSBA]
         if len(prosba) < 8:
-            return json.dumps({"ok": False, "blad": "oddaj: napisz w `prosba`, co właściciel ma zrobić w Ekranie HQ "
-                                                   "(np. „zaloguj się do panelu sklepu i daj znać”)"}, ensure_ascii=False)
+            return json.dumps({"ok": False, "blad": "oddaj: napisz w `prosba`, co właściciel ma zrobić w oknie "
+                                                   "Komputera (np. „kliknij Zapłać 129 zł i daj znać”)"},
+                              ensure_ascii=False)
         wynik = _stan(_ster({"polecenie": "pauza", "powod": prosba}))
         if wynik.get("ok"):
             wynik["dalej"] = ("Komputer stoi i czeka na właściciela. Powiedz mu dokładnie, co ma zrobić (to samo, co w prośbie), "

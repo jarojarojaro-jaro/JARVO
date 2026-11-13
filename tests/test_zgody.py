@@ -571,6 +571,23 @@ def test_telefon_confirm_bez_czlowieka_block(sr, monkeypatch, kontekst):
     assert hak("mcp__phone__act", cmd="tap", args={"index": 3}) is None
 
 
+def test_telefon_confirm_na_karcie_z_zgoda_wlasciciela(sr, monkeypatch):
+    """13.11: rejestracja na telefonie z karty stawała na każdym needs_confirm (regulamin, „Załóż konto”), bo na
+    karcie nie ma kogo zapytać. Polecenie właściciela wpisane w kartę linią ZGODA WŁAŚCICIELA jest jego „tak”."""
+    import sqlite3
+    bez_czlowieka(sr, monkeypatch, "kanban")
+    sr.dane.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(sr.dane / "kanban.db") as c:
+        c.execute("CREATE TABLE tasks (id TEXT PRIMARY KEY, body TEXT)")
+        c.execute("INSERT INTO tasks VALUES ('t_1', ?)", ("CEL: konto InstaBox przez Google na telefonie\n"
+                  "ZGODA WŁAŚCICIELA: konto — „załóż konto na instabox, sam masz zrobić wszystko” (2026-11-13)",))
+    kroki = [{"cmd": "tap", "text": "Akceptuję regulamin", "confirm": True}]
+    assert hak("mcp__phone__batch", steps=kroki) is None
+    with sqlite3.connect(sr.dane / "kanban.db") as c:
+        c.execute("UPDATE tasks SET body = 'CEL: konto InstaBox (bez zgody w karcie)'")
+    assert akcja(hak("mcp__phone__batch", steps=kroki)) == "block"
+
+
 def test_telefon_confirm_pod_yolo_block(sr, monkeypatch):
     monkeypatch.setattr(z, "_yolo", lambda: True)                    # YOLO zatwierdziłoby prośbę bez człowieka
     assert akcja(hak("mcp__phone__act", cmd="enter", confirm=True)) == "block"

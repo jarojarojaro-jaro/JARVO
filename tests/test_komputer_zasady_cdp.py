@@ -1,6 +1,7 @@
 """Twarde zasady natywnie (docs/NATYWNIE.md J05): słownik ról CDP → zasady z kontenera (infra/komputer/zasady.py bez
 zmian) i zasady natywne (komputer/zasady_natywne.py): schowek, skróty okna przeglądarki, okna potwierdzeń
-z wrażliwym tekstem, wybór pliku i CAPTCHA. Czyste funkcje na atrapie kontekstu: biegną na każdym systemie."""
+z wrażliwym tekstem, wybór pliku i znak po znaku w polu karty. Czyste funkcje na atrapie kontekstu: biegną na każdym
+systemie."""
 from __future__ import annotations
 
 import sys
@@ -42,11 +43,15 @@ def test_role_dzialania_zasad_pokrywaja_przyciski_i_linki_cdp():
 
 
 class Ctx:
-    """Atrapa kontekstu zasad: cel i fokus podane przez test (jak KontekstCDP po opisie ze sterownika)."""
+    """Atrapa kontekstu zasad: cel, fokus i zgody z karty podane przez test (jak KontekstCDP po opisie ze sterownika)."""
 
-    def __init__(self, cel=None, fokus=None, wstrzymane=False, aktywne=1):
+    def __init__(self, cel=None, fokus=None, wstrzymane=False, aktywne=1, zgody=frozenset()):
         self._cel, self._fokus, self.wstrzymane, self._aktywne = cel, fokus, wstrzymane, aktywne
+        self._zgody = frozenset(zgody)
         self.powod_pauzy = "właściciel zatrzymał Komputer"
+
+    def zgody(self):
+        return self._zgody
 
     def cel(self, nazwa, args):
         return self._cel
@@ -80,7 +85,8 @@ PISZ = {"pid": 7, "window_id": 1, "delivery_mode": "foreground"}
 
 @pytest.mark.parametrize("cel, decyzja, kod", [
     (el("button", "Zapłać 129 zł"), zasady.CZLOWIEK, "przycisk_wrazliwy"),
-    (el("link", "Zaloguj się"), zasady.CZLOWIEK, "przycisk_wrazliwy"),
+    (el("link", "Zaloguj się"), zasady.TAK, ""),
+    (el("button", "Continue with GitHub"), zasady.TAK, ""),
     (el("menuitem", "Kup teraz"), zasady.CZLOWIEK, "przycisk_wrazliwy"),
     (el("button", "Dodaj do koszyka"), zasady.TAK, ""),
     (el("checkbox", "Akceptuję regulamin sklepu"), zasady.TAK, ""),
@@ -92,16 +98,35 @@ def test_rdzen_zasad_na_opisie_z_cdp(cel, decyzja, kod):
     assert (w.decyzja, w.kod) == (decyzja, kod)
 
 
-@pytest.mark.parametrize("pole, powod", [
-    (el("textbox", "Hasło", "password"), "pole hasła"),
-    (el("textbox", "Numer karty", autocomplete="cc-number"), "pole"),
-    (el("textbox", "", atrybuty={"tag": "input", "autocomplete": "cc-number"}), "pole"),
-    (el("textbox", "Kod BLIK"), "pole"),
-    (el("textbox", "Kod SMS"), "pole"),
+@pytest.mark.parametrize("pole", [
+    el("textbox", "Numer karty", autocomplete="cc-number"),
+    el("textbox", "", atrybuty={"tag": "input", "autocomplete": "cc-number"}),
+    el("textbox", "Kod BLIK"),
 ])
-def test_pisanie_w_polach_wrazliwych_z_cdp(pole, powod):
+def test_pisanie_w_polach_platnosci_z_cdp(pole):
     w = zasady.ocen("type_text", {**PISZ, "text": "123456"}, Ctx(fokus=pole))
-    assert w.decyzja == zasady.CZLOWIEK and w.kod == "pole_wrazliwe" and powod in w.powod
+    assert w.decyzja == zasady.CZLOWIEK and w.kod == "pole_wrazliwe" and "pole" in w.powod
+    assert zasady.ocen("type_text", {**PISZ, "text": "123456"}, Ctx(fokus=pole, zgody={"platnosc"})).wolno
+
+
+@pytest.mark.parametrize("pole", [el("textbox", "Hasło", "password"), el("textbox", "Kod SMS"),
+                                  el("textbox", "", atrybuty={"tag": "input", "autocomplete": "one-time-code"})])
+def test_hasla_i_kody_z_cdp_agent_wpisuje_sam(pole):
+    assert zasady.ocen("type_text", {**PISZ, "text": "123456"}, Ctx(fokus=pole)).wolno
+
+
+def test_rejestracja_z_cdp_wysyla_sam():
+    """Formularz rejestracji tak, jak go opisuje sterownik CDP (pola_formularza, opis_formularza)."""
+    rejestracja = {"w_formularzu": True, "formularz": [{"rola": "push button", "nazwa": "Wyślij"}],
+                   "pola_formularza": [{"tag": "input", "typ": "email", "nazwa": "email"},
+                                       {"tag": "input", "typ": "password", "nazwa": "haslo"}],
+                   "opis_formularza": {"nazwa": "", "id": "", "action": "/konto", "etykieta": ""}}
+    assert zasady.ocen("click", KLIK, Ctx(cel=el("button", "Wyślij", **rejestracja))).wolno
+    haslo = el("textbox", "Hasło", "password", stany=["editable", "single-line"], **rejestracja)
+    assert zasady.ocen("press_key", {**PISZ, "key": "Return"}, Ctx(fokus=haslo)).wolno
+    kontakt = {**rejestracja, "pola_formularza": [{"tag": "input", "typ": "email"}, {"tag": "textarea", "typ": ""}]}
+    w = zasady.ocen("click", KLIK, Ctx(cel=el("button", "Wyślij", **kontakt)))
+    assert (w.decyzja, w.dane) == (zasady.CZLOWIEK, {"kategoria": "wysylka"})
 
 
 def test_enter_w_formularzu_z_przyciskiem_platnosci_z_cdp():
@@ -166,6 +191,7 @@ def test_prompt_z_wrazliwym_tekstem_i_enterem():
     w = zasady_natywne.ocen("type_text", {**PISZ, "text": "123456\n"}, Ctx(fokus=pole))
     assert w is not None and w.kod == "okno_wrazliwe"
     assert zasady.ocen("type_text", {**PISZ, "text": "123456"}, Ctx(fokus=pole)).kod == "pole_wrazliwe"
+    assert zasady.ocen("type_text", {**PISZ, "text": "123456"}, Ctx(fokus=pole, zgody={"platnosc"})).wolno
 
 
 def test_wybor_pliku_robi_czlowiek():
@@ -184,9 +210,9 @@ def test_wybor_pliku_robi_czlowiek():
                                                  "security challenge turnstile"}]),
     el("checkbox", "I'm not a robot"),
 ])
-def test_captcha_robi_czlowiek(cel):
-    w = zasady_natywne.ocen("click", KLIK, Ctx(cel=cel))
-    assert w is not None and w.kod == "captcha"
+def test_captcha_agent_probuje_sam(cel):
+    assert zasady_natywne.ocen("click", KLIK, Ctx(cel=cel)) is None
+    assert zasady.ocen("click", KLIK, Ctx(cel=cel)).wolno
 
 
 def test_pauza_i_odczyt_zostaja_dla_rdzenia():
@@ -202,22 +228,24 @@ def test_nieznany_cel_nie_przechodzi_przez_zasady_natywne():
 
 @pytest.mark.parametrize("args", [{"key": "a"}, {"key": "7"}, {"key": "A", "modifiers": ["shift"]},
                                   {"keys": ["shift", "x"]}])
-def test_znak_po_znaku_w_polu_hasla_robi_wlasciciel(args):
-    """Rdzeń sprawdza pole tylko przy type_text: znak przez press_key albo hotkey w polu hasła czy kodu też jest
-    pisaniem, więc natywnie robi go właściciel."""
+def test_znak_po_znaku_w_polu_karty_tylko_ze_zgoda(args):
+    """Rdzeń sprawdza pole tylko przy type_text: znak przez press_key albo hotkey w polu karty czy BLIK też jest
+    pisaniem, więc natywnie potrzebuje zgody `platnosc`; w polu hasła agent pisze sam."""
     nazwa = "hotkey" if "keys" in args else "press_key"
-    w = zasady_natywne.ocen(nazwa, {**PISZ, **args}, Ctx(fokus=el("textbox", "Hasło", "password")))
-    assert (w.decyzja, w.kod) == (zasady.CZLOWIEK, "pole_wrazliwe")
-    assert zasady_natywne.ocen(nazwa, {**PISZ, **args}, Ctx(fokus=el("textbox", "Kod BLIK"))).kod == "pole_wrazliwe"
+    w = zasady_natywne.ocen(nazwa, {**PISZ, **args}, Ctx(fokus=el("textbox", "Kod BLIK")))
+    assert (w.decyzja, w.kod, w.dane) == (zasady.CZLOWIEK, "pole_wrazliwe", {"kategoria": "platnosc"})
+    assert zasady_natywne.ocen(nazwa, {**PISZ, **args}, Ctx(fokus=el("textbox", "Kod BLIK"), zgody={"platnosc"})) \
+        is None
+    assert zasady_natywne.ocen(nazwa, {**PISZ, **args}, Ctx(fokus=el("textbox", "Hasło", "password"))) is None
     assert zasady_natywne.ocen(nazwa, {**PISZ, **args}, Ctx(fokus=el("textbox", "Uwagi"))) is None
     assert zasady_natywne.ocen(nazwa, {**PISZ, **args}, Ctx(fokus=None)) is None        # skrót strony bez pola
     assert zasady_natywne.ocen(nazwa, {**PISZ, **args}, Ctx(fokus=zasady.NIEZNANY)).kod == "nieznany_cel"
 
 
-def test_skrot_z_ctrl_w_polu_hasla_to_nie_pisanie():
-    haslo = Ctx(fokus=el("textbox", "Hasło", "password"))
-    assert zasady_natywne.ocen("hotkey", {**PISZ, "keys": ["ctrl", "a"]}, haslo) is None
-    assert zasady_natywne.ocen("press_key", {**PISZ, "key": "Tab"}, haslo) is None
+def test_skrot_z_ctrl_w_polu_karty_to_nie_pisanie():
+    karta = Ctx(fokus=el("textbox", "Numer karty"))
+    assert zasady_natywne.ocen("hotkey", {**PISZ, "keys": ["ctrl", "a"]}, karta) is None
+    assert zasady_natywne.ocen("press_key", {**PISZ, "key": "Tab"}, karta) is None
 
 
 @pytest.mark.parametrize("tekst, adres", [
