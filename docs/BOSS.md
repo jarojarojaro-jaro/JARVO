@@ -200,6 +200,11 @@ Przejęte z kontraktu firstmate i dostosowane do nas:
   rozmawiasz, ile chcesz (pracę Jarvo zleca jako misję `[poboczna]`), a „zamknij” kończy: Jarvo zapisuje teczkę
   `missions/poboczne/…` (ustalenia, wynik, ocena, jak odtworzyć) i jedną notatkę `projekty/` z tagiem `poboczny`;
   potem `/new` czyści rozmowę.
+  **Sesje zewnętrzne (dopisek, np. „gpu”):** wiadomość zakończona słowem z `<dane>/jarvo/konfig/sesje.json` nie idzie
+  do Jarva, tylko do skrzynki innej sesji agenta (u nas: sesja Kernel o silniku inferencji, omp na serwerze). Bot
+  potwierdza „📥 Kernel: przyjąłem”, a odpowiedź sesji przychodzi z jej procesu (`jarvo telegram wyslij`). Przechwytuje
+  hak bramy `pre_gateway_dispatch` (`wiedza/plugin/sesje.py`) tylko wiadomości od dozwolonych osób; awaria haka
+  oddaje wiadomość Jarvowi. Format pliku: `{"gpu": {"nazwa": "Kernel", "skrzynka": "/ścieżka/skrzynki"}}`.
 - **Prosty polski** (skill `prosty-polski`, wzór: ASD-STE100 z dokumentacji lotniczej „w 80%”): zdanie do 20–25 słów,
   akapit do 6 zdań, jedna czynność w zdaniu, strona czynna, zwykłe słowa zamiast urzędowych (słownik w skillu),
   ostrzeżenie: najpierw co zrobić, potem ryzyko (⛔ strata pieniędzy, danych, konta; ⚠ gorszy wynik). Te same limity liczy

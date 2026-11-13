@@ -21,9 +21,10 @@ K02, K03, K07, K08, H06, H11, decyzja I36).
         `<dane>/jarvo/konfig/jarvo.env` (TELEGRAM_OWNER_ID: DM → Jarvo i cel rutyn, TELEGRAM_HQ_CHAT_ID); potem
         wdrożenie floty (jarvo/flota.py: trasy w configu bramy, rutyny na Telegram) i restart bramy przez nadzorcę.
         ID właściciela: --wlasciciel albo z pierwszej wiadomości do bota (getUpdates, gdy nikt inny bota nie czyta)
-  jarvo telegram test [--bez-rutyn] | status [--json] [--sprawdz]
+  jarvo telegram test [--bez-rutyn] | status [--json] [--sprawdz] | wyslij
         próbna wiadomość do właściciela (udana włącza rutyny, I36) / co jest ustawione (bez wartości) i konflikt 409
-        w logach bramy (dwie bramy na jednym tokenie, H11)
+        w logach bramy (dwie bramy na jednym tokenie, H11) / tekst z wejścia do właściciela, długi w kilku
+        wiadomościach (odpowiedzi sesji zewnętrznych ze skrzynki „<dopisek>”, wiedza/plugin/sesje.py)
 
 Integracja z jarvo/cli.py: `dodaj_polecenia(sub)` dopisuje te trzy polecenia do parsera, `sprawdzenia(u, ot)` daje
 wyniki dla `jarvo doctor` (format cli._wynik: nazwa, stan ok|uwaga|blad, opis, rada). Moduł działa też sam:
@@ -1179,6 +1180,52 @@ def polecenie_telegram_test(u: Uklad, a, _reszta, ot, *, uruchom: Callable | Non
     return 0 if not bledy else 1
 
 
+LIMIT_WIADOMOSCI = 4000                 # Telegram przyjmuje 4096 znaków; zapas na podział po liniach
+
+
+def kawalki_wiadomosci(tekst: str, limit: int = LIMIT_WIADOMOSCI) -> list[str]:
+    """Długi tekst → wiadomości ≤ limit, cięte po liniach (linia dłuższa niż limit: twardo)."""
+    wynik, biezacy = [], ""
+    for linia in tekst.splitlines(keepends=True):
+        while len(linia) > limit:
+            if biezacy:
+                wynik.append(biezacy)
+                biezacy = ""
+            wynik.append(linia[:limit])
+            linia = linia[limit:]
+        if len(biezacy) + len(linia) > limit:
+            wynik.append(biezacy)
+            biezacy = ""
+        biezacy += linia
+    if biezacy.strip():
+        wynik.append(biezacy)
+    return [w.rstrip("\n") for w in wynik if w.strip()]
+
+
+def polecenie_telegram_wyslij(u: Uklad, a, _reszta, _ot) -> int:
+    """Tekst z wejścia do właściciela (zwykły tekst, długi w kilku wiadomościach): odpowiedzi sesji zewnętrznych
+    (skrzynka `<dopisek>` z wiedza/plugin/sesje.py) i skrypty na serwerze. Token nigdy nie trafia na ekran."""
+    if not _zainstalowane(u):
+        return _brak_instalacji(u)
+    token = _token(u)
+    k = konfiguracja_telegrama(u)
+    cel = k["wlasciciel"] or (k["dozwoleni"][0] if k["dozwoleni"] else "")
+    if not token or not cel:
+        print("Telegram nie jest ustawiony (token i ID właściciela): jarvo telegram ustaw.", file=sys.stderr)
+        return 1
+    tekst = sys.stdin.read().strip()
+    if not tekst:
+        print("Pusta wiadomość: podaj tekst na wejściu.", file=sys.stderr)
+        return 1
+    try:
+        for kawalek in kawalki_wiadomosci(tekst):
+            api_telegrama(token, "sendMessage", {"chat_id": cel, "text": kawalek, "disable_web_page_preview": True})
+    except BladTelegrama as e:
+        print(f"BŁĄD: nie wysłałem wiadomości ({e}). {rada_telegrama(e)}", file=sys.stderr)
+        return 1
+    return 0
+
+
 POLACZONY_RE = re.compile(r"Connected to Telegram \(polling", re.I)   # adapter Hermesa po (ponownym) starcie bramy
 
 
@@ -1298,6 +1345,8 @@ def dodaj_polecenia(sub) -> None:
     k = t.add_parser("test", help="próbna wiadomość do Ciebie; udana włącza rutyny")
     k.add_argument("--bez-rutyn", action="store_true", help="nie włączaj rutyn po udanej wiadomości")
     k.set_defaults(funkcja=polecenie_telegram_test)
+    k = t.add_parser("wyslij", help="tekst z wejścia do Ciebie (długi: kilka wiadomości)")
+    k.set_defaults(funkcja=polecenie_telegram_wyslij)
     k = t.add_parser("status", help="co jest ustawione (bez wartości) i konflikt 409")
     k.add_argument("--json", action="store_true")
     k.add_argument("--sprawdz", action="store_true", help="sprawdź token w Telegramie (getMe)")

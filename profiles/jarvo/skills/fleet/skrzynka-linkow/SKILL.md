@@ -1,7 +1,7 @@
 ---
 name: skrzynka-linkow
 description: "Link od właściciela do skarbca; „one” = temat poboczny."
-version: 1.3.0
+version: 1.4.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-11-12"
+    reviewed: "2026-11-13"
 ---
 
 # Skrzynka linków
@@ -20,7 +20,10 @@ Właściciel udostępnia z telefonu wpis z X, film z YouTube albo stronę (zwykl
 **Wysłanie linku to polecenie:** pobierz, oceń i zapisz w skarbcu. Nie pytasz, czy zapisać.
 Używasz tego skilla, gdy wiadomość to link albo link z krótkim komentarzem. Gdy komentarz zleca pracę („zrób nam
 taki landing”, „sprawdź tę firmę”), najpierw ten skill, potem zwykła ścieżka `intake`. Wiadomość, której ostatnie
-słowo to „one”, otwiera temat poboczny (sekcja niżej).
+słowo to „one”, otwiera temat poboczny (sekcja niżej). Wiadomości zakończone słowem „gpu” do Ciebie nie trafiają:
+brama oddaje je sesji Kernel (silnik inferencji właściciela, kernele GPU), która je analizuje i dopisuje do kolejki
+testów. Link o optymalizacji inferencji albo GPU bez tego dopisku robisz normalnie, a w odpowiedzi dodajesz jedno
+zdanie: „Następnym razem dopisz „gpu”, to trafi prosto do sesji Kernel.”
 
 Budżet: 4–6 wywołań narzędzi i poniżej minuty dla wpisu bez filmu. Nie piszesz własnych skryptów, nie wołasz
 API ręcznie, nie otwierasz linku w przeglądarce: wszystko daje narzędzie `pobierz_link` (skrypt `pobierz_link.py`).
