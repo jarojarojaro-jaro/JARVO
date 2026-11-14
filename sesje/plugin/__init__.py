@@ -178,7 +178,7 @@ async def hak_bramy(event: Any = None, gateway: Any = None, **kw) -> Optional[di
 def register(ctx) -> None:
     """Zwykła wtyczka hosta bramy: hak rejestrowany przy starcie bramy (stan-jarva sprawdza ten wpis w gateway.log)."""
     ctx.register_hook("pre_gateway_dispatch", hak_bramy)
-    try:                                      # zakres menedżera wtyczek: host (<dane>) albo profil (stan-jarva szuka „jarvo”)
+    try:                                      # zakres menedżera wtyczek: host (<dane>) albo profil (ładowany przy 1. wiadomości)
         from hermes_constants import get_hermes_home
         gdzie = Path(get_hermes_home()).name
     except Exception:
