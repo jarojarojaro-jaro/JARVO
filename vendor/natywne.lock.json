@@ -17,7 +17,7 @@
  },
  "narzedzia": {
   "agent-browser": {
-   "wersja": "0.38.1",
+   "wersja": "0.43.0",
    "kiedy": "instalacja",
    "licencja": "Apache-2.0 (+ wbudowany axe-core MPL-2.0)",
    "zrodlo": "agent-browser",
@@ -27,45 +27,45 @@
       "JARVO_AGENT_BROWSER_BIN": "{katalog}/agent-browser-win32-x64.exe"
      },
      "format": "plik",
-     "rozmiar": 17868288,
-     "sha256": "70bd758b2a5a72b18055f60ff877d2297d036c4104e3bc94af6f7c1ceb941408",
-     "url": "https://github.com/vercel-labs/agent-browser/releases/download/v0.38.1/agent-browser-win32-x64.exe"
+     "rozmiar": 20043776,
+     "sha256": "ebcef5ebea93c7ccf0fe3f8c18eee908ae9174dfef8e52a3dda6f24a59f630dc",
+     "url": "https://github.com/vercel-labs/agent-browser/releases/download/v0.43.0/agent-browser-win32-x64.exe"
     },
     "windows-arm64": {
      "env": {
       "JARVO_AGENT_BROWSER_BIN": "{katalog}/agent-browser-win32-x64.exe"
      },
      "format": "plik",
-     "rozmiar": 17868288,
-     "sha256": "70bd758b2a5a72b18055f60ff877d2297d036c4104e3bc94af6f7c1ceb941408",
-     "url": "https://github.com/vercel-labs/agent-browser/releases/download/v0.38.1/agent-browser-win32-x64.exe"
+     "rozmiar": 20043776,
+     "sha256": "ebcef5ebea93c7ccf0fe3f8c18eee908ae9174dfef8e52a3dda6f24a59f630dc",
+     "url": "https://github.com/vercel-labs/agent-browser/releases/download/v0.43.0/agent-browser-win32-x64.exe"
     },
     "macos-arm64": {
      "env": {
       "JARVO_AGENT_BROWSER_BIN": "{katalog}/agent-browser-darwin-arm64"
      },
      "format": "plik",
-     "rozmiar": 15768448,
-     "sha256": "2e61287259053ea964d39e77002c6a34af0e589e55ccff25e659efae7e892e0d",
-     "url": "https://github.com/vercel-labs/agent-browser/releases/download/v0.38.1/agent-browser-darwin-arm64"
+     "rozmiar": 17755040,
+     "sha256": "05338a8eeddf0b3f9ebf0c87a6c21aedc10685608c68618e1a8483c43eae9c3f",
+     "url": "https://github.com/vercel-labs/agent-browser/releases/download/v0.43.0/agent-browser-darwin-arm64"
     },
     "linux-x64": {
      "env": {
       "JARVO_AGENT_BROWSER_BIN": "{katalog}/agent-browser-linux-x64"
      },
      "format": "plik",
-     "rozmiar": 18247376,
-     "sha256": "5100149a1903211c889de4e545bf36d90803740cea4f99aa22651649f9205ea1",
-     "url": "https://github.com/vercel-labs/agent-browser/releases/download/v0.38.1/agent-browser-linux-x64"
+     "rozmiar": 20460232,
+     "sha256": "8e69c9fb662514c9cf36e4911e94e913742ba066e55102486350e049dd847612",
+     "url": "https://github.com/vercel-labs/agent-browser/releases/download/v0.43.0/agent-browser-linux-x64"
     },
     "linux-arm64": {
      "env": {
       "JARVO_AGENT_BROWSER_BIN": "{katalog}/agent-browser-linux-arm64"
      },
      "format": "plik",
-     "rozmiar": 15832320,
-     "sha256": "937b315ee0761e8a62f7950ddcfef9b3d3d8e8d5eb9c9d2bf9e23e5725664511",
-     "url": "https://github.com/vercel-labs/agent-browser/releases/download/v0.38.1/agent-browser-linux-arm64"
+     "rozmiar": 17871832,
+     "sha256": "34be55c2b92d8d199fb9d1d62a905ee5b6ac5b1f3e8c24e5b20597f370d905e5",
+     "url": "https://github.com/vercel-labs/agent-browser/releases/download/v0.43.0/agent-browser-linux-arm64"
     }
    }
   },

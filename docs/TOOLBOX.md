@@ -424,7 +424,7 @@ Zasady obrazu Hermesa, których pilnujemy (`make pins` sprawdza piny przed zmian
   Dockerfile sprawdza, że ta rewizja jest w obrazie, a `/usr/local/bin/chromium` wskazuje tę samą binarkę, i uruchamia
   ją testowo. Niczego nie dociąga: Playwright nie sprawdza sumy pobranej przeglądarki, więc brak rewizji zatrzymuje build,
 - `AGENT_BROWSER_EXECUTABLE_PATH` celowo nieustawione: agent-browser użyłby go też dla silnika lightpanda,
-- agent-browser bez serwera podglądu: demon agent-browsera (0.38.1, tak samo 0.39.1) przy starcie każdej sesji otwiera
+- agent-browser bez serwera podglądu: demon agent-browsera (0.38.1 … 0.43.0) przy starcie każdej sesji otwiera
   na 127.0.0.1 serwer WebSocket/HTTP bez hasła (obraz strony, polecenia z wynikami i wpisywanymi wartościami,
   wstrzykiwanie myszy i klawiatury, zakładanie sesji), a strona otwarta w przeglądarce agenta mogłaby go znaleźć.
   Zmienną ani flagą się go nie wyłączy. Nakładka [`/opt/jarvo/bin/agent-browser`](../infra/bin/agent-browser), pierwsza
@@ -525,7 +525,7 @@ natywny ma mniej funkcji.
 | chrome-headless-shell (Chrome for Testing) | 153.0.8010.12 | zip | x64 w emulacji | zip | zip | instalacja | rewizja 1243 Playwrighta 1.63; na Windows silnik `browser_*` |
 | ffmpeg Playwrighta | 1011 | zip | x64 w emulacji | zip | zip | instalacja | LGPL, tylko VP8/WebM, PNG, MJPEG |
 | Lightpanda | 1.0.0 | brak: silnik `chrome` | brak: silnik `chrome` | plik | plik | instalacja | Linux = binarka z obrazu; telemetria wyłączona zmiennymi |
-| agent-browser | 0.38.1 | plik z wydania | x64 w emulacji | plik | plik | instalacja | te same bajty co w paczce npm z atestacją SLSA |
+| agent-browser | 0.43.0 | plik z wydania | x64 w emulacji | plik | plik | instalacja | te same bajty co w paczce npm platformy z atestacją |
 | Camoufox | 152.0.4-beta.30 | zip | x64 w emulacji | zip | zip | przy użyciu | paczka Windows ma fonty macOS, a macOS fonty Windows (decyzja właściciela) |
 | Chrome for Testing (Komputer Jarva) | 156.0.8078.47 | zip | x64 w emulacji | zip | zip | przy użyciu | `jarvo komputer on`; CDP po potoku, ruch przez proxy filtrujące; 134/134 sprawdzeń Komputera na Windows 11 |
 | FFmpeg (BtbN, gpl) | 9.0.2 | zip | x64 w emulacji (winarm64 bez libvpx) | brak: build Riedla | tar.xz | instalacja | filtry i kodery floty na Windows 11; libass na Windows potrzebuje `fontsdir` |

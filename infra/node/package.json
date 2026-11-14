@@ -4,7 +4,7 @@
   "description": "Narzędzia Node floty Jarvo: w obrazie /opt/jarvo/node, natywnie z package-lock.json obok (sumy integrity każdej paczki, `npm ci --ignore-scripts`, docs/NATYWNIE.md P02 i I32). Wersje przypięte i przejrzane przed dodaniem (docs/SOURCES.md); aktualizacja = PR, `make pins` i nowy lock (`npm install --package-lock-only --ignore-scripts`). playwright-core musi odpowiadać Chromium z obrazu Hermesa (Dockerfile to sprawdza) i chrome-headless-shell z vendor/natywne.yaml; hyperframes w tej samej wersji co skille HyperFrames z vendor/skills.lock.yaml.",
   "license": "MIT",
   "dependencies": {
-    "agent-browser": "0.38.1",
+    "agent-browser": "0.43.0",
     "axe-core": "4.13.0",
     "dembrandt": "0.32.2",
     "favicons": "7.3.1",

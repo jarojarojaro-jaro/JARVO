@@ -89,14 +89,14 @@ RUN set -e; cd /opt/jarvo/node && \
     npm ci --omit=dev --no-audit --no-fund && \
     # dembrandt: model ML tylko dla eksperymentalnej flagi --ai (nie używamy) → bez onnxruntime-node (~0,5 GB)
     rm -rf node_modules/onnxruntime-node node_modules/onnxruntime-common && \
-    # agent-browser: zostaje tylko binarka tej platformy (paczka niesie 7 wariantów, ~90 MB)
-    case "$(uname -m)" in x86_64) ab=linux-x64;; aarch64) ab=linux-arm64;; *) ab=unknown;; esac && \
-    find node_modules/agent-browser/bin -name 'agent-browser-*' ! -name "agent-browser-$ab" -delete && \
-    # bit wykonywania nadaje postinstall paczki, a ten jest zablokowany (allowScripts); paczka arm64 przychodzi bez niego
-    chmod 0755 node_modules/agent-browser/bin/agent-browser-$ab && \
+    # agent-browser (od 0.43): binarka tej platformy w paczce @agent-browser/cli-linux-<arch>-gnu; npm ci instaluje
+    # tylko paczkę pasującą do os/cpu/libc, więc w obrazie nie ma innych wariantów
+    case "$(uname -m)" in x86_64) ab=linux-x64-gnu;; aarch64) ab=linux-arm64-gnu;; *) ab=unknown;; esac && \
+    # bit wykonywania nadaje postinstall paczki, a ten jest zablokowany (allowScripts)
+    chmod 0755 node_modules/@agent-browser/cli-$ab/bin/agent-browser && \
     # natywna binarka zamiast nakładki w Node (jak robi postinstall przy instalacji globalnej); na PATH pierwsza
     # jest nakładka Jarva /opt/jarvo/bin/agent-browser (infra/bin: demon bez serwera podglądu), także w /usr/local/bin
-    ln -sf ../agent-browser/bin/agent-browser-$ab node_modules/.bin/agent-browser && \
+    ln -sf ../@agent-browser/cli-$ab/bin/agent-browser node_modules/.bin/agent-browser && \
     ln -sf /opt/jarvo/bin/agent-browser /usr/local/bin/agent-browser && \
     node_modules/.bin/agent-browser --version && \
     # jedna Chromium dla wszystkich: playwright-core musi trafić w rewizję chrome-headless-shell z obrazu Hermesa

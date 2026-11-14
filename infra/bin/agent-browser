@@ -1,7 +1,7 @@
 #!/bin/bash
 # agent-browser bez serwera podglądu (docs/TOOLBOX.md, „agent-browser bez serwera podglądu”).
 #
-# Demon agent-browsera (0.38.1, tak samo 0.39.1) przy starcie każdej sesji zawsze otwiera na 127.0.0.1 serwer
+# Demon agent-browsera (0.38.1 … 0.43.0) przy starcie każdej sesji zawsze otwiera na 127.0.0.1 serwer
 # WebSocket/HTTP bez hasła: obraz strony, każde polecenie z wynikiem (także wpisywane wartości), wstrzykiwanie
 # myszy i klawiatury, zakładanie nowych sesji. Strona otwarta w przeglądarce agenta (np. podgląd serwera
 # deweloperskiego na localhost) mogłaby go znaleźć. Zmienną ani flagą się go nie wyłączy, tylko poleceniem
@@ -16,23 +16,26 @@ set -uo pipefail
 shopt -s nullglob
 # JARVO_AGENT_BROWSER_BIN tylko dla testów nakładki (tests/test_agent_browser_nakladka.py)
 bin=("${JARVO_AGENT_BROWSER_BIN:-}")
-[[ -n ${bin[0]} ]] || bin=(/opt/jarvo/node/node_modules/agent-browser/bin/agent-browser-linux-*)
+[[ -n ${bin[0]} ]] || bin=(/opt/jarvo/node/node_modules/@agent-browser/cli-linux-*/bin/agent-browser)
 if (( ${#bin[@]} != 1 )); then
-  echo "agent-browser: brak natywnej binarki w /opt/jarvo/node/node_modules/agent-browser/bin" >&2
+  echo "agent-browser: brak natywnej binarki w /opt/jarvo/node/node_modules/@agent-browser/cli-linux-*/bin" >&2
   exit 127
 fi
 AB=${bin[0]}
+# od 0.41.2 start przeglądarki pyta chromereleases.googleblog.com o CVE; wersję Chromium daje obraz Jarva
+export AGENT_BROWSER_NO_VERSION_CHECK=${AGENT_BROWSER_NO_VERSION_CHECK:-1}
 [[ -n ${AGENT_BROWSER_DAEMON-} ]] && exec "$AB" "$@"
 
-# flagi globalne jak w agent-browser 0.38.1 (cli/src/flags.rs, clean_args): z wartością i bez
+# flagi globalne jak w agent-browser 0.43.0 (cli/src/flags.rs, clean_args): z wartością i bez
 Z_WARTOSCIA=" --session --restore-save --restore-check-url --restore-check-text --restore-check-fn --namespace
  --headers --executable-path --cdp --extension --init-script --enable --profile --state --proxy --proxy-bypass
  --args --user-agent -p --provider --device --session-name --color-scheme --download-path --max-output
  --allowed-domains --action-policy --confirm-actions --config --engine --input-mode --screenshot-dir
- --screenshot-quality --screenshot-format --idle-timeout --ca-cert --model "
+ --screenshot-quality --screenshot-format --idle-timeout --ca-cert --model --cdp-headers --capture "
 BEZ_WARTOSCI=" --json --headed --webgpu --no-webmcp --debug --ignore-https-errors --allow-file-access
  --hide-scrollbars --auto-connect --pin-tab --no-pin-tab --no-ca-cert --annotate --content-boundaries
- --confirm-interactive --no-auto-dialog -v --verbose -q --quiet --offline --quick --fix "
+ --confirm-interactive --no-auto-dialog -v --verbose -q --quiet --offline --quick --fix --no-auto-connect
+ --relaunch --use-system-ca "
 Z_WARTOSCIA=${Z_WARTOSCIA//$'\n'/ }
 BEZ_WARTOSCI=${BEZ_WARTOSCI//$'\n'/ }
 
@@ -81,7 +84,7 @@ case "${polecenie[0]-} ${polecenie[1]-}" in
   "mcp "*) odmowa "serwer MCP agent-browsera nie jest w Jarvie używany (otwierałby sesje z serwerem podglądu)" ;;
 esac
 
-# polecenia, które nie uruchamiają demona (agent-browser 0.38.1, cli/src/main.rs), idą prosto do binarki
+# polecenia, które nie uruchamiają demona (agent-browser 0.43.0, cli/src/main.rs), idą prosto do binarki
 case "${polecenie[0]-}" in
   ""|help|install|upgrade|doctor|profiles|skills|plugin|plugins|session|chat) exec "$AB" "$@" ;;
 esac

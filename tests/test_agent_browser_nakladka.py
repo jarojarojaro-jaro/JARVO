@@ -7,7 +7,7 @@ silnikowi chrome Chromium z instalacji.
 
 Atrapa agent-browsera to program z kodu Pythona zbudowany tak samo jak program w bin-floty (agent_browser.program:
 na Windows launcher distlib i zip, na POSIX dwa wiersze sh i zip). Każde wywołanie zapisuje jako wiersz JSON
-(argumenty, wejście, AGENT_BROWSER_EXECUTABLE_PATH) i odpowiada jak 0.38.1. Te same scenariusze przechodzą obie
+(argumenty, wejście, AGENT_BROWSER_EXECUTABLE_PATH) i odpowiada jak 0.43.0. Te same scenariusze przechodzą obie
 nakładki, więc obraz i instalacja natywna zachowują się tak samo.
 """
 

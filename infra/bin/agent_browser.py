@@ -4,7 +4,7 @@ Odpowiednik nakładki bash z obrazu (infra/bin/agent-browser) dla instalacji nat
 (docs/NATYWNIE.md C05, docs/TOOLBOX.md „agent-browser bez serwera podglądu”). Sama biblioteka standardowa: działa
 Pythonem z python-build-standalone, bez venvu.
 
-Demon agent-browsera (0.38.1) przy starcie każdej sesji otwiera na 127.0.0.1 serwer WebSocket/HTTP bez hasła: obraz
+Demon agent-browsera (0.38.1 … 0.43.0) przy starcie każdej sesji otwiera na 127.0.0.1 serwer WebSocket/HTTP bez hasła: obraz
 strony, każde polecenie z wynikiem (także wpisywane wartości), wstrzykiwanie myszy i klawiatury, zakładanie sesji.
 Strona otwarta w przeglądarce agenta (np. podgląd serwera deweloperskiego na localhost) mogłaby go znaleźć. Zmienną ani
 flagą się go nie wyłączy (AGENT_BROWSER_STREAM_PORT zmienia tylko port), tylko poleceniem `stream disable` do
@@ -48,21 +48,21 @@ from pathlib import Path
 
 WINDOWS = os.name == "nt"
 
-# flagi globalne jak w agent-browser 0.38.1 (cli/src/flags.rs, clean_args): z wartością i bez (to samo co w nakładce bash)
+# flagi globalne jak w agent-browser 0.43.0 (cli/src/flags.rs, clean_args): z wartością i bez (to samo co w nakładce bash)
 Z_WARTOSCIA = frozenset("""
     --session --restore-save --restore-check-url --restore-check-text --restore-check-fn --namespace --headers
     --executable-path --cdp --extension --init-script --enable --profile --state --proxy --proxy-bypass --args
     --user-agent -p --provider --device --session-name --color-scheme --download-path --max-output --allowed-domains
     --action-policy --confirm-actions --config --engine --input-mode --screenshot-dir --screenshot-quality
-    --screenshot-format --idle-timeout --ca-cert --model""".split())
+    --screenshot-format --idle-timeout --ca-cert --model --cdp-headers --capture""".split())
 BEZ_WARTOSCI = frozenset("""
     --json --headed --webgpu --no-webmcp --debug --ignore-https-errors --allow-file-access --hide-scrollbars
     --auto-connect --pin-tab --no-pin-tab --no-ca-cert --annotate --content-boundaries --confirm-interactive
-    --no-auto-dialog -v --verbose -q --quiet --offline --quick --fix""".split())
+    --no-auto-dialog -v --verbose -q --quiet --offline --quick --fix --no-auto-connect --relaunch --use-system-ca""".split())
 WPROST = frozenset({"--version", "-V", "--help", "-h"})
-# polecenia, które nie łączą się z demonem (agent-browser 0.38.1, cli/src/main.rs): prosto do binarki
+# polecenia, które nie łączą się z demonem (agent-browser 0.43.0, cli/src/main.rs): prosto do binarki
 BEZ_DEMONA = frozenset({"", "help", "doctor", "skills", "plugin", "plugins", "session", "chat"})
-KONTENER = "/opt/jarvo/node/node_modules/agent-browser/bin/agent-browser-linux-*"   # binarka w obrazie (bez manifestu)
+KONTENER = "/opt/jarvo/node/node_modules/@agent-browser/cli-linux-*/bin/agent-browser"   # binarka w obrazie (bez manifestu)
 
 PODGLAD = "serwer podglądu agent-browsera jest w Jarvie wyłączony (bez hasła, na 127.0.0.1)"
 POBIERANIE = ("agent-browser {0} pobiera z sieci bez sumy; w Jarvie Chromium i agent-browser są z instalacji "
@@ -175,8 +175,11 @@ def silnik(globalne: list[str], env: dict) -> str:
 def srodowisko(globalne: list[str], env: dict) -> dict:
     """Środowisko binarki: silnik inny niż Lightpanda dostaje Chromium z instalacji (CHROME_PATH), gdy nikt nie podał
     własnego (AGENT_BROWSER_EXECUTABLE_PATH, --executable-path). Bez tego agent-browser szukałby Chrome w systemie
-    (np. przeglądarki właściciela) albo prosił o `agent-browser install`."""
+    (np. przeglądarki właściciela) albo prosił o `agent-browser install`. Od 0.41.2 agent-browser przy starcie
+    przeglądarki pyta chromereleases.googleblog.com o poprawki CVE nowszego Chrome: w Jarvie wersję Chromium daje
+    manifest instalacji, a nowe wydania śledzi Jarvo, więc tego zapytania nie ma (AGENT_BROWSER_NO_VERSION_CHECK)."""
     env = dict(env)
+    env.setdefault("AGENT_BROWSER_NO_VERSION_CHECK", "1")
     chrome = env.get("CHROME_PATH") or ""
     if (silnik(globalne, env) != "lightpanda" and not env.get("AGENT_BROWSER_EXECUTABLE_PATH")
             and wartosc(globalne, "--executable-path") is None and chrome and os.path.isfile(chrome)):
