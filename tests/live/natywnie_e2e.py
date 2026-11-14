@@ -1201,8 +1201,18 @@ def _doctor_status_panel(inst: Instalacja, rap: Raport, art: Path, dopusc: list,
     # po instalacji brama restartuje się z flotą i łączy platformy: doctor dopiero, gdy nadzorca widzi ją gotową
     # (brama_gotowa: identify i /health API), najwyżej 120 s
     czekaj_na_brame(inst)
-    r = inst.jarvo_cmd("doctor", "--json", czas=300)
-    d = json_z_wyjscia(r.out)
+    # Świeża instalacja osadza notatki skarbca w tle (usługa wektorów): na runnerze 14.11 doctor zastał 8/140 i cały
+    # test był czerwony, choć usługa działała. Czekamy, aż osadzi wszystko (najwyżej 10 min); gdy nie zdąży, doctor
+    # zostaje z uwagą i test pada jak dotąd, więc prawdziwy błąd usługi dalej widać.
+    koniec = time.monotonic() + 600
+    while True:
+        r = inst.jarvo_cmd("doctor", "--json", czas=300)
+        d = json_z_wyjscia(r.out)
+        wektory = [w for w in (d or {}).get("wyniki", []) if isinstance(d, dict) and w.get("nazwa") == "wektory skarbca"]
+        if not (wektory and wektory[0].get("stan") == "uwaga" and "tylko słowami" in str(wektory[0].get("opis"))
+                and "wektory:" in str(wektory[0].get("opis")) and time.monotonic() < koniec):
+            break
+        time.sleep(20)
     if d is not None:
         zapisz_json(art / "doctor.json", d)
     else:
