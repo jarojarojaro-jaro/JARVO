@@ -14,9 +14,12 @@ Tryby (wybór: `/tryb` w sesji > JARVO_TRYB_ZGOD z `jarvo chat --tryb` > plik st
   pelny    tylko na sesję: proces czatu z --yolo albo /yolo, wtedy Hermes sam zatwierdza prośby wtyczki. Wtyczka
            nigdy nie włącza YOLO; pod YOLO blokuje w profilu jarvo narzędzia ekranu i telefonu (computer_use,
            komputer, mcp__phone__*), bo Komputer Jarva i telefon działałyby wtedy bez człowieka.
-Zawsze, w każdym trybie: zapis config.yaml Hermesa = block; zgoda na AGENTS.md, CLAUDE.md, SOUL.md i chronione
-miejsca (.git, .vscode, .idea, .claude, .hermes, .gitconfig, .bashrc, .zshrc, .npmrc, .mcp.json i podobne pliki
-startowe powłoki, dane i kod Jarva). Pod YOLO o chronione miejsca nie da się zapytać, więc wtyczka je blokuje.
+Zawsze, w każdym trybie: zapis config.yaml Hermesa = block; zapis w kodzie floty (skills, plugins, hooks, scripts,
+SOUL.md i mcp.json profili i hosta, <JARVO_ROOT>/program i build, kod Hermesa, Jarva i tej wtyczki) = block z radą
+„zlecenie dla Claude Code w misjach/DLA-CLAUDE.md”, bez pytania (także bez człowieka i pod YOLO); zgoda na AGENTS.md,
+CLAUDE.md, SOUL.md i chronione miejsca (.git, .vscode, .idea, .claude, .hermes, .gitconfig, .bashrc, .zshrc, .npmrc,
+.mcp.json i podobne pliki startowe powłoki, reszta danych Jarva), a w treści takiej prośby uwaga, że „Always” obejmie
+tylko ten sam plik albo to samo polecenie. Pod YOLO o chronione miejsca nie da się zapytać, więc wtyczka je blokuje.
 Telefon (serwer MCP `phone` z PHONEUSE, `jarvo telefon on`): mcp__phone__act i mcp__phone__batch z confirm=true
 (na wierzchu, w args albo w kroku batch) przechodzą bramkę needs_confirm telefonu, więc z człowiekiem to prośba
 z treścią akcji (zgoda = „tak” dla tej jednej akcji, bez zapamiętania), bez człowieka i pod YOLO block. Reszta
@@ -151,8 +154,15 @@ PLIKI_INSTRUKCJI = frozenset({"agents.md", "claude.md", "soul.md", ".cursorrules
 NAZWA_KONFIGU = "config.yaml"
 # katalogi robocze Hermesa w każdym profilu i w hoście (brudnopis cache/scratch, HOME terminala, plany, piaskownice):
 # zwykła praca, nie „dane Jarva”. 14.11 właściciel klikał zgody na cache/scratch/gpu_audyt.py („no limits, tylko
-# security, nie normalna praca”); chronione zostają config, sekrety, bazy, wtyczki, skille, pamięć i kod Hermesa.
+# security, nie normalna praca”); pytamy dalej o config, sekrety, bazy i pamięć, a kod floty blokujemy (niżej).
 ROBOCZE_PROFILU = ("cache", "home", "workspace", "plans", "sandboxes", "audio_cache", "image_cache")
+# kod floty w każdym profilu i w hoście: buduje go repo JARVO (build.py, skan skilli) i podmienia przy aktualizacji.
+# 14.11 21:21–21:26 Jarvo wgrał ręcznie skill do jarvo-web (cp, write_file, patch), a właściciel osiem razy klikał
+# „Always”, które obejmuje tylko ten sam plik albo to samo polecenie. Zapis tu = block z radą, bez prośby do właściciela.
+KOD_FLOTY_PROFILU = (("skills", "zainstalowane skille"), ("plugins", "wtyczki"), ("hooks", "haki bramy"),
+                     ("scripts", "skrypty floty"), ("SOUL.md", "instrukcja agenta"), ("mcp.json", "serwery MCP"))
+ZLECENIE_FLOTY = "DLA-CLAUDE.md"           # zlecenia dla Claude Code w katalogu misji (SOUL Jarva, zasada 8)
+KOD_FLOTY = "kod floty"
 
 KONTEKSTY = {"kanban": "karta kanbana", "cron": "rutyna (cron)", "q": "jednorazowe zapytanie (-q)",
              "podagent": "podagent (delegate_task)", "webhook": "webhook", "brak": "sesja bez człowieka"}
@@ -518,6 +528,7 @@ class _Miejsca:
     dozwolone: List[str] = field(default_factory=list)
     dane: List[str] = field(default_factory=list)
     robocze: List[str] = field(default_factory=list)
+    flota: List[Tuple[str, str]] = field(default_factory=list)   # (klucz, opis): kod floty, zapis = block z radą
     konfig_k: Optional[str] = None
 
 
@@ -566,7 +577,15 @@ def _miejsca(tryb: str, bez_czl: Optional[str], yolo: bool) -> _Miejsca:
     profile = [root, home, *(p for p in (root / "profiles").glob("*") if p.is_dir())] if (root / "profiles").is_dir() \
         else [root, home]
     m.robocze += [k for d in dict.fromkeys(profile) for n in ROBOCZE_PROFILU if (k := _k_realny(d / n))]
-    # dane i kod Jarva: zawsze pytamy (stan zgód, sekrety, profile, wtyczki, kod Hermesa i tej wtyczki)
+    # kod floty: zawsze block z radą (zlecenie dla Claude Code), bez pytania właściciela i bez zgody „zawsze”
+    jarvo_root = Path(os.environ["JARVO_ROOT"]) if os.environ.get("JARVO_ROOT") else \
+        (root.parent if root.name.lower() == "dane" else None)               # <root>/dane, <root>/program (sciezki.py)
+    flota = [(d / n, opis) for d in dict.fromkeys(profile) for n, opis in KOD_FLOTY_PROFILU]
+    flota += [(jarvo_root / n, "program Jarva") for n in ("program", "build")] if jarvo_root else []
+    flota += [(os.environ.get("HERMES_SRC"), "kod Hermesa"), (os.environ.get("JARVO_REPO"), "kod Jarva"),
+              (_HERE, "kod wtyczki zgód")]
+    m.flota = list({k: opis for p, opis in flota if (k := _k_realny(p))}.items())
+    # reszta danych i kodu Jarva: zawsze pytamy (stan zgód, sekrety, sesje, pamięć)
     m.dane = [k for k in (_k_realny(home), _k_realny(root), _k_realny(os.environ.get("JARVO_ROOT")),
                           _k_realny(os.environ.get("HERMES_SRC")), _k_realny(os.environ.get("JARVO_REPO")),
                           _k_realny(_HERE)) if k]
@@ -614,6 +633,9 @@ def _ocen_sciezke(realna: Optional[str], surowa: str, m: _Miejsca, *, plikowe: b
     w_danych = any(_wewnatrz(k, d) for d in m.dane) and not any(_wewnatrz(k, r) for r in m.robocze)
     nazwa = _skladnik(os.path.basename(k) or k)
     pokaz = _pokaz(realna)
+    flota = next((opis for r, opis in m.flota if _wewnatrz(k, r)), None)
+    if flota:
+        return _Werdykt("blokuj", pokaz, f"{KOD_FLOTY}: {flota}", zawsze=True)
     if (m.konfig_k and k == m.konfig_k) or (nazwa == NAZWA_KONFIGU and w_danych):
         return _Werdykt("blokuj", pokaz, "config.yaml", zawsze=True)
     korzen = next((r for r in m.dozwolone if _wewnatrz(k, r)), None)
@@ -2626,6 +2648,16 @@ def _blok(tresc: str) -> Dict[str, str]:
 
 
 def _blok_werdyktow(werdykty: List[_Werdykt], m: _Miejsca, co: str) -> Dict[str, str]:
+    flota = [w for w in werdykty if w.powod.startswith(KOD_FLOTY)]
+    if flota:
+        opisy = ", ".join(dict.fromkeys(w.powod.split(": ", 1)[-1] for w in flota))
+        logger.warning("jarvo-zgody: zablokowany zapis w kodzie floty (%s): %s", opisy, _maskuj(_lista(flota))[:300])
+        return _blok(f"{_lista(flota)} to {KOD_FLOTY} ({opisy}). Zapis tutaj znika przy aktualizacji floty i omija skan "
+                     "bezpieczeństwa, więc nie robisz go i nie pytasz o niego właściciela. Zmiana floty (nowy albo "
+                     "zmieniony skill, wtyczka, config agenta) = zlecenie dla Claude Code: dopisz `- [ ] data · co · po "
+                     f"co · plik` w {_pokaz(os.path.join(m.misje, ZLECENIE_FLOTY))} (repo JARVO, skan bezpieczeństwa, "
+                     "wdrożenie) i powiedz właścicielowi jednym zdaniem, że zlecenie czeka. Lekcję na następny raz "
+                     "zapisz przez skill_manage (poczekalnia skilli).")
     konfig = [w for w in werdykty if w.powod == "config.yaml"]
     if konfig:
         return _blok(f"{_lista(konfig)} to konfiguracja Hermesa (zgody, modele, klucze). Agent nie zmienia jej w żadnym "
@@ -2641,10 +2673,20 @@ def _blok_werdyktow(werdykty: List[_Werdykt], m: _Miejsca, co: str) -> Dict[str,
                  + (" Pliki instrukcji zmieniaj przez write_file albo patch: o nie Hermes pyta zawsze." if instrukcje else ""))
 
 
-def _prosba(narzedzie: str, m: _Miejsca, opis: str, tresc_klucza: str) -> Dict[str, str]:
+# Hermes nie pozwala wtyczce ukryć przycisku „Always” (tools/approval.py:1095-1120 request_tool_approval woła bramkę
+# bez permanent_capable), a nasz rule_key to narzędzie + folder + skrót ścieżek (write_file, patch) albo polecenia
+# (terminal): „Always” i „Session” obejmują tylko ten sam plik albo to samo polecenie. 14.11 21:21–21:26 właściciel
+# klikał „Always” osiem razy i prośby wracały (każdy nowy plik to nowa prośba), więc przy powodzie „zawsze pytaj”
+# mówimy to w treści prośby.
+STALA_ZGODA = (" Stała zgoda tu nie działa: o chronione miejsce pytam przy każdym nowym pliku i poleceniu, a „Always” "
+               "obejmie tylko ten sam plik albo to samo polecenie.")
+
+
+def _prosba(narzedzie: str, m: _Miejsca, opis: str, tresc_klucza: str, *, zawsze: bool = False) -> Dict[str, str]:
     tryb = "pełny" if m.yolo else m.tryb
+    uwaga = STALA_ZGODA if zawsze else ""
     return {"action": "approve", "rule_key": _klucz_reguly(narzedzie, m, tresc_klucza),
-            "message": _maskuj(f"jarvo-zgody (tryb {tryb}): {opis}")[:400]}
+            "message": _maskuj(f"jarvo-zgody (tryb {tryb}): {opis}")[:400 - len(uwaga)] + uwaga}
 
 
 def _opis_powodow(werdykty: List[_Werdykt]) -> str:
@@ -2671,7 +2713,7 @@ def _zapis_plikow(narzedzie: str, sciezki: List[str], m: _Miejsca, task_id: str)
         return None
     co = "zapis pliku" if narzedzie == "write_file" else "zmiana plików"
     tresc = "\n".join(sorted(_klucz(_realna(s, baza) or s) for s in sciezki))
-    return _prosba(narzedzie, m, f"{co} ({_opis_powodow(pytaj)})", tresc)
+    return _prosba(narzedzie, m, f"{co} ({_opis_powodow(pytaj)})", tresc, zawsze=any(w.zawsze for w in pytaj))
 
 
 _V4A = re.compile(r"^\*\*\*\s*(?:Update|Add|Delete)\s+File:\s*(.+?)\s*$", re.M)
@@ -2744,7 +2786,8 @@ def _terminal(args: Dict[str, Any], m: _Miejsca, task_id: str) -> Optional[Dict[
         powody.append("polecenie złożone, nie da się go sprawdzić")
     if not powody:
         powody.append("zapis")
-    return _prosba("terminal", m, f"polecenie `{pokaz}` ({'; '.join(powody)})", polecenie.strip())
+    return _prosba("terminal", m, f"polecenie `{pokaz}` ({'; '.join(powody)})", polecenie.strip(),
+                   zawsze=bool(zawsze))
 
 
 def _potwierdza(v: Any) -> bool:

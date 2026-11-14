@@ -229,7 +229,8 @@ def test_tryb_auto_zostawia_strazniki(sr, monkeypatch):
 
 def test_tryb_auto_brudnopis_i_home_profilu_bez_prosb(sr, monkeypatch):
     """14.11 12:52 i 12:56: właściciel klikał zgody na zapis cache/scratch/gpu_audyt.py w profilu Jarva („no limits,
-    tylko security, nie normalna praca”). Katalogi robocze Hermesa przechodzą; wtyczki, skille i sekrety dalej pytają."""
+    tylko security, nie normalna praca”). Katalogi robocze Hermesa przechodzą; sekrety dalej pytają, wtyczki i skille
+    blokuje strażnik kodu floty (test niżej)."""
     ustaw_tryb(monkeypatch, "auto")
     for rel in ("cache/scratch/gpu_audyt.py", "home/notatki.txt", "workspace/a.md", "plans/plan.md"):
         (sr.home / rel).parent.mkdir(parents=True, exist_ok=True)
@@ -237,9 +238,10 @@ def test_tryb_auto_brudnopis_i_home_profilu_bez_prosb(sr, monkeypatch):
     (sr.dane / "profiles" / "jarvo-web" / "cache").mkdir(parents=True)
     assert hak("write_file", path=str(sr.dane / "profiles" / "jarvo-web" / "cache" / "x.py"), content="x") is None
     assert hak("terminal", command=f"python3 a.py > '{sr.home / 'cache' / 'scratch' / 'wynik.json'}'") is None
-    for rel in ("plugins/jarvo-zgody/__init__.py", "skills/x/SKILL.md", ".env"):
+    assert akcja(hak("write_file", path=str(sr.home / ".env"), content="x")) == "approve"
+    for rel in ("plugins/jarvo-zgody/__init__.py", "skills/x/SKILL.md"):
         (sr.home / rel).parent.mkdir(parents=True, exist_ok=True)
-        assert akcja(hak("write_file", path=str(sr.home / rel), content="x")) == "approve", rel
+        assert akcja(hak("write_file", path=str(sr.home / rel), content="x")) == "block", rel
 
 
 def test_komunikat_prosby_z_nazwa_pliku_i_polecenia(sr):
@@ -413,9 +415,10 @@ def test_pliki_instrukcji_przez_write_file_pyta_hermes(sr, monkeypatch):
 
 def test_dane_jarva_zawsze_pytaja_poza_katalogami_roboczymi(sr, monkeypatch):
     monkeypatch.setenv("TERMINAL_CWD", str(sr.dane))        # czat odpalony w katalogu danych
-    for p in (sr.home / "SOUL.md", sr.home / ".env", sr.dane / "plugins" / "x" / "__init__.py",
-              sr.home / "plugin-data" / "jarvo-zgody" / "stan.json"):
+    for p in (sr.home / ".env", sr.home / "plugin-data" / "jarvo-zgody" / "stan.json", sr.home / "memories" / "x.md"):
         assert akcja(hak("write_file", path=str(p), content="x")) == "approve", p
+    for p in (sr.home / "SOUL.md", sr.dane / "plugins" / "x" / "__init__.py"):          # kod floty: block z radą
+        assert akcja(hak("write_file", path=str(p), content="x")) == "block", p
     assert hak("write_file", path=str(sr.ws_root / "jarvo" / "raport.md"), content="x") is None
     assert hak("write_file", path=str(sr.wiedza / "notatka.md"), content="x") is None
 
@@ -426,12 +429,102 @@ def test_brama_z_folderem_w_katalogu_roboczym(sr, monkeypatch):
     assert akcja(hak("write_file", path=str(sr.home / "memories" / "x.md"), content="x")) == "approve"
 
 
-def test_kod_wtyczki_i_jarva_chroniony(sr, monkeypatch):
+def test_kod_wtyczki_i_jarva_zablokowany(sr, monkeypatch):
     monkeypatch.setenv("TERMINAL_CWD", str(REPO))
-    assert akcja(hak("write_file", path=str(REPO / "zgody" / "plugin" / "__init__.py"), content="x")) == "approve"
+    assert akcja(hak("write_file", path=str(REPO / "zgody" / "plugin" / "__init__.py"), content="x")) == "block"
     assert hak("write_file", path=str(REPO / "docs" / "nowy.md"), content="x") is None
     monkeypatch.setenv("JARVO_ROOT", str(sr.tmp))
-    assert akcja(hak("write_file", path=str(sr.tmp / "program" / "hermes" / "x.py"), content="x")) == "approve"
+    assert akcja(hak("write_file", path=str(sr.tmp / "program" / "hermes" / "x.py"), content="x")) == "block"
+
+
+# ------------------------------------------------------------------------------------------------ kod floty (14.11)
+# Sesja Telegram 14.11 21:21–21:26: na „dodajmy” Jarvo wgrał ręcznie skill do <dane>/profiles/jarvo-web/skills (cp przez
+# terminal, write_file, patch), a właściciel osiem razy klikał „Always” i prośby wracały. Zapis w kodzie floty to
+# zlecenie dla Claude Code (misje/DLA-CLAUDE.md), więc strażnik blokuje go z radą i nie pyta właściciela.
+
+def zapisy_skilla(sr):
+    skille = sr.dane / "profiles" / "jarvo-web" / "skills"
+    zrodlo = sr.home / "cache" / "scratch" / "mwg" / ".agents" / "skills" / "x"
+    for d in (skille / "web", zrodlo):
+        d.mkdir(parents=True, exist_ok=True)
+    cel = skille / "web" / "x" / "SKILL.md"
+    return [
+        ("terminal", {"command": f"src={zrodlo}\ndst={cel.parent}\nmkdir -p \"$dst\" && cp -a \"$src/.\" \"$dst/\" && "
+                                 "du -sh \"$dst\""}),
+        ("terminal", {"command": f"cd {cel.parent} && mv SKILL.md SKILL-upstream.md && ls"}),
+        ("terminal", {"command": f"echo '---' > '{cel}'"}),
+        ("write_file", {"path": str(cel), "content": "---\nname: x\n---\n"}),
+        ("write_file", {"path": str(cel.parent / "zbuduj-index.py"), "content": "print(1)\n"}),
+        ("patch", {"path": str(cel), "old_string": "a", "new_string": "b"}),
+        ("patch", {"mode": "patch", "patch": f"*** Begin Patch\n*** Update File: {cel}\n@@\n-a\n+b\n*** End Patch"}),
+    ]
+
+
+@pytest.mark.parametrize("tryb", ["pytaj", "projekt", "auto", "pelny"])
+@pytest.mark.parametrize("yolo", [False, True])
+def test_kod_floty_zablokowany_z_rada_bez_prosby(sr, monkeypatch, tryb, yolo):
+    ustaw_tryb(monkeypatch, tryb)
+    monkeypatch.setattr(z, "_yolo", lambda: yolo)
+    for narzedzie, argumenty in zapisy_skilla(sr):
+        w = hak(narzedzie, **argumenty)
+        assert akcja(w) == "block", (narzedzie, argumenty, w)
+        assert "kod floty (zainstalowane skille)" in w["message"] and "zlecenie dla Claude Code" in w["message"], w
+        assert "DLA-CLAUDE.md" in w["message"] and "nie pytasz o niego właściciela" in w["message"]
+
+
+@pytest.mark.parametrize("kontekst", ["kanban", "cron", "q", "podagent", "webhook", "brak"])     # KONTEKSTY niżej
+def test_kod_floty_bez_czlowieka_z_ta_sama_rada(sr, monkeypatch, kontekst):
+    bez_czlowieka(sr, monkeypatch, kontekst)
+    for narzedzie, argumenty in zapisy_skilla(sr):
+        w = hak(narzedzie, **argumenty)
+        assert akcja(w) == "block" and "DLA-CLAUDE.md" in w["message"], (narzedzie, w)
+    assert hak("write_file", path=str(sr.misje / "DLA-CLAUDE.md"), content="- [ ] x\n") is None
+
+
+def test_kod_floty_hosta_profili_i_programu(sr, monkeypatch):
+    ustaw_tryb(monkeypatch, "auto")
+    web = sr.dane / "profiles" / "jarvo-web"
+    web.mkdir(parents=True)
+    for p, opis in ((sr.dane / "skills" / "x" / "SKILL.md", "zainstalowane skille"),
+                    (sr.dane / "plugins" / "jarvo-wiedza" / "sesje.py", "wtyczki"),
+                    (sr.dane / "hooks" / "x" / "handler.py", "haki bramy"),
+                    (sr.home / "scripts" / "poczekalnia.py", "skrypty floty"),
+                    (web / "SOUL.md", "instrukcja agenta"), (web / "mcp.json", "serwery MCP"),
+                    (sr.tmp / "program" / "app" / "x.py", "program Jarva"),       # <root>/program obok <root>/dane
+                    (sr.tmp / "build" / "profiles" / "jarvo-web" / "SOUL.md", "program Jarva")):
+        w = hak("write_file", path=str(p), content="x")
+        assert akcja(w) == "block" and f"kod floty ({opis})" in w["message"], (p, w)
+    assert akcja(hak("terminal", command=f"echo x >> '{sr.dane / 'plugins' / 'x.py'}'")) == "block"
+
+
+def test_kod_floty_nie_rusza_legalnych_drog(sr, monkeypatch):
+    """Pamięć, misje (z DLA-CLAUDE.md), skarbiec, katalogi robocze profili i narzędzia Hermesa do skilli bez zmian."""
+    for tryb in ("projekt", "auto"):
+        ustaw_tryb(monkeypatch, tryb)
+        assert hak("write_file", path=str(sr.misje / "DLA-CLAUDE.md"), content="- [ ] x\n") is None
+        assert hak("patch", path=str(sr.misje / "Z-1" / "MISSION.md"), old_string="a", new_string="b") is None
+        assert hak("write_file", path=str(sr.wiedza / "fleet" / "arsenal.md"), content="x") is None
+        assert akcja(hak("write_file", path=str(sr.home / "memories" / "MEMORY.md"), content="x")) == "approve"
+        assert hak("skill_manage", action="create", name="x", content="---\nname: x\n---\n") is None
+    # poczekalnia skilli: zatwierdzenie robi skrypt (zapis Pythona, nie ścieżka w poleceniu), w auto bez pytania
+    assert hak("terminal", command="python3 poczekalnia.py zatwierdz jarvo-web p1 abc") is None
+    assert hak("write_file", path=str(sr.home / "cache" / "scratch" / "skill.md"), content="x") is None
+
+
+def test_prosba_zawsze_pytaj_nie_obiecuje_stalej_zgody(sr, monkeypatch):
+    """Hermes nie da wtyczce ukryć „Always”, więc prośba o chronione miejsce mówi, że obejmie ono jedno wywołanie."""
+    dluga = sr.proj / ".git" / ("a" * 150) / ("b" * 150) / "config"
+    for tryb in ("pytaj", "projekt", "auto"):
+        ustaw_tryb(monkeypatch, tryb)
+        for w in (hak("write_file", path=str(sr.home / ".env"), content="x"),
+                  hak("terminal", command=f"echo x >> '{sr.proj / '.git' / 'config'}'"),
+                  hak("patch", path=str(sr.proj / "AGENTS.md"), old_string="a", new_string="b"),
+                  hak("write_file", path=str(dluga), content="x")):
+            assert akcja(w) == "approve" and w["message"].endswith(z.STALA_ZGODA), (tryb, w)
+            assert len(w["message"]) <= 400
+    ustaw_tryb(monkeypatch, "projekt")
+    w = hak("write_file", path=str(sr.poza / "x.txt"), content="x")
+    assert akcja(w) == "approve" and "Stała zgoda" not in w["message"]
 
 
 # ------------------------------------------------------------------------------------------------ niebezpieczne i stałe zgody Hermesa

@@ -18,11 +18,19 @@ Wtyczka Hermesa (`plugin/`: `__init__.py`, `plugin.yaml`) ma hak `pre_tool_call`
 
 Zawsze, w każdym trybie:
 - zapis `config.yaml` Hermesa (profilu i katalogu danych) = blokada;
+- zapis w kodzie floty = blokada z radą, bez pytania (z człowiekiem, bez niego i pod YOLO): `skills`, `plugins`,
+  `hooks`, `scripts`, `SOUL.md` i `mcp.json` każdego profilu i hosta, `<JARVO_ROOT>/program` i `build`, kod Hermesa
+  (`HERMES_SRC`), Jarva (`JARVO_REPO`) i tej wtyczki. Rada dla agenta: zmiana floty (nowy albo zmieniony skill,
+  wtyczka, config agenta) to zlecenie dla Claude Code w `<misje>/DLA-CLAUDE.md` (repo JARVO, skan skilli, wdrożenie);
+  zapis w zainstalowanym profilu znika przy aktualizacji i omija skan. 14.11 Jarvo wgrał tak ręcznie skill do
+  `jarvo-web`, a właściciel osiem razy klikał „Always”;
 - zgoda na `AGENTS.md`, `CLAUDE.md`, `SOUL.md` i chronione miejsca: `.git`, `.vscode`, `.idea`, `.claude`, `.hermes`,
-  `.gitconfig`, `.bashrc`, `.zshrc`, `.npmrc`, `.mcp.json` (i inne pliki startowe powłoki), dane Jarva (`HERMES_HOME`,
-  `JARVO_ROOT`, kod Hermesa i wtyczki; poza `jarvo/workspaces`, skarbcem, misjami i katalogami roboczymi Hermesa
-  w każdym profilu: `cache` (brudnopis `cache/scratch`), `home`, `workspace`, `plans`, `sandboxes`, `audio_cache`, `image_cache`). W trybie pełnym o te miejsca nie
-  da się zapytać, więc są blokowane;
+  `.gitconfig`, `.bashrc`, `.zshrc`, `.npmrc`, `.mcp.json` (i inne pliki startowe powłoki), reszta danych Jarva
+  (`HERMES_HOME`, `JARVO_ROOT`: sekrety, stan zgód, pamięć, bazy; poza `jarvo/workspaces`, skarbcem, misjami
+  i katalogami roboczymi Hermesa w każdym profilu: `cache` (brudnopis `cache/scratch`), `home`, `workspace`, `plans`,
+  `sandboxes`, `audio_cache`, `image_cache`). Hermes nie pozwala wtyczce ukryć przycisku „Always”, a klucz reguły
+  obejmuje ten sam plik albo to samo polecenie, więc treść takiej prośby kończy się zdaniem „Stała zgoda tu nie
+  działa: …”. W trybie pełnym o te miejsca nie da się zapytać, więc są blokowane;
 - o polecenia, które Hermes sam uzna za niebezpieczne, pyta tylko Hermes (bez drugiego pytania). Pliki instrukcji
   przez `write_file` i `patch` też pyta sam Hermes (zawsze, także pod YOLO). Wyjątek: masowe kasowanie blokuje
   strażnik kasowania (niżej), zanim Hermes o nie zapyta;
