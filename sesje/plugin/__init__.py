@@ -16,10 +16,20 @@ profilu, nie tylko w hoście: brama obsługuje wiadomość w zakresie profilu tr
 gateway/run_adapters.py `_make_profile_message_handler`) i bierze haki z menedżera wtyczek tego profilu (14.11 14:21:
 wtyczka tylko w hoście, wiadomość poszła do Jarva). Konfiguracja (bez sekretów):
 
-    {"gpu": {"nazwa": "Kernel", "skrzynka": "/home/<użytkownik>/kernel/skrzynka"}}
+    {"gpu": {"nazwa": "Kernel", "skrzynka": "/home/<użytkownik>/kernel/skrzynka", "czat": "-100…", "watek": "7"},
+     "dev": {"nazwa": "Jarodev", "profil": "jarvo-jarodev"}}
 
 Plik w skrzynce: `nowe/<RRRRMMDD-HHMMSS>-<id wiadomości>.json` z polami dopisek, nazwa, tekst (bez dopisku),
-odpowiedz_na (cytowana wiadomość), media (kopie zdjęć i plików obok JSON-a), czas, chat_id, message_id.
+odpowiedz_na (cytowana wiadomość), media (kopie zdjęć i plików obok JSON-a), czas, chat_id, message_id, watek
+(wątek grupy, z którego przyszła; pusty w DM: sesja odpowiada wtedy właścicielowi w DM).
+
+Grupa „Jarvo HQ” z tematami (14.11): wątek na agenta. Wpis skrzynki z `czat` i `watek` (zapisuje je
+`jarvo telegram tematy`) łapie każdą wiadomość właściciela w tym wątku, bez dopisku. Wpis z `profil` zamiast
+`skrzynka` to agent floty: „… dev” zakłada kartę kanbana przypisaną do tego profilu (API kanbana Hermesa, jak
+narzędzie kanban_create; recenzenta wybiera pracownik przy kanban_request_review według floty), bot odpowiada
+„📥 Jarodev: przyjąłem, karta <id>”. Każda wiadomość właściciela w grupie zapisuje też grupę i wątek (nazwa tematu
+z `reply_to_message.forum_topic_created`) w `<dane>/jarvo/state/telegram-grupy.json`: stąd `jarvo telegram tematy`
+bierze ID grupy i istniejące tematy. Samo „start” w grupie tylko to zapisuje i potwierdza (nie budzi Jarva).
 """
 
 from __future__ import annotations
@@ -36,7 +46,14 @@ from typing import Any, Optional
 logger = logging.getLogger(__name__)
 
 PLIK_KONFIGURACJI = "sesje.json"
+PLIK_GRUP = "telegram-grupy.json"
+TYPY_GRUP = frozenset({"group", "forum"})        # Hermes: supergrupa = "group" (adapter._build_message_event)
+WATEK_OGOLNY = "1"                               # temat General forum (adapter._GENERAL_TOPIC_THREAD_ID)
+MAKS_GRUP, MAKS_WATKOW = 20, 200
 _OSTATNIE_SLOWO = re.compile(r"(?:^|\s)([^\s]+)\s*$")
+_START = re.compile(r"/?start(?:@\w+)?", re.I)
+_PROFIL = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}")
+_ID_GRUPY = re.compile(r"-\d{3,20}")
 _PRZYJETE: dict[tuple[str, str], float] = {}     # (chat, wiadomość) → czas: ten sam event dwa razy (dwie rejestracje
 _PAMIEC_S = 600                                  # wtyczki, ponowienie Telegrama) nie robi drugiego pliku ani potwierdzenia
 
@@ -50,7 +67,7 @@ def _dane() -> Optional[Path]:
 
 
 def konfiguracja(dane: Optional[Path] = None) -> dict[str, dict]:
-    """Dopisek (małe litery) → {nazwa, skrzynka}; brak pliku albo błąd = brak skrzynek."""
+    """Dopisek (małe litery) → {nazwa, skrzynka[, czat, watek]} albo {nazwa, profil}; brak pliku albo błąd = nic."""
     dane = dane or _dane()
     if dane is None:
         return {}
@@ -59,9 +76,17 @@ def konfiguracja(dane: Optional[Path] = None) -> dict[str, dict]:
     except (OSError, ValueError):
         return {}
     wynik = {}
-    for dopisek, wpis in (surowe or {}).items():
-        if isinstance(wpis, dict) and wpis.get("skrzynka"):
-            wynik[str(dopisek).strip().lower()] = {"nazwa": str(wpis.get("nazwa") or dopisek), "skrzynka": str(wpis["skrzynka"])}
+    for dopisek, wpis in (surowe if isinstance(surowe, dict) else {}).items():
+        if not isinstance(wpis, dict):
+            continue
+        klucz, nazwa = str(dopisek).strip().lower(), str(wpis.get("nazwa") or dopisek)
+        if wpis.get("skrzynka"):
+            cel = {"nazwa": nazwa, "skrzynka": str(wpis["skrzynka"])}
+            if wpis.get("czat") and wpis.get("watek"):
+                cel.update(czat=str(wpis["czat"]), watek=str(wpis["watek"]))
+            wynik[klucz] = cel
+        elif _PROFIL.fullmatch(str(wpis.get("profil") or "")):
+            wynik[klucz] = {"nazwa": nazwa, "profil": str(wpis["profil"])}
     return wynik
 
 
@@ -76,24 +101,47 @@ def rozpoznaj(tekst: str, dopiski: dict[str, dict]) -> Optional[tuple[str, str]]
     return slowo, tekst[: m.start(1)].rstrip(" \t\n,;:-–—")
 
 
+def _rdzen(event: Any) -> tuple[str, str]:
+    mid = re.sub(r"[^0-9A-Za-z_-]", "", str(getattr(event, "message_id", "") or "")) or "0"
+    return f"{time.strftime('%Y%m%d-%H%M%S')}-{mid}", mid
+
+
+def _kopiuj_media(event: Any, katalog: Path, rdzen: str) -> list[str]:
+    media = []
+    for i, sciezka in enumerate(getattr(event, "media_urls", None) or []):
+        p = Path(str(sciezka))
+        if p.is_file():
+            katalog.mkdir(parents=True, exist_ok=True)
+            cel = katalog / f"{rdzen}-{i}{p.suffix}"
+            shutil.copy2(p, cel)
+            media.append(str(cel))
+    return media
+
+
+def _zapisz_atomowo(plik: Path, tresc: str) -> None:
+    plik.parent.mkdir(parents=True, exist_ok=True)
+    tymczasowy = plik.with_name(f".{plik.name}.{os.getpid()}.tmp")
+    tymczasowy.write_text(tresc, encoding="utf-8")
+    tymczasowy.replace(plik)
+
+
+def _watek_grupy(zrodlo: Any) -> str:
+    """Wątek grupy (forum: General = "1"); pusty poza grupą, bo w DM sesja odpowiada właścicielowi wprost."""
+    if str(getattr(zrodlo, "chat_type", "") or "") not in TYPY_GRUP:
+        return ""
+    return str(getattr(zrodlo, "thread_id", "") or "")
+
+
 def zapisz(skrzynka: Path, dopisek: str, nazwa: str, tekst: str, event: Any) -> Path:
     """Wiadomość jako JSON w `nowe/` (zapis przez plik tymczasowy, więc proces sesji nie przeczyta połowy)."""
     nowe = skrzynka / "nowe"
     nowe.mkdir(parents=True, exist_ok=True)
     zrodlo = getattr(event, "source", None)
-    mid = re.sub(r"[^0-9A-Za-z_-]", "", str(getattr(event, "message_id", "") or "")) or "0"
-    rdzen = f"{time.strftime('%Y%m%d-%H%M%S')}-{mid}"
-    media = []
-    for i, sciezka in enumerate(getattr(event, "media_urls", None) or []):
-        p = Path(str(sciezka))
-        if p.is_file():
-            cel = nowe / f"{rdzen}-{i}{p.suffix}"
-            shutil.copy2(p, cel)
-            media.append(str(cel))
+    rdzen, mid = _rdzen(event)
     wpis = {"dopisek": dopisek, "nazwa": nazwa, "tekst": tekst,
             "odpowiedz_na": getattr(event, "reply_to_text", None) or "",
-            "media": media, "czas": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "chat_id": str(getattr(zrodlo, "chat_id", "") or ""), "message_id": mid}
+            "media": _kopiuj_media(event, nowe, rdzen), "czas": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "chat_id": str(getattr(zrodlo, "chat_id", "") or ""), "message_id": mid, "watek": _watek_grupy(zrodlo)}
     tymczasowy = nowe / f".{rdzen}.json.tmp"
     tymczasowy.write_text(json.dumps(wpis, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     plik = nowe / f"{rdzen}.json"
@@ -101,39 +149,196 @@ def zapisz(skrzynka: Path, dopisek: str, nazwa: str, tekst: str, event: Any) -> 
     return plik
 
 
+# ---------------------------------------------------------------- karta kanbana (wpis z `profil`)
+
+def tytul_karty(tekst: str, slow: int = 10, znakow: int = 80) -> str:
+    """Pierwsze słowa pierwszej niepustej linii (do `slow` słów i `znakow` znaków)."""
+    linia = next((x.strip() for x in (tekst or "").splitlines() if x.strip()), "")
+    slowa = linia.split()
+    tytul = " ".join(slowa[:slow])
+    if len(tytul) > znakow:
+        return tytul[: znakow - 1].rstrip() + "…"
+    return (tytul + ("…" if len(slowa) > slow else "")) or "Wiadomość od właściciela z Telegrama"
+
+
+def tresc_karty(tekst: str, dopisek: str, event: Any, media: list[str]) -> str:
+    czesci = [tekst or "(bez tekstu)"]
+    if getattr(event, "reply_to_text", None):
+        czesci.append(f"Odpowiedź na wiadomość:\n{event.reply_to_text}")
+    if media:
+        czesci.append("Załączniki:\n" + "\n".join(f"- {m}" for m in media))
+    czesci.append(f"— od właściciela przez Telegram, dopisek {dopisek}")
+    return "\n\n".join(czesci)
+
+
+def zaloz_karte(profil: str, tytul: str, tresc: str, klucz: str) -> str:
+    """Karta na tablicy floty przez API kanbana Hermesa (hermes_cli/kanban_db.py create_task, jak narzędzie
+    kanban_create w tools/kanban_tools.py); `klucz` (idempotency_key) = ta sama wiadomość nie robi drugiej karty."""
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+    with kbc.connect_closing() as conn:
+        return str(kb.create_task(conn, title=tytul, body=tresc, assignee=profil, created_by="user",
+                                  idempotency_key=klucz))
+
+
+def karta(cel: dict, dopisek: str, tekst: str, event: Any, dane: Optional[Path]) -> str:
+    rdzen, mid = _rdzen(event)
+    media = _kopiuj_media(event, dane / "jarvo" / "workspaces" / "telegram", rdzen) if dane else []
+    czat = str(getattr(getattr(event, "source", None), "chat_id", "") or "")
+    return zaloz_karte(cel["profil"], tytul_karty(tekst), tresc_karty(tekst, dopisek, event, media),
+                       f"telegram:{czat}:{mid}")
+
+
+# ---------------------------------------------------------------- grupa „Jarvo HQ”: wykrycie grupy i wątków
+
+def nazwa_tematu(event: Any) -> str:
+    """Nazwa tematu forum: wiadomość w temacie odpowiada na usługową `forum_topic_created` (Bot API), a zmiana nazwy
+    przychodzi jako `forum_topic_edited`; bez nich nazwa z wiązań tematów Hermesa (`chat_topic`)."""
+    surowa = getattr(event, "raw_message", None)
+    for usluga in (getattr(surowa, "forum_topic_edited", None), getattr(surowa, "forum_topic_created", None),
+                   getattr(getattr(surowa, "reply_to_message", None), "forum_topic_created", None)):
+        nazwa = getattr(usluga, "name", None)
+        if isinstance(nazwa, str) and nazwa.strip():
+            return nazwa.strip()
+    temat = getattr(getattr(event, "source", None), "chat_topic", None)
+    return temat.strip() if isinstance(temat, str) else ""
+
+
+def zapamietaj_grupe(event: Any, dane: Optional[Path] = None) -> bool:
+    """Grupa i wątek wiadomości właściciela → `<dane>/jarvo/state/telegram-grupy.json` (zapis tylko przy zmianie).
+    Kształt: {"grupy": {"-100…": {"nazwa", "forum", "od", "watki": {"<wątek>": {"nazwa", "od"}}}}}."""
+    dane = dane or _dane()
+    zrodlo = getattr(event, "source", None)
+    czat = str(getattr(zrodlo, "chat_id", "") or "")
+    if dane is None or str(getattr(zrodlo, "chat_type", "") or "") not in TYPY_GRUP or not _ID_GRUPY.fullmatch(czat):
+        return False
+    plik = dane / "jarvo" / "state" / PLIK_GRUP
+    try:
+        stan = json.loads(plik.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        stan = {}
+    grupy = stan.get("grupy") if isinstance(stan, dict) and isinstance(stan.get("grupy"), dict) else {}
+    stara = grupy.get(czat) if isinstance(grupy.get(czat), dict) else {}
+    teraz = time.strftime("%Y-%m-%d %H:%M:%S")
+    surowa = getattr(event, "raw_message", None)
+    nowa = {**stara, "od": stara.get("od") or teraz}
+    nazwa = getattr(zrodlo, "chat_name", None) or getattr(getattr(surowa, "chat", None), "title", None)
+    if isinstance(nazwa, str) and nazwa.strip():
+        nowa["nazwa"] = nazwa.strip()
+    forum = getattr(getattr(surowa, "chat", None), "is_forum", None)
+    if isinstance(forum, bool):
+        nowa["forum"] = forum
+    watki = dict(stara.get("watki") or {})
+    watek = str(getattr(zrodlo, "thread_id", "") or "")
+    if watek:
+        byl = watki.get(watek) if isinstance(watki.get(watek), dict) else {}
+        temat = nazwa_tematu(event) or byl.get("nazwa") or ("General" if watek == WATEK_OGOLNY else "")
+        if not byl or byl.get("nazwa") != temat:
+            watki[watek] = {"nazwa": temat, "od": byl.get("od") or teraz}
+        if len(watki) > MAKS_WATKOW:
+            watki = dict(sorted(watki.items(), key=lambda kv: str(kv[1].get("od", "")))[-MAKS_WATKOW:])
+    nowa["watki"] = watki
+    if nowa == stara:
+        return False
+    grupy = {**grupy, czat: nowa}
+    if len(grupy) > MAKS_GRUP:
+        grupy = dict(sorted(grupy.items(), key=lambda kv: str(kv[1].get("od", "")))[-MAKS_GRUP:])
+    _zapisz_atomowo(plik, json.dumps({"grupy": grupy}, ensure_ascii=False, indent=1) + "\n")
+    return True
+
+
+# ---------------------------------------------------------------- hak bramy
+
+def _cel_watku(dopiski: dict[str, dict], zrodlo: Any) -> Optional[tuple[str, dict]]:
+    """Skrzynka, której wątek w grupie to wątek tej wiadomości (wpis z `czat` i `watek`)."""
+    czat, watek = str(getattr(zrodlo, "chat_id", "") or ""), _watek_grupy(zrodlo)
+    if not watek:
+        return None
+    return next(((d, c) for d, c in dopiski.items() if c.get("watek") == watek and c.get("czat") == czat), None)
+
+
+async def _odpowiedz(gateway: Any, zrodlo: Any, tekst: str) -> None:
+    """Potwierdzenie tam, skąd przyszła wiadomość (w grupie do tego samego wątku); to grzeczność, nie warunek."""
+    adapter = getattr(gateway, "_delivery_adapter_for", lambda _s: None)(zrodlo)
+    if adapter is None:
+        return
+    watek = _watek_grupy(zrodlo)
+    try:
+        if watek:
+            await adapter.send(zrodlo.chat_id, tekst, metadata={"thread_id": watek})
+        else:
+            await adapter.send(zrodlo.chat_id, tekst)
+    except Exception as e:
+        logger.warning("jarvo-sesje: potwierdzenie nie wyszło: %s", e)
+
+
+def _juz_przyjeta(zrodlo: Any, event: Any) -> tuple[tuple[str, str], bool]:
+    klucz = (str(getattr(zrodlo, "chat_id", "") or ""), str(getattr(event, "message_id", "") or ""))
+    teraz = time.time()
+    for k in [k for k, t in _PRZYJETE.items() if teraz - t > _PAMIEC_S]:
+        del _PRZYJETE[k]
+    if klucz[1] and klucz in _PRZYJETE:
+        return klucz, True
+    _PRZYJETE[klucz] = teraz
+    return klucz, False
+
+
 async def przechwyc(event: Any = None, gateway: Any = None, **_kw) -> Optional[dict]:
-    """Hak `pre_gateway_dispatch`: wiadomość z dopiskiem sesji → skrzynka + potwierdzenie, Jarvo jej nie dostaje."""
+    """Hak `pre_gateway_dispatch`: wiadomość z dopiskiem albo z wątku sesji → skrzynka / karta + potwierdzenie,
+    Jarvo jej nie dostaje. W grupie zapisuje też grupę i wątek („start” tylko to). Reszta idzie dalej bez zmian."""
     try:
         if event is None or getattr(event, "internal", False) or not isinstance(getattr(event, "text", None), str):
             return None
-        dopiski = konfiguracja()
-        trafienie = rozpoznaj(event.text, dopiski) if dopiski else None
-        if trafienie is None:
-            return None
         zrodlo = getattr(event, "source", None)
+        dopiski = konfiguracja()
+        w_grupie = str(getattr(zrodlo, "chat_type", "") or "") in TYPY_GRUP
+        z_watku = _cel_watku(dopiski, zrodlo) if dopiski else None
+        start = w_grupie and bool(_START.fullmatch(event.text.strip()))
+        trafienie = rozpoznaj(event.text, dopiski) if dopiski and not (z_watku or start) else None
+        if not (w_grupie or z_watku or trafienie):
+            return None
         autoryzacja = getattr(gateway, "_is_user_authorized_for_source", None)
         if zrodlo is None or not callable(autoryzacja) or not autoryzacja(zrodlo):
             return None                       # obcy nadawca idzie zwykłą drogą (parowanie / odmowa Hermesa)
-        dopisek, tekst = trafienie
-        klucz = (str(getattr(zrodlo, "chat_id", "") or ""), str(getattr(event, "message_id", "") or ""))
-        teraz = time.time()
-        for k in [k for k, t in _PRZYJETE.items() if teraz - t > _PAMIEC_S]:
-            del _PRZYJETE[k]
-        if klucz[1] and klucz in _PRZYJETE:
-            return {"action": "skip", "reason": f"skrzynka sesji „{dopisek}” (już przyjęta)"}
-        _PRZYJETE[klucz] = teraz
-        cel = dopiski[dopisek]
-        skrzynka = Path(os.path.expanduser(cel["skrzynka"]))
-        zapisz(skrzynka, dopisek, cel["nazwa"], tekst, event)
-        w_kolejce = len(list((skrzynka / "nowe").glob("*.json")))
-        potwierdzenie = f"📥 {cel['nazwa']}: przyjąłem, analizuję" + (f" (w kolejce: {w_kolejce})" if w_kolejce > 1 else "") + "."
-        adapter = getattr(gateway, "_delivery_adapter_for", lambda _s: None)(zrodlo)
-        if adapter is not None:
+        if w_grupie:
             try:
-                await adapter.send(zrodlo.chat_id, potwierdzenie)
-            except Exception as e:            # potwierdzenie to grzeczność; wiadomość już leży w skrzynce
-                logger.warning("jarvo-sesje: potwierdzenie skrzynki %s nie wyszło: %s", dopisek, e)
-        return {"action": "skip", "reason": f"skrzynka sesji „{dopisek}”"}
+                zapamietaj_grupe(event)
+            except Exception as e:            # wykrycie grupy to dodatek: wiadomość idzie dalej
+                logger.warning("jarvo-sesje: zapis grupy Telegrama: %s", e)
+        if start:
+            _klucz, bylo = _juz_przyjeta(zrodlo, event)
+            if not bylo:
+                temat = nazwa_tematu(event) or ("General" if _watek_grupy(zrodlo) == WATEK_OGOLNY else "")
+                await _odpowiedz(gateway, zrodlo, f"✅ Jarvo HQ: zapisałem ten wątek{f' „{temat}”' if temat else ''}. "
+                                 "Gdy napiszesz „start” we wszystkich, uruchom na serwerze: jarvo telegram tematy.")
+            return {"action": "skip", "reason": "start w grupie Jarvo HQ (zapis wątku)"}
+        if z_watku:
+            dopisek, cel = z_watku
+            wlasny = rozpoznaj(event.text, {dopisek: cel})
+            tekst = wlasny[1] if wlasny else event.text.strip()
+        elif trafienie:
+            dopisek, tekst = trafienie
+            cel = dopiski[dopisek]
+        else:
+            return None
+        klucz, bylo = _juz_przyjeta(zrodlo, event)
+        if bylo:
+            return {"action": "skip", "reason": f"dopisek „{dopisek}” (już przyjęta)"}
+        try:
+            if cel.get("profil"):
+                ident = karta(cel, dopisek, tekst, event, _dane())
+                potwierdzenie = f"📥 {cel['nazwa']}: przyjąłem, karta {ident}."
+            else:
+                skrzynka = Path(os.path.expanduser(cel["skrzynka"]))
+                zapisz(skrzynka, dopisek, cel["nazwa"], tekst, event)
+                w_kolejce = len(list((skrzynka / "nowe").glob("*.json")))
+                potwierdzenie = (f"📥 {cel['nazwa']}: przyjąłem, analizuję"
+                                 + (f" (w kolejce: {w_kolejce})" if w_kolejce > 1 else "") + ".")
+        except Exception:
+            _PRZYJETE.pop(klucz, None)        # ponowienie ma szansę; tę wiadomość dostaje Jarvo
+            raise
+        await _odpowiedz(gateway, zrodlo, potwierdzenie)
+        return {"action": "skip", "reason": f"dopisek „{dopisek}”"}
     except Exception as e:                    # awaria haka nigdy nie gubi wiadomości: idzie do Jarva
         logger.warning("jarvo-sesje: skrzynka sesji: %s", e)
         return None
