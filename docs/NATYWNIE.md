@@ -948,7 +948,7 @@ Każde przechodzi przegląd z docs/SOURCES.md i trafia do vendor/zrodla.yaml. Pl
 | FFmpeg evermeet.cx (zapas na Intela) | 9.0.2 | GPL | tylko macOS x86_64; podpis GPG, bez sum | https://evermeet.cx/ffmpeg/ |
 | FFmpeg Gyan.dev (zapas na Windows) | 9.0.2 essentials | GPLv3 | Windows x64; .sha256 | https://www.gyan.dev/ffmpeg/builds/ |
 | Lightpanda (pliki z wydania) | 1.0.4 | AGPL-3.0 | Linux x86_64 i aarch64, macOS x86_64 i aarch64; bez Windows; digesty GitHub | https://github.com/lightpanda-io/browser/releases/tag/1.0.0 |
-| Camoufox (paczki Windows i macOS) | 158.0-beta.40 | MPL-2.0 + fonty na różnych licencjach | win x86_64 i i686, mac arm64 i x86_64, lin x86_64 i arm64 | https://github.com/daijro/camoufox/releases/tag/v152.0.4-beta.30 |
+| Camoufox (paczki Windows i macOS) | 152.0.4-beta.30 | MPL-2.0 + fonty na różnych licencjach | win x86_64 i i686, mac arm64 i x86_64, lin x86_64 i arm64 | https://github.com/daijro/camoufox/releases/tag/v152.0.4-beta.30 |
 | agent-browser (pojedyncze binarki z wydania) | 0.43.0 | Apache-2.0 | darwin arm64 i x64, linux x64 i arm64 (+musl), win32-x64; bez win32-arm64 | https://github.com/vercel-labs/agent-browser/releases/tag/v0.43.0 |
 | pandoc | 3.14 | GPL-2.0-or-later | Windows x86_64, macOS arm64 i x86_64, Linux amd64 i arm64 | https://github.com/jgm/pandoc/releases/tag/3.12.1 |
 | qpdf | 12.4.2 | Apache-2.0 | msvc64, msvc-arm64, macOS arm64 i x86_64, Linux x86_64 i aarch64; .sha256 + sigstore | https://github.com/qpdf/qpdf/releases/tag/v12.4.2 |

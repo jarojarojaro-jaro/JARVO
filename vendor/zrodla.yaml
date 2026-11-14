@@ -217,8 +217,8 @@ zrodla:
   camoufox:
     repo: https://github.com/daijro/camoufox
     status: uzywane
-    przejrzane: c9ed439d49948cc8e4335aee6bea1a7b23dc4d2d
-    notatka: "Camoufox 158.0-beta.40 (MPL-2.0, tag v158.0-beta.40 = ten commit, workflow Build and Release z tagu): w obrazie lin.x86_64 i lin.arm64 (sumy w infra/Dockerfile = digesty GitHuba = własne liczenie 2026-10-24). Natywnie (przegląd 2026-10-24), przy pierwszym użyciu: win.x86_64 (ea52a02f…, 937 MB po rozpakowaniu) i mac.arm64 (3b43e766…, zip bez dowiązań); Windows arm64 = x86_64 w emulacji. Polityki i camoufox.cfg wyłączają aktualizacje, telemetrię, Normandy, Safe Browsing i zdalne ustawienia (w 25 s bezczynności tylko gniazda 127.0.0.1). Windows: camoufox.exe i xul.dll bez Authenticode, w paczce podpisane DLL runtime VC++ i Windows App SDK Microsoftu; macOS: pakiet bez _CodeSignature, Mach-O ad-hoc, bez notaryzacji. Paczka Windows ma płasko fonty macOS (355 plików, 596 MB) i Linuksa, paczka macOS fonty Windows (144, 337 MB); w obrazie fonty macOS i Windows pomijamy, natywnie decyduje właściciel"
+    przejrzane: 5d06ec1629ac7843508f1e683f83e404fde8db76
+    notatka: "Camoufox 152.0.4-beta.30 (MPL-2.0, tag v152.0.4-beta.30 = ten commit, workflow Build and Release z tagu): w obrazie lin.x86_64 i lin.arm64 (sumy w infra/Dockerfile = digesty GitHuba = własne liczenie 2026-10-24). Natywnie (przegląd 2026-10-24), przy pierwszym użyciu: win.x86_64 (ea52a02f…, 937 MB po rozpakowaniu) i mac.arm64 (3b43e766…, zip bez dowiązań); Windows arm64 = x86_64 w emulacji. Polityki i camoufox.cfg wyłączają aktualizacje, telemetrię, Normandy, Safe Browsing i zdalne ustawienia (w 25 s bezczynności tylko gniazda 127.0.0.1). Windows: camoufox.exe i xul.dll bez Authenticode, w paczce podpisane DLL runtime VC++ i Windows App SDK Microsoftu; macOS: pakiet bez _CodeSignature, Mach-O ad-hoc, bez notaryzacji. Paczka Windows ma płasko fonty macOS (355 plików, 596 MB) i Linuksa, paczka macOS fonty Windows (144, 337 MB); w obrazie fonty macOS i Windows pomijamy, natywnie decyduje właściciel"
   cua:
     repo: https://github.com/trycua/cua
     status: uzywane

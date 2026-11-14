@@ -60,7 +60,7 @@ własną przeglądarkę i ~0,3 GB; całą witrynę audytujemy `audit.sh` po kole
 | [SearXNG](https://github.com/searxng/searxng) 2026.10.19-81371861f | własna metawyszukiwarka (70+ silników), bez kluczy i limitów; obraz przypięty wersją i digestem w `infra/docker-compose.yml` | AGPL-3.0 | 2026-10 | sidecar + dostawca `searxng` |
 | [trafilatura](https://github.com/adbar/trafilatura) | czysta treść artykułów, metadane, daty publikacji (`extract.py`) | Apache-2.0 | 2026-09 | skrypt |
 | [Lightpanda](https://github.com/lightpanda-io/browser) | strony z JS do Markdown bez Chromium: `lightpanda fetch --dump markdown <url>`; silnik `browser_*` | AGPL-3.0 (osobny program) | 2026-10 | CLI + Hermes |
-| [Camoufox](https://github.com/daijro/camoufox) 158.0-beta.40 + biblioteka `camoufox` 0.5.6 | zapasowa przeglądarka tylko po odmowie strony (`ostrozna.py`, wspólny skill `ostrozna-przegladarka`, [niżej](#łowca-i-sherlock-skill-ostrozna-przegladarka)) | MPL-2.0 (przeglądarka), MIT (biblioteka) | 2026-10 | skrypt |
+| [Camoufox](https://github.com/daijro/camoufox) 152.0.4-beta.30 + biblioteka `camoufox` 0.5.6 | zapasowa przeglądarka tylko po odmowie strony (`ostrozna.py`, wspólny skill `ostrozna-przegladarka`, [niżej](#łowca-i-sherlock-skill-ostrozna-przegladarka)) | MPL-2.0 (przeglądarka), MIT (biblioteka) | 2026-10 | skrypt |
 | [Scrapling](https://github.com/D4Vinci/Scrapling) | odporny scraping (skill [H] `scrapling`) | BSD-3 | 2026-09 | CLI |
 | [Docling](https://github.com/docling-project/docling) | PDF-y, raporty, tabele → Markdown | MIT | 2026-09 | skrypt |
 | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | napisy i transkrypcje z wideo jako źródła | Unlicense | 2026-09 | CLI |
@@ -334,7 +334,7 @@ Aleo i rejestr.io (403); G2 raz przepuszcza, raz nie. Wyniki Google zabrania rob
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
-| [Camoufox](https://github.com/daijro/camoufox) 158.0-beta.40 (binarka z wydania, SHA-256 amd64 i arm64 w `infra/Dockerfile`) | Firefox z podmienionym odciskiem przeglądarki; w obrazie bez fontów macOS i Windows z paczki, więc udaje tylko Linuksa | MPL-2.0 | 2026-10 | `/opt/jarvo/camoufox`, healthcheck `ostrozna.py --sprawdz` |
+| [Camoufox](https://github.com/daijro/camoufox) 152.0.4-beta.30 (binarka z wydania, SHA-256 amd64 i arm64 w `infra/Dockerfile`) | Firefox z podmienionym odciskiem przeglądarki; w obrazie bez fontów macOS i Windows z paczki, więc udaje tylko Linuksa | MPL-2.0 | 2026-10 | `/opt/jarvo/camoufox`, healthcheck `ostrozna.py --sprawdz` |
 | biblioteka [`camoufox`](https://pypi.org/project/camoufox/) 0.5.6 + [Playwright](https://github.com/microsoft/playwright-python) 1.62.0 | odcisk przeglądarki (BrowserForge) i sterowanie Firefoksem; Playwright na Node z obrazu | MIT / Apache-2.0 | 2026-09 | venv `/opt/jarvo/venv` |
 | GTK 3 (`libgtk-3-0t64`, apt) | biblioteka, bez której Firefox nie startuje, także bez okna | LGPL-2.1 | n/d | pakiet systemowy |
 
@@ -526,7 +526,7 @@ natywny ma mniej funkcji.
 | ffmpeg Playwrighta | 1011 | zip | x64 w emulacji | zip | zip | instalacja | LGPL, tylko VP8/WebM, PNG, MJPEG |
 | Lightpanda | 1.0.4 | brak: silnik `chrome` | brak: silnik `chrome` | plik | plik | instalacja | Linux = binarka z obrazu; telemetria wyłączona zmiennymi |
 | agent-browser | 0.43.0 | plik z wydania | x64 w emulacji | plik | plik | instalacja | te same bajty co w paczce npm platformy z atestacją |
-| Camoufox | 158.0-beta.40 | zip | x64 w emulacji | zip | zip | przy użyciu | paczka Windows ma fonty macOS, a macOS fonty Windows (decyzja właściciela) |
+| Camoufox | 152.0.4-beta.30 | zip | x64 w emulacji | zip | zip | przy użyciu | paczka Windows ma fonty macOS, a macOS fonty Windows (decyzja właściciela) |
 | Chrome for Testing (Komputer Jarva) | 157.0.8103.78 | zip | x64 w emulacji | zip | zip | przy użyciu | `jarvo komputer on`; CDP po potoku, ruch przez proxy filtrujące; 134/134 sprawdzeń Komputera na Windows 11 |
 | FFmpeg (BtbN, gpl) | 9.0.2 | zip | x64 w emulacji (winarm64 bez libvpx) | brak: build Riedla | tar.xz | instalacja | filtry i kodery floty na Windows 11; libass na Windows potrzebuje `fontsdir` |
 | FFmpeg i ffprobe (Martin Riedl) | 9.0.2 | brak: BtbN | brak: BtbN | dwa zipy, Developer ID | brak: BtbN | instalacja | bez vidstab i librsvg |

@@ -250,9 +250,9 @@ ENV INDRA_OCR_MODEL_DIR=/opt/jarvo/models/indra-ocr
 #     ~0,35 GB: bez fontów macOS i Windows (~0,9 GB fontów Apple i Microsoft, których nie redystrybuujemy), więc
 #     przeglądarka udaje tylko Linuksa (fonty Linuksa z paczki: Noto, Arimo, Tinos, Cousine; OFL i Apache-2.0).
 #     Na końcu start bez sieci: strona z data: i navigator.webdriver = false.
-ARG CAMOUFOX_VERSION=158.0-beta.40
-ARG CAMOUFOX_SHA256_AMD64=2ead498d4765394addd3278d6a663962f3f99b189a99d3f966de56656cefc823
-ARG CAMOUFOX_SHA256_ARM64=8a4dfdd85dfb5212dae716b4aa8e30041634edbbba6f6177a566a3ee6b1efe8c
+ARG CAMOUFOX_VERSION=152.0.4-beta.30
+ARG CAMOUFOX_SHA256_AMD64=5720d45b894ce1770543de024c6f10d514b38be560fa2dc3226b3d8586caf672
+ARG CAMOUFOX_SHA256_ARM64=60447260af8bebdb0ec3f2aa72f687b879e5598367303de2e3fdbc7a5be8c124
 RUN set -e; case "$(uname -m)" in x86_64) a=x86_64; s="$CAMOUFOX_SHA256_AMD64";; aarch64) a=arm64; s="$CAMOUFOX_SHA256_ARM64";; \
       *) echo "Camoufox: brak wydania dla $(uname -m)" >&2; exit 1;; esac; \
     d=/opt/jarvo/camoufox; t="$(mktemp -d)"; \
