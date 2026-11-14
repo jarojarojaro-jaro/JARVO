@@ -87,7 +87,7 @@ def test_blok_promptu_i_przypomnienie(srodowisko):
     r = p.prefetch("czemu zrzut strony z three.js jest pusty?")
     assert "`agenci/jarvo-web/lightpanda nie renderuje three.js`" in r and "Zrzuty stron z WebGL" in r
     assert "## Orzeczenia (wiążące)" in r and "[web] W stronach użytkownika nie używaj innerHTML" in r and "[wszyscy] Odpowiadaj po polsku" in r
-    assert "Przyciski zaokrąglone" not in r                                       # orzeczenia marki tylko przy trafieniu w markę
+    assert "[acme] Przyciski zaokrąglone" in r     # agent bez marki: orzeczenia każdej marki, bez trafienia w markę (15.11)
     r2 = p.prefetch("jakie kolory ma marka Acme?")
     assert "brands/acme/BRAND" in r2 and "[acme] Przyciski zaokrąglone" in r2
     dziennik = (root / "jarvo" / "state" / "wiedza-przypomnienia.jsonl").read_text(encoding="utf-8").splitlines()

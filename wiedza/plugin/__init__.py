@@ -51,7 +51,9 @@ MIN_ZNAKOW_TURY = 300                 # …albo choć raz tyle znaków (jedno ko
 CISZA_S = 10 * 60                     # wyciąg po tylu sekundach ciszy w sesji
 MAX_ZNAKOW_ROZMOWY = 24_000
 MAX_PRZYPOMNIENIA = 2_200
-MAX_ORZECZEN = 20
+MAX_ORZECZEN = 20                     # własne + `wszyscy` (ostatnie linie)
+MAX_ORZECZEN_MARKI = 10               # z każdego pliku orzeczenia/marki/<marka>
+MAX_ZNAKOW_ORZECZENIA = 400           # jedna linia w przypomnieniu (bez dopisku „(źródło: …)”)
 LIMIT_NOTATEK = 5
 DZIENNIK_PRZYPOMNIEN = "wiedza-przypomnienia.jsonl"   # w state/: co agent dostał ze skarbca przed turą (do sprawdzenia w zakładce i w pliku)
 DZIENNIK_MAX_B = 5_000_000
@@ -304,6 +306,14 @@ def _orzeczenia_z_pliku(sk, rel: str, limit: int) -> List[str]:
     return linie[-limit:]
 
 
+_ZRODLO_ORZECZENIA_RE = re.compile(r"\s*\(źródło: .*\)\s*$")
+
+
+def _bez_zrodla(linia: str) -> str:
+    """Linia orzeczenia do przypomnienia: bez dopisku „(źródło: …)” (zostaje w pliku), najwyżej MAX_ZNAKOW_ORZECZENIA."""
+    return _ZRODLO_ORZECZENIA_RE.sub("", linia)[:MAX_ZNAKOW_ORZECZENIA]
+
+
 ARSENAL = "fleet/arsenal.md"
 MAX_ARSENAL = 2400
 
@@ -545,25 +555,29 @@ class SkarbiecProvider(MemoryProvider):
             silnik = ix.silnik
         finally:
             ix.zamknij()
-        marki = {marka} if marka else \
-            {t["sciezka"].split("/")[1] for t in notatki if t["sciezka"].startswith("brands/") and t["sciezka"].count("/") >= 2}
+        # Orzeczenia mają własny budżet i idą przed notatkami: do 15.11 jeden limit MAX_PRZYPOMNIENIA obcinał blok
+        # z końca, więc Jarvo dostawał 3 z 20 wiążących linii (dziennik przypomnień: orzeczen 3, znakow 2200).
+        # Agent bez marki widzi cały skarbiec, więc dostaje orzeczenia wszystkich marek (reguły o Enigmie leżą
+        # w orzeczenia/marki/enigmalabz, nie w `wszyscy`, żeby nie trafiały do agentów biznesowych innych marek).
+        marki = [marka] if marka else lib.marki_z_orzeczeniami(sk)
+        orz = (_orzeczenia_z_pliku(sk, self._moje_orzeczenia(), MAX_ORZECZEN)
+               + _orzeczenia_z_pliku(sk, "orzeczenia/wszyscy", MAX_ORZECZEN))[-MAX_ORZECZEN:]
+        for m in marki:
+            orz += _orzeczenia_z_pliku(sk, f"orzeczenia/marki/{m}", MAX_ORZECZEN_MARKI)
         czesci = []
-        if notatki:
-            czesci.append("## Skarbiec wiedzy: może się przydać")
-            for t in notatki:
-                s = (t.get("streszczenie") or "")[:140]
-                czesci.append(f"- `{t['sciezka']}` · {t['tytul']}" + (f": {s}" if s else ""))
-        orz = _orzeczenia_z_pliku(sk, self._moje_orzeczenia(), MAX_ORZECZEN) + _orzeczenia_z_pliku(sk, "orzeczenia/wszyscy", MAX_ORZECZEN)
-        for m in sorted(marki):
-            orz += _orzeczenia_z_pliku(sk, f"orzeczenia/marki/{m}", 10)
-        orz = orz[-MAX_ORZECZEN:]
         if orz:
             czesci.append("## Orzeczenia (wiążące)")
-            czesci += orz
-        if not czesci:
-            return "", silnik
-        tekst = "\n".join(czesci)
-        return tekst[:MAX_PRZYPOMNIENIA], silnik
+            czesci += [_bez_zrodla(l) for l in orz]
+        blok_orz = "\n".join(czesci)
+        notatki_linie = []
+        if notatki:
+            notatki_linie.append("## Skarbiec wiedzy: może się przydać")
+            for t in notatki:
+                s = (t.get("streszczenie") or "")[:140]
+                notatki_linie.append(f"- `{t['sciezka']}` · {t['tytul']}" + (f": {s}" if s else ""))
+        blok_not = "\n".join(notatki_linie)[:MAX_PRZYPOMNIENIA]
+        tekst = "\n".join(b for b in (blok_orz, blok_not) if b)
+        return (tekst, silnik) if tekst else ("", silnik)
 
     # ---- narzędzia
     def get_tool_schemas(self) -> List[Dict[str, Any]]:

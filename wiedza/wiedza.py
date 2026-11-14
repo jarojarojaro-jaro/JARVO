@@ -538,6 +538,16 @@ def zakres_marki(marka: str, agent: str = "", orzeczenia: str = "") -> tuple[str
     return tuple(dict.fromkeys(z))
 
 
+def marki_z_orzeczeniami(sk: "Skarbiec") -> list[str]:
+    """Marki, które mają plik `orzeczenia/marki/<marka>.md` (posortowane): agent bez marki widzi cały skarbiec, więc
+    w przypomnieniu dostaje orzeczenia każdej marki."""
+    katalog = sk.root / "orzeczenia" / "marki"
+    try:
+        return sorted(p.stem for p in katalog.glob("*.md") if p.is_file() and not p.name.startswith(("_", ".")))
+    except OSError:
+        return []
+
+
 def w_zakresie(rel: str, zakres) -> bool:
     """Ścieżka (notatka bez `.md`, plik albo katalog) w zakresie agenta; pusty zakres = wszystko."""
     if not zakres:

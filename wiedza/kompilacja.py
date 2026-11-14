@@ -228,14 +228,14 @@ class Kompilacja:
         return [r for r in wyn if r["typ"] not in ("orzeczenia",)]
 
     def orzeczenia(self, szkic: dict) -> List[str]:
-        """Orzeczenia właściciela dla promptu: `orzeczenia/wszyscy`, plik agenta szkicu (z wiedza-agenci.json) i, dla
-        agenta marki, `orzeczenia/marki/<marka>`; datowane linie."""
+        """Orzeczenia właściciela dla promptu: `orzeczenia/wszyscy`, plik agenta szkicu (z wiedza-agenci.json) oraz
+        `orzeczenia/marki/<marka>` marki agenta, a dla szkicu agenta bez marki: wszystkich marek; datowane linie."""
         agent = szkic.get("agent") or ""
         pliki = ["orzeczenia/wszyscy"]
         if agent:
             pliki.append((self._agenci.get(agent) or {}).get("orzeczenia") or f"orzeczenia/{agent}")
-        if self.marka(szkic):
-            pliki.append(f"orzeczenia/marki/{self.marka(szkic)}")
+        marki = [self.marka(szkic)] if self.marka(szkic) else self.lib.marki_z_orzeczeniami(self.sk)
+        pliki += [f"orzeczenia/marki/{m}" for m in marki]
         linie: List[str] = []
         for rel in pliki:
             try:

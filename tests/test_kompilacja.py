@@ -462,7 +462,7 @@ def test_decyzja_wlasciciela_aktualizuje_zamiast_sprzecznosci(sk):
     model.prompty = []
     r = k.Kompilacja(sk, model).uruchom()
     assert r["aktualizacje"] == 1 and r["sprzeczne"] == 0
-    assert "ORZECZENIA WŁAŚCICIELA" in model.prompty[0] and "Przyciski zaokrąglone" not in model.prompty[0]   # marka nie dotyczy
+    assert "ORZECZENIA WŁAŚCICIELA" in model.prompty[0] and "Przyciski zaokrąglone" in model.prompty[0]   # agent bez marki: wszystkie marki
     fm, tresc = w.podziel(sk.plik(cel).read_text(encoding="utf-8"))
     assert fm["status"] == "aktualna" and fm["zmieniono"] == "2026-09-30" and "tylko Jarvo" in tresc and "## Sprzeczność" not in tresc
 

@@ -208,6 +208,23 @@ def test_agent_bez_marki_widzi_wszystko(skarbiec):
     assert "marka" not in w.podziel((sk.root / f"{z['szkic']}.md").read_text(encoding="utf-8"))[0]
 
 
+def test_orzeczenia_w_przypomnieniu_wszystkie_i_przed_notatkami(skarbiec):
+    """15.11: jeden limit znaków obcinał przypomnienie z końca i Jarvo dostawał 3 z 20 orzeczeń (dziennik przypomnień).
+    Orzeczenia mają własny budżet i idą przed notatkami; agent bez marki dostaje orzeczenia każdej marki (Enigma
+    nie leży już w `wszyscy`), a dopisek „(źródło: …)” zostaje w pliku."""
+    root, sk = skarbiec
+    for i in range(18):
+        w.dodaj_orzeczenie(sk, "wszyscy", f"Zasada numer {i} dla całej floty z długim uzasadnieniem " + "słowo " * 40, "rozmowa z cytatem " * 8)
+    for agent in ("jarvo", "jarvo-web"):
+        r = provider(root, agent).prefetch("kernel gpu enigmalabz strona internetowa")
+        assert r.index("## Orzeczenia (wiążące)") < r.index("## Skarbiec wiedzy")
+        assert all(f"Zasada numer {i} " in r for i in range(1, 18))                 # ostatnie MAX_ORZECZEN z `wszyscy`
+        assert "Kernel nazywaj silnikiem Enigmy" in r and "Ceny podawaj brutto" in r     # marki bez dopasowanej notatki
+        assert "(źródło:" not in r
+    r = provider(root, "jarvo-jarodev").prefetch("kernel gpu enigmalabz strona internetowa")
+    assert "Ceny podawaj brutto" in r and "Zasada numer 17 " in r and "Enigmy" not in r
+
+
 def test_szkic_i_lustro_pamieci_niosa_marke(skarbiec):
     root, sk = skarbiec
     p = provider(root, "jarvo-jarodev")
