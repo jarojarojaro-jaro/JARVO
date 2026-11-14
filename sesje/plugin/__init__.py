@@ -11,7 +11,10 @@ hosta), nie część jarvo-wiedza: Hermes ładuje dostawcę pamięci dopiero prz
 restarcie bramy pierwsza wiadomość „… gpu” trafiała do Jarva. Wiadomość do zajętej rozmowy (Jarvo w trakcie tury)
 omija `pre_gateway_dispatch` (gateway/platforms/base.py `_handle_message_while_active` → obsługa zajętej sesji), więc
 hak przy każdym wywołaniu owija tę obsługę w adapterach bramy (`set_busy_session_handler`): tak samo łapie „… gpu”
-wysłane, gdy Jarvo pracuje (14.11: trzy linki z 04:22 trafiły do jego tury). Konfiguracja (bez sekretów):
+wysłane, gdy Jarvo pracuje (14.11: trzy linki z 04:22 trafiły do jego tury). Wtyczka musi być włączona w każdym
+profilu, nie tylko w hoście: brama obsługuje wiadomość w zakresie profilu trasy (DM właściciela → jarvo,
+gateway/run_adapters.py `_make_profile_message_handler`) i bierze haki z menedżera wtyczek tego profilu (14.11 14:21:
+wtyczka tylko w hoście, wiadomość poszła do Jarva). Konfiguracja (bez sekretów):
 
     {"gpu": {"nazwa": "Kernel", "skrzynka": "/home/<użytkownik>/kernel/skrzynka"}}
 
@@ -175,4 +178,10 @@ async def hak_bramy(event: Any = None, gateway: Any = None, **kw) -> Optional[di
 def register(ctx) -> None:
     """Zwykła wtyczka hosta bramy: hak rejestrowany przy starcie bramy (stan-jarva sprawdza ten wpis w gateway.log)."""
     ctx.register_hook("pre_gateway_dispatch", hak_bramy)
-    logger.info("jarvo-sesje: przekierowanie dopisków aktywne (%s)", ", ".join(sorted(konfiguracja())) or "brak skrzynek")
+    try:                                      # zakres menedżera wtyczek: host (<dane>) albo profil (stan-jarva szuka „jarvo”)
+        from hermes_constants import get_hermes_home
+        gdzie = Path(get_hermes_home()).name
+    except Exception:
+        gdzie = "?"
+    logger.info("jarvo-sesje: przekierowanie dopisków aktywne (%s; profil %s)",
+                ", ".join(sorted(konfiguracja())) or "brak skrzynek", gdzie)

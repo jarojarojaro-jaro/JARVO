@@ -126,7 +126,7 @@ def zbuduj(build: Path) -> None:
     for a in AGENCI:
         p = build / "profiles" / a
         _pisz(p / "distribution.yaml", f'name: {a}\nversion: 0.1.0\ndescription: "Atrapa {a}"\n')
-        zgody = "  - jarvo-zgody\n" if a == "jarvo-web" else ""
+        zgody = "  - jarvo-zgody\n" if a == "jarvo-web" else "  - jarvo-sesje\n"
         _pisz(p / "config.yaml", f"model:\n  provider: openrouter\n  default: atrapa/{a}\nplugins:\n  enabled:\n"
                                  f"  - jarvo-wiedza\n{zgody}")
         _pisz(p / "SOUL.md", f"# {a}\n")
@@ -212,7 +212,7 @@ def test_pierwszy_przebieg_instaluje_flote(dwa_przebiegi):
     assert w["agenci"] == list(AGENCI)
     assert w["wtyczki"] == {n: "nowa" for n in install_fleet.WTYCZKI}
     rodzaj = "junction" if WINDOWS else "symlink"
-    assert w["dowiazania"] == {"jarvo": {"jarvo-wiedza": rodzaj},
+    assert w["dowiazania"] == {"jarvo": {"jarvo-wiedza": rodzaj, "jarvo-sesje": rodzaj},
                                "jarvo-web": {"jarvo-wiedza": rodzaj, "jarvo-zgody": rodzaj}}
     assert w["restart_bramy"] and w["restart_panelu"] and w["restart"]
     assert re.fullmatch(r"[0-9a-f]{16}", w["odcisk_panelu"]) and s["zapisany"]
@@ -242,7 +242,8 @@ def test_pierwszy_przebieg_instaluje_flote(dwa_przebiegi):
     cfg = yaml.safe_load((dane / "config.yaml").read_text(encoding="utf-8"))
     assert cfg["model"]["default"] == "atrapa/host"
     assert {"jarvo-hq", "jarvo-wiedza", "jarvo-zgody", "jarvo-sesje"} <= set(cfg["plugins"]["enabled"])
-    assert not any((dane / "profiles" / a / "plugins" / "jarvo-sesje").exists() for a in AGENCI)   # tylko host bramy
+    assert (dane / "profiles" / "jarvo" / "plugins" / "jarvo-sesje" / "plugin.yaml").is_file()     # profil z buildu
+    assert not (dane / "profiles" / "jarvo-web" / "plugins" / "jarvo-sesje").exists()
     assert b"\r\n" not in (dane / "config.yaml").read_bytes()                      # LF także na Windows
     assert (dane / "SOUL.md").read_text(encoding="utf-8") == "# Host floty\n"
     # katalogi floty, szablony, skarbiec, tablica, motywy

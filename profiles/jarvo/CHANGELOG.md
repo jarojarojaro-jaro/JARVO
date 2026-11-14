@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Przekierowanie „… gpu” naprawdę działa: wtyczka `jarvo-sesje` włączona w każdym profilu, nie tylko w hoście (14.11 14:21 test właściciela poszedł do Ciebie: brama obsługuje wiadomość w zakresie profilu trasy i bierze haki z jego menedżera wtyczek). Linków z „gpu” nie przekazujesz ręcznie.
 - Koniec próśb o zwykłą pracę na czacie (właściciel 14.11: „no limits, wszystko approve, tylko security, nie normalna praca”): wtyczka zgód nie pyta już o zapis w katalogach roboczych Hermesa (`cache/scratch`, `home`, `workspace`, `plans`…; 12:52 i 12:56 dwie prośby o `cache/scratch/gpu_audyt.py`), a build zatwierdza z góry także `execute_code` (Hermes w bramie pytał o każdy skrypt Pythona). Pytają dalej tylko: config, sekrety, wtyczki, skille i kod Jarva, pliki instrukcji, dysk, własna brama, zaciemnione polecenia, `sudo`, płatność na telefonie.
 - Brama nie gubi wiadomości wysłanych w trakcie jej restartu (wdrożenie, reboot): `platforms.telegram.drop_pending_on_cold_boot: false` w configu hosta; Hermes domyślnie je wyrzucał bez śladu (decyzja właściciela 14.11: „ma nie gubić wiadomości”).
 - Poranny brief codziennie o 7:50, także w weekend (było: dni robocze; 14.11 w sobotę właściciel czekał na brief). Kopalnia pomysłów czyta zawsze 48 h (bez osobnego okna 72 h w poniedziałek).

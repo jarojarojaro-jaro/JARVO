@@ -209,8 +209,8 @@ Przejęte z kontraktu firstmate i dostosowane do nas:
   **Sesje zewnętrzne (dopisek, np. „gpu”):** wiadomość zakończona słowem z `<dane>/jarvo/konfig/sesje.json` nie idzie
   do Jarva, tylko do skrzynki innej sesji agenta (u nas: sesja Kernel o silniku inferencji, omp na serwerze). Bot
   potwierdza „📥 Kernel: przyjąłem”, a odpowiedź sesji przychodzi z jej procesu (`jarvo telegram wyslij`). Przechwytuje
-  wtyczka hosta bramy `jarvo-sesje` (`sesje/plugin/__init__.py`, hak `pre_gateway_dispatch` od startu bramy, także
-  gdy Jarvo jest w trakcie tury) tylko wiadomości od dozwolonych osób; awaria haka oddaje wiadomość Jarvowi. Format pliku: `{"gpu": {"nazwa": "Kernel", "skrzynka": "/ścieżka/skrzynki"}}`.
+  wtyczka `jarvo-sesje` w hoście i w każdym profilu (`sesje/plugin/__init__.py`, hak `pre_gateway_dispatch` od startu
+  bramy, także gdy Jarvo jest w trakcie tury) tylko wiadomości od dozwolonych osób; awaria haka oddaje wiadomość Jarvowi. Format pliku: `{"gpu": {"nazwa": "Kernel", "skrzynka": "/ścieżka/skrzynki"}}`.
 - **Prosty polski** (skill `prosty-polski`, wzór: ASD-STE100 z dokumentacji lotniczej „w 80%”): zdanie do 20–25 słów,
   akapit do 6 zdań, jedna czynność w zdaniu, strona czynna, zwykłe słowa zamiast urzędowych (słownik w skillu),
   ostrzeżenie: najpierw co zrobić, potem ryzyko (⛔ strata pieniędzy, danych, konta; ⚠ gorszy wynik). Te same limity liczy

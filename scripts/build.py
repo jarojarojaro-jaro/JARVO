@@ -12,7 +12,7 @@ Wynik: build/
   host/srodowisko.json  (tylko natywnie) zmienne bramy z buildu: HERMES_LOCAL_STT_COMMAND, na Windows także
                       AGENT_BROWSER_EXECUTABLE_PATH (Chromium silnika chrome)
   plugins/            jarvo-hq, jarvo-wiedza, jarvo-komputer; natywnie także jarvo-zgody (tryby zgód, zgody/)
-                      i jarvo-sesje (skrzynki sesji zewnętrznych „… gpu”, sesje/; tylko w hoście bramy)
+                      i jarvo-sesje (skrzynki sesji zewnętrznych „… gpu”, sesje/; host i każdy profil)
   BUILD.json          manifest (commit repo, źródła skilli, agenci; natywnie także układ i ścieżki)
 
 Układ (`--uklad`, docs/NATYWNIE.md S06): `kontener` (domyślny) daje dzisiejsze ścieżki obrazu (/opt/data, /opt/jarvo/…),
@@ -701,7 +701,7 @@ def render_roster_skill(fleet: fl.Fleet) -> str:
 WIEDZA_PLUGIN = "jarvo-wiedza"
 KOMPUTER_PLUGIN = "jarvo-komputer"     # narzędzie `komputer` (komputer/plugin) dla agentów z `komputer: true`
 ZGODY_PLUGIN = "jarvo-zgody"           # tryby zgód pytaj/projekt/pełny (zgody/plugin), tylko w układzie natywnym
-SESJE_PLUGIN = "jarvo-sesje"           # skrzynki sesji zewnętrznych w hoście bramy (sesje/plugin), tylko natywnie
+SESJE_PLUGIN = "jarvo-sesje"           # skrzynki sesji zewnętrznych (sesje/plugin): host i każdy profil, tylko natywnie
 # czas zadania jarvo_wiedza (s): kompilacja jednego szkicu na deepseek-v4.1-flash trwa ok. 20–25 s, wyciąg z długiej
 # rozmowy dłużej; domyślne 30 s Hermesa po przekroczeniu wyłącza dostawcę na 10 min (pomiar 2026-11-07)
 CZAS_ZADANIA_WIEDZY = 180
@@ -1148,7 +1148,7 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         wtyczki = cfg.setdefault("plugins", {})
         wlaczone = list(wtyczki.get("enabled") or [])
         wtyczki["enabled"] = wlaczone + [w for w in [WIEDZA_PLUGIN] + ([KOMPUTER_PLUGIN] if agent.komputer else [])
-                                         + ([ZGODY_PLUGIN] if u.natywny else []) if w not in wlaczone]
+                                         + ([ZGODY_PLUGIN, SESJE_PLUGIN] if u.natywny else []) if w not in wlaczone]
         cfg.setdefault("auxiliary", {})["jarvo_wiedza"] = {"model": fleet.model_for("frontier"), "timeout": CZAS_ZADANIA_WIEDZY}
         naglowek = "# Wygenerowane przez scripts/build.py (tokeny, wspólne zakazy floty, skarbiec wiedzy, głos floty)."
         if u.natywny:
@@ -1325,10 +1325,11 @@ def main(argv: list[str] | None = None) -> int:
         wtyczki.append(ZGODY_PLUGIN)
         print(f"✓ plugins/{ZGODY_PLUGIN}: tryby zgód w każdym profilu i w hoście, profil czatu {fleet.orchestrator} "
               f"z approvals.mode {TRYB_ZGOD_CZATU}")
-        # skrzynki sesji zewnętrznych („… gpu” → sesja Kernel): zwykła wtyczka hosta bramy, ładowana przy jej starcie
+        # skrzynki sesji zewnętrznych („… gpu” → sesja Kernel): zwykła wtyczka w hoście i w każdym profilu; brama woła
+        # pre_gateway_dispatch w zakresie profilu trasy (DM właściciela → jarvo), z menedżera wtyczek tego profilu
         shutil.copytree(fl.REPO_ROOT / "sesje" / "plugin", sp, ignore=COPY_IGNORE)
         wtyczki.append(SESJE_PLUGIN)
-        print(f"✓ plugins/{SESJE_PLUGIN}: skrzynki sesji zewnętrznych w hoście bramy")
+        print(f"✓ plugins/{SESJE_PLUGIN}: skrzynki sesji zewnętrznych w hoście i w każdym profilu")
 
     notes = build_host(fleet, out / "host", env, uklad)
     for note in notes:

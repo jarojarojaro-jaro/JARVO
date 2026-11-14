@@ -475,6 +475,8 @@ def test_natywny_windows_sciezki_i_wartosci_per_system(natywny_win):
         assert "search_backend" not in (cfg.get("web") or {}), a.name
         # W04: wtyczka zgód w każdym profilu; I08: profil czatu (orkiestrator) z approvals.mode manual
         assert build.ZGODY_PLUGIN in cfg["plugins"]["enabled"] and "jarvo-wiedza" in cfg["plugins"]["enabled"], a.name
+        # 14.11 14:21: hak „… gpu” bierze brama z menedżera wtyczek profilu trasy (DM → jarvo), nie hosta
+        assert build.SESJE_PLUGIN in cfg["plugins"]["enabled"], a.name
         assert cfg["approvals"]["mode"] == ("manual" if a.name == fleet.orchestrator else zrodlo["approvals"]["mode"])
         assert {k: cfg["approvals"][k] for k in ("cron_mode", "single_query_mode", "unattended_mode")} == \
             {"cron_mode": "deny", "single_query_mode": "deny", "unattended_mode": "deny"}, a.name
@@ -489,8 +491,8 @@ def test_natywny_windows_sciezki_i_wartosci_per_system(natywny_win):
     assert "D:/JarvoTest/proba-build/Michał Żółć/build/profiles/jarvo-web/skills" in reka["skills"]["external_dirs"]
     assert "Michał Żółć/dane/jarvo/missions." in reka["approvals"]["smart_policy"].replace("\n", " ")
     host = fl.load_yaml(natywny_win / "host" / "config.yaml")
-    # jarvo-sesje w hoście bramy, nie w profilach: hak „… gpu” musi działać od startu bramy (dostawca pamięci jarvo-wiedza
-    # ładuje się dopiero przy pierwszym agencie; 14.11 pierwsza wiadomość po restarcie trafiła do Jarva)
+    # jarvo-sesje także w hoście (wiadomości bez trasy profilu); dostawca pamięci jarvo-wiedza ładuje się dopiero przy
+    # pierwszym agencie, więc hak nie może w nim siedzieć (14.11 pierwsza wiadomość po restarcie trafiła do Jarva)
     assert host["plugins"]["enabled"] == [build.ZGODY_PLUGIN, build.SESJE_PLUGIN] and host["security"]["tirith_enabled"] is False
     assert host["tts"]["providers"]["matcha"]["command"].startswith(f'"{WIN_PROGRAM}/bin-floty/jarvo-tts.exe" --plik ')
     stt = json.loads((natywny_win / "host" / "srodowisko.json").read_text(encoding="utf-8"))
