@@ -192,7 +192,7 @@ zrodla:
   agent-browser:
     repo: https://github.com/vercel-labs/agent-browser
     status: uzywane
-    przejrzane: aff6125c023b810ea3f2e5deec5379e9a4270bdc
+    przejrzane: 1cc19526f3641c8543d55aa6700e7c55b37ac356
     notatka: "agent-browser 0.43.0 (paczka npm przypięta w infra/node/package.json; tag v0.43.0 = commit 1cc1952; od 0.43 binarki w paczkach platform @agent-browser/cli-<platforma> z atestacją npm): sterownik narzędzi browser_* Hermesa, w obrazie tylko binarka tej platformy, postinstall zablokowany. Przegląd 2026-10-11 (0.38.1), aktualizacja 2026-11-14 do 0.43.0 na prośbę właściciela: przegląd zmian 0.38.1..0.43.0 w cli/src (flagi globalne: nowe --capture, --cdp-headers, --no-auto-connect, --relaunch, --use-system-ca; polecenia bez demona bez zmian; serwer podglądu demona nadal startuje bez hasła, więc nakładka zostaje; od 0.41.2 sprawdzanie CVE Chrome przez chromereleases.googleblog.com, w nakładce wyłączone). Natywnie: pojedyncze binarki z wydania v0.43.0 (agent-browser-win32-x64.exe, -darwin-arm64, -linux-x64, -linux-arm64); sha256 = digesty GitHuba = bin/agent-browser paczek npm @agent-browser/cli-* 0.43.0 (sprawdzone dla linux-x64 2026-11-14)."
   browser:
     repo: https://github.com/lightpanda-io/browser
