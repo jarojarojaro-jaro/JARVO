@@ -271,7 +271,7 @@ def test_bootstrap_ps1_na_sucho_x64_arm64_i_odmowa_x86(tmp_path):
     assert r.returncode == 0, r.stdout + r.stderr
     x64 = {n: LOCK["narzedzia"][n]["pliki"]["windows-x64"] for n in ("uv", "python313")}
     assert x64["uv"]["url"] in r.stdout and x64["python313"]["url"] in r.stdout
-    assert "program\\narzedzia\\uv\\0.12.13" in r.stdout and "program\\narzedzia\\python313\\3.13.17" in r.stdout
+    assert f"program\\narzedzia\\uv\\{UV}" in r.stdout and "program\\narzedzia\\python313\\3.13.17" in r.stdout
     assert f"codeload.github.com/jarojarojaro-jaro/JARVO/tar.gz/{SHA_JARVA}" in r.stdout
     assert re.search(r"python\.exe -I -X utf8 \S+app\\fb7e3ffa0e77\\jarvo\\start\.py instaluj", r.stdout)
     assert not (tmp_path / "root").exists(), "na sucho nic nie powstaje"
