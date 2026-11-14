@@ -1,4 +1,4 @@
-"""Skrzynki sesji zewnętrznych: wiadomość właściciela zakończona dopiskiem (np. „gpu”) idzie do innej sesji agenta.
+"""Wtyczka jarvo-sesje: wiadomość właściciela zakończona dopiskiem (np. „gpu”) idzie do innej sesji agenta.
 
 Właściciel ma poza flotą długie sesje agenta kodującego (np. sesja omp o kernelach GPU jego silnika, przeniesiona na
 serwer Jarva 13.11). Chce wysyłać do nich tweety i linki z telefonu tym samym botem: wiadomość zakończona słowem
@@ -6,7 +6,12 @@ z `<dane>/jarvo/konfig/sesje.json` nie trafia do Jarva, tylko jako plik JSON do 
 krótkim potwierdzeniem, a odpowiedź sesji wysyła jej własny proces (`jarvo telegram wyslij`).
 
 Hak `pre_gateway_dispatch` (brama, przed autoryzacją i modelem): przechwytuje tylko wiadomości od osoby
-z listy dozwolonych; reszta idzie dalej zwykłą drogą. Konfiguracja (bez sekretów):
+z listy dozwolonych; reszta idzie dalej zwykłą drogą. Osobna zwykła wtyczka hosta bramy (plugins.enabled w config.yaml
+hosta), nie część jarvo-wiedza: Hermes ładuje dostawcę pamięci dopiero przy pierwszym agencie, więc do 14.11 po każdym
+restarcie bramy pierwsza wiadomość „… gpu” trafiała do Jarva. Wiadomość do zajętej rozmowy (Jarvo w trakcie tury)
+omija `pre_gateway_dispatch` (gateway/platforms/base.py `_handle_message_while_active` → obsługa zajętej sesji), więc
+hak przy każdym wywołaniu owija tę obsługę w adapterach bramy (`set_busy_session_handler`): tak samo łapie „… gpu”
+wysłane, gdy Jarvo pracuje (14.11: trzy linki z 04:22 trafiły do jego tury). Konfiguracja (bez sekretów):
 
     {"gpu": {"nazwa": "Kernel", "skrzynka": "/home/<użytkownik>/kernel/skrzynka"}}
 
@@ -124,8 +129,50 @@ async def przechwyc(event: Any = None, gateway: Any = None, **_kw) -> Optional[d
             try:
                 await adapter.send(zrodlo.chat_id, potwierdzenie)
             except Exception as e:            # potwierdzenie to grzeczność; wiadomość już leży w skrzynce
-                logger.warning("jarvo-wiedza: potwierdzenie skrzynki %s nie wyszło: %s", dopisek, e)
+                logger.warning("jarvo-sesje: potwierdzenie skrzynki %s nie wyszło: %s", dopisek, e)
         return {"action": "skip", "reason": f"skrzynka sesji „{dopisek}”"}
     except Exception as e:                    # awaria haka nigdy nie gubi wiadomości: idzie do Jarva
-        logger.warning("jarvo-wiedza: skrzynka sesji: %s", e)
+        logger.warning("jarvo-sesje: skrzynka sesji: %s", e)
         return None
+
+
+ZNACZNIK = "_jarvo_sesje"
+
+
+def owin_zajete(gateway: Any) -> int:
+    """Obsługa wiadomości do zajętej rozmowy w każdym adapterze bramy najpierw pyta skrzynki sesji; zwraca liczbę nowo
+    owiniętych. Adapter po ponownym połączeniu dostaje od Hermesa świeżą obsługę, więc hak sprawdza to przy każdej
+    wiadomości (owinięta obsługa ma ZNACZNIK, drugi raz jej nie owijamy)."""
+    nowe = 0
+    for adapter in list((getattr(gateway, "adapters", None) or {}).values()):
+        ustaw = getattr(adapter, "set_busy_session_handler", None)
+        obecna = getattr(adapter, "_busy_session_handler", None)
+        if not callable(ustaw) or getattr(obecna, ZNACZNIK, False):
+            continue
+
+        async def zajeta(event, session_key, _obecna=obecna):
+            wynik = await przechwyc(event=event, gateway=gateway)
+            if isinstance(wynik, dict) and wynik.get("action") == "skip":
+                return True                    # obsłużona: w skrzynce sesji, Jarvo jej nie dostaje
+            return bool(await _obecna(event, session_key)) if _obecna is not None else False
+
+        setattr(zajeta, ZNACZNIK, True)
+        ustaw(zajeta)
+        nowe += 1
+    return nowe
+
+
+async def hak_bramy(event: Any = None, gateway: Any = None, **kw) -> Optional[dict]:
+    """Hak `pre_gateway_dispatch`: najpierw obsługa zajętej rozmowy w adapterach, potem ta wiadomość."""
+    try:
+        if owin_zajete(gateway):
+            logger.info("jarvo-sesje: skrzynki sesji łapią też wiadomości do zajętej rozmowy")
+    except Exception as e:                    # bez owinięcia zajęta rozmowa działa jak w Hermesie; wiadomość idzie dalej
+        logger.warning("jarvo-sesje: obsługa zajętej rozmowy bez skrzynek sesji: %s", e)
+    return await przechwyc(event=event, gateway=gateway, **kw)
+
+
+def register(ctx) -> None:
+    """Zwykła wtyczka hosta bramy: hak rejestrowany przy starcie bramy (stan-jarva sprawdza ten wpis w gateway.log)."""
+    ctx.register_hook("pre_gateway_dispatch", hak_bramy)
+    logger.info("jarvo-sesje: przekierowanie dopisków aktywne (%s)", ", ".join(sorted(konfiguracja())) or "brak skrzynek")

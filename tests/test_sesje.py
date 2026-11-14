@@ -10,7 +10,7 @@ REPO = Path(__file__).resolve().parents[1]
 
 
 def load():
-    spec = importlib.util.spec_from_file_location("jarvo_sesje_t", REPO / "wiedza" / "plugin" / "sesje.py")
+    spec = importlib.util.spec_from_file_location("jarvo_sesje_t", REPO / "sesje" / "plugin" / "__init__.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -100,3 +100,33 @@ def test_dlugi_tekst_dzielony_po_liniach():
     czesci = kawalki_wiadomosci(tekst, limit=1000)
     assert all(len(c) <= 1000 for c in czesci) and "\n".join(czesci) == tekst
     assert kawalki_wiadomosci("a" * 2500, limit=1000) == ["a" * 1000, "a" * 1000, "a" * 500]
+
+
+class AdapterHermesa:
+    """Jak gateway/platforms/base.py: obsługa wiadomości do zajętej rozmowy ustawiana przez set_busy_session_handler."""
+    def __init__(self):
+        self.do_jarva = []
+
+        async def hermes(event, session_key):           # obsługa Hermesa: wiadomość trafia do trwającej tury Jarva
+            self.do_jarva.append(event.text)
+            return True
+        self._busy_session_handler = hermes
+
+    def set_busy_session_handler(self, handler):
+        self._busy_session_handler = handler
+
+
+def test_dopisek_do_zajetej_rozmowy_idzie_do_skrzynki(tmp_path, monkeypatch):
+    """14.11: Jarvo był w trakcie tury, a trzy linki „… gpu” poszły do niego, bo zajęta rozmowa omija pre_gateway_dispatch."""
+    s = load()
+    skrzynka = ustaw(tmp_path, monkeypatch)
+    brama = Brama()
+    adapter = AdapterHermesa()
+    brama.adapters = {"telegram": adapter}
+    assert asyncio.run(s.hak_bramy(event=zdarzenie("cześć", mid="1"), gateway=brama)) is None
+    asyncio.run(s.hak_bramy(event=zdarzenie("drugie", mid="2"), gateway=brama))   # bez drugiego owinięcia
+    obsluga = adapter._busy_session_handler
+    assert asyncio.run(obsluga(zdarzenie("https://x.com/a/status/1 gpu", mid="3"), "sesja")) is True
+    assert asyncio.run(obsluga(zdarzenie("a to do Jarva", mid="4"), "sesja")) is True
+    assert adapter.do_jarva == ["a to do Jarva"]
+    assert len(list((skrzynka / "nowe").glob("*.json"))) == 1 and len(brama.wyslane) == 1

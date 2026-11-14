@@ -24,7 +24,7 @@ K02, K03, K07, K08, H06, H11, decyzja I36).
   jarvo telegram test [--bez-rutyn] | status [--json] [--sprawdz] | wyslij
         próbna wiadomość do właściciela (udana włącza rutyny, I36) / co jest ustawione (bez wartości) i konflikt 409
         w logach bramy (dwie bramy na jednym tokenie, H11) / tekst z wejścia do właściciela, długi w kilku
-        wiadomościach (odpowiedzi sesji zewnętrznych ze skrzynki „<dopisek>”, wiedza/plugin/sesje.py)
+        wiadomościach (odpowiedzi sesji zewnętrznych ze skrzynki „<dopisek>”, sesje/plugin/__init__.py)
 
 Integracja z jarvo/cli.py: `dodaj_polecenia(sub)` dopisuje te trzy polecenia do parsera, `sprawdzenia(u, ot)` daje
 wyniki dla `jarvo doctor` (format cli._wynik: nazwa, stan ok|uwaga|blad, opis, rada). Moduł działa też sam:
@@ -1204,7 +1204,7 @@ def kawalki_wiadomosci(tekst: str, limit: int = LIMIT_WIADOMOSCI) -> list[str]:
 
 def polecenie_telegram_wyslij(u: Uklad, a, _reszta, _ot) -> int:
     """Tekst z wejścia do właściciela (zwykły tekst, długi w kilku wiadomościach): odpowiedzi sesji zewnętrznych
-    (skrzynka `<dopisek>` z wiedza/plugin/sesje.py) i skrypty na serwerze. Token nigdy nie trafia na ekran."""
+    (skrzynka `<dopisek>` z sesje/plugin/__init__.py) i skrypty na serwerze. Token nigdy nie trafia na ekran."""
     if not _zainstalowane(u):
         return _brak_instalacji(u)
     token = _token(u)

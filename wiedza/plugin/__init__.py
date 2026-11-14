@@ -16,8 +16,6 @@ profilu ma `memory.provider: jarvo-wiedza`). Co robi:
   - narzędzia tylko dla agentów z SCHEMAT_DLA (Jarvo, rozmowa z właścicielem, bez terminala): `schemat` (schemat.py,
     SVG → PNG w rozmowie) i `pobierz_link` (linki.py: link od właściciela → treść do analizy, skill `skrzynka-linkow`).
     Hermes ładuje tę wtyczkę jako dostawcę pamięci (wyłączną), więc narzędzia idą przez get_tool_schemas, nie register_tool.
-  - hak `pre_gateway_dispatch` (brama): wiadomość właściciela z dopiskiem sesji zewnętrznej („… gpu”) idzie do jej
-    skrzynki zamiast do Jarva (sesje.py, `<dane>/jarvo/konfig/sesje.json`).
 Agenci nie piszą notatek: notatki, INDEX i huby pisze kompilacja (etap 4) i `wiedza.py`.
 """
 from __future__ import annotations
@@ -100,19 +98,6 @@ def _schemat():
 
 def _linki():
     return _modul("jarvo_linki", "linki.py")
-
-
-def _sesje():
-    return _modul("jarvo_sesje", "sesje.py")
-
-
-async def skrzynka_sesji(**kwargs):
-    """Hak `pre_gateway_dispatch`: wiadomość z dopiskiem sesji zewnętrznej (sesje.py) zamiast do Jarva."""
-    try:
-        return await _sesje().przechwyc(**kwargs)
-    except Exception as e:
-        logger.warning("jarvo-wiedza: skrzynka sesji niedostępna: %s", e)
-        return None
 
 
 def cisza_tablicy(**kwargs) -> None:
@@ -1287,10 +1272,6 @@ def register(ctx) -> None:
         ctx.register_hook("pre_tool_call", straznik)
     except Exception as e:
         logger.debug("jarvo-wiedza: strażnik narzędzi nie zarejestrowany: %s", e)
-    try:
-        ctx.register_hook("pre_gateway_dispatch", skrzynka_sesji)
-    except Exception as e:
-        logger.debug("jarvo-wiedza: skrzynka sesji nie zarejestrowana: %s", e)
     try:
         ctx.register_hook("post_tool_call", cisza_tablicy)
     except Exception as e:

@@ -120,7 +120,7 @@ def _pisz(p: Path, tekst: str) -> None:
 
 
 def zbuduj(build: Path) -> None:
-    """Build w układzie scripts/build.py: dwa profile, host, cztery wtyczki, dane skarbca."""
+    """Build w układzie scripts/build.py: dwa profile, host, pięć wtyczek, dane skarbca."""
     _pisz(build / "BUILD.json", json.dumps({"agents": [{"agent": a, "skills": 1, "cron_jobs": 0} for a in AGENCI],
                                             "plugins": list(install_fleet.WTYCZKI)}))
     for a in AGENCI:
@@ -136,12 +136,12 @@ def zbuduj(build: Path) -> None:
     _pisz(szablony / "mission-ledger" / "references" / "INDEX.template.md", "# Misje\n")
     _pisz(szablony / "onboarding-interview" / "references" / "USER.template.md", "# Właściciel\n")
     _pisz(build / "host" / "config.yaml", "model:\n  provider: openrouter\n  default: atrapa/host\ngateway:\n"
-                                          "  profile_routes: []\nplugins:\n  enabled:\n  - jarvo-zgody\n")
+                                          "  profile_routes: []\nplugins:\n  enabled:\n  - jarvo-zgody\n  - jarvo-sesje\n")
     _pisz(build / "host" / "SOUL.md", "# Host floty\n")
     w = build / "plugins"
     _pisz(w / "jarvo-hq" / "dashboard" / "manifest.json", '{"name": "jarvo-hq"}\n')
     _pisz(w / "jarvo-hq" / "dashboard" / "plugin_api.py", "# panel\n")
-    for nazwa in ("jarvo-wiedza", "jarvo-komputer", "jarvo-zgody"):
+    for nazwa in ("jarvo-wiedza", "jarvo-komputer", "jarvo-zgody", "jarvo-sesje"):
         _pisz(w / nazwa / "plugin.yaml", f"name: {nazwa}\nversion: 0.1.0\n")
         _pisz(w / nazwa / "__init__.py", "def register(ctx):\n    pass\n")
     _pisz(build / "wiedza" / "fleet.json", json.dumps(
@@ -241,7 +241,8 @@ def test_pierwszy_przebieg_instaluje_flote(dwa_przebiegi):
     import yaml
     cfg = yaml.safe_load((dane / "config.yaml").read_text(encoding="utf-8"))
     assert cfg["model"]["default"] == "atrapa/host"
-    assert {"jarvo-hq", "jarvo-wiedza", "jarvo-zgody"} <= set(cfg["plugins"]["enabled"])
+    assert {"jarvo-hq", "jarvo-wiedza", "jarvo-zgody", "jarvo-sesje"} <= set(cfg["plugins"]["enabled"])
+    assert not any((dane / "profiles" / a / "plugins" / "jarvo-sesje").exists() for a in AGENCI)   # tylko host bramy
     assert b"\r\n" not in (dane / "config.yaml").read_bytes()                      # LF także na Windows
     assert (dane / "SOUL.md").read_text(encoding="utf-8") == "# Host floty\n"
     # katalogi floty, szablony, skarbiec, tablica, motywy
@@ -301,7 +302,7 @@ def test_drugi_przebieg_niczego_nie_zmienia(dwa_przebiegi):
     assert roznice == []
     wywolania = [json.loads(x) for x in (s["dane"] / ".atrapa-hermesa.log").read_text(encoding="utf-8").splitlines()]
     assert sum(x[2:4] == ["profile", "update"] for x in wywolania) == len(AGENCI)
-    assert sum(x[2:4] == ["plugins", "enable"] for x in wywolania) == 3          # tylko w pierwszym przebiegu
+    assert sum(x[2:4] == ["plugins", "enable"] for x in wywolania) == 4          # tylko w pierwszym przebiegu
 
 
 def test_brak_buildu_to_blad_z_rada(tmp_path):

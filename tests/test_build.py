@@ -487,20 +487,23 @@ def test_natywny_windows_sciezki_i_wartosci_per_system(natywny_win):
     assert "D:/JarvoTest/proba-build/Michał Żółć/build/profiles/jarvo-web/skills" in reka["skills"]["external_dirs"]
     assert "Michał Żółć/dane/jarvo/missions." in reka["approvals"]["smart_policy"].replace("\n", " ")
     host = fl.load_yaml(natywny_win / "host" / "config.yaml")
-    assert host["plugins"]["enabled"] == [build.ZGODY_PLUGIN] and host["security"]["tirith_enabled"] is False
+    # jarvo-sesje w hoście bramy, nie w profilach: hak „… gpu” musi działać od startu bramy (dostawca pamięci jarvo-wiedza
+    # ładuje się dopiero przy pierwszym agencie; 14.11 pierwsza wiadomość po restarcie trafiła do Jarva)
+    assert host["plugins"]["enabled"] == [build.ZGODY_PLUGIN, build.SESJE_PLUGIN] and host["security"]["tirith_enabled"] is False
     assert host["tts"]["providers"]["matcha"]["command"].startswith(f'"{WIN_PROGRAM}/bin-floty/jarvo-tts.exe" --plik ')
     stt = json.loads((natywny_win / "host" / "srodowisko.json").read_text(encoding="utf-8"))
     # C06: silnik chrome każdego profilu dostaje Chromium z instalacji (ścieżka Windows, nie YAML: z „\”)
     assert stt == {"HERMES_LOCAL_STT_COMMAND": f'"{WIN_PROGRAM}/bin-floty/jarvo-stt.exe" {build.STT_ARGUMENTY}',
                    "AGENT_BROWSER_EXECUTABLE_PATH": str(PureWindowsPath(WIN_CHROME))}
     manifest = json.loads((natywny_win / "BUILD.json").read_text(encoding="utf-8"))
-    assert manifest["plugins"][-1] == build.ZGODY_PLUGIN and manifest["uklad"]["system"] == "windows"
+    assert manifest["plugins"][-2:] == [build.ZGODY_PLUGIN, build.SESJE_PLUGIN] and manifest["uklad"]["system"] == "windows"
     assert manifest["uklad"]["node_modules"] == f"{WIN_PROGRAM}/node-floty/node_modules"
     assert manifest["uklad"]["chrome"] == WIN_CHROME
     assert manifest["uklad"]["sciezki"]["PY"] == f'"{WIN_PROGRAM}/venvs/narzedzia/Scripts/python.exe"'
-    for rel in ("plugin.yaml", "__init__.py"):
-        assert (natywny_win / "plugins" / build.ZGODY_PLUGIN / rel).read_bytes() == \
-            (fl.REPO_ROOT / "zgody" / "plugin" / rel).read_bytes()
+    for wtyczka, zrodlo in ((build.ZGODY_PLUGIN, "zgody"), (build.SESJE_PLUGIN, "sesje")):
+        for rel in ("plugin.yaml", "__init__.py"):
+            assert (natywny_win / "plugins" / wtyczka / rel).read_bytes() == \
+                (fl.REPO_ROOT / zrodlo / "plugin" / rel).read_bytes()
 
 
 def test_natywne_polecenia_stt_i_tts_jak_dzieli_je_hermes(natywny_win):

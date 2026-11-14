@@ -1,0 +1,5 @@
+name: jarvo-sesje
+version: 0.1.0
+description: "Skrzynki sesji zewnętrznych: wiadomość właściciela z dopiskiem (np. „gpu”) idzie do innej sesji agenta, także gdy Jarvo jest zajęty. Hak pre_gateway_dispatch bramy."
+kind: standalone
+provides_hooks: [pre_gateway_dispatch]
