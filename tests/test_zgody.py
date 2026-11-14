@@ -869,6 +869,7 @@ BLOKOWANE = [
     ("uv run python -c 'import os; os.system(\"rm -rf ~/dev\")'", None),
     ("node -e \"require('fs').rmSync('{dom_p}/dev', {{recursive: true}})\"", None),
     ("bash -c 'rm -rf ~/dev'", None), ("sh -lc \"rm -rf $HOME/strony\"", None), ("eval 'rm -rf ~/dev'", None),
+    ("eval rm -rf ~/dev", None),
     ("echo $(rm -rf ~/dev)", None), ("(cd ~ && rm -rf dev)", None), ("cd ~/dev && rm -rf ./*", None),
     ("bash <<'EOF'\nrm -rf ~/dev\nEOF", None), ("D=~/dev; rm -rf $D", None),
     # cele, których nie da się ustalić, przy -r albo -f

@@ -4,7 +4,6 @@ odmowy, z-buildu, podgląd, blokada floty i jedna próba połączenia SSH. Serwe
 
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import shutil
@@ -141,6 +140,24 @@ def test_wgraj_kopia_weryfikacja_tag_i_main(strona, capsys):
     assert kod == 0 and k["kopie"][0]["nazwa"] == nowa.name and len(k["kopie"]) == 2
 
 
+def test_eksport_prawa_755_644_niezaleznie_od_umask(strona):
+    """Prawa idą z eksportu, nie z `rsync --chmod` (openrsync na macOS 15 go nie stosuje)."""
+    s = strona
+    commit(s["repo"], {"js/lib/a.js": "x\n"})
+    stan = w.sprawdz(s["repo"], "HEAD")
+    cel = s["tmp"] / "eksport"
+    stara = os.umask(0o077)
+    try:
+        cel.mkdir()
+        w.eksportuj(s["repo"], stan, cel)
+    finally:
+        os.umask(stara)
+    prawa = {p.relative_to(cel).as_posix(): p.stat().st_mode & 0o777 for p in [cel, *cel.rglob("*")]}
+    assert prawa["."] == prawa["js"] == prawa["js/lib"] == 0o755
+    assert prawa["js/lib/a.js"] == prawa["index.html"] == 0o644
+    assert {v for k, v in prawa.items() if (cel / k).is_file()} == {0o644}
+
+
 def test_wgraj_odmawia_bez_zmian_na_serwerze(strona, capsys):
     s = strona
     przed = drzewo(s["srv"])
@@ -263,6 +280,7 @@ def test_podglad_bez_metadanych(strona, capsys, monkeypatch):
 
 
 def test_blokada_odmawia_po_czekaniu(strona, capsys):
+    import fcntl                      # tylko POSIX: na Windows moduł ma być zebrany i pominięty przez pytestmark
     s = strona
     stan = s["tmp"] / "stan"
     stan.mkdir()

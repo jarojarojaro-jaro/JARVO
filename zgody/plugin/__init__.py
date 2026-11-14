@@ -946,11 +946,21 @@ _ZMIENNE_GROZNE = re.compile(
     r"|MSYS\w*|CYGWIN)$", re.I)
 
 
+def _dom_powloki(dom: str) -> str:
+    """HOME tak, jak widzi go Git Bash: C:\\Users\\x → /c/Users/x, \\\\serwer\\u → //serwer/u. Bez tego tekst po
+    rozwinięciu $HOME albo ~ w `sh -c "…"` czy `eval` zgubiłby ukośniki odwrotne przy drugim czytaniu przez powłokę."""
+    if not WINDOWS:
+        return dom
+    s = dom.replace("\\", "/")
+    m = re.match(r"^([A-Za-z]):(/.*)?$", s)
+    return f"/{m.group(1).lower()}{(m.group(2) or '').rstrip('/')}" if m else s
+
+
 def _wartosc(nazwa: str, zmienne: Dict[str, Optional[str]], dom: str) -> Optional[str]:
     if nazwa in zmienne:
         return zmienne[nazwa]
     if nazwa == "HOME":
-        return dom
+        return _dom_powloki(dom)
     return os.environ.get(nazwa) if _ZMIENNE_ZNANE.match(nazwa) else None
 
 
@@ -1067,7 +1077,7 @@ def _rozwin(slowo: _Slowo, zmienne: Dict[str, Optional[str]], dom: str) -> Optio
                 koniec = t.find("/")
                 glowa = t if koniec < 0 else t[:koniec]
                 if glowa == "~":
-                    t = dom + ("" if koniec < 0 else t[koniec:])
+                    t = _dom_powloki(dom) + ("" if koniec < 0 else t[koniec:])
                 elif _NAZWA_ZM.fullmatch(glowa[1:]):
                     rozw = os.path.expanduser(glowa)
                     if rozw == glowa:
