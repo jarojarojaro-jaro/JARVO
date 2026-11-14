@@ -591,16 +591,18 @@ def test_natywny_macos_i_linux_bez_exe_z_lightpanda(tmp_path):
 
 def test_natywny_mcp_inspo_przez_node_ze_skryptem_paczki(natywny_win, kontener_main):
     """P06: serwer MCP inspo natywnie to `node <node_modules>/inspo-mcp/inspo-mcp.mjs --stdio` (bez .bin, na Windows
-    .cmd), certyfikaty z magazynu systemu zamiast pliku z Debiana; reszta wpisu bez zmian. Kontener bez zmian."""
+    .cmd), certyfikaty z magazynu systemu zamiast pliku z Debiana; reszta wpisu bez zmian. Kontener bez zmian.
+    Cache inspo-mcp 0.2 w danych Jarva (domyślnie %LOCALAPPDATA% na Windows: ślad po odinstalowaniu, W64 14.11)."""
     zrodlo = fl.load_yaml(fl.REPO_ROOT / "profiles" / "jarvo-web" / "config.yaml")["mcp_servers"]["inspo"]
     inspo = fl.load_yaml(natywny_win / "profiles" / "jarvo-web" / "config.yaml")["mcp_servers"]["inspo"]
     assert inspo["command"] == "node"
     assert inspo["args"] == [f"{WIN_PROGRAM}/node-floty/node_modules/inspo-mcp/inspo-mcp.mjs", *zrodlo["args"]]
     assert inspo["env"] == {**{k: v for k, v in zrodlo["env"].items() if k != "NODE_EXTRA_CA_CERTS"},
-                            "NODE_USE_SYSTEM_CA": "1"}
+                            "INSPO_CACHE_DIR": f"{WIN_DANE}/jarvo/cache/inspo-mcp", "NODE_USE_SYSTEM_CA": "1"}
     assert {k: v for k, v in inspo.items() if k not in ("command", "args", "env")} == \
         {k: v for k, v in zrodlo.items() if k not in ("command", "args", "env")}
-    assert fl.load_yaml(kontener_main / "profiles" / "jarvo-web" / "config.yaml")["mcp_servers"]["inspo"] == zrodlo
+    w_kontenerze = fl.load_yaml(kontener_main / "profiles" / "jarvo-web" / "config.yaml")["mcp_servers"]["inspo"]
+    assert w_kontenerze == {**zrodlo, "env": {**zrodlo["env"], "INSPO_CACHE_DIR": "/opt/data/jarvo/cache/inspo-mcp"}}
     # program z node_modules obrazu bez odpowiednika natywnego: build staje, zamiast zostawić ścieżkę /opt
     cfg = {"mcp_servers": {"inny": {"command": build.MCP_BIN_KONTENERA + "inny-mcp", "args": ["--stdio"]}}}
     with pytest.raises(SystemExit, match="inny-mcp"):
