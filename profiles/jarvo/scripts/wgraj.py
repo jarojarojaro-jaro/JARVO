@@ -302,15 +302,22 @@ def sprawdz(repo: Path, rev: str = "HEAD", czyste: bool = True) -> dict:
 
 
 def eksportuj(repo: Path, stan: dict, cel: Path) -> None:
-    """Zapis zbioru do wgrania z obiektów git (bez drzewa roboczego i bez atrybutów eksportu) do katalogu `cel`."""
+    """Zapis zbioru do wgrania z obiektów git (bez drzewa roboczego i bez atrybutów eksportu) do katalogu `cel`.
+    Prawa 755/644 ustawiamy tu, nie opcją rsync `--chmod`: openrsync z macOS 15 odrzuca `D755,F644`, a postać
+    symboliczną przyjmuje i pomija, więc o prawach plików na serwerze decyduje eksport."""
     bloby = Bloby(repo)
+    katalogi = {cel}
     try:
         for sciezka, (_, _, sha) in stan["pliki"].items():
             plik = cel / sciezka
             plik.parent.mkdir(parents=True, exist_ok=True)
             plik.write_bytes(bloby.czytaj(sha))
+            plik.chmod(0o644)
+            katalogi.update(p for p in plik.parents if p.is_relative_to(cel))
     finally:
         bloby.zamknij()
+    for katalog in katalogi:
+        katalog.chmod(0o755)
 
 
 # ---------------------------------------------------------------- połączenie z serwerem
@@ -608,7 +615,7 @@ def wdroz(repo: Path, rev: str, odcisk: str, pol: Polaczenie, czekaj: float) -> 
                 raport["usuniete_kopie"] = [x for x in r.stdout.decode().split() if KOPIA.fullmatch(x)]
                 _info(f"Wgrywanie {len(stan['pliki'])} plików na {pol.opis()}:{kat}")
                 filtry = [f"--filter=- {w}" for w in [*METADANE, *konf["chronione"]]]
-                r = subprocess.run(["rsync", "-rlt", "--checksum", "--chmod=D755,F644", "--delete", *filtry,
+                r = subprocess.run(["rsync", "-rlt", "--checksum", "--delete", *filtry,
                                     *pol.rsync_opcje(), f"{eksport}/", pol.rsync_cel(kat)],
                                    capture_output=True, text=True, stdin=subprocess.DEVNULL)
                 raport["rsync_kod"] = r.returncode
