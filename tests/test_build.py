@@ -14,7 +14,7 @@ import os
 import re
 import shlex
 import shutil
-from pathlib import PureWindowsPath
+from pathlib import Path, PureWindowsPath
 
 import pytest
 
@@ -712,3 +712,27 @@ def test_wspolne_skille_jarva_dostaja_tokeny(tmp_path, monkeypatch):
     assert 'Uruchom: "D:/Py thon/python.exe" "D:/app/1/scripts/x.py"' in (out / "wspolne/proba/SKILL.md").read_text(
         encoding="utf-8")
     assert (out / "wspolne/proba/references/bez.md").read_bytes() == b"bez tokenow\r\n"
+
+
+def test_zgody_z_gory_w_profilu_czatu():
+    """Polecenie właściciela 14.11: czat z góry zatwierdza groźne wzorce terminala Hermesa (koniec „randomowych” próśb),
+    ale dysk i system, sekrety, własna brama Jarva, zaciemnione polecenia i sudo dalej czekają na „tak”."""
+    z_gory = {"script execution via heredoc", "script execution via -e/-c flag", "shell command via -c/-lc flag",
+              "recursive delete", "pipe remote content to shell", "stop/restart system service", "force kill processes",
+              "kill process via pgrep/pidof expansion (self-termination)", "docker restart/stop/kill (container lifecycle)",
+              "chmod +x followed by immediate execution", "overwrite project env/config via redirection"}
+    za_zgoda = {"format filesystem", "write to block device", "disk copy", "fork bomb", "kill all processes",
+                "access to SSH keys (Windows path)", "access to Hermes secrets (Windows path)",
+                "cloud metadata endpoint access (instance credentials)",
+                "in-place edit of sensitive credential/SSH/shell-rc path", "in-place edit of Hermes config/env",
+                "stop/restart hermes gateway (kills running agents)", "hermes update (restarts gateway, kills running agents)",
+                "kill hermes/gateway process (self-termination)",
+                "pipe decoded content to shell (possible command obfuscation)", "PowerShell encoded command execution",
+                "sudo with privilege flag (stdin/askpass/shell/list)", "command parser limit or malformed executable payload"}
+    assert set(build.wzorce_z_gory(sorted(z_gory | za_zgoda))) == z_gory
+
+
+@pytest.mark.skipif(not HERMES_SRC, reason="ustaw JARVO_TEST_HERMES_SRC, aby czytać wzorce zgód Hermesa")
+def test_klucze_wzorcow_z_hermesa():
+    klucze = build.klucze_wzorcow(Path(HERMES_SRC))
+    assert {"script execution via heredoc", "script execution via -e/-c flag", "recursive delete"} <= set(klucze)

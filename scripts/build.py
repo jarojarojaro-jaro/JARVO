@@ -362,6 +362,47 @@ def zakazy(deny: list[str], fleet: fl.Fleet, u: Uklad) -> list[str]:
 # a tryb pełny tylko --yolo albo /yolo na sesję (nigdy HERMES_YOLO_MODE w środowisku ani `mode: off`).
 TRYB_ZGOD_CZATU = "manual"
 
+# Polecenie właściciela 14.11 („w czacie na Telegramie ma być wszystko approve z góry, jakieś randomowe komendy kazało
+# potwierdzać”): po trybie auto wtyczki zgód pytał już tylko Hermes, o swoje groźne wzorce terminala (python -c,
+# heredoc, curl | sh, rm -r w /tmp…), a `profile update --force-config` przy każdym wdrożeniu kasował „zawsze”.
+# Profil czatu dostaje więc w command_allowlist każdy klucz groźnego wzorca bieżącego Hermesa (liczone z --hermes-src
+# przy buildzie, jak cron), poza tymi, które zostają za „tak” właściciela (decyzja 11.11: klucze nigdy na zewnątrz,
+# rzeczy nieodwracalne za zgodą): dysk i system, sekrety i klucze, własna brama Jarva, zaciemnione polecenia, sudo.
+# Masowe kasowanie w chronionych miejscach blokuje strażnik kasowania jarvo-zgody w każdym trybie, także mimo tej
+# listy; twarde blokady Hermesa (rm -rf /, mkfs) i approvals.deny działają przed nią. `mode: off` odpada: dla wtyczki
+# zgód to YOLO, a pod YOLO blokuje ekran i telefon.
+ZA_ZGODA = re.compile(r"format|wipe|disk|block device|boot|fork bomb|kill all|backup|shadow|SSH|secret|credential|"
+                      r"metadata|hermes|gateway|launchd|obfuscation|encoded|sudo|parser limit", re.I)
+
+_WZORCE_SNIPPET = r"""
+import json
+from tools import approval_detection as d
+klucze = [opis for _, opis in d.DANGEROUS_PATTERNS]
+klucze += list(getattr(d, "_REMOVED_PATTERN_KEY_ALIASES", {}))      # python -c, python <<EOF (wzorce wykonania skryptu)
+klucze.append("shell command via -c/-lc flag")
+klucze += [f"arbitrary program execution via {n} {f}" for n, fl in getattr(d, "_READ_TOOL_EXEC_FLAGS", {}).items()
+           for f in sorted(fl)]
+print(json.dumps(list(dict.fromkeys(klucze))))
+"""
+
+
+def wzorce_z_gory(klucze: list[str]) -> list[str]:
+    """Klucze groźnych wzorców Hermesa zatwierdzane z góry w profilu czatu: wszystkie poza ZA_ZGODA."""
+    return [k for k in klucze if not ZA_ZGODA.search(k)]
+
+
+def klucze_wzorcow(hermes_src: Path | None) -> list[str]:
+    """Klucze groźnych wzorców terminala z tools/approval_detection.py Hermesa (`pattern_key` z „zawsze”)."""
+    if hermes_src is None:
+        return []
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(hermes_src), os.environ.get("PYTHONPATH", "")]))
+    python = os.environ.get("JARVO_HERMES_PYTHON") or sys.executable
+    res = subprocess.run([python, "-c", _WZORCE_SNIPPET], env=env, capture_output=True, text=True, encoding="utf-8",
+                         errors="replace")
+    if res.returncode != 0:
+        raise SystemExit(f"Wzorce zgód Hermesa: nie czytam tools/approval_detection.py:\n{res.stderr}")
+    return json.loads(res.stdout)
+
 
 def _sekcja(cfg: dict, klucz: str) -> dict:
     if not isinstance(cfg.get(klucz), dict):
@@ -1110,6 +1151,14 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         if u.natywny:
             ustaw_natywnie(cfg, fleet, u, czat=agent.name == fleet.orchestrator)
             naglowek += f"\n# Układ natywny ({u.system}): katalog danych {u.dane}."
+            if agent.name == fleet.orchestrator:
+                z_gory = wzorce_z_gory(klucze_wzorcow(hermes_src))
+                if z_gory:
+                    obecne = [str(k) for k in cfg.get("command_allowlist") or []]
+                    cfg["command_allowlist"] = obecne + [k for k in z_gory if k not in obecne]
+                    print(f"✓ {agent.name}: {len(z_gory)} groźnych wzorców terminala Hermesa zatwierdzonych z góry")
+                else:
+                    print(f"! {agent.name}: bez --hermes-src groźne wzorce terminala zostają za pytaniem")
         zapisz(dest / "config.yaml", naglowek + "\n" + fl.dump_yaml(cfg))
     # model zapasowy zestawu: agent nie milknie, gdy główny model odmówi (np. poza planem)
     if fleet.fallback and (dest / "config.yaml").exists():
