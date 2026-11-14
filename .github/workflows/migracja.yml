@@ -62,7 +62,7 @@ jobs:
       # Node z decyzji I04 (npm 11.20.0): front Hermesa ma engine-strict i odrzuca npm 11.10–11.16
       - uses: actions/setup-node@v4
         with:
-          node-version: "26.12.1"
+          node-version: "26.13.1"
       - name: Miejsce na dysku (obraz floty ok. 7 GB po rozpakowaniu)
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
       - name: Logowanie do GHCR (gotowy obraz starej floty)

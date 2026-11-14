@@ -16,7 +16,7 @@
 ARG HERMES_IMAGE=nousresearch/hermes-agent:v2026.9.24@sha256:fca358f12efd65bfaaca05884166f15c0e2788375ca30d77061ac1ebc96452b7
 # Lightpanda (AGPL-3.0, niezmodyfikowana binarka): przeglądarka headless dla narzędzi browser_* agentów.
 # Wersja przypięta digestem i przejrzana przed dodaniem (docs/SOURCES.md, „Przegląd przed dodaniem”).
-ARG LIGHTPANDA_IMAGE=lightpanda/browser:1.0.0@sha256:5b84708cb3d9bef841aba4a4cd299f4de0609ac1bd7d4c6fbfcbf168d56b685e
+ARG LIGHTPANDA_IMAGE=lightpanda/browser:1.0.4@sha256:a9d899882899802bc3a6b82622a7ca394f8e1b828452869a0965d2e5097e6116
 
 FROM ${LIGHTPANDA_IMAGE} AS lightpanda
 
@@ -250,9 +250,9 @@ ENV INDRA_OCR_MODEL_DIR=/opt/jarvo/models/indra-ocr
 #     ~0,35 GB: bez fontów macOS i Windows (~0,9 GB fontów Apple i Microsoft, których nie redystrybuujemy), więc
 #     przeglądarka udaje tylko Linuksa (fonty Linuksa z paczki: Noto, Arimo, Tinos, Cousine; OFL i Apache-2.0).
 #     Na końcu start bez sieci: strona z data: i navigator.webdriver = false.
-ARG CAMOUFOX_VERSION=152.0.4-beta.30
-ARG CAMOUFOX_SHA256_AMD64=5720d45b894ce1770543de024c6f10d514b38be560fa2dc3226b3d8586caf672
-ARG CAMOUFOX_SHA256_ARM64=60447260af8bebdb0ec3f2aa72f687b879e5598367303de2e3fdbc7a5be8c124
+ARG CAMOUFOX_VERSION=158.0-beta.40
+ARG CAMOUFOX_SHA256_AMD64=2ead498d4765394addd3278d6a663962f3f99b189a99d3f966de56656cefc823
+ARG CAMOUFOX_SHA256_ARM64=8a4dfdd85dfb5212dae716b4aa8e30041634edbbba6f6177a566a3ee6b1efe8c
 RUN set -e; case "$(uname -m)" in x86_64) a=x86_64; s="$CAMOUFOX_SHA256_AMD64";; aarch64) a=arm64; s="$CAMOUFOX_SHA256_ARM64";; \
       *) echo "Camoufox: brak wydania dla $(uname -m)" >&2; exit 1;; esac; \
     d=/opt/jarvo/camoufox; t="$(mktemp -d)"; \

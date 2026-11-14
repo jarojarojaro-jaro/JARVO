@@ -70,7 +70,7 @@
    }
   },
   "camoufox": {
-   "wersja": "152.0.4-beta.30",
+   "wersja": "158.0-beta.40",
    "kiedy": "przy-uzyciu",
    "licencja": "MPL-2.0 (Camoufox, Firefox) + fonty z paczki (OFL-1.1, Apache-2.0, CC-BY-4.0, Apple, Microsoft) + DLL Microsoftu",
    "zrodlo": "camoufox",
@@ -80,45 +80,45 @@
       "JARVO_CAMOUFOX": "{katalog}/camoufox.exe"
      },
      "format": "zip",
-     "rozmiar": 493141328,
-     "sha256": "ea52a02fb1cfb1813ef6a326bea03fb2b650c9774143d953a94a27bfc8f10072",
-     "url": "https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-win.x86_64.zip"
+     "rozmiar": 1315506159,
+     "sha256": "2d3e33207c2d5853e817e8317f0e33124ffb7054bd5102c8b84546e3d15a6447",
+     "url": "https://github.com/daijro/camoufox/releases/download/v158.0-beta.40/camoufox-158.0-beta.40-win.x86_64.zip"
     },
     "windows-arm64": {
      "env": {
       "JARVO_CAMOUFOX": "{katalog}/camoufox.exe"
      },
      "format": "zip",
-     "rozmiar": 493141328,
-     "sha256": "ea52a02fb1cfb1813ef6a326bea03fb2b650c9774143d953a94a27bfc8f10072",
-     "url": "https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-win.x86_64.zip"
+     "rozmiar": 1315506159,
+     "sha256": "2d3e33207c2d5853e817e8317f0e33124ffb7054bd5102c8b84546e3d15a6447",
+     "url": "https://github.com/daijro/camoufox/releases/download/v158.0-beta.40/camoufox-158.0-beta.40-win.x86_64.zip"
     },
     "macos-arm64": {
      "env": {
       "JARVO_CAMOUFOX": "{katalog}/Camoufox.app/Contents/MacOS/camoufox"
      },
      "format": "zip",
-     "rozmiar": 312665777,
-     "sha256": "3b43e766574f286a6a63296cf58b660b7a3120952086c869b4df4c9a71604bc3",
-     "url": "https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-mac.arm64.zip"
+     "rozmiar": 1293080825,
+     "sha256": "b8aba26d86f761627651b8e7f0d90ade022a32a3d750e0b68ff5830ebefd3aab",
+     "url": "https://github.com/daijro/camoufox/releases/download/v158.0-beta.40/camoufox-158.0-beta.40-mac.arm64.zip"
     },
     "linux-x64": {
      "env": {
       "JARVO_CAMOUFOX": "{katalog}/camoufox-bin"
      },
      "format": "zip",
-     "rozmiar": 663467670,
-     "sha256": "5720d45b894ce1770543de024c6f10d514b38be560fa2dc3226b3d8586caf672",
-     "url": "https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-lin.x86_64.zip"
+     "rozmiar": 1299054257,
+     "sha256": "2ead498d4765394addd3278d6a663962f3f99b189a99d3f966de56656cefc823",
+     "url": "https://github.com/daijro/camoufox/releases/download/v158.0-beta.40/camoufox-158.0-beta.40-lin.x86_64.zip"
     },
     "linux-arm64": {
      "env": {
       "JARVO_CAMOUFOX": "{katalog}/camoufox-bin"
      },
      "format": "zip",
-     "rozmiar": 653870625,
-     "sha256": "60447260af8bebdb0ec3f2aa72f687b879e5598367303de2e3fdbc7a5be8c124",
-     "url": "https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-lin.arm64.zip"
+     "rozmiar": 1292898414,
+     "sha256": "8a4dfdd85dfb5212dae716b4aa8e30041634edbbba6f6177a566a3ee6b1efe8c",
+     "url": "https://github.com/daijro/camoufox/releases/download/v158.0-beta.40/camoufox-158.0-beta.40-lin.arm64.zip"
     }
    }
   },
@@ -196,7 +196,7 @@
    }
   },
   "chrome-komputer": {
-   "wersja": "156.0.8078.47",
+   "wersja": "157.0.8103.78",
    "kiedy": "przy-uzyciu",
    "licencja": "BSD-3-Clause (Chromium) + składniki w LICENSE i ABOUT; binarka Google Chrome for Testing (chrome://terms)",
    "zrodlo": "chrome-for-testing",
@@ -206,45 +206,45 @@
       "JARVO_KOMPUTER_CHROME": "{katalog}/chrome-win64/chrome.exe"
      },
      "format": "zip",
-     "rozmiar": 209154801,
-     "sha256": "a4e0d57245e167e98a9d465af1e3774d2b4ec9f04e483d19bcd97a6f63cf46dd",
-     "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/win64/chrome-win64.zip"
+     "rozmiar": 209854321,
+     "sha256": "5f6ec40206407112702e163bf694d07f9fdc8ccbd346c70ce61fa62f716493f9",
+     "url": "https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.78/win64/chrome-win64.zip"
     },
     "windows-arm64": {
      "env": {
       "JARVO_KOMPUTER_CHROME": "{katalog}/chrome-win64/chrome.exe"
      },
      "format": "zip",
-     "rozmiar": 209154801,
-     "sha256": "a4e0d57245e167e98a9d465af1e3774d2b4ec9f04e483d19bcd97a6f63cf46dd",
-     "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/win64/chrome-win64.zip"
+     "rozmiar": 209854321,
+     "sha256": "5f6ec40206407112702e163bf694d07f9fdc8ccbd346c70ce61fa62f716493f9",
+     "url": "https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.78/win64/chrome-win64.zip"
     },
     "macos-arm64": {
      "env": {
       "JARVO_KOMPUTER_CHROME": "{katalog}/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
      },
      "format": "zip",
-     "rozmiar": 194932023,
-     "sha256": "ad7f2b49a4dc679af286b1b1b386670d93ca7868079f69012d21ba0ac8293df3",
-     "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/mac-arm64/chrome-mac-arm64.zip"
+     "rozmiar": 196634479,
+     "sha256": "bf3b49d0fe62a62397e98641aa736ef813c46014f03ec13d4913442e6966c7fc",
+     "url": "https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.78/mac-arm64/chrome-mac-arm64.zip"
     },
     "linux-x64": {
      "env": {
       "JARVO_KOMPUTER_CHROME": "{katalog}/chrome-linux64/chrome"
      },
      "format": "zip",
-     "rozmiar": 200206486,
-     "sha256": "e6c94490f0b6b337225aeb2d2a5034858516b7017356980ba94f5176d8774a50",
-     "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/linux64/chrome-linux64.zip"
+     "rozmiar": 203266906,
+     "sha256": "9223832977a13db3646201b1341c1f9cf08afa3ceae92540116d7b0c062364fb",
+     "url": "https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.78/linux64/chrome-linux64.zip"
     },
     "linux-arm64": {
      "env": {
       "JARVO_KOMPUTER_CHROME": "{katalog}/chrome-linux-arm64/chrome"
      },
      "format": "zip",
-     "rozmiar": 199726566,
-     "sha256": "9e37000e3ee2731e45e475a6a2eac587d3c0ee5f8aef7cab5211ecd52cf3fb7b",
-     "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/linux-arm64/chrome-linux-arm64.zip"
+     "rozmiar": 203144198,
+     "sha256": "f354d666822a11d8fe99e923c44be77dd226fab2750c5b5947e6318818bf10f1",
+     "url": "https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.78/linux-arm64/chrome-linux-arm64.zip"
     }
    }
   },
@@ -416,9 +416,9 @@
       "bin"
      ],
      "format": "zip",
-     "rozmiar": 194034585,
-     "sha256": "a0e45723c72141975f51d8666302e614711745f3102b704ca3f82c897a58d278",
-     "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n9.0.2-17-g2a571b6068-win64-gpl-9.0.zip",
+     "rozmiar": 195110184,
+     "sha256": "693f3e224bc184b40524a62ca47526cfebaf2504414021b92fe75f677ad868b9",
+     "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59/ffmpeg-n9.0.2-39-g7adfbe40dc-win64-gpl-9.0.zip",
      "usun_poziom": 1
     },
     "windows-arm64": {
@@ -426,9 +426,9 @@
       "bin"
      ],
      "format": "zip",
-     "rozmiar": 194034585,
-     "sha256": "a0e45723c72141975f51d8666302e614711745f3102b704ca3f82c897a58d278",
-     "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n9.0.2-17-g2a571b6068-win64-gpl-9.0.zip",
+     "rozmiar": 195110184,
+     "sha256": "693f3e224bc184b40524a62ca47526cfebaf2504414021b92fe75f677ad868b9",
+     "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59/ffmpeg-n9.0.2-39-g7adfbe40dc-win64-gpl-9.0.zip",
      "usun_poziom": 1
     },
     "macos-arm64": {
@@ -440,9 +440,9 @@
       "bin"
      ],
      "format": "tar.xz",
-     "rozmiar": 151017172,
-     "sha256": "68ee646831adaae2495618346f3bba94ff207ff83bbd34d643e7004730d66269",
-     "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n9.0.2-17-g2a571b6068-linux64-gpl-9.0.tar.xz",
+     "rozmiar": 153175100,
+     "sha256": "73e29a56974ae5a651133a04584c7483b21afe941e17dc91d79814a758b608d3",
+     "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59/ffmpeg-n9.0.2-39-g7adfbe40dc-linux64-gpl-9.0.tar.xz",
      "usun_poziom": 1
     },
     "linux-arm64": {
@@ -450,9 +450,9 @@
       "bin"
      ],
      "format": "tar.xz",
-     "rozmiar": 127445692,
-     "sha256": "91afcd7695d4bbbb9e0057aa10baaf9875ec4e1a97303f9059ec971336a2ab46",
-     "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n9.0.2-17-g2a571b6068-linuxarm64-gpl-9.0.tar.xz",
+     "rozmiar": 128664064,
+     "sha256": "6cad88ae5bcec356cfc5d7979a036cc4007128201928a0cf243df3db483276cc",
+     "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59/ffmpeg-n9.0.2-39-g7adfbe40dc-linuxarm64-gpl-9.0.tar.xz",
      "usun_poziom": 1
     }
    }
@@ -673,7 +673,7 @@
    }
   },
   "git": {
-   "wersja": "2.56.0.windows.3",
+   "wersja": "2.56.1.windows.1",
    "kiedy": "instalacja",
    "licencja": "GPL-2.0-only (Git) + licencje komponentów MSYS2, UCRT64 i CLANGARM64 (GPL-3.0+, LGPL-3.0+, Artistic/GPL, Apache-2.0, MIT…; usr/share/licenses i ucrt64/share/licenses)",
    "zrodlo": "git-for-windows",
@@ -687,9 +687,9 @@
       "GIT_CONFIG_NOSYSTEM": "1"
      },
      "format": "tar.bz2",
-     "rozmiar": 123893966,
-     "sha256": "2460cdc329f9061e0682672eb9995da9da1da0ffb9761494c7abb3559ecbc40e",
-     "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.3/Git-2.56.0.3-64-bit.tar.bz2"
+     "rozmiar": 124091126,
+     "sha256": "d7d89e69855f00e73d957b513c49538a420c465c84b9d212cf1add400eecdf54",
+     "url": "https://github.com/git-for-windows/git/releases/download/v2.56.1.windows.1/Git-2.56.1-64-bit.tar.bz2"
     },
     "windows-arm64": {
      "bin": [
@@ -700,9 +700,9 @@
       "GIT_CONFIG_NOSYSTEM": "1"
      },
      "format": "tar.bz2",
-     "rozmiar": 172807073,
-     "sha256": "4e065c301a08b04ceb17e88ba2479acd5d46e214f799d2f915953a1d728ca33f",
-     "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.3/Git-2.56.0.3-arm64.tar.bz2"
+     "rozmiar": 172843751,
+     "sha256": "4a5e1555ac8453033d504930857ec8ba4eef20275d784b4e71df84a3da071afb",
+     "url": "https://github.com/git-for-windows/git/releases/download/v2.56.1.windows.1/Git-2.56.1-arm64.tar.bz2"
     },
     "macos-arm64": {
      "brak": "git z systemu (Xcode CLT, pakiet dystrybucji); doctor sprawdza"
@@ -774,7 +774,7 @@
    }
   },
   "lightpanda": {
-   "wersja": "1.0.0",
+   "wersja": "1.0.4",
    "kiedy": "instalacja",
    "licencja": "AGPL-3.0",
    "zrodlo": "browser",
@@ -797,9 +797,9 @@
      },
      "format": "plik",
      "nazwa_pliku": "lightpanda",
-     "rozmiar": 90354360,
-     "sha256": "955440053a84754dd64c62f970449a56a2b350cdf43ea5f2e809a73047b8173d",
-     "url": "https://github.com/lightpanda-io/browser/releases/download/1.0.0/lightpanda-aarch64-macos"
+     "rozmiar": 91609208,
+     "sha256": "83b0ba5ae31086b675fb3ba50644bda075a13bebabe46dc5f7543952bc41ae46",
+     "url": "https://github.com/lightpanda-io/browser/releases/download/1.0.4/lightpanda-aarch64-macos"
     },
     "linux-x64": {
      "bin": [
@@ -811,9 +811,9 @@
      },
      "format": "plik",
      "nazwa_pliku": "lightpanda",
-     "rozmiar": 188268424,
-     "sha256": "aa5a4b8ed53d1e38b3c73f5b2647d0a84a82e6744557f45f9a9c85858aa031c3",
-     "url": "https://github.com/lightpanda-io/browser/releases/download/1.0.0/lightpanda-x86_64-linux"
+     "rozmiar": 77649224,
+     "sha256": "7d22651129901203abdb95c64f49069c49e88f5211f4d8c4c6828c123c4adab4",
+     "url": "https://github.com/lightpanda-io/browser/releases/download/1.0.4/lightpanda-x86_64-linux"
     },
     "linux-arm64": {
      "bin": [
@@ -825,14 +825,14 @@
      },
      "format": "plik",
      "nazwa_pliku": "lightpanda",
-     "rozmiar": 192757248,
-     "sha256": "69791924bcee43b13b224af4c845622c5fe66fdbc1b8143bfaa39ca8f85244f5",
-     "url": "https://github.com/lightpanda-io/browser/releases/download/1.0.0/lightpanda-aarch64-linux"
+     "rozmiar": 74747976,
+     "sha256": "f021d49a0b66d07bf2633f8e00870b9075293516f872695b0ca4aeb5848b6ea8",
+     "url": "https://github.com/lightpanda-io/browser/releases/download/1.0.4/lightpanda-aarch64-linux"
     }
    }
   },
   "node": {
-   "wersja": "26.12.1",
+   "wersja": "26.13.1",
    "kiedy": "instalacja",
    "licencja": "MIT (Node.js) + Artistic-2.0 (npm) + licencje bibliotek w paczce (V8, OpenSSL, ICU, libuv, undici…; plik LICENSE)",
    "zrodlo": "nodejs",
@@ -845,9 +845,9 @@
       "npm_config_update_notifier": "false"
      },
      "format": "zip",
-     "rozmiar": 41901456,
-     "sha256": "b3efd5c70cba3308ed46e7e699a9b8aac075bbc6b027fcb39c84c31acc25e2b4",
-     "url": "https://nodejs.org/dist/v26.12.1/node-v26.12.1-win-x64.zip",
+     "rozmiar": 41166246,
+     "sha256": "e2edda75bfb089654705cf65a13b58933bfd5f57148e8ebda916f58a2474f1f7",
+     "url": "https://nodejs.org/dist/v26.13.1/node-v26.13.1-win-x64.zip",
      "usun_poziom": 1
     },
     "windows-arm64": {
@@ -858,9 +858,9 @@
       "npm_config_update_notifier": "false"
      },
      "format": "zip",
-     "rozmiar": 41901456,
-     "sha256": "b3efd5c70cba3308ed46e7e699a9b8aac075bbc6b027fcb39c84c31acc25e2b4",
-     "url": "https://nodejs.org/dist/v26.12.1/node-v26.12.1-win-x64.zip",
+     "rozmiar": 41166246,
+     "sha256": "e2edda75bfb089654705cf65a13b58933bfd5f57148e8ebda916f58a2474f1f7",
+     "url": "https://nodejs.org/dist/v26.13.1/node-v26.13.1-win-x64.zip",
      "usun_poziom": 1
     },
     "macos-arm64": {
@@ -871,9 +871,9 @@
       "npm_config_update_notifier": "false"
      },
      "format": "tar.gz",
-     "rozmiar": 58334853,
-     "sha256": "1901d539912c02afa10d1cc126943a8855a7eedebe830119463470db5e6c59e8",
-     "url": "https://nodejs.org/dist/v26.12.1/node-v26.12.1-darwin-arm64.tar.gz",
+     "rozmiar": 58340590,
+     "sha256": "aec2514ea1ceb2ba52455e9ec65986f6749a06dd759e5db2a72e6889668c9735",
+     "url": "https://nodejs.org/dist/v26.13.1/node-v26.13.1-darwin-arm64.tar.gz",
      "usun_poziom": 1
     },
     "linux-x64": {
@@ -884,9 +884,9 @@
       "npm_config_update_notifier": "false"
      },
      "format": "tar.xz",
-     "rozmiar": 34122264,
-     "sha256": "6170b2d474e1c626f43cff3adc118df9fe3b573258a4fc3d850c8dbc6b079bbd",
-     "url": "https://nodejs.org/dist/v26.12.1/node-v26.12.1-linux-x64.tar.xz",
+     "rozmiar": 34093052,
+     "sha256": "5c063e46bab0fbc1c17cc445d7ff129cbdcd0471be6ed83b6ab864f8143bc864",
+     "url": "https://nodejs.org/dist/v26.13.1/node-v26.13.1-linux-x64.tar.xz",
      "usun_poziom": 1
     },
     "linux-arm64": {
@@ -897,15 +897,15 @@
       "npm_config_update_notifier": "false"
      },
      "format": "tar.xz",
-     "rozmiar": 33053712,
-     "sha256": "42aa04922591ee5d4dbc7740d452621acf28508239daa512f5ee8c47ee224fdb",
-     "url": "https://nodejs.org/dist/v26.12.1/node-v26.12.1-linux-arm64.tar.xz",
+     "rozmiar": 33053848,
+     "sha256": "89e1853138db51e8b82d3e98ba9c0d3f2956a28e5e55ea1b7e12d25aae92d5dd",
+     "url": "https://nodejs.org/dist/v26.13.1/node-v26.13.1-linux-arm64.tar.xz",
      "usun_poziom": 1
     }
    }
   },
   "pandoc": {
-   "wersja": "3.12.1",
+   "wersja": "3.14",
    "kiedy": "instalacja",
    "licencja": "GPL-2.0-or-later (pandoc-types BSD-3-Clause, wbudowany Lua MIT)",
    "zrodlo": "pandoc",
@@ -915,9 +915,9 @@
       "."
      ],
      "format": "zip",
-     "rozmiar": 42154914,
-     "sha256": "6ef431cb20b2c24a0371fc19200dc49d452be54b1b5c9239f3462841ef53e587",
-     "url": "https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-windows-x86_64.zip",
+     "rozmiar": 43614099,
+     "sha256": "0144b96e8c7b023fd382ec5ef5bdc475e873f1019d6fa72502492df2c9a94a3b",
+     "url": "https://github.com/jgm/pandoc/releases/download/3.14/pandoc-3.14-windows-x86_64.zip",
      "usun_poziom": 1
     },
     "windows-arm64": {
@@ -925,9 +925,9 @@
       "."
      ],
      "format": "zip",
-     "rozmiar": 42154914,
-     "sha256": "6ef431cb20b2c24a0371fc19200dc49d452be54b1b5c9239f3462841ef53e587",
-     "url": "https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-windows-x86_64.zip",
+     "rozmiar": 43614099,
+     "sha256": "0144b96e8c7b023fd382ec5ef5bdc475e873f1019d6fa72502492df2c9a94a3b",
+     "url": "https://github.com/jgm/pandoc/releases/download/3.14/pandoc-3.14-windows-x86_64.zip",
      "usun_poziom": 1
     },
     "macos-arm64": {
@@ -935,9 +935,9 @@
       "bin"
      ],
      "format": "zip",
-     "rozmiar": 42313957,
-     "sha256": "c2146cf33a583f3ac93eccddf1bb662371d5cfcce1aad1c87ad860cca1435d46",
-     "url": "https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-arm64-macOS.zip",
+     "rozmiar": 43712865,
+     "sha256": "58d6593884fec9d4424b641b92503c316d9c36decb2891ff8d73ae74dd3b6304",
+     "url": "https://github.com/jgm/pandoc/releases/download/3.14/pandoc-3.14-arm64-macOS.zip",
      "usun_poziom": 1
     },
     "linux-x64": {
@@ -945,9 +945,9 @@
       "bin"
      ],
      "format": "tar.gz",
-     "rozmiar": 35363545,
-     "sha256": "d0c90410e90204c9ca83b8539fac5c7aed01fd537207e4585849f8abc5df20b8",
-     "url": "https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-linux-amd64.tar.gz",
+     "rozmiar": 36635549,
+     "sha256": "c5f4720cdefb3f7bdc5d07202ef579feef0d1370773c873804dd8fdaa8c4f1b8",
+     "url": "https://github.com/jgm/pandoc/releases/download/3.14/pandoc-3.14-linux-amd64.tar.gz",
      "usun_poziom": 1
     },
     "linux-arm64": {
@@ -955,15 +955,15 @@
       "bin"
      ],
      "format": "tar.gz",
-     "rozmiar": 37892300,
-     "sha256": "445d96fd08801fe636cab1158b4f017ee320ac3b7446328b4fe2f902117b19b9",
-     "url": "https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-linux-arm64.tar.gz",
+     "rozmiar": 39208196,
+     "sha256": "c692f3d78a415741bbbac4cdbbbe26fa7edca1f43d2301b982fbf4009cc8cf7f",
+     "url": "https://github.com/jgm/pandoc/releases/download/3.14/pandoc-3.14-linux-arm64.tar.gz",
      "usun_poziom": 1
     }
    }
   },
   "pixi": {
-   "wersja": "0.83.0",
+   "wersja": "0.84.2",
    "kiedy": "instalacja",
    "licencja": "BSD-3-Clause",
    "zrodlo": "pixi",
@@ -977,9 +977,9 @@
       "PIXI_NO_CONFIG": "1"
      },
      "format": "zip",
-     "rozmiar": 32758879,
-     "sha256": "77bed9f9d2795c94f9ab5744353892eb82bd3b1eaa09ecbbe7573e22ef70a2f4",
-     "url": "https://github.com/prefix-dev/pixi/releases/download/v0.83.0/pixi-x86_64-pc-windows-msvc.zip"
+     "rozmiar": 33542762,
+     "sha256": "aa4f02efac31566176d639007e65a36740aa7b56c22673c44ecfd2611e7a6b2c",
+     "url": "https://github.com/prefix-dev/pixi/releases/download/v0.84.2/pixi-x86_64-pc-windows-msvc.zip"
     },
     "windows-arm64": {
      "bin": [
@@ -990,9 +990,9 @@
       "PIXI_NO_CONFIG": "1"
      },
      "format": "zip",
-     "rozmiar": 35462210,
-     "sha256": "9ed3a4f7c1fdd2a36936e6d44b1492bfd47d84a57bfbd9be3ae4f338bd3cc92c",
-     "url": "https://github.com/prefix-dev/pixi/releases/download/v0.83.0/pixi-aarch64-pc-windows-msvc.zip"
+     "rozmiar": 36150850,
+     "sha256": "2c8d16e4f1a3600e587c0157ddb25f9a046b41da275e2125f0384e94841a45e6",
+     "url": "https://github.com/prefix-dev/pixi/releases/download/v0.84.2/pixi-aarch64-pc-windows-msvc.zip"
     },
     "macos-arm64": {
      "bin": [
@@ -1003,9 +1003,9 @@
       "PIXI_NO_CONFIG": "1"
      },
      "format": "tar.gz",
-     "rozmiar": 28789945,
-     "sha256": "b46066fbaf931284a3f4a61d68e0eb352295f4b3ce4330315a3de3dc5da5736c",
-     "url": "https://github.com/prefix-dev/pixi/releases/download/v0.83.0/pixi-aarch64-apple-darwin.tar.gz"
+     "rozmiar": 29577518,
+     "sha256": "039d4b48c7e17bc62a36faa2af1b13d0d187f5dd6e8fea17e0587302438df6e6",
+     "url": "https://github.com/prefix-dev/pixi/releases/download/v0.84.2/pixi-aarch64-apple-darwin.tar.gz"
     },
     "linux-x64": {
      "bin": [
@@ -1016,9 +1016,9 @@
       "PIXI_NO_CONFIG": "1"
      },
      "format": "tar.gz",
-     "rozmiar": 32008054,
-     "sha256": "064f371e692aaa3400ac581c89da2843c91437f20c2d9155395a5d0037f33551",
-     "url": "https://github.com/prefix-dev/pixi/releases/download/v0.83.0/pixi-x86_64-unknown-linux-musl.tar.gz"
+     "rozmiar": 32721589,
+     "sha256": "6d2a576bde0a7b26533a068fec0aea6e4ee21c36668efc1dc73fce90110906ae",
+     "url": "https://github.com/prefix-dev/pixi/releases/download/v0.84.2/pixi-x86_64-unknown-linux-musl.tar.gz"
     },
     "linux-arm64": {
      "bin": [
@@ -1029,9 +1029,9 @@
       "PIXI_NO_CONFIG": "1"
      },
      "format": "tar.gz",
-     "rozmiar": 35152082,
-     "sha256": "d08403d8f048626ec93ba7b7c56e3b747a5f3a95c4e6e0c815ceb264f5f0b9ce",
-     "url": "https://github.com/prefix-dev/pixi/releases/download/v0.83.0/pixi-aarch64-unknown-linux-musl.tar.gz"
+     "rozmiar": 35891547,
+     "sha256": "0957b6352d077bb3ffcce913f90b1e6cfbc6b98888a45d59ee2910e8c4811110",
+     "url": "https://github.com/prefix-dev/pixi/releases/download/v0.84.2/pixi-aarch64-unknown-linux-musl.tar.gz"
     }
    }
   },
@@ -1389,7 +1389,7 @@
    }
   },
   "uv": {
-   "wersja": "0.12.13",
+   "wersja": "0.13.8",
    "kiedy": "instalacja",
    "licencja": "Apache-2.0 OR MIT",
    "zrodlo": "uv",
@@ -1399,27 +1399,27 @@
       "."
      ],
      "format": "zip",
-     "rozmiar": 17612025,
-     "sha256": "a86c9dc7bad9b03f388583b7187c05fe9951c2e0d392217e8fd43d97787f6ec2",
-     "url": "https://github.com/astral-sh/uv/releases/download/0.12.13/uv-x86_64-pc-windows-msvc.zip"
+     "rozmiar": 15529884,
+     "sha256": "529e78a9cec6cd7e3e014f7ecd8bda0c113969d4ed0f2efeedb85c30943325b8",
+     "url": "https://github.com/astral-sh/uv/releases/download/0.13.8/uv-x86_64-pc-windows-msvc.zip"
     },
     "windows-arm64": {
      "bin": [
       "."
      ],
      "format": "zip",
-     "rozmiar": 18817671,
-     "sha256": "1efb2654b06e7063d4ac1fc9d49a9bda9a6704d82f035b589a2751a592f14151",
-     "url": "https://github.com/astral-sh/uv/releases/download/0.12.13/uv-aarch64-pc-windows-msvc.zip"
+     "rozmiar": 15590791,
+     "sha256": "59e6d919bed1f72035e622a7c930058f08a8931c4c78ceaf9f56e7fb74dd2c48",
+     "url": "https://github.com/astral-sh/uv/releases/download/0.13.8/uv-aarch64-pc-windows-msvc.zip"
     },
     "macos-arm64": {
      "bin": [
       "."
      ],
      "format": "tar.gz",
-     "rozmiar": 16674623,
-     "sha256": "7e6ddb9316acc00f2296c82ff4d99977870ee34b2f0ddcae9444d714db9364ed",
-     "url": "https://github.com/astral-sh/uv/releases/download/0.12.13/uv-aarch64-apple-darwin.tar.gz",
+     "rozmiar": 14375545,
+     "sha256": "6b71028a6b904f2ae3340ef52e595512de807d06c0a20eaef2f692581b246558",
+     "url": "https://github.com/astral-sh/uv/releases/download/0.13.8/uv-aarch64-apple-darwin.tar.gz",
      "usun_poziom": 1
     },
     "linux-x64": {
@@ -1427,9 +1427,9 @@
       "."
      ],
      "format": "tar.gz",
-     "rozmiar": 19391575,
-     "sha256": "745765a3b6e360ad76743599ae5c42e9278c7edf8bbff9fc76d05bf2623a04dd",
-     "url": "https://github.com/astral-sh/uv/releases/download/0.12.13/uv-x86_64-unknown-linux-gnu.tar.gz",
+     "rozmiar": 16855069,
+     "sha256": "5acfd9177cfecf0bf87578f059728215ccc884388988f55f7a65041b57387d91",
+     "url": "https://github.com/astral-sh/uv/releases/download/0.13.8/uv-x86_64-unknown-linux-gnu.tar.gz",
      "usun_poziom": 1
     },
     "linux-arm64": {
@@ -1437,9 +1437,9 @@
       "."
      ],
      "format": "tar.gz",
-     "rozmiar": 18581057,
-     "sha256": "2eaa5d94f5db7b3a1a092156b9420459e42ab0217d917fe74a876309cef9b5e9",
-     "url": "https://github.com/astral-sh/uv/releases/download/0.12.13/uv-aarch64-unknown-linux-gnu.tar.gz",
+     "rozmiar": 16065638,
+     "sha256": "74f2f5c6024d397481db228db8fc25eed420db192243f88438c118e7e013e585",
+     "url": "https://github.com/astral-sh/uv/releases/download/0.13.8/uv-aarch64-unknown-linux-gnu.tar.gz",
      "usun_poziom": 1
     }
    }

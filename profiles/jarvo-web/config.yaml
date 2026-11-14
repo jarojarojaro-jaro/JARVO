@@ -47,7 +47,7 @@ stt:
   language: pl
 
 # Inspo (Nutlope/inspo, MIT): katalog 832 prawdziwych stron (2320 podstron) jako inspiracja przed projektem,
-# skill inspiracje-stron. Pakiet z infra/node/package.json (inspo-mcp 0.1.16), lokalnie po stdio; hostowanego
+# skill inspiracje-stron. Pakiet z infra/node/package.json (inspo-mcp 0.2.0), lokalnie po stdio; hostowanego
 # endpointu nie używamy. Natywnie build.py wpisuje `node <node_modules>/inspo-mcp/inspo-mcp.mjs --stdio` (bez
 # nakładki z .bin, na Windows .cmd) i NODE_USE_SYSTEM_CA zamiast pliku certyfikatów z Debiana (NATYWNIE.md P06).
 # Katalog pobiera z CDN autorów przy starcie procesu (~2,3 MB, wektory w tle),
@@ -72,7 +72,7 @@ mcp_servers:
     # trust: full (domyślne), nie untrusted: Hermes 0.21.5 z SDK mcp 2.0 czyta adnotację jako readOnlyHint, a SDK ma
     # już read_only_hint, więc KAŻDE narzędzie serwera untrusted wygląda na zapisujące i czeka na zgodę, której w pracy
     # z kanbana nikt nie da. Bezpiecznie i tak: wersja przypięta w infra/node, w schemacie tylko 6 narzędzi z include,
-    # a wszystkie 15 ma w 0.1.16 readOnlyHint=true (sprawdzone w tools/list). Gdy Hermes to naprawi: wrócić do untrusted.
+    # a wszystkie ma readOnlyHint=true (sprawdzone w tools/list 0.1.16; 0.2.0: te same nazwy 6 narzędzi z include). Gdy Hermes to naprawi: wrócić do untrusted.
     # Decyzja właściciela 2026-10-05: Web ma mieć dostęp do Inspo bez pytania.
     trust: full
     tools:

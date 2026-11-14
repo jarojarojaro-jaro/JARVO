@@ -1,6 +1,6 @@
 # Mapa branż: polski klient → filtry Inspo
 
-Katalog Inspo 0.1.16 (`inspo-mcp`): 832 strony, 2320 podstron, 24 branże. Liczby policzone 2026-10-03 z danych katalogu
+Katalog Inspo (pomiar na 0.1.16) (`inspo-mcp`): 832 strony, 2320 podstron, 24 branże. Liczby policzone 2026-10-03 z danych katalogu
 (`packages/db/src/static-screens.json` w repo Nutlope/inspo, commit `0e1e636`): **w filtrze** = strony z tym tagiem
 `industry`, **trafne** = strony, których tytuł i opis naprawdę dotyczą tej branży (słowa kluczowe + przegląd).
 **Ocena:** dobre ≥ 30 trafnych, średnie 10–29, słabe < 10 (wtedy własna baza w skarbcu, SKILL.md).

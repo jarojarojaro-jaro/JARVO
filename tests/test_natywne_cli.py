@@ -43,6 +43,7 @@ PS1 = REPO / "jarvo" / "bootstrap" / "install.ps1"
 SH = REPO / "jarvo" / "bootstrap" / "install.sh"
 LOCK = json.loads((REPO / "vendor" / "natywne.lock.json").read_text(encoding="utf-8"))
 PIN = LOCK["hermes"]["commit"]
+UV = LOCK["narzedzia"]["uv"]["wersja"]                     # wersja uv z manifestu (doctor porównuje z nią)
 SHA_JARVA = "fb7e3ffa0e77b125f7f24457f8316026bbb3a07b"
 PLATFORMY_PS1 = ("windows-x64", "windows-arm64")
 PLATFORMY_SH = ("macos-arm64", "linux-x64", "linux-arm64")
@@ -1020,9 +1021,9 @@ def _zainstalowane(tmp_path, *, profile=("jarvo",)) -> sciezki.Uklad:
     (checkout / ".git" / "HEAD").write_text(PIN + "\n", encoding="utf-8")
     srodowisko.hermes_python(checkout).parent.mkdir(parents=True)
     srodowisko.hermes_python(checkout).write_bytes(b"")
-    uv_kat = u.program / "narzedzia" / "uv" / "0.12.13"
-    atrapy.program(uv_kat, "uv", "print('uv 0.12.13 (atrapa 2026-10-01)')\n")
-    (u.stan / "narzedzia.json").write_text(json.dumps({"uv": {"wersja": "0.12.13", "katalog": str(uv_kat),
+    uv_kat = u.program / "narzedzia" / "uv" / UV
+    atrapy.program(uv_kat, "uv", f"print('uv {UV} (atrapa 2026-10-01)')\n")
+    (u.stan / "narzedzia.json").write_text(json.dumps({"uv": {"wersja": UV, "katalog": str(uv_kat),
                                                                "bin": [str(uv_kat)], "env": {}}}), encoding="utf-8")
     (u.program / "current.json").write_text(json.dumps({"app": str(REPO), "hermes": str(checkout),
                                                         "wersja": "abc123def456"}), encoding="utf-8")
@@ -1039,7 +1040,7 @@ def test_status_z_nadzorcy_albo_z_pliku(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "serwis:     działa" in out and "brama: dziala, gotowa, PID 101" in out
     assert "panel: dziala, gotowa, PID 102, restarty 2" in out
-    assert "wersja:     abc123def456" in out and "uv 0.12.13" in out and "autostart:  wyłączony" in out
+    assert "wersja:     abc123def456" in out and f"uv {UV}" in out and "autostart:  wyłączony" in out
     assert "nie odpowiada" in out                                               # na porcie panelu nikt nie słucha
     nadzorca.dziala = False
     assert cli.main(["status"], otoczenie=ot) == 1
@@ -1336,7 +1337,7 @@ def test_doctor_na_zainstalowanym(tmp_path, capsys, monkeypatch):
     assert cli.main(["doctor", "--json"], otoczenie=ot) in (0, 1)
     d = {w["nazwa"]: w for w in json.loads(capsys.readouterr().out)["wyniki"]}
     assert d["korzeń"]["stan"] == "ok"
-    assert d["uv"]["stan"] == "ok" and "0.12.13" in d["uv"]["opis"]
+    assert d["uv"]["stan"] == "ok" and UV in d["uv"]["opis"]
     assert d["Hermes"]["stan"] == "ok" and PIN[:7] in d["Hermes"]["opis"]
     assert d[f"port {port} (panel)"]["stan"] == "ok"
     assert d["autostart"]["stan"] == "uwaga" and "jarvo autostart on" in d["autostart"]["rada"]

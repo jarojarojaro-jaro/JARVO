@@ -38,7 +38,7 @@ Punkty:
   8. głos bramy (V11) kodem Hermesa z instalacji: głosówka „Próba Żółć/brama/głosówka_październik.wav” przez
      HERMES_LOCAL_STT_COMMAND (shlex jak tools/transcription_local.py) → transkrypcja z „dzień”; odpowiedź głosem
      przez tts.providers.matcha z config.yaml (render_command_template i run_command_provider Hermesa) → WAV
-  9. pozostałe narzędzia npm floty z NODE_PATH wpisu node-floty: `lighthouse --version` (13.4.1), grafika HTML Studia
+  9. pozostałe narzędzia npm floty z NODE_PATH wpisu node-floty: `lighthouse --version` (13.6.0), grafika HTML Studia
      (render_html.cjs: playwright-core z NODE_PATH, chrome-headless-shell z instalacji, PNG w dokładnych wymiarach)
      i podgląd 3D warsztatu (cad.py `stan` = podgląd przez Node, `podglad` sześcianu GLB: Three.js z node-floty, bez
      silnika CAD i bez pobierania)
@@ -409,7 +409,7 @@ def punkt_npm_floty(p: Proba) -> dict:
         musi((nm / paczka / "package.json").is_file(), f"brak paczki {paczka} w {nm}")
     wynik: dict = {"node_modules": nm.as_posix()}
     lighthouse = p.uruchom([program_npm(wpis, "lighthouse"), "--version"], timeout=120).stdout.strip()
-    musi(lighthouse.splitlines()[-1:] == ["13.4.1"], f"lighthouse --version: {lighthouse[-120:]!r}")
+    musi(lighthouse.splitlines()[-1:] == ["13.6.0"], f"lighthouse --version: {lighthouse[-120:]!r}")
     wynik["lighthouse"] = lighthouse.splitlines()[-1]
     node = shutil.which("node", path=p.env.get("PATH"))
     musi(node, "brak node w PATH procesów Jarva (Node.js z manifestu)")

@@ -5,7 +5,7 @@
 name = "jarvo-tesseract"
 channels = ["https://conda.anaconda.org/conda-forge"]
 platforms = ["win-64", "osx-arm64", "linux-64", "linux-aarch64"]
-requires-pixi = ">=0.83.0,<0.84"
+requires-pixi = ">=0.84.2,<0.85"
 
 [dependencies]
 tesseract = "==5.5.3"
