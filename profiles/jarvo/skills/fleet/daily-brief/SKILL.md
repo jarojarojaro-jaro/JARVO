@@ -1,7 +1,7 @@
 ---
 name: daily-brief
 description: "Poranny brief: co w toku, co gotowe, jakie decyzje."
-version: 1.2.0
+version: 1.2.1
 author: Jarvo
 license: MIT
 metadata:
@@ -16,7 +16,7 @@ metadata:
 
 # Poranny brief
 
-Rutyna cron (dni robocze, rano). Skrypt `fleet_report.py --mode daily` dał Ci dane z ostatnich 24 h, `numer` briefu
+Rutyna cron (codziennie, rano). Skrypt `fleet_report.py --mode daily` dał Ci dane z ostatnich 24 h, `numer` briefu
 (`B-RRRR-MM-DD`) i `otwarte_decyzje` (pozycje z wcześniejszych briefów bez odpowiedzi właściciela, z numerem i liczbą dni).
 Pole `kopalnia` to materiał do jednej rzeczy wartej zbudowania (skill `kopalnia-pomyslow`). Jeśli nic się nie dzieje,
 nic nie czeka i właściciel nic nie pisał, skrypt nie budzi modelu. Po wysłaniu briefu skrypt `briefy.py` zapisuje go

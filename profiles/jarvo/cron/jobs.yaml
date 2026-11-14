@@ -24,7 +24,7 @@ jobs:
 
   - id: jarvo-daily-brief
     name: "Poranny brief"
-    schedule: "50 7 * * 1-5"
+    schedule: "50 7 * * *"          # codziennie: właściciel pracuje też w weekendy (decyzja 2026-11-14)
     script: brief_daily.py
     reasoning_effort: low
     skills: [daily-brief, decision-queue, kopalnia-pomyslow, prosty-polski]

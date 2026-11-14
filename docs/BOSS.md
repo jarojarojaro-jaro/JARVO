@@ -196,7 +196,7 @@ Przejęte z kontraktu firstmate i dostosowane do nas:
   w rozmowie (SVG → PNG narzędziem `schemat`, kilka sekund, bez kart) i dodaje 1–3 zdania. Film wyjaśniający to
   osobna karta dla Wideografa (wzorzec „Wyjaśnij mi filmem”).
 - **Kopalnia pomysłów** (skill `kopalnia-pomyslow`, decyzja 2026-11-14, wzór: idea-miner Garry'ego Tana): poranny
-  brief czyta Twoje wiadomości z 48 h (w poniedziałek 72 h), nowe notatki skarbca i skille floty, a na liście decyzji
+  brief czyta Twoje wiadomości z 48 h, nowe notatki skarbca i skille floty, a na liście decyzji
   daje najwyżej jedną pozycję „🛠 Zbudować …” z dowodem (co się powtórzyło, kiedy). „Ok” = Jarvo buduje i mierzy,
   „nie” = pomysł nie wraca. Bez powtórek w rozmowach: bez pozycji. Dane bez modelu: `kopalnia.py`.
 - **Skrzynka linków** (skill `skrzynka-linkow`): link z telefonu (wpis X, film YouTube, strona), także z komentarzem,

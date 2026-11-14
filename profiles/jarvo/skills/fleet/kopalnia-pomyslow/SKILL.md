@@ -1,7 +1,7 @@
 ---
 name: kopalnia-pomyslow
 description: "Rano jedna rzecz warta zbudowania z 48 h, z dowodem."
-version: 1.0.1
+version: 1.0.2
 author: Jarvo
 license: MIT
 metadata:
@@ -22,7 +22,7 @@ mówić albo robić ręcznie. Lekcje z błędów na kartach prowadzi osobno `fle
 właściciela.
 
 ## Dane (pole `kopalnia` w danych briefu, 0 tokenów)
-- `wiadomosci_wlasciciela`: jego wiadomości do Ciebie z okna (48 h, w poniedziałek 72 h), skrócone;
+- `wiadomosci_wlasciciela`: jego wiadomości do Ciebie z ostatnich 48 h, skrócone;
 - `notatki_zmienione`: notatki skarbca nowe albo zmienione w oknie (linki, które przysłał, decyzje, fakty);
 - `skille_floty`: skille każdego agenta (nazwa: opis); arsenał zasobów masz w instrukcji;
 - `pomysly_wczesniej`: Twoje pozycje „🛠” z briefów z 30 dni z odpowiedzią i tym, co zrobiono.

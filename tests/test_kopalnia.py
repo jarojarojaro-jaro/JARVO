@@ -47,11 +47,6 @@ def test_tylko_wiadomosci_wlasciciela_z_okna_i_bez_kluczy(tmp_path):
     assert all(x["skad"] == "telegram" for x in w)
 
 
-def test_poniedzialek_obejmuje_weekend():
-    assert kopalnia.okno_godzin(dt.datetime(2026, 11, 16, 7, 50)) == 72
-    assert kopalnia.okno_godzin(TERAZ) == 48
-
-
 def test_wczesniejsze_pomysly_z_odpowiedzia(tmp_path):
     (tmp_path / "briefy").mkdir()
     (tmp_path / "briefy" / "B-2026-11-16.md").write_text(
