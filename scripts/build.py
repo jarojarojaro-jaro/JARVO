@@ -381,6 +381,7 @@ from tools import approval_detection as d
 klucze = [opis for _, opis in d.DANGEROUS_PATTERNS]
 klucze += list(getattr(d, "_REMOVED_PATTERN_KEY_ALIASES", {}))      # python -c, python <<EOF (wzorce wykonania skryptu)
 klucze.append("shell command via -c/-lc flag")
+klucze.append("execute_code")      # bramka całego skryptu execute_code w bramie (tools/approval.py)
 klucze += [f"arbitrary program execution via {n} {f}" for n, fl in getattr(d, "_READ_TOOL_EXEC_FLAGS", {}).items()
            for f in sorted(fl)]
 print(json.dumps(list(dict.fromkeys(klucze))))

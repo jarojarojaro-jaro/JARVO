@@ -149,6 +149,10 @@ CHRONIONE_PLIKI = frozenset({".gitconfig", ".bashrc", ".zshrc", ".npmrc", ".mcp.
                              ".profile", ".zprofile", ".zshenv", ".zlogin", ".envrc"})
 PLIKI_INSTRUKCJI = frozenset({"agents.md", "claude.md", "soul.md", ".cursorrules"})
 NAZWA_KONFIGU = "config.yaml"
+# katalogi robocze Hermesa w każdym profilu i w hoście (brudnopis cache/scratch, HOME terminala, plany, piaskownice):
+# zwykła praca, nie „dane Jarva”. 14.11 właściciel klikał zgody na cache/scratch/gpu_audyt.py („no limits, tylko
+# security, nie normalna praca”); chronione zostają config, sekrety, bazy, wtyczki, skille, pamięć i kod Hermesa.
+ROBOCZE_PROFILU = ("cache", "home", "workspace", "plans", "sandboxes", "audio_cache", "image_cache")
 
 KONTEKSTY = {"kanban": "karta kanbana", "cron": "rutyna (cron)", "q": "jednorazowe zapytanie (-q)",
              "podagent": "podagent (delegate_task)", "webhook": "webhook", "brak": "sesja bez człowieka"}
@@ -156,7 +160,8 @@ OPISY_TRYBOW = {
     "pytaj": "pytam o każdy zapis, polecenie spoza listy tylko do odczytu, execute_code, procesy w tle i rutyny",
     "projekt": "zapisy i proste polecenia plikowe w folderze projektu bez pytania, poza nim pytam",
     "auto": "bez pytania: polecenia, zapisy, kod, procesy i rutyny; pytam tylko o chronione miejsca (config, .git, "
-            "pliki instrukcji, dane Jarva) i o płatność na telefonie; masowe kasowanie i klucze zawsze blokuję",
+            "pliki instrukcji, dane Jarva poza katalogami roboczymi) i o płatność na telefonie; masowe kasowanie i "
+            "klucze zawsze blokuję",
     "pelny": "Hermes sam zatwierdza prośby (YOLO, tylko ta sesja)",
 }
 
@@ -558,6 +563,9 @@ def _miejsca(tryb: str, bez_czl: Optional[str], yolo: bool) -> _Miejsca:
     m.misje = os.environ.get("JARVO_MISSIONS_DIR") or str(root / "jarvo" / "missions")
     wiedza_k, misje_k = _k_realny(m.wiedza), _k_realny(m.misje)
     m.robocze = [k for k in (_k_realny(root / "jarvo" / "workspaces"), wiedza_k, misje_k, m.karta_k) if k]
+    profile = [root, home, *(p for p in (root / "profiles").glob("*") if p.is_dir())] if (root / "profiles").is_dir() \
+        else [root, home]
+    m.robocze += [k for d in dict.fromkeys(profile) for n in ROBOCZE_PROFILU if (k := _k_realny(d / n))]
     # dane i kod Jarva: zawsze pytamy (stan zgód, sekrety, profile, wtyczki, kod Hermesa i tej wtyczki)
     m.dane = [k for k in (_k_realny(home), _k_realny(root), _k_realny(os.environ.get("JARVO_ROOT")),
                           _k_realny(os.environ.get("HERMES_SRC")), _k_realny(os.environ.get("JARVO_REPO")),

@@ -740,4 +740,4 @@ def test_zgody_z_gory_w_profilu_czatu():
 @pytest.mark.skipif(not HERMES_SRC, reason="ustaw JARVO_TEST_HERMES_SRC, aby czytać wzorce zgód Hermesa")
 def test_klucze_wzorcow_z_hermesa():
     klucze = build.klucze_wzorcow(Path(HERMES_SRC))
-    assert {"script execution via heredoc", "script execution via -e/-c flag", "recursive delete"} <= set(klucze)
+    assert {"script execution via heredoc", "script execution via -e/-c flag", "recursive delete", "execute_code"} <= set(klucze)

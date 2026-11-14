@@ -227,6 +227,21 @@ def test_tryb_auto_zostawia_strazniki(sr, monkeypatch):
     assert akcja(hak("mcp__phone__batch", steps=[{"cmd": "tap", "text": "Usuń konto", "confirm": True}])) == "approve"
 
 
+def test_tryb_auto_brudnopis_i_home_profilu_bez_prosb(sr, monkeypatch):
+    """14.11 12:52 i 12:56: właściciel klikał zgody na zapis cache/scratch/gpu_audyt.py w profilu Jarva („no limits,
+    tylko security, nie normalna praca”). Katalogi robocze Hermesa przechodzą; wtyczki, skille i sekrety dalej pytają."""
+    ustaw_tryb(monkeypatch, "auto")
+    for rel in ("cache/scratch/gpu_audyt.py", "home/notatki.txt", "workspace/a.md", "plans/plan.md"):
+        (sr.home / rel).parent.mkdir(parents=True, exist_ok=True)
+        assert hak("write_file", path=str(sr.home / rel), content="x") is None, rel
+    (sr.dane / "profiles" / "jarvo-web" / "cache").mkdir(parents=True)
+    assert hak("write_file", path=str(sr.dane / "profiles" / "jarvo-web" / "cache" / "x.py"), content="x") is None
+    assert hak("terminal", command=f"python3 a.py > '{sr.home / 'cache' / 'scratch' / 'wynik.json'}'") is None
+    for rel in ("plugins/jarvo-zgody/__init__.py", "skills/x/SKILL.md", ".env"):
+        (sr.home / rel).parent.mkdir(parents=True, exist_ok=True)
+        assert akcja(hak("write_file", path=str(sr.home / rel), content="x")) == "approve", rel
+
+
 def test_komunikat_prosby_z_nazwa_pliku_i_polecenia(sr):
     w = hak("write_file", path=str(sr.poza / "raport.txt"), content="x")
     assert "raport.txt" in w["message"] and "poza folderem projektu" in w["message"]

@@ -20,7 +20,8 @@ Zawsze, w każdym trybie:
 - zapis `config.yaml` Hermesa (profilu i katalogu danych) = blokada;
 - zgoda na `AGENTS.md`, `CLAUDE.md`, `SOUL.md` i chronione miejsca: `.git`, `.vscode`, `.idea`, `.claude`, `.hermes`,
   `.gitconfig`, `.bashrc`, `.zshrc`, `.npmrc`, `.mcp.json` (i inne pliki startowe powłoki), dane Jarva (`HERMES_HOME`,
-  `JARVO_ROOT`, kod Hermesa i wtyczki; poza `jarvo/workspaces`, skarbcem i misjami). W trybie pełnym o te miejsca nie
+  `JARVO_ROOT`, kod Hermesa i wtyczki; poza `jarvo/workspaces`, skarbcem, misjami i katalogami roboczymi Hermesa
+  w każdym profilu: `cache` (brudnopis `cache/scratch`), `home`, `workspace`, `plans`, `sandboxes`, `audio_cache`, `image_cache`). W trybie pełnym o te miejsca nie
   da się zapytać, więc są blokowane;
 - o polecenia, które Hermes sam uzna za niebezpieczne, pyta tylko Hermes (bez drugiego pytania). Pliki instrukcji
   przez `write_file` i `patch` też pyta sam Hermes (zawsze, także pod YOLO). Wyjątek: masowe kasowanie blokuje
