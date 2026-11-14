@@ -157,6 +157,7 @@ Pełna, zweryfikowana lista: [TOOLBOX.md](TOOLBOX.md). Instalacja na VPS: [VPS.m
 | Pamięć własna agenta | `memories/MEMORY.md` profilu | agent (np. „ta strona używa Tailwind”) |
 | Wiedza o Tobie | MVP: `knowledge/user/USER.md` (onboarding) + pamięć użytkownika Jarva; później wspólny provider (np. Honcho) | Jarvo (onboarding), agenci czytają |
 | Brand kity | `knowledge/brands/<marka>/` | `jarvo-web` / `jarvo-studio` |
+| Wiedza agenta biznesowego | tylko `brands/<marka>/`, `agenci/<profil>/`, `fleet/`, `inspiracje/` (pole `marka` we `fleet.yaml`, [FLEET.md](FLEET.md#agenci-biznesowi)) | agent (szkice do swojej marki), kompilacja |
 | Strony referencyjne branż (inspiracje) | `knowledge/inspiracje/strony/<branża>/` | `jarvo-web` (skill `inspiracje-stron`) |
 | Historia zleceń | kanban (`kanban.db`) | Jarvo i agenci |
 
@@ -164,8 +165,9 @@ Pełna, zweryfikowana lista: [TOOLBOX.md](TOOLBOX.md). Instalacja na VPS: [VPS.m
 
 ## 8. Rutyny
 
-`cron/jobs.yaml` → `cron/jobs.json` przy buildzie: zadania cykliczne agenta. Dziś ma je tylko Jarvo (patrol, poranny brief,
-przegląd tygodnia, świeżość wiedzy). Rutyny snajperów (np. monitoring Sherlocka) zakłada Jarvo po Twojej zgodzie.
+`cron/jobs.yaml` → `cron/jobs.json` przy buildzie: zadania cykliczne agenta. Dziś ma je Jarvo (patrol, poranny brief,
+przegląd tygodnia, świeżość wiedzy) i agent biznesowy `jarvo-jarodev` (`jarodev-dzien` z `paused: true`: włącza go
+właściciel po przydziale telefonu). Rutyny snajperów (np. monitoring Sherlocka) zakłada Jarvo po Twojej zgodzie.
 Z dystrybucji instalują się **wstrzymane**, a włączasz je świadomie.
 
 ---
@@ -277,6 +279,8 @@ Agent wchodzi do floty (`status: active` w `fleet.yaml`) dopiero, gdy:
   zadania; u Jarva scenariusze `routing`),
 - [ ] przeszedł tydzień dogfoodingu bez krytycznych problemów,
 - [ ] ma README i changelog w dystrybucji,
+- [ ] agent biznesowy (pole `marka` we `fleet.yaml`, slug `[a-z0-9-]+`, tylko specjalista, jedna marka = jeden agent)
+  ma evals na zgodę właściciela przed każdym wyjściem i na pytanie spoza swojej marki („to nie mój obszar”),
 - [ ] specjalista ma w `fleet.yaml` pole `oddaj_gdy` (z niego build generuje tabelę „komu oddać” u Ręki)
   i występuje we wzorcach misji Jarva (`dispatch-playbook/references/patterns.md`); bez tego walidator go nie przepuści.
 
@@ -290,7 +294,8 @@ profiles/jarvo-web/
 ├── SOUL.md                  # main prompt
 ├── config.yaml              # model (@@MODEL@@ z fleet.yaml), reasoning_effort, toolsety per platforma, zgody,
 │                            # terminal/przeglądarka/delegacja, mcp_servers (w repo tylko jarvo-web: inspo;
-│                            # phone dla jarvo dopisuje do instalacji `jarvo telefon on`),
+│                            # phone dla jarvo dopisuje do instalacji `jarvo telefon on`, dla agenta
+│                            # biznesowego `jarvo telefon przydziel`: jeden telefon),
 │                            # skills.write_approval: true przy creation_nudge_interval > 0 (poczekalnia, RSI.md §5)
 ├── .no-bundled-skills       # snajper i orkiestrator: bez katalogu skilli Hermesa (brak tylko u jarvo-reka)
 ├── toolbox.yaml             # narzędzia OSS (nasz manifest + healthchecki)
@@ -303,7 +308,7 @@ profiles/jarvo-web/
 ├── scripts/                 # automaty wołane jako $HERMES_HOME/scripts/<plik>
 ├── quality/
 │   └── rubric.md            # rubryka dla sędziego (kopiowana do sdlc-review Jarva)
-├── cron/jobs.yaml           # rutyny (tylko Jarvo); build → cron/jobs.json ze stałymi ID
+├── cron/jobs.yaml           # rutyny (Jarvo, agenci biznesowi); build → cron/jobs.json ze stałymi ID
 ├── README.md
 └── CHANGELOG.md
 evals/jarvo-web/scenarios.yaml   # scenariusze testowe (poza dystrybucją)
@@ -312,7 +317,7 @@ shared/protocol/kontrakt-zlecenia.md   # protokół (wklejany do SOUL)
 shared/calibration/<rodzina>.md        # kalibracja pod model (za protokołem)
 shared/security/deny.yaml              # wspólne zakazy → approvals.deny
 shared/skills/                         # wspólne skille własne (np. graf-kodu), przypisywane w locku
-fleet.yaml (wpis agenta)               # kind, handle (+ aliasy), rola (+ en.rola), model_tier, autonomy_max, telegram_topic, hq_room, pin_skills, description, oddaj_gdy
+fleet.yaml (wpis agenta)               # kind, handle (+ aliasy), rola (+ en.rola), model_tier, autonomy_max, telegram_topic, hq_room, pin_skills, description, oddaj_gdy; opcjonalnie komputer, marka (agent biznesowy)
 ```
 
 Build (`scripts/build.py`) dokłada do kopii profilu: `profile.yaml` (opis z `fleet.yaml` do routingu kanbana),

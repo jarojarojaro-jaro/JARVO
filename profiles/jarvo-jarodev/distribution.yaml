@@ -1,0 +1,9 @@
+name: jarvo-jarodev
+version: 0.1.0
+description: "Jarodev: klienci dla jarodev.pl z grup Facebooka, Map Google i szybkiego audytu stron; lejek i szkice za zgodą właściciela."
+author: "Jarvo fleet"
+license: MIT
+env_requires:
+  - name: OPENROUTER_API_KEY
+    description: "Klucz modelu dla Jarodev (osobny klucz z limitem kredytów)"
+    required: false

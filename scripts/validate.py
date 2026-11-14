@@ -113,10 +113,35 @@ def check_fleet(fleet: fl.Fleet, r: Report) -> None:
                     r.err(f"{a.name}: brak pola {jez} (krótka rola w aplikacji, docs/FLEET.md)")
                 elif len(rola.split()) > 8:
                     r.err(f"{a.name}: {jez} ma {len(rola.split())} słów (najwyżej 8)")
+    check_marki(fleet, r)
     check_uchwyty(fleet, r)
     for d in fl.PROFILES_DIR.iterdir():
         if d.is_dir() and not d.name.startswith("_") and d.name not in names:
             r.err(f"profiles/{d.name}: brak wpisu w fleet.yaml")
+
+
+MARKA_RE = re.compile(r"[a-z0-9-]+")
+
+
+def check_marki(fleet: fl.Fleet, r: Report) -> None:
+    """Agent biznesowy (`marka` we fleet.yaml, docs/FLEET.md „Agenci biznesowi”): slug = katalog brands/<marka>/
+    skarbca, więc [a-z0-9-]+; pole tylko u specjalisty (orkiestrator i generalista widzą całą wiedzę), jedna marka
+    = jeden agent (inaczej dwóch dzieliłoby szkice i orzeczenia marki)."""
+    raw = {e.get("name"): e for e in fleet.raw.get("agents", []) or [] if isinstance(e, dict)}
+    wlasciciel: dict[str, str] = {}
+    for a in fleet.agents:
+        if "marka" in (raw.get(a.name) or {}) and not isinstance(raw[a.name]["marka"], str):
+            r.err(f"{a.name}: marka musi być napisem (slug [a-z0-9-]+)")
+            continue
+        if not a.marka:
+            continue
+        if not MARKA_RE.fullmatch(a.marka):
+            r.err(f"{a.name}: marka {a.marka!r} musi pasować do [a-z0-9-]+ (katalog brands/<marka>/ w skarbcu)")
+        if a.kind != "specialist":
+            r.err(f"{a.name}: marka tylko u specjalisty (agent biznesowy); {a.kind} widzi całą wiedzę floty")
+        inny = wlasciciel.setdefault(a.marka, a.name)
+        if inny != a.name:
+            r.err(f"{a.name}: marka {a.marka!r} należy już do {inny} (jedna marka = jeden agent)")
 
 
 def check_uchwyty(fleet: fl.Fleet, r: Report) -> None:

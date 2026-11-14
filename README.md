@@ -15,6 +15,7 @@ pilnuje terminów i niczego nie zapomina. Z każdym specjalistą można też roz
 | 📈 `jarvo-ads` | specjalista Ads: Meta i Google Ads, kampanie, testy A/B/C, raporty; przygotowuje paczkę do publikacji, publikujesz Ty |
 | 🎯 `jarvo-lowca` | łowca leadów: sygnały zakupowe z KRS, CEIDG, przetargów i stron firm → ranking firm z „dlaczego teraz” i opublikowanym kontaktem; nic nie wysyła |
 | 📱 `jarvo-mobile` | twórca aplikacji: uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA), aplikacje Expo ze zgodnością ze sklepami od planu (także ze strony firmy), podgląd w HQ i w Expo Go, bramka jakości, pakiet do sklepów z listą 44 punktów, wydanie i poprawki OTA za zgodą, kontrola paczek npm; konta zawsze właściciela |
+| 🧲 `jarvo-jarodev` | agent biznesowy marki jarodev.pl (szkielet): klienci na strony, sklepy i automatyzacje z grup Facebooka (jeden przydzielony telefon), z Map Google (Komputer Jarva) i z szybkiego audytu stron firm; lejek i szkice, wysyłka i publikacja tylko za Twoim „tak”, firm z Map nie kontaktuje mailem ani telefonem; wie tylko o swojej marce |
 | 🦾 `jarvo-reka` | prawa ręka: generalista ze wszystkimi skillami, składa pakiety misji, dokumenty, prototypy |
 
 ## Próba: Jarvo jako paczka do zwykłego Hermesa
@@ -147,7 +148,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 ```
 Ty (Telegram DM / aplikacja Jarvo)
  └─ gateway Hermesa (multipleks profili) ─┬─ DM, wątek General → jarvo (Main Judge)
-                                          └─ wątki Sherlock / Web / Studio / Wideo / Ads / Łowca / Ręka → snajper
+                                          └─ wątki Sherlock / Web / Studio / Wideo / Ads / Łowca / Jarodev / Ręka → snajper
 jarvo: intake → MISSION.md → karty kanban (CEL, DoD, GRANICE) → snajperzy pracują w swoich katalogach
     → kanban_request_review → jarvo sędziuje (rubryka agenta) → poprawki albo akceptacja → raport efektów
 patrol co 30 min (skrypt bez modelu; budzi Jarva tylko przy anomaliach), brief rano, przegląd tygodnia

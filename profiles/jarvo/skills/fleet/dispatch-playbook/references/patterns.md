@@ -47,6 +47,15 @@ Decyzje przed rozdaniem tylko, gdy zmieniają wynik: platforma/format, długoś�
 3. opcjonalnie `jarvo-studio` / `wiadomosci` (parents: leady): szkic pierwszej wiadomości na firmę (`copy-pl`), z „dlaczego teraz”.
 Wysyłka = decyzja człowieka (A2); agent niczego nie wysyła. Monitoring (rutyna) tylko za zgodą użytkownika.
 
+## 7a. Klienci dla jarodev.pl (agent biznesowy)
+Prośba o klientów na strony, sklepy, automatyzacje **jarodev** (grupy FB, firmy bez strony z Map, audyt strony firmy pod
+ofertę, lejek): jedna karta `jarvo-jarodev` / `jarodev`. Leady B2B z rejestrów i przetargów dalej idą do `jarvo-lowca` (wzorzec 7).
+- KONTEKST: tylko to, co dotyczy jarodev (agent biznesowy wie wyłącznie o swojej marce; nie wklejaj mu innych projektów).
+- DoD: wpisy w lejku (`lejek.py`) ze źródłem i potrzebą, szkice do zgody w `decisions_needed`, raport z liczbami.
+- GRANICE: post, komentarz i wiadomość tylko z linią `ZGODA WŁAŚCICIELA` (kategoria `publikacja` albo `wysylka`,
+  cytat treści); firm z Map nie kontaktuje mailem, telefonem ani SMS-em (art. 398 PKE). Budowa strony po „tak” klienta
+  → `jarvo-web` (parents: karta jarodev). Grafika do posta → `jarvo-studio`.
+
 ## 8. Aplikacja mobilna („chcę aplikację”)
 1. `jarvo-mobile` / `decyzja`: `natywna-czy-pwa`: potrzeby (`potrzeby.yaml`) → rekomendacja (strona, PWA, karta w Wallet,
    platforma albo aplikacja w sklepach) z kosztami, ryzykiem odrzucenia (Apple 4.2) i następnym krokiem.

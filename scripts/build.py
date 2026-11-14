@@ -496,11 +496,24 @@ def render_tokens(text: str, tokens: dict[str, str]) -> str:
     return text
 
 
+def cel_watku(agent: fl.Agent, env: dict[str, str]) -> str:
+    """Wątek agenta w grupie Jarvo HQ jako cel dostarczania crona Hermesa: `telegram:<grupa>:<wątek>`, temat „general”
+    = sama grupa; pusto, gdy brak TELEGRAM_HQ_CHAT_ID albo TELEGRAM_TOPIC_<temat> (te same zmienne co trasy w build_host)."""
+    hq, temat = env.get("TELEGRAM_HQ_CHAT_ID", "").strip(), agent.telegram_topic.strip()
+    if not hq or not temat:
+        return ""
+    if temat.lower() == "general":
+        return f"telegram:{hq}"
+    watek = env.get(f"TELEGRAM_TOPIC_{temat.upper()}", "").strip()
+    return f"telegram:{hq}:{watek}" if watek else ""
+
+
 def base_tokens(fleet: fl.Fleet, agent: fl.Agent, runtime_build_dir: str, env: dict[str, str],
                 uklad: Uklad | None = None) -> dict[str, str]:
     """Tokeny @@…@@ profilu. Bez `uklad`: kontener z buildem pod `runtime_build_dir` (dawne wywołanie)."""
     shared = fleet.raw.get("shared", {})
     owner = env.get("TELEGRAM_OWNER_ID", "").strip()
+    owner_deliver = f"telegram:{owner}" if owner else "local"
     u = uklad or Uklad(build=runtime_build_dir)
     return {
         "PROVIDER": fleet.provider,
@@ -517,7 +530,9 @@ def base_tokens(fleet: fl.Fleet, agent: fl.Agent, runtime_build_dir: str, env: d
         "REVIEWER": fleet.reviewer,
         "ORCHESTRATOR": fleet.orchestrator,
         # cel dostarczania rutyn: DM właściciela (trasa DM → jarvo), albo lokalnie gdy brak
-        "OWNER_DELIVER": f"telegram:{owner}" if owner else "local",
+        "OWNER_DELIVER": owner_deliver,
+        # rutyny agentów (nie Jarva): ich wątek w grupie Jarvo HQ, a bez grupy albo tematu w .env jak OWNER_DELIVER
+        "AGENT_DELIVER": cel_watku(agent, env) or owner_deliver,
     }
 
 
@@ -901,7 +916,8 @@ def wiedza_fleet(fleet: fl.Fleet, profiles_out: Path) -> dict:
     """fleet.json dla skarbca wiedzy: hub każdego agenta (wiedza/wiedza.py zasiej) dostaje rolę, skille własne i wspólne
     (shared/skills) z opisami, powiązaniami i skryptami (każdy skill to węzeł grafu), nazwy skilli zewnętrznych
     (z dystrybucji po buildzie), skrypty, serwery MCP i ostatnie zmiany z CHANGELOG-u; `skrypty_repo` to skrypty wspólne (scripts/
-    i skryptów wspólnych skilli, shared/skills/*/scripts/), żeby lint skarbca odróżnił odwołanie do istniejącego skryptu od nieaktualnego."""
+    i skryptów wspólnych skilli, shared/skills/*/scripts/), żeby lint skarbca odróżnił odwołanie do istniejącego skryptu od nieaktualnego.
+    `marka` (tylko agent biznesowy) trafia przez zasiew do state/wiedza-agenci.json: zakres skarbca we wtyczce i kompilacji."""
     skrypty_repo = sorted({p.name for p in (fl.REPO_ROOT / "scripts").glob("*") if p.suffix in SKRYPT_EXT}
                           | {n for d in (fl.SHARED_DIR / "skills").glob("*") for n in skrypty_skilla(d)})
     agents = []
@@ -926,7 +942,7 @@ def wiedza_fleet(fleet: fl.Fleet, profiles_out: Path) -> dict:
                        "external_skills": [n for n in obce if n not in wspolne], "scripts": skrypty,
                        "mcp": serwery_mcp(a.dir / "config.yaml"), "env": zmienne_srodowiska(a.dir),
                        "tools": narzedzia_agenta(a.dir), "evals": evale_agenta(a.name),
-                       "changes_section": sekcja, "changes": zmiany})
+                       "changes_section": sekcja, "changes": zmiany, **({"marka": a.marka} if a.marka else {})})
     return {"orchestrator": fleet.orchestrator, "agents": agents, "repo_scripts": skrypty_repo, "zrodla": zrodla_zewnetrzne()}
 
 

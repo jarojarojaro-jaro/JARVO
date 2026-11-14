@@ -12,7 +12,7 @@ Tryby (wybór: `/tryb` w sesji > JARVO_TRYB_ZGOD z `jarvo chat --tryb` > plik st
            projektu (JARVO_FOLDER_PROJEKTU albo TERMINAL_CWD, czyli katalog startu czatu) albo w katalogu roboczym
            karty (HERMES_KANBAN_WORKSPACE); poza nimi approve;
   pelny    tylko na sesję: proces czatu z --yolo albo /yolo, wtedy Hermes sam zatwierdza prośby wtyczki. Wtyczka
-           nigdy nie włącza YOLO; pod YOLO blokuje w profilu jarvo narzędzia ekranu i telefonu (computer_use,
+           nigdy nie włącza YOLO; pod YOLO blokuje w każdym profilu narzędzia ekranu i telefonu (computer_use,
            komputer, mcp__phone__*), bo Komputer Jarva i telefon działałyby wtedy bez człowieka.
 Zawsze, w każdym trybie: zapis config.yaml Hermesa = block; zapis w kodzie floty (skills, plugins, hooks, scripts,
 SOUL.md i mcp.json profili i hosta, <JARVO_ROOT>/program i build, kod Hermesa, Jarva i tej wtyczki) = block z radą
@@ -125,7 +125,6 @@ TRYBY = ("pytaj", "projekt", "auto", "pelny")
 DOMYSLNY_TRYB = "auto"
 ZMIENNA_TRYBU = "JARVO_TRYB_ZGOD"          # ustawia `jarvo chat --tryb` (etap E4)
 ZMIENNA_FOLDERU = "JARVO_FOLDER_PROJEKTU"  # katalog startu czatu, gdy launcher go zna
-PROFIL_EKRANU = "jarvo"                    # agent z Komputerem Jarva i telefonem (fleet.yaml `komputer: true`)
 
 WINDOWS = os.name == "nt"
 MACOS = sys.platform == "darwin"
@@ -133,7 +132,9 @@ MACOS = sys.platform == "darwin"
 OBSLUGIWANE = frozenset({"write_file", "patch", "terminal", "execute_code", "process_manage", "cronjob_manage"})
 PROCESY_ODCZYT = frozenset({"list", "poll", "log", "wait"})      # process_manage: tylko podgląd
 RUTYNY_ODCZYT = frozenset({"list"})                              # cronjob_manage: tylko podgląd
-# pod YOLO w profilu jarvo: narzędzia ekranu i telefonu block (I08, docs/NATYWNIE.md F09), reszta jak w trybie pełnym
+# pod YOLO w każdym profilu: narzędzia ekranu i telefonu block (I08, docs/NATYWNIE.md F09), reszta jak w trybie pełnym;
+# ekran i telefon ma Jarvo i agent biznesowy z przydziałem (fleet.yaml `komputer: true`, `jarvo telefon przydziel`),
+# więc blokada nie zależy od profilu: nowy agent z ekranem albo telefonem nie wypada spod niej
 NARZEDZIA_EKRANU = frozenset({"computer_use", "komputer"})
 # telefon przez PHONEUSE (jarvo telefon on, serwer MCP `phone`): act i batch z confirm=true przechodzą bramkę
 # needs_confirm telefonu, więc confirm daje tylko „tak” człowieka dla tej jednej akcji
@@ -2906,8 +2907,7 @@ def _werdykt_z_rozmowy(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[st
 
 def _decyzja(tool_name: str, args: Dict[str, Any], task_id: str) -> Optional[Dict[str, str]]:
     yolo = _yolo()
-    if yolo and _profil(_hermes_home()) == PROFIL_EKRANU and (tool_name in NARZEDZIA_EKRANU
-                                                              or tool_name.startswith(f"mcp__{TELEFON}__")):
+    if yolo and (tool_name in NARZEDZIA_EKRANU or tool_name.startswith(f"mcp__{TELEFON}__")):
         return _blok("tryb pełny (YOLO) nie obejmuje ekranu ani telefonu: Komputer Jarva i telefon działałyby wtedy "
                      "bez ograniczeń. Uruchom czat bez --yolo albo wpisz /yolo, żeby je wyłączyć.")
     if tool_name in TELEFON_POTWIERDZENIA:
@@ -3104,7 +3104,7 @@ def polecenie_tryb(raw_args: str = "") -> str:
         if tryb == "pelny":
             return ("Tryb pełny działa tylko na tę sesję i włącza go Hermes: wpisz /yolo albo uruchom "
                     "`jarvo chat --tryb pelny`. Wtyczka sama go nie włącza. Nawet wtedy config.yaml i chronione "
-                    "miejsca zostają zablokowane, a w profilu jarvo także ekran i telefon.")
+                    "miejsca zostają zablokowane, a w każdym profilu także ekran i telefon.")
         return "Użycie: /tryb [auto|projekt|pytaj|pelny]. Bez argumentu pokazuję bieżący tryb."
     except Exception as e:
         logger.warning("jarvo-zgody: /tryb: %s", e)

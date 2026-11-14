@@ -294,6 +294,37 @@ agents:
     oddaj_gdy: "aplikacja mobilna: czy firmie potrzebna (natywna, PWA, Wallet), prototyp i budowa aplikacji, podgląd na telefonie, audyt aplikacji w App Store i Google Play"
     status: active
 
+  - name: jarvo-jarodev
+    kind: specialist
+    title: "Jarodev: klienci na strony i automatyzacje"
+    emoji: "🧲"
+    marka: jarodev           # agent biznesowy: w skarbcu widzi tylko brands/jarodev/ i swoje (docs/FLEET.md „Agenci biznesowi”)
+    description: >-
+      Agent biznesowy marki jarodev.pl (strony, sklepy, automatyzacje, aplikacje, wszystko, co da się zakodować):
+      zdobywa klientów. Czyta prośby o stronę w grupach na Facebooku na przydzielonym telefonie, szkicuje własne posty,
+      szuka na Mapach Google (Komputer Jarva) firm bez strony, robi szybki audyt publicznej strony firmy (łatwe
+      wygrane SEO i szybkości), prowadzi lejek i szkice ofert. Każdy post, komentarz i wiadomość tylko za „tak”
+      właściciela; firm z Map nie kontaktuje mailem, telefonem ani SMS-em. Wie tylko o marce jarodev.
+    model_tier: strong
+    delegation_tier: fast
+    autonomy_max: A1          # wysyłka i publikacja to A2: tylko za „tak” właściciela (ZGODA WŁAŚCICIELA w karcie)
+    telegram_topic: jarodev
+    pin_skills: [lejek]
+    hq_room: control    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
+    hq_label: "Biuro Jarodev"
+    hq_short: "Jarodev"
+    rola: "klienci dla jarodev.pl"
+    handle: jarodev
+    en:
+      title: "Jarodev: clients for websites and automations"
+      rola: "clients for jarodev.pl"
+      hq_label: "Jarodev office"
+      description: >-
+        Business agent of the jarodev.pl brand (websites, shops, automations, apps, anything that can be coded): wins clients. Reads requests for a website in Facebook groups on its assigned phone, drafts its own posts, finds businesses without a website on Google Maps (Jarvo's Computer), runs a quick audit of a company's public website (easy SEO and speed wins), keeps the pipeline and offer drafts. Every post, comment and message only after the owner's "yes"; businesses found on Maps are never contacted by e-mail, phone or SMS. Knows only the jarodev brand.
+    oddaj_gdy: "klienci dla jarodev.pl: prośby o stronę w grupach FB, firmy bez strony z Map, szybki audyt strony firmy pod ofertę, lejek i szkice ofert jarodev"
+    komputer: true      # Mapy Google na Komputerze Jarva (ekran jednej sesji naraz, docs/KOMPUTER.md §6); telefon: jarvo telefon przydziel
+    status: active
+
   - name: jarvo-reka
     kind: generalist
     title: "Prawa ręka"

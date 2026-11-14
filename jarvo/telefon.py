@@ -1,11 +1,13 @@
-"""Telefony właściciela dla floty przez serwer MCP PHONEUSE: `jarvo telefon on|off|status` (docs/MOBILE.md
-„Telefon przez PHONEUSE”).
+"""Telefony właściciela dla floty przez serwer MCP PHONEUSE: `jarvo telefon on|off|status|przydziel|zabierz`
+(docs/MOBILE.md „Telefon przez PHONEUSE”).
 
 PHONEUSE (osobne repo właściciela) steruje telefonem z Androidem przez usługę dostępności na telefonie; jego serwer
 MCP `tools/phone_mcp.py` (stdio) daje narzędzia list_phones, ping, screen, act, shot, wait i batch. Jarvo dopisuje
-go jako serwer `phone` w configu profilu `jarvo` ze wszystkimi narzędziami (Jarvo sam steruje telefonem), więc
-w Hermesie są `mcp__phone__screen`, `mcp__phone__act` itd. Bez `jarvo telefon on`
-w żadnym configu nie ma wpisu `phone` (repo go nie zawiera).
+go jako serwer `phone` w configu profilu `jarvo` ze wszystkimi narzędziami i telefonami (Jarvo sam steruje
+telefonem), więc w Hermesie są `mcp__phone__screen`, `mcp__phone__act` itd. Agent biznesowy (np. `jarvo-jarodev`)
+dostaje ten sam serwer tylko z przydziałem właściciela i tylko na JEDEN telefon: env PHONEUSE_ONLY=<telefon>
+(phone_mcp.py pokazuje wtedy tylko ten telefon i odrzuca każde wywołanie z inną nazwą). Bez `jarvo telefon on`
+w żadnym configu nie ma wpisu `phone` (repo go nie zawiera); bez przydziału agent biznesowy nie ma serwera phone.
 
   jarvo telefon on --phoneuse KATALOG [--python PYTHON] [--telefon NAZWA]
         serwer KATALOG/tools/phone_mcp.py, Python z MCP SDK 2.x (domyślnie ~/.phoneuse/mcp-venv, zakłada go
@@ -17,10 +19,16 @@ w żadnym configu nie ma wpisu `phone` (repo go nie zawiera).
         zasada restartu); następna instalacja albo `jarvo update` nie dopisze już wpisu
   jarvo telefon status [--json]
         stan, pliki, SDK, adb, wpis w zainstalowanych profilach
+  jarvo telefon przydziel PROFIL TELEFON
+        przydział jednego telefonu agentowi biznesowemu (`profile` w telefon.json, np. {"jarvo-jarodev": "fb"});
+        przy włączonym telefonie od razu wpis phone z PHONEUSE_ONLY w tym profilu (ta sama zasada restartu)
+  jarvo telefon zabierz PROFIL
+        zdejmuje przydział: mcp_servers.phone.enabled: false w tym profilu, następne jarvo update usuwa wpis
 
 Wpis przeżywa `jarvo update`: `flota.ustawienia_profili` bierze go z `klucze_profili` (jeden wzór, ten moduł), a
 install_fleet.py ustawia go w tym samym przebiegu co `profile update --force-config`. `env` serwera: ADB = adb
-z platform-tools Jarva (jarvo/android.py), żeby działał jeden serwer adb jednej wersji; PHONEUSE_PHONE = --telefon;
+z platform-tools Jarva (jarvo/android.py), żeby działał jeden serwer adb jednej wersji; PHONEUSE_PHONE = --telefon
+(u agenta z przydziałem: jego telefon, plus PHONEUSE_ONLY);
 HOME (Windows: USERPROFILE) = prawdziwy katalog domowy właściciela z chwili `on` (`dom` w telefon.json), bo PHONEUSE
 czyta `~/.phoneuse/` (token ciała, phones/*.env, stan) przez katalog domowy, a pracownik karty kanbana ma
 HOME=<dane>/home (karta t_15a3d38c 14.11: „No such file or directory: <dane>/home/.phoneuse/body_token”).
@@ -28,12 +36,12 @@ HOME=<dane>/home (karta t_15a3d38c 14.11: „No such file or directory: <dane>/h
 a na karcie kanbana (bez człowieka) zawsze by odpadło.
 Zgoda: `confirm=true` w act albo batch (bramka needs_confirm telefonu) przechodzi tylko przez prośbę o zgodę
 wtyczki jarvo-zgody albo z linią `ZGODA WŁAŚCICIELA` w karcie, a bez człowieka jest zablokowane. Pod YOLO wtyczka
-blokuje telefon w profilu jarvo, tak jak computer_use.
+blokuje telefon w każdym profilu, tak jak computer_use.
 
-`on` i `off` robi tylko właściciel w swoim terminalu: wywołane przez proces Jarva (agent, rutyna, karta kanbana;
-znaczniki jak w jarvo/rece.py) kończą się odmową. `status` może każdy. Restart bramy przerwałby pracę kart, więc przy
-karcie w toku (status `running` w kanban.db którejkolwiek tablicy, hq/plugin/prace.py karty_w_toku) zmiana czeka
-na następny restart bramy albo `jarvo update`.
+`on`, `off`, `przydziel` i `zabierz` robi tylko właściciel w swoim terminalu: wywołane przez proces Jarva (agent,
+rutyna, karta kanbana; znaczniki jak w jarvo/rece.py) kończą się odmową. `status` może każdy. Restart bramy
+przerwałby pracę kart, więc przy karcie w toku (status `running` w kanban.db którejkolwiek tablicy,
+hq/plugin/prace.py karty_w_toku) zmiana czeka na następny restart bramy albo `jarvo update`.
 
 YAML profili czyta i pisze Python Hermesa (ruamel, fleetlib.rt_yaml) z kodu aktywnej wersji Jarva; ten moduł działa
 na bibliotece standardowej.
@@ -63,6 +71,8 @@ STAN = "telefon.json"                                  # <stan>/telefon.json
 SERWER = "phone"                                       # nazwa serwera MCP: narzędzia mcp__phone__<narzędzie>
 KLUCZ = f"mcp_servers.{SERWER}"
 PROFILE = ("jarvo",)                                                     # profile z serwerem phone (wszystkie narzędzia)
+# agent biznesowy z przydziałem jednego telefonu (`jarvo telefon przydziel`); jarvo nie potrzebuje przydziału
+PROFIL_BIZNESOWY = re.compile(r"^jarvo-[a-z0-9][a-z0-9-]{0,47}$")
 DOM = "USERPROFILE" if WINDOWS else "HOME"                               # skąd os.path.expanduser bierze `~`
 SDK = "mcp>=2.3,<3"
 NAZWA_TELEFONU = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")         # jak NAME w phone_mcp.py
@@ -108,8 +118,23 @@ def _wynik(nazwa: str, stan: str, opis: str, rada: str = "") -> dict:
 # ---------------------------------------------------------------- stan i wzór wpisu
 
 def stan_telefonu(u: Uklad) -> dict:
-    """`<stan>/telefon.json`: {"wlaczony", "python", "serwer", "telefon", "dom", "kiedy"}."""
+    """`<stan>/telefon.json`: {"wlaczony", "python", "serwer", "telefon", "dom", "kiedy", "profile"}; `profile` =
+    przydziały {agent biznesowy: telefon}."""
     return srodowisko.wczytaj_json(u.stan / STAN)
+
+
+def przydzialy(st: dict) -> dict[str, str]:
+    """Poprawne przydziały z telefon.json (zły wpis, np. ręczna edycja, nie daje serwera nikomu)."""
+    surowe = st.get("profile")
+    if not isinstance(surowe, dict):
+        return {}
+    return {p: t for p, t in sorted(surowe.items()) if isinstance(p, str) and isinstance(t, str)
+            and PROFIL_BIZNESOWY.fullmatch(p) and NAZWA_TELEFONU.fullmatch(t)}
+
+
+def profile_z_telefonem(st: dict) -> list[str]:
+    """Profile, które mogą mieć serwer phone: jarvo (wszystkie telefony) i agenci z przydziałem."""
+    return [*PROFILE, *przydzialy(st)]
 
 
 def zapisz_stan(u: Uklad, dane: dict) -> None:
@@ -137,8 +162,9 @@ def adb_floty(u: Uklad) -> Path | None:
     return android.adb(u)
 
 
-def wpis_serwera(st: dict, adb: Path | str | None, dom: str | None) -> dict:
-    """Wpis `mcp_servers.phone` profilu (jeden wzór dla `jarvo telefon on` i flota.ustawienia_profili)."""
+def wpis_serwera(st: dict, adb: Path | str | None, dom: str | None, tylko: str | None = None) -> dict:
+    """Wpis `mcp_servers.phone` profilu (jeden wzór dla `jarvo telefon on` i flota.ustawienia_profili); `tylko` =
+    jedyny telefon agenta biznesowego (PHONEUSE_ONLY, ten sam telefon domyślny)."""
     wpis: dict = {"command": str(st["python"]), "args": [str(st["serwer"])],
                   # jak inspo (profiles/jarvo-web/config.yaml): bez readOnlyHint `untrusted` pytałby o każde wywołanie
                   "trust": "full",
@@ -150,7 +176,10 @@ def wpis_serwera(st: dict, adb: Path | str | None, dom: str | None) -> dict:
     env = {}
     if adb:
         env["ADB"] = str(adb)
-    if st.get("telefon"):
+    if tylko:
+        env["PHONEUSE_PHONE"] = tylko
+        env["PHONEUSE_ONLY"] = tylko       # phone_mcp.py: lista i każde wywołanie tylko z tym telefonem
+    elif st.get("telefon"):
         env["PHONEUSE_PHONE"] = str(st["telefon"])
     if dom:
         env[DOM] = dom                     # env wpisu wygrywa z HOME procesu (Hermes, mcp_tool_config._build_safe_env)
@@ -159,14 +188,19 @@ def wpis_serwera(st: dict, adb: Path | str | None, dom: str | None) -> dict:
     return wpis
 
 
-def klucze_profili(u: Uklad, agenci=PROFILE) -> dict[str, dict]:
-    """{agent: {"mcp_servers.phone": wpis}} dla install_fleet.py --ustawienia-profili, gdy telefon jest włączony;
-    wyłączony albo bez <stan>/telefon.json: {} (instalacja bez PHONEUSE bez zmian)."""
+def klucze_profili(u: Uklad, agenci=None) -> dict[str, dict]:
+    """{agent: {"mcp_servers.phone": wpis}} dla install_fleet.py --ustawienia-profili, gdy telefon jest włączony:
+    jarvo ze wszystkimi telefonami, agent biznesowy z przydziałem tylko ze swoim; `agenci` None = wszyscy.
+    Wyłączony albo bez <stan>/telefon.json: {} (instalacja bez PHONEUSE bez zmian)."""
     st = stan_telefonu(u)
     if not st.get("wlaczony") or not st.get("python") or not st.get("serwer"):
         return {}
-    wpis = wpis_serwera(st, adb_floty(u), dom_wlasciciela(u, st))
-    return {a: {KLUCZ: wpis} for a in PROFILE if a in agenci}
+    adb, dom = adb_floty(u), dom_wlasciciela(u, st)
+    wynik = {a: {KLUCZ: wpis_serwera(st, adb, dom)} for a in PROFILE if agenci is None or a in agenci}
+    for agent, tel in przydzialy(st).items():
+        if agenci is None or agent in agenci:
+            wynik[agent] = {KLUCZ: wpis_serwera(st, adb, dom, tylko=tel)}
+    return wynik
 
 
 # ---------------------------------------------------------------- sprawdzenia plików i SDK
@@ -229,13 +263,16 @@ def config_profilu(u: Uklad, agent: str) -> Path:
 
 
 def zainstalowane(u: Uklad) -> list[str]:
-    return [a for a in PROFILE if config_profilu(u, a).is_file()]
+    """Zainstalowane profile, które mogą mieć serwer phone (jarvo i agenci z przydziałem)."""
+    return [a for a in profile_z_telefonem(stan_telefonu(u)) if config_profilu(u, a).is_file()]
 
 
-def wpisy_w_profilach(u: Uklad) -> dict[str, dict | bool | None]:
-    """{agent: wpis phone (dict), False = profil bez wpisu, None = brak profilu}."""
-    wynik = json.loads(_konfig_hermesem(u, "czytaj", list(PROFILE)).strip().splitlines()[-1])
-    return {a: wynik.get(a) for a in PROFILE}
+def wpisy_w_profilach(u: Uklad, agenci: list[str] | None = None) -> dict[str, dict | bool | None]:
+    """{agent: wpis phone (dict), False = profil bez wpisu, None = brak profilu}; domyślnie jarvo i agenci
+    z przydziałem."""
+    agenci = list(agenci) if agenci is not None else profile_z_telefonem(stan_telefonu(u))
+    wynik = json.loads(_konfig_hermesem(u, "czytaj", agenci).strip().splitlines()[-1])
+    return {a: wynik.get(a) for a in agenci}
 
 
 def ustaw_w_profilach(u: Uklad, klucze: dict[str, dict]) -> list[str]:
@@ -340,6 +377,8 @@ def polecenie_on(u: Uklad, a, _reszta=(), _ot=None) -> int:
         return 1
     st = {"wlaczony": True, "python": str(python), "serwer": str(serwer), "telefon": a.telefon,
           "dom": dom_wlasciciela(u, {}), "kiedy": time.strftime("%Y-%m-%dT%H:%M:%S")}
+    if przydzialy(poprzedni := stan_telefonu(u)):
+        st["profile"] = poprzedni["profile"]            # przydziały agentów biznesowych przeżywają off/on
     zapisz_stan(u, st)
     print(f"Telefon dla floty włączony: serwer MCP {serwer} ({python}).")
     try:
@@ -349,12 +388,14 @@ def polecenie_on(u: Uklad, a, _reszta=(), _ot=None) -> int:
               "jarvo telefon on jeszcze raz.", file=sys.stderr)
         return 1
     if not zainstalowane(u):
-        print("Profil jarvo nie jest jeszcze zainstalowany: wpis dopisze instalacja floty.")
+        print("Profil jarvo (ani agent z przydziałem) nie jest jeszcze zainstalowany: wpis dopisze instalacja floty.")
         return 0
     if not zmienione:
-        print("Profil jarvo miał już ten wpis: bez restartu bramy.")
+        print("Profile miały już ten wpis: bez restartu bramy.")
         return 0
-    print(f"Wpis mcp_servers.{SERWER} w profilach: {', '.join(zmienione)} (wszystkie narzędzia).")
+    opis = {ag: f"tylko telefon {tel}" for ag, tel in przydzialy(st).items()}
+    print(f"Wpis mcp_servers.{SERWER} w profilach: "
+          + ", ".join(f"{ag} ({opis.get(ag, 'wszystkie telefony')})" for ag in zmienione) + ".")
     return restart_gdy_wolno(u, "telefon w profilach")
 
 
@@ -383,6 +424,79 @@ def polecenie_off(u: Uklad, a, _reszta=(), _ot=None) -> int:
     return restart_gdy_wolno(u, "wyłączenie telefonu")
 
 
+def _zly_profil(profil: str) -> bool:
+    if PROFIL_BIZNESOWY.fullmatch(profil):
+        return False
+    print(f"{profil!r}: przydział dostaje agent biznesowy floty (jarvo-<nazwa>, np. jarvo-jarodev); Jarvo ma "
+          "wszystkie telefony bez przydziału.", file=sys.stderr)
+    return True
+
+
+def polecenie_przydziel(u: Uklad, a, _reszta=(), _ot=None) -> int:
+    """Jeden telefon dla agenta biznesowego: serwer phone z PHONEUSE_ONLY tylko w jego profilu."""
+    if not przy_uzyciu.natywnie(u):
+        return _bez_instalacji(u)
+    if (kod := _odmowa_floty(u, "Telefon agentowi przydziela")) is not None:
+        return kod
+    if _zly_profil(a.profil):
+        return 2
+    if not NAZWA_TELEFONU.fullmatch(a.telefon):
+        print(f"{a.telefon!r}: nazwa telefonu z PHONEUSE (litery, cyfry, - i _; lista: list_phones).", file=sys.stderr)
+        return 2
+    st = stan_telefonu(u)
+    st["profile"] = {**przydzialy(st), a.profil: a.telefon}
+    zapisz_stan(u, st)
+    print(f"{a.profil}: przydzielony telefon {a.telefon} (serwer phone tylko z tym telefonem, PHONEUSE_ONLY).")
+    if not st.get("wlaczony"):
+        print("Telefon dla floty nie jest włączony: wpis w profilu dopisze jarvo telefon on --phoneuse KATALOG.")
+        return 0
+    if not config_profilu(u, a.profil).is_file():
+        print(f"Profil {a.profil} nie jest jeszcze zainstalowany: wpis dopisze instalacja floty.")
+        return 0
+    try:
+        zmienione = ustaw_w_profilach(u, klucze_profili(u, [a.profil]))
+    except BladTelefonu as e:
+        print(f"BŁĄD: przydział zapisany, ale profilu nie zmieniłem: {e}. Wpis dopisze następne jarvo update.",
+              file=sys.stderr)
+        return 1
+    if not zmienione:
+        print(f"Profil {a.profil} miał już ten wpis: bez restartu bramy.")
+        return 0
+    return restart_gdy_wolno(u, f"telefon {a.telefon} w profilu {a.profil}")
+
+
+def polecenie_zabierz(u: Uklad, a, _reszta=(), _ot=None) -> int:
+    """Bez przydziału agent biznesowy nie ma serwera phone: enabled: false teraz, jarvo update usuwa wpis."""
+    if not przy_uzyciu.natywnie(u):
+        return _bez_instalacji(u)
+    if (kod := _odmowa_floty(u, "Telefon agentowi zabiera")) is not None:
+        return kod
+    if _zly_profil(a.profil):
+        return 2
+    st = stan_telefonu(u)
+    zostaja = {ag: tel for ag, tel in przydzialy(st).items() if ag != a.profil}
+    if zostaja:
+        st["profile"] = zostaja
+    else:
+        st.pop("profile", None)
+    zapisz_stan(u, st)
+    print(f"{a.profil}: bez telefonu (przydział zdjęty).")
+    if not config_profilu(u, a.profil).is_file():
+        return 0
+    try:
+        if not isinstance(wpisy_w_profilach(u, [a.profil]).get(a.profil), dict):
+            return 0
+        zmienione = ustaw_w_profilach(u, {a.profil: {f"{KLUCZ}.enabled": False}})
+    except BladTelefonu as e:
+        print(f"BŁĄD: profilu nie zmieniłem: {e}. Serwer phone zniknie z niego przy następnym jarvo update.",
+              file=sys.stderr)
+        return 1
+    if not zmienione:
+        return 0
+    print(f"mcp_servers.{SERWER}.enabled: false w profilu {a.profil}.")
+    return restart_gdy_wolno(u, f"zabranie telefonu profilowi {a.profil}")
+
+
 def opis_stanu(u: Uklad) -> dict:
     st = stan_telefonu(u)
     python = Path(st["python"]) if st.get("python") else python_domyslny()
@@ -396,7 +510,7 @@ def opis_stanu(u: Uklad) -> dict:
     return {"wlaczony": bool(st.get("wlaczony")), "wlaczano": bool(st), "kiedy": st.get("kiedy"),
             "python": str(python), "python_jest": python.is_file(), "sdk": wersja, "blad_sdk": blad_sdk or None,
             "serwer": str(serwer) if serwer else None, "serwer_jest": bool(serwer and serwer.is_file()),
-            "telefon": st.get("telefon"), "adb": str(adb) if adb else None,
+            "telefon": st.get("telefon"), "adb": str(adb) if adb else None, "przydzialy": przydzialy(st),
             "profile": profile, "blad_profili": blad_profili}
 
 
@@ -407,7 +521,9 @@ def _opis_wpisu(w) -> str:
         return "bez serwera phone"
     stan = "wyłączony (enabled: false)" if w.get("enabled") is False else "włączony"
     include = (w.get("tools") or {}).get("include") if isinstance(w.get("tools"), dict) else None
-    return f"serwer phone {stan}, " + (f"narzędzia: {', '.join(include)}" if include else "wszystkie narzędzia")
+    tylko = (w.get("env") or {}).get("PHONEUSE_ONLY") if isinstance(w.get("env"), dict) else None
+    return (f"serwer phone {stan}, " + (f"narzędzia: {', '.join(include)}" if include else "wszystkie narzędzia")
+            + (f", tylko telefon {tylko}" if tylko else ""))
 
 
 def polecenie_status(u: Uklad, a, _reszta=(), _ot=None) -> int:
@@ -427,6 +543,8 @@ def polecenie_status(u: Uklad, a, _reszta=(), _ot=None) -> int:
                        "platform-tools Jarva nie ma (jarvo android on): PHONEUSE weźmie swój adb"))
     if s["telefon"]:
         print(f"  telefon domyślny: {s['telefon']}")
+    for agent, tel in s["przydzialy"].items():
+        print(f"  przydział: {agent} → {tel} (jarvo telefon zabierz {agent})")
     if s["profile"] is None:
         print(f"  profile: nie sprawdzę ({s['blad_profili']})")
     else:
@@ -450,7 +568,9 @@ def sprawdzenia(u: Uklad, ot=None) -> list[dict]:
     if blad:
         return [_wynik("telefon (PHONEUSE)", "uwaga", blad, "Potem jarvo telefon on --phoneuse <katalog PHONEUSE> "
                        "albo jarvo telefon off.")]
-    return [_wynik("telefon (PHONEUSE)", "ok", f"serwer MCP {SERWER} włączony: jarvo, wszystkie narzędzia")]
+    przydzialy_ = ", ".join(f"{ag} → {tel}" for ag, tel in przydzialy(st).items())
+    return [_wynik("telefon (PHONEUSE)", "ok", f"serwer MCP {SERWER} włączony: jarvo, wszystkie narzędzia"
+                   + (f"; przydziały: {przydzialy_}" if przydzialy_ else ""))]
 
 
 # ---------------------------------------------------------------- parser
@@ -458,8 +578,9 @@ def sprawdzenia(u: Uklad, ot=None) -> list[dict]:
 def dodaj_polecenia(sub) -> None:
     """Polecenie `telefon` w parserze jarvo (cli._parser); funkcje biorą (u, a, reszta, ot). Samo `jarvo telefon` =
     status."""
-    s = sub.add_parser("telefon", help="telefon przez PHONEUSE dla Jarva: status, on, off",
-                       description="Serwer MCP PHONEUSE (phone_mcp.py) w profilu jarvo (wszystkie narzędzia).")
+    s = sub.add_parser("telefon", help="telefon przez PHONEUSE: status, on, off, przydziel, zabierz",
+                       description="Serwer MCP PHONEUSE (phone_mcp.py) w profilu jarvo (wszystkie narzędzia) i w "
+                                   "profilach agentów biznesowych z przydziałem (jeden telefon).")
     s.set_defaults(funkcja=polecenie_status, json=False)
     t = s.add_subparsers(dest="telefon_polecenie", metavar="polecenie", title="polecenia")
     k = t.add_parser("status", help="stan, pliki, SDK, adb, wpis w profilach")
@@ -472,10 +593,17 @@ def dodaj_polecenia(sub) -> None:
     k.set_defaults(funkcja=polecenie_on)
     k = t.add_parser("off", help="wyłącz: enabled: false w profilach, restart bramy bez kart w toku")
     k.set_defaults(funkcja=polecenie_off)
+    k = t.add_parser("przydziel", help="jeden telefon dla agenta biznesowego (PHONEUSE_ONLY), restart bez kart w toku")
+    k.add_argument("profil", metavar="PROFIL", help="agent biznesowy, np. jarvo-jarodev")
+    k.add_argument("telefon", metavar="TELEFON", help="nazwa telefonu z PHONEUSE (list_phones)")
+    k.set_defaults(funkcja=polecenie_przydziel)
+    k = t.add_parser("zabierz", help="zdejmij przydział: enabled: false w profilu agenta")
+    k.add_argument("profil", metavar="PROFIL")
+    k.set_defaults(funkcja=polecenie_zabierz)
 
 
 def main(argv: list[str] | None = None) -> int:
-    """`python -I -X utf8 jarvo/telefon.py <status|on|off> …` bez reszty CLI."""
+    """`python -I -X utf8 jarvo/telefon.py <status|on|off|przydziel|zabierz> …` bez reszty CLI."""
     for strumien in (sys.stdout, sys.stderr):
         with contextlib.suppress(AttributeError, ValueError):
             strumien.reconfigure(errors="replace")

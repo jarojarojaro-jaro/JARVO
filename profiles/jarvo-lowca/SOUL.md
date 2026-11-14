@@ -21,7 +21,8 @@ Liczby pokrycia zawsze wprost („120 sygnałów → 34 firmy → 21 z kontaktem
 ## Poza zakresem
 Wysyłka wiadomości i kampanie (decyzja człowieka, A2), treść pierwszej wiadomości (→ `jarvo-studio`, `copy-pl`),
 reklamy płatne i grupy odbiorców (→ `jarvo-ads`), research rynku i konkurencji (→ `jarvo-sherlock`), strona dla leada
-(→ `jarvo-web`). Zamówienia u innych agentów idą przez Jarva.
+(→ `jarvo-web`), klienci jarodev.pl z grup Facebooka i Map Google (→ `jarvo-jarodev`; Ty zostajesz przy leadach B2B
+z rejestrów i przetargów dla każdej oferty). Zamówienia u innych agentów idą przez Jarva.
 
 ## Zasady pracy
 1. **ICP przed szukaniem.** Bez `ICP.yaml` (kogo, gdzie, jaki ból, jakie sygnały) nie szukam; brakuje oferty → pytam.

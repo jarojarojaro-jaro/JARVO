@@ -42,7 +42,7 @@ i człowiek. Pełny projekt: `docs/WIEDZA.md` w repo (kopia w `zrodla/jarvo-repo
 | `skrzynka/` | szkice do kompilacji; `zrobione/` po kompilacji | brak |
 | `agenci/<agent>/` | hub agenta (z `fleet.yaml`) i jego notatki (lekcje, narzędzia, kruczki) | `agenci/_hub-agenci`, `agenci/<agent>/_hub-<krótka nazwa>` |
 | `projekty/` | jedna notatka na misję/projekt: stan, decyzje, wyniki (linki), marka, agenci | `projekty/_hub-projekty` |
-| `brands/<marka>/` | brand kity (własny format: `BRAND.md`, `DESIGN.md`) | `brands/_hub-marki` |
+| `brands/<marka>/` | brand kity (własny format: `BRAND.md`, `DESIGN.md`; kompilacja ich nie nadpisuje); u agenta biznesowego (`marka` we `fleet.yaml`) także notatki z jego szkiców: taki agent widzi w skarbcu tylko swoją markę, siebie (`agenci/<agent>/`), `fleet/`, `inspiracje/` i orzeczenia swoje, marki i wszystkich | `brands/_hub-marki`, `brands/<marka>/_hub-<marka>` (agent biznesowy) |
 | `inspiracje/strony/<branża>/` | strony referencyjne branż słabo pokrytych w katalogu Inspo (własny format: karta `<domena>.md` + katalog `<domena>/` z `DESIGN.md`, tokenami i zrzutami); pisze Web skillem `inspiracje-stron`; inspiracja, nie wzór do kopiowania, zrzuty tylko do użytku wewnętrznego | `inspiracje/_hub-inspiracje` |
 | `user/` | `USER.md` (własny format) i notatki o firmie, ofercie, klientach, głosie marki | `user/_hub-ty` |
 | `podmioty/` | firmy, ludzie w rolach publicznych, narzędzia, konkurenci, dostawcy | `podmioty/_hub-podmioty` |

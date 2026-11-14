@@ -1,13 +1,13 @@
 # Flota Jarvo: specyfikacja agentów v1
 
-Flota: **Main Judge + 8 agentów**. Każdy agent to osobny profil Hermesa
+Flota: **Main Judge + 9 agentów** (w tym jeden agent biznesowy). Każdy agent to osobny profil Hermesa
 (osobna dystrybucja w `profiles/<nazwa>/`). Rejestr maszynowy jest w [`fleet.yaml`](../fleet.yaml).
 
 Każdy agent jest budowany według [PROFILE-SPEC.md](PROFILE-SPEC.md) (main prompt, workflowy,
 knowledge packi, skrypty, toolbox, granice, evals). Zweryfikowane narzędzia open-source
 każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.md).
 
-**Stan: wszystkie dziewięć profili jest zbudowanych.** Ten dokument to specyfikacja. Implementacja:
+**Stan: dziewięć pierwszych profili jest zbudowanych, a dziesiąty, agent biznesowy `jarvo-jarodev` to szkielet (MVP, 14.11.2026).** Ten dokument to specyfikacja. Implementacja:
 
 | Agent | Main prompt | Workflowy własne | Skille zewnętrzne | Skrypty | Evals |
 |---|---|---|---|---|---|
@@ -19,6 +19,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [11 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 8 (marketingskills, wspólne `hooki`, `konwersja-plikow` i `odczyt-ekranu`) | ads, planer, eksperyment, eksport, paczka | [14](../evals/jarvo-ads/scenarios.yaml) |
 | `jarvo-lowca` | [SOUL](../profiles/jarvo-lowca/SOUL.md) | [7 w `skills/lowca/`](../profiles/jarvo-lowca/skills/lowca) | 3 (wspólne `konwersja-plikow`, `odczyt-ekranu` i `ostrozna-przegladarka`) | krs, ceidg, przetargi, strona, leady, zrodlo | [16](../evals/jarvo-lowca/scenarios.yaml) |
 | `jarvo-mobile` | [SOUL](../profiles/jarvo-mobile/SOUL.md) | [10 w `skills/mobile/`](../profiles/jarvo-mobile/skills/mobile) | 23 (Expo, React Native, ASO; wspólne `konwersja-plikow`, `odczyt-ekranu` i `warsztat-3d`; `vendor/skills.lock.yaml`) | audyt_mobilny, decyzja, zgodnosc, aplikacja, ikony, zrzuty, wrogie, urzadzenie, ios_ci, bramka, sklep_check, pakiet, kadry, wydanie, odrzucenie, ze_strony, utrzymanie, paczki (+ mobile_lib, szablon `expo-jarvo`, workflow iOS) | [34](../evals/jarvo-mobile/scenarios.yaml) |
+| `jarvo-jarodev` | [SOUL](../profiles/jarvo-jarodev/SOUL.md) | [7 w `skills/jarodev/`](../profiles/jarvo-jarodev/skills/jarodev) | 2 (wspólne `konwersja-plikow` i `odczyt-ekranu`) | lejek, poranek, wygrane (+ wzór `zrodla.yaml`; audyt przez `seo_check.py` Weba); serwer `phone` z jednym telefonem (`jarvo telefon przydziel`), Komputer Jarva (`komputer: true`) | [12](../evals/jarvo-jarodev/scenarios.yaml) |
 | `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 6 (skill-creator, `writing-for-agents`, `graf-kodu`, `transkrypcja-filmu`, `konwersja-plikow`, `odczyt-ekranu`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [15](../evals/jarvo-reka/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
@@ -38,6 +39,7 @@ Legenda przy skillach:
 | `jarvo-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy | snajper | A1 (renderuje; publikacja i zakupy = A2) |
 | `jarvo-lowca` | Łowca leadów: firmy z sygnałem zakupowym i opublikowanym kontaktem | snajper | A1 (szuka i ocenia; wysyłka = decyzja człowieka) |
 | `jarvo-mobile` | Twórca aplikacji: natywna czy PWA, audyt mobilny, aplikacje Expo do sklepów | snajper | A1 (audyty i rekomendacje; konta sklepów i wysyłka = A2) |
+| `jarvo-jarodev` | Agent biznesowy jarodev.pl: klienci z grup FB, Map Google i szybkiego audytu stron | snajper (agent biznesowy, `marka: jarodev`) | A1 (czyta, szkicuje, prowadzi lejek; post, komentarz i wiadomość = A2 za „tak” właściciela; mail, telefon i SMS do firm z Map nigdy) |
 | `jarvo-reka` | Prawa ręka: generalista, który ogarnia wszystko | generalista | A1 (e-maile i akcje zewnętrzne = A2) |
 
 ---
@@ -61,6 +63,7 @@ bez polskich znaków (`@łowca` = `@lowca`) i opcjonalne pole `aliasy` (lista). 
 | `jarvo-ads` | `@ads` | reklamy Meta i Google |
 | `jarvo-lowca` | `@lowca` | nowi klienci z KRS i CEIDG |
 | `jarvo-mobile` | `@mobile` | aplikacje na telefon |
+| `jarvo-jarodev` | `@jarodev` | klienci dla jarodev.pl |
 | `jarvo-reka` | `@reka` | dokumenty i szybkie sprawy |
 
 Pole `rola` (i `en.rola`) to krótka rola agenta, najwyżej 8 słów: aplikacja pokazuje ją w Ustawieniach › Zespół
@@ -88,6 +91,28 @@ Wszyscy znają też **Ciebie**:
   agentach i narzędziach, orzeczenia z Twoich korekt, wyciągi z rozmów i kart. Wtyczka `jarvo-wiedza` (dostawca pamięci
   Hermesa u każdego agenta) daje przypomnienia przed turą i narzędzia `wiedza_szukaj`, `wiedza_czytaj`, `wiedza_zapisz`,
   `wiedza_orzeczenie`; agenci zgłaszają szkice, notatki pisze kompilacja.
+
+---
+
+## Agenci biznesowi
+
+Agent biznesowy to specjalista jednej firmy właściciela („odnoga Jarva”, decyzja 14.11.2026): ma we `fleet.yaml`
+pole `marka: <slug>` (slug = katalog `brands/<slug>/` w skarbcu, `[a-z0-9-]+`, jedna marka = jeden agent; walidator
+pilnuje). Wie **tylko** o swojej firmie: w skarbcu widzi `brands/<marka>/`, swoje notatki (`agenci/<profil>/`),
+wspólne lekcje floty (`fleet/`) i `inspiracje/`, z orzeczeń swoje, swojej marki i wspólne; reszty (projekty,
+rozmowy, Ty, inne marki, inni agenci) nie znajdzie w wyszukiwaniu, nie przeczyta i nie dostanie w przypomnieniach,
+a jego szkice trafiają do jego marki ([WIEDZA.md](WIEDZA.md)). To podział dla skupienia, nie szyfr: wszyscy agenci
+działają jako ten sam użytkownik systemu. Jarvo i Claude (operator) wiedzą wszystko. Agenci bez `marka` widzą całość.
+
+Agent biznesowy może mieć **jeden przydzielony telefon** (`jarvo telefon przydziel <profil> <telefon>`, serwer
+`phone` z `PHONEUSE_ONLY`: widzi tylko ten telefon, [MOBILE.md](MOBILE.md)) i Komputer Jarva (`komputer: true`,
+ekran wspólny z Jarvem, jedna sesja steruje naraz, [KOMPUTER.md](KOMPUTER.md) §6). Wysyła i publikuje tylko za „tak”
+właściciela; pod YOLO ekran i telefon są zablokowane w każdym profilu. Rozmowa: wątek agenta w grupie Jarvo HQ, DM
+z dopiskiem skrótu (np. „dev”) albo `@uchwyt` w aplikacji.
+
+| Agent | Marka | Firma |
+|---|---|---|
+| `jarvo-jarodev` | `jarodev` | jarodev.pl: strony, sklepy, automatyzacje, aplikacje |
 
 ---
 
@@ -125,6 +150,7 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 | Leady, nowi klienci, „komu sprzedać”, przetargi do wzięcia, nowe firmy w branży, kontakt do firm | `jarvo-lowca` |
 | Aplikacja mobilna, „czy potrzebujemy aplikacji”, PWA czy natywna, audyt aplikacji w App Store i Google Play, aplikacja z naszej strony, aktualizacja albo poprawka aplikacji w sklepie | `jarvo-mobile` |
 | Zadanie na ekranie albo telefonie: kliknij w panelu albo programie w przeglądarce, wypełnij formularz, przejdź stronę jak klient, przepisz dane z ekranu, załóż konto, zaloguj się, gdzie nie ma API | `jarvo` sam (wymaga włączonego Komputera: `jarvo komputer on`; telefon: `jarvo telefon on`); dłuższe niż kilka minut: karta kanbana przypisana do siebie (`assignee: jarvo`), żeby czat był wolny |
+| Klienci dla jarodev.pl: prośby o stronę w grupach FB, firmy bez strony z Map, szybki audyt strony firmy pod ofertę, lejek i szkice ofert jarodev | `jarvo-jarodev` |
 | Szybkie sprawy, sklejanie wyników, prototyp, „ogarnij to”, zadanie bez oczywistego snajpera | `jarvo-reka` |
 | Duże cele (np. „wypuść nowy produkt”) | rozbicie na kilka kart, np. sherlock → web + studio → reka (spięcie) |
 
@@ -486,6 +512,24 @@ i `templates/ci/jarvo-ios.yml`.
 
 ---
 
+## `jarvo-jarodev`: Jarodev (agent biznesowy jarodev.pl)
+
+Zdobywa klientów dla jarodev.pl (strony, sklepy, automatyzacje, aplikacje, „wszystko, co da się zakodować”). Czyta
+grupy na Facebooku z listy właściciela na jednym przydzielonym telefonie i wyłapuje ludzi, którzy sami szukają
+wykonawcy; szkicuje własne posty jarodev; szuka na Mapach Google (Komputer Jarva, ludzkim tempem, bez Places API)
+firm bez strony; robi szybki audyt publicznej strony firmy (3 łatwe wygrane z dowodem: `seo_check.py` Weba i jeden
+Lighthouse); prowadzi lejek (`lejek.py`: odsiew duplikatów, statusy nowy → szkic → zaakceptowany → wysłany → rozmowa
+→ klient/odpada, zapis zgody, limity dnia, retencja RODO 90 dni). Każdy post, komentarz i wiadomość tylko za „tak”
+właściciela; firm z Map i audytu nie kontaktuje mailem, telefonem, SMS-em ani formularzem (art. 398 PKE: `lejek.py`
+odmawia takiego kanału). Grupy FB i portale podaje właściciel w `zrodla.yaml`. Rutyna `jarodev-dzien` (wstrzymana do
+włączenia) rano zakłada kartę dnia i pisze w wątku agenta. Granice i prawo: [LEADY.md](LEADY.md#agent-biznesowy-jarodev).
+
+**Skille:** [T] `lejek` (+ prawo: PKE, RODO, Facebook, Mapy), `fb-grupy`, [A2] `fb-posty`, [T] `mapy-firmy`,
+`szybkie-wygrane`, [A2] `oferta-szkic` (+ oferta jarodev i tabela kanałów), [T] `raport-dnia`; wspólne
+`konwersja-plikow` i `odczyt-ekranu`. Skrypty: `lejek.py`, `poranek.py`, `wygrane.py`, wzór `zrodla.wzor.yaml`.
+
+---
+
 ## Kolejność budowy (historycznie, faza 1)
 
 1. `jarvo` + `jarvo-sherlock`: najprostsze narzędzia, dobre do przetestowania pętli sędziego.
@@ -496,6 +540,7 @@ i `templates/ci/jarvo-ios.yml`.
 6. `jarvo-ads`: bez kluczy, kampanie jako paczka do publikacji przez właściciela; Skarbiec (sejf tokenów) odłożony ([ADS.md](ADS.md)).
 7. `jarvo-lowca` i `jarvo-mobile`: specjaliści z własnymi skryptami do źródeł publicznych ([LEADY.md](LEADY.md), [MOBILE.md](MOBILE.md)).
 8. Ekran (computer use na Komputerze Jarva, po kanale z twardymi zasadami, etapy K0–K3 w [KOMPUTER.md](KOMPUTER.md)): najpierw osobny agent, od 2026-11-14 robi to sam `jarvo`.
+9. `jarvo-jarodev`: pierwszy agent biznesowy (szkielet 14.11.2026): wiedza tylko o swojej marce, jeden telefon, Komputer Jarva.
 
 Pierwszy wspólny test floty: **„wypuść landing nowego produktu”**. Sherlock robi research
 i słowa kluczowe, web buduje stronę, studio przygotowuje grafiki i posty, ręka składa

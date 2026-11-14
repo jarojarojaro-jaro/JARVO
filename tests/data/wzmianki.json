@@ -76,6 +76,15 @@
    "nazwa": "Aplikacje"
   },
   {
+   "name": "jarvo-jarodev",
+   "handle": "jarodev",
+   "aliasy": [
+    "jarodev",
+    "jarvo-jarodev"
+   ],
+   "nazwa": "Jarodev"
+  },
+  {
    "name": "jarvo-reka",
    "handle": "reka",
    "aliasy": [

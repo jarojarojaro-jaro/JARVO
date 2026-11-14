@@ -28,7 +28,7 @@ ocr = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ocr)
 
 AGENCI = ("jarvo", "jarvo-sherlock", "jarvo-web", "jarvo-studio", "jarvo-wideo", "jarvo-ads", "jarvo-reka",
-          "jarvo-mobile", "jarvo-lowca")
+          "jarvo-mobile", "jarvo-lowca", "jarvo-jarodev")
 
 
 def _linia(tekst, ramka=(100, 10, 400, 40), pewnosc=0.95):

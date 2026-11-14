@@ -175,7 +175,7 @@ def _parser() -> argparse.ArgumentParser:
     wiedza_cli.dodaj_polecenia(sub)
     from . import android                   # telefon testowy Twórcy aplikacji (etap E11): jarvo android status|on|off|ekran
     android.dodaj_polecenia(sub)
-    from . import telefon                   # telefon przez PHONEUSE (serwer MCP phone): jarvo telefon status|on|off
+    from . import telefon                   # telefon przez PHONEUSE (serwer MCP phone): jarvo telefon status|on|off|przydziel
     telefon.dodaj_polecenia(sub)
 
     s = sub.add_parser("komputer", add_help=False, help="Komputer Jarva: przeglądarka Jarva (on, off, status, …) "

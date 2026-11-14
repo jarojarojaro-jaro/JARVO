@@ -16,6 +16,8 @@ profilu ma `memory.provider: jarvo-wiedza`). Co robi:
   - narzędzia tylko dla agentów z SCHEMAT_DLA (Jarvo, rozmowa z właścicielem, bez terminala): `schemat` (schemat.py,
     SVG → PNG w rozmowie) i `pobierz_link` (linki.py: link od właściciela → treść do analizy, skill `skrzynka-linkow`).
     Hermes ładuje tę wtyczkę jako dostawcę pamięci (wyłączną), więc narzędzia idą przez get_tool_schemas, nie register_tool.
+Agent biznesowy (`marka` z state/wiedza-agenci.json, docs/WIEDZA.md §4a) widzi tylko swój zakres skarbca (wiedza.zakres_marki):
+szukanie, czytanie, przypomnienia, orzeczenia i strażnik narzędzi plików; jego szkice niosą `marka`.
 Agenci nie piszą notatek: notatki, INDEX i huby pisze kompilacja (etap 4) i `wiedza.py`.
 """
 from __future__ import annotations
@@ -167,6 +169,26 @@ def _sciezki(hermes_home: str) -> tuple[Path, Path]:
     root = _korzen(hermes_home)
     return (Path(os.environ.get("JARVO_KNOWLEDGE_DIR") or root / "jarvo" / "knowledge"),
             Path(os.environ.get("JARVO_STATE_DIR") or root / "jarvo" / "state"))
+
+
+def _meta_agentow(stan: Path) -> Dict[str, Any]:
+    """state/wiedza-agenci.json z zasiewu (hub, orzeczenia, krótka nazwa, `marka` agenta biznesowego); {} bez pliku."""
+    try:
+        meta = json.loads((stan / "wiedza-agenci.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return meta if isinstance(meta, dict) else {}
+
+
+def _marka(meta: Dict[str, Any], agent: str) -> str:
+    """Marka agenta biznesowego (fleet.yaml `marka`, docs/WIEDZA.md „Agenci biznesowi”); pusto = agent widzi cały skarbiec."""
+    m = (meta.get(agent) or {}).get("marka") if isinstance(meta.get(agent), dict) else ""
+    return m if isinstance(m, str) and _lib().MARKA_RE.fullmatch(m) else ""
+
+
+def _poza_zakresem(rel: str, marka: str, zakres: tuple) -> str:
+    return (f"`{rel}` jest poza Twoim zakresem skarbca (agent marki `{marka}`). Widzisz tylko: "
+            + ", ".join(f"`{z}`" for z in zakres) + ". Wiedzę bierz przez wiedza_szukaj i wiedza_czytaj w tym zakresie.")
 
 
 def _bez_ogonkow(s: str) -> str:
@@ -373,10 +395,7 @@ class SkarbiecProvider(MemoryProvider):
         self._platforma = str(kwargs.get("platform") or "")
         self._session_id = session_id or ""
         self._skarbiec, self._stan = _sciezki(self._home)
-        try:
-            self._meta = json.loads((self._stan / "wiedza-agenci.json").read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            self._meta = {}
+        self._meta = _meta_agentow(self._stan)
         if self._kontekst == "primary" and self._watek is None and CISZA_S > 0:
             try:
                 self._watek = spawn_context_thread(self._petla_ciszy, name="jarvo-wiedza-cisza")
@@ -402,15 +421,34 @@ class SkarbiecProvider(MemoryProvider):
     def _moje_orzeczenia(self) -> str:
         return (self._meta.get(self._agent) or {}).get("orzeczenia") or f"orzeczenia/{self._agent}"
 
+    def _moja_marka(self) -> str:
+        return _marka(self._meta, self._agent)
+
+    def _zakres(self) -> tuple:
+        """Zakres skarbca agenta biznesowego (wiedza.zakres_marki); pusta krotka = cały skarbiec (agent bez marki)."""
+        return _lib().zakres_marki(self._moja_marka(), self._agent, self._moje_orzeczenia())
+
     # ---- prompt i przypomnienia
     def system_prompt_block(self) -> str:
         sk = self._sk()
         if sk is None:
             return ""
+        marka = self._moja_marka()
+        if marka:
+            naglowek = (
+                f"# Skarbiec wiedzy (jarvo-wiedza): zakres marki `{marka}`\n"
+                f"Jesteś agentem marki `{marka}`. Ze skarbca floty widzisz tylko swój zakres: "
+                + ", ".join(f"`{z}`" for z in self._zakres()) + ". Innych marek, projektów, rozmów ani notatek o "
+                f"użytkowniku nie szukasz i nie czytasz; Twoje szkice kompilacja kładzie w `brands/{marka}/` albo "
+                f"`agenci/{self._agent}/`. Twój hub: `{self._moj_hub()}`, Twoje orzeczenia: `{self._moje_orzeczenia()}` "
+                f"i `orzeczenia/marki/{marka}`.\n")
+        else:
+            naglowek = (
+                "# Skarbiec wiedzy floty (jarvo-wiedza)\n"
+                "Masz wspólny skarbiec wiedzy floty: notatki o użytkowniku, markach, projektach, agentach i narzędziach oraz "
+                f"orzeczenia (korekty od użytkownika). Twój hub: `{self._moj_hub()}`, Twoje orzeczenia: `{self._moje_orzeczenia()}`.\n")
         return (
-            "# Skarbiec wiedzy floty (jarvo-wiedza)\n"
-            "Masz wspólny skarbiec wiedzy floty: notatki o użytkowniku, markach, projektach, agentach i narzędziach oraz "
-            f"orzeczenia (korekty od użytkownika). Twój hub: `{self._moj_hub()}`, Twoje orzeczenia: `{self._moje_orzeczenia()}`.\n"
+            naglowek +
             "- Zanim odpowiesz o użytkowniku, marce, projekcie, narzędziu albo o swojej dziedzinie, sprawdź skarbiec: "
             "wiedza_szukaj, potem wiedza_czytaj (całe notatki czytasz na żądanie).\n"
             "- Przypomnienia ze skarbca dostajesz przed turą w <memory-context>; orzeczenia w nich są wiążące.\n"
@@ -494,17 +532,21 @@ class SkarbiecProvider(MemoryProvider):
 
     def _przypomnienie(self, sk, query: str) -> tuple[str, str]:
         """(blok przypomnienia, silnik szukania). Wektory z usługi (state/wektory.json) z limitem WEKTORY_CZAS_S;
-        bez usługi albo po czasie przypomnienie idzie słowami (silnik „slowa”), tura bez błędu."""
+        bez usługi albo po czasie przypomnienie idzie słowami (silnik „slowa”), tura bez błędu. Agent biznesowy: notatki
+        tylko z zakresu, orzeczenia własne, wszystkich i swojej marki (innych marek nigdy)."""
         lib = _lib()
+        marka, zakres = self._moja_marka(), self._zakres()
         ix = lib.Indeks(sk)
         try:
             ix.odswiez()
             klient = lib.KlientWektorow(sk.stan)
-            notatki = lib.notatki_przypomnienia(ix, query, limit=LIMIT_NOTATEK, wektory=klient if klient.dostepny else None)
+            notatki = lib.notatki_przypomnienia(ix, query, limit=LIMIT_NOTATEK, wektory=klient if klient.dostepny else None,
+                                                zakres=zakres)
             silnik = ix.silnik
         finally:
             ix.zamknij()
-        marki = {t["sciezka"].split("/")[1] for t in notatki if t["sciezka"].startswith("brands/") and t["sciezka"].count("/") >= 2}
+        marki = {marka} if marka else \
+            {t["sciezka"].split("/")[1] for t in notatki if t["sciezka"].startswith("brands/") and t["sciezka"].count("/") >= 2}
         czesci = []
         if notatki:
             czesci.append("## Skarbiec wiedzy: może się przydać")
@@ -526,12 +568,14 @@ class SkarbiecProvider(MemoryProvider):
     # ---- narzędzia
     def get_tool_schemas(self) -> List[Dict[str, Any]]:
         """Hermes bierze schematy (i trasę wywołań) w add_provider, ZANIM wywoła initialize(): agent z HERMES_HOME
-        tej sesji, nie z initialize (11.11: `schemat` i `pobierz_link` nie były wystawione, „Unknown tool”)."""
+        tej sesji, nie z initialize (11.11: `schemat` i `pobierz_link` nie były wystawione, „Unknown tool”). Agent
+        biznesowy (marka z wiedza-agenci.json) dostaje opisy pól w swoim zakresie."""
         agent = self._agent if self._home else _profil(_hermes_home())
-        return self._narzedzia_skarbca() + (_narzedzia_jarva() if agent in SCHEMAT_DLA else [])
+        meta = self._meta if self._home else _meta_agentow(_sciezki(_hermes_home())[1])
+        return self._narzedzia_skarbca(_marka(meta, agent), agent) + (_narzedzia_jarva() if agent in SCHEMAT_DLA else [])
 
-    def _narzedzia_skarbca(self) -> List[Dict[str, Any]]:
-        return [
+    def _narzedzia_skarbca(self, marka: str = "", agent: str = "") -> List[Dict[str, Any]]:
+        narzedzia = [
             {"name": "wiedza_szukaj",
              "description": "Szuka w skarbcu wiedzy floty (notatki o użytkowniku, markach, projektach, agentach, narzędziach, "
                             "orzeczenia). Zwraca ścieżki i streszczenia; całą notatkę czyta wiedza_czytaj.",
@@ -562,6 +606,14 @@ class SkarbiecProvider(MemoryProvider):
                  "cytat": {"type": "string", "description": "słowa użytkownika z tej tury"}},
                  "required": ["tresc", "cytat"]}},
         ]
+        if marka:
+            narzedzia[0]["description"] = (f"Szuka w Twoim zakresie skarbca (marka `{marka}`: brand kit i notatki marki, Twoje notatki, "
+                                           "wiedza o flocie, inspiracje, orzeczenia). Zwraca ścieżki i streszczenia; całą notatkę "
+                                           "czyta wiedza_czytaj.")
+            narzedzia[0]["parameters"]["properties"]["folder"]["description"] = (
+                f"opcjonalnie: brands/{marka}, agenci/{agent}, fleet (lekcje i skille floty), inspiracje (strony referencyjne branż), orzeczenia")
+            narzedzia[3]["parameters"]["properties"]["kogo"]["description"] = f"ja (ten agent) albo marki/{marka}; domyślnie ja"
+        return narzedzia
 
     def handle_tool_call(self, tool_name: str, args: Dict[str, Any], **kwargs) -> str:
         if tool_name == "schemat" and self._agent in SCHEMAT_DLA:       # rysunek nie potrzebuje skarbca
@@ -581,8 +633,7 @@ class SkarbiecProvider(MemoryProvider):
             if tool_name == "wiedza_szukaj":
                 return json.dumps(self._szukaj(sk, args), ensure_ascii=False)
             if tool_name == "wiedza_czytaj":
-                n = sk.wczytaj(str(args.get("sciezka") or ""))
-                return json.dumps({"sciezka": n.sciezka, "tytul": n.tytul, "frontmatter": n.fm, "tresc": n.tresc[:12000]}, ensure_ascii=False)
+                return json.dumps(self._czytaj(sk, str(args.get("sciezka") or "")), ensure_ascii=False)
             if tool_name == "wiedza_zapisz":
                 if self._kontekst not in ("primary", "cron"):
                     return json.dumps({"error": "szkice zgłasza główna sesja albo rutyna, nie subagent"}, ensure_ascii=False)
@@ -592,7 +643,8 @@ class SkarbiecProvider(MemoryProvider):
                                                 f"{', '.join(sorted(POLA_SZKICU))} (źródło w `zrodlo`, tagi w `tagi`)"},
                                       ensure_ascii=False)
                 rel = _lib().zapisz_szkic(sk, str(args.get("typ") or "fakt"), str(args.get("tytul") or ""), str(args.get("tresc") or ""),
-                                          str(args.get("zrodlo") or ""), self._agent, list(args.get("tagi") or []), skad=f"sesja {self._session_id}")
+                                          str(args.get("zrodlo") or ""), self._agent, list(args.get("tagi") or []), skad=f"sesja {self._session_id}",
+                                          marka=self._moja_marka())
                 return json.dumps({"szkic": rel, "info": "szkic czeka na kompilację; nie jest jeszcze notatką"}, ensure_ascii=False)
             if tool_name == "wiedza_orzeczenie":
                 return json.dumps(self._orzeczenie(sk, args), ensure_ascii=False)
@@ -605,18 +657,36 @@ class SkarbiecProvider(MemoryProvider):
 
     def _szukaj(self, sk, args: Dict[str, Any]) -> Dict[str, Any]:
         lib = _lib()
+        zakres = self._zakres()
+        folder = args.get("folder") or None
+        if zakres and folder and not lib.folder_w_zakresie(str(folder), zakres):
+            return {"error": f"folder `{folder}` jest poza Twoim zakresem skarbca (agent marki `{self._moja_marka()}`); "
+                             "dozwolone foldery: " + ", ".join(f"`{z.rstrip('/')}`" for z in zakres) + " albo bez folderu"}
         ix = lib.Indeks(sk)
         try:
             ix.odswiez()
             limit = max(1, min(int(args.get("limit") or LIMIT_NOTATEK), 12))
             klient = lib.KlientWektorow(sk.stan, lib.WEKTORY_CZAS_NARZEDZIA_S)
-            wyn = ix.szukaj(str(args.get("zapytanie") or ""), limit=limit, folder=(args.get("folder") or None),
-                            wektory=klient if klient.dostepny else None)
+            wyn = ix.szukaj(str(args.get("zapytanie") or ""), limit=limit, folder=folder,
+                            wektory=klient if klient.dostepny else None, zakres=zakres)
         finally:
             ix.zamknij()
         return {"wyniki": [{"sciezka": r["sciezka"], "tytul": r["tytul"], "streszczenie": r["streszczenie"], "typ": r["typ"],
                             "zmieniono": r["zmieniono"]} for r in wyn],
                 "info": "wiedza_czytaj(sciezka) daje całą notatkę" if wyn else "nic nie znaleziono; spróbuj innych słów albo folderu"}
+
+    def _czytaj(self, sk, sciezka: str) -> Dict[str, Any]:
+        """Cała notatka; agent biznesowy tylko w swoim zakresie (ścieżka po rozwiązaniu `..` i dowiązań, przed odczytem,
+        i ścieżka znalezionego pliku)."""
+        zakres = self._zakres()
+        if zakres:
+            kanon = sk.rel(sk.plik(sciezka))
+            if not _lib().w_zakresie(kanon, zakres):
+                return {"error": _poza_zakresem(kanon, self._moja_marka(), zakres)}
+        n = sk.wczytaj(sciezka)
+        if zakres and not _lib().w_zakresie(n.sciezka, zakres):
+            return {"error": _poza_zakresem(n.sciezka, self._moja_marka(), zakres)}
+        return {"sciezka": n.sciezka, "tytul": n.tytul, "frontmatter": n.fm, "tresc": n.tresc[:12000]}
 
     def _orzeczenie(self, sk, args: Dict[str, Any]) -> Dict[str, Any]:
         if self._kontekst != "primary":
@@ -630,6 +700,12 @@ class SkarbiecProvider(MemoryProvider):
         kogo = str(args.get("kogo") or "ja").strip().lower()
         if kogo in ("ja", "", "agent", self._agent):
             kogo = self._agent
+        marka = self._moja_marka()
+        if marka and kogo == self._moje_orzeczenia().rsplit("/", 1)[-1].lower():      # krótka nazwa agenta = ja
+            kogo = self._agent
+        if marka and kogo not in (self._agent, f"marki/{marka}"):
+            return {"error": f"agent marki `{marka}` zapisuje orzeczenia tylko dla siebie (`ja`) albo swojej marki "
+                             f"(`marki/{marka}`); orzeczenia dla całej floty i innych marek zapisuje Jarvo"}
         linia = _lib().dodaj_orzeczenie(sk, kogo, str(args.get("tresc") or ""), f"rozmowa {self._platforma or 'czat'} {self._session_id[:8]}, cytat: „{cytat[:120]}”")
         self._cache = ("", 0.0, "")
         return {"orzeczenie": linia, "info": "zapisane; obowiązuje od następnej tury w każdej rozmowie"}
@@ -650,6 +726,8 @@ class SkarbiecProvider(MemoryProvider):
                 if not sk.istnieje(rel):
                     fm = {"szkic": True, "typ": "fakt", "tytul": f"Pamięć agenta {self._agent}: wpisy", "agent": self._agent,
                           "zrodlo": f"pamięć (memory) agenta {self._agent}", "utworzono": lib.dzis(), "skad": "lustro memory", "tagi": ["pamiec"], "linki": []}
+                    if self._moja_marka():
+                        fm["marka"] = self._moja_marka()
                     sk.zapisz_plik(rel, lib.sklej(fm, f"# Pamięć agenta {self._agent}: wpisy\n\nWpisy `memory` (MEMORY.md/USER.md) w kolejności zapisu; kompilacja robi z nich notatki.\n"))
                 p = sk.plik(rel)
                 with p.open("a", encoding="utf-8", newline="\n") as f:
@@ -739,7 +817,8 @@ class SkarbiecProvider(MemoryProvider):
         try:
             with self._lock:
                 sk.zapisz_plik(rel_zrodlo, lib.sklej(fm, f"# Wyciąg z rozmowy: {tytul}\n\n{tresc}\n"))
-                lib.zapisz_szkic(sk, "rozmowa", tytul, tresc, rel_zrodlo, self._agent, ["rozmowa"], skad=f"sesja {sid} ({powod})")
+                lib.zapisz_szkic(sk, "rozmowa", tytul, tresc, rel_zrodlo, self._agent, ["rozmowa"], skad=f"sesja {sid} ({powod})",
+                                 marka=self._moja_marka())
         except ValueError as e:
             logger.info("jarvo-wiedza: szkic odrzucony: %s", e)
             return None
@@ -851,7 +930,8 @@ def karta_zamknieta(task_id: str = "", profile_name: str = "", board: str = "", 
         ) if x)
         if lib.zawiera_sekret(tresc):
             return
-        lib.zapisz_szkic(sk, "projekt", f"Karta: {tytul[:60]}", tresc, f"karta {task_id}", agent, ["karta"], skad=f"kanban {board or ''} {run_id or ''}".strip())
+        lib.zapisz_szkic(sk, "projekt", f"Karta: {tytul[:60]}", tresc, f"karta {task_id}", agent, ["karta"], skad=f"kanban {board or ''} {run_id or ''}".strip(),
+                         marka=_marka(_meta_agentow(stan), agent))
     except Exception as e:
         logger.debug("jarvo-wiedza: hak karty %s: %s", task_id, e)
 
@@ -892,6 +972,9 @@ def _karta_z_bazy(db: Path, task_id: str) -> Dict[str, Any]:
 #    tylko z rejestrem źródeł `out/zrodla.json` (SOUL, zasada 9; 26.10: dwa raporty bez rejestru i bez `verify`).
 # 6) szybki skill karty ma twardy budżet wzroku (`vision_analyze`, `browser_vision`) na sesję: wykonawca i recenzent
 #    osobno. Tekst skilla nie wystarczył (9.11: szybkie audyty z 3–7 wywołaniami wzroku po 36–120 s, sędzia 1–5).
+# 7) agent biznesowy (fleet.yaml `marka`) czyta i pisze narzędziami plików (`read_file`, `search_files`, `write_file`,
+#    `patch`) tylko w swoim zakresie skarbca (wiedza.zakres_marki), jak wiedza_szukaj i wiedza_czytaj. Polecenia
+#    terminala i szukanie z katalogu nad skarbcem zostają poza strażnikiem (zakres to skupienie, nie tajność).
 LIMITY_GENERACJI = {"video_generate": ("JARVO_LIMIT_WIDEO_AI", 3), "image_generate": ("JARVO_LIMIT_OBRAZY_AI", 12)}
 _LOGOWANIE_RE = re.compile(r"(?i)\b(has[łl]o|password|passwd|pin)\b(?:\s+[^\s\d!@#$%^&*]{1,12}){0,3}?\s*(?:[:=]|to\b|jest\b)?"
                            r"\s*\S*[\d!@#$%^&*]\S*")
@@ -1223,6 +1306,29 @@ def _zapis_w_skarbcu(args: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _poza_zakresem_marki(args: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Narzędzie plików agenta biznesowego na ścieżce skarbca poza jego zakresem (także cały skarbiec albo `brands/`):
+    blokada z drogą przez wiedza_szukaj. Agent bez marki: None bez sprawdzania ścieżek."""
+    home = _hermes_home()
+    agent = _profil(home)
+    skarbiec, stan = _sciezki(home)
+    meta = _meta_agentow(stan)
+    marka = _marka(meta, agent)
+    if not marka:
+        return None
+    zakres = _lib().zakres_marki(marka, agent, (meta.get(agent) or {}).get("orzeczenia") or f"orzeczenia/{agent}")
+    korzen = Path(os.path.realpath(skarbiec))
+    for s in [args.get("path"), *_V4A_PLIK_RE.findall(str(args.get("patch") or ""))]:
+        if not isinstance(s, str) or not s.strip():
+            continue
+        try:
+            rel = Path(os.path.realpath(os.path.expanduser(s.strip()))).relative_to(korzen).as_posix()
+        except ValueError:
+            continue
+        if rel == "." or not _lib().w_zakresie(rel, zakres):
+            return {"action": "block", "message": _poza_zakresem("skarbiec" if rel == "." else rel, marka, zakres)}
+    return None
+
 
 def straznik(tool_name: str = "", args: Optional[Dict[str, Any]] = None, task_id: str = "", session_id: str = "",
              turn_id: str = "", **_kw: Any) -> Optional[Dict[str, Any]]:
@@ -1248,8 +1354,10 @@ def straznik(tool_name: str = "", args: Optional[Dict[str, Any]] = None, task_id
             return _budzet_wzroku(tool_name, session_id)
         elif tool_name in NARZEDZIA_RESEARCHU:
             return _budzet_researchu(tool_name, session_id, turn_id)
+        elif tool_name in ("read_file", "search_files"):
+            return _poza_zakresem_marki(args)
         elif tool_name in ("write_file", "patch"):
-            return _zapis_w_skarbcu(args)
+            return _poza_zakresem_marki(args) or _zapis_w_skarbcu(args)
     except Exception as e:                       # strażnik nie może zatrzymać zwykłej pracy własnym błędem
         logger.debug("jarvo-wiedza: strażnik %s: %s", tool_name, e)
     return None

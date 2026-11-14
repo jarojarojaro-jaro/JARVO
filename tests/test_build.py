@@ -25,7 +25,8 @@ EMPTY_LOCK = {"sources": {}, "agents": {}}
 ENV = {"TELEGRAM_OWNER_ID": "111111111", "TELEGRAM_HQ_CHAT_ID": "-1002222222222",
        "TELEGRAM_TOPIC_SHERLOCK": "11", "TELEGRAM_TOPIC_WEB": "12", "TELEGRAM_TOPIC_STUDIO": "13",
        "TELEGRAM_TOPIC_REKA": "14", "TELEGRAM_TOPIC_WIDEO": "15", "TELEGRAM_TOPIC_ADS": "16",
-       "TELEGRAM_TOPIC_LOWCA": "17", "TELEGRAM_TOPIC_MOBILE": "18"}
+       "TELEGRAM_TOPIC_LOWCA": "17", "TELEGRAM_TOPIC_MOBILE": "18",
+       "TELEGRAM_TOPIC_JARODEV": "19"}
 
 
 @pytest.fixture(scope="module")
@@ -155,6 +156,22 @@ def test_owner_deliver_token():
     jarvo = fleet.agent(fleet.orchestrator)
     assert build.base_tokens(fleet, jarvo, "/b", ENV)["OWNER_DELIVER"] == "telegram:111111111"
     assert build.base_tokens(fleet, jarvo, "/b", {})["OWNER_DELIVER"] == "local"
+
+
+def test_agent_deliver_token_watek_w_grupie_hq():
+    """Rutyny agenta raportują do jego wątku w grupie Jarvo HQ (telegram:<grupa>:<wątek>), temat „general” do samej
+    grupy; bez grupy albo tematu w .env jak OWNER_DELIVER (DM właściciela, bez niego lokalnie)."""
+    import dataclasses
+    fleet = fl.load_fleet()
+    web = fleet.agent("jarvo-web")
+    assert build.base_tokens(fleet, web, "/b", ENV)["AGENT_DELIVER"] == "telegram:-1002222222222:12"
+    ogolny = dataclasses.replace(web, telegram_topic="general")
+    assert build.base_tokens(fleet, ogolny, "/b", ENV)["AGENT_DELIVER"] == "telegram:-1002222222222"
+    bez_tematu = {k: v for k, v in ENV.items() if k != "TELEGRAM_TOPIC_WEB"}
+    assert build.base_tokens(fleet, web, "/b", bez_tematu)["AGENT_DELIVER"] == "telegram:111111111"
+    bez_grupy = {k: v for k, v in ENV.items() if k != "TELEGRAM_HQ_CHAT_ID"}
+    assert build.base_tokens(fleet, web, "/b", bez_grupy)["AGENT_DELIVER"] == "telegram:111111111"
+    assert build.base_tokens(fleet, web, "/b", {})["AGENT_DELIVER"] == "local"
 
 
 def test_host_routes(tmp_path):

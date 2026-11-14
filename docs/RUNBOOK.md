@@ -16,14 +16,14 @@ Czas: ok. 1,5 h przy pierwszym razie (z czego ~20 min to budowa obrazu).
 | Klucz SSH (ed25519) | logowanie na serwer | hasła będą wyłączone |
 | Konto [Tailscale](https://tailscale.com) (darmowe) | prywatny dostęp do serwera i paneli | nic nie wystawiamy publicznie |
 | Konto ChatGPT (z dostępem do Codex) | domyślne modele floty (`openai-codex`, gpt-6-luna) | logowanie OAuth w dashboardzie: Models → Login przy profilu „default” |
-| Konto [OpenRouter](https://openrouter.ai) z kredytami | obrazy i wideo AI (modele tylko przy zestawie `openrouter`) | **10 kluczy**: host + 9 agentów, każdy z limitem kredytów |
+| Konto [OpenRouter](https://openrouter.ai) z kredytami | obrazy i wideo AI (modele tylko przy zestawie `openrouter`) | **11 kluczy**: host + 10 agentów, każdy z limitem kredytów |
 | Klucz [Pexels](https://www.pexels.com/api/) albo [Pixabay](https://pixabay.com/api/docs/) (darmowy) | ujęcia stock dla Wideografa | `PEXELS_API_KEY` / `PIXABAY_API_KEY` w Keys (profil główny) |
 | Token [CEIDG](https://dane.biznes.gov.pl) (darmowy, opcjonalny) | jednoosobowe działalności dla Łowcy | `CEIDG_TOKEN` w Keys przy profilu `jarvo-lowca` (Własne klucze); kroki: [LEADY.md](LEADY.md#token-ceidg) |
 | Konto Telegram | główny kanał | bot + supergrupa „Jarvo HQ” z tematami |
 | Miejsce na backup (Backblaze B2, S3 albo SFTP) | nocne kopie restic | poza serwerem |
 
 Limity kluczy OpenRouter na start (miesięcznie, do korekty po 2 tygodniach): `jarvo` 30 $, `jarvo-sherlock` 20 $,
-`jarvo-web` 20 $, `jarvo-studio` 20 $ (obrazy), `jarvo-wideo` 30 $ (wideo AI), `jarvo-ads` 15 $, `jarvo-lowca` 10 $, `jarvo-mobile` 15 $, `jarvo-reka` 15 $, host 5 $. Klucz z limitem to bezpiecznik:
+`jarvo-web` 20 $, `jarvo-studio` 20 $ (obrazy), `jarvo-wideo` 30 $ (wideo AI), `jarvo-ads` 15 $, `jarvo-lowca` 10 $, `jarvo-mobile` 15 $, `jarvo-jarodev` 10 $, `jarvo-reka` 15 $, host 5 $. Klucz z limitem to bezpiecznik:
 zapętlony agent nie wyczyści konta.
 
 Przed wdrożeniem sprawdź, czy modele z `fleet.yaml` nadal istnieją (lokalnie albo na serwerze). Przy domyślnym
@@ -129,7 +129,7 @@ TELEGRAM_TOPIC_WIDEO=6
 TELEGRAM_TOPIC_ADS=7
 TELEGRAM_TOPIC_LOWCA=8
 TELEGRAM_TOPIC_MOBILE=9
-TELEGRAM_TOPIC_OPERATOR=10
+TELEGRAM_TOPIC_JARODEV=10
 JARVO_MODEL_PROVIDER=              # puste = openai-codex (niżej: „Dostawca modeli”)
 ```
 
@@ -142,7 +142,7 @@ TELEGRAM_REQUIRE_MENTION=false
 OPENROUTER_API_KEY=sk-or-v1-…     # klucz "host" (niski limit)
 ```
 
-**`/srv/jarvo/secrets/<agent>.env`** dla `jarvo`, `jarvo-sherlock`, `jarvo-web`, `jarvo-studio`, `jarvo-wideo`, `jarvo-ads`, `jarvo-lowca`, `jarvo-mobile`, `jarvo-reka`:
+**`/srv/jarvo/secrets/<agent>.env`** dla `jarvo`, `jarvo-sherlock`, `jarvo-web`, `jarvo-studio`, `jarvo-wideo`, `jarvo-ads`, `jarvo-lowca`, `jarvo-mobile`, `jarvo-jarodev`, `jarvo-reka`:
 ```ini
 OPENROUTER_API_KEY=sk-or-v1-…     # osobny klucz na agenta
 ```
@@ -168,7 +168,7 @@ kanbana) dostaje najszybszy model zestawu, chyba że wybrano mu model ręcznie p
 ### Klucze dostawców i logowanie (OAuth)
 
 Każdy agent floty to osobny profil Hermesa z własnym `.env`, a Hermes celowo ich nie miesza (izolacja kluczy
-przy multipleksowaniu). Żeby nie wpisywać klucza dziewięć razy:
+przy multipleksowaniu). Żeby nie wpisywać klucza dziesięć razy:
 
 - **Klucze API** (CommandCode, OpenRouter, OpenCode, Exa…) dodawaj w dashboardzie **Keys przy profilu
   „default”**. Jarvo HQ w ciągu kilku sekund kopiuje je do wszystkich agentów (`scripts/share_keys.py`, blok
@@ -222,7 +222,7 @@ sudo systemctl start jarvo-updater
    ```
    Po kilku–kilkunastu minutach: recenzja Jarva (status `review` → `done` albo prośba o poprawki) i raport w DM.
 4. **Aplikacja Jarvo:** `http://<ip-tailscale>:9119/jarvo` (zakładka **Jarvo**, pierwsza w menu, nad CHAT; adres `/` prowadzi tam sam; obok **Wiedza** z grafem skarbca: po wdrożeniu
-   widać huby 9 agentów), login `jarvo` + `DASHBOARD_PASSWORD`
+   widać huby 10 agentów), login `jarvo` + `DASHBOARD_PASSWORD`
    z `compose/.env`. To aplikacja czatu: ekran startu (powitanie, jedno zdanie gotowości, gdy brakuje modelu albo profilu
    właściciela), rozmowy z Jarvem i agentami, ustawienia w szufladzie (koło zębate); budynek floty z pokojami agentów,
    decyzjami i misjami jest w **Ustawienia › Stara Baza** ([HQ.md](HQ.md)). Na `/jarvo` menu Hermesa jest schowane;
@@ -242,6 +242,18 @@ docker exec -u hermes jarvo-hermes hermes -p jarvo cron list
 ```
 
 Na własnym komputerze (instalator, polecenie `jarvo`): `JARVO_RESUME_CRON=1 jarvo up`.
+
+**Agent biznesowy Jarodev** (`jarvo-jarodev`, [FLEET.md](FLEET.md#agenci-biznesowi)) ma własną rutynę
+`jarodev-dzien` (pon–sob 8:40), też wstrzymaną (`paused: true`), i `--resume-cron` jej nie rusza. Włączasz ją sam,
+gdy agent ma czym pracować:
+
+```bash
+jarvo telefon on --phoneuse ~/dev/PHONEUSE            # raz, jeśli telefon jeszcze nie jest włączony dla floty
+jarvo telefon przydziel jarvo-jarodev <telefon>       # jeden telefon z kontem Facebook (lista: list_phones)
+jarvo komputer on                                     # Mapy Google na Komputerze Jarva
+# grupy FB, portale i miasta: zrodla.yaml w <dane>/jarvo/workspaces/jarvo-jarodev/ (wzór zakłada lejek.py init)
+hermes -p jarvo-jarodev cron resume jarodev-dzien     # w kontenerze: docker exec -u hermes jarvo-hermes hermes …
+```
 
 Potem napisz do Jarva: **„Zróbmy onboarding.”** Wywiad (15–20 min) wypełnia `knowledge/user/USER.md` i pamięć
 o Tobie, z której korzystają wszyscy agenci. Brand kity dodajesz poleceniem: „Naucz się marki z https://…”.

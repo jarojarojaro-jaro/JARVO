@@ -150,6 +150,9 @@ class Agent:
     en: dict = field(default_factory=dict)   # angielskie title / hq_label / description (HQ po angielsku)
     oddaj_gdy: str = ""                       # kiedy generalista (Ręka) ma oddać zadanie temu agentowi; tabela generowana
     komputer: bool = False                    # agent z narzędziem computer_use (Komputer Jarva, docs/KOMPUTER.md)
+    # agent biznesowy: slug marki = katalog brands/<marka>/ w skarbcu; widzi w wiedzy tylko swoją markę
+    # (docs/FLEET.md „Agenci biznesowi”); "" = bez marki, widzi wszystko
+    marka: str = ""
 
     @property
     def dir(self) -> Path:
@@ -272,6 +275,7 @@ def load_fleet(path: Path | None = None) -> Fleet:
                 en={k: " ".join(str(v).split()) for k, v in (entry.get("en") or {}).items() if v},
                 oddaj_gdy=" ".join(str(entry.get("oddaj_gdy", "") or "").split()),
                 komputer=entry.get("komputer") is True,
+                marka=str(entry.get("marka") or ""),
             )
         )
     return Fleet(raw=raw, agents=agents)

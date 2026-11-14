@@ -149,3 +149,29 @@ out/leady/<projekt>/
 5. ✅ CEIDG (2026-10-05, decyzja właściciela): `ceidg.py` (API v3, token właściciela), sygnał `ceidg-nowa-firma`,
    minimum danych osoby, testy offline, eval `lowca-ceidg`. ⬜ Pierwsze zapytanie z prawdziwym tokenem: sprawdzić
    link `zrodlo` do wyszukiwarki firm, dopasowanie miasta (wielkość liter) i maksymalną partię `ids`.
+
+## Agent biznesowy Jarodev
+
+Od 14.11.2026 klientów dla jarodev.pl (strony, sklepy, automatyzacje, aplikacje) szuka osobny agent biznesowy
+`jarvo-jarodev` ([FLEET.md](FLEET.md#agenci-biznesowi)); Łowca zostaje przy leadach B2B z rejestrów i przetargów dla
+dowolnej oferty. Źródła Jarodev są inne niż Łowcy i mają osobne granice:
+
+| Źródło | Jak | Granica |
+|---|---|---|
+| grupy na Facebooku z listy właściciela (`zrodla.yaml`) | jeden przydzielony telefon z kontem właściciela (`jarvo telefon przydziel`), czytanie jak człowiek | limit grup dziennie, bez skrobaków i serii akcji; ostrzeżenie Facebooka = stop |
+| własne posty jarodev | szkic → „tak” właściciela → publikacja na telefonie | limit postów, treść słowo w słowo jak zaakceptowana |
+| Mapy Google | przeglądarka Komputera Jarva na karcie (`komputer`), bez Places API (decyzja właściciela) | limit firm dziennie, tylko czytanie wizytówek |
+| strona firmy | `wygrane.py`: `seo_check.py` Weba (kilka zapytań) i jeden Lighthouse | jedna strona, bez pełzania po witrynie |
+| portale ze zleceniami | lista od właściciela (`zrodla.yaml`), jako odwiedzający | regulamin portalu |
+
+- **Zgoda na każde wyjście.** Post, komentarz i wiadomość tylko za „tak” właściciela dla tej treści (w rozmowie albo
+  linia `ZGODA WŁAŚCICIELA` w karcie); `lejek.py` nie przyjmie statusu `zaakceptowany` bez zapisu zgody, a bramki
+  telefonu i Komputera zatrzymują wysyłkę i publikację same.
+- **Art. 398 PKE.** Firm z Map i audytu nikt z floty nie kontaktuje mailem, telefonem, SMS-em, formularzem ani
+  Messengerem: `lejek.py status … wyslany` z takim kanałem kończy się odmową (kod 3). Kanał wybiera właściciel
+  (list, spotkanie, odpowiedź, gdy firma napisała pierwsza). Osoba, która w grupie sama prosi o oferty, dostaje
+  odpowiedź w temacie swojej prośby.
+- **RODO dla osób z postów.** W lejku tylko link do posta, wyświetlana nazwa, potrzeba i data (e-mail albo telefon
+  w polach osoby = odmowa); bez kontaktu po 90 dniach wpis znika (`poranek.py` codziennie, `lejek.py retencja`).
+- **Pliki:** `<dane>/jarvo/workspaces/jarvo-jarodev/lejek/` (`lejek.json`, `lejek.csv`, `limity.json`) i
+  `zrodla.yaml` obok (wzór kopiuje `lejek.py init`, nigdy go nie nadpisuje).

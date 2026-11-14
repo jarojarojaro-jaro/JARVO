@@ -139,7 +139,19 @@ status` pokazuje pliki, SDK, adb i wpisy w profilach, `jarvo doctor` sprawdza pl
 właściciel w swoim terminalu. Zgoda: `act` i `batch` z `confirm: true` omijają bramkę `needs_confirm` telefonu, więc
 wtyczka `jarvo-zgody` pyta o nie z treścią akcji (zgoda = „tak” właściciela dla tej jednej akcji); na karcie
 przepuszcza je tylko z linią `ZGODA WŁAŚCICIELA` w treści karty, a bez niej, w rutynie i pod YOLO blokuje; pod YOLO
-`jarvo` nie ma telefonu wcale, tak jak `computer_use`.
+żaden profil nie ma telefonu wcale, tak jak `computer_use`.
+
+**Telefon agenta biznesowego.** Agent biznesowy (np. `jarvo-jarodev`, [FLEET.md](FLEET.md#agenci-biznesowi)) dostaje
+serwer `phone` tylko z przydziałem właściciela i tylko na **jeden** telefon:
+`jarvo telefon przydziel jarvo-jarodev <telefon>` zapisuje przydział w `<stan>/telefon.json` (`"profile":
+{"jarvo-jarodev": "<telefon>"}`) i, gdy telefon dla floty jest włączony (`on`), od razu dopisuje w tym profilu ten sam
+serwer z `PHONEUSE_ONLY=<telefon>` i `PHONEUSE_PHONE=<telefon>`: `phone_mcp.py` pokazuje w `list_phones` tylko ten
+telefon i odrzuca każde wywołanie z inną nazwą, zanim cokolwiek pójdzie do telefonu. Jarvo dalej ma wszystkie telefony.
+Bez przydziału agent biznesowy nie ma serwera `phone`. `jarvo telefon zabierz <profil>` zdejmuje przydział
+(`enabled: false` w tym profilu teraz, następne `jarvo update` usuwa wpis); przydział przeżywa `off` i `on`,
+a `jarvo telefon status` i `jarvo doctor` go pokazują. Przydział i zabranie robi tylko właściciel (ta sama odmowa
+procesów floty i ta sama zasada restartu bramy co `on`). Nazwa profilu: `jarvo-<nazwa>` (nie `jarvo`), nazwa
+telefonu jak w PHONEUSE.
 
 **Włączenie jednym poleceniem (serwer z kontenerem):** `jarvo android on` wybiera wariant sam: `/dev/kvm` dostępne dla Dockera → emulator
 (profil compose `android-kvm`), inaczej binder w jądrze → Redroid (profil `android`; brakujący moduł `binder_linux`

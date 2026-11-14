@@ -507,3 +507,6 @@ agents:
     - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     - {source: jarvo, path: shared/skills/odczyt-ekranu, dest: pliki/odczyt-ekranu}
     - {source: jarvo, path: shared/skills/ostrozna-przegladarka, dest: web/ostrozna-przegladarka}
+  jarvo-jarodev:
+    - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
+    - {source: jarvo, path: shared/skills/odczyt-ekranu, dest: pliki/odczyt-ekranu}

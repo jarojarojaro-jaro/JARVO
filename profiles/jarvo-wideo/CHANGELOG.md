@@ -1,6 +1,7 @@
 # Changelog: jarvo-wideo
 
 ## Niewydane
+- Wzór żywego schematu „Jak działa flota Jarva”: 10 agentów (doszedł agent biznesowy `jarvo-jarodev`, 14.11).
 - Zapis w kodzie floty (zainstalowane skille, wtyczki, haki, skrypty floty, `SOUL.md` i `mcp.json` profili, program Jarva, kod Hermesa) blokuje wtyczka `jarvo-zgody` w każdym trybie, bez prośby do właściciela, z radą: zmiana floty to zlecenie dla Claude Code (`missions/DLA-CLAUDE.md`), bo zapis w zainstalowanym profilu znika przy aktualizacji i omija skan skilli (14.11). Prośba o pozostałe chronione miejsca mówi wprost, że „Always” obejmie tylko ten sam plik albo to samo polecenie. Lekcję na następny raz zapisujesz jak dotąd przez `skill_manage` (poczekalnia).
 - Przeglądarka narzędzi `browser_*`: agent-browser 0.43.0 (było 0.38.1; poprawki bezpieczeństwa, zawieszona karta nie psuje sesji, podpowiedzi przy przyciskach bez nazwy) i Lightpanda 1.0.4 (było 1.0.0).
 - Wzór żywego schematu „Jak działa flota Jarva” (`zywy-schemat/references/flota-jarva.py` i `.json`, 2026-11-14): 9 agentów, bez Operatora (pracę na ekranie i telefonie robi teraz sam Jarvo); 8 ramek specjalistów na środku kadru.

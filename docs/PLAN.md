@@ -204,7 +204,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ Profil `jarvo`: SOUL, roster generowany z floty, protokół zlecania, 11 skilli dowodzenia ([BOSS.md](BOSS.md)).
 - ✅ `jarvo-sherlock`: metoda śledcza, weryfikacja faktów, raporty, skrypty wyszukiwania i dziennika źródeł.
 - ✅ Jedna komenda stawia całą flotę (`scripts/deploy.sh --first-run` → `install-fleet.sh`).
-- ✅ Walidator + testy (`make validate`, `make test`, CI) + 197 scenariuszy evals.
+- ✅ Walidator + testy (`make validate`, `make test`, CI) + 232 scenariusze evals.
 
 ### Faza 2: Kanały
 - ✅ CLI: aliasy profili (`hermes profile install --alias`).
@@ -259,7 +259,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ Evals na stagingu (`scripts/evals-staging.sh`), sędzia LLM + sprawdzenia deterministyczne.
 - ✅ Koszty: poziomy modeli w `fleet.yaml` i `reasoning_effort` per agent; przy presecie `openrouter` osobny klucz z limitem na agenta.
 - ✅ Bezpieczeństwo: zgody (A2 tylko z człowiekiem, praca bez nadzoru = odmowa), sekrety tylko w `.env`, Tailscale.
-- ✅ Red team na promptfoo (`security/redteam/`, `scripts/redteam.sh`, 23 ataki) i wspólne zakazy floty
+- ✅ Red team na promptfoo (`security/redteam/`, `scripts/redteam.sh`, 25 ataków) i wspólne zakazy floty
   (`shared/security/deny.yaml`).
 - ⬜ Przegląd kosztów po 2 tygodniach, korekta poziomów modeli.
 

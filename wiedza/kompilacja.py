@@ -15,6 +15,9 @@ i state/wiedza-lint.json pokazują stan po kompilacji, a raport przebiegu ma lic
 60 dotkniętych notatek. Błąd samego wywołania modelu (czas, dostawca, sieć) przerywa przebieg: ten szkic dostaje próbę,
 dalsze czekają bez zmiany licznika (Hermes po przekroczeniu czasu wyłącza dostawcę na 10 min, więc reszta partii padłaby
 od razu i po trzech takich przebiegach wypadła do `zrobione/`); zła odpowiedź na jeden szkic (bez JSON) liczy się tylko jemu.
+Szkic agenta biznesowego (pole `marka` szkicu albo jego agenta w wiedza-agenci.json, docs/WIEDZA.md §4a): kandydaci
+i linki tylko z zakresu marki, notatki tylko w `brands/<marka>/` albo `agenci/<agent>/`. Pliki własnego formatu w
+`brands/` i `inspiracje/` (brand kit bez `typ`) nie są nadpisywane ani scalane.
 
 Uruchomienie: nadzorca Jarva co minutę (natywnie), a w bramie bez nadzorcy (VPS) hak wtyczki na tik dyspozytora
 kanbana (przy szkicach: najnowszy ≥ 5 min albo najstarszy ≥ 15 min; co noc, także nadrabiane po uśpieniu), przycisk
@@ -176,10 +179,34 @@ class Kompilacja:
             return {}
         return {"bledy": len(r["bledy"]), "ostrzezenia": len(r["ostrzezenia"]), "informacje": len(r["informacje"])}
 
-    def _huby(self) -> List[str]:
+    def _huby(self, zakres=()) -> List[str]:
+        """Huby do linków: foldery i agenci; szkic agenta biznesowego (`zakres`) dostaje tylko huby z zakresu i hub swojej marki."""
         out = [f"{f}/{h}" for f, (h, _t) in self.lib.HUBY.items() if f]
         out += [m["hub"] for m in self._agenci.values() if m.get("hub")]
+        if zakres:
+            marki = [z.rstrip("/").split("/", 1)[1] for z in zakres if z.startswith("brands/")]
+            out = [h for h in [*(self.lib.hub_marki(m) for m in marki), *out] if self.lib.w_zakresie(h, zakres)]
         return [h for h in out if self.sk.istnieje(h)]
+
+    # ---- agent biznesowy (fleet.yaml `marka`, docs/WIEDZA.md „Agenci biznesowi”)
+    def marka(self, szkic: dict) -> str:
+        """Marka szkicu: pole `marka` szkicu albo marka jego agenta z wiedza-agenci.json (szkic z karty, lustro sprzed
+        pola); pusto = zwykły szkic."""
+        m = szkic.get("marka") or (self._agenci.get(szkic.get("agent") or "") or {}).get("marka") or ""
+        return m if self.lib.MARKA_RE.fullmatch(m) else ""
+
+    def zakres(self, szkic: dict) -> tuple:
+        """Co widzi agent marki (kandydaci, linki): zakres_marki; pusta krotka = cały skarbiec."""
+        agent = szkic.get("agent") or ""
+        orz = (self._agenci.get(agent) or {}).get("orzeczenia") or (f"orzeczenia/{agent}" if agent else "")
+        return self.lib.zakres_marki(self.marka(szkic), agent, orz)
+
+    def foldery_marki(self, szkic: dict) -> List[str]:
+        """Gdzie wolno pisać notatki ze szkicu agenta marki: `brands/<marka>` i `agenci/<agent>` (gdy ma katalog)."""
+        marka, agent = self.marka(szkic), szkic.get("agent") or ""
+        if not marka:
+            return []
+        return [f"brands/{marka}"] + ([f"agenci/{agent}"] if agent and (self.sk.root / "agenci" / agent).is_dir() else [])
 
     @staticmethod
     def lustro_pamieci(szkic: dict) -> bool:
@@ -187,24 +214,28 @@ class Kompilacja:
         return szkic["plik"].startswith("pamiec-") or szkic.get("skad") == "lustro memory"
 
     def kandydaci(self, ix, szkic: dict) -> List[dict]:
+        zakres = self.zakres(szkic)            # agent marki: kandydaci (więc i linki) tylko z jego zakresu
         if self.lustro_pamieci(szkic):        # każdy wpis pamięci to inny temat: kandydaci osobno dla każdego wpisu
             wpisy = [re.sub(r"^- [\d-]+ · \w+ \w+: ", "", l) for l in szkic["tresc"].splitlines() if l.startswith("- ")]
             out: List[dict] = []
             for w in wpisy[-KANDYDATOW_LUSTRA:]:
-                for r in ix.szukaj(w, limit=2, wektory=self.wektory):
+                for r in ix.szukaj(w, limit=2, wektory=self.wektory, zakres=zakres):
                     if r["typ"] != "orzeczenia" and all(r["sciezka"] != o["sciezka"] for o in out):
                         out.append(r)
             return out[:KANDYDATOW_LUSTRA]
         zap = f"{szkic['tytul']} {szkic['tresc'][:400]}"
-        wyn = ix.szukaj(zap, limit=KANDYDATOW, wektory=self.wektory)
+        wyn = ix.szukaj(zap, limit=KANDYDATOW, wektory=self.wektory, zakres=zakres)
         return [r for r in wyn if r["typ"] not in ("orzeczenia",)]
 
     def orzeczenia(self, szkic: dict) -> List[str]:
-        """Orzeczenia właściciela dla promptu: `orzeczenia/wszyscy` i plik agenta szkicu (z wiedza-agenci.json), datowane linie."""
+        """Orzeczenia właściciela dla promptu: `orzeczenia/wszyscy`, plik agenta szkicu (z wiedza-agenci.json) i, dla
+        agenta marki, `orzeczenia/marki/<marka>`; datowane linie."""
         agent = szkic.get("agent") or ""
         pliki = ["orzeczenia/wszyscy"]
         if agent:
             pliki.append((self._agenci.get(agent) or {}).get("orzeczenia") or f"orzeczenia/{agent}")
+        if self.marka(szkic):
+            pliki.append(f"orzeczenia/marki/{self.marka(szkic)}")
         linie: List[str] = []
         for rel in pliki:
             try:
@@ -217,12 +248,17 @@ class Kompilacja:
         return linie
 
     def prompt(self, szkic: dict, kandydaci: List[dict]) -> str:
+        marka = self.marka(szkic)
         linie = [f"Agent, którego dotyczy szkic: {szkic.get('agent') or 'brak'}", f"Dziś: {self.lib.dzis()}", "",
                  "SZKIC" + (" (lustro pamięci: tylko fakty, których nie ma w kandydatach)" if self.lustro_pamieci(szkic) else "") + ":",
                  f"- typ proponowany: {szkic['typ']}", f"- tytuł: {szkic['tytul']}", f"- źródło: {szkic['zrodlo']}",
                  f"- skąd: {szkic.get('skad') or '-'}", f"- utworzono: {szkic.get('utworzono') or '-'}",
                  f"- tagi: {', '.join(szkic.get('tagi') or []) or '-'}", "- treść:",
                  szkic["tresc"][:6000], "", "ORZECZENIA WŁAŚCICIELA (wiążące, z datą; nowsze niż notatka rozstrzygają):"]
+        if marka:
+            linie[1:1] = [f"Marka agenta: {marka}. Notatki tylko w folderach: "
+                          + ", ".join(f"{f}/" for f in self.foldery_marki(szkic))
+                          + "; linki tylko do ścieżek z listy niżej (ten agent nie widzi innych marek, projektów ani rozmów)."]
         linie += self.orzeczenia(szkic) or ["- brak"]
         linie += ["", "KANDYDACI (istniejące notatki, najbliższe tematycznie):"]
         if not kandydaci:
@@ -235,7 +271,7 @@ class Kompilacja:
                     linie.append("  treść: " + self.lib.GEN_RE.sub("", n.tresc).strip()[:1500].replace("\n", "\n  "))
                 except (ValueError, FileNotFoundError):
                     pass
-        linie += ["", "DOSTĘPNE ŚCIEŻKI DO LINKÓW (tylko te i kandydaci):"] + [f"- {h}" for h in self._huby()]
+        linie += ["", "DOSTĘPNE ŚCIEŻKI DO LINKÓW (tylko te i kandydaci):"] + [f"- {h}" for h in self._huby(self.zakres(szkic))]
         return "\n".join(linie)
 
     def zapytaj_model(self, szkic: dict, kandydaci: List[dict]) -> tuple:
@@ -293,6 +329,9 @@ class Kompilacja:
         folder, _, nazwa = prop.rpartition("/")
         tytul = str(wynik.get("tytul") or nazwa or szkic["tytul"])
         agent = szkic.get("agent") or ""
+        wlasne = self.foldery_marki(szkic)
+        if wlasne:                    # agent marki: tylko brands/<marka>/ albo agenci/<agent>/, propozycja modelu inna = marka
+            return f"{folder if folder in wlasne else wlasne[0]}/{lib.nazwa_pliku(tytul)}"
         dozwolony = folder in FOLDERY_NOTATEK or (folder.startswith("agenci/") and folder.count("/") == 1 and (self.sk.root / folder).is_dir()) \
             or (folder.startswith("brands/") and folder.count("/") == 1 and (self.sk.root / folder).is_dir())
         if not dozwolony:
@@ -304,13 +343,15 @@ class Kompilacja:
                 folder = "pojecia"
         return f"{folder}/{lib.nazwa_pliku(tytul)}"
 
-    def linki(self, wynik: dict, sciezka: str, kandydaci: List[dict], stare: List[str] = ()) -> List[str]:
+    def linki(self, wynik: dict, sciezka: str, kandydaci: List[dict], stare: List[str] = (), zakres=()) -> List[str]:
+        """Linki notatki: stare, od modelu (istniejące), hub katalogu albo folderu, sąsiad, notatka z innego folderu.
+        `zakres` (szkic agenta marki): tylko cele z zakresu."""
         folder = sciezka.split("/", 1)[0]
         katalog = sciezka.rsplit("/", 1)[0]
         out: List[str] = []
 
         def dodaj(c: Optional[str]) -> None:
-            if c and c != sciezka and c not in out and self.sk.istnieje(c):
+            if c and c != sciezka and c not in out and self.sk.istnieje(c) and self.lib.w_zakresie(c, zakres):
                 out.append(c)
 
         for c in stare:
@@ -319,11 +360,11 @@ class Kompilacja:
         for c in wynik.get("linki") or []:
             dodaj(self.sk.rozwiaz(str(c), znane, zbior))
         hub = None
-        if folder == "agenci" and katalog.count("/") == 1:
+        if folder in ("agenci", "brands") and katalog.count("/") == 1:   # hub agenta albo marki agenta biznesowego
             hub = next((h for h in (self.sk.rel(p) for p in (self.sk.root / katalog).glob("_hub-*.md"))), None)
         if not hub and folder in self.lib.HUBY:
             hub = f"{folder}/{self.lib.HUBY[folder][0]}"
-        if hub and hub not in out:
+        if hub and hub not in out and self.lib.w_zakresie(hub, zakres):
             out.insert(0, hub)
         if not any(c.startswith(katalog + "/") and c != hub for c in out):        # sąsiad z tego samego katalogu
             for k in kandydaci:
@@ -348,9 +389,19 @@ class Kompilacja:
         """Rdzenie słów (5 pierwszych liter bez ogonków, bez stopsłów): „strona”, „strony”, „stronie” to jedno."""
         return {w[:5] for w in re.findall(r"\w+", self.lib.bez_ogonkow(s).lower()) if len(w) >= 2 and w not in self.lib.STOPSLOWA}
 
+    def wlasny_format(self, rel: str) -> bool:
+        """Plik własnego formatu skilla w `brands/` albo `inspiracje/` (brand kit `BRAND.md`, karta strony): bez `typ`
+        we frontmatterze. Pisze go skill skryptem (SCHEMA, zasada 9), więc kompilacja go nie nadpisuje ani nie scala."""
+        if not rel.startswith(("brands/", "inspiracje/")):
+            return False
+        try:
+            return not self.sk.wczytaj(rel).fm.get("typ")
+        except (OSError, ValueError):
+            return False
+
     def bliska_notatka(self, sciezka: str) -> Optional[str]:
         """Istniejąca notatka w tym samym folderze o prawie tym samym tytule (Jaccard rdzeni nazw plików ≥ PODOBNY_TYTUL),
-        najbliższa; None = brak. Nazwa pliku to tytuł notatki (wiedza.nazwa_pliku)."""
+        najbliższa; None = brak. Nazwa pliku to tytuł notatki (wiedza.nazwa_pliku). Pliki własnego formatu się nie liczą."""
         folder, _, nazwa = sciezka.rpartition("/")
         klucz = self._rdzenie(nazwa)
         katalog = self.sk.root / folder
@@ -358,7 +409,7 @@ class Kompilacja:
             return None
         najlepsza, wynik = None, 0.0
         for p in katalog.glob("*.md"):
-            if p.stem.startswith("_hub-") or p.stem == nazwa:
+            if p.stem.startswith("_hub-") or p.stem == nazwa or self.wlasny_format(f"{folder}/{p.stem}"):
                 continue
             inny = self._rdzenie(p.stem)
             j = len(klucz & inny) / len(klucz | inny) if inny else 0.0
@@ -412,12 +463,18 @@ class Kompilacja:
         cel = str(wynik.get("sciezka") or "").strip().strip("/")
         cel = cel[:-3] if cel.endswith(".md") else cel
         cel_istnieje = bool(cel) and self.sk.istnieje(cel) and not cel.startswith(("zrodla/", "skrzynka/"))
-        # hubów i archiwum briefów (`briefy/`, pisze skrypt briefy.py i Jarvo w tabeli decyzji) nie nadpisujemy
-        cel_hub = cel_istnieje and (cel.rsplit("/", 1)[-1].startswith("_hub-") or cel.startswith("briefy/"))
+        # hubów, archiwum briefów (`briefy/`, pisze skrypt briefy.py i Jarvo w tabeli decyzji) i plików własnego formatu
+        # (brand kit) nie nadpisujemy; szkic agenta marki zmienia tylko notatki w swoich folderach (foldery_marki)
+        wlasne = self.foldery_marki(szkic)
+        cel_hub = cel_istnieje and (cel.rsplit("/", 1)[-1].startswith("_hub-") or cel.startswith("briefy/") or self.wlasny_format(cel)
+                                    or bool(wlasne) and not any(cel.startswith(f + "/") for f in wlasne))
         if decyzja in ("aktualizacja", "sprzecznosc") and (not cel_istnieje or cel_hub):
             decyzja = "nowa"                                         # brak celu albo cel chroniony = nowa notatka
+        zakres = self.zakres(szkic)                                  # agent marki: linki tylko do jego zakresu
         if decyzja == "nowa":
             sciezka = self.sciezka_nowej(wynik, szkic)
+            if self.wlasny_format(sciezka):                          # tytuł jak plik brand kitu („BRAND”): obok, nie w miejsce
+                sciezka += " (notatka)"
             if self.sk.istnieje(sciezka):
                 decyzja, cel = "aktualizacja", sciezka
             elif not sciezka.startswith("rozmowy/") and (bliska := self.bliska_notatka(sciezka)):
@@ -432,7 +489,7 @@ class Kompilacja:
                 tresc = self.tresc_wlasciwa(stara_b) + "\n\n" + " ".join(nowe_zdania)
                 powod = f"prawie ten sam tytuł co istniejąca notatka, dopisane nowe zdania; {powod}".rstrip("; ")
         if decyzja == "nowa":
-            linki = self.linki(wynik, sciezka, kandydaci)
+            linki = self.linki(wynik, sciezka, kandydaci, zakres=zakres)
             fm = {"typ": typ, "tagi": tagi, "utworzono": lib.dzis(), "zmieniono": lib.dzis(), "status": "aktualna", "zrodlo": szkic["zrodlo"]}
             if aliasy and (typ == "podmiot" or sciezka.startswith("user/")):
                 fm["aliasy"] = aliasy
@@ -465,7 +522,7 @@ class Kompilacja:
                 fm["aliasy"] = list(dict.fromkeys([*stare_aliasy, *aliasy]))[:8]
             if wazne_do:
                 fm["wazne_do"] = wazne_do
-            linki = self.linki(wynik, cel, kandydaci, stare=stare_linki)
+            linki = self.linki(wynik, cel, kandydaci, stare=stare_linki, zakres=zakres)
             if not self.na_sucho:
                 self.sk.zapisz_plik(cel, lib.sklej(fm, self._tresc_notatki(tytul, streszczenie, tresc, linki)))
             self.raport["aktualizacje"] += 1
@@ -490,7 +547,7 @@ class Kompilacja:
         tresc = re.sub(r"^# .*\n", "", body, count=1).strip()
         return {"plik": p.name, "typ": str(fm.get("typ") or "fakt"), "tytul": str(fm.get("tytul") or p.stem), "tresc": tresc,
                 "zrodlo": str(fm.get("zrodlo") or ""), "agent": str(fm.get("agent") or ""), "skad": str(fm.get("skad") or ""),
-                "utworzono": str(fm.get("utworzono") or ""),
+                "utworzono": str(fm.get("utworzono") or ""), "marka": str(fm.get("marka") or ""),
                 "tagi": list(fm.get("tagi") or []) if isinstance(fm.get("tagi"), list) else [], "proby": int(fm.get("proby") or 0), "fm": fm, "body": body}
 
     def _zrobione(self, p: Path) -> None:

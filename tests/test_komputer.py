@@ -138,11 +138,11 @@ def test_agent_z_komputerem_terminal_i_klucze(repo_copy):
 
 
 def test_jarvo_stale_zgody_bez_okna_na_wierzch(repo_copy):
-    """Jarvo (jedyny z `komputer: true`) ma w repo stałe zgody na działania w tle i na działania wejścia na wierzchu
-    (wejście Komputera przepuszcza je tylko w aktywnym oknie); okna na wierzch nie dostanie. Ekran, terminal i kanban
-    ma w czacie (Telegram, HQ) i na karcie."""
+    """Jarvo (i agent biznesowy jarvo-jarodev, oba z `komputer: true`) ma w repo stałe zgody na działania w tle i na
+    działania wejścia na wierzchu (wejście Komputera przepuszcza je tylko w aktywnym oknie); okna na wierzch nie
+    dostanie. Ekran, terminal i kanban ma w czacie (Telegram, HQ) i na karcie."""
     fleet = validate.fl.load_fleet()
-    assert [a.name for a in fleet.active() if a.komputer] == ["jarvo"]
+    assert [a.name for a in fleet.active() if a.komputer] == ["jarvo", "jarvo-jarodev"]
     cfg = validate.fl.load_yaml(REPO / "profiles/jarvo/config.yaml")
     klucze = cfg["command_allowlist"]
     assert klucze and all(k.startswith("cua:") for k in klucze)
@@ -155,6 +155,14 @@ def test_jarvo_stale_zgody_bez_okna_na_wierzch(repo_copy):
         assert {"computer_use", "komputer", "terminal", "kanban"} <= ts and "code_execution" not in ts, plat
     assert cfg["computer_use"] == {"permission_mode": "standard", "capture_after_mode": "ax", "ax_max_elements": 300,
                                    "max_image_dimension": 1456, "cua_telemetry": False}
+    # agent biznesowy: te same stałe zgody, ale ekran tylko w osobnym procesie (karta, CLI), nie w bramie Telegrama
+    # i czatu HQ, gdzie grupa ekranu procesu dzieliłaby ekran z rozmową Jarva bez zamka (docs/KOMPUTER.md §7)
+    biz = validate.fl.load_yaml(REPO / "profiles/jarvo-jarodev/config.yaml")
+    assert biz["command_allowlist"] == klucze and biz["computer_use"] == cfg["computer_use"]
+    assert {"computer_use", "komputer"} <= set(biz["platform_toolsets"]["cli"])
+    for plat in ("telegram", "api_server", "cron"):
+        ts = set(biz["platform_toolsets"][plat])
+        assert not {"computer_use", "komputer", "code_execution"} & ts and "kanban" in ts, plat
     plik = repo_copy / "profiles/jarvo/config.yaml"
     plik.write_text(plik.read_text(encoding="utf-8").replace('  - "cua:key:background"\n',
                     '  - "cua:key:background"\n  - "cua:set_value:foreground"\n  - "cua:bring_to_front:foreground"\n'),

@@ -1,5 +1,6 @@
-"""`jarvo telefon on|off|status` (jarvo/telefon.py, docs/MOBILE.md „Telefon przez PHONEUSE”): serwer MCP PHONEUSE
-w zainstalowanym profilu jarvo (wszystkie narzędzia).
+"""`jarvo telefon on|off|status|przydziel|zabierz` (jarvo/telefon.py, docs/MOBILE.md „Telefon przez PHONEUSE”):
+serwer MCP PHONEUSE w zainstalowanym profilu jarvo (wszystkie narzędzia) i u agenta biznesowego z przydziałem
+(jeden telefon).
 
 Bez telefonu i bez Hermesa: instalacja to katalog tymczasowy z `program/current.json` (kod tego repo), PHONEUSE to
 katalog z pustym `tools/phone_mcp.py`, Python serwera to atrapa (tests/atrapy.py), która drukuje wersję mcp, a YAML
@@ -172,3 +173,73 @@ def test_doctor_widzi_zniknieta_instalacje_phoneuse(inst):
     (inst.phoneuse / "tools" / "phone_mcp.py").unlink()
     w = telefon.sprawdzenia(inst.u)[0]
     assert w["stan"] == "uwaga" and "phone_mcp.py" in w["opis"]
+
+
+BIZNES = "jarvo-jarodev"
+
+
+def profil_biznesowy(inst) -> None:
+    p = inst.u.dane / "profiles" / BIZNES / "config.yaml"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(CONFIG, encoding="utf-8")
+
+
+def test_przydzial_daje_agentowi_biznesowemu_jeden_telefon(inst, capsys):
+    """Agent biznesowy (docs/MOBILE.md „Telefon agenta biznesowego”): bez przydziału bez serwera phone, z przydziałem
+    serwer z PHONEUSE_ONLY (phone_mcp.py: tylko ten telefon); Jarvo dalej wszystkie telefony."""
+    profil_biznesowy(inst)
+    assert wlacz(inst, "--telefon", "pixel") == 0
+    assert wpis(inst, BIZNES) is None and BIZNES not in telefon.klucze_profili(inst.u)   # bez przydziału: nic
+    assert jarvo(inst, "przydziel", BIZNES, "fb-telefon") == 0
+    w = wpis(inst, BIZNES)
+    assert w["env"]["PHONEUSE_ONLY"] == "fb-telefon" and w["env"]["PHONEUSE_PHONE"] == "fb-telefon"
+    assert w["command"] == str(inst.python) and w["env"]["ADB"] == str(inst.adb)
+    assert "PHONEUSE_ONLY" not in wpis(inst, "jarvo")["env"] and wpis(inst, "jarvo")["env"]["PHONEUSE_PHONE"] == "pixel"
+    assert inst.restarty == [1, 1]
+    assert jarvo(inst, "przydziel", BIZNES, "fb-telefon") == 0 and inst.restarty == [1, 1]   # to samo: bez restartu
+    assert telefon.stan_telefonu(inst.u)["profile"] == {BIZNES: "fb-telefon"}
+    # flota.ustawienia_profili (jarvo update) bierze ten sam wpis, tylko dla agentów z listy
+    assert telefon.klucze_profili(inst.u, ["jarvo-web"]) == {}
+    assert telefon.klucze_profili(inst.u, [BIZNES])[BIZNES][telefon.KLUCZ]["env"]["PHONEUSE_ONLY"] == "fb-telefon"
+    capsys.readouterr()
+    assert jarvo(inst, "status") == 0
+    out = capsys.readouterr().out
+    assert f"przydział: {BIZNES} → fb-telefon" in out and "tylko telefon fb-telefon" in out
+    assert f"przydziały: {BIZNES} → fb-telefon" in telefon.sprawdzenia(inst.u)[0]["opis"]
+
+
+def test_przydzial_przed_on_i_po_off(inst):
+    profil_biznesowy(inst)
+    assert jarvo(inst, "przydziel", BIZNES, "fb") == 0                  # telefon nie włączony: tylko zapis
+    assert wpis(inst, BIZNES) is None and telefon.klucze_profili(inst.u) == {} and inst.restarty == []
+    assert wlacz(inst) == 0                                              # on dopisuje też przydział
+    assert wpis(inst, BIZNES)["env"]["PHONEUSE_ONLY"] == "fb"
+    assert jarvo(inst, "off") == 0
+    assert wpis(inst, BIZNES)["enabled"] is False and wpis(inst, "jarvo")["enabled"] is False
+    assert wlacz(inst) == 0                                              # przydział przeżywa off i on
+    assert telefon.stan_telefonu(inst.u)["profile"] == {BIZNES: "fb"}
+
+
+def test_zabierz_wylacza_serwer_tylko_u_agenta(inst):
+    profil_biznesowy(inst)
+    assert wlacz(inst) == 0 and jarvo(inst, "przydziel", BIZNES, "fb") == 0
+    assert jarvo(inst, "zabierz", BIZNES) == 0
+    assert wpis(inst, BIZNES)["enabled"] is False and "enabled" not in wpis(inst, "jarvo")
+    assert "profile" not in telefon.stan_telefonu(inst.u) and BIZNES not in telefon.klucze_profili(inst.u)
+    restarty = list(inst.restarty)
+    assert jarvo(inst, "zabierz", BIZNES) == 0 and inst.restarty == restarty   # drugi raz: nic do zmiany
+
+
+def test_przydzial_tylko_agent_biznesowy_i_tylko_wlasciciel(inst, monkeypatch, capsys):
+    for profil, tel in (("jarvo", "fb"), ("web", "fb"), ("jarvo-X", "fb"), (BIZNES, "zly;telefon")):
+        assert jarvo(inst, "przydziel", profil, tel) == 2, profil
+    assert jarvo(inst, "zabierz", "jarvo") == 2
+    assert not (inst.u.stan / telefon.STAN).exists()
+    # ręcznie zepsuty przydział nie daje serwera nikomu
+    telefon.zapisz_stan(inst.u, {"profile": {"jarvo": "x", BIZNES: "a b", "jarvo-ok": "fb"}})
+    assert telefon.przydzialy(telefon.stan_telefonu(inst.u)) == {"jarvo-ok": "fb"}
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "t_1")
+    capsys.readouterr()
+    assert jarvo(inst, "przydziel", BIZNES, "fb") == 1 and jarvo(inst, "zabierz", "jarvo-ok") == 1
+    assert capsys.readouterr().err.count("tylko właściciel") == 2
+    assert telefon.przydzialy(telefon.stan_telefonu(inst.u)) == {"jarvo-ok": "fb"}

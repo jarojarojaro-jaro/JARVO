@@ -187,6 +187,10 @@ ZNACZNIK_BLOKADY = "wiedza.lock"
 PLIK_ZAMKA = "wiedza.zamek"
 BLOKADA_STARA_S = 2 * 3600         # starszy znacznik to resztka po awarii (jak w install_fleet.py)
 LINT_JSON = "wiedza-lint.json"     # state/: podsumowanie ostatniego lintu dla `jarvo doctor` i statusu
+# agent biznesowy (pole `marka` we fleet.yaml, docs/WIEDZA.md „Agenci biznesowi”): w skarbcu widzi tylko swoją markę,
+# siebie, wiedzę o flocie i inspiracje; reszta (projekty, rozmowy, user, inne marki, inni agenci) nie dla niego
+WSPOLNE_DLA_MAREK = ("fleet/", "inspiracje/")
+MARKA_RE = re.compile(r"[a-z0-9][a-z0-9-]*")
 
 
 def dzis() -> str:
@@ -524,6 +528,44 @@ def zastap_blok(text: str, nazwa: str, tresc: str) -> str:
 
 # ------------------------------------------------------------------------------------------------ notatka
 
+def zakres_marki(marka: str, agent: str = "", orzeczenia: str = "") -> tuple[str, ...]:
+    """Ścieżki skarbca widoczne dla agenta biznesowego (fleet.yaml `marka`): katalogi z „/” na końcu, pliki orzeczeń bez
+    `.md`. Brak marki (albo marka spoza [a-z0-9-]) = pusta krotka: agent widzi cały skarbiec."""
+    if not marka or not MARKA_RE.fullmatch(marka):
+        return ()
+    z = [f"brands/{marka}/", *([f"agenci/{agent}/"] if agent else []), *WSPOLNE_DLA_MAREK,
+         *([orzeczenia] if orzeczenia else []), f"orzeczenia/marki/{marka}", "orzeczenia/wszyscy"]
+    return tuple(dict.fromkeys(z))
+
+
+def w_zakresie(rel: str, zakres) -> bool:
+    """Ścieżka (notatka bez `.md`, plik albo katalog) w zakresie agenta; pusty zakres = wszystko."""
+    if not zakres:
+        return True
+    rel = rel.strip().strip("/").removesuffix(".md")
+    return any(rel == z.rstrip("/") or (z.endswith("/") and rel.startswith(z)) for z in zakres)
+
+
+def folder_w_zakresie(folder: str, zakres) -> bool:
+    """Folder `wiedza_szukaj` w zakresie: w dozwolonym katalogu albo nad nim (`brands`, `orzeczenia`: wyniki i tak
+    tylko z zakresu); pusty zakres = każdy folder."""
+    f = folder.strip().strip("/")
+    return not zakres or any(z.startswith(f + "/") or w_zakresie(f, (z,)) for z in zakres)
+
+
+def _warunek_zakresu(zakres) -> tuple[str, list[str]]:
+    """Warunek SQL na kolumnę `p.sciezka` (LIMIT liczy wtedy tylko notatki z zakresu)."""
+    czesci, arg = [], []
+    for z in zakres:
+        if z.endswith("/"):
+            czesci.append("p.sciezka LIKE ? ESCAPE '\\'")
+            arg.append(z.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
+        else:
+            czesci.append("p.sciezka = ?")
+            arg.append(z)
+    return "(" + " OR ".join(czesci) + ")", arg
+
+
 @dataclass
 class Notatka:
     sciezka: str                      # względem skarbca, bez `.md`, POSIX
@@ -852,39 +894,42 @@ class Indeks:
         wybrane = set(sorted(trafne, key=lambda w: df[w])[:n])       # sort stabilny: przy remisie wcześniejsze słowo
         return [w for w in slowa if w in wybrane]
 
-    def rozszerz(self, q: str) -> str:
+    def rozszerz(self, q: str, zakres=()) -> str:
         """Zapytanie z tytułami notatek, których alias (frontmatter `aliasy:`) pada w pytaniu: „co lubi szefowa” →
         „co lubi szefowa Ola Wrona”. Ogonki i wielkość liter bez znaczenia, słowa aliasu pasują też w odmianie
-        (_ma_fraze). Tytuł, który już jest w pytaniu, nie wraca."""
+        (_ma_fraze). Tytuł, który już jest w pytaniu, nie wraca. Z `zakres` (agent biznesowy) tylko aliasy notatek
+        z zakresu."""
         slowa = _slowa_lista(q)
         if not slowa:
             return q
         w_pytaniu = " ".join(slowa)
         dopiski: list[str] = []
-        for alias, tytul in self.db.execute("SELECT alias, tytul FROM aliasy ORDER BY sciezka, alias"):
-            if tytul in dopiski or " ".join(_slowa_lista(tytul)) in w_pytaniu or not _ma_fraze(slowa, alias.split()):
+        for alias, tytul, sciezka in self.db.execute("SELECT alias, tytul, sciezka FROM aliasy ORDER BY sciezka, alias"):
+            if (tytul in dopiski or " ".join(_slowa_lista(tytul)) in w_pytaniu or not _ma_fraze(slowa, alias.split())
+                    or not w_zakresie(sciezka, zakres)):
                 continue
             dopiski.append(tytul)
             if len(dopiski) >= MAX_DOPISKOW_ALIASOW:
                 break
         return q + (" " + " ".join(dopiski) if dopiski else "")
 
-    def szukaj_wektorami(self, osadzacz, q: str, n: int = WEKTOROW_W_RANKINGU) -> list[tuple[str, float]] | None:
+    def szukaj_wektorami(self, osadzacz, q: str, n: int = WEKTOROW_W_RANKINGU, zakres=()) -> list[tuple[str, float]] | None:
         """[(ścieżka, kosinus)] najlepszych `n` notatek albo None (brak modelu, wektorów, usługi albo czasu: wołający
         zostaje przy słowach). Pytanie dłuższe niż DLUGIE_ZAPYTANIE słów idzie zdaniami (każde z aliasami), wynik notatki
-        to najlepsze zdanie. Iloczyn skalarny w czystym Pythonie: wektory są znormalizowane, brama nie ma numpy."""
+        to najlepsze zdanie. Iloczyn skalarny w czystym Pythonie: wektory są znormalizowane, brama nie ma numpy.
+        Z `zakres` (agent biznesowy) ranking tylko notatek z zakresu, więc `n` najlepszych jest z zakresu."""
         model = getattr(osadzacz, "model", "") if osadzacz is not None else ""
         if not model:
             return None
         wiersze = self.db.execute("SELECT sciezka, wektor FROM wektory WHERE model = ?", (model,)).fetchall()
         if not wiersze:
             return None
-        pytania = osadzacz.osadz([f"query: {self.rozszerz(z)}" for z in zdania_zapytania(q)])
+        pytania = osadzacz.osadz([f"query: {self.rozszerz(z, zakres)}" for z in zdania_zapytania(q)])
         if not pytania:
             return None
         wymiar = len(pytania[0])
         wyniki = []
-        for s, blob in wiersze:
+        for s, blob in (wiersze if not zakres else [x for x in wiersze if w_zakresie(x[0], zakres)]):
             v = wektor_z_bajtow(blob)
             if len(v) == wymiar:
                 wyniki.append((-max(_iloczyn(p, v) for p in pytania), s))
@@ -892,14 +937,15 @@ class Indeks:
         return [(s, -w) for w, s in wyniki[:n]]
 
     def szukaj(self, q: str, limit: int = 5, folder: str | None = None, agent: str | None = None, zrodla: bool = False,
-               wektory=None, silnik: str | None = None) -> list[dict]:
+               wektory=None, silnik: str | None = None, zakres=()) -> list[dict]:
         """Notatki do pytania. `wektory` (KlientWektorow albo atrapa: `model`, `osadz(teksty)`) i `silnik` (SILNIKI,
         domyślnie SILNIK): wektory = lista wektorów (kosinus), a notatki jeszcze bez wektora (nowe od ostatniego
         osadzania, zrodla/ przy `zrodla`) wchodzą z miejscem z listy BM25; hybryda = fuzja RRF listy BM25 i listy
         wektorów; slowa = BM25. Bez wektorów (brak usługi, modelu, czasu) zawsze BM25; użyty silnik zostaje
-        w `self.silnik`. Zapytanie rozszerzają aliasy notatek (rozszerz)."""
+        w `self.silnik`. Zapytanie rozszerzają aliasy notatek (rozszerz). `zakres` (zakres_marki, agent biznesowy): tylko
+        notatki z zakresu, już w zapytaniu (BM25 z warunkiem SQL, wektory przefiltrowane), więc wyników jest do `limit`."""
         silnik = silnik if silnik in SILNIKI else SILNIK
-        wek = self.szukaj_wektorami(wektory, q) if wektory is not None and silnik != "slowa" else None
+        wek = self.szukaj_wektorami(wektory, q, zakres=zakres) if wektory is not None and silnik != "slowa" else None
         self.silnik = silnik if wek is not None else "slowa"
         kolumny = "p.sciezka, p.tytul, p.streszczenie, p.typ, p.status, p.folder, p.agent, p.zmieniono"
 
@@ -911,14 +957,18 @@ class Indeks:
                 return False
             if folder and not s.startswith(folder.rstrip("/") + "/"):
                 return False
+            if zakres and not w_zakresie(s, zakres):
+                return False
             return not (agent and r["agent"] and r["agent"] != agent)
 
         bm = []
-        zap = self.zapytanie(self.slowa_informacyjne(self.rozszerz(q)))
+        zap = self.zapytanie(self.slowa_informacyjne(self.rozszerz(q, zakres)))
         if zap:
+            warunek, arg = _warunek_zakresu(zakres) if zakres else ("", [])
             bm = [r for r in self.db.execute(
                 f"SELECT {kolumny}, bm25(fts, 0, 3.0, 2.0, 1.0, 1.5) AS w FROM fts f JOIN pliki p ON p.sciezka = f.sciezka "
-                "WHERE fts MATCH ? ORDER BY w LIMIT ?", (zap, limit * 6)).fetchall() if dopuszczona(r)]
+                f"WHERE fts MATCH ?{' AND ' + warunek if warunek else ''} ORDER BY w LIMIT ?", (zap, *arg, limit * 6)).fetchall()
+                  if dopuszczona(r)]
         if wek is None:
             ranking = [(r, round(-r["w"], 3)) for r in bm]
         else:
@@ -955,7 +1005,7 @@ class Indeks:
             if r["sciezka"].startswith("brands/") and "/" in r["sciezka"][7:]:
                 marka = r["sciezka"].split("/")[1]
                 orz = f"orzeczenia/marki/{marka}"
-                if self.sk.istnieje(orz) and orz not in widziane:
+                if self.sk.istnieje(orz) and orz not in widziane and w_zakresie(orz, zakres):
                     widziane.add(orz)
                     out.append({"sciezka": orz, "tytul": f"Orzeczenia marki {marka}", "streszczenie": "korekty użytkownika dotyczące tej marki",
                                 "typ": "orzeczenia", "status": "aktualna", "zmieniono": "", "wynik": 0.0})
@@ -1181,14 +1231,14 @@ def hub_agenta_nazwany(sciezka: str, slowa_pytania: set[str]) -> bool:
     return any(n and n <= slowa_pytania for n in nazwy)
 
 
-def notatki_przypomnienia(ix: Indeks, q: str, limit: int = 5, wektory=None, silnik: str | None = None) -> list[dict]:
+def notatki_przypomnienia(ix: Indeks, q: str, limit: int = 5, wektory=None, silnik: str | None = None, zakres=()) -> list[dict]:
     """Notatki „może się przydać” przed turą (wtyczka jarvo-wiedza) i w `ocena`: wyszukiwanie (Indeks.szukaj: wektory,
     gdy usługa odpowie w czasie, inaczej słowa) bez hubów folderów, orzeczeń (idą osobno) i hubów agentów
     `agenci/<agent>/_hub-*`, chyba że pytanie nazywa tego agenta (hub ma ogólne słowa o całej dziedzinie, więc bez
-    tego zajmuje miejsca przy każdym pytaniu o pracę). Użyty silnik: `ix.silnik`."""
+    tego zajmuje miejsca przy każdym pytaniu o pracę). Użyty silnik: `ix.silnik`. `zakres`: agent biznesowy (zakres_marki)."""
     slowa = _slowa_ascii(q)
     out = []
-    for t in ix.szukaj(q, limit=limit + 8, wektory=wektory, silnik=silnik):
+    for t in ix.szukaj(q, limit=limit + 8, wektory=wektory, silnik=silnik, zakres=zakres):
         if t["typ"] in ("orzeczenia", "hub"):
             continue
         if HUB_AGENTA_RE.match(t["sciezka"]) and not hub_agenta_nazwany(t["sciezka"], slowa):
@@ -1262,7 +1312,8 @@ def zbuduj_index(sk: Skarbiec, ix: Indeks) -> int:
 
 
 def odswiez_listy_hubow(sk: Skarbiec, ix: Indeks) -> int:
-    """Blok `lista` w hubie folderu (i w hubie agenta): linki do wszystkich notatek folderu, 0 tokenów."""
+    """Blok `lista` w hubie folderu (i w hubie agenta albo marki agenta biznesowego, `brands/<marka>/_hub-<marka>`):
+    linki do wszystkich notatek folderu, 0 tokenów."""
     notatki = [r for r in ix.notatki() if not r["hub"]]
     ile = 0
     for folder, (hub, _t) in HUBY.items():
@@ -1278,7 +1329,7 @@ def odswiez_listy_hubow(sk: Skarbiec, ix: Indeks) -> int:
                        for r in notatki if r["sciezka"].startswith(folder + "/")]
         ile += _wpisz_liste(sk, rel, wiersze)
     for r in ix.notatki():
-        if r["hub"] and r["sciezka"].startswith("agenci/") and r["sciezka"].count("/") == 2:
+        if r["hub"] and r["sciezka"].startswith(("agenci/", "brands/")) and r["sciezka"].count("/") == 2:
             katalog = r["sciezka"].rsplit("/", 1)[0] + "/"
             wiersze = [f"- [[{n['sciezka']}|{n['tytul']}]]" + (f" · {n['streszczenie'][:90]}" if n["streszczenie"] else "")
                        for n in notatki if n["sciezka"].startswith(katalog)]
@@ -1395,6 +1446,26 @@ def zasiej_lustro(sk: Skarbiec, repo: Path) -> tuple[int, set[str]]:
     return zmienione, {lustro(r) for r in nowe}
 
 
+def hub_marki(marka: str) -> str:
+    """Hub marki agenta biznesowego: `brands/<marka>/_hub-<marka>` (lista notatek marki, cel linku notatek z kompilacji)."""
+    return f"brands/{marka}/_hub-{marka}"
+
+
+def zasiej_marke(sk: Skarbiec, marka: str, a: dict, hub_agenta_rel: str) -> None:
+    """Agent biznesowy (fleet.yaml `marka`): hub marki i plik orzeczeń marki, gdy ich nie ma. Brand kit (`BRAND.md`
+    z `brand-z-url`) może jeszcze nie istnieć; kompilacja i tak kładzie tu notatki ze szkiców tego agenta."""
+    hub, orz = hub_marki(marka), f"orzeczenia/marki/{marka}"
+    if not sk.istnieje(hub):
+        sk.zapisz_plik(hub, sklej(_hub_frontmatter("hub", "fleet.yaml", agent=a["name"]),
+                                  f"# Marka {marka}\n\n**Wiedza marki `{marka}`: brand kit i notatki z pracy agenta `{a['name']}`; "
+                                  f"kompilacja kładzie tu notatki z jego szkiców.**\n\n## Powiązane\n- hub: [[brands/_hub-marki|Marki]]\n"
+                                  f"- [[{hub_agenta_rel}|{a.get('short') or a['name']}]]\n- [[{orz}|Orzeczenia marki {marka}]]\n"))
+    if not sk.istnieje(orz):
+        sk.zapisz_plik(orz, sklej(_hub_frontmatter("orzeczenia", "człowiek"),
+                                  f"# Orzeczenia: {marka}\n\n**Korekty od użytkownika dla marki `{marka}`, jedna datowana linia każda.**\n\n"
+                                  f"## Powiązane\n- hub: [[orzeczenia/_hub-orzeczenia|Orzeczenia]]\n- [[{hub}|Marka {marka}]]\n\n## Linie\n"))
+
+
 def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | None, repo: Path | None = None) -> dict:
     sk.root.mkdir(parents=True, exist_ok=True)
     for f in FOLDERY:
@@ -1433,6 +1504,10 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
             opis = " ".join(a.get("description", "").split())
             agenci_meta[a["name"]] = {"hub": rel, "orzeczenia": orz, "short": a.get("short") or krotki, "title": a.get("title", ""),
                                       "opis": opis}
+            marka = str(a.get("marka") or "").strip()
+            marka = marka if MARKA_RE.fullmatch(marka) else ""
+            if marka:                          # agent biznesowy: zakres skarbca (zakres_marki) czytają wtyczka i kompilacja
+                agenci_meta[a["name"]]["marka"] = marka
             if not sk.istnieje(rel):
                 body = (f"# {a.get('emoji', '')} {a.get('title', a['name'])} ({a['name']})\n\n**{a.get('description', '').strip()}**\n\n"
                         f"## Powiązane\n- hub: [[agenci/_hub-agenci|Agenci]]\n- [[{orz}|Orzeczenia: {a.get('short') or krotki}]]\n"
@@ -1472,6 +1547,7 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
             zmiany_linia = (f"\n- ostatnie zmiany (CHANGELOG profilu, {a.get('changes_section') or 'najnowsze'}):{zmiany}"
                             if zmiany else "")
             uchwyt = f"uchwyt: @{a['handle']} · " if a.get("handle") else ""   # @… w rozmowie aplikacji Jarvo
+            uchwyt += f"marka: [[{hub_marki(marka)}|{marka}]] · " if marka else ""
             gen = (f"## Z rejestru floty (fleet.yaml)\n- rola: {a.get('kind', '')} · autonomia: {a.get('autonomy_max', '')} · "
                    f"{uchwyt}pokój HQ: {a.get('label', a.get('room', ''))} (`{a.get('room', '')}`) · temat Telegrama: `{a.get('telegram_topic', '')}`\n"
                    f"- skille ({len(a.get('skills', []))}):\n{skille}{zewn_linia}\n- skrypty: {skrypty}{mcp_linia}{zmiany_linia}")
@@ -1486,6 +1562,8 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
                 sk.zapisz_plik(orz, sklej(_hub_frontmatter("orzeczenia", "człowiek", agent=a["name"]),
                                           f"# Orzeczenia: {a.get('short') or krotki}\n\n**Korekty od użytkownika dla `{a['name']}`, jedna datowana linia każda; agent czyta je przed każdą turą.**\n\n"
                                           f"## Powiązane\n- hub: [[orzeczenia/_hub-orzeczenia|Orzeczenia]]\n- [[{rel}|{a.get('short') or krotki}]]\n\n## Linie\n"))
+            if marka:
+                zasiej_marke(sk, marka, a, rel)
         (sk.stan).mkdir(parents=True, exist_ok=True)
         (sk.stan / "wiedza-agenci.json").write_text(json.dumps(agenci_meta, ensure_ascii=False, indent=1), encoding="utf-8",
                                                     newline="\n")
@@ -1536,7 +1614,9 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
 # ------------------------------------------------------------------------------------------------ szkice i orzeczenia
 
 def zapisz_szkic(sk: Skarbiec, typ: str, tytul: str, tresc: str, zrodlo: str, agent: str = "", tagi: list | None = None,
-                 linki: list | None = None, skad: str = "") -> str:
+                 linki: list | None = None, skad: str = "", marka: str = "") -> str:
+    """Szkic w skrzynka/. `marka`: szkic agenta biznesowego (kompilacja kładzie notatki tylko w `brands/<marka>/` albo
+    `agenci/<agent>/`)."""
     if typ not in TYPY - {"hub", "orzeczenia"}:
         raise ValueError(f"typ spoza schematu: {typ} (dozwolone: {', '.join(sorted(TYPY - {'hub', 'orzeczenia'}))})")
     if not tytul.strip() or not tresc.strip():
@@ -1550,6 +1630,8 @@ def zapisz_szkic(sk: Skarbiec, typ: str, tytul: str, tresc: str, zrodlo: str, ag
     rel = f"skrzynka/{dzis()}-{slug_ascii(agent or 'agent', 16)}-{slug_ascii(tytul)}-{skrot}"
     fm = {"szkic": True, "typ": typ, "tytul": tytul.strip(), "agent": agent or "", "zrodlo": zrodlo.strip(), "utworzono": dzis(),
           "skad": skad or "", "tagi": tagi or [], "linki": linki or []}
+    if marka:
+        fm["marka"] = marka
     sk.zapisz_plik(rel, sklej(fm, f"# {tytul.strip()}\n\n{tresc.strip()}\n"))
     return rel
 

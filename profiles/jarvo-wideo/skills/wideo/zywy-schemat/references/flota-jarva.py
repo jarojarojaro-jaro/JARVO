@@ -24,7 +24,7 @@ E = []
 # tytuł
 E.append({"type": "text", "x": 65, "y": 148, "w": 950, "align": "center", "size": 44, "b": 1, "c": "ink", "t": "Jak działa flota Jarva"})
 E.append({"type": "text", "x": 65, "y": 192, "w": 950, "align": "center", "size": 18, "c": "dim",
-          "t": "9 agentów: Jarvo prowadzi, 8 specjalistów robi"})
+          "t": "10 agentów: Jarvo prowadzi, 9 specjalistów robi"})
 
 def box(x, y, w, h, color, fill, lines, when=None, glow=None, pad=(8, 8, 8), align="center", **kw):
     b = {"type": "box", "x": x, "y": y, "w": w, "h": h, "color": color, "fill": fill, "pad": list(pad), "align": align,
@@ -133,7 +133,7 @@ E.append({"type": "text", "x": 65, "y": 1166, "w": 950, "align": "center", "size
 cfg = {"meta": {"title": "Jak działa flota Jarva", "lang": "pl"},
        "canvas": {"preset": "ig", "duration": 28, "fps": 30},
        "theme": {"preset": "jarvo-jasny"},
-       "credit": {"text": "Misja i kolejność poglądowe · flota JARVO: 9 agentów (fleet.yaml) · ruch: live-panel (MIT)", "y": 1204, "size": 13},
+       "credit": {"text": "Misja i kolejność poglądowe · flota JARVO: 10 agentów (fleet.yaml) · ruch: live-panel (MIT)", "y": 1204, "size": 13},
        "machines": {"seq": {"type": "cycle", "period": 3.5, "t0": 0,
                             "values": ["plan", "sherlock", "studio", "wideograf", "web", "ads", "recenzja", "wynik"]}},
        "elements": E + FLOWS}
