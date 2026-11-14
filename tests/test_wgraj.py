@@ -4,7 +4,6 @@ odmowy, z-buildu, podgląd, blokada floty i jedna próba połączenia SSH. Serwe
 
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import shutil
@@ -263,6 +262,7 @@ def test_podglad_bez_metadanych(strona, capsys, monkeypatch):
 
 
 def test_blokada_odmawia_po_czekaniu(strona, capsys):
+    import fcntl                      # tylko POSIX: na Windows moduł ma być zebrany i pominięty przez pytestmark
     s = strona
     stan = s["tmp"] / "stan"
     stan.mkdir()
