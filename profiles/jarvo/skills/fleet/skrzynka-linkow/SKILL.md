@@ -1,7 +1,7 @@
 ---
 name: skrzynka-linkow
 description: "Link od właściciela do skarbca; „one” = temat poboczny."
-version: 1.6.0
+version: 1.7.0
 author: Jarvo
 license: MIT
 metadata:
@@ -46,6 +46,10 @@ API ręcznie, nie otwierasz linku w przeglądarce: wszystko daje narzędzie `pob
    rozwiązuje i jak („darmowe 4 vCPU = drugi procesor na render i testy kerneli”). Gdy rozwiązuje, jest darmowe
    i odwracalne, **od razu zakładasz misję próby** (konto zakładasz sam w Komputerze Jarva, pierwsze prawdziwe zadanie, pomiar
    względem serwera) i mówisz, że ruszyło; płatne albo nieodwracalne: propozycja z kosztem.
+   **Udana próba = wpis do arsenału** `@@KNOWLEDGE_DIR@@/fleet/arsenal.md` (sekcja „## Zasoby”, jedna linia:
+   `- **Nazwa** · co (liczby z pomiaru) · kiedy użyć · jak (dokładne polecenie albo skill) · limity`), piszesz go wprost
+   (`patch`). Każdy agent i sesja Kernel widzą arsenał w instrukcji od następnej rozmowy, więc nikomu tego nie mówisz
+   osobno; właścicielowi piszesz jednym zdaniem, którzy agenci skorzystają i jak.
 5. **Zapisz zawsze** jeden szkic na link: `wiedza_zapisz` z polami:
    - `typ`: `fakt` (wiadomość, liczba, ogłoszenie), `podmiot` (firma, narzędzie, człowiek w roli publicznej),
      `pojecie` (metoda, pomysł, wzorzec), `projekt` (dotyczy konkretnego projektu właściciela);

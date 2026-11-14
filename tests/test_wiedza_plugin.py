@@ -99,6 +99,21 @@ def test_blok_promptu_i_przypomnienie(srodowisko):
     assert p.prefetch("o niczym konkretnym xyzzy") .startswith("## Orzeczenia")   # bez trafień zostają orzeczenia
 
 
+def test_arsenal_w_bloku_promptu_kazdego_agenta(srodowisko):
+    """14.11: darmową maszynę InstaBox znał tylko Jarvo; Wideograf, Web i reszta nie wiedzieli, że mogą jej użyć.
+    Arsenał (`fleet/arsenal.md`, sekcja „## Zasoby”) jest w stałym bloku promptu każdego agenta."""
+    root, home, sk, p = srodowisko
+    assert "Arsenał floty" not in p.system_prompt_block()                            # bez pliku: bez sekcji
+    sk.plik("fleet/arsenal.md").parent.mkdir(parents=True, exist_ok=True)
+    sk.plik("fleet/arsenal.md").write_text(
+        "# Arsenał floty\n\n**Lista.**\n\n## Zasoby\n- **Zapas mocy** · 4 vCPU · `zapas-mocy uruchom -- 'x'`\n"
+        "- **Serwer** · CPU 80%\n\n## Powiązane\n- hub: [[_hub-skarbiec]]\n", encoding="utf-8")
+    blok = p.system_prompt_block()                                                   # profil jarvo-web, nie Jarvo
+    assert "# Arsenał floty" in blok and "`zapas-mocy uruchom -- 'x'`" in blok and "- **Serwer** · CPU 80%" in blok
+    assert "_hub-skarbiec" not in blok.split("# Arsenał floty")[1]                   # tylko sekcja Zasoby
+    assert pl._zapis_w_skarbcu({"path": str(sk.plik("fleet/arsenal.md"))}) is None   # Jarvo dopisuje wprost
+
+
 def test_przypomnienie_wektorami_z_uslugi_i_slowami_bez_niej(srodowisko):
     """Usługa wektorów działa (state/wektory.json z tokenem): przypomnienie i wiedza_szukaj trafiają po znaczeniu,
     dziennik ma silnik „wektory”; bez usługi te same tury idą słowami (silnik „slowa”), bez błędu."""

@@ -51,6 +51,7 @@ i człowiek. Pełny projekt: `docs/WIEDZA.md` w repo (kopia w `zrodla/jarvo-repo
 | `rozmowy/` | skompilowane ustalenia z rozmów i kart | `rozmowy/_hub-rozmowy` |
 | `briefy/` | poranne briefy `B-RRRR-MM-DD` i przeglądy tygodnia `T-RRRR-Wtt` (własny format): treść i tabela decyzji z odpowiedziami właściciela; pisze skrypt `briefy.py`, odpowiedzi dopisuje Jarvo (`decision-queue`); kompilacja ich nie nadpisuje | `briefy/_hub-briefy` |
 | `fleet/lekcje.md` | księga lekcji floty (skill `fleet-improvement`) | linkowana z hubów agentów |
+| `fleet/arsenal.md` | arsenał floty: jedna linia na zasób (sprzęt, maszyny, konta, narzędzia), kiedy i jak go użyć; sekcja „## Zasoby” trafia do stałego bloku promptu każdego agenta i sesji Kernel; dopisuje Jarvo po udanej próbie (skill `skrzynka-linkow`), kompilacja go nie nadpisuje | linkowana z `_hub-skarbiec` |
 | `fleet/skille/` | jeden węzeł na skill floty (własny i wspólny), generowany przy zasiewie z repo: opis, agenci, powiązane skille, skrypty, materiały; nie edytuj, poza domyślnym szukaniem (`folder=fleet`) | linkowane z hubów agentów |
 
 Pliki specjalne w korzeniu: `_hub-skarbiec.md` (strona główna), `INDEX.md` (generowany), `LOG.md` (tylko dopisywanie),
