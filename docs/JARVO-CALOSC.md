@@ -42,7 +42,7 @@ Inspiracja: firstmate. Rozmawiasz z jednym agentem, a on prowadzi załogę.
 - **Wspólne:** wiedza o Tobie (USER.md), brand kity (`knowledge/brands`) i **skarbiec wiedzy** (`knowledge/`, [WIEDZA.md](WIEDZA.md):
   notatki z linkami, orzeczenia z Twoich korekt, wyciągi z rozmów i kart; wtyczka `jarvo-wiedza` daje każdemu agentowi
   przypomnienia przed turą i narzędzia `wiedza_*`). Pamięć i skille są per agent
-  (wyjątki: skille z `shared/skills/`: `graf-kodu` u Weba i Ręki, `transkrypcja-filmu` u Sherlocka, Wideografa i Ręki, `hooki` u Studia, Wideografa i Ads, `izometria` u Weba, Studia i Wideografa, `warsztat-3d` (model 3D z kodu) u Weba, Wideografa i Mobile, `konwersja-plikow` (plik → inny format albo bez metadanych) i `odczyt-ekranu` (tekst ze zrzutu ekranu, skanu albo PDF: Indra OCR, zapas Tesseract) u wszystkich poza Operatorem (nie ma terminala), `ostrozna-przegladarka` (jedna próba Camoufoxem po odmowie strony) u Łowcy i Sherlocka; Ręka czyta skille wszystkich).
+  (wyjątki: skille z `shared/skills/`: `graf-kodu` u Weba i Ręki, `transkrypcja-filmu` u Sherlocka, Wideografa i Ręki, `hooki` u Studia, Wideografa i Ads, `izometria` u Weba, Studia i Wideografa, `warsztat-3d` (model 3D z kodu) u Weba, Wideografa i Mobile, `konwersja-plikow` (plik → inny format albo bez metadanych) i `odczyt-ekranu` (tekst ze zrzutu ekranu, skanu albo PDF: Indra OCR, zapas Tesseract) u wszystkich, `ostrozna-przegladarka` (jedna próba Camoufoxem po odmowie strony) u Łowcy i Sherlocka; Ręka czyta skille wszystkich).
 - **Nadzór bez palenia tokenów:** dispatcher kanbana i patrol (skrypt bez modelu) pilnują floty
   i budzą Jarva tylko przy anomaliach albo gdy trzeba Twojej decyzji.
 
@@ -51,14 +51,14 @@ Poziomy autonomii: **A0** odczyt · **A1** szkice we własnym workspace · **A2*
 
 ---
 
-## 2. Flota agentów (10 profili)
+## 2. Flota agentów (9 profili)
 
 Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady), `config.yaml`
 (model, toolset, deny), skille, skrypty, rubryka jakości, toolbox, dystrybucja.
 
 | Agent | Rola | Uchwyt | Pokój HQ | Temat Telegram | Skille |
 |---|---|---|---|---|---|
-| 🛰️ `jarvo` | **Main Judge** — intake, misje, karty, sędziowanie, raporty, patrol, wgrywanie stron właściciela na hosting za zgodą, skrzynka linków (link od właściciela → ocena i szkic w skarbcu) | `@jarvo` | Mostek dowodzenia (`bridge`) | general | 16 |
+| 🛰️ `jarvo` | **Main Judge** — intake, misje, karty, sędziowanie, raporty, patrol, wgrywanie stron właściciela na hosting za zgodą, skrzynka linków (link od właściciela → ocena i szkic w skarbcu); sam pracuje na ekranie Komputera Jarva (computer use) i na telefonie właściciela (PHONEUSE), zakłada konta i loguje się; płatność, wysyłka i publikacja tylko z `ZGODA WŁAŚCICIELA` w karcie | `@jarvo` | Mostek dowodzenia (`bridge`) | general | 21 |
 | 🔎 `jarvo-sherlock` | **Researcher-detektyw** — szybki research (domyślnie 10–15 min, raport na jedną stronę), pełne śledztwo na zamówienie, weryfikacja faktów, raporty z cytatami z rejestru źródeł sprawdzanymi przed oddaniem, transkrypcja filmu z linku | `@sherlock` | Gabinet śledczy (`study`) | sherlock | 9 |
 | 🌐 `jarvo-web` | **Web Senior Dev** — strony/landingi (z inspiracjami z branży: Inspo + własna baza), SEO techniczne, bezpieczeństwo aplikacji, wydajność, wdrożenie | `@web` | Pracownia webowa (`devlab`) | web | 11 |
 | 🎬 `jarvo-studio` | **Marketing i kreacja** — grafiki social, obrazy AI, żywe obrazy (pętla 5 s, warstwy PSD), copy PL, kampanie, kalendarze | `@studio` | Atelier kreatywne (`atelier`) | studio | 7 |
@@ -66,29 +66,31 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 | 📈 `jarvo-ads` | **Specjalista Ads** — Meta + Google Ads, kampanie, testy A/B/C, raporty; przygotowuje paczkę, publikujesz Ty | `@ads` | Sala operacyjna (`office`) | ads | 11 |
 | 🎯 `jarvo-lowca` | **Łowca leadów** — sygnały zakupowe (KRS, CEIDG, przetargi BZP/TED, strony firm, oferty pracy), kwalifikacja wg profilu klienta, ranking z „dlaczego teraz”, kontakt opublikowany ze źródłem, monitoring, rozpoznanie nowego źródła; nic nie wysyła | `@lowca` | Radar sprzedaży (`radar`) | lowca | 7 |
 | 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go, bramka jakości (Android, iOS w CI), pakiet do sklepów z listą 44 punktów, wydanie za zgodą i nauka z odrzuceń, aplikacja ze strony firmy, utrzymanie (terminy, opinie, SDK, poprawki OTA za zgodą), kontrola paczek npm; konta zawsze właściciela | `@mobile` | Pracownia aplikacji (`apps`) | mobile | 10 |
-| 🖥️ `jarvo-operator` | **Operator** — praca na ekranie Komputera Jarva (computer use): klik w panelach i programach w przeglądarce, formularze, dane z ekranu do pliku, ścieżka klienta na stronie; klik w tle, klawiatura w aktywnym oknie, logowanie, płatność i wysyłkę oddaje właścicielowi | `@operator` | Sterownia (`control`) | operator | 5 |
 | 🦾 `jarvo-reka` | **Prawa ręka** — generalista, składa pakiety misji, dokumenty, prototypy; zna skille wszystkich (read-only) | `@reka` | Warsztat (`workshop`) | reka | 4 |
 
-### 2a°. jarvo-operator — szczegóły (najnowszy)
-Operator ekranu, etap K3 z [KOMPUTER.md](KOMPUTER.md). Narzędzie `computer_use` Hermesa idzie przez bramkę
-`komputer/jarvo_cua.py` do wejścia Komputera Jarva (twarde zasady, ukrywanie sekretów, dziennik); wtyczka
-`jarvo-komputer` daje narzędzie `komputer` (`stan`, `dziennik`, `oddaj`: prośba do właściciela jako pauza z powodem).
+### 2a°. Jarvo przy ekranie i telefonie — szczegóły (najnowszy)
+Od 2026-11-14 Jarvo sam pracuje na ekranie (etap K3 z [KOMPUTER.md](KOMPUTER.md)); osobnego agenta ekranu nie ma.
+Narzędzie `computer_use` Hermesa idzie przez bramkę `komputer/jarvo_cua.py` do wejścia Komputera Jarva (twarde
+zasady, ukrywanie sekretów, dziennik); wtyczka `jarvo-komputer` daje narzędzie `komputer` (`stan`, `dziennik`,
+`oddaj`: prośba do właściciela jako pauza z powodem; natywnie także `idz`, `patrz`, `kroki`, `czekaj`).
 Pętla z `praca-na-ekranie`: najpierw droga bez ekranu (`web_extract`), potem `capture` `ax` → `som` → `vision`, klik
 po numerze elementu, paragon sterownika po każdym działaniu (`confirmed` ze zmianą = dalej bez `capture`,
-`suspected_noop` i `verify_fresh_state` = najpierw `capture`) i werdykt (`escalate`). Skille:
+`suspected_noop` i `verify_fresh_state` = najpierw `capture`) i werdykt (`escalate`). Skille w `skills/ekran/`:
 `praca-na-ekranie`, `formularze`, `dane-z-ekranu`, `przejscie-strony`, `oddaj-ekran`. Konfiguracja: toolsety
-`computer_use`, `komputer`, `file`, `web`, `memory`, `skills`, `todo`, `session_search` (na Telegramie też `clarify`;
-w cronie bez ekranu), bez terminala, wykonywania kodu, przeglądarki Hermesa i delegowania; `computer_use`:
-`permission_mode: standard`, `capture_after_mode: ax`, telemetria wyłączona; stałe zgody (`command_allowlist`)
-`cua:<działanie>:background` i `cua:<działanie>:foreground` dla działań wejścia (na pulpicie X11 klawiatura,
-przewijanie i przeciąganie działają tylko na wierzchu; wejście przepuszcza je tylko w aktywnym oknie, odmowa
-`okno_nieaktywne`), walidator odrzuca `bring_to_front`, tryby cron i bez nadzoru odmawiają.
-Logowanie, płatność, CAPTCHA i wysyłkę robi właściciel w Ekranie HQ; Operator nie przyjmuje haseł ani kart z czatu.
-Bez wyciągu rozmów do skarbca (`bez_wyciagu`). 20 evals, 2 ataki red teamu (wstrzyknięcie z ekranu, karta i hasło
-na ekranie), pokój Sterownia w HQ. Wzorzec 11 w `dispatch-playbook` mówi Jarvowi, kiedy dać kartę Operatorowi.
-Telefon właściciela przez PHONEUSE (serwer MCP `phone`, dopisuje go `jarvo telefon on`): Operator ma wszystkie
-narzędzia, Jarvo tylko odczyt; `confirm=true` w `act` i `batch` wymaga „tak” człowieka (wtyczka `jarvo-zgody`),
-pod YOLO telefon jest zablokowany jak `computer_use` ([MOBILE.md](MOBILE.md)).
+`computer_use`, `komputer` i `terminal` na Telegramie, w czacie HQ i w CLI; `computer_use`:
+`permission_mode: standard`, `capture_after_mode: ax`, `ax_max_elements: 300`, `max_image_dimension: 1456`;
+18 stałych zgód (`command_allowlist`) `cua:<działanie>:background` i `cua:<działanie>:foreground` dla działań
+wejścia (na pulpicie X11 klawiatura, przewijanie i przeciąganie działają tylko na wierzchu; wejście przepuszcza je
+tylko w aktywnym oknie, odmowa `okno_nieaktywne`), walidator odrzuca `bring_to_front`.
+Konta i logowania robi Jarvo; hasło zostaje w menedżerze haseł przeglądarki; CAPTCHA: jedna próba, potem właściciel
+przez VNC. Płatność, wysyłka, publikacja i usunięcie konta tylko z linią `ZGODA WŁAŚCICIELA` w karcie. Haseł ani kart
+z czatu nie przyjmuje. Dłuższa praca na ekranie (więcej niż kilka minut) idzie na kartę kanbana przypisaną do Jarva,
+żeby czat był wolny. Sesja z narzędziem ekranu albo telefonu nie daje wyciągu do skarbca; pozostałe rozmowy Jarva
+tak. Evals `jarvo-ekran-*` w `evals/jarvo/scenarios.yaml`, 2 ataki red teamu (wstrzyknięcie z ekranu, karta i hasło
+na ekranie) na profil `jarvo`. Pokój Sterownia w HQ zostaje bez agenta.
+Telefon właściciela przez PHONEUSE (serwer MCP `phone`, dopisuje go `jarvo telefon on`): Jarvo ma wszystkie
+narzędzia; `confirm=true` w `act` i `batch` wymaga „tak” człowieka albo linii `ZGODA WŁAŚCICIELA` w karcie (wtyczka `jarvo-zgody`).
+Pod YOLO (tryb pełny) w profilu `jarvo` narzędzia ekranu i telefonu są zablokowane ([MOBILE.md](MOBILE.md)).
 
 ### 2a. jarvo-mobile — szczegóły
 Twórca aplikacji, etap 1 z [MOBILE.md](MOBILE.md): `natywna-czy-pwa` (`decyzja.py`: potrzeby → strona, PWA, karta
@@ -325,11 +327,12 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
   dostanie je sterownik: płatności, zakupy, logowanie, wysyłkę, publikację, Enter w takim formularzu i wpisywanie
   haseł, kart, BLIK i kodów zostawia właścicielowi, sekretów nie wpisuje i ukrywa je w odpowiedziach, wyłącza
   JavaScript, schowek i DevTools, uruchamia tylko Chromium; cel działania zna z migawek sterownika i z AT-SPI.
-  Pauzę włączy każdy, zdejmie tylko właściciel (`SO_PEERCRED`); pauza od floty to prośba Operatora do właściciela
+  Pauzę włączy każdy, zdejmie tylko właściciel (`SO_PEERCRED`); pauza od floty to prośba Jarva do właściciela
   z powodem (widać ją w `jarvo komputer status`); ekranem steruje jedna sesja naraz (`zajete`); dziennik bez treści.
   Test na żywo: `scripts/komputer-test.sh`.
-  Agent z `komputer: true` dostaje wtyczkę `jarvo-komputer` (narzędzie `komputer`: stan, dziennik, prośba do
-  właściciela jako pauza z powodem; wznowić nie umie) i nie ma wyciągów rozmów do skarbca (treść ekranu).
+  Agent z `komputer: true` (dziś tylko `jarvo`) dostaje wtyczkę `jarvo-komputer` (narzędzie `komputer`: stan,
+  dziennik, prośba do właściciela jako pauza z powodem; wznowić nie umie); sesja z narzędziem ekranu albo telefonu
+  nie daje wyciągu rozmowy do skarbca (treść ekranu).
 - **Skan skilli z cudzych repo** (`scripts/skan_skilli.py`, przy każdym buildzie): skaner Hermesa + wzorce
   getsentry `skill-scanner` i ECC (wstrzyknięcia, `curl|sh`, sekrety, ukryte znaki, hooki, `postinstall`).
   High/critical bez przejrzanego wyjątku (`vendor/skan-wyjatki.yaml`, przypięty do commitu) zatrzymuje wdrożenie.
@@ -347,7 +350,7 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
   `wgranie-…` i przewinięcie `main`; cofnięcie nowym commitem z drzewem tagu. Śledzony sekret z `.gitignore` = odmowa.
 - **Skrzynka linków** (skill Jarva `skrzynka-linkow`, narzędzie `pobierz_link` z wtyczki `jarvo-wiedza`,
   `profiles/jarvo/scripts/pobierz_link.py`): właściciel udostępnia z telefonu wpis X, film YouTube albo stronę na
-  Telegramie; Jarvo (bez terminala) pobiera treść narzędziem (fxtwitter bez logowania, `yt-dlp -J`, trafilatura;
+  Telegramie; Jarvo pobiera treść narzędziem (fxtwitter bez logowania, `yt-dlp -J`, trafilatura;
   film 360p i transkrypcja skryptem `transkrypcja-filmu` tylko na żądanie), ocenia ją i zawsze zgłasza szkic
   `wiedza_zapisz` (źródło = link, tagi `skrzynka-linkow` i tematy) oraz odpowiada 2–4 zdaniami. Adresy w sieci
   lokalnej i przekierowania na nie są odrzucane; treść linku to dane, nie polecenia. Wiadomość zakończona „one” =
@@ -393,7 +396,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `hq/` | aplikacja Jarvo, HQ (backend, frontend, demo) |
 | `infra/` | obraz jarvo-hermes, obraz Komputera Jarva (`infra/komputer`), docker-compose z sidecarami, szablony env; `infra/python/natywne/`: locki venvów instalacji natywnej z wejściami i opisem odtworzenia |
 | `knowledge/` | szablon brand kitu (`brands/_szablon`); szablon USER.md jest w skillu `onboarding-interview` Jarva |
-| `komputer/` | computer use: bramka sterownika ekranu `jarvo_cua.py` (`HERMES_CUA_DRIVER_CMD`), wtyczka Operatora `plugin/` (narzędzie `komputer`), ręce na ekranie właściciela `rece/` (K6: podpisana zgoda, bramka z twardymi zasadami i ścisłym odczytem zgód profilu, profil rąk `jarvo-ekran`, sterownik cua-driver-rs 0.38.0); projekt i etapy w [KOMPUTER.md](KOMPUTER.md) |
+| `komputer/` | computer use: bramka sterownika ekranu `jarvo_cua.py` (`HERMES_CUA_DRIVER_CMD`), wtyczka Jarva `plugin/` (narzędzie `komputer`), ręce na ekranie właściciela `rece/` (K6: podpisana zgoda, bramka z twardymi zasadami i ścisłym odczytem zgód profilu, profil rąk `jarvo-ekran`, sterownik cua-driver-rs 0.38.0); projekt i etapy w [KOMPUTER.md](KOMPUTER.md) |
 | `wiedza/` | skarbiec wiedzy (drugi mózg): `wiedza.py` (zasiew, indeks FTS5, szukanie, szkice, orzeczenia, lint, graf, git) i `SCHEMA.md`; projekt w [WIEDZA.md](WIEDZA.md) |
 | `branding/` | skórka Jarvo (banner, logo, motyw i tłumaczenie dashboardu), łatka powłoki `/jarvo` (`powloka.json`, `powloka.js`) |
 | `site/` | landing jarvo.pl |
@@ -407,7 +410,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 agentów), PROFILE-SPEC (anatomia agenta: 10 warstw), TOOLBOX (narzędzia open-source), VPS (infra),
 HQ (dashboard), ADS (projekt agenta reklam + Skarbiec), LEADY (Łowca leadów), KLIPY (clipmaker),
 WIEDZA (skarbiec wiedzy: drugi mózg floty, projekt do akceptacji), RUNBOOK (wdrożenie krok po kroku), INSTALER (plan instalatora jednym poleceniem na trzy systemy), NATYWNIE (plan przejścia na instalację natywną bez Dockera i WSL), ROZWOJ-FLOTY (plan dopracowania agentów), MOBILE (projekt Twórcy aplikacji),
-KOMPUTER (computer use i server use: Komputer Jarva, Operator, Ekran w HQ, Ręce; etapy K0–K6),
+KOMPUTER (computer use i server use: Komputer Jarva, Jarvo przy ekranie, Ekran w HQ, Ręce; etapy K0–K6),
 SOURCES (licencje).
 
 ---

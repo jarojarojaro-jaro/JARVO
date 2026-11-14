@@ -1,7 +1,7 @@
 ---
 name: przejscie-strony
 description: "Ścieżka klienta na stronie: gdzie się psuje, z dowodem"
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -9,9 +9,9 @@ metadata:
     tags: [computer-use, user-journey, ux, checkout, qa]
     related_skills: [praca-na-ekranie, formularze, oddaj-ekran]
   jarvo:
-    agent: jarvo-operator
+    agent: jarvo
     autonomy: A1
-    reviewed: "2026-10-19"
+    reviewed: "2026-11-14"
 ---
 
 # Przejście strony jak klient
@@ -39,4 +39,4 @@ zamawia albo wysyła, nie robisz: ścieżka kończy się przed nim, a raport to 
 ## Raport
 `out/RAPORT.md`: cel, wynik (przeszło / przeszło z problemami / nie przeszło), tabela kroków (krok, działanie,
 co widać, problem), zrzut miejsca problemu (`screenshot_path`), 3 najważniejsze poprawki w kolejności wpływu.
-Poprawki w kodzie strony zleca Jarvo (`jarvo-web`), Ty ich nie robisz.
+Poprawki w kodzie strony dajesz kartą `jarvo-web`; sam ich nie robisz (praca dziedzinowa).

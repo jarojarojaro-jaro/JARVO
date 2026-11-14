@@ -13,7 +13,7 @@ Wtyczka Hermesa (`plugin/`: `__init__.py`, `plugin.yaml`) ma hak `pre_tool_call`
 |---|---|
 | **pytaj** | pyta o `write_file`, `patch` (także łatki V4A), `execute_code`, `process_manage` i `cronjob_manage` (działania zmieniające) oraz o terminal spoza listy poleceń tylko do odczytu |
 | **projekt** (domyślny) | jak pytaj, ale bez pytania zapisy i proste polecenia plikowe (`mkdir`, `touch`, `cp`, `mv`, `rm`, `rmdir`, `sed -i`, `tee`, `>` i `>>`), gdy rzeczywista ścieżka leży w folderze projektu, w katalogu roboczym karty, w skarbcu (`JARVO_KNOWLEDGE_DIR`) albo w misjach (`JARVO_MISSIONS_DIR`, dziennik Jarva) |
-| **pełny** | tylko na sesję: `jarvo chat --tryb pelny` (czyli `--yolo`) albo `/yolo`; Hermes zatwierdza prośby sam; wtyczka nigdy nie włącza go sama i blokuje go w `jarvo-operator` |
+| **pełny** | tylko na sesję: `jarvo chat --tryb pelny` (czyli `--yolo`) albo `/yolo`; Hermes zatwierdza prośby sam; wtyczka nigdy nie włącza go sama, a w profilu `jarvo` blokuje pod nim narzędzia ekranu i telefonu (`computer_use`, `komputer`, `mcp__phone__*`) |
 
 Zawsze, w każdym trybie:
 - zapis `config.yaml` Hermesa (profilu i katalogu danych) = blokada;
@@ -27,9 +27,10 @@ Zawsze, w każdym trybie:
 - telefon (serwer MCP `phone` z PHONEUSE po `jarvo telefon on`, [docs/MOBILE.md](../docs/MOBILE.md)):
   `mcp__phone__act` i `mcp__phone__batch` z `confirm: true` (na wierzchu, w `args` albo w kroku `batch`) omijają
   bramkę `needs_confirm` telefonu, więc z człowiekiem to prośba z treścią akcji (zgoda = „tak” dla tej jednej akcji;
-  „zawsze” niczego nie zapamiętuje), a bez człowieka i w trybie pełnym blokada (na karcie z poradą
-  `kanban_block(kind="needs_input")`). Pozostałe narzędzia telefonu wtyczka zostawia Hermesowi. Pod YOLO
-  `jarvo-operator` ma zablokowany telefon tak jak `computer_use`.
+  „zawsze” niczego nie zapamiętuje), na karcie kanbana z linią `ZGODA WŁAŚCICIELA` w treści karty przepuszczenie, a bez
+  człowieka i w trybie pełnym blokada (na karcie bez tej linii z poradą `kanban_block(kind="needs_input")`). Pozostałe
+  narzędzia telefonu wtyczka zostawia Hermesowi. Pod YOLO
+  `jarvo` ma zablokowany telefon tak jak `computer_use` i `komputer`.
 
 Folder projektu to katalog startu czatu: `JARVO_FOLDER_PROJEKTU` albo `TERMINAL_CWD` (u pracownika karty: katalog
 karty). Katalog domowy i korzeń dysku nie są folderem projektu: wtedy tryb projekt pyta o każdy zapis. Ścieżki Git Bash

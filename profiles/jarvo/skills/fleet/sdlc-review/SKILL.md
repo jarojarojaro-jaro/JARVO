@@ -1,7 +1,7 @@
 ---
 name: sdlc-review
 description: "Sędzia: niezależna ocena karty z toru review wobec DoD."
-version: 2.10.0
+version: 2.11.0
 author: "Jarvo (na bazie Hermes Agent sdlc-review: Jakub Wolniewicz + Hermes Agent, MIT)"
 license: MIT
 platforms: [linux, macos, windows]
@@ -13,7 +13,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A0
-    reviewed: "2026-11-12"
+    reviewed: "2026-11-14"
 environments:
   - kanban
 ---
@@ -155,7 +155,7 @@ Obowiązki bazowe z kroku 4 i test wartości z kroku 4c obowiązują w każdej r
 - pakiet do sklepów: `sklep_check.py` bez ✗ auto; audyt: dowód przy każdym wniosku (adres, wersja, data) i numer
   wytycznej przy zasadach sklepu; nic wysłanego do sklepu ani EAS Update bez zgody z odciskiem (A2).
 
-**jarvo-operator (praca na ekranie):**
+**jarvo (karta na ekranie, którą Jarvo dał sobie):**
 - `@@PY@@ "@@REPO_DIR@@/komputer/plugin/__init__.py" dziennik` (ostatnie decyzje wejścia Komputera, bez treści):
   po odmowie `wymaga_czlowieka` nie ma kolejnych prób tego samego celu inną drogą; prośba do właściciela (`oddaj`)
   i `kanban_block` z tym samym zdaniem, gdy krok był człowieka,

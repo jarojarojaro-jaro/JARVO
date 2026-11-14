@@ -10,7 +10,7 @@ ekranie naraz) i te same twarde zasady (`infra/komputer/zasady.py`) z zasadami n
   - kanały to potok nazwany z DACL właściciela albo gniazdo 0600 (komputer/kanal.py), a wznowienie po pauzie
     i polecenia usługi (stop, okno, wyczyść) wymagają tokenu właściciela z `<stan>/komputer/wlasciciel.klucz`
     (`jarvo komputer wznow`, HQ po zalogowaniu). Token przeczyta każdy proces właściciela, także agent z pełnym
-    terminalem: to granica wobec Operatora (bez terminala) i wobec stron, nie wobec właściciela.
+    terminalem: to granica wobec agenta i stron, nie wobec właściciela.
   - zgoda właściciela: bramka podaje pierwszą wiadomością sesji kartę agenta (`notifications/jarvo/karta`:
     HERMES_KANBAN_TASK i HERMES_KANBAN_BOARD pracownika Hermesa), a kontekst czyta linię ZGODA WŁAŚCICIELA z treści
     tej karty w `<dane>/kanban.db` (zgoda_karty.py, tylko do odczytu); strona i argumenty modelu zgody nie dają.
@@ -428,7 +428,7 @@ class WejscieNatywne:
 
     def w_uzyciu(self, cisza: float, teraz: float | None = None) -> bool:
         """Czy ktoś korzysta z ekranu albo ekran na kogoś czeka (usługa nie parkuje wtedy kart): pauza (prośba
-        Operatora do właściciela albo przejęcie w HQ: strona ma zostać taka, jaka jest) albo sesja Operatora, od
+        Jarva do właściciela albo przejęcie w HQ: strona ma zostać taka, jaka jest) albo sesja Jarva, od
         której przyszła wiadomość w ostatnich `cisza` s. Sesja otwarta, ale milcząca dłużej, nie liczy się: Hermes
         trzyma sterownik otwarty do godziny po turze agenta w bramie. `teraz`: zegar monotoniczny."""
         if self.ekran.wstrzymane:
@@ -487,7 +487,7 @@ class WejscieNatywne:
                     if co not in ("klatka", "przejmij", "wejscie") else
                     f"{co}: tylko właściciel (Ekran w HQ po zalogowaniu)"}
         if co == "pauza":
-            # pauza od floty to prośba Operatora do właściciela; pauzy właściciela flota nie nadpisze swoją
+            # pauza od floty to prośba Jarva do właściciela; pauzy właściciela flota nie nadpisze swoją
             kto = "wlasciciel" if wlasciciel else "flota"
             if not (kto == "flota" and self.ekran.pauza and self.ekran.pauza["kto"] == "wlasciciel"):
                 self.ekran.ustaw_pauze(True, polecenie.get("powod", ""), kto)
@@ -498,7 +498,7 @@ class WejscieNatywne:
             self.dziennik.zapisz({"narzedzie": "ster", "decyzja": "wznow"})
             return self.stan()
         if co == "przejmij":
-            # prośbę Operatora (pauza floty) przejęcie zastępuje: teraz ekran ma właściciel, a wraca „Oddaj” (wznow)
+            # prośbę Jarva (pauza floty) przejęcie zastępuje: teraz ekran ma właściciel, a wraca „Oddaj” (wznow)
             self.ekran.ustaw_pauze(True, POWOD_PRZEJECIA, "wlasciciel")
             self.dziennik.zapisz({"narzedzie": "ster", "decyzja": "przejmij", "kto": "wlasciciel"})
             return self.stan()

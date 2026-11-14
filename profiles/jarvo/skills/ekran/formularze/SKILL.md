@@ -1,7 +1,7 @@
 ---
 name: formularze
 description: "Formularz na ekranie: pola, listy, sprawdzenie wartości"
-version: 1.4.0
+version: 1.5.0
 author: Jarvo
 license: MIT
 metadata:
@@ -9,9 +9,9 @@ metadata:
     tags: [computer-use, forms, input, select, verify]
     related_skills: [praca-na-ekranie, oddaj-ekran]
   jarvo:
-    agent: jarvo-operator
+    agent: jarvo
     autonomy: A1
-    reviewed: "2026-11-10"
+    reviewed: "2026-11-14"
 ---
 
 # Formularze

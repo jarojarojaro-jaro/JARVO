@@ -177,7 +177,7 @@ def _parser() -> argparse.ArgumentParser:
     from . import telefon                   # telefon przez PHONEUSE (serwer MCP phone): jarvo telefon status|on|off
     telefon.dodaj_polecenia(sub)
 
-    s = sub.add_parser("komputer", add_help=False, help="Komputer Jarva: przeglądarka Operatora (on, off, status, …) "
+    s = sub.add_parser("komputer", add_help=False, help="Komputer Jarva: przeglądarka Jarva (on, off, status, …) "
                        "i ręce na Twoim ekranie (komputer rece on|off|status)",
                        description="Argumenty idą do jarvo/komputer.py (jarvo komputer --help), po słowie rece do "
                        "jarvo/rece.py (jarvo komputer rece --help).")
@@ -529,10 +529,6 @@ def polecenie_chat(u: Uklad, a, reszta, ot: Otoczenie) -> int:
         hermes = ot.modul("hermes")
     except ImportError as e:
         print(f"BŁĄD: brak modułu Hermesa ({e}). Uruchom instalację ponownie.", file=sys.stderr)
-        return 1
-    if a.tryb == "pelny" and a.profil == "jarvo-operator":
-        print("Tryb pełny nie jest dostępny dla jarvo-operator (praca na ekranie zawsze z pytaniem o zgodę).",
-              file=sys.stderr)
         return 1
     env = srodowisko.srodowisko(u, ot.env)
     env.pop("HERMES_YOLO_MODE", None)            # tryb pełny tylko flagą --yolo tej jednej sesji, nigdy w środowisku

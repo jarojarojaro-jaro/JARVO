@@ -13,8 +13,10 @@ alias zasłoniłby polecenie jarvo, H14; katalog <profil>/home dla terminal.home
 nie zakładamy, bo zmieniłby HOME agentów) i `--bez-sekretow`, gdy sekrety są od razu w .env w <dane>.
 
 Kroki (numeracja jak w install-fleet.sh):
-  1.  migracja TARS → Jarvo (scripts/migrate_jarvo.py container), katalogi floty, szablony wiedzy (INDEX.md misji,
-      USER.md, brands/_szablon),
+  1.  migracja TARS → Jarvo (scripts/migrate_jarvo.py container), profile usuniętych agentów (USUNIETE_PROFILE,
+      np. jarvo-operator po 2026-11-14) przeniesione do <dane>/profiles/.usuniete/<agent>-<RRRR-MM-DD> (nazwa z kropką:
+      Hermes nie widzi jej jako profilu; dane zostają, nic nie kasujemy), katalogi floty, szablony wiedzy (INDEX.md
+      misji, USER.md, brands/_szablon),
   1b. skarbiec wiedzy (K02): `wiedza.py zasiej` (huby z build/wiedza, docs repo, indeks, punkt zapisu git) pod
       blokadą kompilacji `state/wiedza.lock` (ten sam plik i format co wiedza/kompilacja.py: PID i czas), w niej
       lint informacyjny (`lint --json`; błędy idą do logu i podsumowania, nie zatrzymują instalacji),
@@ -95,6 +97,9 @@ W_HOSCIE = ("jarvo-hq", "jarvo-wiedza")             # zakładki panelu: włączo
 WE_WSZYSTKICH = ("jarvo-wiedza",)                   # dostawca pamięci każdego profilu
 TYLKO_PANEL = ("jarvo-hq",)                         # wtyczka samego panelu: bez dowiązań w profilach i restartu bramy
 PANEL = ("jarvo-hq", "jarvo-wiedza")                # ich odcisk decyduje o restarcie panelu
+# agenci usunięci z fleet.yaml: ich stary katalog profilu w <dane>/profiles nie może zostać profilem bramy
+USUNIETE_PROFILE = ("jarvo-operator",)              # decyzja właściciela 2026-11-14: wszystko robi Jarvo
+USUNIETE = ".usuniete"                              # <dane>/profiles/.usuniete/<agent>-<data>
 RUTYNY = ("jarvo-patrol", "jarvo-daily-brief", "jarvo-weekly-review", "jarvo-knowledge-freshness")
 ZNACZNIK_PANELU = ".odcisk-panelu"
 PLIKI_PROFILU = ("config.yaml", "SOUL.md", "profile.yaml", "mcp.json", ".env")
@@ -549,6 +554,7 @@ class Flota:
         for plik in [self.dane / ".env", *sorted((self.dane / "profiles").glob("*/.env"))]:
             self.log.z_pliku(plik)
         self.migracja()
+        self.usun_stare_profile()
         self.katalogi()
         self.zasiej_skarbiec()
         self.profil_hosta()
@@ -600,6 +606,25 @@ class Flota:
             self.uwaga("migracja Jarvo z ostrzeżeniami (patrz wyżej)")
         elif linie:
             self.zmiana("migracja TARS → Jarvo")
+
+    def usun_stare_profile(self) -> None:
+        """Profil agenta usuniętego z floty (USUNIETE_PROFILE) przenosimy do <dane>/profiles/.usuniete/<agent>-<data>
+        (sesje, pamięć i pliki zostają do wglądu; brama i `jarvo` widzą tylko profile bez kropki). Agent, który wrócił
+        do buildu, zostaje na miejscu."""
+        for agent in USUNIETE_PROFILE:
+            stary = self.profil(agent)
+            if agent in self.agenci or not stary.is_dir() or stary.is_symlink():
+                continue
+            kosz = self.dane / "profiles" / USUNIETE
+            kosz.mkdir(parents=True, exist_ok=True)
+            cel = kosz / f"{agent}-{time.strftime('%Y-%m-%d')}"
+            n = 2
+            while cel.exists():
+                cel = kosz / f"{agent}-{time.strftime('%Y-%m-%d')}-{n}"
+                n += 1
+            _zmien_nazwe(stary, cel)
+            self.log(f"  ✓ profil usuniętego agenta {agent} przeniesiony do {cel}")
+            self.zmiana(f"profil {agent} → profiles/{USUNIETE}/{cel.name}")
 
     def katalogi(self) -> None:
         self.krok("Katalogi floty")

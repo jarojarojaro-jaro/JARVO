@@ -115,6 +115,14 @@ async def skrzynka_sesji(**kwargs):
         return None
 
 
+def cisza_tablicy(**kwargs) -> None:
+    """Hak `post_tool_call`: karta założona z Telegrama budzi Jarva bez surowego komunikatu Hermesa (cisza_tablicy.py)."""
+    try:
+        _modul("jarvo_cisza_tablicy", "cisza_tablicy.py").po_narzedziu(**kwargs)
+    except Exception as e:
+        logger.warning("jarvo-wiedza: cisza tablicy niedostępna: %s", e)
+
+
 def _narzedzia_jarva() -> List[Dict[str, Any]]:
     """Schematy narzędzi Jarva (`schemat`, `pobierz_link`); awaria jednego modułu (brak pliku, błąd w kodzie) zabiera
     tylko jego narzędzie, nie narzędzia skarbca ani drugie."""
@@ -205,6 +213,39 @@ def wywolaj_model(system: str, user: str, max_tokens: int = 1200) -> str:
 def _dosc_tresci(teksty: List[str]) -> bool:
     """Nowe wiadomości użytkownika warte wyciągu: co najmniej MIN_TUR albo jedna od MIN_ZNAKOW_TURY znaków."""
     return len(teksty) >= MIN_TUR or any(len(t.strip()) >= MIN_ZNAKOW_TURY for t in teksty)
+
+
+# Rozmowa z narzędziem ekranu albo telefonu (Komputer Jarva, PHONEUSE): wyniki to treść ekranu, czyli cudze dane
+# (maile, konta, adresy), więc z takiej sesji nie ma wyciągu (docs/KOMPUTER.md §7, docs/WIEDZA.md). Sesje bez tych
+# narzędzi idą do wyciągu jak zawsze. Sesję oznacza strażnik (pre_tool_call) albo zapis tur z wywołaniem narzędzia.
+NARZEDZIA_EKRANU = frozenset({"computer_use", "komputer"})
+NARZEDZIA_TELEFONU = "mcp__phone__"
+_SESJE_EKRANU: set = set()
+_SESJE_EKRANU_LOCK = threading.Lock()
+
+
+def _narzedzie_ekranu(nazwa: Any) -> bool:
+    return isinstance(nazwa, str) and (nazwa in NARZEDZIA_EKRANU or nazwa.startswith(NARZEDZIA_TELEFONU))
+
+
+def _oznacz_ekran(sid: str) -> None:
+    if sid:
+        with _SESJE_EKRANU_LOCK:
+            _SESJE_EKRANU.add(sid)
+
+
+def _sesja_ekranu(sid: str, messages: Optional[List[Dict[str, Any]]] = None) -> bool:
+    """Czy w sesji padło narzędzie ekranu albo telefonu (oznaczenie strażnika albo wywołanie w wiadomościach)."""
+    for m in messages or []:
+        if not isinstance(m, dict):
+            continue
+        if m.get("role") == "tool" and _narzedzie_ekranu(m.get("name") or m.get("tool_name")):
+            _oznacz_ekran(sid)
+        for tc in m.get("tool_calls") or []:
+            if isinstance(tc, dict) and _narzedzie_ekranu((tc.get("function") or {}).get("name") or tc.get("name")):
+                _oznacz_ekran(sid)
+    with _SESJE_EKRANU_LOCK:
+        return bool(sid) and sid in _SESJE_EKRANU
 
 
 def _zapis_rozmowy(messages: List[Dict[str, Any]], od_tury: int = 0) -> tuple[str, int, List[str]]:
@@ -610,6 +651,7 @@ class SkarbiecProvider(MemoryProvider):
         if self._kontekst != "primary":
             return
         sid = session_id or self._session_id
+        _sesja_ekranu(sid, messages)                      # oznacza sesję, gdy tura miała narzędzie ekranu albo telefonu
         with self._lock:
             b = self._bufor.setdefault(sid, {"tury": [], "ts": 0.0, "wyciagnieto": 0})
             b["tury"].append((str(user_content or "")[:4000], str(assistant_content or "")[:4000]))
@@ -662,8 +704,8 @@ class SkarbiecProvider(MemoryProvider):
                     if b["tury"] and teraz - b["ts"] >= CISZA_S and _dosc_tresci([u for u, _a in b["tury"][b["wyciagnieto"]:]])]
 
     def _wyciag(self, messages: List[Dict[str, Any]], sid: str, *, od_tury: int, powod: str) -> Optional[Dict[str, Any]]:
-        if (self._meta.get(self._agent) or {}).get("bez_wyciagu"):
-            return None                     # agent z Komputerem Jarva: wyniki narzędzi to treść ekranu (docs/KOMPUTER.md §7)
+        if _sesja_ekranu(sid, messages):
+            return None                     # sesja z ekranem albo telefonem: wyniki narzędzi to treść ekranu (cudze dane)
         sk = self._sk()
         if sk is None:
             return None
@@ -1177,6 +1219,8 @@ def straznik(tool_name: str = "", args: Optional[Dict[str, Any]] = None, task_id
     """Hak pre_tool_call: {"action": "block"|"approve", "message"}, {"action": "modify", "args"} (dopisany recenzent
     oddania) albo None (narzędzie idzie dalej)."""
     args = args if isinstance(args, dict) else {}
+    if _narzedzie_ekranu(tool_name):
+        _oznacz_ekran(session_id)            # z tej sesji nie będzie wyciągu do skarbca (_sesja_ekranu)
     try:
         if tool_name == "memory":
             for tekst in _teksty_pamieci(args):
@@ -1222,6 +1266,10 @@ def register(ctx) -> None:
         ctx.register_hook("pre_gateway_dispatch", skrzynka_sesji)
     except Exception as e:
         logger.debug("jarvo-wiedza: skrzynka sesji nie zarejestrowana: %s", e)
+    try:
+        ctx.register_hook("post_tool_call", cisza_tablicy)
+    except Exception as e:
+        logger.debug("jarvo-wiedza: cisza tablicy nie zarejestrowana: %s", e)
     try:
         ctx.register_auxiliary_task(ZADANIE_AUX, display_name="Skarbiec wiedzy", description="wyciągi z rozmów i kompilacja skarbca (główny model)")
     except Exception as e:

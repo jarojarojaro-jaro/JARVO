@@ -60,12 +60,12 @@ ROLE_DOKUMENTU = {"document web", "document frame"}
 STANY_POLA = {"editable", "multi-line", "single-line"}
 BLAD = object()                 # AT-SPI nie odpowiedział albo rzucił wyjątek: cel nieznany, działanie nie przechodzi
 ZAJETE_S = 120                  # tyle sekund po ostatnim działaniu ekran należy do sesji, która działała
-MAKS_POWOD = 300                # znaków powodu pauzy (prośba Operatora do właściciela)
+MAKS_POWOD = 300                # znaków powodu pauzy (prośba Jarva do właściciela)
 PROBY_TRAFIENIA = 3             # zapytań o element w punkcie: dwa zgodne z rzędu albo cel nieznany
 PAUZA_TRAFIENIA = 0.12          # s między nimi: Chromium najpierw zgaduje z drzewa, potem pyta silnik strony
 WEWNETRZNE = "jarvo-wejscie:"   # id zapytań wejścia do sterownika (świeża migawka); agentowi zastrzeżone
 CZAS_MIGAWKI = 30               # s na świeżą migawkę (sterownik sam kończy przejście drzewa po 25 s)
-# Grupa ekranu: sesje jednego procesu agenta (computer_use Hermesa i narzędzie `komputer` Operatora, każde przez
+# Grupa ekranu: sesje jednego procesu agenta (computer_use Hermesa i narzędzie `komputer` Jarva, każde przez
 # bramkę jarvo_cua.py) dzielą ekran zamiast odmawiać sobie `zajete`. Bramka wysyła to powiadomienie przed rozmową,
 # z kluczem ze zmiennej JARVO_KOMPUTER_GRUPA, którą ustawia wtyczka jarvo-komputer w procesie Hermesa. To nie jest
 # granica bezpieczeństwa: każdy krok i tak oceniają twarde zasady, a grupa tylko nie każe czekać 120 s.
@@ -364,7 +364,7 @@ class Ekran:
         if self.pauza is None:
             return ""
         if self.pauza["kto"] == "flota":
-            return "Operator czeka na właściciela: " + (self.pauza["powod"] or "bez opisu")
+            return "Jarvo czeka na właściciela: " + (self.pauza["powod"] or "bez opisu")
         return "właściciel zatrzymał Komputer" + (f": {self.pauza['powod']}" if self.pauza["powod"] else "")
 
     def ustaw_pauze(self, tak: bool, powod: str = "", kto: str = "wlasciciel") -> None:
@@ -776,7 +776,7 @@ class Sesja:
             temu = self.wejscie.ekran.zajmij(self.klucz_ekranu)
             if temu is not None:
                 return zasady.Werdykt(zasady.ODMOWA, "zajete",
-                                      f"ekranem steruje teraz inna sesja Operatora (działała {int(temu)} s temu); "
+                                      f"ekranem steruje teraz inna sesja Jarva (działała {int(temu)} s temu); "
                                       f"poczekaj, aż skończy (ekran zwalnia się po {ZAJETE_S} s bez jej działań)")
         if w.wolno and nazwa in zasady.DZIALANIA and self.wejscie.ekran.limit():
             return zasady.Werdykt(zasady.ODMOWA, "limit", f"ponad {LIMIT_DZIALAN} działań na minutę; zwolnij")
@@ -857,7 +857,7 @@ class Sesja:
         if w.cel:
             wpis["cel"] = w.cel[:100]
         wpis.update(w.dane)
-        if w.decyzja not in (zasady.TAK, zasady.WSTRZYMANE):    # powód pauzy to prośba Operatora: tylko w stanie
+        if w.decyzja not in (zasady.TAK, zasady.WSTRZYMANE):    # powód pauzy to prośba Jarva: tylko w stanie
             wpis["powod"] = w.powod[:200]
         self.wejscie.dziennik.zapisz(wpis)
 
@@ -1026,7 +1026,7 @@ class Wejscie:
                                            ensure_ascii=False) + "\n").encode())
                 return
             if co == "pauza":
-                # pauza od floty to prośba Operatora do właściciela (powód widać w stanie, nie w dzienniku);
+                # pauza od floty to prośba Jarva do właściciela (powód widać w stanie, nie w dzienniku);
                 # pauzy właściciela flota nie nadpisze swoją
                 kto = "wlasciciel" if wolno_wznowic(uid) else "flota"
                 if not (kto == "flota" and self.ekran.pauza and self.ekran.pauza["kto"] == "wlasciciel"):

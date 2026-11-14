@@ -512,24 +512,24 @@ def test_flota_przekazuje_ustawienia_profili(tmp_path):
 
 
 def test_ustawienia_profili_z_telefonem_przezywaja_force_config(tmp_path, monkeypatch):
-    """`jarvo telefon on` (<stan>/telefon.json) → serwer MCP phone w jarvo (odczyt) i jarvo-operator (pełny) przy każdej
+    """`jarvo telefon on` (<stan>/telefon.json) → serwer MCP phone w jarvo (wszystkie narzędzia) przy każdej
     instalacji floty; bez pliku albo wyłączony: nic (instalacja bez PHONEUSE bez zmian)."""
     u = uklad(tmp_path / "Jarvo")
     adb = tmp_path / "pt" / "adb"
     monkeypatch.setattr(android, "adb", lambda _u: adb)
-    agenci = ["jarvo", "jarvo-operator", "jarvo-web"]
+    agenci = ["jarvo", "jarvo-web"]
     bez = flota.ustawienia_profili(u, agenci)["profile"]
     assert not any(telefon.KLUCZ in k for k in bez.values())
     telefon.zapisz_stan(u, {"wlaczony": True, "python": str(tmp_path / "py"), "serwer": str(tmp_path / "phone_mcp.py"),
-                            "telefon": None})
+                            "telefon": None, "dom": str(tmp_path / "dom")})
     ust = json.loads(json.dumps(flota.ustawienia_profili(u, agenci)))       # tak, jak zapisuje je zainstaluj_flote
-    szef, operator = ust["profile"]["jarvo"][telefon.KLUCZ], ust["profile"]["jarvo-operator"][telefon.KLUCZ]
-    assert szef["tools"]["include"] == list(telefon.NARZEDZIA_ODCZYTU) and "act" not in szef["tools"]["include"]
-    assert "include" not in operator["tools"] and operator["env"] == {"ADB": str(adb)}   # bez --telefon: bez PHONEUSE_PHONE
+    szef = ust["profile"]["jarvo"][telefon.KLUCZ]
+    assert "include" not in szef["tools"]                                   # wszystkie narzędzia, także act i batch
+    assert szef["env"] == {"ADB": str(adb), telefon.DOM: str(tmp_path / "dom")}   # bez --telefon: bez PHONEUSE_PHONE
     assert telefon.KLUCZ not in ust["profile"].get("jarvo-web", {})
     if WINDOWS:                                                               # klucze powłoki zostają obok
         assert "terminal.shell_init_files" in ust["profile"]["jarvo"]
-    assert "jarvo-operator" not in flota.ustawienia_profili(u, ["jarvo"])["profile"]   # tylko agenci z buildu
+    assert "jarvo" not in flota.ustawienia_profili(u, ["jarvo-web"])["profile"]   # tylko agenci z buildu
     # install_fleet.py po --force-config: wpis w config.yaml, drugi przebieg bez zapisu
     plik = tmp_path / "ustawienia.json"
     plik.write_text(json.dumps(ust), encoding="utf-8")
@@ -547,6 +547,36 @@ def test_ustawienia_profili_z_telefonem_przezywaja_force_config(tmp_path, monkey
     assert config.stat().st_mtime_ns == przed
     telefon.zapisz_stan(u, {**telefon.stan_telefonu(u), "wlaczony": False})
     assert not any(telefon.KLUCZ in k for k in flota.ustawienia_profili(u, agenci)["profile"].values())
+
+
+def test_profil_usunietego_agenta_idzie_do_kosza_bez_utraty_danych(tmp_path):
+    """Stary katalog profilu usuniętego agenta (Operator, 2026-11-14) nie zostaje profilem bramy: instalacja
+    przenosi go do profiles/.usuniete/<agent>-<data> z całą zawartością; agent z buildu i drugi przebieg bez zmian."""
+    u = uklad(tmp_path / "Jarvo")
+    a = install_fleet.parser().parse_args(["--dane", str(u.dane), "--build", str(u.build), "--natywnie",
+                                           "--bez-sekretow"])
+    f = install_fleet.Flota(a, wypisz=lambda _t: None)
+    f.agenci = ["jarvo"]
+    f.usun_stare_profile()                                                    # nie ma czego przenosić
+    assert not (u.dane / "profiles" / install_fleet.USUNIETE).exists() and f.zmiany == []
+    stary = u.dane / "profiles" / install_fleet.USUNIETE_PROFILE[0]
+    (stary / "sessions").mkdir(parents=True)
+    (stary / "config.yaml").write_text("model:\n  default: x\n", encoding="utf-8")
+    (stary / "sessions" / "s1.json").write_text("{}", encoding="utf-8")
+    f.usun_stare_profile()
+    kosz = u.dane / "profiles" / install_fleet.USUNIETE
+    [cel] = list(kosz.iterdir())
+    assert not stary.exists() and cel.name.startswith(f"{stary.name}-")
+    assert (cel / "config.yaml").is_file() and (cel / "sessions" / "s1.json").read_text(encoding="utf-8") == "{}"
+    assert len(f.zmiany) == 1
+    assert sorted(p.name for p in (u.dane / "profiles").iterdir() if not p.name.startswith(".")) == []
+    (stary / "sessions").mkdir(parents=True)                                  # ten sam dzień drugi raz: nowa nazwa
+    f.usun_stare_profile()
+    assert len(list(kosz.iterdir())) == 2 and not stary.exists()
+    f.agenci = ["jarvo", stary.name]                                          # agent wrócił do buildu: zostaje
+    stary.mkdir()
+    f.usun_stare_profile()
+    assert stary.is_dir() and len(list(kosz.iterdir())) == 2
 
 
 # ---------------------------------------------------------------- klucz i port API bramy

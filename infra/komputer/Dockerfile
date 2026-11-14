@@ -1,4 +1,4 @@
-# Komputer Jarva (docs/KOMPUTER.md): pulpit Linux, na którym agent Operator klika i pisze. Osobny kontener bez
+# Komputer Jarva (docs/KOMPUTER.md): pulpit Linux, na którym Jarvo klika i pisze. Osobny kontener bez
 # kluczy floty: Xvnc tylko na gnieździe unix, xfwm4 z kompozytorem (bez niego zrzuty zasłoniętych okien są czarne),
 # Chromium z drzewem dostępności, sterownik ekranu cua-driver (MIT, wersja i sumy z vendor/zrodla.yaml) i wejście
 # sterownika z twardymi zasadami (wejscie.py, zasady.py, okna.py: flota sięga do sterownika tylko przez nie).

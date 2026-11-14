@@ -1138,10 +1138,11 @@ def test_chat_srodowisko_tryb_i_argumenty_dla_hermesa(tmp_path, capsys):
     assert "etap E4" in capsys.readouterr().err
     assert cli.main(["chat", "--profil", "../x"], otoczenie=ot) == 2
     assert cli.main(["chat", "--tryb", "yolo"], otoczenie=ot) == 2
-    (u.dane / "profiles" / "jarvo-operator").mkdir(parents=True)
-    assert cli.main(["chat", "--tryb", "pelny", "--profil", "jarvo-operator"], otoczenie=ot) == 1   # nigdy pełny
-    assert "jarvo-operator" in capsys.readouterr().err
-    assert len(wywolania) == 3
+    (u.dane / "profiles" / "jarvo").mkdir(parents=True, exist_ok=True)
+    assert cli.main(["chat", "--tryb", "pelny", "--profil", "jarvo"], otoczenie=ot) == 7   # ekran i telefon blokuje wtyczka
+    argv, env = wywolania[-1]
+    assert "--yolo" in argv and env["JARVO_TRYB_ZGOD"] == "pelny"
+    assert len(wywolania) == 4
 
 
 def test_panel_startuje_serwis_czeka_i_otwiera_przegladarke(tmp_path, capsys):

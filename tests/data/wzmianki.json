@@ -76,15 +76,6 @@
    "nazwa": "Aplikacje"
   },
   {
-   "name": "jarvo-operator",
-   "handle": "operator",
-   "aliasy": [
-    "operator",
-    "jarvo-operator"
-   ],
-   "nazwa": "Operator"
-  },
-  {
    "name": "jarvo-reka",
    "handle": "reka",
    "aliasy": [

@@ -581,9 +581,9 @@ function roomApps(L, a, queue) {
   const c = L.get("chair"); c.r(70, 46, 13, 9, "#2D3440"); c.r(75, 55, 3, 4, "#555E6B"); c.r(70, 59, 13, 1, "#555E6B");
 }
 
-// Sterownia (Operator): Komputer Jarva na żywo. Duży ekran z pulpitem (przeglądarka i okno terminala; przy pracy kursor
+// Sterownia (Jarvo): Komputer Jarva na żywo. Duży ekran z pulpitem (przeglądarka i okno terminala; przy pracy kursor
 // myszy klika przycisk strony), monitor terminala z zielonym tekstem, neon LIVE, bursztynowa lampa „oddaj ekran” (świeci,
-// gdy Operator czeka na właściciela: logowanie, płatność; wtedy w przeglądarce formularz z kłódką), komputer z diodami,
+// gdy Jarvo czeka na właściciela: logowanie, płatność; wtedy w przeglądarce formularz z kłódką), komputer z diodami,
 // pulpit z klawiaturą, myszą, stosem kart (kolejka) i dużym czerwonym STOP.
 function roomControl(L, a, queue) {
   const g = L.get("props"), st = a.status, on = isBusy(st), hand = st === "blocked", live = on || hand;

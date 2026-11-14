@@ -1,4 +1,4 @@
-"""Komputer Jarva: bramka sterownika (jarvo_cua.py), wtyczka Operatora (plugin/) i Komputer natywnie (docs/KOMPUTER.md).
+"""Komputer Jarva: bramka sterownika (jarvo_cua.py), wtyczka Jarva (plugin/) i Komputer natywnie (docs/KOMPUTER.md).
 
 Komputer natywnie (docs/NATYWNIE.md, etap E10): osobna przeglądarka Jarva (Chrome for Testing z własnym profilem)
 sterowana przez CDP po potoku, z twardymi zasadami wejścia i filtrem ruchu w aplikacji:

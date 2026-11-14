@@ -1,7 +1,7 @@
 ---
 name: dispatch-playbook
 description: "Rozdawanie pracy: karty z kontraktem, zależności, misje."
-version: 1.4.0
+version: 1.5.0
 author: Jarvo
 license: MIT
 metadata:
@@ -12,7 +12,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-10-05"
+    reviewed: "2026-11-14"
 ---
 
 # Dispatch: jak rozdać pracę
@@ -45,8 +45,8 @@ GRANICE: autonomia A1 (bez publikacji/wdrożeń); budżet <czas>; nie ruszać <�
 ZGODA WŁAŚCICIELA: <konto|platnosc|wysylka|publikacja|usuniecie_konta|wszystko> — „<cytat polecenia>” (<RRRR-MM-DD>)
 ```
 Linia `ZGODA WŁAŚCICIELA`, gdy właściciel kazał założyć konto (`konto`), zapłacić, wysłać, opublikować albo usunąć
-konto: cytujesz jego słowa. Czyta ją kod (Komputer Jarva, bramka telefonu), nie model; bez niej taki klik Operator
-oddaje właścicielowi. W Komputerze logowanie i rejestracja przechodzą i bez niej, na telefonie zgoda na regulamin
+konto: cytujesz jego słowa. Czyta ją kod (Komputer Jarva, bramka telefonu), nie model; bez niej taki klik na karcie
+oddajesz właścicielowi (`oddaj-ekran`). W Komputerze logowanie i rejestracja przechodzą i bez niej, na telefonie zgoda na regulamin
 potrzebuje `konto`.
 
 ## Wywołanie `kanban_create`
@@ -84,8 +84,8 @@ kanban_create(
 | **Leady** | lowca (ICP → sygnały → ranking z kontaktem) → [decyzja użytkownika, do kogo] → studio (szkic wiadomości, opcjonalnie) |
 | **Aplikacja mobilna** | mobile (natywna czy PWA, koszty) → [decyzja użytkownika] → web (strona, PWA) albo mobile (Wallet, aplikacja) |
 | **Audyt mobilny** | mobile (audyt: sklepy, linki, PWA, opinie) → [decyzja użytkownika] → web ∥ studio (poprawki) |
-| **Zadanie na ekranie** | [droga bez ekranu: sherlock albo web] → operator (jedna karta naraz; płatność, wysyłka, publikacja: linia ZGODA WŁAŚCICIELA albo prośba do właściciela) |
-| **Konto w serwisie** (mail, usługa, klucz API) | operator: rejestracja w Komputerze Jarva albo na telefonie („przez Google/GitHub”, kod SMS z telefonu), hasło w menedżerze haseł przeglądarki, zrzut każdego kroku do `out/kroki/`; CAPTCHA próbuje sam, nie przejdzie → prośba do właściciela o klik przez VNC. Klucz API: karta reka przez CLI usługi (logowanie agenta, np. `instabox login --agent`) prosto do sejfu (`secret-tool`), nigdy do czatu ani pliku; klucz tylko w panelu WWW: Operator klika „utwórz”, kopiuje właściciel przez VNC (Komputer ukrywa klucze przed agentem). Film z procesu: → wideo (motion graphic ze zrzutów, 30–45 s, do 15 MB) |
+| **Zadanie na ekranie** | [droga bez ekranu: `web_extract`, sherlock albo web] → robisz sam (`praca-na-ekranie`); dłużej niż kilka minut → karta dla siebie (`assignee="jarvo"`, jedna naraz, jeden ekran); płatność, wysyłka, publikacja: linia ZGODA WŁAŚCICIELA albo prośba do właściciela |
+| **Konto w serwisie** (mail, usługa, klucz API) | robisz sam: rejestracja w Komputerze Jarva albo na telefonie („przez Google/GitHub”, kod SMS z telefonu), hasło w menedżerze haseł przeglądarki, zrzut każdego kroku; CAPTCHA próbujesz sam, nie przejdzie → prośba do właściciela o klik przez VNC. Klucz API: CLI usługi w terminalu (logowanie agenta, np. `instabox login --agent`) prosto do sejfu (`secret-tool`), nigdy do czatu ani pliku; klucz tylko w panelu WWW: klikasz „utwórz”, kopiuje właściciel przez VNC (Komputer ukrywa klucze przed agentem). Film z procesu: → wideo (motion graphic ze zrzutów, 30–45 s, do 15 MB) |
 
 **Karta „złożenie”** (dla misji z ≥2 agentami): `assignee="jarvo-reka"`, `parents` = wszystkie karty merytoryczne,
 cel: jeden pakiet w `@@MISSIONS_DIR@@/<MISJA>/zlozenie/out/` (INDEX.md z opisem i ścieżkami, bez przerabiania treści).

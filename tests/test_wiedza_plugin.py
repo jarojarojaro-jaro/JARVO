@@ -209,23 +209,35 @@ def test_lustro_pamieci_i_wyciag(srodowisko, monkeypatch):
     assert p4.on_pre_compress(dluga) == ""
 
 
-def test_agent_z_komputerem_bez_wyciagu(srodowisko, tmp_path, monkeypatch):
-    """Agent z `komputer: true` (Operator, docs/KOMPUTER.md §7): wyniki narzędzi to treść ekranu, więc żadnego wyciągu."""
+def test_sesja_z_ekranem_albo_telefonem_bez_wyciagu(srodowisko, monkeypatch):
+    """Rozmowa z narzędziem ekranu albo telefonu (computer_use, komputer, mcp__phone__*; docs/KOMPUTER.md §7): wyniki
+    narzędzi to treść ekranu, więc z tej sesji żadnego wyciągu. Inne sesje tego samego agenta idą do wyciągu."""
     root, home, sk, p = srodowisko
-    fleet = tmp_path / "fleet-komputer.json"
-    fleet.write_text(json.dumps({**FLEET, "agents": [{**FLEET["agents"][0], "komputer": True}]}, ensure_ascii=False), encoding="utf-8")
-    assert w.main(["--skarbiec", str(root / "jarvo" / "knowledge"), "--stan", str(root / "jarvo" / "state"), "zasiej", "--fleet", str(fleet)]) == 0
-    assert json.loads((root / "jarvo" / "state" / "wiedza-agenci.json").read_text(encoding="utf-8"))["jarvo-web"]["bez_wyciagu"] is True
     wywolania = []
     monkeypatch.setattr(pl.SkarbiecProvider, "_model", staticmethod(lambda s, u, max_tokens=1200: wywolania.append(u) or "## Fakty\n- x"))
+    zwykla = [m for i in range(6) for m in ({"role": "user", "content": f"wypełnij formularz {i} w sklepie Acme"},
+                                            {"role": "assistant", "content": "Zrobione, formularz wypełniony."})]
+    ekran = [m for i in range(6) for m in (
+        {"role": "user", "content": f"wypełnij formularz {i} w sklepie Acme"},
+        {"role": "assistant", "content": "", "tool_calls": [{"function": {"name": "komputer", "arguments": "{}"}}]},
+        {"role": "tool", "content": "Jan Kowalski, ul. Polna 1, tel. 600 100 200"})]
     op = pl.SkarbiecProvider()
     op.initialize("sesja-ekranu", hermes_home=str(home), platform="cli", agent_context="primary")
-    dluga = [m for i in range(6) for m in ({"role": "user", "content": f"wypełnij formularz {i} w sklepie Acme"},
-                                           {"role": "tool", "content": "Jan Kowalski, ul. Polna 1, tel. 600 100 200"})]
-    assert op.on_pre_compress(dluga) == ""
-    op.on_session_end(dluga)
+    assert op.on_pre_compress(ekran) == ""
+    op.on_session_end(zwykla)                                  # ta sama sesja: oznaczona, mimo zapisu bez narzędzi
     assert wywolania == [] and not list((sk.root / "zrodla/rozmowy").glob("*.md"))
-    assert op.prefetch("lightpanda three.js") != ""                          # skarbiec czyta dalej, tylko nic nie wyciąga
+    assert op.prefetch("lightpanda three.js") != ""            # skarbiec czyta dalej, tylko nic nie wyciąga
+    # telefon: sesję oznacza strażnik (pre_tool_call), zanim tura trafi do bufora
+    assert pl.straznik("mcp__phone__screen", {"phone": "first"}, session_id="sesja-telefonu") is None
+    tel = pl.SkarbiecProvider()
+    tel.initialize("sesja-telefonu", hermes_home=str(home), platform="telegram", agent_context="primary")
+    tel.on_session_end(zwykla)
+    assert wywolania == []
+    # rozmowa bez ekranu i telefonu: wyciąg jak zawsze
+    czysta = pl.SkarbiecProvider()
+    czysta.initialize("sesja-bez-ekranu", hermes_home=str(home), platform="telegram", agent_context="primary")
+    czysta.on_session_end(zwykla)
+    assert len(wywolania) == 1
 
 
 def test_hak_kanbana(srodowisko, monkeypatch):

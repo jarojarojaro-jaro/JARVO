@@ -1,11 +1,11 @@
-"""Profil rąk `jarvo-ekran`: profil Hermesa, w którym Operator działa na ekranie właściciela (K6).
+"""Profil rąk `jarvo-ekran`: profil Hermesa, w którym Jarvo działa na ekranie właściciela (K6).
 
 Zakłada go i odświeża `jarvo komputer rece on` (jarvo/rece.py) przed zapisem zgody. To nie agent floty: nie ma go
 w fleet.yaml, nie dostaje kart kanbana, rutyn ani delegacji, nie ma terminala ani narzędzi plików. Rozmowa:
 `jarvo chat --profil jarvo-ekran` (każde działanie na ekranie zatwierdzasz w niej sam). Pliki w
 `<dane>/profiles/jarvo-ekran/`:
 
-  config.yaml   zapisywany od nowa przy każdym `on` (tekst niżej, `tekst_configu`): model z profilu jarvo-operator
+  config.yaml   zapisywany od nowa przy każdym `on` (tekst niżej, `tekst_configu`): model z profilu jarvo
                 (albo z configu hosta), computer_use w trybie bounded z manifestem zgody (<stan>/rece/manifest.yaml),
                 approvals.mode manual, cron_mode, single_query_mode i unattended_mode deny, pusta command_allowlist,
                 narzędzia computer_use, clarify i todo (reszta w agent.disabled_toolsets, rutyny bez narzędzi),
@@ -39,14 +39,14 @@ from pathlib import Path
 from . import APP, KONFIGURACJA, PROFIL, konfig
 
 WTYCZKA_ZGOD = "jarvo-zgody"
-PROFIL_MODELU = "jarvo-operator"              # skąd profil rąk bierze model (build.py wpisuje tam model floty)
+PROFIL_MODELU = "jarvo"                       # skąd profil rąk bierze model (build.py wpisuje tam model floty)
 NARZEDZIA_PROFILU = ("computer_use", "clarify", "todo")
 # hermes_cli/tools_config.py: CONFIGURABLE_TOOLSETS; agent.disabled_toolsets wyłącza je na każdej powierzchni
 WYLACZONE_NARZEDZIA = ("terminal", "file", "code_execution", "browser", "web", "delegation", "cronjob", "kanban",
                        "memory", "skills", "session_search", "image_gen", "video_gen", "tts", "vision", "video",
                        "x_search", "homeassistant", "spotify", "discord", "discord_admin", "yuanbao", "connections",
                        "context_engine")
-SOUL = """# Ręce Jarva: Operator na Twoim ekranie
+SOUL = """# Ręce Jarva: Jarvo na Twoim ekranie
 
 Działam na ekranie właściciela przez computer_use, tylko w aplikacjach z jego zgody (`jarvo komputer rece on`)
 i tylko do jej końca. Każde działanie zatwierdza właściciel w tej rozmowie, a bramka rąk Jarva sprawdza je jeszcze
@@ -70,7 +70,7 @@ raz i odmawia wszystkiego, czego zgoda nie obejmuje. Nie mam terminala, plików 
 ## Język
 Z właścicielem po polsku; napisy z ekranu cytuję dokładnie.
 """
-OPIS = {"description": "Ręce Jarva: Operator na ekranie właściciela, tylko w aplikacjach z jego zgody "
+OPIS = {"description": "Ręce Jarva: Jarvo na ekranie właściciela, tylko w aplikacjach z jego zgody "
                        "(jarvo komputer rece on).",
         "description_auto": False, "display_name": "Ręce Jarva"}
 
@@ -99,7 +99,7 @@ def _napis(wartosc: str) -> str:
 
 
 def model_floty(dane: Path) -> tuple[dict, str | None, str]:
-    """(model, strefa czasowa, skąd): `model.provider` i `model.default` z profilu jarvo-operator (build.py wpisuje
+    """(model, strefa czasowa, skąd): `model.provider` i `model.default` z profilu jarvo (build.py wpisuje
     tam model floty), a bez niego z configu hosta. BladProfilu, gdy żaden nie ma modelu, który da się przeczytać."""
     for plik in (Path(dane) / "profiles" / PROFIL_MODELU / "config.yaml", Path(dane) / "config.yaml"):
         try:
@@ -112,7 +112,7 @@ def model_floty(dane: Path) -> tuple[dict, str | None, str]:
         if nazwa and "@@" not in nazwa:
             return ({"provider": dostawca, "default": nazwa} if dostawca else {"default": nazwa},
                     konfig.napis(m, "timezone"), str(plik))
-    raise BladProfilu("Nie wiem, jakim modelem ma pracować profil rąk: nie ma profilu jarvo-operator ani modelu "
+    raise BladProfilu("Nie wiem, jakim modelem ma pracować profil rąk: nie ma profilu jarvo ani modelu "
                       f"w configu hosta ({Path(dane) / 'config.yaml'}). Najpierw zainstaluj flotę, albo podaj "
                       "--profil z gotowym profilem rąk.")
 

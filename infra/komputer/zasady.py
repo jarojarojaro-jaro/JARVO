@@ -11,7 +11,7 @@ Decyzje:
               płatność, zakup, subskrypcja, karta i BLIK (`platnosc`), wysyłka (`wysylka`; formularz logowania
               i rejestracji bez zgody),
               publikacja (`publikacja`), usunięcie konta (`usuniecie_konta`); ze zgodą przechodzi,
-  wstrzymane  Komputer zatrzymany (właściciel: jarvo komputer pauza; Operator: czeka na właściciela);
+  wstrzymane  Komputer zatrzymany (właściciel: jarvo komputer pauza; Jarvo: czeka na właściciela);
               patrzeć wolno, działać nie, wznawia tylko właściciel.
 Przy dwóch sesjach naraz zmieniać ekran może jedna (odmowa `zajete`, wejscie.py: Ekran.zajmij).
 Działanie z delivery_mode foreground (klawiatura, przewijanie, przeciąganie i podwójny klik na pulpicie X11 mają tylko
@@ -196,7 +196,7 @@ class Werdykt:
 class Kontekst(Protocol):
     """To, co wejscie.py wie o ekranie w chwili wywołania."""
     wstrzymane: bool
-    powod_pauzy: str                  # kto i dlaczego wstrzymał (np. Operator czeka na właściciela)
+    powod_pauzy: str                  # kto i dlaczego wstrzymał (np. Jarvo czeka na właściciela)
 
     def cel(self, nazwa: str, args: dict) -> Optional[dict]:
         """Element, w który trafi działanie (z migawki sterownika albo z AT-SPI w punkcie), None gdy nieznany."""

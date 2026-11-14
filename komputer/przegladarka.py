@@ -123,7 +123,7 @@ def brak_piaskownicy(log: Path) -> bool:
 def preferencje(pobrane: Path) -> dict:
     """Część `Default/Preferences` profilu, którą ustawiamy przed każdym startem (reszta należy do przeglądarki)."""
     return {
-        # menedżer haseł włączony (decyzja właściciela 13.11: konta robi Operator, hasło zostaje w profilu przeglądarki,
+        # menedżer haseł włączony (decyzja właściciela 13.11: konta robi Jarvo, hasło zostaje w profilu przeglądarki,
         # nie w czacie ani pliku); na Linuksie `--password-store=basic`, więc bez okna pęku kluczy systemu
         "credentials_enable_service": True,
         "credentials_enable_autosignin": True,

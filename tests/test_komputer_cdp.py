@@ -146,7 +146,7 @@ def test_migawka_formularza_z_rolami_zasad_i_ramka_platnosci(przegl):
     assert all(e["element_token"].startswith(sc["snapshot_id"] + ":") for e in sc["elements"])
 
 
-def test_operator_wypelnia_formularz_a_wrazliwe_konczy_oddaj(przegl):
+def test_jarvo_wypelnia_formularz_a_wrazliwe_konczy_oddaj(przegl):
     st, _, _ = przegl
     nr = otworz(st, "https://sklep.jarvo.test/formularz.html")
     ctx = Ctx(st)
@@ -466,7 +466,7 @@ def test_podglad_i_wejscie_wlasciciela(przegl):
 
 def test_pasek_adresu_jak_w_chromium_z_pulpitu(przegl):
     """Element 0 migawki to pasek adresu (ta sama nazwa co w Chromium z pulpitu): klik, type z adresem, key return
-    otwiera stronę bez zmian w poleceniach Operatora, a type z nową linią na końcu robi to w jednym wywołaniu
+    otwiera stronę bez zmian w poleceniach Jarva, a type z nową linią na końcu robi to w jednym wywołaniu
     (paragon `adres: …`); adresy spoza http(s) nie przechodzą."""
     st, _, _ = przegl
     nr = otworz(st, "https://sklep.jarvo.test/sklep.html")
@@ -803,8 +803,8 @@ def _wtyczka():
     return m
 
 
-def test_wtyczka_operatora_idz_patrz_kroki_przez_bramke(przegl, monkeypatch):
-    """Droga Operatora do stron: narzędzie `komputer` (wtyczka) przez bramkę floty i kanał `cua` do wejścia
+def test_wtyczka_jarva_idz_patrz_kroki_przez_bramke(przegl, monkeypatch):
+    """Droga Jarva do stron: narzędzie `komputer` (wtyczka) przez bramkę floty i kanał `cua` do wejścia
     z zasadami: idz, patrz (okno zgody na górze), kroki z celem napisem i obserwacją (nowy tekst z `*`), czekaj;
     krok płatności kończy paczkę z radą `oddaj`. Cztery wywołania od adresu do odczytu."""
     from jarvo import komputer as jk

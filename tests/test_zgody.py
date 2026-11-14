@@ -442,22 +442,25 @@ def test_yolo_chronione_blokuje_reszte_zostawia_hermesowi(sr, monkeypatch):
     assert akcja(hak("terminal", command="rm -rf .git")) == "block"
 
 
-def test_operator_nigdy_w_trybie_pelnym(sr, monkeypatch):
-    operator = sr.dane / "profiles" / "jarvo-operator"
-    operator.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(operator))
+def test_jarvo_pod_yolo_bez_ekranu_i_telefonu(sr, monkeypatch):
+    """Profil jarvo (Komputer Jarva i telefon) pod YOLO: narzędzia ekranu i telefonu block, reszta jak w trybie pełnym."""
+    jarvo = sr.dane / "profiles" / "jarvo"
+    jarvo.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("HERMES_HOME", str(jarvo))
     monkeypatch.setattr(z, "_yolo", lambda: True)
-    for narzedzie, args in (("write_file", {"path": str(sr.proj / "x"), "content": "x"}), ("computer_use", {}),
-                            ("terminal", {"command": "ls"}), ("komputer", {"akcja": "klik"})):
+    for narzedzie, args in (("computer_use", {}), ("komputer", {"akcja": "klik"}),
+                            ("mcp__phone__screen", {"phone": "first"}), ("mcp__phone__act", {"cmd": "tap"})):
         w = hak(narzedzie, **args)
-        assert akcja(w) == "block" and "jarvo-operator" in w["message"], narzedzie
+        assert akcja(w) == "block" and "ekranu ani telefonu" in w["message"], narzedzie
+    assert hak("write_file", path=str(sr.proj / "x"), content="x") is None
     assert hak("read_file", path="x") is None
     assert hak("kanban_block", reason="YOLO") is None
-    assert "wyłączony dla jarvo-operator" in z.polecenie_tryb("pelny")
+    assert "ekran i telefon" in z.polecenie_tryb("pelny")
     ustaw_tryb(monkeypatch, "pelny")
-    assert z.tryb_zgod()[0] == "projekt"
+    assert z.tryb_zgod()[0] == "pelny"
     monkeypatch.setattr(z, "_yolo", lambda: False)
-    assert hak("terminal", command="ls") is None
+    assert hak("komputer", akcja="patrz") is None
+    assert hak("mcp__phone__screen", phone="first") is None
 
 
 # ------------------------------------------------------------------------------------------------ bez człowieka
@@ -591,10 +594,10 @@ def test_telefon_confirm_na_karcie_z_zgoda_wlasciciela(sr, monkeypatch):
 def test_telefon_confirm_pod_yolo_block(sr, monkeypatch):
     monkeypatch.setattr(z, "_yolo", lambda: True)                    # YOLO zatwierdziłoby prośbę bez człowieka
     assert akcja(hak("mcp__phone__act", cmd="enter", confirm=True)) == "block"
-    operator = sr.dane / "profiles" / "jarvo-operator"
-    operator.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(operator))
-    assert akcja(hak("mcp__phone__screen", phone="first")) == "block"   # Operator pod YOLO: telefon jak computer_use
+    jarvo = sr.dane / "profiles" / "jarvo"
+    jarvo.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("HERMES_HOME", str(jarvo))
+    assert akcja(hak("mcp__phone__screen", phone="first")) == "block"   # jarvo pod YOLO: telefon jak computer_use
 
 
 # ------------------------------------------------------------------------------------------------ werdykty na kartach

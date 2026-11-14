@@ -154,7 +154,7 @@ def srodowisko(u: Uklad, baza: dict | None = None, *, biez: dict | None = None,
     env.update(build)
     env["PATH"] = os.pathsep.join([*dict.fromkeys(sciezka), env.get("PATH", "")]).rstrip(os.pathsep)
     # bramka Komputera Jarva (komputer/jarvo_cua.py; plik w bin-floty zakłada `jarvo komputer on`). Zawsze ta ścieżka:
-    # Hermes sprawdza plik przy każdym starcie agenta, więc Operator dostaje computer_use bez restartu bramy, a bez
+    # Hermes sprawdza plik przy każdym starcie agenta, więc Jarvo dostaje computer_use bez restartu bramy, a bez
     # pliku narzędzia nie ma; nadpisuje też cudzą wartość z otoczenia i wyłącza samodzielne pobieranie sterownika przez
     # Hermesa (bez pinu i sumy)
     env["HERMES_CUA_DRIVER_CMD"] = str(u.bin_floty / ("jarvo-cua.cmd" if WINDOWS else "jarvo-cua"))

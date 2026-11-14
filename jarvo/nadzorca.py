@@ -42,7 +42,7 @@ Usługi (uslugi_jarva; flagi i zmienne sprawdzone w kodzie Hermesa f97608f):
   (kolejność 3), gotowa, gdy /zdrowie odpowiada z tokenem; po starcie nadrabia brakujące wektory skarbca. Ctrl+Break
   albo SIGTERM kończy ją od razu (plik z tokenem znika), po 10 s zabicie. Bez kodu, venvu narzędzi albo modelu
   w narzedzia.json usługi nie ma, a przypomnienia idą słowami.
-- komputer: Komputer Jarva, czyli przeglądarka Jarva dla Operatora (docs/NATYWNIE.md J12), `<python Jarva> -I -X utf8
+- komputer: Komputer Jarva, czyli przeglądarka Jarva (docs/NATYWNIE.md J12), `<python Jarva> -I -X utf8
   <app>/komputer/usluga.py --korzen R --zastap`. Usługa z bramką: działa tylko wtedy, gdy właściciel ją włączył
   (`jarvo komputer on`: `wlaczony: true` w `<stan>/komputer/ustawienia.json`) i przeglądarka jest zainstalowana
   (jarvo/komputer.py do_startu); inaczej ma stan `wylaczona` i to nie jest błąd. Okno albo tło, program przeglądarki

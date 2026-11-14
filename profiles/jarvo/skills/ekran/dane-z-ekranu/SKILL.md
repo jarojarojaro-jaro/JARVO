@@ -1,7 +1,7 @@
 ---
 name: dane-z-ekranu
 description: "Dane z ekranu do pliku: tabele, listy, źródło i godzina"
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -9,9 +9,9 @@ metadata:
     tags: [computer-use, extraction, table, csv, gdpr]
     related_skills: [praca-na-ekranie]
   jarvo:
-    agent: jarvo-operator
+    agent: jarvo
     autonomy: A1
-    reviewed: "2026-10-19"
+    reviewed: "2026-11-14"
 ---
 
 # Dane z ekranu

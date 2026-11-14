@@ -42,7 +42,7 @@ Dzięki temu po każdym restarcie, kompresji czy nowej rozmowie Jarvo odtwarza p
          ▼                                                          ▼
   missions/<ID>/MISSION.md                         jarvo-sherlock / jarvo-web / jarvo-studio /
                                                    jarvo-wideo / jarvo-ads / jarvo-lowca /
-                                                   jarvo-mobile / jarvo-operator / jarvo-reka
+                                                   jarvo-mobile / jarvo-reka / jarvo (ekran, długie)
                                                             │ kanban_request_review(reviewer="jarvo")
                                                             ▼
                                                    jarvo (pracownik-sędzia, lane "review")
@@ -51,8 +51,10 @@ Dzięki temu po każdym restarcie, kompresji czy nowej rozmowie Jarvo odtwarza p
 ```
 
 - **`jarvo` w czacie (Boss):** przyjmuje zlecenie, zakłada misję, tworzy karty, odbiera
-  zdarzenia, prowadzi kolejkę decyzji, raportuje. Na platformach czatu (Telegram, czat HQ) **nie ma terminala**
-  (toolsety: kanban, memory, file, web, session_search, clarify, todo, skills, cronjob; w HQ bez clarify).
+  zdarzenia, prowadzi kolejkę decyzji, raportuje. Sam pracuje na ekranie Komputera Jarva i na telefonie
+  właściciela; dłuższą pracę na ekranie (więcej niż kilka minut) daje na kartę przypisaną do siebie
+  (toolsety: kanban, memory, file, web, session_search, clarify, todo, skills, cronjob, computer_use, komputer,
+  terminal; w HQ bez clarify).
 - **`jarvo` jako pracownik-sędzia:** kiedy snajper odda kartę do recenzji, dispatcher uruchamia
   profil `jarvo` w torze „review” z wymuszonym skillem `sdlc-review`. Nasza wersja tego skilla
   (w profilu `jarvo`) zastępuje wbudowaną i zawiera rubryki każdego agenta. Pracownik ma
@@ -295,7 +297,7 @@ albo daje kartę `jarvo-reka` z adnotacją „poza snajperami”.
 | film, reels, short, montaż, lektor, napisy, klipy z nagrania | `jarvo-wideo` |
 | leady, nowi klienci, komu sprzedać, przetargi do wzięcia, nowe firmy w branży, kontakt do firm | `jarvo-lowca` |
 | aplikacja mobilna, „czy potrzebujemy aplikacji”, PWA czy natywna, App Store, Google Play, audyt aplikacji | `jarvo-mobile` |
-| kliknij w panelu albo programie w przeglądarce, wypełnij formularz, przejdź stronę jak klient, przepisz z ekranu, gdzie nie ma API | `jarvo-operator` (gdy Komputer jest włączony; logowanie i płatność robi właściciel) |
+| kliknij w panelu albo programie w przeglądarce, wypełnij formularz, przejdź stronę jak klient, przepisz z ekranu, załóż konto, zaloguj się, telefon, gdzie nie ma API | `jarvo` sam (gdy Komputer jest włączony); dłuższe niż kilka minut: karta przypisana do siebie (`assignee: jarvo`); płatność, wysyłka i publikacja tylko z `ZGODA WŁAŚCICIELA` w karcie |
 | szybkie sprawy, dokumenty, konwersje, sklejanie wyników, organizacja, „ogarnij” | `jarvo-reka` |
 
 ---

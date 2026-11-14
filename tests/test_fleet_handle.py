@@ -66,7 +66,7 @@ def test_fleet_json_niesie_uchwyt_i_aliasy():
 
 def test_fleet_json_niesie_krotka_role():
     dane = hqbuild.fleet_json()
-    assert len(dane["agents"]) >= 10
+    assert len(dane["agents"]) >= 9
     for a in dane["agents"]:
         assert a["rola"] and len(a["rola"].split()) <= 8, a["name"]
         assert a["en"]["rola"] and len(a["en"]["rola"].split()) <= 8, a["name"]

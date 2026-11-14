@@ -344,7 +344,7 @@ def przebieg(root: str) -> int:
             f"zablokowane przed {przed}, po {po}")
     k.narzedzie("bring_to_front", {"pid": pid, "window_id": wid})
 
-    # druga sesja (druga karta Operatora): patrzy, ale ekranem steruje ta, która działała ostatnio
+    # druga sesja (druga karta Jarva): patrzy, ale ekranem steruje ta, która działała ostatnio
     k2 = Klient()
     inicjuj(k2, "komputer-natywny-test-2")
     el2 = po_nazwie((k2.narzedzie("get_window_state", {"pid": pid, "window_id": wid}).get(
@@ -359,10 +359,10 @@ def przebieg(root: str) -> int:
     pulapka_fokusu(k, pid)
     ekran_hq(k, root, pid, wid)
 
-    # prośba Operatora i pauza
+    # prośba Jarva i pauza
     w, el = stan_okna()
     odp = ster(root, "pauza", powod="Zaloguj się do sklepu testowego")
-    sprawdz((odp.get("pauza") or {}).get("kto") == "flota", "kanał ster: prośba Operatora (pauza od floty z powodem)")
+    sprawdz((odp.get("pauza") or {}).get("kto") == "flota", "kanał ster: prośba Jarva (pauza od floty z powodem)")
     w = klik("Dodaj do koszyka")
     sprawdz(kod(w) == "wstrzymane" and "Zaloguj się do sklepu testowego" in tekst(w),
             "klik przy prośbie: wstrzymane z powodem prośby", tekst(w))
@@ -393,7 +393,7 @@ def przebieg(root: str) -> int:
 
 
 def formularz(k: Klient, pid: int) -> None:
-    """Operator wypełnia formularz zamówienia; wrażliwe pola, przyciski, okno potwierdzenia, ramka płatności i wybór
+    """Jarvo wypełnia formularz zamówienia; wrażliwe pola, przyciski, okno potwierdzenia, ramka płatności i wybór
     pliku kończą się „oddaj” (wymaga_czlowieka), pobranie programu jest odrzucane."""
     w = k.narzedzie("launch_app", {"name": "chromium", "urls": [FORMULARZ]})
     okno = okno_o_tytule(k, "Zamówienie testowe Jarvo")
@@ -411,7 +411,7 @@ def formularz(k: Klient, pid: int) -> None:
     for etykieta, wartosc in (("Imię i nazwisko", "Jan Kowalski"), ("E-mail", "jan@example.com"),
                               ("Telefon", "+48 600 100 200"), ("Adres dostawy", "ul. Testowa 1, 00-001 Warszawa")):
         w = k.narzedzie("type_text", {**pisz, "element_token": el[etykieta]["element_token"], "text": wartosc})
-        sprawdz(kod(w) == "ok", f"formularz: Operator wpisuje „{etykieta}”", tekst(w))
+        sprawdz(kod(w) == "ok", f"formularz: Jarvo wpisuje „{etykieta}”", tekst(w))
     w = k.narzedzie("set_value", {"pid": pid, "window_id": wid, "element_token": el["Dostawa"]["element_token"],
                                   "value": "Paczkomat"})
     sprawdz(kod(w) == "ok", "formularz: lista „Dostawa” przez set_value", tekst(w))
@@ -421,7 +421,7 @@ def formularz(k: Klient, pid: int) -> None:
     el = migawka()
     sprawdz(el.get("Imię i nazwisko", {}).get("value") == "Jan Kowalski", "formularz: wartość pola widać w migawce")
     w = k.narzedzie("type_text", {**pisz, "element_token": el["Hasło do konta"]["element_token"], "text": "123456"})
-    sprawdz(kod(w) == "ok", "formularz: „Hasło do konta” wpisuje Operator", tekst(w))
+    sprawdz(kod(w) == "ok", "formularz: „Hasło do konta” wpisuje Jarvo", tekst(w))
     w = k.narzedzie("type_text", {**pisz, "element_token": el["Kod BLIK"]["element_token"], "text": "123456"})
     sprawdz(kod(w) == "wymaga_czlowieka", "formularz: „Kod BLIK” bez zgody `platnosc` w karcie: wymaga człowieka",
             tekst(w))

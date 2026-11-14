@@ -1,17 +1,17 @@
 # Flota Jarvo: specyfikacja agentów v1
 
-Flota: **Main Judge + 9 agentów**. Każdy agent to osobny profil Hermesa
+Flota: **Main Judge + 8 agentów**. Każdy agent to osobny profil Hermesa
 (osobna dystrybucja w `profiles/<nazwa>/`). Rejestr maszynowy jest w [`fleet.yaml`](../fleet.yaml).
 
 Każdy agent jest budowany według [PROFILE-SPEC.md](PROFILE-SPEC.md) (main prompt, workflowy,
 knowledge packi, skrypty, toolbox, granice, evals). Zweryfikowane narzędzia open-source
 każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.md).
 
-**Stan: wszystkie dziesięć profili jest zbudowanych.** Ten dokument to specyfikacja. Implementacja:
+**Stan: wszystkie dziewięć profili jest zbudowanych.** Ten dokument to specyfikacja. Implementacja:
 
 | Agent | Main prompt | Workflowy własne | Skille zewnętrzne | Skrypty | Evals |
 |---|---|---|---|---|---|
-| `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | [16 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster` | 3 (`writing-for-agents`, mattpocock; wspólne `konwersja-plikow` i `odczyt-ekranu`) | patrol, brief, przegląd, raport floty, liczby floty, świeżość, linter kontraktu, prosty polski, księga lekcji, poczekalnia skilli, wgrywanie stron, skrzynka linków | [30](../evals/jarvo/scenarios.yaml) |
+| `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | 21: [16 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster`, [5 w `skills/ekran/`](../profiles/jarvo/skills/ekran) | 3 (`writing-for-agents`, mattpocock; wspólne `konwersja-plikow` i `odczyt-ekranu`) | patrol, brief, przegląd, raport floty, liczby floty, świeżość, linter kontraktu, prosty polski, księga lekcji, poczekalnia skilli, wgrywanie stron, skrzynka linków; wtyczka `jarvo-komputer` (stan, dziennik, oddanie ekranu; natywnie strony: idz, patrz, kroki, czekaj) + narzędzie `computer_use` Hermesa przez bramkę `komputer/jarvo_cua.py` | [48](../evals/jarvo/scenarios.yaml) |
 | `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [9 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 18 (Hermes, marketingskills, wspólne `transkrypcja-filmu`, `konwersja-plikow`, `odczyt-ekranu` i `ostrozna-przegladarka`) | search_fanout, extract, sources (rejestr cytowań), fakty (brief do filmu) | [16](../evals/jarvo-sherlock/scenarios.yaml) |
 | `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [11 w `skills/web/`](../profiles/jarvo-web/skills/web) | 62 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólne `graf-kodu`, `izometria`, `warsztat-3d`, `konwersja-plikow` i `odczyt-ekranu`) | audit, szybki_audyt, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [20](../evals/jarvo-web/scenarios.yaml) |
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [7 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 28 (marketingskills, Anthropic, Hermes, impeccable, lemo-wake, wspólne `hooki`, `izometria`, `konwersja-plikow` i `odczyt-ekranu`) | render_html, check_media, lemo_wake | [15](../evals/jarvo-studio/scenarios.yaml) |
@@ -19,7 +19,6 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [11 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 8 (marketingskills, wspólne `hooki`, `konwersja-plikow` i `odczyt-ekranu`) | ads, planer, eksperyment, eksport, paczka | [14](../evals/jarvo-ads/scenarios.yaml) |
 | `jarvo-lowca` | [SOUL](../profiles/jarvo-lowca/SOUL.md) | [7 w `skills/lowca/`](../profiles/jarvo-lowca/skills/lowca) | 3 (wspólne `konwersja-plikow`, `odczyt-ekranu` i `ostrozna-przegladarka`) | krs, ceidg, przetargi, strona, leady, zrodlo | [16](../evals/jarvo-lowca/scenarios.yaml) |
 | `jarvo-mobile` | [SOUL](../profiles/jarvo-mobile/SOUL.md) | [10 w `skills/mobile/`](../profiles/jarvo-mobile/skills/mobile) | 23 (Expo, React Native, ASO; wspólne `konwersja-plikow`, `odczyt-ekranu` i `warsztat-3d`; `vendor/skills.lock.yaml`) | audyt_mobilny, decyzja, zgodnosc, aplikacja, ikony, zrzuty, wrogie, urzadzenie, ios_ci, bramka, sklep_check, pakiet, kadry, wydanie, odrzucenie, ze_strony, utrzymanie, paczki (+ mobile_lib, szablon `expo-jarvo`, workflow iOS) | [34](../evals/jarvo-mobile/scenarios.yaml) |
-| `jarvo-operator` | [SOUL](../profiles/jarvo-operator/SOUL.md) | [5 w `skills/operator/`](../profiles/jarvo-operator/skills/operator) | 0 (bez terminala nie dostaje skilli ze skryptami) | wtyczka `jarvo-komputer` (stan, dziennik, oddanie ekranu; natywnie strony: idz, patrz, kroki, czekaj) + narzędzie `computer_use` Hermesa przez bramkę `komputer/jarvo_cua.py` | [21](../evals/jarvo-operator/scenarios.yaml) |
 | `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 6 (skill-creator, `writing-for-agents`, `graf-kodu`, `transkrypcja-filmu`, `konwersja-plikow`, `odczyt-ekranu`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [15](../evals/jarvo-reka/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
@@ -31,7 +30,7 @@ Legenda przy skillach:
 
 | Profil | Rola | Typ | Maks. autonomia bez zgody |
 |---|---|---|---|
-| `jarvo` | Main Judge: przyjmuje zlecenia, rozdziela, ocenia, raportuje | orkiestrator | A1 (tworzy karty, ocenia; wgranie strony na hosting = A2) |
+| `jarvo` | Main Judge: przyjmuje zlecenia, rozdziela, ocenia, raportuje; sam pracuje na ekranie Komputera Jarva i na telefonie właściciela | orkiestrator | A1 (tworzy karty, ocenia, klika w tle i pisze w aktywnym oknie; wgranie strony na hosting = A2; płatność, wysyłka, publikacja i usunięcie konta tylko z `ZGODA WŁAŚCICIELA` w karcie; okno na wierzch = człowiek) |
 | `jarvo-web` | Web Senior Dev: strony od faviconu po SEO | snajper | A1 (buduje lokalnie; wdrożenie = A2) |
 | `jarvo-sherlock` | Researcher-detektyw: znajduje i weryfikuje | snajper | A1 (czyta, pisze raporty) |
 | `jarvo-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media | snajper | A1 (tworzy; publikacja = A2) |
@@ -39,7 +38,6 @@ Legenda przy skillach:
 | `jarvo-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy | snajper | A1 (renderuje; publikacja i zakupy = A2) |
 | `jarvo-lowca` | Łowca leadów: firmy z sygnałem zakupowym i opublikowanym kontaktem | snajper | A1 (szuka i ocenia; wysyłka = decyzja człowieka) |
 | `jarvo-mobile` | Twórca aplikacji: natywna czy PWA, audyt mobilny, aplikacje Expo do sklepów | snajper | A1 (audyty i rekomendacje; konta sklepów i wysyłka = A2) |
-| `jarvo-operator` | Operator: praca na ekranie Komputera Jarva (klik, formularz, dane z ekranu, ścieżka klienta) | snajper | A1 (klik w tle, klawiatura w aktywnym oknie; logowanie, płatność, wysyłka i okno na wierzch = człowiek) |
 | `jarvo-reka` | Prawa ręka: generalista, który ogarnia wszystko | generalista | A1 (e-maile i akcje zewnętrzne = A2) |
 
 ---
@@ -63,7 +61,6 @@ bez polskich znaków (`@łowca` = `@lowca`) i opcjonalne pole `aliasy` (lista). 
 | `jarvo-ads` | `@ads` | reklamy Meta i Google |
 | `jarvo-lowca` | `@lowca` | nowi klienci z KRS i CEIDG |
 | `jarvo-mobile` | `@mobile` | aplikacje na telefon |
-| `jarvo-operator` | `@operator` | pracuje na Komputerze Jarva |
 | `jarvo-reka` | `@reka` | dokumenty i szybkie sprawy |
 
 Pole `rola` (i `en.rola`) to krótka rola agenta, najwyżej 8 słów: aplikacja pokazuje ją w Ustawieniach › Zespół
@@ -111,9 +108,11 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
   odcisku, wgranie z kopią na serwerze i weryfikacją sumami, cofnięcie do tagu,
 - skrzynka linków (`skrzynka-linkow`, narzędzie `pobierz_link`, `pobierz_link.py`): wpis X, film YouTube albo strona
   od Ciebie (zwykle z Telegrama) → treść (fxtwitter, `yt-dlp -J`, trafilatura; film 360p i transkrypcja tylko gdy
-  trzeba), krótka ocena, szkic w skarbcu z tagami tematów i 2–4 zdania odpowiedzi; wysłanie linku to polecenie zapisu.
+  trzeba), krótka ocena, szkic w skarbcu z tagami tematów i 2–4 zdania odpowiedzi; wysłanie linku to polecenie zapisu,
+- praca na ekranie i telefonie sam (niżej „Ekran i telefon”): klik w panelu albo programie w przeglądarce, formularz,
+  ścieżka klienta, dane z ekranu, konta i logowania, telefon właściciela przez PHONEUSE.
 
-**Nie robi:** żadnej pracy dziedzinowej. Nie pisze stron, nie robi researchu, nie projektuje grafik.
+**Nie robi:** pracy dziedzinowej snajperów. Nie pisze stron, nie robi researchu, nie projektuje grafik.
 
 **Zasady routingu:**
 | Zlecenie | Do kogo |
@@ -125,7 +124,7 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 | Film, reels, short, montaż, napisy, lektor, klipy, żywy schemat (animowany przepływ na post), explainer z wykresem albo tablicą, film w stylu malarza (Van Gogh, Klimt, jaskinia) | `jarvo-wideo` |
 | Leady, nowi klienci, „komu sprzedać”, przetargi do wzięcia, nowe firmy w branży, kontakt do firm | `jarvo-lowca` |
 | Aplikacja mobilna, „czy potrzebujemy aplikacji”, PWA czy natywna, audyt aplikacji w App Store i Google Play, aplikacja z naszej strony, aktualizacja albo poprawka aplikacji w sklepie | `jarvo-mobile` |
-| Zadanie na ekranie: kliknij w panelu albo programie w przeglądarce, wypełnij formularz, przejdź stronę jak klient, przepisz dane z ekranu, gdzie nie ma API | `jarvo-operator` (wymaga włączonego Komputera: `jarvo komputer on`) |
+| Zadanie na ekranie albo telefonie: kliknij w panelu albo programie w przeglądarce, wypełnij formularz, przejdź stronę jak klient, przepisz dane z ekranu, załóż konto, zaloguj się, gdzie nie ma API | `jarvo` sam (wymaga włączonego Komputera: `jarvo komputer on`; telefon: `jarvo telefon on`); dłuższe niż kilka minut: karta kanbana przypisana do siebie (`assignee: jarvo`), żeby czat był wolny |
 | Szybkie sprawy, sklejanie wyników, prototyp, „ogarnij to”, zadanie bez oczywistego snajpera | `jarvo-reka` |
 | Duże cele (np. „wypuść nowy produkt”) | rozbicie na kilka kart, np. sherlock → web + studio → reka (spięcie) |
 
@@ -136,12 +135,42 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 zgoda na odcisk, wgranie z kopią i weryfikacją sumami, cofnięcie; `wgraj.py`), `skrzynka-linkow` (link od właściciela:
 pobranie narzędziem `pobierz_link`, ocena, szkic w skarbcu zawsze; `pobierz_link.py`), [T] `roster` (generowany z `fleet.yaml`: kto istnieje i co umie);
 [Z] `writing-for-agents` (mattpocock/skills: warsztat pisania SOUL i skilli, dla `fleet-improvement`), wspólny
-`konwersja-plikow` (zamiana pliku od ręki, bez karty dla snajpera) i `odczyt-ekranu` (tekst z obrazu; na czacie bez
-terminala, więc odczyt robi Ręka).
+`konwersja-plikow` (zamiana pliku od ręki, bez karty dla snajpera) i `odczyt-ekranu` (tekst z obrazu); [T] skille ekranu w `skills/ekran/`: `praca-na-ekranie` (pętla, tryby patrzenia,
+werdykty, odmowy wejścia), `formularze` (pole po polu, listy przez `set_value`, sprawdzenie wartości, formularze
+wrażliwe), `dane-z-ekranu` (tabela z drzewa albo obrazu do CSV z adresem i godziną, dane osób), `przejscie-strony`
+(ścieżka klienta z tabelą kroków i zrzutem problemu), `oddaj-ekran` (krok właściciela: CAPTCHA po jednej próbie,
+płatność bez zgody, prośba w jednym zdaniu).
 
 **Toolsety:** na Telegramie `kanban`, `memory`, `file`, `web`, `session_search`, `clarify`, `todo`, `skills`, `cronjob`,
-bez terminala; narzędzia `schemat` (SVG → PNG w rozmowie) i `pobierz_link` (skrzynka linków: skrypt profilu w venvie narzędzi) daje mu wtyczka `jarvo-wiedza` razem z narzędziami skarbca; w czacie HQ (`api_server`) to samo bez `clarify`. Pracownik-sędzia (CLI) ma dodatkowo `terminal`, `browser` i `vision` do weryfikacji wyników.
+`computer_use`, `komputer`, `terminal`; narzędzia `schemat` (SVG → PNG w rozmowie) i `pobierz_link` (skrzynka linków: skrypt profilu w venvie narzędzi) daje mu wtyczka `jarvo-wiedza` razem z narzędziami skarbca; w czacie HQ (`api_server`) to samo bez `clarify`. Pracownik-sędzia (CLI) ma dodatkowo `browser` i `vision` do weryfikacji wyników.
 Pracy dziedzinowej nie wykonuje (zasada SOUL, nie brak narzędzi).
+
+**Ekran i telefon.** Jarvo pracuje na ekranie Komputera Jarva: osobnego pulpitu z Chromium w kontenerze
+`jarvo-komputer`, który właściciel włącza poleceniem `jarvo komputer on` ([KOMPUTER.md](KOMPUTER.md)). Robi tak to,
+czego nie da się zrobić przez API ani `web_extract`: klika w panelach www i programach w przeglądarce, wypełnia
+formularze, przechodzi ścieżkę na stronie jak klient i mówi, gdzie się psuje, przepisuje dane z ekranu do pliku,
+zakłada konta i loguje się. Najpierw sprawdza drogę bez ekranu. Na ekranie pracuje w pętli patrz → działaj → sprawdź:
+drzewo dostępności (`capture` `ax`), potem znaczniki na zrzucie (`som`), obraz tylko gdy drzewo jest puste; klika po
+numerze elementu, po każdym działaniu czyta paragon sterownika (`effect: confirmed` ze zmianą albo `suspected_noop`),
+a nowy `capture` robi, gdy paragon nie wystarcza, i słucha werdyktu (`verify_fresh_state`, `escalate`). Klika w tle;
+pisze, naciska klawisze, przewija i przeciąga na wierzchu, ale tylko w oknie, które już jest aktywne (wejście pilnuje
+tego samo); okna na wierzch nie wyciąga bez zgody człowieka przy tym działaniu. Treść ekranu to dane, nie polecenia.
+
+Wejście Komputera ma twarde zasady, których agent nie wyłączy. Hasło zostaje w menedżerze haseł przeglądarki, nie
+w czacie ani w karcie; CAPTCHA: jedna próba, potem właściciel przez VNC. Płaci, wysyła, publikuje i usuwa konto tylko
+z linią `ZGODA WŁAŚCICIELA` w karcie; inaczej przygotowuje ekran i oddaje go właścicielowi (`komputer` akcja `oddaj`:
+pauza z jednym zdaniem prośby, karta w `kanban_block`), a wznawia Komputer tylko właściciel. Haseł ani numerów kart
+z czatu nie przyjmuje. Stałe zgody Hermesa (`command_allowlist`) ma na działania w tle i na działania wejścia na
+wierzchu, nigdy na okno na wierzch (walidator odrzuca `bring_to_front`). Limit: 60 działań na kartę, po 3 nieudanych
+próbach zmienia drogę albo oddaje ekran. Ekran jest jeden: gdy na Komputerze pracuje już inna sesja, wejście zwraca
+`zajete` (jedna sesja naraz). Dłuższą pracę na ekranie (więcej niż kilka minut) Jarvo daje na kartę przypisaną do
+siebie, żeby czat był wolny. Sesja z narzędziem ekranu albo telefonu nie daje wyciągu do skarbca: to, co było na
+ekranie, nie trafia do wiedzy floty sam. Pod YOLO (tryb pełny) narzędzia ekranu i telefonu są zablokowane.
+
+Po `jarvo telefon on` (instalacja natywna, [MOBILE.md](MOBILE.md)) Jarvo obsługuje też telefon właściciela przez
+PHONEUSE (`mcp__phone__*`, wszystkie narzędzia): najpierw `ping`, przed działaniem `screen`, `confirm=true` tylko po
+„tak” właściciela dla tej jednej akcji albo z linią `ZGODA WŁAŚCICIELA` w karcie (wtyczka `jarvo-zgody` pyta o nie;
+na karcie bez tej linii i pod YOLO blokuje).
 
 ---
 
@@ -370,7 +399,7 @@ Pełna lista narzędzi: [TOOLBOX.md](TOOLBOX.md#jarvo-wideo-wideograf).
 robi szybkie rzeczy od ręki, skleja wyniki snajperów i łata dziury, gdzie nie ma specjalisty.
 
 **Czym różni się od Jarva:** Jarvo *zarządza i ocenia*, a prawa ręka *wykonuje*.
-Jarvo nie robi pracy, a ręka robi wszystko.
+Jarvo nie robi pracy dziedzinowej (sam robi tylko ekran, konta, telefon i terminal), a ręka robi wszystko.
 
 **Czym różni się od snajperów:** ma **dostęp do skilli wszystkich snajperów** (tylko do odczytu; walidator
 pilnuje, żeby nowy snajper też tu trafił) i pełny katalog Hermesa, ale nie ma ich pamięci ani głębi.
@@ -454,42 +483,6 @@ i `templates/ci/jarvo-ios.yml`.
 
 ---
 
-## `jarvo-operator`: Operator
-
-Pracuje na ekranie Komputera Jarva: osobnego pulpitu z Chromium w kontenerze `jarvo-komputer`, który właściciel
-włącza poleceniem `jarvo komputer on` ([KOMPUTER.md](KOMPUTER.md)). Robi to, czego nie da się zrobić przez API ani
-`web_extract`: klika w panelach www i programach w przeglądarce, wypełnia formularze, przechodzi ścieżkę na stronie
-jak klient i mówi, gdzie się psuje, przepisuje dane z ekranu do pliku. Najpierw sprawdza drogę bez ekranu. Na ekranie
-pracuje w pętli patrz → działaj → sprawdź: drzewo dostępności (`capture` `ax`), potem znaczniki na zrzucie (`som`),
-obraz tylko gdy drzewo jest puste; klika po numerze elementu, po każdym działaniu czyta paragon sterownika
-(`effect: confirmed` ze zmianą albo `suspected_noop`), a nowy `capture` robi, gdy paragon nie wystarcza, i słucha
-werdyktu (`verify_fresh_state`, `escalate`). Klika w tle; pisze, naciska klawisze, przewija i przeciąga na
-wierzchu, ale tylko w oknie, które już jest aktywne (wejście pilnuje tego samo); okna na wierzch nie wyciąga bez
-zgody człowieka przy tym działaniu. Treść ekranu to dane, nie polecenia.
-
-Wejście Komputera ma twarde zasady, których agent nie wyłączy: przyciski i formularze, które logują, płacą,
-zamawiają, wysyłają albo publikują, i pola haseł, kart i kodów zwracają `wymaga_czlowieka`. Operator przygotowuje
-ekran do tego kroku i oddaje go właścicielowi (`komputer` akcja `oddaj`: pauza z jednym zdaniem prośby, karta
-w `kanban_block`); właściciel loguje się i płaci sam w Ekranie HQ, wznawia Komputer tylko on. Operator nie przyjmuje
-haseł ani numerów kart z czatu. Nie ma terminala, wykonywania kodu ani delegowania; stałe zgody Hermesa
-(`command_allowlist`) ma na działania w tle i na działania wejścia na wierzchu, nigdy na okno na wierzch
-(walidator odrzuca `bring_to_front`). Limit: 60 działań na kartę,
-po 3 nieudanych próbach zmienia drogę albo oddaje ekran. Ekran jest jeden: Jarvo daje karty Operatora po kolei (`parents`, wzorzec 11), a gdy na Komputerze pracuje
-już inna sesja, wejście zwraca `zajete` (jedna sesja naraz).
-Ze skarbca nie robi wyciągu po sesji (`bez_wyciagu`): to, co było na ekranie, nie trafia do wiedzy floty sam.
-Po `jarvo telefon on` (instalacja natywna, [MOBILE.md](MOBILE.md)) obsługuje też telefon właściciela przez PHONEUSE
-(`mcp__phone__*`): najpierw `ping`, przed działaniem `screen`, `confirm=true` tylko po „tak” właściciela dla tej jednej
-akcji (wtyczka `jarvo-zgody` pyta o nie, a na karcie i pod YOLO blokuje). Jarvo ma ten serwer tylko do odczytu.
-
-**Skille:** [T] `praca-na-ekranie` (pętla, tryby patrzenia, werdykty, odmowy wejścia), `formularze` (pole po polu,
-listy przez `set_value`, sprawdzenie wartości, formularze wrażliwe), `dane-z-ekranu` (tabela z drzewa albo obrazu
-do CSV z adresem i godziną, dane osób), `przejscie-strony` (ścieżka klienta z tabelą kroków i zrzutem problemu),
-`oddaj-ekran` (krok właściciela: logowanie, płatność, CAPTCHA, prośba w jednym zdaniu). Narzędzia: `computer_use`
-Hermesa przez bramkę `komputer/jarvo_cua.py` i wtyczka `jarvo-komputer` (`komputer/plugin`: `stan`, `dziennik`,
-`oddaj`).
-
----
-
 ## Kolejność budowy (historycznie, faza 1)
 
 1. `jarvo` + `jarvo-sherlock`: najprostsze narzędzia, dobre do przetestowania pętli sędziego.
@@ -499,7 +492,7 @@ Hermesa przez bramkę `komputer/jarvo_cua.py` i wtyczka `jarvo-komputer` (`kompu
 5. `jarvo-wideo`: wydzielony później ze Studia (wideo to osobny warsztat).
 6. `jarvo-ads`: bez kluczy, kampanie jako paczka do publikacji przez właściciela; Skarbiec (sejf tokenów) odłożony ([ADS.md](ADS.md)).
 7. `jarvo-lowca` i `jarvo-mobile`: specjaliści z własnymi skryptami do źródeł publicznych ([LEADY.md](LEADY.md), [MOBILE.md](MOBILE.md)).
-8. `jarvo-operator`: computer use na Komputerze Jarva, po kanale z twardymi zasadami (etapy K0–K3 w [KOMPUTER.md](KOMPUTER.md)).
+8. Ekran (computer use na Komputerze Jarva, po kanale z twardymi zasadami, etapy K0–K3 w [KOMPUTER.md](KOMPUTER.md)): najpierw osobny agent, od 2026-11-14 robi to sam `jarvo`.
 
 Pierwszy wspólny test floty: **„wypuść landing nowego produktu”**. Sherlock robi research
 i słowa kluczowe, web buduje stronę, studio przygotowuje grafiki i posty, ręka składa

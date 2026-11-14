@@ -197,7 +197,7 @@ def test_srodowisko_narzedzia_modele_i_zmienne_obce(tmp_path):
 
 def test_srodowisko_wskazuje_bramke_komputera(tmp_path):
     """Hermes widzi sterownik ekranu tylko przez HERMES_CUA_DRIVER_CMD: zawsze bramka, którą zakłada `jarvo komputer
-    on` (bez zmiennej Operator nie dostawał computer_use, próba na Xubuntu 7.11), także zamiast cudzej wartości."""
+    on` (bez zmiennej Jarvo nie dostawał computer_use, próba na Xubuntu 7.11), także zamiast cudzej wartości."""
     from jarvo import komputer
     u = sciezki.uklad({"JARVO_ROOT": str(tmp_path / "j")})
     env = srodowisko.srodowisko(u, {"PATH": "", "HERMES_CUA_DRIVER_CMD": "/cudzy/cua-driver"}, biez={}, narz={},

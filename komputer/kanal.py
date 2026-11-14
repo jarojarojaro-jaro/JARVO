@@ -1,7 +1,7 @@
 """Kanały usługi Komputera Jarva natywnie (docs/NATYWNIE.md J03, J09): MCP sterownika (`cua`) i sterowanie (`ster`).
 
 Adres liczy się z samego korzenia Jarva (JARVO_ROOT), tym samym przepisem co kanał nadzorcy (16 znaków sha256
-znormalizowanej ścieżki), więc bramka `jarvo_cua.py`, wtyczka Operatora i `jarvo komputer` trafiają w tę samą usługę
+znormalizowanej ścieżki), więc bramka `jarvo_cua.py`, wtyczka Jarva i `jarvo komputer` trafiają w tę samą usługę
 bez dodatkowych zmiennych:
   Windows  \\\\.\\pipe\\jarvo-komputer-cua-<skrót> i ...-ster-<skrót>: potok nazwany z DACL tylko dla bieżącego
            użytkownika (D:P(A;;GA;;;<SID>)), bez klientów zdalnych (PIPE_REJECT_REMOTE_CLIENTS), pierwsza instancja

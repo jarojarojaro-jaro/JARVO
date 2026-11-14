@@ -245,7 +245,7 @@ def utworz(pliki: Pliki, aplikacje: list[Aplikacja], sekundy: int, *, platforma:
            bezczynnosc: int = BEZCZYNNOSC, teraz: float | None = None, uzytkownik: str | None = None) -> Zgoda:
     """Nowa zgoda (stara przestaje działać: inne id) i manifest sterownika. Zwraca zapisaną zgodę."""
     if not aplikacje:
-        raise BladZgody("bez_aplikacji", "Podaj aplikacje, w których Operator może działać (--aplikacje).")
+        raise BladZgody("bez_aplikacji", "Podaj aplikacje, w których Jarvo może działać (--aplikacje).")
     if not CZAS_MIN <= int(sekundy) <= CZAS_MAKS:
         raise BladZgody("zly_czas", f"Czas zgody od 1 min do {CZAS_MAKS // 3600} h.")
     przygotuj_katalog(pliki)

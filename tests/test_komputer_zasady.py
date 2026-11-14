@@ -647,7 +647,7 @@ def test_wynik_odmowy_mowi_co_dalej():
     r = zasady.wynik_odmowy(ocen("page", {}, Ctx()))
     assert r["structuredContent"]["code"] == "zablokowane" and r["structuredContent"]["rule"] == "narzedzie"
     ctx = Ctx(wstrzymane=True)
-    ctx.powod_pauzy = "Operator czeka na właściciela: zaloguj się do panelu"
+    ctx.powod_pauzy = "Jarvo czeka na właściciela: zaloguj się do panelu"
     r = zasady.wynik_odmowy(ocen("type_text", {"pid": 1, "text": "a"}, ctx))
     assert "zaloguj się do panelu" in r["content"][0]["text"]
     r = zasady.wynik_odmowy(zasady.Werdykt(zasady.ODMOWA, "zajete", "ekranem steruje inna sesja"))

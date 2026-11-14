@@ -119,7 +119,9 @@ def test_zle_klucze_gwiazdki_i_tryb_off(repo_copy):
     assert _blad(raport, r"jarvo-studio: command_allowlist 'plugin_rule:komputer-host:excel'")
 
 
-def test_agent_z_komputerem_bez_lokalnego_terminala(repo_copy):
+def test_agent_z_komputerem_terminal_i_klucze(repo_copy):
+    """Agent z `komputer: true` może mieć lokalny terminal (Jarvo, decyzja 2026-11-14); terminal zdalny bez
+    sync_back_max_bytes: 0 i zły klucz cua:* to błędy."""
     fleet = repo_copy / "fleet.yaml"
     tekst = fleet.read_text(encoding="utf-8")
     tekst = re.sub(r"(\n  - name: jarvo-ads\n)", r"\1    komputer: true\n", tekst, count=1)
@@ -128,33 +130,38 @@ def test_agent_z_komputerem_bez_lokalnego_terminala(repo_copy):
     tekst = cfg.read_text(encoding="utf-8") + "\ncommand_allowlist:\n  - \"cua:clik:background\"\n"
     cfg.write_text(tekst, encoding="utf-8")
     raport = validate.run()
-    assert _blad(raport, r"jarvo-ads: agent z computer_use nie ma lokalnego terminala")
-    assert _blad(raport, r"jarvo-ads: terminal w Komputerze Jarva wymaga terminal.sync_back_max_bytes: 0")
+    assert not _blad(raport, r"jarvo-ads: .*terminal")
     assert _blad(raport, r"jarvo-ads: command_allowlist 'cua:clik:background': zły klucz")
+    cfg.write_text(cfg.read_text(encoding="utf-8").replace("  backend: local", "  backend: ssh", 1), encoding="utf-8")
+    raport = validate.run()
+    assert _blad(raport, r"jarvo-ads: terminal w Komputerze Jarva wymaga terminal.sync_back_max_bytes: 0")
 
 
-def test_operator_stale_zgody_bez_okna_na_wierzch(repo_copy):
-    """Operator (jedyny z `komputer: true`) ma w repo stałe zgody na działania w tle i na działania wejścia na wierzchu
-    (wejście Komputera przepuszcza je tylko w aktywnym oknie); okna na wierzch nie dostanie."""
+def test_jarvo_stale_zgody_bez_okna_na_wierzch(repo_copy):
+    """Jarvo (jedyny z `komputer: true`) ma w repo stałe zgody na działania w tle i na działania wejścia na wierzchu
+    (wejście Komputera przepuszcza je tylko w aktywnym oknie); okna na wierzch nie dostanie. Ekran, terminal i kanban
+    ma w czacie (Telegram, HQ) i na karcie."""
     fleet = validate.fl.load_fleet()
-    assert [a.name for a in fleet.active() if a.komputer] == ["jarvo-operator"]
-    cfg = validate.fl.load_yaml(REPO / "profiles/jarvo-operator/config.yaml")
+    assert [a.name for a in fleet.active() if a.komputer] == ["jarvo"]
+    cfg = validate.fl.load_yaml(REPO / "profiles/jarvo/config.yaml")
     klucze = cfg["command_allowlist"]
     assert klucze and all(k.startswith("cua:") for k in klucze)
     tlo = {k.split(":")[1] for k in klucze if k.endswith(":background")}
     wierzch = {k.split(":")[1] for k in klucze if k.endswith(":foreground")}
     assert tlo == validate.CUA_AKCJE - {"bring_to_front"}
     assert wierzch == validate.CUA_NA_WIERZCHU and len(tlo) + len(wierzch) == len(klucze)
-    for plat, ts in cfg["platform_toolsets"].items():
-        assert not {"terminal", "code_execution", "browser", "delegation"} & set(ts), plat
-    assert cfg["computer_use"]["permission_mode"] == "standard" and cfg["computer_use"]["cua_telemetry"] is False
-    plik = repo_copy / "profiles/jarvo-operator/config.yaml"
+    for plat in ("telegram", "api_server", "cli"):
+        ts = set(cfg["platform_toolsets"][plat])
+        assert {"computer_use", "komputer", "terminal", "kanban"} <= ts and "code_execution" not in ts, plat
+    assert cfg["computer_use"] == {"permission_mode": "standard", "capture_after_mode": "ax", "ax_max_elements": 300,
+                                   "max_image_dimension": 1456, "cua_telemetry": False}
+    plik = repo_copy / "profiles/jarvo/config.yaml"
     plik.write_text(plik.read_text(encoding="utf-8").replace('  - "cua:key:background"\n',
                     '  - "cua:key:background"\n  - "cua:set_value:foreground"\n  - "cua:bring_to_front:foreground"\n'),
                     encoding="utf-8")
     raport = validate.run()
-    assert _blad(raport, r"jarvo-operator: command_allowlist 'cua:set_value:foreground': na wierzchu tylko działania")
-    assert _blad(raport, r"jarvo-operator: command_allowlist 'cua:bring_to_front:foreground': okno na wierzch")
+    assert _blad(raport, r"jarvo: command_allowlist 'cua:set_value:foreground': na wierzchu tylko działania")
+    assert _blad(raport, r"jarvo: command_allowlist 'cua:bring_to_front:foreground': okno na wierzch")
 
 
 def test_deny_blokuje_instalacje_sterownika():

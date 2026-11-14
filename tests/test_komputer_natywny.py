@@ -1,6 +1,6 @@
 """Komputer Jarva natywnie bez przeglądarki (docs/NATYWNIE.md J03, J04, J09, N13): wejście z twardymi zasadami
 (komputer/wejscie_natywne.py) na atrapie sterownika CDP, kanały usługi, bramka floty w trybie natywnym
-(komputer/jarvo_cua.py: potok albo gniazdo, PID usługi), wtyczka Operatora i polecenie `jarvo komputer`.
+(komputer/jarvo_cua.py: potok albo gniazdo, PID usługi), wtyczka Jarva i polecenie `jarvo komputer`.
 
 Bramka idzie osobnym procesem tą samą drogą co Hermes (`python -I jarvo_cua.py mcp`, JARVO_ROOT w otoczeniu).
 Kanały: potok nazwany z DACL właściciela na Windows, gniazdo 0600 na macOS i Linuksie, więc testy biegną wszędzie.
@@ -363,7 +363,7 @@ def test_ekran_hq_klatka_przejmij_i_wejscie_tylko_wlasciciel(usluga):
     klik = {"typ": "klik", "x": 0.5, "y": 0.5}
     odp = kanal.zapytaj(adres, {"polecenie": "wejscie", "token": usluga.token, "zdarzenie": klik})
     assert odp["ok"] is False and "przejmij" in odp["blad"] and not usluga.sterownik.wlasciciel
-    # prośba Operatora (pauza floty): przejęcie zastępuje ją pauzą właściciela
+    # prośba Jarva (pauza floty): przejęcie zastępuje ją pauzą właściciela
     kanal.zapytaj(adres, {"polecenie": "pauza", "powod": "Zaloguj się do sklepu"})
     odp = kanal.zapytaj(adres, {"polecenie": "przejmij", "token": usluga.token})
     assert odp["wstrzymane"] and odp["pauza"]["kto"] == "wlasciciel" and odp["przejete"] is True
@@ -444,14 +444,14 @@ def _wtyczka():
     return m
 
 
-def test_wtyczka_operatora_natywnie(usluga, monkeypatch):
+def test_wtyczka_jarva_natywnie(usluga, monkeypatch):
     monkeypatch.delenv("JARVO_KOMPUTER_GNIAZDO", raising=False)
     monkeypatch.setenv("JARVO_ROOT", str(usluga.root))
     w = _wtyczka()
     stan = json.loads(w.obsluz({"akcja": "stan"}))
     assert stan["ok"] and stan["dziala"] and stan["drzewo_dostepnosci"] is True and not stan["wstrzymane"]
     odp = json.loads(w.obsluz({"akcja": "oddaj", "prosba": "Zaloguj się do panelu sklepu i daj znać"}))
-    assert odp["wstrzymane"] and odp["kto_wstrzymal"].startswith("Operator")
+    assert odp["wstrzymane"] and odp["kto_wstrzymal"].startswith("Jarvo")
     assert json.loads(w.obsluz({"akcja": "dziennik", "n": 5}))["ok"]
 
 
@@ -828,7 +828,7 @@ def test_on_i_off_przy_nadzorcy_bez_drugiej_uslugi():
 
 def test_postoj_po_ostatniej_sesji_a_nie_w_trakcie(usluga, monkeypatch):
     """Karty idą na pustą stronę dopiero, gdy nikt nie korzysta z ekranu przez POSTOJ_PO s: nie w trakcie sesji
-    Operatora, nie przy podglądzie w HQ, nie przy pauzie (strona czeka na właściciela) i nie, gdy właściciel pracuje
+    Jarva, nie przy podglądzie w HQ, nie przy pauzie (strona czeka na właściciela) i nie, gdy właściciel pracuje
     w oknie. Sesja otwarta, ale milcząca dłużej niż CISZA_SESJI, liczy się jak zakończona."""
     from komputer import usluga as ku
     st, wej, parkowania = usluga.sterownik, usluga.wejscie, []
@@ -849,7 +849,7 @@ def test_postoj_po_ostatniej_sesji_a_nie_w_trakcie(usluga, monkeypatch):
     sesja = kanal.polacz(kanal.adres(usluga.root, "cua"), 5.0)
     _czekaj(lambda: len(wej.sesje) == 1)
     t = mija(t, dlugo)
-    assert not parkowania                                                # sesja Operatora trwa
+    assert not parkowania                                                # sesja Jarva trwa
     sesja.close()
     _czekaj(lambda: not wej.sesje)
     t = mija(t, ku.POSTOJ_PO - 2)
@@ -862,7 +862,7 @@ def test_postoj_po_ostatniej_sesji_a_nie_w_trakcie(usluga, monkeypatch):
     t = mija(t, dlugo)
     assert parkowania == [1] and us.postoj is None
     st.podglad_wlaczony = False
-    wej.ekran.ustaw_pauze(True, "Zaloguj się w panelu", "flota")         # Operator oddał ekran: strona czeka
+    wej.ekran.ustaw_pauze(True, "Zaloguj się w panelu", "flota")         # Jarvo oddał ekran: strona czeka
     t = mija(t, dlugo)
     assert parkowania == [1]
     wej.ekran.ustaw_pauze(False)

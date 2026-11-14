@@ -216,21 +216,6 @@ Wszystkie źródła bez kluczy. Odmowa źródła = blokada, bez obchodzenia; opi
 
 ---
 
-## `jarvo-operator`: Operator
-
-| Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
-|---|---|---|---|---|
-| `computer_use` Hermesa | patrzenie (`capture`: drzewo dostępności, znaczniki na zrzucie, obraz) i działania na ekranie (klik, pisanie, klawisze, przewijanie, `set_value`) z werdyktem po działaniu | MIT | n/d | toolset `computer_use`; sterownik przez `HERMES_CUA_DRIVER_CMD` = bramka `komputer/jarvo_cua.py` |
-| Komputer Jarva (`infra/komputer`) | osobny pulpit Xvnc z Chromium w kontenerze bez kluczy floty; wejście z twardymi zasadami (logowanie, płatność, wysyłka, pola haseł i kart = człowiek), ukrywanie sekretów, dziennik | własny kod (MIT) | n/d | usługa compose `komputer`, włącza właściciel: `jarvo komputer on` |
-| [cua-driver](https://github.com/trycua/cua) 0.21.0 | sterownik ekranu w Komputerze (AT-SPI, zrzuty, wejście w tle); telemetria i aktualizacje wyłączone, suma SHA-256 w `vendor/zrodla.yaml` | MIT | 2026-10 | binarka w obrazie `jarvo-komputer` |
-| wtyczka `jarvo-komputer` (`komputer/plugin`) | narzędzie `komputer`: `stan` (czy Komputer działa, pauza, kto steruje), `dziennik` (ostatnie działania bez treści), `oddaj` (prośba do właściciela jako pauza z powodem); natywnie strony przez bramkę i wejście z twardymi zasadami: `idz` (navigate), `patrz` (drzewo z numerami), `kroki` (run_steps: do 20 działań, każdy krok oceniony), `czekaj` (wait_for do 30 s); wznowić nie umie | własny kod (MIT) | n/d | wtyczka Hermesa, healthcheck `komputer/plugin/__init__.py stan` (opcjonalny) |
-
-Bez terminala, wykonywania kodu, przeglądarki Hermesa i delegowania. Stałe zgody na działania w tle
-(`cua:<działanie>:background`) i na działania wejścia na wierzchu w aktywnym oknie (`cua:<działanie>:foreground`);
-okno na wierzch zatwierdza człowiek. Szczegóły: [KOMPUTER.md](KOMPUTER.md).
-
----
-
 ## `jarvo-reka`: Prawa ręka
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
@@ -257,6 +242,13 @@ MCP według Twoich narzędzi (np. `notion`, `todoist`, `calendly`, `airtable`), 
 | [Langfuse](https://github.com/langfuse/langfuse) | ślady przebiegów, koszty per agent, oceny sędziego | MIT (core) | 2026-09 | plugin `langfuse` + sidecar |
 | [promptfoo](https://github.com/promptfoo/promptfoo) | red team floty (`scripts/redteam.sh`, ataki z `security/redteam/`); evals z `evals/` robi `scripts/run-evals.py` | MIT | 2026-09 | CLI w kontenerze (0.123.1, instalowany przy pierwszym użyciu) |
 | [DeepEval](https://github.com/confident-ai/deepeval) | alternatywa dla promptfoo (metryki LLM-sędziego) | Apache-2.0 | 2026-09 | do oceny |
+| `computer_use` Hermesa | patrzenie (`capture`: drzewo dostępności, znaczniki na zrzucie, obraz) i działania na ekranie (klik, pisanie, klawisze, przewijanie, `set_value`) z werdyktem po działaniu | MIT | n/d | toolset `computer_use`; sterownik przez `HERMES_CUA_DRIVER_CMD` = bramka `komputer/jarvo_cua.py` |
+| Komputer Jarva (`infra/komputer`) | osobny pulpit Xvnc z Chromium w kontenerze bez kluczy floty; wejście z twardymi zasadami (płatność, wysyłka i publikacja tylko ze zgodą właściciela w karcie, pola kart i kodów = człowiek), ukrywanie sekretów, dziennik | własny kod (MIT) | n/d | usługa compose `komputer`, włącza właściciel: `jarvo komputer on` |
+| [cua-driver](https://github.com/trycua/cua) 0.21.0 | sterownik ekranu w Komputerze (AT-SPI, zrzuty, wejście w tle); telemetria i aktualizacje wyłączone, suma SHA-256 w `vendor/zrodla.yaml` | MIT | 2026-10 | binarka w obrazie `jarvo-komputer` |
+| wtyczka `jarvo-komputer` (`komputer/plugin`) | narzędzie `komputer`: `stan` (czy Komputer działa, pauza, kto steruje), `dziennik` (ostatnie działania bez treści), `oddaj` (prośba do właściciela jako pauza z powodem); natywnie strony przez bramkę i wejście z twardymi zasadami: `idz` (navigate), `patrz` (drzewo z numerami), `kroki` (run_steps: do 20 działań, każdy krok oceniony), `czekaj` (wait_for do 30 s); wznowić nie umie | własny kod (MIT) | n/d | wtyczka Hermesa, healthcheck `komputer/plugin/__init__.py stan` (opcjonalny) |
+
+Ekran: stałe zgody na działania w tle (`cua:<działanie>:background`) i na działania wejścia na wierzchu w aktywnym
+oknie (`cua:<działanie>:foreground`); okno na wierzch zatwierdza człowiek. Szczegóły: [KOMPUTER.md](KOMPUTER.md).
 
 Z katalogu wtyczek Hermesa do oceny w fazie 6: `afterforge` (zamienia porażki agentów
 w przejrzane testy regresji), `gonogo` (wynik evali → decyzja o wdrożeniu).
@@ -491,8 +483,7 @@ serwerom stdio tylko bezpieczne zmienne środowiska (`PATH`, `HOME`, bez proxy),
 Proxy wymagające `HTTPS_PROXY` dalej blokuje pobór. Healthcheck (`toolbox.yaml`) startuje serwer z takim samym okrojonym
 środowiskiem i robi prawdziwe `search_screens`, więc zielony wynik znaczy, że katalog się pobrał.
 Drugi, tylko w instalacji natywnej i tylko po `jarvo telefon on`: `phone` (serwer MCP PHONEUSE `tools/phone_mcp.py`,
-telefon właściciela z Androidem, [MOBILE.md](MOBILE.md)) u `jarvo-operator` (wszystkie narzędzia) i `jarvo` (tylko
-odczyt przez `tools.include`). W repo `config.yaml` go nie ma: wpis dopisuje `jarvo telefon on` w zainstalowanych
+telefon właściciela z Androidem, [MOBILE.md](MOBILE.md)) u `jarvo` (wszystkie narzędzia). W repo `config.yaml` go nie ma: wpis dopisuje `jarvo telefon on` w zainstalowanych
 profilach i każda instalacja floty (`flota.ustawienia_profili`), więc hub wiedzy, który czyta config z buildu, go
 nie pokazuje. Też `trust: full` (bez `readOnlyHint`); `confirm=true` w `act` i `batch` pilnuje wtyczka `jarvo-zgody`.
 

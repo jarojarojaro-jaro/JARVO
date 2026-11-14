@@ -3,8 +3,8 @@
 
 PHONEUSE (osobne repo właściciela) steruje telefonem z Androidem przez usługę dostępności na telefonie; jego serwer
 MCP `tools/phone_mcp.py` (stdio) daje narzędzia list_phones, ping, screen, act, shot, wait i batch. Jarvo dopisuje
-go jako serwer `phone` w configu dwóch profili: `jarvo-operator` dostaje wszystkie narzędzia, `jarvo` (szef) tylko
-odczyt (list_phones, ping, screen, shot, wait), więc w Hermesie są `mcp__phone__screen` itd. Bez `jarvo telefon on`
+go jako serwer `phone` w configu profilu `jarvo` ze wszystkimi narzędziami (Jarvo sam steruje telefonem), więc
+w Hermesie są `mcp__phone__screen`, `mcp__phone__act` itd. Bez `jarvo telefon on`
 w żadnym configu nie ma wpisu `phone` (repo go nie zawiera).
 
   jarvo telefon on --phoneuse KATALOG [--python PYTHON] [--telefon NAZWA]
@@ -20,12 +20,15 @@ w żadnym configu nie ma wpisu `phone` (repo go nie zawiera).
 
 Wpis przeżywa `jarvo update`: `flota.ustawienia_profili` bierze go z `klucze_profili` (jeden wzór, ten moduł), a
 install_fleet.py ustawia go w tym samym przebiegu co `profile update --force-config`. `env` serwera: ADB = adb
-z platform-tools Jarva (jarvo/android.py), żeby działał jeden serwer adb jednej wersji; PHONEUSE_PHONE = --telefon.
+z platform-tools Jarva (jarvo/android.py), żeby działał jeden serwer adb jednej wersji; PHONEUSE_PHONE = --telefon;
+HOME (Windows: USERPROFILE) = prawdziwy katalog domowy właściciela z chwili `on` (`dom` w telefon.json), bo PHONEUSE
+czyta `~/.phoneuse/` (token ciała, phones/*.env, stan) przez katalog domowy, a pracownik karty kanbana ma
+HOME=<dane>/home (karta t_15a3d38c 14.11: „No such file or directory: <dane>/home/.phoneuse/body_token”).
 `trust: full`, bo narzędzia PHONEUSE nie mają readOnlyHint: przy `untrusted` każde wywołanie czekałoby na zgodę,
-a na karcie kanbana (bez człowieka) zawsze by odpadło; tryb tylko do odczytu szefa daje `tools.include`.
+a na karcie kanbana (bez człowieka) zawsze by odpadło.
 Zgoda: `confirm=true` w act albo batch (bramka needs_confirm telefonu) przechodzi tylko przez prośbę o zgodę
-wtyczki jarvo-zgody, a bez człowieka jest zablokowane. Pod YOLO wtyczka blokuje narzędzia jarvo-operator (także
-telefon), tak jak computer_use.
+wtyczki jarvo-zgody albo z linią `ZGODA WŁAŚCICIELA` w karcie, a bez człowieka jest zablokowane. Pod YOLO wtyczka
+blokuje telefon w profilu jarvo, tak jak computer_use.
 
 `on` i `off` robi tylko właściciel w swoim terminalu: wywołane przez proces Jarva (agent, rutyna, karta kanbana;
 znaczniki jak w jarvo/rece.py) kończą się odmową. `status` może każdy. Restart bramy przerwałby pracę kart, więc przy
@@ -59,8 +62,8 @@ from jarvo.sciezki import WINDOWS, Uklad  # noqa: E402
 STAN = "telefon.json"                                  # <stan>/telefon.json
 SERWER = "phone"                                       # nazwa serwera MCP: narzędzia mcp__phone__<narzędzie>
 KLUCZ = f"mcp_servers.{SERWER}"
-NARZEDZIA_ODCZYTU = ("list_phones", "ping", "screen", "shot", "wait")     # bez act i batch: nic nie stuka ani nie pisze
-PROFILE = {"jarvo": NARZEDZIA_ODCZYTU, "jarvo-operator": None}           # None = wszystkie narzędzia serwera
+PROFILE = ("jarvo",)                                                     # profile z serwerem phone (wszystkie narzędzia)
+DOM = "USERPROFILE" if WINDOWS else "HOME"                               # skąd os.path.expanduser bierze `~`
 SDK = "mcp>=2.3,<3"
 NAZWA_TELEFONU = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")         # jak NAME w phone_mcp.py
 CZAS_SDK = 60.0
@@ -105,7 +108,7 @@ def _wynik(nazwa: str, stan: str, opis: str, rada: str = "") -> dict:
 # ---------------------------------------------------------------- stan i wzór wpisu
 
 def stan_telefonu(u: Uklad) -> dict:
-    """`<stan>/telefon.json`: {"wlaczony", "python", "serwer", "telefon", "kiedy"}."""
+    """`<stan>/telefon.json`: {"wlaczony", "python", "serwer", "telefon", "dom", "kiedy"}."""
     return srodowisko.wczytaj_json(u.stan / STAN)
 
 
@@ -119,14 +122,23 @@ def python_domyslny() -> Path:
     return venv / ("Scripts/python.exe" if WINDOWS else "bin/python")
 
 
+def dom_wlasciciela(u: Uklad, st: dict) -> str | None:
+    """Katalog domowy, w którym PHONEUSE ma `~/.phoneuse/`: zapisany przy `on`, a bez niego (telefon.json sprzed
+    tego pola) katalog domowy tego procesu, chyba że to dom profilu pod <dane> (proces floty): wtedy None."""
+    if st.get("dom"):
+        return str(st["dom"])
+    dom = Path.home().absolute()
+    return None if dom.is_relative_to(Path(u.dane).absolute()) else str(dom)
+
+
 def adb_floty(u: Uklad) -> Path | None:
     """adb serwera telefonu: ten sam co `jarvo android` (platform-tools Jarva), żeby działał jeden serwer adb jednej
     wersji; None = PHONEUSE weźmie swój (body.adb_binary)."""
     return android.adb(u)
 
 
-def wpis_serwera(st: dict, agent: str, adb: Path | str | None) -> dict:
-    """Wpis `mcp_servers.phone` profilu `agent` (jeden wzór dla `jarvo telefon on` i flota.ustawienia_profili)."""
+def wpis_serwera(st: dict, adb: Path | str | None, dom: str | None) -> dict:
+    """Wpis `mcp_servers.phone` profilu (jeden wzór dla `jarvo telefon on` i flota.ustawienia_profili)."""
     wpis: dict = {"command": str(st["python"]), "args": [str(st["serwer"])],
                   # jak inspo (profiles/jarvo-web/config.yaml): bez readOnlyHint `untrusted` pytałby o każde wywołanie
                   "trust": "full",
@@ -140,10 +152,10 @@ def wpis_serwera(st: dict, agent: str, adb: Path | str | None) -> dict:
         env["ADB"] = str(adb)
     if st.get("telefon"):
         env["PHONEUSE_PHONE"] = str(st["telefon"])
+    if dom:
+        env[DOM] = dom                     # env wpisu wygrywa z HOME procesu (Hermes, mcp_tool_config._build_safe_env)
     if env:
         wpis["env"] = env
-    if PROFILE[agent] is not None:
-        wpis["tools"]["include"] = list(PROFILE[agent])
     return wpis
 
 
@@ -153,8 +165,8 @@ def klucze_profili(u: Uklad, agenci=PROFILE) -> dict[str, dict]:
     st = stan_telefonu(u)
     if not st.get("wlaczony") or not st.get("python") or not st.get("serwer"):
         return {}
-    adb = adb_floty(u)
-    return {a: {KLUCZ: wpis_serwera(st, a, adb)} for a in PROFILE if a in agenci}
+    wpis = wpis_serwera(st, adb_floty(u), dom_wlasciciela(u, st))
+    return {a: {KLUCZ: wpis} for a in PROFILE if a in agenci}
 
 
 # ---------------------------------------------------------------- sprawdzenia plików i SDK
@@ -327,7 +339,7 @@ def polecenie_on(u: Uklad, a, _reszta=(), _ot=None) -> int:
         print(f"BŁĄD: {blad}", file=sys.stderr)
         return 1
     st = {"wlaczony": True, "python": str(python), "serwer": str(serwer), "telefon": a.telefon,
-          "kiedy": time.strftime("%Y-%m-%dT%H:%M:%S")}
+          "dom": dom_wlasciciela(u, {}), "kiedy": time.strftime("%Y-%m-%dT%H:%M:%S")}
     zapisz_stan(u, st)
     print(f"Telefon dla floty włączony: serwer MCP {serwer} ({python}).")
     try:
@@ -337,12 +349,12 @@ def polecenie_on(u: Uklad, a, _reszta=(), _ot=None) -> int:
               "jarvo telefon on jeszcze raz.", file=sys.stderr)
         return 1
     if not zainstalowane(u):
-        print("Profile jarvo i jarvo-operator nie są jeszcze zainstalowane: wpis dopisze instalacja floty.")
+        print("Profil jarvo nie jest jeszcze zainstalowany: wpis dopisze instalacja floty.")
         return 0
     if not zmienione:
-        print("Profile jarvo i jarvo-operator miały już ten wpis: bez restartu bramy.")
+        print("Profil jarvo miał już ten wpis: bez restartu bramy.")
         return 0
-    print(f"Wpis mcp_servers.{SERWER} w profilach: {', '.join(zmienione)} (jarvo: tylko odczyt ekranu).")
+    print(f"Wpis mcp_servers.{SERWER} w profilach: {', '.join(zmienione)} (wszystkie narzędzia).")
     return restart_gdy_wolno(u, "telefon w profilach")
 
 
@@ -438,8 +450,7 @@ def sprawdzenia(u: Uklad, ot=None) -> list[dict]:
     if blad:
         return [_wynik("telefon (PHONEUSE)", "uwaga", blad, "Potem jarvo telefon on --phoneuse <katalog PHONEUSE> "
                        "albo jarvo telefon off.")]
-    return [_wynik("telefon (PHONEUSE)", "ok", f"serwer MCP {SERWER} włączony: jarvo-operator pełny, jarvo tylko "
-                   "odczyt ekranu")]
+    return [_wynik("telefon (PHONEUSE)", "ok", f"serwer MCP {SERWER} włączony: jarvo, wszystkie narzędzia")]
 
 
 # ---------------------------------------------------------------- parser
@@ -447,9 +458,8 @@ def sprawdzenia(u: Uklad, ot=None) -> list[dict]:
 def dodaj_polecenia(sub) -> None:
     """Polecenie `telefon` w parserze jarvo (cli._parser); funkcje biorą (u, a, reszta, ot). Samo `jarvo telefon` =
     status."""
-    s = sub.add_parser("telefon", help="telefon przez PHONEUSE dla Operatora (i podgląd dla Jarva): status, on, off",
-                       description="Serwer MCP PHONEUSE (phone_mcp.py) w profilach jarvo-operator (wszystkie "
-                       "narzędzia) i jarvo (tylko odczyt ekranu).")
+    s = sub.add_parser("telefon", help="telefon przez PHONEUSE dla Jarva: status, on, off",
+                       description="Serwer MCP PHONEUSE (phone_mcp.py) w profilu jarvo (wszystkie narzędzia).")
     s.set_defaults(funkcja=polecenie_status, json=False)
     t = s.add_subparsers(dest="telefon_polecenie", metavar="polecenie", title="polecenia")
     k = t.add_parser("status", help="stan, pliki, SDK, adb, wpis w profilach")

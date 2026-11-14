@@ -77,7 +77,7 @@ def test_tresc_karty_tylko_do_odczytu(tmp_path, monkeypatch):
     assert zgoda_karty.tresc_karty("t_1", tmp_path / "brak.db") is None
     # bez bazy: z otoczenia pracownika Hermesa (HERMES_HOME profilu, tablica)
     assert zgoda_karty.tresc_karty("t_1") is None
-    monkeypatch.setenv("HERMES_HOME", str(dane / "profiles" / "jarvo-operator"))
+    monkeypatch.setenv("HERMES_HOME", str(dane / "profiles" / "jarvo"))
     assert zgoda_karty.tresc_karty("t_1") == "treść 1"
     monkeypatch.setenv("HERMES_KANBAN_BOARD", "sklep")
     assert zgoda_karty.tresc_karty("t_2") == "treść 2"

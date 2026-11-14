@@ -1,7 +1,7 @@
 ---
 name: wgrywanie-stron
 description: "Wgranie strony na hosting: plan, zgoda na odcisk, cofnięcie."
-version: 1.0.0
+version: 1.0.1
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A2
-    reviewed: "2026-11-07"
+    reviewed: "2026-11-14"
 ---
 
 # Wgrywanie stron na hosting
@@ -21,8 +21,9 @@ Właściciel ma 12 stron na hostingu współdzielonym (SEOHost). Każda strona t
 Na serwer wgrywasz **tylko Ty** i **tylko** skryptem `@@PY@@ "$HERMES_HOME/scripts/wgraj.py"`, po wyraźnym „tak”
 właściciela dla konkretnego odcisku. Wgranie to akcja A2: zgoda dotyczy jednego planu, nie „wgrywaj od teraz”.
 
-Skrypt potrzebuje narzędzia terminal (sesja CLI i praca na karcie). W czacie bez terminala go nie masz: powiedz
-właścicielowi, że plan i wgranie zrobisz w sesji z terminalem, i nie szukaj innej drogi.
+Skrypt potrzebuje narzędzia terminal; masz je w rozmowie (Telegram, czat HQ), w sesji CLI i na karcie. Gdy w tej
+sesji terminala nie ma (np. rutyna), powiedz właścicielowi, że plan i wgranie zrobisz w sesji z terminalem, i nie
+szukaj innej drogi.
 
 ## Kiedy
 - Specjalista (zwykle Web) skończył zmianę strony na gałęzi repo strony, sędzia ją przyjął, a właściciel chce ją na żywo.

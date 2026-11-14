@@ -1017,7 +1017,7 @@ def test_komputer_dziala_tylko_wlaczony_i_z_przegladarka(u, tmp_path):
 
 def test_nadzorca_przepina_bramke_komputera_na_biezaca_wersje(u, tmp_path):
     """Bramka HERMES_CUA_DRIVER_CMD wskazuje kod jednej wersji, a `jarvo update` usuwa starsze: po drugiej
-    aktualizacji Operator dostawał „can't open file …/app/<stara>/komputer/jarvo_cua.py”. Nadzorca nowej wersji
+    aktualizacji Jarvo dostawał „can't open file …/app/<stara>/komputer/jarvo_cua.py”. Nadzorca nowej wersji
     zapisuje bramkę na swój kod."""
     from jarvo import komputer as jk
     stara, nowa = tmp_path / "app-stara", tmp_path / "app-nowa"

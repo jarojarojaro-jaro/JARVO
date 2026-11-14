@@ -1,4 +1,4 @@
-"""Polecenie `jarvo komputer` natywnie (docs/NATYWNIE.md N13, J01, J09, J11, J12): przeglądarka Jarva dla Operatora.
+"""Polecenie `jarvo komputer` natywnie (docs/NATYWNIE.md N13, J01, J09, J11, J12): przeglądarka Jarva.
 
   on [--okno|--w-tle]   przeglądarka Jarva (Chrome for Testing z manifestu, wpis `chrome-komputer`, pobierana przy
                         pierwszym włączeniu z paskiem i sumą sha256), nakładka bramki `jarvo-cua` dla Hermesa
@@ -6,10 +6,10 @@
                         proxy filtrujące z samotestem, przeglądarka, wejście z twardymi zasadami) i czekanie, aż
                         odpowie
   off                   `wlaczony: false` i zatrzymanie usługi (profil, pobrane pliki, dziennik i pauza zostają)
-  status [--json]       działa czy nie, okno albo w tle, pauza (kto, dlaczego), sesje Operatora, filtr ruchu
+  status [--json]       działa czy nie, okno albo w tle, pauza (kto, dlaczego), sesje Jarva, filtr ruchu
                         (zablokowane połączenia), pobrane i odrzucone pliki, piaskownica, postój, wersja przeglądarki
   okno on|off           okno przeglądarki na pulpicie (właściciel sam się w nim loguje) albo w tle (--headless=new)
-  pauza [powód]         zatrzymuje Operatora od razu: patrzeć może, działać nie; trwa także po restarcie
+  pauza [powód]         zatrzymuje Jarva od razu: patrzeć może, działać nie; trwa także po restarcie
   wznow                 zdejmuje pauzę (token właściciela z `<stan>/komputer/wlasciciel.klucz`)
   dziennik [N]          ostatnie N decyzji twardych zasad (bez wpisywanych treści)
   wyczysc [--tak]       po potwierdzeniu kasuje profil przeglądarki (zalogowania, ciasteczka, historia), pobrane
@@ -452,7 +452,7 @@ def opis_stanu(u: Uklad, stan: dict | None = None) -> str:
         filtr = us.get("filtr") or {}
         linie = [f"Komputer Jarva: działa, {'okno widoczne' if us.get('okno') else 'w tle'}; "
                  f"{us.get('przegladarka') or 'przeglądarka'} (pid {us.get('pid_przegladarki')}), "
-                 f"kart: {us.get('okna')}, sesje Operatora: {s.get('sesje')}",
+                 f"kart: {us.get('okna')}, sesje Jarva: {s.get('sesje')}",
                  f"  filtr ruchu: proxy 127.0.0.1:{us.get('proxy')}, zablokowane połączenia: "
                  f"{filtr.get('zablokowane', 0)}" + ("" if (us.get("samotest") or {}).get("filtr", {}).get("ok")
                                                      else " (samotest NIE przeszedł)"),
@@ -489,7 +489,7 @@ def polecenie_okno(u: Uklad, a, ot) -> int:
         if not odp.get("ok"):
             print(f"BŁĄD: {odp.get('blad')}", file=sys.stderr)
             return 1
-    print("Przeglądarka Jarva " + ("w oknie na pulpicie: zaloguj się w niej sam, Operator korzysta z tej sesji."
+    print("Przeglądarka Jarva " + ("w oknie na pulpicie: zaloguj się w niej sam, Jarvo korzysta z tej sesji."
                                    if okno else "w tle (podgląd w HQ, K4)."))
     return 0
 
@@ -499,7 +499,7 @@ def polecenie_pauza(u: Uklad, a, _ot) -> int:
         print("Komputer Jarva nie działa.", file=sys.stderr)
         return 1
     odp = zapytaj(u, {"polecenie": "pauza", "powod": " ".join(a.powod or [])}, wlasciciel=True)
-    print("Komputer Jarva wstrzymany: Operator patrzy, ale nie działa. Wznowienie: jarvo komputer wznow"
+    print("Komputer Jarva wstrzymany: Jarvo patrzy, ale nie działa. Wznowienie: jarvo komputer wznow"
           if odp.get("wstrzymane") else f"BŁĄD: {odp.get('blad')}")
     return 0 if odp.get("wstrzymane") else 1
 
@@ -615,8 +615,8 @@ def przenies_z_kontenera(u: Uklad, dom_pulpitu: Path) -> dict:
 
 
 def _parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="jarvo komputer", description="Komputer Jarva: przeglądarka Jarva dla "
-                                "Operatora (osobny profil, filtr ruchu, twarde zasady).")
+    p = argparse.ArgumentParser(prog="jarvo komputer", description="Komputer Jarva: przeglądarka Jarva "
+                                "(osobny profil, filtr ruchu, twarde zasady).")
     sub = p.add_subparsers(dest="akcja", metavar="akcja", title="akcje")
     s = sub.add_parser("on", help="włącz (przy pierwszym razie pobiera przeglądarkę z sumą)")
     tryb = s.add_mutually_exclusive_group()
@@ -632,7 +632,7 @@ def _parser() -> argparse.ArgumentParser:
     s = sub.add_parser("okno", help="okno przeglądarki na pulpicie (on) albo w tle (off)")
     s.add_argument("stan", choices=("on", "off"), metavar="on|off")
     s.set_defaults(funkcja=polecenie_okno)
-    s = sub.add_parser("pauza", help="wstrzymaj Operatora od razu")
+    s = sub.add_parser("pauza", help="wstrzymaj Jarva od razu")
     s.add_argument("powod", nargs="*", metavar="powód")
     s.set_defaults(funkcja=polecenie_pauza)
     s = sub.add_parser("wznow", help="zdejmij pauzę (tylko właściciel)")

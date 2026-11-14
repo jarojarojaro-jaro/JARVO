@@ -182,8 +182,8 @@ Poziomy autonomii (każda akcja agenta ma przypisany poziom):
 | **A3** | nigdy | płatności, usuwanie cudzych danych, działania na kontach bez zgody |
 
 Mechanizmy techniczne:
-- **toolsety:** każdy profil ma włączone tylko potrzebne toolsety, osobno na platformę (np. Jarvo nie ma terminala
-  na Telegramie ani w czacie HQ; ma go tylko pracownik-sędzia na CLI); czat HQ to platforma `api_server`,
+- **toolsety:** każdy profil ma włączone tylko potrzebne toolsety, osobno na platformę (np. agent bez ekranu nie ma
+  `computer_use`; Jarvo ma ekran, terminal i kanban także na Telegramie i w czacie HQ); czat HQ to platforma `api_server`,
   ustawiana jawnie jak Telegram (bez `clarify`), inaczej Hermes dałby jej domyślny zestaw (walidator tego pilnuje),
 - **sandbox:** `terminal.backend: local` wewnątrz kontenera `jarvo-hermes` (repo i build zamontowane `:ro`),
 - **zatwierdzanie komend:** Hermes pyta o ryzykowne komendy, więc nie wyłączamy tego; pracownicy bez człowieka
@@ -290,7 +290,7 @@ profiles/jarvo-web/
 ├── SOUL.md                  # main prompt
 ├── config.yaml              # model (@@MODEL@@ z fleet.yaml), reasoning_effort, toolsety per platforma, zgody,
 │                            # terminal/przeglądarka/delegacja, mcp_servers (w repo tylko jarvo-web: inspo;
-│                            # phone dla jarvo i jarvo-operator dopisuje do instalacji `jarvo telefon on`),
+│                            # phone dla jarvo dopisuje do instalacji `jarvo telefon on`),
 │                            # skills.write_approval: true przy creation_nudge_interval > 0 (poczekalnia, RSI.md §5)
 ├── .no-bundled-skills       # snajper i orkiestrator: bez katalogu skilli Hermesa (brak tylko u jarvo-reka)
 ├── toolbox.yaml             # narzędzia OSS (nasz manifest + healthchecki)

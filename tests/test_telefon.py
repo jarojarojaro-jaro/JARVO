@@ -1,5 +1,5 @@
 """`jarvo telefon on|off|status` (jarvo/telefon.py, docs/MOBILE.md „Telefon przez PHONEUSE”): serwer MCP PHONEUSE
-w zainstalowanych profilach jarvo (odczyt) i jarvo-operator (pełny).
+w zainstalowanym profilu jarvo (wszystkie narzędzia).
 
 Bez telefonu i bez Hermesa: instalacja to katalog tymczasowy z `program/current.json` (kod tego repo), PHONEUSE to
 katalog z pustym `tools/phone_mcp.py`, Python serwera to atrapa (tests/atrapy.py), która drukuje wersję mcp, a YAML
@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sqlite3
+import subprocess
 import sys
 from pathlib import Path
 
@@ -23,7 +25,7 @@ from conftest import REPO
 sys.path.insert(0, str(REPO))
 from jarvo import android, rece, sciezki, telefon  # noqa: E402
 
-PROFILE = ("jarvo", "jarvo-operator")
+PROFILE = ("jarvo",)
 CONFIG = "model:\n  default: x\nmcp_servers: {}\n"
 
 
@@ -46,10 +48,13 @@ def inst(tmp_path, monkeypatch):
     for z in (*rece.ZNACZNIKI_FLOTY, "HERMES_HOME"):
         monkeypatch.delenv(z, raising=False)
     restarty: list = []
+    dom = tmp_path / "dom właściciela"                                 # prawdziwy katalog domowy (~/.phoneuse)
+    dom.mkdir()
+    monkeypatch.setenv(telefon.DOM, str(dom))
     monkeypatch.setattr(telefon, "_python_hermesa", lambda _u: Path(sys.executable))
     monkeypatch.setattr(telefon, "zrestartuj_brame", lambda _u: restarty.append(1) or "zrestartowana")
     monkeypatch.setattr(android, "adb", lambda _u: adb)
-    return argparse.Namespace(u=u, phoneuse=phoneuse, python=python, adb=adb, restarty=restarty, tmp=tmp_path)
+    return argparse.Namespace(u=u, phoneuse=phoneuse, python=python, adb=adb, restarty=restarty, tmp=tmp_path, dom=dom)
 
 
 def jarvo(inst, *argv: str) -> int:
@@ -77,26 +82,46 @@ def kanban(db: Path, karty: list[tuple[str, str, str, str]]) -> None:
     c.close()
 
 
-def test_on_wpisuje_serwer_odczyt_dla_szefa_i_restartuje_raz(inst):
+def test_on_wpisuje_serwer_wszystkie_narzedzia_i_restartuje_raz(inst):
     assert wlacz(inst, "--telefon", "pixel") == 0
     st = telefon.stan_telefonu(inst.u)
-    assert st["wlaczony"] is True and st["telefon"] == "pixel"
+    assert st["wlaczony"] is True and st["telefon"] == "pixel" and st["dom"] == str(inst.dom)
     assert st["serwer"] == str(inst.phoneuse / "tools" / "phone_mcp.py")
-    szef, operator = wpis(inst, "jarvo"), wpis(inst, "jarvo-operator")
-    assert szef["tools"]["include"] == ["list_phones", "ping", "screen", "shot", "wait"]
-    assert "include" not in operator["tools"]                       # Operator: wszystkie narzędzia, także act i batch
-    for w in (szef, operator):
-        assert w["command"] == str(inst.python) and w["args"] == [st["serwer"]]
-        assert w["env"] == {"ADB": str(inst.adb), "PHONEUSE_PHONE": "pixel"}
-        assert (w["trust"], w["timeout"], w["lazy"]) == ("full", 360, True)
-        # Hermes czyta te flagi tylko z `tools` (bez nich 4 zbędne narzędzia list_resources, read_resource, …)
-        assert (w["tools"]["resources"], w["tools"]["prompts"]) == (False, False)
-        assert "resources" not in w and "prompts" not in w
+    w = wpis(inst, "jarvo")
+    assert "include" not in w["tools"]                              # Jarvo: wszystkie narzędzia, także act i batch
+    assert w["command"] == str(inst.python) and w["args"] == [st["serwer"]]
+    assert w["env"] == {"ADB": str(inst.adb), "PHONEUSE_PHONE": "pixel", telefon.DOM: str(inst.dom)}
+    assert (w["trust"], w["timeout"], w["lazy"]) == ("full", 360, True)
+    # Hermes czyta te flagi tylko z `tools` (bez nich 4 zbędne narzędzia list_resources, read_resource, …)
+    assert (w["tools"]["resources"], w["tools"]["prompts"]) == (False, False)
+    assert "resources" not in w and "prompts" not in w
     assert inst.restarty == [1]
     assert wlacz(inst, "--telefon", "pixel") == 0                   # to samo drugi raz: bez restartu bramy
     assert inst.restarty == [1]
     s = telefon.opis_stanu(inst.u)                                   # status czyta YAML profili tym samym kodem
-    assert s["sdk"] == "2.3.0" and s["adb"] == str(inst.adb) and s["profile"]["jarvo"]["tools"] == szef["tools"]
+    assert s["sdk"] == "2.3.0" and s["adb"] == str(inst.adb) and s["profile"]["jarvo"]["tools"] == w["tools"]
+
+
+def test_serwer_na_karcie_widzi_phoneuse_wlasciciela(inst, monkeypatch):
+    """Regresja t_15a3d38c (14.11): pracownik karty ma HOME=<dane>/home, a PHONEUSE czyta ~/.phoneuse przez katalog
+    domowy. Wpis serwera daje mu prawdziwy dom z chwili `on`, także gdy config powstaje w procesie z HOME floty."""
+    phoneuse = inst.dom / ".phoneuse"
+    phoneuse.mkdir()
+    (phoneuse / "body_token").write_text("atrapa\n", encoding="utf-8")   # atrapa tokenu w katalogu testu
+    assert wlacz(inst) == 0
+    dom_karty = inst.u.dane / "home"
+    dom_karty.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv(telefon.DOM, str(dom_karty))                     # jarvo update z procesu floty
+    w = telefon.klucze_profili(inst.u)["jarvo"][telefon.KLUCZ]
+    assert w["env"][telefon.DOM] == str(inst.dom)
+    # serwer jak go startuje Hermes: otoczenie pracownika karty, na wierzchu `env` wpisu (mcp_tool_config)
+    env = {**os.environ, telefon.DOM: str(dom_karty), **w["env"]}
+    kod = "import os; print(open(os.path.expanduser('~/.phoneuse/body_token')).read().strip())"
+    wynik = subprocess.run([sys.executable, "-c", kod], env=env, capture_output=True, text=True, timeout=60)
+    assert wynik.returncode == 0 and wynik.stdout.strip() == "atrapa", wynik.stderr
+    # telefon.json sprzed pola `dom` i proces z HOME pod <dane>: bez zgadywania (nie wpisujemy domu floty)
+    telefon.zapisz_stan(inst.u, {k: v for k, v in telefon.stan_telefonu(inst.u).items() if k != "dom"})
+    assert telefon.DOM not in telefon.klucze_profili(inst.u)["jarvo"][telefon.KLUCZ].get("env", {})
 
 
 def test_on_bez_serwera_albo_sdk_niczego_nie_zmienia(inst, capsys):
@@ -115,11 +140,11 @@ def test_on_bez_serwera_albo_sdk_niczego_nie_zmienia(inst, capsys):
 
 def test_karta_w_toku_na_innej_tablicy_wstrzymuje_restart(inst, capsys):
     kanban(inst.u.dane / "kanban.db", [("t_1", "Stara", "jarvo-web", "done")])
-    kanban(inst.u.dane / "kanban" / "boards" / "klient" / "kanban.db", [("t_2", "Formularz", "jarvo-operator", "running")])
+    kanban(inst.u.dane / "kanban" / "boards" / "klient" / "kanban.db", [("t_2", "Formularz", "jarvo", "running")])
     assert wlacz(inst) == 0
     out = capsys.readouterr().out
     assert inst.restarty == [] and "Formularz" in out and "jarvo serwis --restart brama" in out
-    assert wpis(inst, "jarvo-operator")["command"] == str(inst.python)  # config i tak zmieniony: zadziała po restarcie
+    assert wpis(inst, "jarvo")["command"] == str(inst.python)  # config i tak zmieniony: zadziała po restarcie
 
 
 def test_off_wylacza_wpis_a_bez_wpisu_nic_nie_dopisuje(inst):

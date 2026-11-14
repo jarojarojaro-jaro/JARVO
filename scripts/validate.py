@@ -25,6 +25,9 @@ import fleetlib as fl  # noqa: E402
 REQUIRED_FILES = ["SOUL.md", "config.yaml", "distribution.yaml", "toolbox.yaml",
                   "quality/rubric.md", "README.md", "CHANGELOG.md"]
 SOUL_REQUIRED = ["## Misja", "## Osobowość"]
+# Jarvo łączy dwa SOUL-e: szefa floty i zasady pracy na ekranie i telefonie po usuniętym Operatorze (decyzja
+# właściciela 2026-11-14), więc ma budżet wyższy niż reszta floty (fl.SOUL_TOKEN_BUDGET) tylko o tyle, ile to wymaga
+SOUL_BUDZET_ORKIESTRATORA = 3510
 # zasada bloku kontekstu (protokół floty, zasada 8; docs/HQ.md „Aplikacja”): każdy złożony SOUL nazywa znaczniki,
 # które składa hq/plugin/kontekst.py
 SOUL_KONTEKST = ["[Jarvo · kontekst rozmowy <kod>]", "[koniec kontekstu <kod>]", "[Wiadomość właściciela <kod>]"]
@@ -180,8 +183,9 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
     _, pominiete = fl.available_skills(d / "skills")        # sekcja „Czego nie zrobisz” z buildu też jest w prefiksie
     dopisek = "\n\n" + fl.missing_section(pominiete, fleet) if pominiete else ""
     tokens = fl.approx_tokens(soul.replace(fl.PROTOCOL_MARKER, f"{fl.protocol_for(protocol, orch)}\n\n{calib}") + dopisek)
-    if tokens > fl.SOUL_TOKEN_BUDGET:
-        r.err(f"{a.name}: SOUL ~{tokens} tokenów (z protokołem i kalibracją) > budżet {fl.SOUL_TOKEN_BUDGET}")
+    budzet = SOUL_BUDZET_ORKIESTRATORA if orch else fl.SOUL_TOKEN_BUDGET
+    if tokens > budzet:
+        r.err(f"{a.name}: SOUL ~{tokens} tokenów (z protokołem i kalibracją) > budżet {budzet}")
 
     cfg_text = (d / "config.yaml").read_text(encoding="utf-8") if (d / "config.yaml").exists() else ""
     try:
@@ -202,8 +206,6 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
     for plat, label in (("telegram", "Telegramie"), ("api_server", "czacie HQ (api_server)")):
         if a.name == fleet.orchestrator and plat in toolsets and "kanban" not in toolsets[plat]:
             r.err(f"{a.name}: orkiestrator bez toolsetu kanban na {label}")
-        if a.name == fleet.orchestrator and "terminal" in (toolsets.get(plat) or []):
-            r.err(f"{a.name}: orkiestrator nie powinien mieć terminala na {label} (nie wykonuje pracy)")
     if a.kind == "generalist":
         # prawa ręka czyta skille wszystkich snajperów (tylko do odczytu); nowy snajper musi tu trafić
         dirs = " ".join((cfg.get("skills") or {}).get("external_dirs") or [])
@@ -277,8 +279,9 @@ CUA_KLUCZ = re.compile(r"^cua:([a-z_]+):(background|foreground)$")
 
 
 def check_komputer(a: fl.Agent, cfg: dict, r: Report) -> None:
-    """Ekran sterują tylko agenci z `komputer: true` we fleet.yaml, bez lokalnego terminala i bez trybów, które
-    wyłączają zgody (`approvals.mode: off` i /yolo przełączają sterownik w tryb bez ograniczeń)."""
+    """Ekran sterują tylko agenci z `komputer: true` we fleet.yaml, bez code_execution i bez trybów, które
+    wyłączają zgody (`approvals.mode: off` i /yolo przełączają sterownik w tryb bez ograniczeń). Terminal lokalny
+    wolno (Jarvo sam pracuje na ekranie i w terminalu, decyzja właściciela 2026-11-14)."""
     toolsets = cfg.get("platform_toolsets") or {}
     plats = sorted(p for p, ts in toolsets.items() if "computer_use" in (ts or []))
     if plats and not a.komputer:
@@ -312,12 +315,10 @@ def check_komputer(a: fl.Agent, cfg: dict, r: Report) -> None:
     if a.komputer:
         terminal = cfg.get("terminal") or {}
         for plat, ts in toolsets.items():
-            ts = ts or []
-            if "code_execution" in ts:
+            if "code_execution" in (ts or []):
                 r.err(f"{a.name}: agent z computer_use nie może mieć code_execution (na {plat}): kod działałby obok kluczy floty")
-            if "terminal" in ts and str(terminal.get("backend", "local")) == "local":
-                r.err(f"{a.name}: agent z computer_use nie ma lokalnego terminala (na {plat}); terminal tylko w Komputerze Jarva")
-        if "terminal" in {t for ts in toolsets.values() for t in (ts or [])} and terminal.get("sync_back_max_bytes") != 0:
+        if str(terminal.get("backend", "local")) != "local" and terminal.get("sync_back_max_bytes") != 0 \
+                and "terminal" in {t for ts in toolsets.values() for t in (ts or [])}:
             r.err(f"{a.name}: terminal w Komputerze Jarva wymaga terminal.sync_back_max_bytes: 0 "
                   "(zdalny katalog nie wraca do profilu)")
 

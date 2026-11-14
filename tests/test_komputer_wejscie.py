@@ -368,8 +368,8 @@ def test_bramka_floty_pompuje_do_wejscia(komputer):
 
 
 @pytest.mark.linux_only
-def test_prosba_operatora_to_pauza_z_powodem(komputer, monkeypatch):
-    """Operator oddaje ekran właścicielowi: pauza od floty z powodem; wznawia tylko właściciel."""
+def test_prosba_jarva_to_pauza_z_powodem(komputer, monkeypatch):
+    """Jarvo oddaje ekran właścicielowi: pauza od floty z powodem; wznawia tylko właściciel."""
     k = Klient(wejscie.CUA)
     k.rpc("initialize")
     k.narzedzie("get_window_state", {"pid": 7, "window_id": 3})
@@ -377,7 +377,7 @@ def test_prosba_operatora_to_pauza_z_powodem(komputer, monkeypatch):
         m.setattr(wejscie, "wolno_wznowic", lambda uid: False)
         odp = ster(wejscie.STER, "pauza", powod="Zaloguj się do panelu\nsklepu, klucz " + KLUCZ)
         assert odp["pauza"]["kto"] == "flota" and "\n" not in odp["pauza"]["powod"]
-        assert KLUCZ not in json.dumps(odp) and odp["pauza"]["opis"].startswith("Operator czeka na właściciela: Zaloguj")
+        assert KLUCZ not in json.dumps(odp) and odp["pauza"]["opis"].startswith("Jarvo czeka na właściciela: Zaloguj")
         w = k.narzedzie("click", {"element_token": "s1:2"})
         assert kod(w) == "wstrzymane" and "Zaloguj się do panelu" in w["content"][0]["text"]
         assert w["structuredContent"]["next_step"] == "wait_for_owner"
@@ -425,7 +425,7 @@ def test_ekranem_steruje_jedna_sesja_naraz(komputer, monkeypatch):
 
 
 @pytest.mark.linux_only
-def test_wtyczka_operatora_przez_ster(komputer, monkeypatch):
+def test_wtyczka_jarva_przez_ster(komputer, monkeypatch):
     """Wtyczka jarvo-komputer (komputer/plugin, docs/KOMPUTER.md §7): stan, dziennik i prośba do właściciela
     przez prawdziwe wejście; wznowić nie umie, bez gniazda mówi, jak włączyć Komputer."""
     import importlib.util
@@ -453,8 +453,8 @@ def test_wtyczka_operatora_przez_ster(komputer, monkeypatch):
     assert "blad" in json.loads(obsluz({"akcja": "oddaj", "prosba": "zrób"}))     # prośba bez treści
     assert "blad" in json.loads(obsluz({"akcja": "wznow"}))
     odp = json.loads(obsluz({"akcja": "oddaj", "prosba": "Zaloguj się do panelu sklepu,\nkliknij Dalej"}))
-    assert odp["wstrzymane"] and odp["kto_wstrzymal"].startswith("Operator") and "patrz" in odp["dalej"]
-    assert odp["pauza"] == "Operator czeka na właściciela: Zaloguj się do panelu sklepu, kliknij Dalej"
+    assert odp["wstrzymane"] and odp["kto_wstrzymal"].startswith("Jarvo") and "patrz" in odp["dalej"]
+    assert odp["pauza"] == "Jarvo czeka na właściciela: Zaloguj się do panelu sklepu, kliknij Dalej"
     assert ster(wejscie.STER, "stan")["wstrzymane"] is True                   # narzędzie nie wysyła wznow
     wpisy = json.loads(obsluz({"akcja": "dziennik", "n": 5}))["wpisy"]
     assert wpisy and wpisy[-1]["decyzja"] == "pauza" and wpisy[-1]["kto"] == "flota" and len(wpisy) <= 5

@@ -1,5 +1,5 @@
 """Kanały usługi Komputera natywnie (komputer/kanal.py, docs/NATYWNIE.md J03, J09): adresy z korzenia (ten sam
-przepis co nadzorca i wtyczka Operatora), potok nazwany z DACL właściciela na Windows, gniazdo 0600 na POSIX,
+przepis co nadzorca i wtyczka Jarva), potok nazwany z DACL właściciela na Windows, gniazdo 0600 na POSIX,
 sprawdzenie procesu, który trzyma potok, i odczyt z zapisem naraz (I/O z nakładaniem)."""
 from __future__ import annotations
 

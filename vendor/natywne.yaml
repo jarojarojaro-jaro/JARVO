@@ -548,7 +548,7 @@ narzedzia:
     zrodlo: chrome-for-testing
     wersja: "156.0.8078.47"
     licencja: BSD-3-Clause (Chromium) + składniki w LICENSE i ABOUT; binarka Google Chrome for Testing (chrome://terms)
-    rola: "Przeglądarka Jarva dla Komputera (Operator): osobny profil, CDP po potoku, proxy filtrujące, podgląd w HQ"
+    rola: "Przeglądarka Jarva dla Komputera: osobny profil, CDP po potoku, proxy filtrujące, podgląd w HQ"
     kiedy: przy-uzyciu
     pliki:
       windows-x64: &cftk-win64
@@ -974,7 +974,7 @@ narzedzia:
     zrodlo: cua
     wersja: "0.38.0"
     licencja: MIT (Cua AI, Inc.) + części MIT z THIRD_PARTY_NOTICES.md (trope-cua, Interface-Agent, yabai, QuickJS-ng, rquickjs, T3 Code)
-    rola: "sterownik ekranu właściciela dla rąk Operatora (komputer/rece): tylko przez bramkę, z podpisaną zgodą, w trybie bounded"
+    rola: "sterownik ekranu właściciela dla rąk Jarva (komputer/rece): tylko przez bramkę, z podpisaną zgodą, w trybie bounded"
     kiedy: przy-uzyciu
     pliki:
       windows-x64:

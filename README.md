@@ -7,7 +7,7 @@ pilnuje terminów i niczego nie zapomina. Z każdym specjalistą można też roz
 
 | Agent | Rola |
 |---|---|
-| 🛰️ `jarvo` | Main Judge: przyjmuje zlecenia, planuje misje, rozdziela karty, ocenia, raportuje, patroluje |
+| 🛰️ `jarvo` | Main Judge: przyjmuje zlecenia, planuje misje, rozdziela karty, ocenia, raportuje, patroluje; sam pracuje na ekranie Komputera Jarva i na Twoim telefonie (klik, formularze, konta), płatność i wysyłka tylko z Twoją zgodą |
 | 🔎 `jarvo-sherlock` | detektyw researchu: wiele źródeł, weryfikacja faktów, raporty z cytatami |
 | 🌐 `jarvo-web` | Web Senior Dev: brand z URL, inspiracje z branży (Inspo), audyty, strony i landingi, SEO, favicony, obrazy |
 | 🎬 `jarvo-studio` | marketing i kreacja: grafiki social, obrazy AI (OpenRouter), copy PL, kampanie |
@@ -15,7 +15,6 @@ pilnuje terminów i niczego nie zapomina. Z każdym specjalistą można też roz
 | 📈 `jarvo-ads` | specjalista Ads: Meta i Google Ads, kampanie, testy A/B/C, raporty; przygotowuje paczkę do publikacji, publikujesz Ty |
 | 🎯 `jarvo-lowca` | łowca leadów: sygnały zakupowe z KRS, CEIDG, przetargów i stron firm → ranking firm z „dlaczego teraz” i opublikowanym kontaktem; nic nie wysyła |
 | 📱 `jarvo-mobile` | twórca aplikacji: uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA), aplikacje Expo ze zgodnością ze sklepami od planu (także ze strony firmy), podgląd w HQ i w Expo Go, bramka jakości, pakiet do sklepów z listą 44 punktów, wydanie i poprawki OTA za zgodą, kontrola paczek npm; konta zawsze właściciela |
-| 🖥️ `jarvo-operator` | operator ekranu: klika, wypełnia i przepisuje w przeglądarce na Komputerze Jarva (osobny pulpit w kontenerze), gdzie nie ma API; logowanie, płatność i wysyłkę oddaje Tobie w Ekranie HQ |
 | 🦾 `jarvo-reka` | prawa ręka: generalista ze wszystkimi skillami, składa pakiety misji, dokumenty, prototypy |
 
 ## Próba: Jarvo jako paczka do zwykłego Hermesa
@@ -91,7 +90,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [`profiles/_host/`](profiles/_host) | profil hosta: gateway z multipleksacją, trasy Telegrama, dispatcher kanbana |
 | [`shared/protocol/`](shared/protocol) | kontrakt zlecenia wstrzykiwany do każdego SOUL (karta: CEL, DoD, WYJŚCIA, GRANICE…) |
 | [`shared/security/deny.yaml`](shared/security/deny.yaml) | zakazy dla całej floty, dopinane do `approvals.deny` każdego profilu |
-| [`shared/skills/`](shared/skills) | skille własne wspólne dla kilku agentów (`graf-kodu` u Weba i Ręki, `transkrypcja-filmu` (tekst mowy z linku do filmu) u Sherlocka, Wideografa i Ręki, `hooki` (trzy warstwy hooka, 18 taktyk) u Studia, Wideografa i Ads, `izometria` (figury izometryczne ze świeceniem: strona, PNG, film) u Weba, Studia i Wideografa, `warsztat-3d` (model 3D z kodu build123d: STEP, STL, GLB, 3MF do druku i na stronę, podgląd PNG, film obrotu) u Weba, Wideografa i Mobile, `konwersja-plikow` (plik → inny format: zdjęcia, wideo, audio, PDF, Word; plik bez metadanych, np. GPS) i `odczyt-ekranu` (tekst ze zrzutu ekranu, skanu, PDF albo klatki filmu w ułamku sekundy: Indra OCR, zapas Tesseract) u wszystkich poza Operatorem (nie ma terminala), `ostrozna-przegladarka` (jedna próba zapasową przeglądarką Camoufox po odmowie strony) u Łowcy i Sherlocka) |
+| [`shared/skills/`](shared/skills) | skille własne wspólne dla kilku agentów (`graf-kodu` u Weba i Ręki, `transkrypcja-filmu` (tekst mowy z linku do filmu) u Sherlocka, Wideografa i Ręki, `hooki` (trzy warstwy hooka, 18 taktyk) u Studia, Wideografa i Ads, `izometria` (figury izometryczne ze świeceniem: strona, PNG, film) u Weba, Studia i Wideografa, `warsztat-3d` (model 3D z kodu build123d: STEP, STL, GLB, 3MF do druku i na stronę, podgląd PNG, film obrotu) u Weba, Wideografa i Mobile, `konwersja-plikow` (plik → inny format: zdjęcia, wideo, audio, PDF, Word; plik bez metadanych, np. GPS) i `odczyt-ekranu` (tekst ze zrzutu ekranu, skanu, PDF albo klatki filmu w ułamku sekundy: Indra OCR, zapas Tesseract) u wszystkich, `ostrozna-przegladarka` (jedna próba zapasową przeglądarką Camoufox po odmowie strony) u Łowcy i Sherlocka) |
 | [`shared/calibration/`](shared/calibration) | kalibracja SOUL pod rodzinę modelu (przy buildzie) |
 | [`shared/templates/`](shared/templates) | szablony SOUL, skilla, evals i toolboxa (`make new-agent`) |
 | [`vendor/skills.lock.yaml`](vendor/skills.lock.yaml) | skille zewnętrzne przypięte do commitów (licencje w [docs/SOURCES.md](docs/SOURCES.md)) |
@@ -138,7 +137,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 | [INSTALER.md](docs/INSTALER.md) | instalator jednym poleceniem na Linuksie, macOS i Windowsie: jak działa na każdym systemie, aktualizacje, testy, etapy |
 | [NATYWNIE.md](docs/NATYWNIE.md) | plan przejścia na instalację natywną bez Dockera i WSL (Windows, macOS, Linux): mapa kontener → natywnie, zgody jak w Claude Code, migracja, etapy, ryzyka, decyzje |
 | [ROZWOJ-FLOTY.md](docs/ROZWOJ-FLOTY.md) | plan dopracowania agentów (Łowca, Ads, Ręka, Sherlock, Studio) i audyt zgodności jako skill Weba |
-| [KOMPUTER.md](docs/KOMPUTER.md) | computer use i server use: Komputer Jarva (pulpit w osobnym kontenerze), agent Operator, Ekran w HQ, terminal i serwery, Ręce na Twoim komputerze; bramka sterownika, zasady bezpieczeństwa, etapy K0–K6 |
+| [KOMPUTER.md](docs/KOMPUTER.md) | computer use i server use: Komputer Jarva (pulpit w osobnym kontenerze), Jarvo przy ekranie, Ekran w HQ, terminal i serwery, Ręce na Twoim komputerze; bramka sterownika, zasady bezpieczeństwa, etapy K0–K6 |
 | [MOBILE.md](docs/MOBILE.md) | projekt Twórcy aplikacji `jarvo-mobile`: pełny proces od pomysłu do sklepu (darmowy audyt mobilny, prototyp Expo na telefonie, Android w dashboardzie i iOS w chmurze, bramka aplikacji, lista kontrolna sklepów, zrzuty, odrzucenia, aplikacja ze strony, utrzymanie); etapy i stan w §16 |
 | [SOURCES.md](docs/SOURCES.md) | źródła, atrybucje i licencje |
 | [JARVO-CALOSC.md](docs/JARVO-CALOSC.md) | całość od A do Z w jednym pliku (kontekst na start sesji) |

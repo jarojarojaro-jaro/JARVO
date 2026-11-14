@@ -26,8 +26,8 @@ przeglądarka startuje drugi raz z `--no-sandbox` i status mówi to wprost (decy
 
 Postój: gdy z ekranu nikt nie korzysta, karty przechodzą na `about:blank` (sterownik_cdp.zaparkuj), bo strona
 zostawiona po zadaniu (animacja, skrypty) zajmowała ponad rdzeń procesora godzinami, także w tle. „Nikt” to razem:
-żadnej czynnej sesji Operatora (sesja otwarta, ale bez wiadomości od CISZA_SESJI s, liczy się jak zakończona:
-Hermes trzyma sterownik otwarty do godziny po turze agenta w bramie), żadnej pauzy (prośba Operatora albo przejęcie
+żadnej czynnej sesji Jarva (sesja otwarta, ale bez wiadomości od CISZA_SESJI s, liczy się jak zakończona:
+Hermes trzyma sterownik otwarty do godziny po turze agenta w bramie), żadnej pauzy (prośba Jarva albo przejęcie
 w HQ: strona czeka na właściciela taka, jaka jest), podgląd w HQ wyłączony, a przy oknie widocznym żadna karta nie
 ma fokusu (właściciel nie pracuje w oknie sam). Po POSTOJ_PO s takiej ciszy usługa parkuje karty, zapisuje to
 w logu, w dzienniku decyzji i w stanie (`postoj`). Profil, ciasteczka i zalogowania zostają, strona jest w historii
@@ -58,8 +58,8 @@ KOD_BLAD = 1
 KOD_FILTR = 3                      # samotest filtra albo przeglądarki nie przeszedł: Komputer nie wstaje
 PORT_PANELU = 9119
 CZAS_ZASTAPIENIA = 40.0            # s: tyle usługa z --zastap czeka, aż poprzednia odda blokadę (jak CZAS_STOPU off)
-POSTOJ_PO = 60.0                   # s bez sesji Operatora, pauzy, podglądu i fokusu okna: karty na about:blank
-CISZA_SESJI = 900.0                # s bez wiadomości od agenta: otwarta sesja Operatora nie liczy się jako czynna
+POSTOJ_PO = 60.0                   # s bez sesji Jarva, pauzy, podglądu i fokusu okna: karty na about:blank
+CISZA_SESJI = 900.0                # s bez wiadomości od agenta: otwarta sesja Jarva nie liczy się jako czynna
 CO_ILE_FOKUS = 5.0                 # s: przy oknie widocznym co tyle sprawdzamy, czy właściciel pracuje w oknie
 ZMIENNE_EKRANU = ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY")   # Linux: ustawienie `ekran` (jarvo komputer on|okno)
 

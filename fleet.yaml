@@ -26,7 +26,7 @@ models:
   provider: openai-codex                    # OpenAI przez logowanie ChatGPT (OAuth, Models → Login)
   tiers:                                    # jeden model, głębia myślenia per agent (reasoning_effort w config.yaml)
     frontier: gpt-6-luna                    # Jarvo: effort high
-    strong: gpt-6-luna                      # specjaliści: effort low (Operator: medium)
+    strong: gpt-6-luna                      # specjaliści: effort low
     fast: gpt-6-luna                        # subagenci i rutyny
   presets:                                  # nazwa zestawu = dostawca Hermesa (zweryfikowane 2026-09-27)
     openrouter:                             # OpenRouter (klucz OPENROUTER_API_KEY)
@@ -76,7 +76,8 @@ agents:
     description: >-
       Main Judge floty. Przyjmuje zlecenia, zakłada misje, rozbija je na karty kanbana dla
       specjalistów, ocenia wyniki według Definition of Done i raportuje. Wgrywa strony właściciela
-      na hosting tylko za jego zgodą. Sam nie wykonuje pracy dziedzinowej.
+      na hosting tylko za jego zgodą. Pracę na ekranie (Komputer Jarva), na telefonie właściciela,
+      konta i terminal robi sam; pracy dziedzinowej specjalistów nie wykonuje.
     model_tier: frontier
     delegation_tier: fast
     autonomy_max: A1
@@ -91,7 +92,8 @@ agents:
       rola: "runs the conversation and checks results"
       hq_label: "Command bridge"
       description: >-
-        The fleet's Main Judge. Takes requests, opens missions, splits them into kanban cards for the specialists, reviews results against the Definition of Done and reports. Does no domain work itself.
+        The fleet's Main Judge. Takes requests, opens missions, splits them into kanban cards for the specialists, reviews results against the Definition of Done and reports. Does screen work (Jarvo's Computer), the owner's phone, accounts and the terminal himself; does no domain work of the specialists.
+    komputer: true      # computer_use i narzędzie `komputer` na Komputerze Jarva, wtyczka jarvo-komputer (docs/KOMPUTER.md)
     status: active
 
   - name: jarvo-sherlock
@@ -290,36 +292,6 @@ agents:
       description: >-
         Mobile apps for small businesses: an honest "native or PWA" decision with costs and app-store rejection risk (website, PWA, Wallet pass, an existing platform or an App Store and Google Play app) and a free mobile audit of any company: apps in the stores (freshness, ratings, Polish listing, privacy, EU trader status), App Store reviews, website-to-app links (Universal Links, App Links), smart banner and PWA. Expo (React Native) apps from a template with store compliance built in from the plan: prototype, checks, preview in HQ and on the owner's phone in Expo Go. Accounts always belong to the owner.
     oddaj_gdy: "aplikacja mobilna: czy firmie potrzebna (natywna, PWA, Wallet), prototyp i budowa aplikacji, podgląd na telefonie, audyt aplikacji w App Store i Google Play"
-    status: active
-
-  - name: jarvo-operator
-    kind: specialist
-    title: "Operator"
-    emoji: "🖥️"
-    description: >-
-      Computer use: praca na Komputerze Jarva (osobny pulpit z Chromium, który widzisz i przejmujesz) tam, gdzie
-      nie ma API ani zwykłego pobrania strony: panele www i programy w przeglądarce, formularze, przeklikanie ścieżki
-      na stronie jak klient, dane przepisane z ekranu do pliku, zrzuty jako dowód. Najpierw droga bez ekranu, potem
-      drzewo dostępności, zrzut tylko gdy trzeba; jedno działanie, sprawdzenie, następne. Nie loguje się, nie płaci,
-      nie wysyła i nie publikuje: te kroki oddaje właścicielowi z dokładną prośbą.
-    model_tier: strong
-    delegation_tier: fast
-    autonomy_max: A1
-    telegram_topic: operator
-    pin_skills: [praca-na-ekranie]
-    hq_room: control    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
-    hq_label: "Sterownia"
-    hq_short: "Operator"
-    rola: "pracuje na Komputerze Jarva"
-    handle: operator
-    komputer: true      # computer_use na Komputerze Jarva, wtyczka jarvo-komputer, bez terminala (docs/KOMPUTER.md)
-    en:
-      title: "Operator"
-      rola: "works on Jarvo's Computer"
-      hq_label: "Control room"
-      description: >-
-        Computer use: works on the Jarvo Computer (a separate desktop with Chromium that you watch and can take over) where there is no API and a plain page fetch is not enough: web panels and browser apps, forms, clicking through a site like a customer, data copied from the screen into a file, screenshots as proof. No-screen route first, then the accessibility tree, a screenshot only when needed; one action, check, next. Never logs in, pays, sends or publishes: hands those steps to the owner with an exact request.
-    oddaj_gdy: "trzeba coś zrobić na ekranie: kliknąć w panelu www albo programie w przeglądarce, wypełnić formularz, przejść ścieżkę na stronie jak klient, przepisać dane z ekranu, gdzie nie ma API"
     status: active
 
   - name: jarvo-reka

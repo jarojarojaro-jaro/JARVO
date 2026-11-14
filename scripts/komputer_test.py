@@ -335,7 +335,7 @@ def main() -> int:
     if xvnc:
         sprawdz(kod(k.narzedzie("kill_app", {"pid": xvnc[0]["pid"]})) == "zablokowane", "kill_app Xvnc: zablokowane")
 
-    # druga sesja (np. druga karta Operatora): patrzy, ale ekranem steruje ta, która działała ostatnio
+    # druga sesja (np. druga karta Jarva): patrzy, ale ekranem steruje ta, która działała ostatnio
     k2 = Klient()
     k2.rpc("initialize", {"protocolVersion": "2025-06-18", "capabilities": {},
                           "clientInfo": {"name": "komputer-test-2", "version": "1"}})
@@ -351,9 +351,9 @@ def main() -> int:
             "druga sesja: patrzy, ale klik dostaje „zajęte” (jedna sesja naraz)", tekst(w))
     k2.zamknij()
 
-    # prośba Operatora do właściciela: pauza od floty z powodem
+    # prośba Jarva do właściciela: pauza od floty z powodem
     odp = ster("pauza", powod="Zaloguj się do sklepu testowego")
-    sprawdz((odp.get("pauza") or {}).get("kto") == "flota", "ster.sock: prośba Operatora (pauza od floty z powodem)")
+    sprawdz((odp.get("pauza") or {}).get("kto") == "flota", "ster.sock: prośba Jarva (pauza od floty z powodem)")
     w = klik("Dodaj do koszyka")
     sprawdz(kod(w) == "wstrzymane" and "Zaloguj się do sklepu testowego" in tekst(w),
             "klik przy prośbie: wstrzymane z powodem prośby", tekst(w))

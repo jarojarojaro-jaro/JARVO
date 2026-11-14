@@ -1,7 +1,7 @@
 ---
 name: oddaj-ekran
 description: "Krok właściciela przez VNC: płatność, CAPTCHA po próbie"
-version: 1.2.0
+version: 1.3.0
 author: Jarvo
 license: MIT
 metadata:
@@ -9,17 +9,18 @@ metadata:
     tags: [computer-use, handoff, login, payment, captcha, human-in-the-loop]
     related_skills: [praca-na-ekranie, formularze]
   jarvo:
-    agent: jarvo-operator
+    agent: jarvo
     autonomy: A1
-    reviewed: "2026-10-25"
+    reviewed: "2026-11-14"
 ---
 
 # Oddaj ekran właścicielowi
 
 Kroki właściciela: płatność, zakup, zamówienie, wysłanie wiadomości do ludzi, publikacja i usunięcie konta bez linii
-`ZGODA WŁAŚCICIELA` w karcie; CAPTCHA, która nie przeszła po Twojej próbie; wybór pliku z jego dysku. Logowanie,
-rejestracja, hasło i kod SMS robisz sam. Przygotowujesz wszystko do kroku właściciela i prosisz go dokładnie o ten
-jeden krok. Właściciel robi go przez VNC na pulpicie serwera, gdzie okno Komputera Jarva jest widoczne.
+`ZGODA WŁAŚCICIELA` w karcie (w rozmowie: bez polecenia właściciela na tę akcję); CAPTCHA, która nie przeszła po
+Twojej próbie; wybór pliku z jego dysku. Logowanie, rejestrację, hasło i kod SMS robisz sam (Ty, Jarvo).
+Przygotowujesz wszystko do kroku właściciela i prosisz go dokładnie o ten jeden krok. Właściciel robi go przez VNC
+na pulpicie serwera, gdzie okno Komputera Jarva jest widoczne.
 
 ## Kiedy
 - Wejście Komputera odmówiło z `code: wymaga_czlowieka` (`next_step: ask_owner`).
@@ -44,4 +45,4 @@ jeden krok. Właściciel robi go przez VNC na pulpicie serwera, gdzie okno Kompu
   w menedżerze haseł przeglądarki; kod SMS czytasz z telefonu.
 - Nie szukasz drogi obok odmowy (punkt zamiast elementu, klawiatura zamiast kliknięcia, inna strona tego samego
   serwisu).
-- Z zalogowanej sesji właściciela korzystasz tylko w zakresie karty.
+- Z zalogowanej sesji właściciela korzystasz tylko w zakresie zadania.

@@ -25,7 +25,6 @@ skills:
     - "@@BUILD_DIR@@/profiles/jarvo-wideo/skills"
     - "@@BUILD_DIR@@/profiles/jarvo-lowca/skills"
     - "@@BUILD_DIR@@/profiles/jarvo-mobile/skills"
-    - "@@BUILD_DIR@@/profiles/jarvo-operator/skills"
     - "@@BUILD_DIR@@/profiles/jarvo-ads/skills"
 
 web:

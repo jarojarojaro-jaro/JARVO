@@ -241,8 +241,9 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
   aplikacji”); etapy 3 i 5 gotowe w kodzie, czekają na telefon testowy (KVM albo binder), pierwszy przebieg iOS w GitHub
   Actions i pierwszą aplikację na kontach właściciela ([MOBILE.md](MOBILE.md) §16).
 - 🟡 **Computer use i server use** ([KOMPUTER.md](KOMPUTER.md)): Komputer Jarva (pulpit z Chromium w osobnym kontenerze,
-  `jarvo komputer on`), kanał z twardymi zasadami (logowanie, płatność, wysyłka, hasła i karty = człowiek) i agent
-  **Operator** `jarvo-operator` (5 skilli, 21 scenariuszy evals, 2 ataki red teamu, pokój „Sterownia”): etapy K0–K3 gotowe;
+  `jarvo komputer on`), kanał z twardymi zasadami (płatność, wysyłka i publikacja tylko ze zgodą właściciela w karcie,
+  karty i kody = człowiek); na ekranie i telefonie pracuje sam Jarvo (5 skilli ekranu, 2 ataki red teamu; osobny agent
+  ekranu usunięty 2026-11-14): etapy K0–K3 gotowe;
   K6 (Ręce: Twój komputer z Linuksem, macOS albo Windows, `jarvo komputer rece on`, profil rąk `jarvo-ekran`) w kodzie,
   przed pierwszą próbą na żywo z prawdziwym sterownikiem; K4 (Ekran w HQ: podgląd, Przejmij, Oddaj, Zatrzymaj) i K5
   (terminal i serwery) w kolejce.

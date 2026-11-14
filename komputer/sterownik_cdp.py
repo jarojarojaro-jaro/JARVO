@@ -2362,7 +2362,7 @@ class Sterownik:
 
     def wlasciciel_przy_oknie(self) -> bool:
         """Okno widoczne: czy któraś strona ma fokus, czyli właściciel pracuje w oknie sam (loguje się, czyta).
-        W tle do stron sięga tylko Operator i HQ, więc nie."""
+        W tle do stron sięga tylko Jarvo i HQ, więc nie."""
         if self.w_tle:
             return False
         for okno in self._strony():

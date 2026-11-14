@@ -1,4 +1,4 @@
-"""Wtyczka jarvo-komputer: narzędzie `komputer` dla agentów z `komputer: true` we fleet.yaml (Operator, docs/KOMPUTER.md §7).
+"""Wtyczka jarvo-komputer: narzędzie `komputer` dla agentów z `komputer: true` we fleet.yaml (Jarvo, docs/KOMPUTER.md §7).
 
 Rozmawia z wejściem Komputera przez gniazdo sterowania (`ster.sock`, docs/KOMPUTER.md §6):
   stan       czy Komputer działa, pauza i jej powód, ile sesji, czy działa drzewo dostępności (AT-SPI),
@@ -203,7 +203,7 @@ def _stan(odp: Dict[str, Any]) -> Dict[str, Any]:
              "drzewo_dostepnosci": bool(odp.get("atspi"))}
     if odp.get("pauza"):
         wynik["pauza"] = odp["pauza"].get("opis") or ""
-        wynik["kto_wstrzymal"] = "Operator (czeka na właściciela)" if odp["pauza"].get("kto") == "flota" else "właściciel"
+        wynik["kto_wstrzymal"] = "Jarvo (czeka na właściciela)" if odp["pauza"].get("kto") == "flota" else "właściciel"
     if not wynik["drzewo_dostepnosci"]:
         wynik["uwaga"] = "drzewo dostępności nie działa: elementy tylko ze zrzutu (capture mode=som), punkty klikasz ostrożnie"
     return wynik
@@ -537,7 +537,7 @@ def register(ctx) -> None:
                                   "oddanie ekranu właścicielowi")
 
 
-if __name__ == "__main__":       # healthcheck toolboxa Operatora: python3 komputer/plugin/__init__.py stan
+if __name__ == "__main__":       # healthcheck toolboxa Jarva: python3 komputer/plugin/__init__.py stan
     import sys
     akcja = sys.argv[1] if len(sys.argv) > 1 else "stan"
     if akcja not in {"stan", "dziennik"}:       # z wiersza poleceń tylko odczyt, bez prośby do właściciela

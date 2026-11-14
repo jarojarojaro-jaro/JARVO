@@ -1,4 +1,8 @@
-# Jarvo: Main Judge. Tokeny @@...@@ podstawia scripts/build.py z fleet.yaml.
+# Jarvo: Main Judge, który sam pracuje na ekranie Komputera Jarva, na telefonie i w terminalu (docs/KOMPUTER.md).
+# Tokeny @@...@@ podstawia scripts/build.py z fleet.yaml. Ekran Komputera tylko przez wejście z twardymi zasadami:
+# strony natywnie narzędziem `komputer` (idz → patrz → kroki → czekaj), zrzut, canvas i Komputer w kontenerze przez
+# computer_use (bramka komputer/jarvo_cua.py); oba dzielą ekran (grupa ekranu procesu, docs/KOMPUTER.md §6).
+# Telefon: serwer MCP phone (PHONEUSE) dopisuje do zainstalowanego configu dopiero `jarvo telefon on`, nie ten plik.
 model:
   provider: "@@PROVIDER@@"
   default: "@@MODEL@@"
@@ -22,17 +26,50 @@ skills:
 web:
   search_backend: searxng         # SEARXNG_URL ustawia docker-compose (własny SearXNG)
 
-# Czat (Telegram): bez terminala. Pracownik-sędzia (tor review, platforma cli): pełna weryfikacja.
+# Czat (Telegram, HQ) i pracownik karty (cli): ekran, terminal i kanban; Jarvo robi sam pracę na ekranie,
+# na telefonie, konta i terminal (decyzja właściciela 2026-11-14), pracę dziedzinową dają specjaliści.
 platform_toolsets:
-  telegram: [kanban, memory, file, web, session_search, clarify, todo, skills, cronjob]
-  api_server: [kanban, memory, file, web, session_search, todo, skills, cronjob]   # czat Jarvo HQ: jak Telegram, bez clarify (API go nie obsługuje)
-  cli: [kanban, memory, file, terminal, web, browser, vision, session_search, todo, skills, cronjob]
+  telegram: [kanban, memory, file, terminal, computer_use, komputer, web, session_search, clarify, todo, skills, cronjob]
+  api_server: [kanban, memory, file, terminal, computer_use, komputer, web, session_search, todo, skills, cronjob]   # czat Jarvo HQ: jak Telegram, bez clarify (API go nie obsługuje)
+  cli: [kanban, memory, file, terminal, computer_use, komputer, web, browser, vision, session_search, todo, skills, cronjob]
   cron: [kanban, memory, file, skills, session_search]
 
 terminal:
   backend: local
   cwd: "@@WORKSPACES_DIR@@/jarvo"
   timeout: 300
+
+computer_use:
+  permission_mode: standard     # bounded wymaga polecenia `serve` sterownika, którego bramka nie przepuszcza
+  capture_after_mode: ax        # sprawdzenie po działaniu z drzewa dostępności (bez obrazu); zrzut, gdy trzeba
+  ax_max_elements: 300          # strony sklepów i paneli mają setki elementów; 300 to ~1 s na zrzut drzewa
+  max_image_dimension: 1456
+  cua_telemetry: false
+
+# Stałe zgody na Komputerze Jarva (klucze dokładne, bez gwiazdek): działania w tle i działania wejścia na wierzchu.
+# Na pulpicie X11 Komputera pisanie, klawisze, przewijanie, przeciąganie i podwójny klik działają tylko na wierzchu,
+# a wejście Komputera przepuszcza je tylko w oknie, które już jest aktywne (docs/KOMPUTER.md §6). Okno na wierzch
+# (`bring_to_front`, `raise_window`) zawsze zatwierdza człowiek. Płatność, wysyłkę i publikację zatrzymuje wejście
+# Komputera, a nie ta lista. Bez człowieka (kanban, cron) wszystko spoza listy kończy się odmową.
+command_allowlist:
+  - "cua:click:background"
+  - "cua:double_click:background"
+  - "cua:right_click:background"
+  - "cua:middle_click:background"
+  - "cua:drag:background"
+  - "cua:scroll:background"
+  - "cua:type:background"
+  - "cua:key:background"
+  - "cua:set_value:background"
+  - "cua:focus_app:background"
+  - "cua:click:foreground"
+  - "cua:double_click:foreground"
+  - "cua:right_click:foreground"
+  - "cua:middle_click:foreground"
+  - "cua:drag:foreground"
+  - "cua:scroll:foreground"
+  - "cua:type:foreground"
+  - "cua:key:foreground"
 
 # Przeglądarka: wbudowane narzędzia browser_* przez agent-browser z silnikiem Lightpanda (~30 MB RAM
 # na sesję zamiast ~300 MB Chromium). Zrzuty ekranu i strony, których Lightpanda nie obsłuży,
@@ -60,8 +97,10 @@ approvals:
   unattended_mode: deny
   smart_policy: >-
     Always ESCALATE: production deployments, publishing or posting content, sending e-mail or
-    messages to third parties, payments or purchases, deleting data outside /opt/data/jarvo/workspaces,
-    changing DNS, credentials or account settings.
+    messages to third parties, payments or purchases, deleting an account, deleting data outside
+    /opt/data/jarvo/workspaces, changing DNS, unless the kanban card body has a line "ZGODA WŁAŚCICIELA"
+    naming that category. Logging in, registering accounts, typing passwords and verification codes
+    for the owner's task are allowed.
   deny:
     - "rm -rf /*"
     - "git push --force*"
@@ -87,6 +126,7 @@ display:
       tool_preview_length: 80
       show_reasoning: true
       reasoning_style: blockquote
+      long_running_notifications: false     # „⌛ Working — 3 min”: dymek postępu pokazuje to samo na żywo
 # odpowiedź pisze się na żywo (Telegram: natywne szkice), zamiast przyjść w całości po minucie
 streaming:
   enabled: true

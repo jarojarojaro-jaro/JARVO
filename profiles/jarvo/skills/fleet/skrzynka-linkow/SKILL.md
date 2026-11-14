@@ -1,7 +1,7 @@
 ---
 name: skrzynka-linkow
 description: "Link od właściciela do skarbca; „one” = temat poboczny."
-version: 1.5.0
+version: 1.6.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-11-13"
+    reviewed: "2026-11-14"
 ---
 
 # Skrzynka linków
@@ -44,7 +44,7 @@ API ręcznie, nie otwierasz linku w przeglądarce: wszystko daje narzędzie `pob
    **Zawsze zestaw z wąskimi gardłami z profilu właściciela** (sekcja „Wąskie gardła”: CPU serwera najwyżej 80%,
    3 zadania naraz, testy kerneli na procesorze, render wideo, buildy i audyty) i powiedz wprost, które gardło to
    rozwiązuje i jak („darmowe 4 vCPU = drugi procesor na render i testy kerneli”). Gdy rozwiązuje, jest darmowe
-   i odwracalne, **od razu zakładasz misję próby** (konto przez Operatora, pierwsze prawdziwe zadanie, pomiar
+   i odwracalne, **od razu zakładasz misję próby** (konto zakładasz sam w Komputerze Jarva, pierwsze prawdziwe zadanie, pomiar
    względem serwera) i mówisz, że ruszyło; płatne albo nieodwracalne: propozycja z kosztem.
 5. **Zapisz zawsze** jeden szkic na link: `wiedza_zapisz` z polami:
    - `typ`: `fakt` (wiadomość, liczba, ogłoszenie), `podmiot` (firma, narzędzie, człowiek w roli publicznej),

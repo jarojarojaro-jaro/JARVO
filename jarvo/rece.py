@@ -1,4 +1,4 @@
-"""`jarvo komputer rece on|off|status`: ręce Operatora na ekranie właściciela (docs/KOMPUTER.md, etap K6;
+"""`jarvo komputer rece on|off|status`: ręce Jarva na ekranie właściciela (docs/KOMPUTER.md, etap K6;
 docs/NATYWNIE.md J14, J15, N13; decyzja I19). Domyślnie wyłączone.
 
   on --aplikacje A,B [--na 30m] [--profil jarvo-ekran] [--bezczynnosc 10m] [--bez-pobierania]
@@ -7,7 +7,7 @@ docs/NATYWNIE.md J14, J15, N13; decyzja I19). Domyślnie wyłączone.
         systemu, menedżerów haseł i samego Jarva) i sterownik cua-driver-rs 0.38.0 (suma programu, podpis; brak =
         pobranie z sumą z manifestu, na macOS instrukcja kopii do /Applications). Domyślny profil rąk `jarvo-ekran`
         zakłada albo odświeża sam (komputer/rece/profil.py: bounded z manifestem zgody, approvals manual, bez
-        terminala i plików, model z jarvo-operator); nowy powstaje w całości obok i dopiero gotowy dostaje swoją
+        terminala i plików, model z profilu jarvo); nowy powstaje w całości obok i dopiero gotowy dostaje swoją
         nazwę, a po zmianie profilu działająca brama Jarva restartuje się przez nadzorcę (bez nadzorcy: rada, jak
         ją zrestartować). Inny --profil musi już być profilem rąk: bramka czyta go tak jak Hermes (approvals.mode
         manual, tryby bez człowieka deny, bez stałych zgód cua:*). Zapisuje zgodę podpisaną kluczem HMAC
@@ -73,7 +73,7 @@ def proces_floty(env: dict, dane: Path) -> str | None:
 
 
 def _parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="jarvo komputer rece", description="Ręce Operatora na Twoim ekranie: domyślnie "
+    p = argparse.ArgumentParser(prog="jarvo komputer rece", description="Ręce Jarva na Twoim ekranie: domyślnie "
                                 "wyłączone, włączasz je sam, na czas i w wybranych aplikacjach.")
     sub = p.add_subparsers(dest="akcja", metavar="on|off|status", title="polecenia")
     s = sub.add_parser("on", help="włącz ręce na czas w wybranych aplikacjach (tylko właściciel, w swoim terminalu)")
@@ -291,7 +291,7 @@ def wlacz(a, u, pliki, plat: str, env: dict, pisz, *, wejscie, tty, teraz, spraw
     if isinstance(sterownik, int):
         return sterownik
     do = (teraz or time.time)() + sekundy
-    pisz("Oddajesz Operatorowi ręce na Twoim ekranie:")
+    pisz("Oddajesz Jarvowi ręce na Twoim ekranie:")
     pisz(f"  aplikacje:  {', '.join(x.nazwa for x in lista)}")
     for x in lista:
         pisz(f"              {x.nazwa}: {next(iter(x.tozsamosc.values()))}")

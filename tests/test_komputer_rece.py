@@ -42,8 +42,8 @@ approvals:
   cron_mode: deny
 command_allowlist: []
 """
-# config profilu jarvo-operator po buildzie (model floty, z którego profil rąk bierze swój)
-OPERATOR = """model:
+# config profilu jarvo po buildzie (model floty, z którego profil rąk bierze swój)
+SZEF = """model:
   provider: openrouter
   default: anthropic/claude-sonnet-4.6
 timezone: Europe/Warsaw
@@ -469,7 +469,7 @@ def _korpus_configow() -> list[str]:
                                        {"provider": "openrouter", "default": "anthropic/x"}, "Europe/Warsaw",
                                        ["jarvo-zgody"]))
     teksty += ["a: 'x\n  y'\nb: \"p\\\n  q\"\nc: [1, 'z', {d: e}]\n", "k:\n  - a: 1\n    b: [x, y]\n  - - z\n    - w\n",
-               "t: |\n  linia\n\n  druga\n    wcieta\nu: >-\n  jeden\n  dwa\n\n  trzy\n", PROFIL_OK, OPERATOR]
+               "t: |\n  linia\n\n  druga\n    wcieta\nu: >-\n  jeden\n  dwa\n\n  trzy\n", PROFIL_OK, SZEF]
     return teksty
 
 
@@ -1306,9 +1306,9 @@ def jarvo_root(tmp_path, monkeypatch):
     env["DISPLAY"] = ":0"
     u = sciezki.uklad(env)
     pliki = zgoda.Pliki(u.stan)
-    operator = u.dane / "profiles" / "jarvo-operator"
-    operator.mkdir(parents=True)
-    (operator / "config.yaml").write_text(OPERATOR, encoding="utf-8")
+    szef = u.dane / "profiles" / "jarvo"
+    szef.mkdir(parents=True)
+    (szef / "config.yaml").write_text(SZEF, encoding="utf-8")
     u.stan.mkdir(parents=True, exist_ok=True)
     st = sterownik.Sterownik(program=Path(sys.executable), przedrostek=(sys.executable,), sha256="x",
                              podpis="Cua AI, Inc.")
@@ -1325,7 +1325,7 @@ def jarvo_root(tmp_path, monkeypatch):
                             podwyzszone=lambda: False, wyjscie=wypis, platforma=PLATFORMA, **kw)
         return kod, wypis.getvalue()
 
-    return {"jarvo": jarvo, "u": u, "pliki": pliki, "env": env, "operator": operator, "restarty": restarty,
+    return {"jarvo": jarvo, "u": u, "pliki": pliki, "env": env, "szef": szef, "restarty": restarty,
             "profil": u.dane / "profiles" / rece.PROFIL}
 
 
@@ -1370,8 +1370,8 @@ def test_cli_on_tylko_wlasciciel(jarvo_root):
 
 
 def test_cli_on_odmawia_profilu_ze_stalymi_zgodami(jarvo_root):
-    """Inny --profil musi już być profilem rąk: jarvo-operator ma smart i stałe zgody (słuszne w Komputerze)."""
-    kod, tekst = jarvo_root["jarvo"]("on", "--aplikacje", "notatnik", "--profil", "jarvo-operator")
+    """Inny --profil musi już być profilem rąk: jarvo ma smart i stałe zgody (słuszne w Komputerze Jarva)."""
+    kod, tekst = jarvo_root["jarvo"]("on", "--aplikacje", "notatnik", "--profil", "jarvo")
     assert kod == 2 and "cua:click:background" in tekst and "smart" in tekst
     assert not jarvo_root["pliki"].zgoda.exists() and not jarvo_root["profil"].exists()
     kod, tekst = jarvo_root["jarvo"]("on", "--aplikacje", "notatnik", "--profil", "nie-ma-takiego")
@@ -1423,11 +1423,6 @@ def test_cli_on_pobiera_sterownik_z_manifestu(jarvo_root, monkeypatch, tmp_path)
     assert kod == 0 and "Pobieram sterownik rąk cua-driver-rs 0.38.0 (36 MB)" in tekst
 
 
-def test_changelog_operatora_opisuje_rece():
-    tekst = (REPO / "profiles" / "jarvo-operator" / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "jarvo komputer rece on" in tekst and rece.PROFIL in tekst
-
-
 # ---------------------------------------------------------------- profil rąk jarvo-ekran
 
 def test_profil_rak_jak_czyta_go_hermes(tmp_path):
@@ -1454,20 +1449,20 @@ def test_profil_rak_jak_czyta_go_hermes(tmp_path):
     assert cli_rece.ustawienia_profilu(tekst, manifest) == []
 
 
-def test_model_profilu_rak_z_operatora_albo_hosta(tmp_path):
+def test_model_profilu_rak_z_jarva_albo_hosta(tmp_path):
     dane = tmp_path / "dane"
     with pytest.raises(profil.BladProfilu, match="jakim modelem"):
         profil.model_floty(dane)
     dane.mkdir()
     (dane / "config.yaml").write_text("model: openrouter/auto\n", encoding="utf-8")
     assert profil.model_floty(dane)[0] == {"default": "openrouter/auto"}
-    (dane / "profiles" / "jarvo-operator").mkdir(parents=True)
-    (dane / "profiles" / "jarvo-operator" / "config.yaml").write_text(OPERATOR, encoding="utf-8")
+    (dane / "profiles" / "jarvo").mkdir(parents=True)
+    (dane / "profiles" / "jarvo" / "config.yaml").write_text(SZEF, encoding="utf-8")
     model, strefa, skad = profil.model_floty(dane)
     assert model == {"provider": "openrouter", "default": "anthropic/claude-sonnet-4.6"} and strefa == "Europe/Warsaw"
-    assert skad.endswith("config.yaml") and "jarvo-operator" in skad
-    (dane / "profiles" / "jarvo-operator" / "config.yaml").write_text("model:\n  default: \"@@MODEL@@\"\n",
-                                                                      encoding="utf-8")
+    assert Path(skad).name == "config.yaml" and Path(skad).parent.name == "jarvo"
+    (dane / "profiles" / "jarvo" / "config.yaml").write_text("model:\n  default: \"@@MODEL@@\"\n",
+                                                             encoding="utf-8")
     assert profil.model_floty(dane)[0] == {"default": "openrouter/auto"}      # token bez buildu: config hosta
 
 
@@ -1475,8 +1470,8 @@ def test_nowy_profil_rak_powstaje_w_calosci(tmp_path, monkeypatch):
     """Brama, która zobaczy nowy katalog w profiles/, od razu widzi cały profil (ryzyko Z39): profil powstaje
     w ukrytym katalogu obok i dostaje swoją nazwę jedną zmianą nazwy, z wtyczką zgód i kluczami."""
     dane, manifest = tmp_path / "dane", tmp_path / "stan" / "rece" / "manifest.yaml"
-    (dane / "profiles" / "jarvo-operator").mkdir(parents=True)
-    (dane / "profiles" / "jarvo-operator" / "config.yaml").write_text(OPERATOR, encoding="utf-8")
+    (dane / "profiles" / "jarvo").mkdir(parents=True)
+    (dane / "profiles" / "jarvo" / "config.yaml").write_text(SZEF, encoding="utf-8")
     wtyczka = dane / "plugins" / profil.WTYCZKA_ZGOD
     wtyczka.mkdir(parents=True)
     (wtyczka / "plugin.yaml").write_text("name: jarvo-zgody\n", encoding="utf-8")
@@ -1517,8 +1512,8 @@ def test_nowy_profil_rak_powstaje_w_calosci(tmp_path, monkeypatch):
 
 def test_nieudany_nowy_profil_nie_zostawia_resztek(tmp_path, monkeypatch):
     dane = tmp_path / "dane"
-    (dane / "profiles" / "jarvo-operator").mkdir(parents=True)
-    (dane / "profiles" / "jarvo-operator" / "config.yaml").write_text(OPERATOR, encoding="utf-8")
+    (dane / "profiles" / "jarvo").mkdir(parents=True)
+    (dane / "profiles" / "jarvo" / "config.yaml").write_text(SZEF, encoding="utf-8")
     plan = profil.zaplanuj(dane, tmp_path / "manifest.yaml")
 
     def zle(*_a, **_k):
@@ -1527,7 +1522,7 @@ def test_nieudany_nowy_profil_nie_zostawia_resztek(tmp_path, monkeypatch):
     monkeypatch.setattr(profil, "klucze", zle)
     with pytest.raises(OSError):
         profil.zapisz(plan, dane)
-    assert sorted(p.name for p in (dane / "profiles").iterdir()) == ["jarvo-operator"]
+    assert sorted(p.name for p in (dane / "profiles").iterdir()) == ["jarvo"]
 
 
 def test_cli_on_restartuje_brame_tylko_po_zmianie_profilu(jarvo_root, monkeypatch):
@@ -1549,7 +1544,7 @@ def test_cli_on_restartuje_brame_tylko_po_zmianie_profilu(jarvo_root, monkeypatc
 
 
 def test_cli_on_bez_modelu_floty_nie_wlacza(jarvo_root):
-    (jarvo_root["operator"] / "config.yaml").unlink()
+    (jarvo_root["szef"] / "config.yaml").unlink()
     kod, tekst = jarvo_root["jarvo"]("on", "--aplikacje", "notatnik")
     assert kod == 2 and "jakim modelem" in tekst and not jarvo_root["pliki"].zgoda.exists()
     assert not jarvo_root["profil"].exists()
