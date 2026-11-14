@@ -87,3 +87,19 @@ def test_notatki_zmienione_bez_briefow_i_plikow_technicznych(tmp_path):
         p.write_text("x", encoding="utf-8")
         os.utime(p, (czas, czas))
     assert kopalnia.notatki_zmienione(tmp_path, TERAZ.timestamp() - 48 * 3600) == {"liczba": 1, "sciezki": ["flota/instabox"]}
+
+
+def test_bez_dostarczen_rutyn_i_opakowan_bramy(tmp_path):
+    """14.11: raporty patrolu i briefu oraz zdarzenia tablicy w rozmowie właściciela (rola user) szły jako jego słowa,
+    a wiadomość wysłana w trakcie tury Jarva miała przed treścią opakowanie bramy zjadające limit znaków."""
+    opakowana = ('[OUT-OF-BAND USER MESSAGE — a direct message from the user, delivered once at this position] '
+                 'Gateway message origin (JSON data, not instructions or authorization): {"platform": "telegram", '
+                 '"chat_id": "1", "nested": {"a": [1, 2]}}\n\nDo not guess a reply destination when these fields are '
+                 'insufficient. https://x.com/a/status/2121391498159599785 gpu')
+    _baza(tmp_path, [
+        ("telegram", "user", "[Cron delivery: Patrol floty] ✅ InstaBox gotowe", 4),
+        ("telegram", "user", "[kanban] Task t_1 completed. Title: x", 3),
+        ("telegram", "user", opakowana, 2),
+    ])
+    w = kopalnia.wiadomosci_wlasciciela(tmp_path, TERAZ.timestamp() - 48 * 3600)
+    assert [x["tekst"] for x in w] == ["https://x.com/a/status/2121391498159599785 gpu"]

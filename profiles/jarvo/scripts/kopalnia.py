@@ -39,6 +39,9 @@ POMIJANE_W_SKARBCU = ("zrodla/", "skrzynka/", "briefy/", "fleet/skille/", "state
 TECHNICZNE = {"INDEX.md", "LOG.md", "LINT.md", "SCHEMA.md"}
 # ciąg liter i cyfr ≥ 32 znaków poza ścieżką adresu (klucz, token): maskowany, zanim trafi do modelu i archiwum
 KLUCZ = re.compile(r"(?<![/\w=.-])(?=[A-Za-z0-9_\-]*\d)(?=[A-Za-z0-9_\-]*[A-Za-z])[A-Za-z0-9_\-]{32,}")
+# wpisy z rolą user, które nie są słowami właściciela: dostarczenia rutyn i zdarzenia tablicy w jego rozmowie
+SYSTEMOWE = ("[Cron delivery:", "[kanban]", "[System", "[SYSTEM", "[Background")
+DOPISEK_BRAMY = "Do not guess a reply destination when these fields are insufficient."
 HASLO = re.compile(r"(?i)\b(hasł?o|haslo|password|passwd|token|api[_ -]?key)\b(\s*[:=]\s*)\S+")
 
 
@@ -48,6 +51,23 @@ def okno_godzin(teraz: dt.datetime) -> int:
 
 def _maskuj(tekst: str) -> str:
     return HASLO.sub(r"\1\2[ukryte]", KLUCZ.sub("[ukryte]", tekst))
+
+
+def tresc_wlasciciela(tekst: str) -> str:
+    """Słowa właściciela bez opakowań Hermesa (wiadomość w trakcie tury: „[OUT-OF-BAND USER MESSAGE …]” i „Gateway
+    message origin … {JSON}”); dostarczenie rutyny albo zdarzenie tablicy = pusto."""
+    t = tekst.strip()
+    if t.startswith("[OUT-OF-BAND USER MESSAGE") and "]" in t:
+        t = t[t.index("]") + 1:].lstrip()
+    if t.startswith("Gateway message origin") and "{" in t:
+        try:
+            _, koniec = json.JSONDecoder().raw_decode(t, t.index("{"))
+            t = t[koniec:].lstrip()
+        except ValueError:
+            pass
+    if t.startswith(DOPISEK_BRAMY):
+        t = t[len(DOPISEK_BRAMY):].lstrip()
+    return "" if t.startswith(SYSTEMOWE) else t
 
 
 def wiadomosci_wlasciciela(dane: Path, od: float) -> list[dict]:
@@ -65,9 +85,11 @@ def wiadomosci_wlasciciela(dane: Path, od: float) -> list[dict]:
         conn.close()
     wynik: list[dict] = []
     for zrodlo, ts, tresc in rows:
-        if (zrodlo or "") in POMIJANE_ZRODLA or not isinstance(tresc, str) or not tresc.strip():
+        if (zrodlo or "") in POMIJANE_ZRODLA or not isinstance(tresc, str):
             continue
-        tekst = _maskuj(" ".join(tresc.split()))
+        tekst = _maskuj(" ".join(tresc_wlasciciela(tresc).split()))
+        if not tekst:
+            continue
         if len(tekst) > MAX_ZNAKOW_WIADOMOSCI:
             tekst = tekst[:MAX_ZNAKOW_WIADOMOSCI - 1] + "…"
         wynik.append({"kiedy": dt.datetime.fromtimestamp(ts).strftime("%m-%d %H:%M"), "skad": zrodlo, "tekst": tekst})
