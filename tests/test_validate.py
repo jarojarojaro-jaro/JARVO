@@ -110,6 +110,37 @@ def test_unpinned_lock_source(repo_copy):
     assert errors_matching(validate.run(), r"musi być przypięte do pełnego SHA")
 
 
+def _lock_z_podmiana(repo_copy, stare: str, nowe: str) -> validate.Report:
+    lock = repo_copy / "vendor/skills.lock.yaml"
+    text = lock.read_text(encoding="utf-8")
+    assert stare in text
+    lock.write_text(text.replace(stare, nowe, 1), encoding="utf-8")
+    report = validate.Report()
+    validate.check_lock(fl.load_fleet(), {}, report)
+    return report
+
+
+def test_lock_nakladka_w_skillu_wlasnym(repo_copy):
+    """Wpis kategoria/nazwa/podkatalog w skillu własnym agenta (nakładka) przechodzi, z `pomin: [SKILL.md]`."""
+    report = validate.Report()
+    validate.check_lock(fl.load_fleet(), {}, report)
+    assert not errors_matching(report, r"modern-web-guidance"), report.errors
+    nazwy = fl.skille_z_locka(fl.load_lock(), "jarvo-web")
+    assert "upstream" not in nazwy and "modern-web-guidance" not in nazwy    # dane nakładki to nie osobny skill
+
+
+def test_lock_nakladka_bez_skilla_wlasnego(repo_copy):
+    report = _lock_z_podmiana(repo_copy, "dest: web/modern-web-guidance/upstream", "dest: web/nie-ma-takiego/upstream")
+    assert errors_matching(report, r"lock/jarvo-web: dest 'web/nie-ma-takiego/upstream': podkatalog tylko w skillu własnym")
+
+
+def test_lock_pomin_skill_md_tylko_w_nakladce(repo_copy):
+    report = _lock_z_podmiana(repo_copy, 'dest: design/lemo-wake-layers, pomin: ["scripts"]',
+                              'dest: design/lemo-wake-layers, pomin: ["scripts", "SKILL.md"]')
+    assert errors_matching(report, r"design/lemo-wake-layers: `pomin` to lista wzorców plików")
+    assert not errors_matching(report, r"modern-web-guidance")
+
+
 def test_cron_script_must_exist(repo_copy):
     (repo_copy / "profiles/jarvo/scripts/brief_daily.py").unlink()
     assert errors_matching(validate.run(), r"jarvo/cron/jarvo-daily-brief: brak skryptu scripts/brief_daily.py")

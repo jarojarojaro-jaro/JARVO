@@ -9,7 +9,11 @@
 # siebie ścieżkami względnymi (../hyperframes-animation/…, ../seo/references/…), MUSZĄ
 # lądować w tej samej kategorii.
 # `pomin` (opcjonalnie, przy wpisie agenta) = wzorce plików i katalogów, których build nie kopiuje
-# (np. filmy i zrzuty przykładów); SKILL.md i LICENSE* zostają zawsze.
+# (np. filmy i zrzuty przykładów); SKILL.md (poza nakładką, niżej) i LICENSE* zostają zawsze.
+# Nakładka: `dest` = <kategoria>/<nazwa>/<podkatalog>, gdy <kategoria>/<nazwa> to skill własny tego agenta
+# (profiles/<agent>/skills/…). Dane cudzego skilla (np. przewodniki) lądują wtedy w podkatalogu naszego skilla, który
+# mówi, jak z nich korzystać; cudzy SKILL.md można pominąć (`pomin: [SKILL.md]`, tylko w nakładce), licencji nie.
+# Taki wpis nie jest osobnym skillem (bez nazwy w indeksie Hermesa, related_skills, rosterze).
 
 version: 1
 
@@ -253,6 +257,13 @@ sources:
     rev: 8de1ee18d8971723ac49320f01c574b8972ed1a5
     license: MIT
     license_file: LICENSE
+  modern-web-guidance:
+    type: git                # repo dystrybucji (gotowy skill); tag v1.0.0 = paczka npm modern-web-guidance@1.0.0,
+                             # zbudowana z GoogleChrome/modern-web-guidance-src v1.0.0 (544c250)
+    repo: https://github.com/GoogleChrome/modern-web-guidance
+    rev: 4dd968349e54ca45a05dd5c818fb035c9054b022
+    license: Apache-2.0
+    license_file: LICENSE
 
 agents:
   jarvo:
@@ -342,6 +353,9 @@ agents:
     - {source: hermes, path: optional-skills/web-development/scrollcraft, dest: design/scrollcraft}
     - {source: hermes, path: optional-skills/web-development/publish-site, dest: deploy/publish-site}
     - {source: hermes, path: optional-skills/web-development/cloudflare-temporary-deploy, dest: deploy/cloudflare-temporary-deploy}
+    # nakładka: przewodniki bez upstreamowego SKILL.md (npx …@latest z telemetrią); jak z nich korzystać mówi nasz
+    # skill web/modern-web-guidance, jego INDEX.tsv buduje scripts/indeks_przewodnikow.py
+    - {source: modern-web-guidance, path: skills/modern-web-guidance, dest: web/modern-web-guidance/upstream, pomin: [SKILL.md]}
 
   jarvo-studio:
     - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}

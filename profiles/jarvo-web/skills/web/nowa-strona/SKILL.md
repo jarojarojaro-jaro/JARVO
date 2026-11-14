@@ -1,13 +1,13 @@
 ---
 name: nowa-strona
 description: "Nowa strona od briefu do podglądu (Astro, mobile-first)."
-version: 1.7.0
+version: 1.8.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
     tags: [web, astro, build, frontend]
-    related_skills: [systematic-debugging, inspiracje-stron, frontend-design, design-md, popular-web-designs, favicon-i-meta, optymalizacja-obrazow, audyt-strony, wdrozenie, animate, gsap-core, gsap-scrolltrigger, threejs-fundamentals]
+    related_skills: [systematic-debugging, inspiracje-stron, frontend-design, design-md, popular-web-designs, modern-web-guidance, favicon-i-meta, optymalizacja-obrazow, audyt-strony, wdrozenie, animate, gsap-core, gsap-scrolltrigger, threejs-fundamentals]
   jarvo:
     agent: jarvo-web
     autonomy: A1
@@ -34,6 +34,9 @@ metadata:
    z pustymi wartościami. Nowa zależność: najpierw sprawdź w rejestrze, że istnieje i jest znana (nie ufaj nazwie od modelu).
 4. **Budowa sekcji:** semantyczny HTML, mobile-first, `<picture>` z AVIF/WebP (`optymalizacja-obrazow`),
    formularze z etykietami, widoczny fokus, `prefers-reduced-motion`.
+   **Zanim napiszesz komponent albo animację:** skill `modern-web-guidance`: szukaj w jego `INDEX.tsv` po słowach
+   (`dialog dismiss`, `table responsive`, `view transition`, `theme toggle`), przeczytaj lokalny przewodnik i użyj
+   natywnego API z fallbackiem zamiast biblioteki; w oddaniu karty sekcja `### Modern Web Guidance`.
 5. **Head i widoczność:** skill `favicon-i-meta` (komplet ikon, manifest, OG, JSON-LD Organization/WebSite, canonical,
    lang) w jednym layoucie; każda podstrona podaje własny `title` i `description` (nigdy kopii ze strony głównej).
    Layout ma landmarki: `<header>`, `<nav>`, jeden `<main>`, `<footer>`. Do tego, zanim powstanie pierwszy podgląd:

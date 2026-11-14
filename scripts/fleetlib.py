@@ -310,6 +310,17 @@ def load_lock(path: Path | None = None) -> dict:
     return load_yaml(path or VENDOR_LOCK)
 
 
+def w_nakladce(dest: str) -> bool:
+    """Wpis locka z `dest` <kategoria>/<nazwa>/<podkatalog>: dane cudzego skilla w podkatalogu skilla własnego
+    (nakładki), nie osobny skill."""
+    return str(dest).count("/") == 2
+
+
+def skille_z_locka(lock: dict, agent: str) -> list[str]:
+    """Nazwy skilli zewnętrznych agenta z locka (bez wpisów w nakładkach)."""
+    return [Path(e["dest"]).name for e in (lock.get("agents") or {}).get(agent) or [] if not w_nakladce(e["dest"])]
+
+
 # -------------------------------------------------------------------------- skills
 
 def iter_skill_files(root: Path):

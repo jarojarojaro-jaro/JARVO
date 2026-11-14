@@ -723,6 +723,55 @@ def test_wspolne_skille_jarva_dostaja_tokeny(tmp_path, monkeypatch):
     assert (out / "wspolne/proba/references/bez.md").read_bytes() == b"bez tokenow\r\n"
 
 
+def _nakladka(tmp_path, monkeypatch, indeks: str | None, wlasny: bool = True):
+    """Repo z cudzym skillem (SKILL.md + guides/) i profil ze skillem własnym web/nak; lock kładzie dane cudzego
+    skilla w web/nak/upstream bez jego SKILL.md."""
+    repo = tmp_path / "repo"
+    obcy = repo / "obcy" / "skill"
+    (obcy / "guides" / "ui").mkdir(parents=True)
+    (obcy / "SKILL.md").write_text("---\nname: obcy\n---\nnpx -y obcy@latest retrieve\n", encoding="utf-8")
+    (obcy / "guides" / "ui" / "dialog.md").write_text("# Dialog\n", encoding="utf-8")
+    (obcy / "guides" / "ui" / "popover.md").write_text("# Popover\n", encoding="utf-8")
+    monkeypatch.setattr(fl, "REPO_ROOT", repo)
+    out = tmp_path / "skills"
+    (out / "web" / "nak").mkdir(parents=True)
+    if wlasny:
+        (out / "web" / "nak" / "SKILL.md").write_text("---\nname: nak\n---\n", encoding="utf-8")
+    if indeks is not None:
+        (out / "web" / "nak" / "INDEX.tsv").write_text(indeks, encoding="utf-8")
+    lock = {"sources": {"obce": {"type": "repo-tree", "license": "MIT", "notice": "Obcy, MIT"}},
+            "agents": {"a": [{"source": "obce", "path": "obcy/skill", "dest": "web/nak/upstream", "pomin": ["SKILL.md"]}]}}
+    return out, lambda: build.vendor_skills("a", out, lock, build.SourceResolver(lock, None, tmp_path / "c", {}), [])
+
+
+def test_nakladka_dane_w_podkatalogu_skilla_wlasnego(tmp_path, monkeypatch):
+    out, buduj = _nakladka(tmp_path, monkeypatch, "dialog\tDialog\tOpis\tupstream/guides/ui/dialog.md\n"
+                                                  "popover\tPopover\tOpis\tupstream/guides/ui/popover.md\n")
+    buduj()
+    dane = out / "web" / "nak" / "upstream"
+    assert (dane / "guides" / "ui" / "dialog.md").is_file() and not (dane / "SKILL.md").exists()
+    assert (dane / "LICENSE-UPSTREAM").is_file() and json.loads((dane / ".vendored.json").read_text())["source"] == "obce"
+    assert (out / "web" / "nak" / "SKILL.md").read_text(encoding="utf-8") == "---\nname: nak\n---\n"
+
+
+def test_nakladka_bez_skilla_wlasnego_zatrzymuje_build(tmp_path, monkeypatch):
+    _, buduj = _nakladka(tmp_path, monkeypatch, None, wlasny=False)
+    with pytest.raises(SystemExit, match="nakładka bez skilla własnego nak"):
+        buduj()
+
+
+def test_indeks_nakladki_musi_pasowac_do_danych(tmp_path, monkeypatch):
+    """Po zmianie rev: przewodnik spoza INDEX.tsv albo ścieżka z indeksu bez pliku zatrzymuje build."""
+    _, buduj = _nakladka(tmp_path / "a", monkeypatch, "dialog\tDialog\tOpis\tupstream/guides/ui/dialog.md\n")
+    with pytest.raises(SystemExit, match=r"0 ścieżek bez pliku \[\], 1 plików spoza indeksu \['upstream/guides/ui/popover.md'\]"):
+        buduj()
+    _, buduj = _nakladka(tmp_path / "b", monkeypatch, "dialog\tDialog\tOpis\tupstream/guides/ui/dialog.md\n"
+                                                      "popover\tPopover\tOpis\tupstream/guides/ui/popover.md\n"
+                                                      "stary\tStary\tOpis\tupstream/guides/ui/stary.md\n")
+    with pytest.raises(SystemExit, match=r"1 ścieżek bez pliku \['upstream/guides/ui/stary.md'\]"):
+        buduj()
+
+
 def test_zgody_z_gory_w_profilu_czatu():
     """Polecenie właściciela 14.11: czat z góry zatwierdza groźne wzorce terminala Hermesa (koniec „randomowych” próśb),
     ale dysk i system, sekrety, własna brama Jarva, zaciemnione polecenia i sudo dalej czekają na „tak”."""

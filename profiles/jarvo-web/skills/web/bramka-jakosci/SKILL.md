@@ -1,13 +1,13 @@
 ---
 name: bramka-jakosci
 description: "Przed oddaniem strony: rubryka designu 0–100 i testy wrogie."
-version: 1.1.0
+version: 1.1.1
 author: "Jarvo (rubryka i werdykt na bazie oh-my-hermes, MIT)"
 license: MIT
 metadata:
   hermes:
     tags: [web, design, quality, visual-qa, accessibility]
-    related_skills: [nowa-strona, landing-produktowy, audyt-strony, frontend-design, design-md, impeccable, review-animations]
+    related_skills: [nowa-strona, landing-produktowy, audyt-strony, modern-web-guidance, frontend-design, design-md, impeccable, review-animations]
   jarvo:
     agent: jarvo-web
     autonomy: A1

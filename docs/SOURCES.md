@@ -122,7 +122,9 @@ Lightpanda 14.8.9); Windows arm64 bierze plik x64 w emulacji, gdy nie ma natywne
 Kopiowane przy buildzie z przypiętych commitów zapisanych w [`vendor/skills.lock.yaml`](../vendor/skills.lock.yaml).
 Każdy skopiowany skill dostaje `LICENSE-UPSTREAM` (albo licencję z własnego katalogu), `NOTICE-UPSTREAM`
 (jeśli źródło go ma) i `.vendored.json` (repo, commit, ścieżka, licencja). Treści skilli nie zmieniamy;
-nasze adaptacje żyją w skillach własnych floty.
+nasze adaptacje żyją w skillach własnych floty. Gdy cudzy skill to głównie dane (np. przewodniki), a jego SKILL.md
+nie pasuje do floty, lock kładzie te dane bez zmian w podkatalogu skilla własnego (nakładki, `dest`
+`kategoria/nazwa/podkatalog`, cudzy SKILL.md w `pomin`), a nasz SKILL.md mówi, jak z nich korzystać.
 
 Przed wejściem do profilu każdy skill przechodzi **skan bezpieczeństwa** (`scripts/skan_skilli.py`):
 - skaner Hermesa `tools/skills_guard.py` z obrazu;
@@ -173,6 +175,7 @@ tylko raportujemy (Hermes instaluje je jako wbudowane). Ręczny skan kandydata p
 | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) | `063bee9` | MIT (w README, autorstwo w `notice`) | Twórca aplikacji (`react-native-skills`) |
 | [Remocn/remocn-studio](https://github.com/Remocn/remocn-studio) | `86f64ee` | MIT | Wideograf (`motion-design`: reżyseria ruchu i wzorce kompozycji, `video-lessons`: znane usterki renderu); ich pojęcia (Studio, `design_check`, panel właściwości) tłumaczy reguła 12 `film-z-kodu`; w HQ za nimi poszły uwagi z kadrem w edytorze, `html_wideo.py pomiar` i podgląd animacji z parametrami (◐ Animacja) |
 | [appeeky/aso-skills](https://github.com/appeeky/aso-skills) | `8de1ee1` | MIT | Twórca aplikacji (6 skilli ASO: metadane, zrzuty, odrzucenia, Google Play, lokalizacja, opinie) |
+| [GoogleChrome/modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance) (wersja 1.0.0, z [GoogleChrome/modern-web-guidance-src](https://github.com/GoogleChrome/modern-web-guidance-src) `544c250` = paczka npm 1.0.0) | `4dd9683` | Apache-2.0 | Web: 209 przewodników nowoczesnego webu (Google Chrome, Microsoft Edge, Mozilla, MDN) bez zmian w `web/modern-web-guidance/upstream/`, nakładka `modern-web-guidance` z lokalnym `INDEX.tsv` (`scripts/indeks_przewodnikow.py`). Bez upstreamowego SKILL.md: każe wołać `npx -y modern-web-guidance@latest search/retrieve`, czyli pobierać kod z npm przy każdym użyciu i wysyłać do Google zapytania i id przewodników (telemetria CLI); audyt `legacy-scan` tylko na prośbę, wersja przypięta 1.0.0 z `DISABLE_TELEMETRY=1` |
 
 Build odrzuca skill z `anthropics/skills`, jeśli w jego katalogu nie ma licencji Apache-2.0: część
 skilli w tym repo ma inne, zastrzeżone warunki i nie wolno ich kopiować.

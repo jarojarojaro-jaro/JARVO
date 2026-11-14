@@ -579,6 +579,9 @@ def vendor_skills(agent: str, out_skills: Path, lock: dict, resolver: SourceReso
         dest = out_skills / entry["dest"]
         if dest.exists():
             raise SystemExit(f"[{agent}] kolizja: {entry['dest']} już istnieje (skill własny o tej nazwie?)")
+        nakladka = fl.w_nakladce(entry["dest"])     # dane cudzego skilla w podkatalogu skilla własnego
+        if nakladka and not (dest.parent / "SKILL.md").is_file():
+            raise SystemExit(f"[{agent}] {entry['dest']}: nakładka bez skilla własnego {dest.parent.name}")
         shutil.copytree(src, dest, ignore=_ignore(entry.get("pomin")))
         rev = spec.get("rev") or _hermes_rev(src_root)
         if straznik is not None:        # skan przed dopisaniem naszych plików (licencja, .vendored.json)
@@ -614,6 +617,26 @@ def vendor_skills(agent: str, out_skills: Path, lock: dict, resolver: SourceReso
             "rev": rev, "path": entry["path"], "license": spec["license"],
         })
         report.append({"agent": agent, "dest": entry["dest"], "source": source, "rev": rev})
+        if nakladka:
+            sprawdz_indeks(agent, dest.parent, dest)
+
+
+def sprawdz_indeks(agent: str, skill: Path, dane: Path) -> None:
+    """INDEX.tsv nakładki (4. kolumna: ścieżka względem skilla) pasuje do danych z locka: każda ścieżka istnieje,
+    a każdy plik *.md z podkatalogu danych jest w indeksie. Po zmianie `rev` build każe przebudować indeks."""
+    indeks = skill / "INDEX.tsv"
+    if not indeks.is_file():
+        return
+    wiersze = [linia.split("\t") for linia in indeks.read_text(encoding="utf-8").splitlines() if linia.strip()]
+    if any(len(w) != 4 for w in wiersze):
+        raise SystemExit(f"[{agent}] {skill.name}/INDEX.tsv: każdy wiersz to 4 pola rozdzielone tabulatorem")
+    sciezki = {w[3] for w in wiersze}
+    brak = sorted(s for s in sciezki if not (skill / s).is_file())
+    poza = sorted(r for p in dane.rglob("*.md") if (r := p.relative_to(skill).as_posix()) not in sciezki)
+    if brak or poza:
+        raise SystemExit(f"[{agent}] {skill.name}/INDEX.tsv nie pasuje do danych z locka (zmiana rev?): "
+                         f"{len(brak)} ścieżek bez pliku {brak[:3]}, {len(poza)} plików spoza indeksu {poza[:3]}. "
+                         "Przebuduj indeks (scripts/indeks_przewodnikow.py) na commicie z locka.")
 
 
 def _ignore(pomin: list[str] | None):
@@ -687,7 +710,7 @@ def render_roster_skill(fleet: fl.Fleet) -> str:
         if a.name == fleet.orchestrator:
             continue
         own = sorted(fl.available_skills(a.dir / "skills")[0].keys())
-        vendored = sorted(Path(e["dest"]).name for e in lock.get("agents", {}).get(a.name, []) or [])
+        vendored = sorted(fl.skille_z_locka(lock, a.name))
         lines.append(f"### `{a.name}`")
         lines.append(f"- workflowy własne: {', '.join(f'`{n}`' for n in own) or '—'}")
         if vendored:

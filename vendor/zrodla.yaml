@@ -134,6 +134,15 @@ zrodla:
     repo: https://github.com/mattpocock/skills
     status: uzywane
     przejrzane: d81f3a183412e71a5b1e84ca21bc1a35eea03a60
+  modern-web-guidance:            # dystrybucja (gotowy skill i przewodniki), tag v1.0.0 = paczka npm 1.0.0
+    repo: https://github.com/GoogleChrome/modern-web-guidance
+    status: uzywane
+    przejrzane: 4dd968349e54ca45a05dd5c818fb035c9054b022
+  modern-web-guidance-src:        # źródło paczki npm i dystrybucji (przewodniki z evalami, CLI z legacy-scan);
+                                  # tag v1.0.0 = gitHead paczki npm modern-web-guidance@1.0.0, nie kopiujemy z niego plików
+    repo: https://github.com/GoogleChrome/modern-web-guidance-src
+    status: uzywane
+    przejrzane: 544c250575f7811d87fef8b1c064bc9571cbfb80
   motion-graphics:
     repo: https://github.com/Barty-Bart/motion-graphics
     status: uzywane

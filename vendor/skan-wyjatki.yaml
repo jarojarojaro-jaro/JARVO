@@ -110,3 +110,11 @@ wyjatki:
      powod: "rada reżyserska w tabeli objawów: zapowiedź typograficzna nie musi „udawać” interaktywnego demo; nie zmienia tożsamości agenta"}
   - {zrodlo: callstack-skills, rev: 61e6e7d, skill: skills/upgrading-react-native, regula: "hermes:sudo_usage", plik: references/upgrading-react-native.md,
      powod: "xcode-select i xcodebuild -runFirstLaunch na Macu człowieka; w kontenerze floty nie ma Xcode ani sudo, iOS budują EAS i GitHub Actions"}
+
+  # --- Modern Web Guidance 1.0.0 (nakładka web/modern-web-guidance, upstreamowy SKILL.md pominięty w locku)
+  - {zrodlo: modern-web-guidance, rev: 4dd9683, skill: skills/modern-web-guidance, regula: pobierz-i-uruchom, plik: "guides/*",
+     powod: "164 odsyłacze między przewodnikami „(via `npx -y modern-web-guidance@latest retrieve \"<id>\"`)”, każdy do przewodnika z INDEX.tsv; SKILL.md nakładki każe czytać lokalny plik i zabrania npx"}
+  - {zrodlo: modern-web-guidance, rev: 4dd9683, skill: skills/modern-web-guidance, regula: "hermes:html_comment_injection", plik: "guides/*",
+     powod: "komentarze HTML w przykładach kodu (6 przewodników: maska SVG, live region, until-found, priorytet preload i obrazów, ikona SVG); „hidden” to CSS/atrybut, nie ukryte polecenia"}
+  - {zrodlo: modern-web-guidance, rev: 4dd9683, skill: skills/modern-web-guidance, regula: "hermes:context_exfil", plik: "guides/built-in-ai/*.md",
+     powod: "dokumentacja Prompt API (prompt-api.md i language-model.md, „Cloning Sessions”): klonowanie sesji modelu w przeglądarce, nic nie wysyła"}

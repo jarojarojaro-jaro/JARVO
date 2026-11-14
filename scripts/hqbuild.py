@@ -91,7 +91,7 @@ def fleet_json(fleet: fl.Fleet | None = None) -> dict:
             "delegation_tier": a.delegation_tier,
             "autonomy_max": a.autonomy_max, "telegram_topic": a.telegram_topic,
             "skills": sorted(fl.skill_names(a.dir / "skills").keys()),
-            "vendored": len((lock.get("agents") or {}).get(a.name) or []),
+            "vendored": len(fl.skille_z_locka(lock, a.name)),
             "personality": personality(soul),
             "en": {"title": a.en.get("title") or a.title, "label": a.en.get("hq_label") or a.hq_label or a.title,
                    "description": a.en.get("description") or a.description, "rola": a.en.get("rola") or a.rola,

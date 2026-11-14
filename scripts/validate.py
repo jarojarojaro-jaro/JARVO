@@ -356,24 +356,37 @@ def check_lock(fleet: fl.Fleet, own: dict[str, set[str]], r: Report) -> None:
             r.err(f"lock: źródło {name} musi być przypięte do pełnego SHA")
         if not spec.get("license"):
             r.err(f"lock: źródło {name} bez licencji")
-    active = {a.name for a in fleet.active()}
+    active = {a.name: a for a in fleet.active()}
     for agent, entries in (lock.get("agents") or {}).items():
         if agent not in active:
             r.err(f"lock: agent {agent} nie jest aktywny we fleet.yaml")
+        skille = active[agent].dir / "skills" if agent in active else None
         dests, vnames = set(), set()
         for e in entries or []:
             if e.get("source") not in sources:
                 r.err(f"lock/{agent}: nieznane źródło {e.get('source')!r}")
             dest = str(e.get("dest", ""))
-            if not re.fullmatch(r"[a-z0-9-]+/[a-z0-9-]+", dest):
+            # nakładka: kategoria/nazwa/podkatalog w skillu własnym agenta (dane cudzego skilla, nie osobny skill)
+            nakladka = fl.w_nakladce(dest)
+            if nakladka:
+                if not re.fullmatch(r"[a-z0-9-]+/[a-z0-9-]+/[a-z0-9-]+", dest):
+                    r.err(f"lock/{agent}: dest {dest!r} musi mieć postać kategoria/nazwa/podkatalog")
+                elif skille is not None and not (skille / dest.rsplit("/", 1)[0] / "SKILL.md").is_file():
+                    r.err(f"lock/{agent}: dest {dest!r}: podkatalog tylko w skillu własnym agenta "
+                          f"(brak profiles/{agent}/skills/{dest.rsplit('/', 1)[0]}/SKILL.md)")
+            elif not re.fullmatch(r"[a-z0-9-]+/[a-z0-9-]+", dest):
                 r.err(f"lock/{agent}: dest {dest!r} musi mieć postać kategoria/nazwa")
             if dest in dests:
                 r.err(f"lock/{agent}: zduplikowany dest {dest}")
             pomin = e.get("pomin")
             if pomin is not None and (not isinstance(pomin, list) or not all(isinstance(p, str) and p for p in pomin)
-                                      or "SKILL.md" in pomin or any(p.upper().startswith("LICENSE") for p in pomin)):
-                r.err(f"lock/{agent}: {dest}: `pomin` to lista wzorców plików (bez SKILL.md i licencji)")
+                                      or ("SKILL.md" in pomin and not nakladka)
+                                      or any(p.upper().startswith("LICENSE") for p in pomin)):
+                r.err(f"lock/{agent}: {dest}: `pomin` to lista wzorców plików (bez licencji; SKILL.md tylko "
+                      "w nakładce)")
             dests.add(dest)
+            if nakladka:
+                continue
             vname = dest.split("/")[-1]
             if vname in vnames or vname in own.get(agent, set()):
                 r.err(f"lock/{agent}: kolizja nazwy skilla {vname!r}")
@@ -910,7 +923,7 @@ def run() -> Report:
     check_skan_wyjatki(r)
     check_zrodla(r)
     for a in fleet.active():
-        vendored = {Path(e["dest"]).name for e in (lock.get("agents", {}).get(a.name) or [])}
+        vendored = set(fl.skille_z_locka(lock, a.name))
         extra = {"roster"} if a.name == fleet.orchestrator else set()
         check_cron(a, own[a.name] | extra, vendored, r)
         check_related(a, own[a.name] | extra | vendored, r)
