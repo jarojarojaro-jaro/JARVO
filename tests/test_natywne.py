@@ -144,6 +144,7 @@ def test_srodowisko_procesow_i_plik_bez_sekretow(tmp_path):
     assert env["HERMES_HOME"] == str(u.dane) and "PYTHONPATH" not in env
     assert "JARVO_TOKEN" not in env and "OPENROUTER_API_KEY" not in env      # sekrety powłoki właściciela zostają u niego
     assert env["HERMES_GATEWAY_LOCK_DIR"] == str(u.stan / "gateway-locks")
+    assert env["ORT_DISABLE_TELEMETRY"] == "1"           # onnxruntime 1.29: bez telemetrii 1DS (macOS: ~/Library/Caches/python)
     assert env["PATH"].split(os.pathsep)[:2] == [str(u.bin_floty), str(tmp_path / "node")]
     assert env["PATH"].endswith("/usr/bin") and env["NODE_PATH"] == str(tmp_path / "nm")
     assert env["JARVO_REPO"] == str(tmp_path / "app") and env["HERMES_SRC"] == str(tmp_path / "hermes")

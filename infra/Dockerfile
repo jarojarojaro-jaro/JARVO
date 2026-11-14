@@ -80,6 +80,9 @@ ENV LIGHTPANDA_DISABLE_TELEMETRY=1 \
     CHROME_PATH=/usr/local/bin/chromium \
     PUPPETEER_SKIP_DOWNLOAD=1 \
     PUPPETEER_EXECUTABLE_PATH=/usr/local/bin/chromium
+# onnxruntime 1.29 (wektory skarbca, onnx-asr, OCR) wysyła telemetrię 1DS do mobile.events.data.microsoft.com
+# z identyfikatorem urządzenia; ORT_DISABLE_TELEMETRY wyłącza ją, zanim proces załaduje onnxruntime
+ENV ORT_DISABLE_TELEMETRY=1
 
 # --- narzędzia Node (wersje przypięte w infra/node/package.json, całe drzewo z sumami integrity w package-lock.json:
 #     ten sam lock co w instalacji natywnej, infra/node/node_floty.py; playwright-core dembrandta ujednolicony

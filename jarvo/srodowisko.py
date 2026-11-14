@@ -117,6 +117,10 @@ def srodowisko(u: Uklad, baza: dict | None = None, *, biez: dict | None = None,
         "PYTHONIOENCODING": "utf-8",
         "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1",
         "PUPPETEER_SKIP_DOWNLOAD": "1",
+        # onnxruntime 1.29 (wektory skarbca, onnx-asr, OCR) wysyła telemetrię 1DS do mobile.events.data.microsoft.com
+        # z identyfikatorem urządzenia; na macOS przez CFNetwork, który zakłada ~/Library/Caches/python poza katalogiem
+        # Jarva (zostawał po odinstalowaniu). Zmienna wyłącza ją, zanim proces załaduje onnxruntime
+        "ORT_DISABLE_TELEMETRY": "1",
         "UV_CACHE_DIR": str(u.cache / "uv"),
         "UV_PYTHON_INSTALL_DIR": str(u.program / "python"),
         "npm_config_cache": str(u.cache / "npm"),
