@@ -169,6 +169,8 @@ def test_host_routes(tmp_path):
     assert routes["hq-jarvo-web"]["thread_id"] == "12" and routes["hq-jarvo-web"]["profile"] == "jarvo-web"
     assert len(routes) == 1 + len(fleet.active())
     assert cfg["gateway"]["multiplex_profiles"] is True
+    # wiadomość wysłana w trakcie restartu bramy nie ginie (Hermes domyślnie wyrzuca kolejkę Telegrama przy starcie)
+    assert cfg["platforms"]["telegram"]["drop_pending_on_cold_boot"] is False
     assert (tmp_path / "SOUL.md").exists()
 
 

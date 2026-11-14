@@ -54,6 +54,9 @@ platforms:
   telegram:
     reply_to_mode: first
     gateway_restart_notification: false
+    # wiadomości wysłane w trakcie restartu bramy (wdrożenie, reboot) brama odbiera po starcie; Hermes domyślnie je
+    # wyrzuca (14.11 trzy restarty po ok. 30 s; decyzja właściciela: „ma nie gubić wiadomości”)
+    drop_pending_on_cold_boot: false
 
 approvals:
   mode: smart
