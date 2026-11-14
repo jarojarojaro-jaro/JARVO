@@ -114,7 +114,7 @@ REMOTION_PKGS = [f"remotion@{REMOTION_VERSION}", f"@remotion/cli@{REMOTION_VERSI
 PUPPETEER = "puppeteer@24.43.1"
 # biblioteki własnych animacji HTML (kontrakt `jarvo`): html_wideo.py serwuje je pod /_lib/, bez CDN
 # (three: MIT; gsap: „Standard no-charge license”, darmowa także komercyjnie)
-HTML_LIBS = ["three@0.186.1", "gsap@3.15.0", "p5@2.3.4"]   # p5: algorithmic-art
+HTML_LIBS = ["three@0.187.0", "gsap@3.15.0", "p5@2.3.4"]   # p5: algorithmic-art
 # nasze moduły JS do animacji HTML (ruch.js: charaktery ruchu, smugi; kreska, morph, crt, plotno, piksel: techniki
 # stylów motion design z wzorów mg-styles-15; os_czasu.js: chwile lektora po nazwie z film.py narracja; huashu_pl.js:
 # polska nakładka na bibliotekę huashu): kopia obok node_modules, bo npm usuwa
