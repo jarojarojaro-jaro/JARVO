@@ -1,7 +1,7 @@
 ---
 name: decision-queue
 description: "Decyzje dla użytkownika: zbierz, zapytaj zbiorczo, wdroż."
-version: 1.1.0
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
@@ -12,7 +12,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-11-12"
+    reviewed: "2026-11-14"
 ---
 
 # Kolejka decyzji
@@ -58,6 +58,8 @@ Dla każdej odpowiedzi:
 6. **trwałe ustalenie** (cena, zasada, kierunek, „nie robimy X”): jeden szkic `wiedza_zapisz(typ="decyzja", …,
    zrodlo="brief B-…/n, odpowiedź właściciela RRRR-MM-DD")`; korekta faktu o właścicielu albo jego pracy: `wiedza_orzeczenie`.
    Jednorazowe „ok, rób” bez ustalenia na przyszłość: bez szkicu (zapis jest w tabeli briefu).
+Pozycja „🛠” (pomysł z kopalni): „ok” → budowa według skilla `kopalnia-pomyslow` (sekcja „Po ok”), „nie” → tylko wiersz
+w tabeli briefu (kopalnia nie wraca z odrzuconym pomysłem).
 Niejasna odpowiedź → dopytaj tylko o niejasną pozycję. Resztę wdroż od razu.
 
 Odpowiedzi przychodzą też z **Jarvo HQ** (panel „Decyzje” w dashboardzie) jako wiadomość w formacie

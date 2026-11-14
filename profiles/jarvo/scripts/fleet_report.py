@@ -13,6 +13,7 @@ import argparse
 import datetime as dt
 import json
 import subprocess
+import sqlite3
 import sys
 import time
 from collections import Counter
@@ -21,6 +22,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _sciezki  # noqa: E402  (katalogi z HERMES_HOME, nie z /opt)
 import briefy  # noqa: E402  (archiwum briefów w skarbcu: numery, decyzje bez odpowiedzi)
+import kopalnia  # noqa: E402  (kopalnia pomysłów: rozmowy właściciela, nowe notatki, skille floty; 0 tokenów)
 import lekcje  # noqa: E402
 import liczby  # noqa: E402  (ta sama definicja jakości co w Jarvo HQ)
 import poczekalnia  # noqa: E402
@@ -105,6 +107,11 @@ def main(argv: list[str] | None = None) -> int:
             summary["otwarte_decyzje_blad"] = str(exc)[:200]
     teraz = dt.datetime.fromtimestamp(now)
     summary["numer"] = briefy.identyfikator("jarvo-daily-brief" if args.mode == "daily" else "jarvo-weekly-review", teraz)
+    if args.mode == "daily" and not args.fixture:
+        try:                                    # materiał do jednej rzeczy wartej zbudowania (skill `kopalnia-pomyslow`)
+            summary["kopalnia"] = kopalnia.zbierz(liczby.dane_domyslne(), teraz=teraz)
+        except (OSError, sqlite3.Error) as exc:
+            summary["kopalnia"] = {"blad": str(exc)[:200]}
     if args.mode == "weekly" and not args.fixture:
         summary["briefy_tygodnia"] = briefy.tydzien(teraz.date())
     if args.mode == "weekly" and not args.fixture:
@@ -116,7 +123,8 @@ def main(argv: list[str] | None = None) -> int:
         # księga lekcji (gotowe, przeterminowane, skutek wdrożonych z evals) i poczekalnia skilli agentów (docs/RSI.md §R1)
         summary["lekcje"] = lekcje.podsumuj(*lekcje.domyslne())
         summary["poczekalnia"] = poczekalnia.podsumuj(liczby.dane_domyslne())
-    empty = not (summary["finished"] or summary["blocked"] or summary["in_flight"] or summary.get("otwarte_decyzje"))
+    empty = not (summary["finished"] or summary["blocked"] or summary["in_flight"] or summary.get("otwarte_decyzje")
+                 or summary.get("kopalnia", {}).get("wiadomosci_wlasciciela"))
     if args.mode == "weekly" and not args.fixture and not empty:
         try:                                    # strona z liczbami tygodnia (0 tokenów); wiadomość niesie link
             summary["strona"] = raport_strona.zapisz(summary, now)
