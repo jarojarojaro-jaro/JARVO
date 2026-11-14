@@ -194,7 +194,7 @@ Co się dzieje (i co powinieneś zobaczyć):
 | budowa obrazu `jarvo-hermes:local` | kilkanaście minut za pierwszym razem |
 | start usług | `hermes`, `searxng`, `valkey` w stanie `running` |
 | walidacja repo | `Walidacja: 0 błędów` |
-| build dystrybucji | `✓ jarvo: … skilli, 4 rutyn cron`, `✓ jarvo-sherlock: …` itd., `✓ skan skilli: … (… znanych wyjątków, … ostrzeżeń)`; brak linii `!` o Telegramie i o wyjątkach skanu |
+| build dystrybucji | `✓ jarvo: … skilli, 5 rutyn cron`, `✓ jarvo-sherlock: …` itd., `✓ skan skilli: … (… znanych wyjątków, … ostrzeżeń)`; brak linii `!` o Telegramie i o wyjątkach skanu |
 | instalacja floty | `Instalacja profilu …` ×8, `✅ Flota zainstalowana` |
 | healthchecki | `✓` przy narzędziach, `○` przy opcjonalnych (dodatki `JARVO_EXTRAS`, narzędzia Wideografa z `narzedzia.py`, klucze Pexels/Pixabay, postiz, skarbiec); każdy `✗` sprawdź w sekcji 10 |
 

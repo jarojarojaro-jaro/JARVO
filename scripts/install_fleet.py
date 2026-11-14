@@ -100,7 +100,7 @@ PANEL = ("jarvo-hq", "jarvo-wiedza")                # ich odcisk decyduje o rest
 # agenci usunięci z fleet.yaml: ich stary katalog profilu w <dane>/profiles nie może zostać profilem bramy
 USUNIETE_PROFILE = ("jarvo-operator",)              # decyzja właściciela 2026-11-14: wszystko robi Jarvo
 USUNIETE = ".usuniete"                              # <dane>/profiles/.usuniete/<agent>-<data>
-RUTYNY = ("jarvo-patrol", "jarvo-daily-brief", "jarvo-weekly-review", "jarvo-knowledge-freshness")
+RUTYNY = ("jarvo-patrol", "jarvo-daily-brief", "jarvo-weekly-review", "jarvo-knowledge-freshness", "jarvo-new-versions")
 ZNACZNIK_PANELU = ".odcisk-panelu"
 PLIKI_PROFILU = ("config.yaml", "SOUL.md", "profile.yaml", "mcp.json", ".env")
 KLUCZ_API = re.compile(r"^API_SERVER_KEY=.{16,}", re.M)

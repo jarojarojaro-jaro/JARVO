@@ -154,7 +154,7 @@ import pytest  # noqa: E402
 from jarvo import instalator, sciezki, srodowisko  # noqa: E402
 from jarvo import wiedza_cli as wc  # noqa: E402
 
-RUTYNY = ["jarvo-patrol", "jarvo-daily-brief", "jarvo-weekly-review", "jarvo-knowledge-freshness"]
+RUTYNY = ["jarvo-patrol", "jarvo-daily-brief", "jarvo-weekly-review", "jarvo-knowledge-freshness", "jarvo-new-versions"]
 
 
 @pytest.fixture

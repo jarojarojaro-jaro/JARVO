@@ -33,7 +33,7 @@ def call_llm(task, messages, max_tokens, temperature):
         "typ": "fakt", "tytul": tytul, "streszczenie": "Streszczenie: " + tytul, "tresc": "Treść notatki o tym. " * 6,
         "tagi": [], "linki": ["pojecia/_hub-pojecia"], "wazne_do": None, "powod": "atrapa"}]}, ensure_ascii=False)}}]}
 """
-RUTYNY = ["jarvo-patrol", "jarvo-daily-brief", "jarvo-weekly-review", "jarvo-knowledge-freshness"]
+RUTYNY = ["jarvo-patrol", "jarvo-daily-brief", "jarvo-weekly-review", "jarvo-knowledge-freshness", "jarvo-new-versions"]
 
 
 class Nadzorca:

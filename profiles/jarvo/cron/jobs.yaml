@@ -54,3 +54,12 @@ jobs:
     script: swiezosc.py
     no_agent: true
     deliver: "@@OWNER_DELIVER@@"
+
+  - id: jarvo-new-versions
+    name: "Nowe wersje"
+    schedule: "15 7 * * *"
+    # nowsze wydania przypiętych programów → jedno zlecenie w missions/DLA-CLAUDE.md (0 tokenów); wyjście puste = cisza
+    # (decyzja właściciela 14.11: „jak wychodzi nowe, to mieć na uwadze i updatować”)
+    script: nowe_wersje.py
+    no_agent: true
+    deliver: "@@OWNER_DELIVER@@"

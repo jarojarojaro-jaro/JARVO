@@ -207,7 +207,7 @@ def test_full_orchestrator_build_with_cron(tmp_path, monkeypatch):
     jobs = json.loads((tmp_path / "out/profiles/jarvo/cron/jobs.json").read_text(encoding="utf-8"))
     jobs = jobs["jobs"] if isinstance(jobs, dict) else jobs
     ids = {j["id"] for j in jobs}
-    assert ids == {"jarvo-patrol", "jarvo-daily-brief", "jarvo-weekly-review", "jarvo-knowledge-freshness"}
+    assert ids == {"jarvo-patrol", "jarvo-daily-brief", "jarvo-weekly-review", "jarvo-knowledge-freshness", "jarvo-new-versions"}
     assert all(j.get("deliver") == "telegram:111111111" for j in jobs)
     # wiadomości rutyn z pytaniami trafiają do historii rozmowy właściciela („1 ok, 2 nie” bez cytatu)
     assert {j["id"] for j in jobs if j.get("attach_to_session") is True} == {
