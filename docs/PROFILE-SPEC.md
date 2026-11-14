@@ -43,7 +43,10 @@ Budżet: **~1500–3000 tokenów**. Walidator pilnuje twardego limitu ~3300 toke
 (~1 500 tokenów u agentów, ~910 u Jarva) i najdłuższą możliwą kalibracją. Wszystko dłuższe należy do skilli.
 
 Walidator wymaga sekcji `## Misja` i `## Osobowość` oraz znacznika `<!-- Jarvo:PROTOCOL -->` (orkiestrator także
-`<!-- Jarvo:ROSTER -->`); bez znacznika build się zatrzymuje. Nowy profil zakłada `scripts/new-agent.py`.
+`<!-- Jarvo:ROSTER -->`); bez znacznika build się zatrzymuje. Nowy profil zakłada `scripts/new-agent.py`, agenta
+biznesowego jednej firmy `scripts/new-agent.py --marka <slug> --title "…"` (wpis z `marka`, SOUL z zasadami zgody,
+art. 398 PKE, RODO i izolacji marki, config bez ekranu w rozmowie i cronie, wstrzymana rutyna dnia, evals z pytaniem
+o cudzą markę i odmową bez zgody; [FLEET.md](FLEET.md#agenci-biznesowi)).
 Zalecane sekcje (szablon: `shared/templates/SOUL.template.md`; Jarvo i prawa ręka mają własny układ):
 
 | Sekcja | Zawartość |

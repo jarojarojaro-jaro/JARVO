@@ -1,7 +1,7 @@
 ---
 name: weekly-review
 description: "Przegląd tygodnia: jakość floty, wnioski, propozycje."
-version: 1.6.0
+version: 1.7.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A0
-    reviewed: "2026-11-12"
+    reviewed: "2026-11-15"
 ---
 
 # Przegląd tygodnia
@@ -60,6 +60,10 @@ awarie pracownika, cisza (karty bez sygnału życia, blokady bez powodu) i token
 11. **Briefy tygodnia:** `briefy_tygodnia` z danych (`briefy.py`, 0 tokenów): ile briefów, ile decyzji, ile z odpowiedzią
    właściciela, ile przeniesionych do kolejnego briefu, w jednej linii. Decyzje bez odpowiedzi > 3 dni wymień z numerami
    (np. B-2026-11-12/2). Brak briefów → pomiń.
+12. **Agenci biznesowi:** `agenci_biznesowi` z danych (`fleet_report.py`, 0 tokenów): na agenta z marką lejek (statusy,
+   nowe w 7 dni, szkice na zgodę), rutyny, telefon i brand kit, plus linia sesji Kernel. Jedno-dwa zdania na agenta:
+   ile nowych wpisów i klientów, szkice do zgody z numerami (`szkice_do_zgody`), czego brakuje do startu (telefon, brand
+   kit, wstrzymana rutyna). Brak agentów z marką → pomiń.
 
 ## Format
 ```
@@ -72,6 +76,7 @@ Poczekalnia: web chce dodać skill `zrzuty-mobile` (sam po zadaniu, skan czysty)
 Skarbiec: +7 notatek, 1 sprzeczność do rozstrzygnięcia (link w zakładce Wiedza)
 Styl: 18/20 wiadomości prostym polskim (najczęściej: za długie zdania)
 Briefy: 4 (B-2026-11-09…12), 11 decyzji, 8 z odpowiedzią, 2 przeniesione; czeka B-2026-11-12/2 (5 dni)
+Agenci biznesowi: Jarodev 9 nowych, 1 klient; 2 szkice do zgody (L-0002, L-0004); brakuje brand kitu
 Proponuję ulepszyć:
 1. <agent>: <zmiana> (<dowód>)
 Decyzja: wdrożyć propozycje 1–2? Zatwierdzić skill z poczekalni? (nic nie wchodzi bez Twojego „ok”)

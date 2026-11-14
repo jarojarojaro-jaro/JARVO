@@ -504,3 +504,24 @@ def test_lustro_pamieci_kandydaci_dla_kazdego_wpisu(sk):
     p = model.prompty[0]
     assert "SZKIC (lustro pamięci: tylko fakty, których nie ma w kandydatach):" in p
     assert "[agenci/jarvo-web/lightpanda nie renderuje three.js]" in p and "[pojecia/audyt strony]" in p
+
+
+def test_main_bez_modelu_hermesa_przekazuje_do_jarvo(sk, monkeypatch):
+    """15.11 (zlecenie Jarva): `python3 kompilacja.py` z pythona narzędzi kończył się „No module named 'yaml'”;
+    teraz przebieg idzie przez `jarvo wiedza kompiluj`, a znacznik w env nie pozwala na pętlę."""
+    def bez_modelu(*_a, **_k):
+        raise ModuleNotFoundError("No module named 'yaml'")
+    wywolania = []
+    monkeypatch.setattr(k, "model_hermes", bez_modelu)
+    monkeypatch.setattr(k, "home_profilu", lambda *_a, **_k: None)
+    monkeypatch.setattr(k.shutil, "which", lambda nazwa: "/opt/bin/jarvo" if nazwa == "jarvo" else None)
+    monkeypatch.setattr(k.subprocess, "run", lambda argv, env=None, **_k: wywolania.append((argv, env)) or
+                        subprocess.CompletedProcess(argv, 0))
+    monkeypatch.delenv("JARVO_KOMPILACJA_PRZEKAZANA", raising=False)
+    monkeypatch.setenv("HERMES_HOME", "/tmp/profil")
+    assert k.main(["--skarbiec", str(sk.root), "--limit", "5"]) == 0
+    argv, env = wywolania[0]
+    assert argv == ["/opt/bin/jarvo", "wiedza", "kompiluj", "--limit", "5"]
+    assert env["JARVO_KOMPILACJA_PRZEKAZANA"] == "1" and "HERMES_HOME" not in env
+    monkeypatch.setenv("JARVO_KOMPILACJA_PRZEKAZANA", "1")                   # drugi raz (już z jarvo): błąd, bez pętli
+    assert k.main(["--skarbiec", str(sk.root)]) == 2 and len(wywolania) == 1

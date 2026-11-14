@@ -35,6 +35,8 @@ import importlib.util
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -759,6 +761,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         try:
             model = model_hermes()
         except Exception as e:
+            # 15.11 (zlecenie Jarva): ręczne `python3 kompilacja.py` z pythona narzędzi kończyło się „No module named
+            # 'yaml'” (Hermes poza venvem), a szkice leżały. Gdy jest polecenie `jarvo`, przebieg idzie przez nie
+            # (Python z venvu Hermesa, HERMES_HOME profilu); znacznik w env chroni przed pętlą.
+            jarvo = None if os.environ.get("JARVO_KOMPILACJA_PRZEKAZANA") else shutil.which("jarvo")
+            if jarvo:
+                print(f"… model Hermesa niedostępny w tym Pythonie ({e}); przekazuję do `jarvo wiedza kompiluj`", file=sys.stderr)
+                env = {k: v for k, v in os.environ.items() if k not in ("HERMES_HOME", "HERMES_SRC")}
+                env["JARVO_KOMPILACJA_PRZEKAZANA"] = "1"
+                argv_jarvo = [jarvo, "wiedza", "kompiluj", "--limit", str(a.limit)] + (["--json"] if a.json else [])
+                return subprocess.run(argv_jarvo, env=env).returncode
             print(f"✗ brak dostępu do modelu Hermesa ({e}); uruchom `jarvo wiedza kompiluj` (Python z venvu Hermesa, "
                   "HERMES_HOME profilu jarvo; w kontenerze scripts/wiedza-kompiluj.sh) albo użyj --na-sucho", file=sys.stderr)
             return 2

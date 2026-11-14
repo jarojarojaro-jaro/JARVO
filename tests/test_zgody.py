@@ -448,11 +448,14 @@ def zapisy_skilla(sr):
     for d in (skille / "web", zrodlo):
         d.mkdir(parents=True, exist_ok=True)
     cel = skille / "web" / "x" / "SKILL.md"
+    # polecenia terminala ścieżkami z „/” jak w Git Bash: niecytowane C:\Users\… bash zjada (\U → U), więc na Windows
+    # cp i cd poszłyby gdzie indziej, a strażnik słusznie by ich nie zatrzymał
+    zrodlo_p, katalog_p, cel_p = zrodlo.as_posix(), cel.parent.as_posix(), cel.as_posix()
     return [
-        ("terminal", {"command": f"src={zrodlo}\ndst={cel.parent}\nmkdir -p \"$dst\" && cp -a \"$src/.\" \"$dst/\" && "
+        ("terminal", {"command": f"src={zrodlo_p}\ndst={katalog_p}\nmkdir -p \"$dst\" && cp -a \"$src/.\" \"$dst/\" && "
                                  "du -sh \"$dst\""}),
-        ("terminal", {"command": f"cd {cel.parent} && mv SKILL.md SKILL-upstream.md && ls"}),
-        ("terminal", {"command": f"echo '---' > '{cel}'"}),
+        ("terminal", {"command": f"cd {katalog_p} && mv SKILL.md SKILL-upstream.md && ls"}),
+        ("terminal", {"command": f"echo '---' > '{cel_p}'"}),
         ("write_file", {"path": str(cel), "content": "---\nname: x\n---\n"}),
         ("write_file", {"path": str(cel.parent / "zbuduj-index.py"), "content": "print(1)\n"}),
         ("patch", {"path": str(cel), "old_string": "a", "new_string": "b"}),

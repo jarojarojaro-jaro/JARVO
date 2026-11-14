@@ -4,6 +4,11 @@
 Skrypt przed turą crona: wypisuje zwięzły kontekst (bez modelu), a ostatnia linia to JSON
 dla schedulera. Brief budzi Jarva zawsze, gdy jest cokolwiek do powiedzenia; pusty dzień → cisza.
 
+Sekcja `agenci_biznesowi` (oba tryby, bez modelu): agenci z `marka` w state/wiedza-agenci.json, ich lejek
+(workspaces/<agent>/lejek/lejek.json), rutyny (profiles/<agent>/cron/jobs.json), telefon (`profile` w <stan>/telefon.json
+instalacji), brand kit (knowledge/brands/<marka>/BRAND.md) i linia zewnętrznej sesji Kernel (JARVO_KERNEL_STAN, domyślnie
+~/kernel/stan.json; bez pliku bez linii). Braki opisuje jedną linią, nigdy nie przerywa raportu.
+
 Tryb testowy: --fixture plik.json z {"tasks": [...], "shows": {id: show_json}, "index": "..."}.
 """
 
@@ -12,6 +17,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import subprocess
 import sqlite3
 import sys
@@ -83,6 +89,113 @@ def summarize(data: dict, now: float, window_s: int) -> dict:
     }
 
 
+def _json(plik: Path):
+    """Zawartość pliku JSON albo None (brak, błąd odczytu, zły JSON): sekcja agentów nie przerywa raportu."""
+    try:
+        return json.loads(plik.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def _stan_instalacji() -> Path:
+    """`<root>/stan` instalacji (jarvo/sciezki.py: dane = <root>/dane, stan = <root>/stan); tam leży telefon.json."""
+    return _sciezki.dane().parent / "stan"
+
+
+def _kiedy(tekst) -> dt.datetime | None:
+    try:
+        return dt.datetime.fromisoformat(str(tekst)).replace(tzinfo=None)
+    except ValueError:
+        return None
+
+
+def _lejek(plik: Path, teraz: dt.datetime) -> tuple[str, list[str]]:
+    """Liczby lejka (format profiles/jarvo-jarodev/scripts/lejek.py): statusy, nowe w 24 h i 7 dni, szkice na zgodę.
+    Zwraca (opis, numery szkiców czekających na zgodę właściciela)."""
+    if not plik.is_file():
+        return "lejek: nie założony", []
+    dane = _json(plik)
+    wpisy = dane.get("wpisy") if isinstance(dane, dict) else None
+    if not isinstance(wpisy, list):
+        return "lejek: plik nieczytelny", []
+    wpisy = [w for w in wpisy if isinstance(w, dict)]
+    statusy = Counter(str(w.get("status")) for w in wpisy)
+    utworzone = [k for k in (_kiedy(w.get("utworzono")) for w in wpisy) if k]
+    doba = sum(k > teraz - dt.timedelta(days=1) for k in utworzone)
+    tydzien = sum(k > teraz - dt.timedelta(days=7) for k in utworzone)
+    szkice = [str(w.get("id")) for w in wpisy if w.get("status") == "szkic"]
+    po = ", ".join(f"{s} {n}" for s, n in statusy.most_common()) or "pusty"
+    zgoda = f"czeka na zgodę: {len(szkice)} ({', '.join(szkice[:5])}{', …' if len(szkice) > 5 else ''})" if szkice \
+        else "czeka na zgodę: 0"
+    return f"lejek {len(wpisy)} ({po}); nowe 24 h: {doba}, 7 dni: {tydzien}; {zgoda}", szkice
+
+
+def _rutyny(plik: Path) -> str:
+    dane = _json(plik)
+    if dane is None:
+        return "rutyny: brak cron/jobs.json"
+    jobs = [j for j in (dane.get("jobs") if isinstance(dane, dict) else dane) or [] if isinstance(j, dict)]
+    if not jobs:
+        return "rutyny: brak"
+    stoi = [str(j.get("id")) for j in jobs if j.get("state") == "paused" or j.get("enabled") is False]
+    return f"rutyny: wstrzymane {len(stoi)}/{len(jobs)} ({', '.join(stoi)})" if stoi else f"rutyny: działają ({len(jobs)})"
+
+
+def _kernel() -> str | None:
+    """Linia zewnętrznej sesji Kernel z jej stan.json (`zwiad_dzien`, `zwiad_ostatni` epoch, `zwiad_pozycje`)."""
+    plik = Path(os.environ.get("JARVO_KERNEL_STAN") or Path.home() / "kernel" / "stan.json")
+    if not plik.is_file():
+        return None
+    st = _json(plik)
+    if not isinstance(st, dict):
+        return "Kernel: stan.json nieczytelny"
+    if not st.get("zwiad_ostatni") and not st.get("zwiad_dzien"):
+        return "Kernel: brak zapisanego zwiadu"
+    try:
+        kiedy = dt.datetime.fromtimestamp(float(st["zwiad_ostatni"])).strftime("%Y-%m-%d %H:%M")
+    except (KeyError, TypeError, ValueError, OverflowError, OSError):
+        kiedy = str(st.get("zwiad_dzien"))
+    poz = st.get("zwiad_pozycje")
+    return f"Kernel: ostatni zwiad {kiedy}, {poz if poz is not None else '?'} pozycji"
+
+
+def agenci_biznesowi(teraz: dt.datetime | None = None) -> dict:
+    """Sekcja „Agenci biznesowi”: `linie` (jedna na agenta z marką, plus linia Kernela, jeśli jest jego stan.json) i
+    `szkice` ({agent: numery szkiców czekających na zgodę właściciela}; niepuste budzą poranny brief)."""
+    teraz = teraz or dt.datetime.now()
+    szkice: dict[str, list[str]] = {}
+    agenci = _json(_sciezki.stan() / "wiedza-agenci.json")
+    if not isinstance(agenci, dict):
+        linie = ["brak state/wiedza-agenci.json (zasiew wiedzy po buildzie): nie wiem, którzy agenci są biznesowi"]
+    else:
+        telefon = _json(_stan_instalacji() / "telefon.json")
+        przydzialy = telefon.get("profile") if isinstance(telefon, dict) else None
+        przydzialy = przydzialy if isinstance(przydzialy, dict) else {}
+        linie = []
+        for nazwa, a in sorted(agenci.items()):
+            marka = a.get("marka") if isinstance(a, dict) else None
+            if not marka:
+                continue
+            brand = "brand kit: jest" if (_sciezki.skarbiec() / "brands" / str(marka) / "BRAND.md").is_file() \
+                else f"brand kit: brak brands/{marka}/BRAND.md"
+            tel = f"telefon: {przydzialy[nazwa]}" if nazwa in przydzialy else "telefon: brak przydziału"
+            lejek, szkice_agenta = _lejek(_sciezki.jarvo() / "workspaces" / nazwa / "lejek" / "lejek.json", teraz)
+            if szkice_agenta:
+                szkice[nazwa] = szkice_agenta
+            rutyny = _rutyny(_sciezki.dane() / "profiles" / nazwa / "cron" / "jobs.json")
+            linie.append(f"{nazwa} ({marka}): {lejek}; {rutyny}; {tel}; {brand}")
+        if not linie:
+            linie.append("brak aktywnych agentów z marką")
+    kernel = _kernel()
+    return {"linie": linie + ([kernel] if kernel else []), "szkice": szkice}
+
+
+def pusto(summary: dict) -> bool:
+    """Nic do powiedzenia: brak kart, decyzji, wiadomości właściciela i szkiców agentów biznesowych do zgody."""
+    return not (summary["finished"] or summary["blocked"] or summary["in_flight"] or summary.get("otwarte_decyzje")
+                or summary.get("kopalnia", {}).get("wiadomosci_wlasciciela") or summary.get("szkice_do_zgody"))
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--mode", choices=["daily", "weekly"], default="daily")
@@ -123,8 +236,12 @@ def main(argv: list[str] | None = None) -> int:
         # księga lekcji (gotowe, przeterminowane, skutek wdrożonych z evals) i poczekalnia skilli agentów (docs/RSI.md §R1)
         summary["lekcje"] = lekcje.podsumuj(*lekcje.domyslne())
         summary["poczekalnia"] = poczekalnia.podsumuj(liczby.dane_domyslne())
-    empty = not (summary["finished"] or summary["blocked"] or summary["in_flight"] or summary.get("otwarte_decyzje")
-                 or summary.get("kopalnia", {}).get("wiadomosci_wlasciciela"))
+    if not args.fixture:                        # agenci biznesowi: lejek, rutyna, telefon, brand kit; linia Kernela
+        sekcja = agenci_biznesowi(teraz)
+        summary["agenci_biznesowi"] = sekcja["linie"]
+        if sekcja["szkice"]:
+            summary["szkice_do_zgody"] = sekcja["szkice"]
+    empty = pusto(summary)
     if args.mode == "weekly" and not args.fixture and not empty:
         try:                                    # strona z liczbami tygodnia (0 tokenów); wiadomość niesie link
             summary["strona"] = raport_strona.zapisz(summary, now)

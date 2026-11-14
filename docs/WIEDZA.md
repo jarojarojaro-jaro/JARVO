@@ -265,7 +265,7 @@ startu komputera, także gdy nikt nie rozmawia; osobny proces jak `jarvo wiedza 
 idzie razem) albo najstarszy ≥ 15 min (ciągły dopływ nie odkłada kompilacji), oraz co noc o 03:10; po przebiegu przerwanym
 błędem wywołania modelu czeka 15 min (Hermes wyłącza wtedy dostawcę na 10 min), a bez szkiców nie rusza wcale. Od rozmowy
 do notatki mija więc ok. 15–25 min (10 min ciszy, 5 min spokoju skrzynki, kompilacja), a nie 30–90 min. Blokada w `state/`
-pilnuje, żeby z dziesięciu profili kompilował jeden; ręcznie: przycisk w zakładce Wiedza albo `scripts/wiedza-kompiluj.sh` w kontenerze
+pilnuje, żeby z dziesięciu profili kompilował jeden; ręcznie: przycisk w zakładce Wiedza, `jarvo wiedza kompiluj` (samo `python3 kompilacja.py` bez modelu Hermesa w tym Pythonie przekazuje przebieg do niego) albo `scripts/wiedza-kompiluj.sh` w kontenerze
 (`--na-sucho` pokazuje szkice i kandydatów bez modelu i bez zapisu). Dla każdego szkicu:
 1. wyszukuje istniejące notatki (FTS5 + INDEX; szkic z lustra pamięci osobno dla każdego wpisu) i z orzeczeniami właściciela
    (`orzeczenia/wszyscy` i plik agenta szkicu, z datami) oraz datą `zmieniono` kandydatów w prompcie decyduje: **aktualizacja**

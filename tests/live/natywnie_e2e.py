@@ -139,6 +139,10 @@ WYJATKI: list[tuple[str, str, str]] = [
     ("appdata:mozilla", "dowolnie", "Firefox z obrazu runnera (zadanie aktualizatora w tle)"),
     ("localappdata:mozilla", "dowolnie", "Firefox z obrazu runnera (zadanie aktualizatora w tle)"),
     ("localappdata:microsoft", "zmieniony", "dane systemu Windows"),
+    # Start Windows (StartMenuExperienceHost) trzyma tu logo kafelków aplikacji Sklepu i zakłada folder sam, gdy
+    # menu Start odświeża kafelki (WARM 14.11: dodany po odinstalowaniu); Jarvo nie ma kafelków ani pakietu Sklepu.
+    # Źródło: learn.microsoft.com/en-us/answers/questions/4128054 (folder z logami aplikacji, część systemu)
+    ("localappdata:placeholdertilelogofolder", "dowolnie", "logo kafelków menu Start Windows"),
     ("dom:ntuser*", "dowolnie", "pliki gałęzi rejestru użytkownika i ich dzienniki transakcji (system)"),
     ("dom:.bash_history", "dowolnie", "historia powłoki runnera"),
     ("dom:.zsh_history", "dowolnie", "historia powłoki runnera"),

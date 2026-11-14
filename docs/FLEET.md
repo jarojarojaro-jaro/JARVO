@@ -114,6 +114,23 @@ z dopiskiem skrótu (np. „dev”) albo `@uchwyt` w aplikacji.
 |---|---|---|
 | `jarvo-jarodev` | `jarodev` | jarodev.pl: strony, sklepy, automatyzacje, aplikacje |
 
+**Jak dodać kolejnego.** Jedno polecenie zakłada szkielet:
+
+```bash
+python3 scripts/new-agent.py --marka <slug> --title "Firma: co robi agent"   # profil jarvo-<slug>, albo --name jarvo-…
+```
+
+Skrypt odmawia sluga spoza `[a-z0-9-]+` i marki, która ma już agenta. Zakłada wpis we `fleet.yaml` (`marka`,
+`status: planned`), `profiles/jarvo-<slug>/` z SOUL agenta biznesowego (nic nie wychodzi bez „tak” właściciela
+ani bez linii `ZGODA WŁAŚCICIELA` na karcie, bez zimnych maili, telefonów i SMS-ów do firm (art. 398 PKE), RODO
+z minimum danych, wiedza tylko z `brands/<slug>/`: „to nie mój obszar, zapytaj Jarva”), config bez ekranu w Telegramie,
+czacie HQ i cronie, `cron/jobs.yaml` z jedną wstrzymaną rutyną dnia (`deliver: "@@AGENT_DELIVER@@"`, wątek agenta)
+i `evals/jarvo-<slug>/` z 10 scenariuszami (w tym pytanie o cudzą markę i odmowa wysyłki bez zgody). Resztę wypisuje
+jako „Dalej”: SOUL, skille, rubryka i scenariusze dziedziny, pola wpisu (`rola`, `en`, `oddaj_gdy`, opcjonalnie
+`komputer: true`), wzorzec misji Jarva i skille w configu Ręki, para red-team w `security/redteam/`, tabele w
+README.md, tu i w RUNBOOK.md, `make validate` i `status: active`, a po wdrożeniu `jarvo telegram tematy`,
+`jarvo telefon przydziel <profil> <telefon>` i `hermes -p <profil> cron resume <slug>-dzien`.
+
 ---
 
 ## `jarvo`: Main Judge
