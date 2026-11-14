@@ -36,7 +36,8 @@ Zawsze, w każdym trybie:
 
 Folder projektu to katalog startu czatu: `JARVO_FOLDER_PROJEKTU` albo `TERMINAL_CWD` (u pracownika karty: katalog
 karty). Katalog domowy i korzeń dysku nie są folderem projektu: wtedy tryb projekt pyta o każdy zapis. Ścieżki Git Bash
-`/c/...` znaczą `C:\...`; na Windows i macOS porównanie jest bez wielkości liter; dowiązania, junction i `..` liczą się
+`/c/...` znaczą `C:\...`, a `$HOME` i `~` w poleceniu mają na Windows postać `/c/Users/...` jak w Git Bash (także
+w `sh -c "…"` i `eval`); na Windows i macOS porównanie jest bez wielkości liter; dowiązania, junction i `..` liczą się
 po rozwiązaniu.
 
 Bez człowieka (karta kanbana, rutyna, `-q`, podagent `delegate_task`, webhook i każda sesja, w której nikt nie
