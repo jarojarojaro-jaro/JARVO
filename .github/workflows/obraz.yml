@@ -54,6 +54,10 @@ jobs:
           echo "klucz=$(bash scripts/obraz.sh klucz)" >> "$GITHUB_OUTPUT"
           if [[ "$WYMUS" != true ]] && JARVO_IMAGE_REPO="$IMAGE" bash scripts/obraz.sh jest; then
             echo "jest=true" >> "$GITHUB_OUTPUT"; echo "Obraz dla tego klucza już jest w rejestrze."
+            # zbudowany wcześniej na gałęzi (bez latest): na main tylko przestawiamy latest na ten obraz
+            if [ "$GITHUB_REF" = refs/heads/main ]; then
+              KLUCZ="$(bash scripts/obraz.sh klucz)"; docker buildx imagetools create -t "$IMAGE:latest" "$IMAGE:src-$KLUCZ"
+            fi
           else echo "jest=false" >> "$GITHUB_OUTPUT"; fi
 
   budowa:
@@ -146,5 +150,8 @@ jobs:
           KLUCZ: ${{ needs.klucz.outputs.klucz }}
         run: |
           cd /tmp/digests
-          docker buildx imagetools create -t "$IMAGE:src-$KLUCZ" -t "$IMAGE:latest" $(printf "$IMAGE@sha256:%s " *)
+          # latest tylko z main: ręczny przebieg na gałęzi (próba przed scaleniem) nie podmienia obrazu instalacjom
+          tagi=(-t "$IMAGE:src-$KLUCZ")
+          if [ "$GITHUB_REF" = refs/heads/main ]; then tagi+=(-t "$IMAGE:latest"); fi
+          docker buildx imagetools create "${tagi[@]}" $(printf "$IMAGE@sha256:%s " *)
           docker buildx imagetools inspect "$IMAGE:src-$KLUCZ"
