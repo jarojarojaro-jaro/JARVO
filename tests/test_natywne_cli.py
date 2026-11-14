@@ -1122,7 +1122,7 @@ def test_chat_srodowisko_tryb_i_argumenty_dla_hermesa(tmp_path, capsys):
     assert cli.main([], otoczenie=ot) == 7                                       # samo `jarvo` = rozmowa
     argv, env = wywolania[-1]
     assert argv[1:] == ["-m", "hermes_cli.main", "-p", "jarvo", "chat"]
-    assert env["JARVO_TRYB_ZGOD"] == "projekt" and env["HERMES_HOME"] == str(u.dane)   # domyślny tryb (I08)
+    assert env["JARVO_TRYB_ZGOD"] == "auto" and env["HERMES_HOME"] == str(u.dane)   # domyślny tryb (14.11)
     assert "HERMES_YOLO_MODE" not in env and "GITHUB_TOKEN" not in env and env["HERMES_DISABLE_LAZY_INSTALLS"] == "1"
     assert env["JARVO_FOLDER_PROJEKTU"] == os.getcwd()                          # folder startu czatu (tryb projekt)
     # H20: narzędzia plików piszą pod <dane> i w folderze projektu (lista z os.pathsep jak w agent/file_safety.py)

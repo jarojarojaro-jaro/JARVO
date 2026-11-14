@@ -115,8 +115,11 @@ logger = logging.getLogger(__name__)
 _HERE = Path(__file__).resolve().parent
 
 NAZWA = "jarvo-zgody"
-TRYBY = ("pytaj", "projekt", "pelny")
-DOMYSLNY_TRYB = "projekt"                  # decyzja I08
+TRYBY = ("pytaj", "projekt", "auto", "pelny")
+# decyzja właściciela 14.11 („czemu aż tyle rzeczy muszę approvować, ma być auto all”; 11.11: Jarvo z pełnym dostępem,
+# „safe” = strażniki): w trybie auto nic nie pyta poza chronionymi miejscami i płatnością na telefonie. Było „projekt”
+# (I08): 14.11 dziesięć próśb o terminal w 9 min przy jednym zadaniu, „zawsze” pamięta tylko to jedno polecenie.
+DOMYSLNY_TRYB = "auto"
 ZMIENNA_TRYBU = "JARVO_TRYB_ZGOD"          # ustawia `jarvo chat --tryb` (etap E4)
 ZMIENNA_FOLDERU = "JARVO_FOLDER_PROJEKTU"  # katalog startu czatu, gdy launcher go zna
 PROFIL_EKRANU = "jarvo"                    # agent z Komputerem Jarva i telefonem (fleet.yaml `komputer: true`)
@@ -134,6 +137,11 @@ NARZEDZIA_EKRANU = frozenset({"computer_use", "komputer"})
 TELEFON = "phone"
 TELEFON_POTWIERDZENIA = frozenset({f"mcp__{TELEFON}__act", f"mcp__{TELEFON}__batch"})
 _NIE = frozenset({"", "false", "0", "no", "off", "none", "null", "nie"})
+# tryb auto: confirm na telefonie przechodzi bez pytania, chyba że cel wygląda na płatność albo usunięcie konta
+PLATNOSC_TELEFON = re.compile(
+    r"(?i)(?<!\w)(?:kup(?:uj[eę])?|zap[lł]a[cć]|p[lł]ac[eę]|p[lł]atno[sś][cć]|zam[oó]w(?:ienie)?|zamawiam|blik|"
+    r"przelew|do[lł]aduj|subskrybuj|wykup|buy|purchase|pay|check ?out|place (?:your )?order|subscribe|top ?up|"
+    r"usu[nń] konto|delete (?:my )?account|zamknij konto|close (?:my )?account)(?!\w)")
 
 # zawsze pytamy (pod YOLO blokujemy): katalogi z ustawieniami, które wykonują kod albo sterują agentem
 CHRONIONE_KATALOGI = frozenset({".git", ".vscode", ".idea", ".claude", ".hermes"})
@@ -147,6 +155,8 @@ KONTEKSTY = {"kanban": "karta kanbana", "cron": "rutyna (cron)", "q": "jednorazo
 OPISY_TRYBOW = {
     "pytaj": "pytam o każdy zapis, polecenie spoza listy tylko do odczytu, execute_code, procesy w tle i rutyny",
     "projekt": "zapisy i proste polecenia plikowe w folderze projektu bez pytania, poza nim pytam",
+    "auto": "bez pytania: polecenia, zapisy, kod, procesy i rutyny; pytam tylko o chronione miejsca (config, .git, "
+            "pliki instrukcji, dane Jarva) i o płatność na telefonie; masowe kasowanie i klucze zawsze blokuję",
     "pelny": "Hermes sam zatwierdza prośby (YOLO, tylko ta sesja)",
 }
 
@@ -536,7 +546,7 @@ def _folder_projektu(karta: Optional[str]) -> Optional[str]:
 def _miejsca(tryb: str, bez_czl: Optional[str], yolo: bool) -> _Miejsca:
     home = _hermes_home()
     root = _korzen_danych(home)
-    m = _Miejsca(tryb="pytaj" if tryb == "pytaj" else "projekt", bez_czl=bez_czl, yolo=yolo, profil=_profil(home))
+    m = _Miejsca(tryb=tryb if tryb in ("pytaj", "auto") else "projekt", bez_czl=bez_czl, yolo=yolo, profil=_profil(home))
     ws = os.environ.get("HERMES_KANBAN_WORKSPACE", "").strip()
     if ws and os.path.isabs(_z_msys(ws)):
         m.karta = _realna(ws, None)
@@ -619,6 +629,8 @@ def _ocen_sciezke(realna: Optional[str], surowa: str, m: _Miejsca, *, plikowe: b
         return _Werdykt("blokuj" if m.yolo else "pytaj", pokaz, f"chronione: {chronione}", zawsze=True)
     if m.tryb == "pytaj":
         return _Werdykt("pytaj", pokaz, "zapis")
+    if m.tryb == "auto":                      # auto: każdy zapis poza chronionymi miejscami bez pytania
+        return _Werdykt("ok", pokaz)
     if korzen:
         return _Werdykt("ok", pokaz)
     return _Werdykt("pytaj", pokaz, "poza folderem projektu" if m.folder_k else "brak folderu projektu")
@@ -2696,6 +2708,8 @@ def _terminal(args: Dict[str, Any], m: _Miejsca, task_id: str) -> Optional[Dict[
     zwykle = [w for w in werdykty if w.rodzaj in ("pytaj", "nieznana") and not w.zawsze]
     if m.tryb == "pytaj":                     # pytaj: wszystko poza poleceniami tylko do odczytu
         potrzebne = not a.tylko_odczyt or bool(zawsze or zwykle)
+    elif m.tryb == "auto":                    # auto: tylko chronione miejsca (zapis config.yaml blokuje _ocen_sciezke)
+        potrzebne = bool(zawsze)
     else:                                     # projekt: zapisy poza folderem, chronione, inne programy, nieznane
         potrzebne = bool(zawsze or zwykle or a.inne or a.nieznane)
     if not potrzebne:
@@ -2786,6 +2800,8 @@ def _telefon(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[str, str]]:
         return _blok(f"confirm=true na telefonie ({tool_name}) wymaga „tak” człowieka, a w trybie pełnym (YOLO) Hermes "
                      "zatwierdza wszystko sam. Wyłącz /yolo i ponów.")
     tryb, _ = tryb_zgod()
+    if tryb == "auto" and not PLATNOSC_TELEFON.search(json.dumps(args, ensure_ascii=False, default=str)):
+        return None                 # auto: polecenie właściciela w rozmowie jest zgodą; płatność dalej pytamy
     m = _miejsca(tryb, None, False)
     return _prosba(tool_name, m, f"telefon: ryzykowna akcja z confirm=true (bramka needs_confirm telefonu): {akcja}. "
                    "Zgoda = Twoje „tak” dla tej jednej akcji.", f"{akcja}\n{os.urandom(8).hex()}")
@@ -2865,13 +2881,13 @@ def _decyzja(tool_name: str, args: Dict[str, Any], task_id: str) -> Optional[Dic
         if bez_czl:
             return _blok(f"execute_code to dowolny kod, a {KONTEKSTY.get(bez_czl, bez_czl)} działa bez człowieka. "
                          f"Użyj terminala albo narzędzi plików w dozwolonych katalogach. {_porada_bez_czlowieka(m)}")
-        if _hermes_pyta_o_kod() and not yolo:
+        if (_hermes_pyta_o_kod() and not yolo) or m.tryb == "auto":
             return None
         kod = str(args.get("code") or "")
         return _prosba(tool_name, m, f"uruchomienie kodu Pythona (execute_code, {kod.count(chr(10)) + 1} linii)", kod)
     akcja = str(args.get("action") or "").strip().lower()
     if tool_name == "process_manage":
-        if akcja in PROCESY_ODCZYT or bez_czl:
+        if akcja in PROCESY_ODCZYT or bez_czl or m.tryb == "auto":
             return None
         cel = str(args.get("session_id") or "")
         return _prosba(tool_name, m, f"proces w tle: {akcja or '?'} {_pokaz(cel, 40)}".rstrip(),
@@ -2882,6 +2898,8 @@ def _decyzja(tool_name: str, args: Dict[str, Any], task_id: str) -> Optional[Dic
         if bez_czl:
             return _blok(f"rutyny zakłada i zmienia człowiek, a {KONTEKSTY.get(bez_czl, bez_czl)} działa bez niego "
                          f"(cronjob_manage {akcja or '?'}). {_porada_bez_czlowieka(m)}")
+        if m.tryb == "auto":
+            return None
         nazwa = str(args.get("name") or args.get("job_id") or args.get("schedule") or "")
         return _prosba(tool_name, m, f"rutyna (cron): {akcja or '?'} {_pokaz(nazwa, 60)}".rstrip(),
                        json.dumps(args, sort_keys=True, ensure_ascii=False, default=str))
@@ -2944,7 +2962,7 @@ def _tryb_z_pliku(home: Path) -> Optional[str]:
     try:
         dane = json.loads(p.read_text(encoding="utf-8-sig"))
         t = dane.get("tryb") if isinstance(dane, dict) else None
-        t = t if t in ("pytaj", "projekt") else None          # pełnego nie zapisujemy: działa tylko na sesję
+        t = t if t in ("pytaj", "projekt", "auto") else None  # pełnego nie zapisujemy: działa tylko na sesję
     except (OSError, ValueError):
         t = None
     with _ZAMEK:
@@ -2974,7 +2992,7 @@ def _zapisz_tryb(home: Path, tryb: str) -> Path:
 
 
 def tryb_zgod(home: Optional[Path] = None) -> Tuple[str, str]:
-    """(tryb, źródło): /tryb w tym procesie > JARVO_TRYB_ZGOD > plik stanu profilu > domyślny „projekt”."""
+    """(tryb, źródło): /tryb w tym procesie > JARVO_TRYB_ZGOD > plik stanu profilu > domyślny „auto”."""
     home = Path(home or _hermes_home())
     k = _klucz(str(home))
     with _ZAMEK:
@@ -3003,7 +3021,7 @@ def _opis_stanu(home: Path) -> str:
         linie.append(f"Folder projektu: {_pokaz(folder)}")
     else:
         linie.append("Folder projektu: brak (start w katalogu domowym albo w korzeniu dysku), więc pytam o każdy zapis.")
-    linie.append("Zmień: /tryb pytaj · /tryb projekt · /tryb pelny (= /yolo na tę sesję).")
+    linie.append("Zmień: /tryb auto · /tryb projekt · /tryb pytaj · /tryb pelny (= /yolo na tę sesję).")
     return "\n".join(linie)
 
 
@@ -3015,7 +3033,7 @@ def polecenie_tryb(raw_args: str = "") -> str:
         if not arg or arg.lower() in ("status", "stan", "?"):
             return _opis_stanu(home)
         tryb = _norm_tryb(arg)
-        if tryb in ("pytaj", "projekt"):
+        if tryb in ("pytaj", "projekt", "auto"):
             _zapisz_tryb(home, tryb)
             with _ZAMEK:
                 _TRYB_W_PROCESIE[_klucz(str(home))] = tryb
@@ -3026,7 +3044,7 @@ def polecenie_tryb(raw_args: str = "") -> str:
             return ("Tryb pełny działa tylko na tę sesję i włącza go Hermes: wpisz /yolo albo uruchom "
                     "`jarvo chat --tryb pelny`. Wtyczka sama go nie włącza. Nawet wtedy config.yaml i chronione "
                     "miejsca zostają zablokowane, a w profilu jarvo także ekran i telefon.")
-        return "Użycie: /tryb [pytaj|projekt|pelny]. Bez argumentu pokazuję bieżący tryb."
+        return "Użycie: /tryb [auto|projekt|pytaj|pelny]. Bez argumentu pokazuję bieżący tryb."
     except Exception as e:
         logger.warning("jarvo-zgody: /tryb: %s", e)
         return f"jarvo-zgody: nie udało się zmienić trybu ({type(e).__name__})."
@@ -3040,7 +3058,7 @@ def register(ctx) -> None:
     ctx.register_hook("pre_tool_call", straznik_zgod)
     try:
         ctx.register_command("tryb", polecenie_tryb,
-                             description="Tryb zgód Jarva: pytaj, projekt (domyślny) albo pelny (= /yolo na sesję)",
-                             args_hint="[pytaj|projekt|pelny]")
+                             description="Tryb zgód Jarva: auto (domyślny), projekt, pytaj albo pelny (= /yolo na sesję)",
+                             args_hint="[auto|projekt|pytaj|pelny]")
     except Exception as e:
         logger.warning("jarvo-zgody: polecenie /tryb niezarejestrowane: %s", e)

@@ -462,7 +462,7 @@ Droga rekomendowana w raporcie „dystrybucja”: wydania u źródła + jeden ma
 | Tryb | Co robi hak | Co zostaje zawsze |
 |---|---|---|
 | **pytaj** | zwraca `approve` dla write_file, patch (także V4A z nagłówkami `*** Update/Add/Delete File`), execute_code, process_manage, cronjob_manage i terminala spoza listy poleceń tylko do odczytu; polecenia, które Hermes sam uzna za niebezpieczne, zostawia jego bramce (żeby nie pytać dwa razy) | twarde blokady, approvals.deny, zgoda na AGENTS.md, CLAUDE.md i SOUL.md, odrzucenie zapisu config.yaml |
-| **projekt** (domyślny dla właściciela) | jak „pytaj”, ale bez pytania przepuszcza zapisy i proste polecenia plikowe (mkdir, touch, cp, mv, rm, rmdir, sed -i), gdy rzeczywista ścieżka leży w folderze projektu (TERMINAL_CWD = katalog startu czatu) albo w katalogu roboczym; ścieżki `/c/...` zamienia na `C:\...`, porównuje bez wielkości liter na Windows i macOS; poza folderem zwraca `approve` | jak wyżej, plus zawsze pyta przy: .git, .vscode, .idea, .claude, .gitconfig, .bashrc, .zshrc, .npmrc, .mcp.json, `<dane>` |
+| **projekt** | jak „pytaj”, ale bez pytania przepuszcza zapisy i proste polecenia plikowe (mkdir, touch, cp, mv, rm, rmdir, sed -i), gdy rzeczywista ścieżka leży w folderze projektu (TERMINAL_CWD = katalog startu czatu) albo w katalogu roboczym; ścieżki `/c/...` zamienia na `C:\...`, porównuje bez wielkości liter na Windows i macOS; poza folderem zwraca `approve` | jak wyżej, plus zawsze pyta przy: .git, .vscode, .idea, .claude, .gitconfig, .bashrc, .zshrc, .npmrc, .mcp.json, `<dane>` |
 | **pełny** | proces czatu startuje z `--yolo` albo właściciel wpisuje `/yolo`; YOLO sam zatwierdza prośby wtyczki | to samo co wyżej; nigdy w config.yaml; w profilu jarvo narzędzia ekranu i telefonu (computer_use, komputer, mcp__phone__*) zablokowane |
 
 Szczegóły:
@@ -796,7 +796,7 @@ Wszystko, co bierzemy z Hermesa albo z obcych projektów, wymaga zgody właścic
   w etapie, który go używa.
 - **I06, macOS Intel:** rezygnujemy. Instalator na Macu z Intelem kończy pracę z jasnym komunikatem, a w CI nie ma
   nogi z Intelem. Dopiski „Intel” w mapie zostają jako wiedza, ale ich nie realizujemy.
-- **I08, zgody:** domyślny tryb `jarvo` to „projekt”. Tryb pełny zawsze tylko na jedną sesję.
+- **I08, zgody:** domyślny tryb `jarvo` to „auto” (decyzja właściciela 14.11: bez pytań poza chronionymi miejscami i płatnością na telefonie; wcześniej „projekt”). Tryb pełny zawsze tylko na jedną sesję.
 - **I14, wyszukiwarka:** „najlepsza dostępna opcja”. Profile przestają wymuszać `web.search_backend: searxng`,
   a wybiera autodetekcja Hermesa (tools/web_tools.py w f97608f) w kolejności: wyszukiwarka z kluczem API, jeśli
   właściciel go poda (Tavily, Perplexity, Exa, Parallel, Keenable, Firecrawl, Brave), potem SearXNG, gdy jest
@@ -814,7 +814,7 @@ Wszystko, co bierzemy z Hermesa albo z obcych projektów, wymaga zgody właścic
 | **I05** | Git na Windows | zawsze własny Git for Windows 2.56.0.windows.3 z pełnego tar.bz2 (nie PortableGit .7z.exe, który sam się rozpakowuje, i nie wariant -mingw64); nowszy niż 2.54.0.windows.1 z instalatora Hermesa przez łaty bezpieczeństwa (wincred, bundle-uri, CA eMudhra, Git LFS 3.8.1) | systemowy Git, gdy działa (mniej przewidywalne) |
 | **I06** | macOS Intel | **decyzja: rezygnacja**; instalator na x86_64 kończy pracę z jasnym komunikatem, CI bez nogi Intela | Tier 2 „bez gwarancji” do ok. IX 2027 (odrzucone: starsze paczki, bez docling i lemo-wake) |
 | **I07** | Minimalny macOS | 15 (Sequoia): pandoc 3.12.1 i qpdf 12.4.2 mają w LC_BUILD_VERSION minos 15.0 (Lightpanda 1.0.0: 14.8.9, koło pikepdf 10.17: macosx_15_0) | 14 (Sonoma) z pandoc i qpdf z innego źródła (nowy przegląd) |
-| **I08** | Zgody: domyślny tryb i approvals.mode | **decyzja: „projekt”**; „pełny” tylko na sesję; profil czatu z `approvals.mode: manual` | smart (czasem dwa pytania); tryby także w HQ i Telegramie albo tylko w terminalu |
+| **I08** | Zgody: domyślny tryb i approvals.mode | **decyzja: „auto”** (14.11; wcześniej „projekt”); „pełny” tylko na sesję; profil czatu z `approvals.mode: manual` | smart (czasem dwa pytania); tryby także w HQ i Telegramie albo tylko w terminalu |
 | **I09** | Izolacja | na start tryby zgód i ograniczenia z (d); osobne konto systemowe dla bramy później, najpierw na Linuksie i macOS | osobne konto od razu (na Windows drogie, niesprawdzone) |
 | **I10** | Nadzór procesów | własny `jarvo serwis` na wszystkich systemach, z autostartem systemu | `hermes gateway install` na macOS i Linuksie + własny nadzór tylko na Windows (dwa modele) |
 | **I11** | Logowanie do panelu | loopback bez hasła; tryb LAN (Tailscale, telefon) z bramką Hermesa i dostawcą Jarva (klucz jednorazowy) | wymuszać logowanie także lokalnie (przez `dashboard.public_url`, niesprawdzone w przeglądarkach) |

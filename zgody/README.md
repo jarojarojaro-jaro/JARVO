@@ -12,7 +12,8 @@ Wtyczka Hermesa (`plugin/`: `__init__.py`, `plugin.yaml`) ma hak `pre_tool_call`
 | Tryb | Co robi hak |
 |---|---|
 | **pytaj** | pyta o `write_file`, `patch` (także łatki V4A), `execute_code`, `process_manage` i `cronjob_manage` (działania zmieniające) oraz o terminal spoza listy poleceń tylko do odczytu |
-| **projekt** (domyślny) | jak pytaj, ale bez pytania zapisy i proste polecenia plikowe (`mkdir`, `touch`, `cp`, `mv`, `rm`, `rmdir`, `sed -i`, `tee`, `>` i `>>`), gdy rzeczywista ścieżka leży w folderze projektu, w katalogu roboczym karty, w skarbcu (`JARVO_KNOWLEDGE_DIR`) albo w misjach (`JARVO_MISSIONS_DIR`, dziennik Jarva) |
+| **projekt** | jak pytaj, ale bez pytania zapisy i proste polecenia plikowe (`mkdir`, `touch`, `cp`, `mv`, `rm`, `rmdir`, `sed -i`, `tee`, `>` i `>>`), gdy rzeczywista ścieżka leży w folderze projektu, w katalogu roboczym karty, w skarbcu (`JARVO_KNOWLEDGE_DIR`) albo w misjach (`JARVO_MISSIONS_DIR`, dziennik Jarva) |
+| **auto** (domyślny, decyzja właściciela 14.11) | bez pytania polecenia terminala, zapisy, `execute_code`, procesy i rutyny; pyta tylko o chronione miejsca (niżej) i o `confirm` na telefonie, gdy cel wygląda na płatność albo usunięcie konta; masowe kasowanie i zapis `config.yaml` blokuje jak w każdym trybie. Z człowiekiem; na karcie i w rutynie zasady bez zmian (niżej) |
 | **pełny** | tylko na sesję: `jarvo chat --tryb pelny` (czyli `--yolo`) albo `/yolo`; Hermes zatwierdza prośby sam; wtyczka nigdy nie włącza go sama, a w profilu `jarvo` blokuje pod nim narzędzia ekranu i telefonu (`computer_use`, `komputer`, `mcp__phone__*`) |
 
 Zawsze, w każdym trybie:
@@ -45,9 +46,9 @@ i zmiany rutyn. Polecenia, których celów nie da się ustalić, zostają polity
 `single_query_mode`), poza kasowaniem rekurencyjnym albo wymuszonym (strażnik kasowania). Błąd wtyczki też kończy się
 blokadą.
 
-Wybór trybu: `/tryb` w sesji, potem `JARVO_TRYB_ZGOD` (`pytaj`, `projekt`, `pelny`; ustawia `jarvo chat --tryb`),
-potem plik profilu `<HERMES_HOME>/plugin-data/jarvo-zgody/stan.json` (zapisuje go `/tryb pytaj` i `/tryb projekt`),
-na końcu „projekt”. Trybu nie trzymamy w `approvals.mode`, bo wdrożenie nadpisuje `approvals`. Odpowiedź „zawsze”
+Wybór trybu: `/tryb` w sesji, potem `JARVO_TRYB_ZGOD` (`auto`, `projekt`, `pytaj`, `pelny`; ustawia `jarvo chat --tryb`),
+potem plik profilu `<HERMES_HOME>/plugin-data/jarvo-zgody/stan.json` (zapisuje go `/tryb auto`, `/tryb pytaj` i `/tryb projekt`),
+na końcu „auto”. Trybu nie trzymamy w `approvals.mode`, bo wdrożenie nadpisuje `approvals`. Odpowiedź „zawsze”
 zapisuje w `command_allowlist` wąski klucz `plugin_rule:jarvo-zgody:<narzędzie>:<odcisk folderu>:<skrót treści>`.
 
 Testy: `tests/test_zgody.py` (atrapa kontekstu wtyczki, bez Hermesa). Budowa i instalacja wtyczki we flocie

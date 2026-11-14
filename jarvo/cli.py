@@ -62,7 +62,7 @@ from .instalator import (Otoczenie, _uruchom, adres_panelu, kto_slucha, port_pan
                          stan_serwisu)
 from .sciezki import MACOS, WINDOWS, BladUkladu, Uklad
 
-TRYBY = ("pytaj", "projekt", "pelny")        # sekcja (d); domyślny „projekt” (decyzja I08)
+TRYBY = ("auto", "projekt", "pytaj", "pelny")   # sekcja (d); domyślny „auto” (decyzja właściciela 14.11, było I08)
 PROFIL = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")   # jak _PROFILE_NAME_RE w hermes_cli/main.py
 SQLITE_MIN = (3, 51, 3)                      # błąd WAL-reset naprawiony w 3.51.3 (hermes_state_wal.py)
 PORTY = (("panel", None), ("API bramy", None), ("podgląd HQ", 9120), ("ekran telefonu", 9122))
@@ -153,9 +153,10 @@ def _parser() -> argparse.ArgumentParser:
     s = sub.add_parser("chat", help="rozmowa z Jarvem w terminalu (domyślne polecenie)", allow_abbrev=False,
                        description="Rozmowa przez Hermesa w środowisku Jarva. Dodatkowe argumenty idą do "
                        "`hermes chat` (np. --resume <id>).")
-    s.add_argument("--tryb", choices=TRYBY, default="projekt",
-                   help="zgody: pytaj = o każdy zapis i polecenie, projekt = bez pytania w folderze projektu "
-                        "(domyślny), pelny = bez pytań na tę sesję")
+    s.add_argument("--tryb", choices=TRYBY, default="auto",
+                   help="zgody: auto = bez pytań poza chronionymi miejscami i płatnością na telefonie (domyślny), "
+                        "projekt = bez pytania w folderze projektu, pytaj = o każdy zapis i polecenie, "
+                        "pelny = bez pytań na tę sesję")
     s.add_argument("--profil", type=_profil, default="jarvo", help="profil agenta (domyślnie jarvo)")
     s.set_defaults(funkcja=polecenie_chat)
 

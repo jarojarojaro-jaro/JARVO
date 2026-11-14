@@ -24,6 +24,7 @@ _spec = importlib.util.spec_from_file_location("jarvo_zgody_plugin", REPO / "zgo
 z = importlib.util.module_from_spec(_spec)
 sys.modules["jarvo_zgody_plugin"] = z
 _spec.loader.exec_module(z)
+DOMYSLNY_W_KODZIE = z.DOMYSLNY_TRYB        # prawdziwy domyślny tryb (test niżej); reszta testów stoi na „projekt”
 
 ZMIENNE = ["HERMES_HOME", "TERMINAL_CWD", "JARVO_FOLDER_PROJEKTU", "JARVO_TRYB_ZGOD", "HERMES_KANBAN_TASK",
            "HERMES_KANBAN_WORKSPACE", "HERMES_CRON_SESSION", "HERMES_SINGLE_QUERY_SESSION",
@@ -89,6 +90,7 @@ def sr(tmp_path, monkeypatch):
     monkeypatch.setattr(z, "_env_sesji", lambda nazwa: os.environ.get(nazwa, ""))
     monkeypatch.setattr(z, "_TRYB_W_PROCESIE", {})
     monkeypatch.setattr(z, "_STAN_CACHE", {})
+    monkeypatch.setattr(z, "DOMYSLNY_TRYB", "projekt")    # testy trybu projekt i wyboru źródła; auto osobno
     monkeypatch.setattr(z, "_START", None)
     z._zamroz()
     return s
@@ -134,9 +136,9 @@ def test_rejestracja_haka_i_polecenia_oraz_manifest():
 
 # ------------------------------------------------------------------------------------------------ tryb × narzędzie
 
-ZAPIS = {"pytaj": "approve", "projekt": None, "pelny": None}    # pełny bez YOLO działa jak projekt
-ZAWSZE = {"pytaj": "approve", "projekt": "approve", "pelny": "approve"}
-NIGDY = {"pytaj": None, "projekt": None, "pelny": None}
+ZAPIS = {"pytaj": "approve", "projekt": None, "auto": None, "pelny": None}    # pełny bez YOLO działa jak projekt
+ZAWSZE = {"pytaj": "approve", "projekt": "approve", "auto": None, "pelny": "approve"}
+NIGDY = {"pytaj": None, "projekt": None, "auto": None, "pelny": None}
 
 PRZYPADKI = [
     ("write w projekcie", "write_file", lambda s: {"path": str(s.proj / "b.txt"), "content": "x"}, ZAPIS),
@@ -192,7 +194,7 @@ PRZYPADKI = [
 ]
 
 
-@pytest.mark.parametrize("tryb", ["pytaj", "projekt", "pelny"])
+@pytest.mark.parametrize("tryb", ["pytaj", "projekt", "auto", "pelny"])
 @pytest.mark.parametrize("opis,narzedzie,argumenty,oczekiwane", PRZYPADKI, ids=[p[0] for p in PRZYPADKI])
 def test_tryb_razy_narzedzie(sr, monkeypatch, tryb, opis, narzedzie, argumenty, oczekiwane):
     ustaw_tryb(monkeypatch, tryb)
@@ -202,10 +204,27 @@ def test_tryb_razy_narzedzie(sr, monkeypatch, tryb, opis, narzedzie, argumenty, 
         assert wynik["message"].startswith("jarvo-zgody (tryb ") and wynik["rule_key"].startswith(f"jarvo-zgody:{narzedzie}:")
 
 
-def test_tryb_domyslny_to_projekt(sr):
-    assert z.tryb_zgod() == ("projekt", "domyślny")
-    assert hak("write_file", path=str(sr.proj / "x.txt"), content="x") is None
-    assert akcja(hak("write_file", path=str(sr.poza / "x.txt"), content="x")) == "approve"
+def test_tryb_domyslny_to_auto_bez_prosb(sr, monkeypatch):
+    """Decyzja właściciela 14.11: „czemu aż tyle rzeczy muszę approvować, ma być auto all”. Dziesięć próśb o terminal
+    w 9 min (kopiowanie zrzutów, ffmpeg) przy jednym zadaniu; „zawsze” zapamiętuje tylko to jedno polecenie."""
+    monkeypatch.setattr(z, "DOMYSLNY_TRYB", DOMYSLNY_W_KODZIE)
+    assert z.tryb_zgod() == ("auto", "domyślny")
+    assert hak("write_file", path=str(sr.poza / "x.txt"), content="x") is None
+    assert hak("terminal", command=f"cp a.txt '{sr.poza / 'b.txt'}' && ffmpeg -y -i a.png out.mp4") is None
+    assert hak("execute_code", code="print(1)") is None
+    assert hak("cronjob_manage", action="create", schedule="every 1h", prompt="x") is None
+
+
+def test_tryb_auto_zostawia_strazniki(sr, monkeypatch):
+    ustaw_tryb(monkeypatch, "auto")
+    assert akcja(hak("write_file", path=str(sr.home / "config.yaml"), content="x")) == "block"   # config Hermesa
+    assert akcja(hak("write_file", path=str(sr.proj / "SOUL.md"), content="x")) == "approve"     # plik instrukcji
+    assert akcja(hak("terminal", command=f"echo x >> '{sr.proj / '.git' / 'config'}'")) == "approve"
+    assert akcja(hak("terminal", command=f"rm -rf '{sr.dom}'")) == "block"                        # strażnik kasowania
+    # telefon w rozmowie: zwykłe potwierdzenie przechodzi, płatność i usunięcie konta dalej pyta
+    assert hak("mcp__phone__act", phone="first", cmd="tap", args={"text": "Continue"}, confirm=True) is None
+    assert akcja(hak("mcp__phone__act", cmd="tap", args={"text": "Kup teraz"}, confirm=True)) == "approve"
+    assert akcja(hak("mcp__phone__batch", steps=[{"cmd": "tap", "text": "Usuń konto", "confirm": True}])) == "approve"
 
 
 def test_komunikat_prosby_z_nazwa_pliku_i_polecenia(sr):
