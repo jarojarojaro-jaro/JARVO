@@ -208,10 +208,37 @@ def port_zajety(port: int, czas: float = 0.3) -> bool:
         return False
 
 
+def _sluchacz_proc(port: int) -> tuple[int, str] | None:
+    """Linux bez lsof (minimalny Debian, kontenery): gniazdo LISTEN z /proc/net/tcp{,6}, właściciel po dowiązaniu
+    `socket:[inode]` w /proc/<pid>/fd. Widać tylko procesy, których fd wolno nam czytać (nasze, użytkownika)."""
+    inody = set()
+    for plik in ("/proc/net/tcp", "/proc/net/tcp6"):
+        try:
+            linie = Path(plik).read_text(encoding="ascii").splitlines()[1:]
+        except OSError:
+            continue
+        for linia in linie:
+            cz = linia.split()
+            if len(cz) > 9 and cz[3] == "0A" and int(cz[1].rsplit(":", 1)[1], 16) == port:
+                inody.add(f"socket:[{cz[9]}]")
+    if not inody:
+        return None
+    for proc in Path("/proc").iterdir():
+        if not proc.name.isdigit():
+            continue
+        try:
+            for fd in (proc / "fd").iterdir():
+                if os.readlink(fd) in inody:
+                    return int(proc.name), (proc / "comm").read_text(encoding="utf-8").strip() or "?"
+        except OSError:
+            continue
+    return None
+
+
 def sluchacz(port: int) -> tuple[int, str] | None:
     """(PID, nazwa programu), który słucha na porcie, albo None, gdy nie wiadomo: netstat i tasklist z System32
-    (Windows), lsof (POSIX). Gniazdo słuchające rozpoznajemy po adresie obcym *:0, bo nazwa stanu (LISTENING)
-    zależy od języka Windowsa."""
+    (Windows), lsof (POSIX), bez lsof na Linuksie /proc. Gniazdo słuchające rozpoznajemy po adresie obcym *:0, bo
+    nazwa stanu (LISTENING) zależy od języka Windowsa."""
     try:
         if WINDOWS:
             netstat, tasklist = systemowy("netstat"), systemowy("tasklist")
@@ -229,7 +256,7 @@ def sluchacz(port: int) -> tuple[int, str] | None:
             return None
         lsof = systemowy("lsof")
         if not lsof:
-            return None
+            return _sluchacz_proc(port) if sys.platform.startswith("linux") else None
         pid = nazwa = None
         for linia in _uruchom([lsof, "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-Fpc"]).stdout.splitlines():
             if linia.startswith("p") and pid is None:

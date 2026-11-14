@@ -1417,6 +1417,22 @@ def test_kto_slucha_i_port_zajety():
     assert not cli.port_zajety(port)
 
 
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="/proc tylko na Linuksie")
+def test_kto_slucha_bez_lsof_na_linuksie(monkeypatch):
+    """Minimalny Debian nie ma lsof ani netstat: doctor i tak rozpoznaje swój port (po /proc), zamiast zgłaszać
+    „zajęty, nie umiem sprawdzić, przez kogo” przy każdym porcie bramy (InstaBox, Debian 13, 14.11)."""
+    monkeypatch.setattr(instalator, "systemowy", lambda nazwa: None)
+    port = wolny_port()
+    with socket.socket(socket.AF_INET6) as s6, socket.socket() as s:
+        s.bind(("127.0.0.1", port))
+        s.listen()
+        assert instalator.sluchacz(port) == (os.getpid(), Path(f"/proc/{os.getpid()}/comm").read_text().strip())
+        s6.bind(("::1", 0))
+        s6.listen()
+        assert instalator.sluchacz(s6.getsockname()[1])[0] == os.getpid()            # tcp6 też
+    assert instalator.sluchacz(port) is None
+
+
 @pytest.mark.windows_only
 def test_programy_tylko_z_pelnej_sciezki_nie_z_katalogu_biezacego(tmp_path, monkeypatch):
     """shutil.which na Windows bez NoDefaultCurrentDirectoryInExePath zagląda najpierw do katalogu bieżącego (także
