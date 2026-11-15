@@ -1082,7 +1082,7 @@ NODE = REPO / "infra" / "node"
 
 
 def test_lock_npm_floty_z_hyperframes_i_sumami():
-    """infra/node/package-lock.json (docs/NATYWNIE.md P02, I32): te same paczki co package.json, HyperFrames 0.8.78
+    """infra/node/package-lock.json (docs/NATYWNIE.md P02, I32): te same paczki co package.json, HyperFrames 0.9.52
     w tym samym locku, każda paczka z sumą integrity z registry.npmjs.org; wersja jak w toolbox.yaml Wideografa."""
     pkg = json.loads((NODE / "package.json").read_text(encoding="utf-8"))
     lock = json.loads((NODE / "package-lock.json").read_text(encoding="utf-8"))
@@ -1091,13 +1091,13 @@ def test_lock_npm_floty_z_hyperframes_i_sumami():
     paczki = {k: v for k, v in lock["packages"].items() if k}
     for nazwa, wersja in pkg["dependencies"].items():
         assert paczki[f"node_modules/{nazwa}"]["version"] == wersja, nazwa
-    assert pkg["dependencies"]["hyperframes"] == "0.8.78"
+    assert pkg["dependencies"]["hyperframes"] == "0.9.52"
     for k, v in paczki.items():
         if v.get("link"):
             continue
         assert v["integrity"].startswith("sha512-") and v["resolved"].startswith("https://registry.npmjs.org/"), k
     toolbox = (REPO / "profiles" / "jarvo-wideo" / "toolbox.yaml").read_text(encoding="utf-8")
-    assert re.search(r"name: hyperframes, .*version: 0\.8\.78, ", toolbox)
+    assert re.search(r"name: hyperframes, .*version: 0\.9\.52, ", toolbox)
     assert b"\r\n" not in (NODE / "package-lock.json").read_bytes()
 
 
@@ -1238,10 +1238,10 @@ def test_node_floty_prefix_npm_dowiazania_wzgledne(tmp_path):
     nf = _node_floty()
     b = tmp_path / "x.new" / "node_modules" / ".bin"
     b.mkdir(parents=True)
-    (b / "hyperframes").write_text("#!/bin/sh\necho 0.8.78\n", encoding="utf-8")
+    (b / "hyperframes").write_text("#!/bin/sh\necho 0.9.52\n", encoding="utf-8")
     assert nf.prefix_npm(tmp_path / "x.new", windows=False) and not nf.prefix_npm(tmp_path / "x.new", windows=False)
     os.replace(tmp_path / "x.new", tmp_path / "x")
-    assert (tmp_path / "x" / "npm-prefix" / "bin" / "hyperframes").read_text(encoding="utf-8").endswith("0.8.78\n")
+    assert (tmp_path / "x" / "npm-prefix" / "bin" / "hyperframes").read_text(encoding="utf-8").endswith("0.9.52\n")
     cel = tmp_path / "x" / "npm-prefix" / "bin" / "hyperframes"
     cel.unlink()
     cel.write_text("obcy", encoding="utf-8")

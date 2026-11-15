@@ -119,11 +119,11 @@ ENV HYPERFRAMES_BROWSER_PATH=/usr/local/bin/chromium \
     HYPERFRAMES_NO_TELEMETRY=1 \
     HYPERFRAMES_NO_UPDATE_CHECK=1
 # Jedna kopia HyperFrames: ta z locka w /opt/jarvo/node (wyżej; wersja przejrzana, ta sama co skille z
-# vendor/skills.lock.yaml, commit po v0.8.78). Skille HyperFrames wołają `npx hyperframes`, a npx szuka programu
+# vendor/skills.lock.yaml, tag v0.9.52). Skille HyperFrames wołają `npx hyperframes`, a npx szuka programu
 # w node_modules/.bin katalogu projektu i w globalnym bin npm, nie w PATH: bez wpisu tam ściągałby najnowszą wersję
 # przy pierwszym użyciu (a bez sieci healthcheck padał). Dlatego globalny bin dostaje dowiązania do tej kopii zamiast
 # drugiej instalacji `npm install -g`; `npx --yes=false` spoza /opt/jarvo/node wywraca build, gdyby npx chciał coś
-# pobrać (sprawdzone na npm 11.20: bez wpisu w globalnym bin „npx canceled due to missing packages”, z nim 0.8.78).
+# pobrać (sprawdzone na npm 11.20: bez wpisu w globalnym bin „npx canceled due to missing packages”, z nim wersja z locka).
 # puppeteer-core w paczce używa Chromium obrazu (PUPPETEER_EXECUTABLE_PATH).
 RUN set -e; g="$(npm prefix -g)/bin"; mkdir -p "$g" && \
     for b in hyperframes hyperframes-localize-fonts; do ln -sf "/opt/jarvo/node/node_modules/.bin/$b" "$g/$b"; done && \

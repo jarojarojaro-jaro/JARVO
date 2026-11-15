@@ -11,7 +11,7 @@ Nie to: coś ma zostać wyjaśnione → `explainer.md`; hasło jest treścią �
 | Styl | Silnik |
 |---|---|
 | geometria, cząstki, shadery, kolaż, infinite zoom | własny HTML Canvas/WebGL (`kontrakt-html.md`) |
-| szybko z szablonów, tekst + kształty | HyperFrames `motion-graphics` |
+| szybko, tekst + kształty | HyperFrames (`hyperframes/references/motion.md`) |
 | rysowany, organiczny | `anidoodle` |
 | opener z wyglądem marki | `bang-motion` |
 | 15 stylów motion design (wrząca linia, izometria, morph, HUD, Bauhaus, synthwave, pixel…) | skill `style-motion`: karta stylu + moduły `/_lib/jarvo/` |

@@ -86,7 +86,8 @@ zrodla:
   hyperframes:
     repo: https://github.com/heygen-com/hyperframes
     status: uzywane
-    przejrzane: 8798e40da8d56b2f0f3be0b74198d0cbbec1dc06
+    przejrzane: ad3a2389ee82b87eaee4bbf9a046c6a4273a6661
+    notatka: "HyperFrames 0.9.52 (tag v0.9.52 = ten commit; paczka npm hyperframes 0.9.52 w infra/node z atestacją SLSA z publish.yml na tym commicie, skille z tego samego commitu). Aktualizacja 0.8.78 → 0.9.52 2026-11-15 (przegląd w docs/SOURCES.md): licencja bez zmian, bez skryptów instalacyjnych, flagi Jarva bez zmian, telemetria i autoaktualizacja wyłączone tymi samymi zmiennymi, GSAP z paczki (render bez jsdelivr, npm i GitHuba, sprawdzone strace); 8 skilli workflow (product-launch-video, faceless-explainer, motion-graphics, embedded-captions, general-video, hyperframes-core/-animation/-creative) upstream wycofał do references skilla hyperframes, we flocie 4 skille."
   huashu-art-motion:
     repo: https://github.com/alchaincyf/huashu-art-motion
     status: uzywane

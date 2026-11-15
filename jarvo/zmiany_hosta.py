@@ -236,20 +236,37 @@ def _cofnij_jeden(u: Uklad, w: dict, wykonaj: Wykonaj, rejestr) -> tuple[str, st
 
 # ---------------------------------------------------------------- katalog
 
+def _wzgledne(gora: Path, cel: Path, dozwolone: list[str]) -> list[str]:
+    przedrostek = cel.relative_to(gora).as_posix()
+    return [f"{przedrostek}/{d}".strip("/") if przedrostek != "." else d.strip("/") for d in dozwolone]
+
+
 def katalog_przed_zmiana(u: Uklad, cel: Path, dozwolone: list[str]) -> Path | None:
     """Przed startem programu, który założy `cel` poza katalogiem Jarva: wpis „katalog” dla najwyższego brakującego
     katalogu na drodze do `cel` (np. ~/Library/Application Support/Google, gdy go nie było). `dozwolone` są względem
-    `cel`; w dzienniku zapisujemy je względem tego katalogu. Gdy `cel` już jest (np. właściciela), nic nie zapisuje
-    i zwraca None."""
+    `cel`; w dzienniku zapisujemy je względem tego katalogu. Gdy `cel` już jest, nowego wpisu nie ma i wynik to None;
+    jeśli `cel` założył program Jarva (wpis „katalog” dla niego albo jego przodka), wpis dostaje brakujące `dozwolone`
+    (nowa wersja programu zakłada w nim więcej, np. HyperFrames 0.9 `running` i `history`)."""
     cel = Path(cel)
     if cel.exists():
+        if sciezka(u).exists():
+            with Zamek(_zamek(u)):
+                lista, zmiana = wpisy(u), False
+                for w in lista:
+                    gora = Path(w["szczegoly"].get("sciezka", "")) if w["rodzaj"] == "katalog" else None
+                    if gora is None or not (cel == gora or gora in cel.parents):
+                        continue
+                    stare = list(w["szczegoly"].get("dozwolone") or [])
+                    nowe = sorted(set(stare) | set(_wzgledne(gora, cel, dozwolone)))
+                    if nowe != sorted(stare):
+                        w["szczegoly"]["dozwolone"], zmiana = nowe, True
+                if zmiana:
+                    _zapisz(u, lista)
         return None
     gora = cel
     while not gora.parent.exists() and gora.parent != gora:
         gora = gora.parent
-    przedrostek = cel.relative_to(gora).as_posix()
-    wzgledne = [f"{przedrostek}/{d}".strip("/") if przedrostek != "." else d.strip("/") for d in dozwolone]
-    dopisz(u, "katalog", sciezka=str(gora), dozwolone=sorted(wzgledne))
+    dopisz(u, "katalog", sciezka=str(gora), dozwolone=sorted(_wzgledne(gora, cel, dozwolone)))
     return gora
 
 

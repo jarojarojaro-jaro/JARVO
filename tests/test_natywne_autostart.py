@@ -304,6 +304,31 @@ def test_katalog_zakladany_przez_program_jarva(u, tmp_path):
     assert zmiany_hosta.cofnij(u, log=None) == []
     # katalog, który był wcześniej (np. Chrome for Testing właściciela): bez wpisu
     assert zmiany_hosta.katalog_przed_zmiana(u, cel, ["Crashpad"]) is None
+    assert zmiany_hosta.wpisy(u) == []                                    # ani nowego wpisu, ani poszerzenia cudzego
+
+
+def test_katalog_jarva_nowa_wersja_programu_poszerza_dozwolone(u, tmp_path):
+    """Katalog założony przez program Jarva, którego nowa wersja zakłada w nim więcej (HyperFrames 0.9: `running`
+    w ~/.hyperframes): wpis z dziennika dostaje brakujące `dozwolone` bez drugiego wiersza, a cofnięcie usuwa katalog."""
+    dom = tmp_path / "dom"
+    dom.mkdir()
+    cel = dom / ".hyperframes"
+    assert zmiany_hosta.katalog_przed_zmiana(u, cel, ["config.json", "cache"]) == cel
+    cel.mkdir()
+    (cel / "config.json").write_text("{}", encoding="utf-8")
+    (cel / "running").mkdir()
+    assert zmiany_hosta.katalog_przed_zmiana(u, cel, ["config.json", "cache", "running"]) is None
+    assert zmiany_hosta.katalog_przed_zmiana(u, cel, ["running"]) is None           # bez zmian: nic nie ubywa
+    assert [w["szczegoly"] for w in zmiany_hosta.wpisy(u)] == [
+        {"sciezka": str(cel), "dozwolone": ["cache", "config.json", "running"]}]
+    # wpis dla przodka (~/.cache, którego nie było): ścieżki względem niego
+    gora = zmiany_hosta.katalog_przed_zmiana(u, dom / ".cache" / "hyperframes", ["fonts"])
+    (dom / ".cache" / "hyperframes" / "locks").mkdir(parents=True)
+    zmiany_hosta.katalog_przed_zmiana(u, dom / ".cache" / "hyperframes", ["fonts", "locks"])
+    assert zmiany_hosta.wpisy(u)[-1]["szczegoly"] == {"sciezka": str(gora),
+                                                     "dozwolone": ["hyperframes/fonts", "hyperframes/locks"]}
+    r = zmiany_hosta.cofnij(u, log=None)
+    assert [x["wynik"] for x in r] == ["cofniete", "cofniete"] and not cel.exists() and not gora.exists()
 
 
 

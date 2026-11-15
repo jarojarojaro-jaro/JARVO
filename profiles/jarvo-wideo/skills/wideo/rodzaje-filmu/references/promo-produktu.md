@@ -15,7 +15,7 @@ Nie to: jak działa zjawisko → `explainer.md`; samo logo → `logo-intro.md`; 
 | ciemny keynote, wielka liczba, living screencast | `lemo-opuscar` (`dark-keynote`, `living-screencast`) |
 | przegląd parametrów produktu z częściami (skan w hologram, ramki celownika, liczby „dokręcają się” do wartości), ekran targowy | `lemo-opuscar` `hologram-hud` |
 | miejsce, szlak, wydarzenie, seria plakatów (płaskie farby sitodruku, warstwa po warstwie) | `lemo-opuscar` `silkscreen-poster` |
-| szybko, tekst + obrazy produktu | HyperFrames `product-launch-video` |
+| szybko, tekst + obrazy produktu | HyperFrames (`hyperframes/references/types/launch.md`; strona: `hyperframes capture <URL> --json`) |
 | produkt fizyczny w 3D | `scena-3d.md` |
 
 ## Struktura

@@ -1229,10 +1229,14 @@ HERMES_MB = {"checkout": 850, "cache_uv": 350, "node_modules": 300, "front": 80}
 # w <root>/build i profile z wtyczkami w <dane>
 # źródła skilli: zmierzone 2026-10-25 (31 źródeł) 2,1 GB na Linuksie i macOS w CI, 0,9 GB na Windows (to samo
 # pobranie git fetch --depth 1); szacunek wg większego, bo sprawdzenie miejsca ma nie zaniżać
-# katalogi HyperFrames w katalogu domowym (ustawienia i cache rejestru; fonty, whisper.cpp, przeglądarka): co wolno
+# katalogi HyperFrames w katalogu domowym (ustawienia, cache rejestru i katalogu bloków; fonty, whisper.cpp,
+# przeglądarka, od 0.9 też historia projektów, blokady renderu i paczki doinstalowane przy pierwszym użyciu): co wolno
 # w nich zastać, żeby `jarvo uninstall` usunął je w całości (zmiany_hosta.katalog_przed_zmiana)
-KATALOGI_HYPERFRAMES = ((".hyperframes", ["config.json", "install-state.json", "cache"]),
-                        (".cache/hyperframes", ["fonts", "whisper", "chrome"]))
+KATALOGI_HYPERFRAMES = ((".hyperframes", ["config.json", "install-state.json", "projects.json", "running", "cache",
+                                          "catalog", "models"]),
+                        (".cache/hyperframes", ["fonts", "whisper", "chrome", "history", "locks", "warm", "optional",
+                                                "parakeet", "tts", "background-removal", "opencv", "animated-gif",
+                                                "audio-helpers"]))
 FLOTA_MB = {"zrodla": 2200, "build": 100, "profile": 150}
 # narzędzia npm floty w MB (infra/node, npm ci z locka b5a1f4c9e3b8; zmierzone 2026-10-25 na Windows 11 x64): katalog
 # `<program>/node-floty/<skrót>` bez onnxruntime, 438 MB plików i 483 MB na dysku NTFS (tysiące małych plików; zostaje),

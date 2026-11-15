@@ -6,7 +6,7 @@
 # jest zawsze zgodna z wersją uruchomionego Hermesa.
 #
 # `dest` = <kategoria>/<nazwa> w skills/ profilu. Rodziny skilli, które odwołują się do
-# siebie ścieżkami względnymi (../hyperframes-animation/…, ../seo/references/…), MUSZĄ
+# siebie ścieżkami względnymi (../hyperframes/…, ../seo/references/…), MUSZĄ
 # lądować w tej samej kategorii.
 # `pomin` (opcjonalnie, przy wpisie agenta) = wzorce plików i katalogów, których build nie kopiuje
 # (np. filmy i zrzuty przykładów); SKILL.md (poza nakładką, niżej) i LICENSE* zostają zawsze.
@@ -107,7 +107,8 @@ sources:
   hyperframes:
     type: git
     repo: https://github.com/heygen-com/hyperframes
-    rev: 8798e40da8d56b2f0f3be0b74198d0cbbec1dc06
+    # tag v0.9.52 = paczka npm hyperframes 0.9.52 z infra/node (polecenia ze skilli pasują do programu)
+    rev: ad3a2389ee82b87eaee4bbf9a046c6a4273a6661
     license: Apache-2.0
     license_file: LICENSE
   remotion-skills:
@@ -419,16 +420,8 @@ agents:
     - {source: anthropic-skills, path: skills/slack-gif-creator, dest: video/slack-gif-creator}
     - {source: marketingskills, path: skills/video, dest: marketing/video}
     - {source: hyperframes, path: skills/hyperframes, dest: video/hyperframes}
-    - {source: hyperframes, path: skills/hyperframes-core, dest: video/hyperframes-core}
-    - {source: hyperframes, path: skills/hyperframes-animation, dest: video/hyperframes-animation}
-    - {source: hyperframes, path: skills/hyperframes-creative, dest: video/hyperframes-creative}
     - {source: hyperframes, path: skills/hyperframes-cli, dest: video/hyperframes-cli}
     - {source: hyperframes, path: skills/media-use, dest: video/media-use}
-    - {source: hyperframes, path: skills/general-video, dest: video/general-video}
-    - {source: hyperframes, path: skills/product-launch-video, dest: video/product-launch-video}
-    - {source: hyperframes, path: skills/faceless-explainer, dest: video/faceless-explainer}
-    - {source: hyperframes, path: skills/motion-graphics, dest: video/motion-graphics}
-    - {source: hyperframes, path: skills/embedded-captions, dest: video/embedded-captions}
     - {source: hyperframes, path: skills/slideshow, dest: video/slideshow}
     - {source: hermes, path: skills/creative/manim-video, dest: creative/manim-video}
     - {source: hermes, path: optional-skills/creative/ai-presenter-video, dest: creative/ai-presenter-video}

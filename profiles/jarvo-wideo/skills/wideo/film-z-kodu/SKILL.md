@@ -1,13 +1,13 @@
 ---
 name: film-z-kodu
 description: "Film z kodu: wybór silnika, B-roll, style kina, rysunek."
-version: 3.13.0
+version: 3.14.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
     tags: [video, hyperframes, manim, manimgx, motion-graphics, animation, code]
-    related_skills: [rodzaje-filmu, style-motion, gramatyki-explainera, style-malarskie, zywy-schemat, motion-design, video-lessons, claude-animation, motion-broll, lemo-opuscar, anidoodle, hyperframes, remotion-best-practices, bang-motion, pixel2motion, text-to-lottie, kinetic-typography, chart-animation, product-launch-video, faceless-explainer, manim-video, scenariusz, napisy, kontrola-wideo]
+    related_skills: [rodzaje-filmu, style-motion, gramatyki-explainera, style-malarskie, zywy-schemat, motion-design, video-lessons, claude-animation, motion-broll, lemo-opuscar, anidoodle, hyperframes, hyperframes-cli, remotion-best-practices, bang-motion, pixel2motion, text-to-lottie, kinetic-typography, chart-animation, manim-video, scenariusz, napisy, kontrola-wideo]
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
@@ -43,7 +43,7 @@ Najpierw rodzaj filmu (`rodzaje-filmu`): jego plik mówi, który silnik i dlacze
 | **postać w akcji** (maskotka, bohater gry, zwierzak z anatomią), efekty jak w grze, low-poly pętla, książeczka; **bez przeglądarki** (najlżejsze dla komputera) | **claude-animation** (Node canvas) | 20–60 min |
 | animacja na stronę (hero, maskotka za kursorem, GIF, naklejka), plik HTML offline | **anidoodle** (`emit.mjs`) → `jarvo-web` osadza | 15–40 min |
 | muzyka **syntezowana kodem** do dowolnego filmu (bez licencji, bez pobierania) | **anidoodle** `music` → plik do `muzyka` w `film.py` | 10–20 min |
-| promo z animowanym tekstem, szybki launch, slajdy | **HyperFrames** (`hyperframes`, `product-launch-video`, `slideshow`) | 10–30 min |
+| promo z animowanym tekstem, szybki launch, slajdy | **HyperFrames** (`hyperframes`, `hyperframes-cli`, `slideshow`) | 10–30 min |
 | matematyka, algorytmy, wykresy w ruchu (wzór krok po kroku, 3D) | **Manim** (`manim-video` + `references/manimgx.md`: silnik ManimGX, dodatek obrazu `manim`) | 15–40 min; render na CPU 2D ~1,5 s na 1 s 720p30, ~4–5 s na 1 s 1080p60, 3D ~25 s na 1 s |
 | **kinowy film produktu** ze strony/aplikacji (prawdziwe screenshoty, ruchy kamery 2.5D, cięcia na bit, dźwięk) | **video-shotcraft** (`$SHOTCRAFT/SKILL.md`, Remotion) | 40–90 min |
 | film w **React/Remotion** (klient chce Remotion, komponenty, parametryzowane serie) | **Remotion** (`remotion-best-practices`: router do create, markup, render, maps…) | 20–60 min |
@@ -83,9 +83,19 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
    wszystko przez fade, rogi i ramki, glow na UI, cząsteczki bez powodu, przejazd liniowy. Zamiast tego ruch z kierunkiem i masą.
 10. **HyperFrames: check przed renderem.** Po każdej zmianie kompozycji `hyperframes check` (lint + walidacja
    w przeglądarce, `--snapshots` na klatki) i render dopiero przy czystym wyniku: według HeyGen mediana 1 render zamiast 2
-   i ~połowa kosztu tokenów. Promo z marki: `hyperframes capture <URL>` (skill `product-launch-video`) albo `assety.py`.
+   i ~połowa kosztu tokenów. Promo z marki: `hyperframes capture <URL> --json`
+   (`hyperframes/references/types/launch.md`) albo `assety.py`.
    Kompozycja bez GSAP (sam CSS): `data-no-timeline` na elemencie z `data-composition-id`, inaczej render czeka 45 s
    na oś czasu. `npx hyperframes` ze skilli HyperFrames bierze tę samą przypiętą wersję co `hyperframes` z PATH.
+   Od HyperFrames 0.9 wiedza siedzi w skillu `hyperframes`: kontrakt i pętla pracy w SKILL.md, rodzaj filmu
+   w `hyperframes/references/types/` (launch, explainer, data, vertical…), napisy `hyperframes/references/captions.md`,
+   ruch `hyperframes/references/motion.md`;
+   dawnych `product-launch-video`, `faceless-explainer`, `motion-graphics`, `embedded-captions` już nie ma. Skille,
+   do których odsyła, a których nie mamy (`/hyperframes-registry`: gotowe bloki z sieci, `/reverse-any-video`,
+   `/style-sampling`, `/figma`): budujesz sam z references. „Usage beacon” (`hyperframes events`) i `hyperframes usage`
+   niczego nie wysyłają (telemetria wyłączona), więc je pomijasz. Aplikacji HyperFrames (desktop app, Framey,
+   `hyperframes open`) ani podglądu Studio nie proponujesz: podgląd to `hyperframes snapshot`, poprawki właściciel robi
+   w edytorze HQ (reguła 13).
 11. **Za wolno?** `krytyka.py tempo` (przestoje i luki obrazu, zasada tempa) i `puls` pokazują, gdzie film zwalnia; poprawiasz na osi czasu przez `retime.py`
    (`references/retime.md`), nie cięciem MP4.
 9. **Pętla krytyki przed oddaniem:** `kontrola-wideo` krok 4a (7 osi 1–10, 3 najgorsze problemy, aż wszystko ≥ 8).
@@ -122,7 +132,8 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
 3. **Środowisko:** `@@PY@@ "$HERMES_HOME/scripts/narzedzia.py" instaluj <motion|lemo|anidoodle|remotion|shotcraft|html|lottie|mg>`
    (raz; dalej z cache), programy silnika przez `@@PY@@ "$HERMES_HOME/scripts/narzedzia.py" uruchom <narzędzie> -- <polecenie>`.
    Skill silnika każe coś doinstalować, pobrać przeglądarkę (`npx playwright install`, `npm i puppeteer`) albo
-   zaktualizować skille (`remotion-upgrade`, `npx skills add`)? Nie rób tego: `references/narzedzia.md` mówi, czym to zastąpić.
+   zaktualizować skille lub program (`remotion-upgrade`, `npx skills add`, `hyperframes skills update`,
+   `hyperframes upgrade`)? Nie rób tego: wersje są przypięte, `references/narzedzia.md` mówi, czym to zastąpić.
 4. **Look:** jedna–trzy klatki stylu renderowane prawdziwym kodem → obejrzyj (vision), popraw, dopiero potem całość.
    Akceptacja użytkownika tylko przy dużych zleceniach (karta mówi) – inaczej decydujesz sam.
 5. **Budowa i render** wg SKILL.md wybranego silnika (i w lemo: `$LIB/AGENTS.md`, `DIRECTOR.md`, `TECHNIQUE.md`, `STYLE.md`).

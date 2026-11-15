@@ -1523,7 +1523,9 @@ def test_narzedzia_npm_floty_krok_instalatora_i_drugi_przebieg(tmp_path, stanowi
     monkeypatch.setattr(instalator.Path, "home", staticmethod(lambda: dom))
     assert tc._instaluj(s, app) == 0, "\n".join(s["log"])
     katalogi = [w["szczegoly"] for w in s["zmiany"].lista if w["rodzaj"] == "katalog"]
-    assert katalogi == [{"sciezka": str(dom / ".cache" / "hyperframes"), "dozwolone": ["chrome", "fonts", "whisper"]}]
+    assert katalogi == [{"sciezka": str(dom / ".cache" / "hyperframes"),
+                         "dozwolone": sorted(dict(instalator.KATALOGI_HYPERFRAMES)[".cache/hyperframes"])}]
+    assert "history" in katalogi[0]["dozwolone"] and "locks" in katalogi[0]["dozwolone"]    # HyperFrames 0.9: render
     log = "\n".join(s["log"])
     kroki = re.findall(r"^\[[#-]+\] +\d+/\d+  (.+)$", log, re.M)
     assert kroki.index("Tesseract") < kroki.index("Narzędzia npm floty") == kroki.index("Spis narzędzi") - 1
