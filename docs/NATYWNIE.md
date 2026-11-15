@@ -432,6 +432,14 @@ Droga rekomendowana w raporcie „dystrybucja”: wydania u źródła + jeden ma
 6. Pracownicy kanbana kończą pracę na starej wersji. Starą usuwamy, gdy nic z niej nie działa (skan psutil).
 7. Nadzorca na końcu uruchamia się ponownie z nowej wersji.
 
+**Prywatna nakładka** (agenci biznesowi, [FLEET.md](FLEET.md#agenci-biznesowi)): instalacja i `jarvo update` biorą
+`<root>/nakladka`, gdy istnieje (Linux `~/.local/share/jarvo/nakladka`, macOS `~/.jarvo/nakladka`, Windows
+`%LOCALAPPDATA%\Jarvo\nakladka`), a inny katalog wskazuje `JARVO_NAKLADKA`; ścieżkę dostają build.py i install_fleet.py
+jako `JARVO_NAKLADKA`. Gdy nakładka jest repo git, najpierw `git pull --ff-only` (najlepiej jak się da: błąd trafia do
+logu i nie zatrzymuje aktualizacji). `BUILD.json` zapisuje `nakladka: {sciezka, commit}`, a `jarvo status` wypisuje
+`nakładka: <ścieżka> <commit>` albo `nakładka: brak`. Skrypty repo (`make validate`, `scripts/build.py`) widzą nakładkę
+tylko z `JARVO_NAKLADKA`.
+
 **jarvo doctor** sprawdza: healthchecki z toolbox.yaml (argv, w środowisku bramy), sumy zainstalowanych narzędzi, porty 9119, 9120, 9122 i 8642 (z nazwą programu, który trzyma port), commit Hermesa wobec pinu, SQLite ≥3.51.3 i FTS5 z remove_diacritics, Git Bash, wolny dysk. Na Windows dodatkowo: zamknięcie DLL (importy PE w drzewie Jarva), stan Smart App Control, strona kodowa, krótkie nazwy 8.3, LongPathsEnabled, OneDrive. Na macOS: TCC i Gatekeeper. Na Linuksie: user bus, linger, AppArmor. Na końcu skarbiec, rutyny i Telegram (K08) oraz konkurencyjne autostarty (c2). Ma tryb `--json` dla CI. Dziś wersja podstawowa (jarvo/cli.py, pełna w E4): korzeń, wolne miejsce, Python i SQLite ≥3.51.3 z FTS5, uv, commit Hermesa wobec pinu, porty z nazwą programu (port uznaje za Jarvo tylko po PID-ach usług nadzorcy), autostart, polecenie jarvo i git, z radą przy każdym wyniku; niczego nie zapisuje.
 
 **jarvo status** pokazuje: PID-y i stan bramy, panelu i Komputera (z nadzorcy, bo WMIC już nie ma), wersje z locka, autostart, rutyny (włączone czy wstrzymane), Telegram, porty i ostatnią aktualizację. Dziś (jarvo/cli.py): stan z kanału nadzorcy (bez niego z `<stan>/nadzorca.json`) z każdą usługą nadzorcy, także `komputer` (`wylaczona`, gdy właściciel go nie włączył), trwałe zatrzymanie (`zatrzymanie`), czy na porcie odpowiada nasz panel (`panel_jarva`), wersje, autostart i porty; `--json`.
@@ -652,7 +660,7 @@ Każdy etap to mały, osobny commit (albo krótka seria), wypchnięty od razu, z
 ### E4. Flota natywnie, czat i zgody
 - **Co:** build.py z tokenami i wartościami per system (S06), install_fleet.py (S07), wtyczki jako kopie albo junction (H27), healthchecki argv i `jarvo doctor` (S02), wtyczka zgód z trzema trybami (sekcja d), home_mode, zakazy per system (F15), kwarantanna paczek (H25), shim python3 (F12), Git Bash (B04).
 - **CI:** atrapa modelu (scripts/atrapa_modelu.py): `jarvo chat` w trzech trybach (zgoda, odmowa, zapis w folderze i poza nim); karta kanbana do agenta, która przeżywa restart bramy; jednorazowa rutyna; delegate_task. W logach pracowników nie może być „runs without a user present”. 5 nóg.
-- **Gotowe, gdy:** 10 agentów zainstalowanych, healthchecki zielone (poza jawnymi brakami platform).
+- **Gotowe, gdy:** 9 agentów zainstalowanych, healthchecki zielone (poza jawnymi brakami platform).
 
 ### E5. Przeglądarki i wyszukiwarka (potrzebne do pierwszej sesji)
 - **Co:** C01–C07, nakładka agent-browsera w Pythonie, audit.py i brand_extract.py (F02), wyszukiwarka z U01 i search_fanout.py (F03), har.cjs i Łowca (F04), MCP inspo (P06), Lighthouse.

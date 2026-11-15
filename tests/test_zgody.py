@@ -594,9 +594,9 @@ def test_jarvo_pod_yolo_bez_ekranu_i_telefonu(sr, monkeypatch):
 
 
 def test_agent_biznesowy_pod_yolo_bez_ekranu_i_telefonu(sr, monkeypatch):
-    """Agent biznesowy z Komputerem i przydzielonym telefonem (jarvo-jarodev, docs/FLEET.md) pod YOLO: ta sama blokada
+    """Agent biznesowy z Komputerem i przydzielonym telefonem (np. jarvo-sklep, docs/FLEET.md) pod YOLO: ta sama blokada
     co w profilu jarvo; blokada nie zależy od profilu, więc nowy agent z ekranem nie wypada spod niej."""
-    profil = sr.dane / "profiles" / "jarvo-jarodev"
+    profil = sr.dane / "profiles" / "jarvo-sklep"
     profil.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("HERMES_HOME", str(profil))
     monkeypatch.setattr(z, "_yolo", lambda: True)

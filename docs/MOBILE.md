@@ -141,10 +141,10 @@ wtyczka `jarvo-zgody` pyta o nie z treścią akcji (zgoda = „tak” właścici
 przepuszcza je tylko z linią `ZGODA WŁAŚCICIELA` w treści karty, a bez niej, w rutynie i pod YOLO blokuje; pod YOLO
 żaden profil nie ma telefonu wcale, tak jak `computer_use`.
 
-**Telefon agenta biznesowego.** Agent biznesowy (np. `jarvo-jarodev`, [FLEET.md](FLEET.md#agenci-biznesowi)) dostaje
+**Telefon agenta biznesowego.** Agent biznesowy (np. `jarvo-sklep`, [FLEET.md](FLEET.md#agenci-biznesowi)) dostaje
 serwer `phone` tylko z przydziałem właściciela i tylko na **jeden** telefon:
-`jarvo telefon przydziel jarvo-jarodev <telefon>` zapisuje przydział w `<stan>/telefon.json` (`"profile":
-{"jarvo-jarodev": "<telefon>"}`) i, gdy telefon dla floty jest włączony (`on`), od razu dopisuje w tym profilu ten sam
+`jarvo telefon przydziel jarvo-sklep <telefon>` zapisuje przydział w `<stan>/telefon.json` (`"profile":
+{"jarvo-sklep": "<telefon>"}`) i, gdy telefon dla floty jest włączony (`on`), od razu dopisuje w tym profilu ten sam
 serwer z `PHONEUSE_ONLY=<telefon>` i `PHONEUSE_PHONE=<telefon>`: `phone_mcp.py` pokazuje w `list_phones` tylko ten
 telefon i odrzuca każde wywołanie z inną nazwą, zanim cokolwiek pójdzie do telefonu. Jarvo dalej ma wszystkie telefony.
 Bez przydziału agent biznesowy nie ma serwera `phone`. `jarvo telefon zabierz <profil>` zdejmuje przydział

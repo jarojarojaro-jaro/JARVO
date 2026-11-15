@@ -7,6 +7,8 @@
     logi        Windows i macOS <root>/logi, Linux ${XDG_STATE_HOME:-~/.local/state}/jarvo/logi
     cache       Windows i macOS <root>/cache, Linux ${XDG_CACHE_HOME:-~/.cache}/jarvo
     build       <root>/build: wynik scripts/build.py (odtwarzalny)
+    nakladka    <root>/nakladka: nakładka prywatna z własnymi agentami (docs/FLEET.md „Agenci biznesowi”), gdy jest;
+                JARVO_NAKLADKA wskazuje inny katalog
 
 `JARVO_ROOT` przenosi wszystko pod inny korzeń (testy, CI, druga instalacja); równy domyślnemu korzeniowi niczego
 nie przenosi (na Linuksie logi i cache zostają w katalogach XDG, inaczej proces z tą zmienną zakładałby drugie). Jarvo nie używa domyślnego katalogu
@@ -129,6 +131,11 @@ class Uklad:
         """Katalog z poleceniem `jarvo` w PATH właściciela (Windows: jarvo.cmd; macOS i Linux: ~/.local/bin)."""
         return self.root / "bin" if WINDOWS else Path.home() / ".local" / "bin"
 
+    @property
+    def nakladka_domyslna(self) -> Path:
+        """<root>/nakladka: miejsce nakładki prywatnej (klon prywatnego repo agentów), gdy nie ma JARVO_NAKLADKA."""
+        return self.root / "nakladka"
+
     def katalogi(self) -> list[Path]:
         """Katalogi, które zakłada instalator (bez katalogu właściciela z poleceniem jarvo)."""
         return [self.root, self.program, self.dane, self.stan, self.logi, self.cache, self.build, self.jarvo_dane,
@@ -161,3 +168,13 @@ def uklad(env: dict | None = None) -> Uklad:
                              "jeszcze raz.")
     return Uklad(root=root, program=program, dane=root / "dane", stan=root / "stan", logi=logi, cache=cache,
                  build=root / "build")
+
+
+def nakladka(u: Uklad, env: dict | None = None) -> Path | None:
+    """Nakładka prywatna tej instalacji: JARVO_NAKLADKA (gdy ustawione, także nieistniejąca: build zgłosi błąd),
+    inaczej <root>/nakladka, gdy istnieje; None = flota bez nakładki."""
+    env = os.environ if env is None else env
+    wartosc = str(env.get("JARVO_NAKLADKA") or "").strip()
+    if wartosc:
+        return Path(wartosc).expanduser()
+    return u.nakladka_domyslna if u.nakladka_domyslna.is_dir() else None

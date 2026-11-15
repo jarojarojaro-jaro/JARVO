@@ -175,7 +175,7 @@ def test_doctor_widzi_zniknieta_instalacje_phoneuse(inst):
     assert w["stan"] == "uwaga" and "phone_mcp.py" in w["opis"]
 
 
-BIZNES = "jarvo-jarodev"
+BIZNES = "jarvo-sklep"
 
 
 def profil_biznesowy(inst) -> None:

@@ -26,7 +26,6 @@ skills:
     - "@@BUILD_DIR@@/profiles/jarvo-lowca/skills"
     - "@@BUILD_DIR@@/profiles/jarvo-mobile/skills"
     - "@@BUILD_DIR@@/profiles/jarvo-ads/skills"
-    - "@@BUILD_DIR@@/profiles/jarvo-jarodev/skills"
 
 web:
   search_backend: searxng

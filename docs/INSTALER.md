@@ -266,6 +266,10 @@ Instalator klonuje gałąź `main`, `JARVO_BRANCH=…` wybiera inną; przy prywa
   domyślnie pytania jak dziś (dostawca modeli, klucz), czytane z `/dev/tty`, nie z potoku `curl | bash`.
 - **Polecenie `jarvo`** (`~/jarvo/bin/jarvo` na PATH): `up`, `down`, `status`, `logs`, `update`, `chat`,
   `pliki`, `uninstall` (kontenery, obraz, `~/jarvo-local`, autostart; repo i klucze pyta osobno).
+- **Prywatna nakładka** (agenci biznesowi, [FLEET.md](FLEET.md#agenci-biznesowi)): `<root>/nakladka`, gdy istnieje
+  (Linux `~/.local/share/jarvo/nakladka`, macOS `~/.jarvo/nakladka`, Windows `%LOCALAPPDATA%\Jarvo\nakladka`), albo
+  katalog z `JARVO_NAKLADKA`; instalacja i `jarvo update` robią najpierw `git pull --ff-only` nakładki (błąd tylko w logu),
+  `BUILD.json` ma pole `nakladka`, a `jarvo status` linię `nakładka: <ścieżka> <commit>` albo `nakładka: brak`.
 - **Idempotencja:** ponowne wklejenie tego samego polecenia = aktualizacja, nigdy druga instalacja.
 - **Test dymny na końcu:** healthchecki z `deploy.sh`, otwarcie dashboardu w przeglądarce
   (`xdg-open` / `open` / `Start-Process`), hasło wypisane raz i zapisane w `~/jarvo-local/compose/.env`.

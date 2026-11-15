@@ -110,7 +110,8 @@ def _kiedy(tekst) -> dt.datetime | None:
 
 
 def _lejek(plik: Path, teraz: dt.datetime) -> tuple[str, list[str]]:
-    """Liczby lejka (format profiles/jarvo-jarodev/scripts/lejek.py): statusy, nowe w 24 h i 7 dni, szkice na zgodę.
+    """Liczby lejka (`lejek/lejek.json` agenta biznesowego: `wpisy` z `status` i `utworzono`): statusy, nowe w 24 h
+    i 7 dni, szkice na zgodę.
     Zwraca (opis, numery szkiców czekających na zgodę właściciela)."""
     if not plik.is_file():
         return "lejek: nie założony", []

@@ -51,7 +51,7 @@ Poziomy autonomii: **A0** odczyt · **A1** szkice we własnym workspace · **A2*
 
 ---
 
-## 2. Flota agentów (10 profili)
+## 2. Flota agentów (9 profili)
 
 Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady), `config.yaml`
 (model, toolset, deny), skille, skrypty, rubryka jakości, toolbox, dystrybucja.
@@ -66,7 +66,6 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 | 📈 `jarvo-ads` | **Specjalista Ads** — Meta + Google Ads, kampanie, testy A/B/C, raporty; przygotowuje paczkę, publikujesz Ty | `@ads` | Sala operacyjna (`office`) | ads | 11 |
 | 🎯 `jarvo-lowca` | **Łowca leadów** — sygnały zakupowe (KRS, CEIDG, przetargi BZP/TED, strony firm, oferty pracy), kwalifikacja wg profilu klienta, ranking z „dlaczego teraz”, kontakt opublikowany ze źródłem, monitoring, rozpoznanie nowego źródła; nic nie wysyła | `@lowca` | Radar sprzedaży (`radar`) | lowca | 7 |
 | 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go, bramka jakości (Android, iOS w CI), pakiet do sklepów z listą 44 punktów, wydanie za zgodą i nauka z odrzuceń, aplikacja ze strony firmy, utrzymanie (terminy, opinie, SDK, poprawki OTA za zgodą), kontrola paczek npm; konta zawsze właściciela | `@mobile` | Pracownia aplikacji (`apps`) | mobile | 10 |
-| 🧲 `jarvo-jarodev` | **Jarodev, agent biznesowy jarodev.pl** (szkielet 14.11) — klienci na strony, sklepy, automatyzacje: prośby z grup FB na jednym przydzielonym telefonie, własne posty, firmy bez strony z Map Google (Komputer Jarva), szybki audyt strony firmy (3 wygrane), lejek i szkice ofert; wysyłka i publikacja tylko za „tak” właściciela, firm z Map nie kontaktuje mailem ani telefonem (art. 398 PKE); wie tylko o marce jarodev (`marka: jarodev`) | `@jarodev` | Biuro Jarodev (`control`) | jarodev | 7 |
 | 🦾 `jarvo-reka` | **Prawa ręka** — generalista, składa pakiety misji, dokumenty, prototypy; zna skille wszystkich (read-only) | `@reka` | Warsztat (`workshop`) | reka | 4 |
 
 ### 2a°. Jarvo przy ekranie i telefonie — szczegóły (najnowszy)
@@ -88,23 +87,19 @@ przez VNC. Płatność, wysyłka, publikacja i usunięcie konta tylko z linią `
 z czatu nie przyjmuje. Dłuższa praca na ekranie (więcej niż kilka minut) idzie na kartę kanbana przypisaną do Jarva,
 żeby czat był wolny. Sesja z narzędziem ekranu albo telefonu nie daje wyciągu do skarbca; pozostałe rozmowy Jarva
 tak. Evals `jarvo-ekran-*` w `evals/jarvo/scenarios.yaml`, 2 ataki red teamu (wstrzyknięcie z ekranu, karta i hasło
-na ekranie) na profil `jarvo`. Pokój Sterownia (`control`) w HQ zajmuje od 14.11 agent biznesowy `jarvo-jarodev` (Biuro Jarodev).
+na ekranie) na profil `jarvo`. Pokój Sterownia w HQ zostaje bez agenta.
 Telefon właściciela przez PHONEUSE (serwer MCP `phone`, dopisuje go `jarvo telefon on`): Jarvo ma wszystkie
 narzędzia; `confirm=true` w `act` i `batch` wymaga „tak” człowieka albo linii `ZGODA WŁAŚCICIELA` w karcie (wtyczka `jarvo-zgody`).
 Pod YOLO (tryb pełny) narzędzia ekranu i telefonu są zablokowane w każdym profilu ([MOBILE.md](MOBILE.md)).
 
-### 2a°°. jarvo-jarodev — agent biznesowy (szkielet, 14.11.2026)
-Pierwsza „odnoga Jarva” jednej firmy właściciela: `marka: jarodev` we `fleet.yaml` (slug = `brands/jarodev/` w skarbcu;
+### 2a°°. Agenci biznesowi (mechanizm)
+„Odnoga Jarva” jednej firmy właściciela: pole `marka: <slug>` we `fleet.yaml` (slug = `brands/<slug>/` w skarbcu;
 walidator: `[a-z0-9-]+`, tylko specjalista, jedna marka = jeden agent). W skarbcu widzi tylko swoją markę, swoje notatki,
 `fleet/` i `inspiracje/` ([FLEET.md](FLEET.md#agenci-biznesowi), [WIEDZA.md](WIEDZA.md)); Jarvo i operator wiedzą wszystko.
-Telefon: jeden przydzielony (`jarvo telefon przydziel jarvo-jarodev <telefon>`: serwer `phone` z `PHONEUSE_ONLY`, inne
-telefony niewidoczne i odrzucane). Ekran: Komputer Jarva (`komputer: true`, te same twarde zasady, jedna sesja naraz,
-odmowa `zajete`). Skille `lejek`, `fb-grupy`, `fb-posty`, `mapy-firmy`, `szybkie-wygrane`, `oferta-szkic`, `raport-dnia`;
-skrypty `lejek.py` (statusy z zapisem zgody, odmowa maila, telefonu i SMS-a do firm z Map, retencja RODO 90 dni,
-limity dnia), `poranek.py`, `wygrane.py` (`seo_check.py` Weba + jeden Lighthouse); wzór `zrodla.yaml` (grupy FB
-i portale podaje właściciel). Rutyna `jarodev-dzien` (pon–sob, wstrzymana do włączenia): karta dnia dla siebie
-i wiadomość w wątku agenta. 12 evals (w tym zgoda, art. 398 PKE, RODO, „co wiesz o Enigmie?” → nie mój obszar).
-Projekt i granice: [LEADY.md](LEADY.md#agent-biznesowy-jarodev).
+Telefon: jeden przydzielony (`jarvo telefon przydziel jarvo-sklep <telefon>`: serwer `phone` z `PHONEUSE_ONLY`, inne
+telefony niewidoczne i odrzucane); ekran opcjonalnie (`komputer: true`, jedna sesja naraz). Publiczne repo nie ma
+żadnego agenta biznesowego: każdy zakłada swoich (`scripts/new-agent.py --marka sklep`) w prywatnej nakładce
+(`<root>/nakladka` albo `JARVO_NAKLADKA`), którą build i `jarvo update` dołączają do floty.
 
 ### 2a. jarvo-mobile — szczegóły
 Twórca aplikacji, etap 1 z [MOBILE.md](MOBILE.md): `natywna-czy-pwa` (`decyzja.py`: potrzeby → strona, PWA, karta
@@ -319,7 +314,7 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
 
 ## 6. Bezpieczeństwo (Skarbiec-design + red team)
 
-- **Red team na promptfoo** (`security/redteam/`): 25 ataków na agentów (w tym orzeczenie wstrzyknięte przez treść strony, klucz do zapisania w skarbcu wiedzy, paczka-literówka i sekret w kodzie aplikacji mobilnej, polecenie ukryte na ekranie Komputera i karta z czatu do wpisania na ekranie), świeża sesja per atak,
+- **Red team na promptfoo** (`security/redteam/`): 23 ataki na agentów (w tym orzeczenie wstrzyknięte przez treść strony, klucz do zapisania w skarbcu wiedzy, paczka-literówka i sekret w kodzie aplikacji mobilnej, polecenie ukryte na ekranie Komputera i karta z czatu do wpisania na ekranie), świeża sesja per atak,
   wykrywanie wycieków. Ostatni zapisany przebieg objął 12 ówczesnych ataków: **12/12 odpartych** po uszczelnieniu;
   dla 9 dodanych później repo nie ma jeszcze wyniku (przebieg wymaga działającej floty z kluczem modelu).
 - **Deny dla całej floty** (`shared/security/deny.yaml`, mergowane do każdego profilu): blokada zmiany

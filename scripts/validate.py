@@ -7,6 +7,11 @@ definicje crona, evals, składnię skryptów, pakiet aplikacji HQ (jednoznaczne 
 klucze tekstów PL/EN), przypadkowe sekrety w repo i zgodność dokumentacji z kodem
 (linki i kotwice w *.md, pełna lista floty w dokumentach przeglądowych, liczby skilli i evals w tabelach).
 Kod wyjścia 1 przy błędach; ostrzeżenia nie blokują.
+
+Sprawdza samo publiczne repo, także przy ustawionym JARVO_NAKLADKA: `make validate` i CI dają ten sam wynik na każdej
+maszynie, a dokumenty repo opisują tylko agentów repo. `--nakladka KATALOG` dokłada agentów nakładki prywatnej
+(docs/FLEET.md „Agenci biznesowi”): te same kontrole profilu, evals, marki, uchwytów i locka na flocie połączonej,
+wzorzec misji w wzorce.md, atak red teamu w security/redteam/testy.yaml, składnia skryptów i sekrety w nakładce.
 """
 
 from __future__ import annotations
@@ -50,11 +55,11 @@ SECRET_PATTERNS = [
 SKIP_DIRS = {".git", ".claude", "build", "node_modules", "__pycache__", ".pytest_cache"}
 
 
-def _pominiety(path: Path) -> bool:
+def _pominiety(path: Path, root: Path | None = None) -> bool:
     """Ścieżka w katalogu z SKIP_DIRS liczona OD KORZENIA REPO: repo w worktree pod .claude/worktrees/… (albo w
     katalogu build) inaczej pomijało każdy plik, a kontrola skryptów i sekretów nie sprawdzała niczego."""
     try:
-        czesci = path.relative_to(fl.REPO_ROOT).parts
+        czesci = path.relative_to(root or fl.REPO_ROOT).parts
     except ValueError:
         czesci = path.parts
     return any(p in SKIP_DIRS for p in czesci)
@@ -65,9 +70,10 @@ DOC_COUNT_COLUMNS = {"skille": "skille", "workflowy własne": "skille", "evals":
 MD_LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 
 
-def w_repo(path: Path) -> str:
-    """Ścieżka względem repo w komunikatach: z „/” na każdym systemie, tak jak w dokumentach i testach."""
-    return path.relative_to(fl.REPO_ROOT).as_posix()
+def w_repo(path: Path, root: Path | None = None) -> str:
+    """Ścieżka względem repo (albo nakładki `root`) w komunikatach: z „/” na każdym systemie, jak w dokumentach i testach."""
+    rel = path.relative_to(root or fl.REPO_ROOT).as_posix()
+    return f"nakładka: {rel}" if root else rel
 
 
 class Report:
@@ -101,7 +107,7 @@ def check_fleet(fleet: fl.Fleet, r: Report) -> None:
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", a.name):
             r.err(f"{a.name}: nazwa profilu musi być [a-z0-9-]")
         if a.status == "active" and not a.dir.is_dir():
-            r.err(f"{a.name}: brak katalogu profiles/{a.name}")
+            r.err(f"{a.name}: brak katalogu {'nakładka: ' if a.root else ''}profiles/{a.name}")
         if a.hq_room not in fl.HQ_ROOMS:
             r.err(f"{a.name}: hq_room {a.hq_room!r} spoza {sorted(fl.HQ_ROOMS)}")
         if len(a.description) < 40:
@@ -115,9 +121,11 @@ def check_fleet(fleet: fl.Fleet, r: Report) -> None:
                     r.err(f"{a.name}: {jez} ma {len(rola.split())} słów (najwyżej 8)")
     check_marki(fleet, r)
     check_uchwyty(fleet, r)
-    for d in fl.PROFILES_DIR.iterdir():
-        if d.is_dir() and not d.name.startswith("_") and d.name not in names:
-            r.err(f"profiles/{d.name}: brak wpisu w fleet.yaml")
+    katalogi = [(fl.PROFILES_DIR, "")] + ([(fleet.nakladka / "profiles", "nakładka: ")] if fleet.nakladka else [])
+    for katalog, przedrostek in katalogi:
+        for d in katalog.iterdir() if katalog.is_dir() else []:
+            if d.is_dir() and not d.name.startswith("_") and d.name not in names:
+                r.err(f"{przedrostek}profiles/{d.name}: brak wpisu w {przedrostek}fleet.yaml")
 
 
 MARKA_RE = re.compile(r"[a-z0-9-]+")
@@ -232,10 +240,11 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
         if a.name == fleet.orchestrator and plat in toolsets and "kanban" not in toolsets[plat]:
             r.err(f"{a.name}: orkiestrator bez toolsetu kanban na {label}")
     if a.kind == "generalist":
-        # prawa ręka czyta skille wszystkich snajperów (tylko do odczytu); nowy snajper musi tu trafić
+        # prawa ręka czyta skille wszystkich snajperów (tylko do odczytu); nowy snajper repo musi tu trafić, snajperów
+        # nakładki prywatnej dopisuje build (scripts/build.py)
         dirs = " ".join((cfg.get("skills") or {}).get("external_dirs") or [])
         for s in fleet.active():
-            if s.kind == "specialist" and f"/profiles/{s.name}/skills" not in dirs:
+            if s.kind == "specialist" and not s.root and f"/profiles/{s.name}/skills" not in dirs:
                 r.err(f"{a.name}: skills.external_dirs bez skilli {s.name} (generalista czyta skille wszystkich snajperów)")
     appr = cfg.get("approvals") or {}
     for key in ("cron_mode", "single_query_mode", "unattended_mode"):
@@ -374,7 +383,7 @@ def check_calibration(r: Report) -> None:
 
 
 def check_lock(fleet: fl.Fleet, own: dict[str, set[str]], r: Report) -> None:
-    lock = fl.load_lock()
+    lock = fl.load_lock(nakladka=fleet.nakladka)
     sources = lock.get("sources", {})
     for name, spec in sources.items():
         if spec.get("type") == "git" and not re.fullmatch(r"[0-9a-f]{40}", str(spec.get("rev", ""))):
@@ -550,7 +559,7 @@ def check_evals(fleet: fl.Fleet, r: Report) -> None:
     import evalslib as ev
     kanarki: dict[str, str] = {}
     for a in fleet.active():
-        path = fl.REPO_ROOT / "evals" / a.name / "scenarios.yaml"
+        path = a.evals_file
         if not path.exists():
             r.err(f"{a.name}: brak evals/{a.name}/scenarios.yaml")
             continue
@@ -587,18 +596,18 @@ def check_evals(fleet: fl.Fleet, r: Report) -> None:
             r.err(f"{a.name}: evals mają {n_out} scenariuszy out_of_scope (< 3)")
 
 
-def check_scripts(r: Report) -> None:
+def check_scripts(r: Report, root: Path | None = None) -> None:
     bash = fl.bash()                # na Windows Git Bash, nigdy System32\bash.exe (WSL)
     bez_basha = 0
-    for path in sorted(fl.REPO_ROOT.rglob("*")):
-        if _pominiety(path) or not path.is_file():
+    for path in sorted((root or fl.REPO_ROOT).rglob("*")):
+        if _pominiety(path, root) or not path.is_file():
             continue
         if path.suffix == ".py":
             # kompilacja w pamięci: repo w kontenerze jest tylko do odczytu (py_compile chce zapisać .pyc)
             try:
                 compile(path.read_text(encoding="utf-8"), str(path), "exec", dont_inherit=True)
             except SyntaxError as exc:
-                r.err(f"{w_repo(path)}: błąd składni Pythona: {exc.msg} (linia {exc.lineno})")
+                r.err(f"{w_repo(path, root)}: błąd składni Pythona: {exc.msg} (linia {exc.lineno})")
         elif path.suffix == ".sh":
             if bash is None:
                 bez_basha += 1
@@ -606,22 +615,22 @@ def check_scripts(r: Report) -> None:
             res = subprocess.run([bash, "-n", str(path)], capture_output=True, text=True, encoding="utf-8",
                                  errors="replace")
             if res.returncode:
-                r.err(f"{w_repo(path)}: błąd składni bash: {res.stderr.strip()[:200]}")
+                r.err(f"{w_repo(path, root)}: błąd składni bash: {res.stderr.strip()[:200]}")
         elif path.suffix in {".cjs", ".mjs", ".js"} and shutil.which("node"):
             res = subprocess.run([shutil.which("node"), "--check", str(path)], capture_output=True, text=True,
                                  encoding="utf-8", errors="replace")
             if res.returncode:
-                r.err(f"{w_repo(path)}: błąd składni JS: {res.stderr.strip()[:200]}")
+                r.err(f"{w_repo(path, root)}: błąd składni JS: {res.stderr.strip()[:200]}")
     if bez_basha:
         r.warn(f"składnia {bez_basha} skryptów .sh niesprawdzona: brak basha (na Windows potrzebny Git Bash)")
 
 
-def check_secrets(r: Report) -> None:
-    for path in sorted(fl.REPO_ROOT.rglob("*")):
-        if _pominiety(path) or not path.is_file() or path.stat().st_size > 2_000_000:
+def check_secrets(r: Report, root: Path | None = None) -> None:
+    for path in sorted((root or fl.REPO_ROOT).rglob("*")):
+        if _pominiety(path, root) or not path.is_file() or path.stat().st_size > 2_000_000:
             continue
         if path.name == ".env" or (path.suffix == ".env" and not path.name.endswith(".example")):
-            r.err(f"{w_repo(path)}: plik .env nie może być w repo")
+            r.err(f"{w_repo(path, root)}: plik .env nie może być w repo")
             continue
         try:
             text = path.read_text(encoding="utf-8")
@@ -629,7 +638,7 @@ def check_secrets(r: Report) -> None:
             continue
         for pattern, label in SECRET_PATTERNS:
             if pattern.search(text):
-                r.err(f"{w_repo(path)}: wygląda na {label}")
+                r.err(f"{w_repo(path, root)}: wygląda na {label}")
 
 
 # pakiet aplikacji to sklejone hq/web/src/*.js w jednym IIFE: nazwy z najwyższego poziomu muszą być jednoznaczne
@@ -864,7 +873,7 @@ def check_docs(fleet: fl.Fleet, r: Report) -> None:
                 r.err(f"{rel}: brak agenta `{a.name}` (dokument opisuje całą flotę)")
     counts = {}
     for a in fleet.active():
-        scen = fl.load_yaml(root / "evals" / a.name / "scenarios.yaml") if (root / "evals" / a.name).exists() else {}
+        scen = fl.load_yaml(a.evals_file) if a.evals_file.exists() else {}
         counts[a.name] = {"skille": len(list((a.dir / "skills").rglob("SKILL.md"))),
                           "evals": len((scen or {}).get("scenarios") or [])}
     uchwyty = {a.name: a.handle for a in fleet.active()}
@@ -893,7 +902,7 @@ def check_docs(fleet: fl.Fleet, r: Report) -> None:
 
 # polecenia, które działają tylko z daną usługą: skill, który ich używa, musi to zadeklarować (`metadata.jarvo.wymaga`)
 SERVICE_COMMANDS = {"skarbiec": r"ads\.py (?:szkic|koperta|pauza|budzet|stop)\b"}
-PATTERNS_FILE = "skills/fleet/dispatch-playbook/references/patterns.md"
+PATTERNS_FILE = fl.PATTERNS_FILE
 
 
 def check_routing(fleet: fl.Fleet, r: Report) -> None:
@@ -912,10 +921,11 @@ def check_routing(fleet: fl.Fleet, r: Report) -> None:
     orch = next((a for a in aktywni if a.name == fleet.orchestrator), None)
     wzorce = orch.dir / PATTERNS_FILE if orch else None
     if wzorce and wzorce.is_file():
-        tekst = wzorce.read_text(encoding="utf-8")
+        tekst = wzorce.read_text(encoding="utf-8") + fl.wzorce_nakladki(fleet.nakladka)
         for a in aktywni:
             if a.kind == "specialist" and f"`{a.name}`" not in tekst:
-                r.err(f"{a.name}: nie występuje w żadnym wzorcu misji Jarva ({PATTERNS_FILE})")
+                gdzie = f"nakładka: {fl.NAKLADKA_WZORCE}" if a.root else PATTERNS_FILE
+                r.err(f"{a.name}: nie występuje w żadnym wzorcu misji Jarva ({gdzie})")
 
 
 def check_services(fleet: fl.Fleet, r: Report) -> None:
@@ -933,15 +943,57 @@ def check_services(fleet: fl.Fleet, r: Report) -> None:
                     r.err(f"{a.name}/{name}: używa poleceń usługi {usluga!r}, ale nie deklaruje `wymaga: [{usluga}]`")
 
 
-def run() -> Report:
+def check_nakladka(fleet: fl.Fleet, r: Report) -> None:
+    """Nakładka prywatna (docs/FLEET.md „Agenci biznesowi”): jej agenci to specjaliści, każdy aktywny ma w nakładce
+    co najmniej jeden atak red teamu (security/redteam/testy.yaml: lista testów promptfoo z `vars.profil`
+    i `vars.atak`), a testy atakują tylko agentów floty. Resztę (profil, SOUL, evals, marka, wzorzec misji, lock)
+    sprawdzają te same kontrole co agentów repo."""
+    n = fleet.nakladka
+    swoi = [a for a in fleet.agents if a.root]
+    if not swoi:
+        r.warn(f"nakładka {n}: fleet.yaml bez agentów")
+    for a in swoi:
+        if a.kind != "specialist":
+            r.err(f"{a.name}: agent nakładki to specjalista (orkiestrator i generalista są w publicznym repo), nie {a.kind}")
+    plik = n / fl.NAKLADKA_REDTEAM
+    testy = fl.load_yaml(plik) if plik.is_file() else []
+    if not isinstance(testy, list):
+        r.err(f"nakładka: {fl.NAKLADKA_REDTEAM.as_posix()} musi być listą testów promptfoo (jak `tests:` w "
+              "security/redteam/promptfooconfig.yaml)")
+        testy = []
+    znani = {a.name for a in fleet.agents}
+    atakowani = set()
+    for i, t in enumerate(testy, 1):
+        zmienne = (t or {}).get("vars") or {} if isinstance(t, dict) else {}
+        profil, atak = str(zmienne.get("profil") or ""), str(zmienne.get("atak") or "")
+        if not (isinstance(t, dict) and t.get("description") and profil and atak):
+            r.err(f"nakładka: {fl.NAKLADKA_REDTEAM.as_posix()} test #{i}: potrzebne description, vars.profil i vars.atak")
+        elif profil not in znani:
+            r.err(f"nakładka: {fl.NAKLADKA_REDTEAM.as_posix()} test #{i}: profil {profil!r} nie jest agentem floty")
+        atakowani.add(profil)
+    for a in swoi:
+        if a.status == "active" and a.name not in atakowani:
+            r.err(f"{a.name}: brak ataku red teamu w nakładce ({fl.NAKLADKA_REDTEAM.as_posix()}, scripts/redteam.sh)")
+
+
+def run(nakladka: Path | None = None) -> Report:
+    """Walidacja publicznego repo; z `nakladka` także agentów nakładki prywatnej (na flocie połączonej: uchwyty,
+    marki, kanarki i nazwy sprawdzane razem), a dokumenty repo dalej tylko z agentami repo."""
     r = Report()
-    fleet = fl.load_fleet()
+    try:
+        fleet = fl.load_fleet(nakladka=nakladka)
+        lock = fl.load_lock(nakladka=nakladka)
+    except SystemExit as e:                  # kolizja nazwy z flotą publiczną, obcy klucz w pliku nakładki
+        r.err(str(e))
+        return r
+    publiczna = fl.Fleet(raw=fleet.raw, agents=[a for a in fleet.agents if not a.root])
     protocol = (fl.REPO_ROOT / fleet.raw["shared"]["protocol"]).read_text(encoding="utf-8")
     check_fleet(fleet, r)
+    if fleet.nakladka:
+        check_nakladka(fleet, r)
     check_routing(fleet, r)
     check_services(fleet, r)
     own: dict[str, set[str]] = {}
-    lock = fl.load_lock()
     for a in fleet.active():
         own[a.name] = check_profile(fleet, a, protocol, r)
     check_lock(fleet, own, r)
@@ -956,19 +1008,32 @@ def run() -> Report:
     check_calibration(r)
     check_hq(r)
     check_bez_base(r)
-    check_docs(fleet, r)
+    check_docs(publiczna, r)
     check_scripts(r)
     check_secrets(r)
+    if fleet.nakladka:
+        check_scripts(r, fleet.nakladka)
+        check_secrets(r, fleet.nakladka)
     return r
 
 
-def main() -> int:
-    r = run()
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+    ap = argparse.ArgumentParser(description="Walidacja repo floty Jarvo (bez nakładki prywatnej, także przy "
+                                             f"{fl.NAKLADKA_ENV}).")
+    ap.add_argument("--nakladka", metavar="KATALOG", type=Path,
+                    help="sprawdź też agentów nakładki prywatnej z tego katalogu (docs/FLEET.md „Agenci biznesowi”)")
+    args = ap.parse_args(argv)
+    if args.nakladka is not None and not args.nakladka.is_dir():
+        print(f"  ✗ --nakladka {args.nakladka}: nie ma takiego katalogu")
+        return 1
+    r = run(args.nakladka)
     for w in r.warnings:
         print(f"  ⚠ {w}")
     for e in r.errors:
         print(f"  ✗ {e}")
-    print(f"Walidacja: {len(r.errors)} błędów, {len(r.warnings)} ostrzeżeń")
+    zakres = f" (z nakładką {args.nakladka})" if args.nakladka else ""
+    print(f"Walidacja{zakres}: {len(r.errors)} błędów, {len(r.warnings)} ostrzeżeń")
     return 1 if r.errors else 0
 
 

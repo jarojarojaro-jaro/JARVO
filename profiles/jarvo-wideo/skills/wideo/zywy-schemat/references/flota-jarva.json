@@ -12,7 +12,7 @@
   "preset": "jarvo-jasny"
  },
  "credit": {
-  "text": "Misja i kolejność poglądowe · flota JARVO: 10 agentów (fleet.yaml) · ruch: live-panel (MIT)",
+  "text": "Misja i kolejność poglądowe · flota JARVO: 9 agentów (fleet.yaml) · ruch: live-panel (MIT)",
   "y": 1204,
   "size": 13
  },
@@ -53,7 +53,7 @@
    "align": "center",
    "size": 18,
    "c": "dim",
-   "t": "10 agentów: Jarvo prowadzi, 9 specjalistów robi"
+   "t": "9 agentów: Jarvo prowadzi, 8 specjalistów robi"
   },
   {
    "type": "box",

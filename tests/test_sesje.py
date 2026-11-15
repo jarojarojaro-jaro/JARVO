@@ -228,7 +228,7 @@ def test_wiadomosc_w_watku_kernela_idzie_do_skrzynki_bez_dopisku(tmp_path, monke
 
 def test_dopisek_dev_zaklada_karte_dla_profilu(tmp_path, monkeypatch):
     s = load()
-    konfig_sesji(tmp_path, monkeypatch, {"dev": {"nazwa": "Jarodev", "profil": "jarvo-jarodev"}})
+    konfig_sesji(tmp_path, monkeypatch, {"dev": {"nazwa": "Sklep", "profil": "jarvo-sklep"}})
     karty = []
 
     def zaloz(profil, tytul, tresc, klucz):
@@ -242,11 +242,11 @@ def test_dopisek_dev_zaklada_karte_dla_profilu(tmp_path, monkeypatch):
     assert asyncio.run(s.przechwyc(event=zdarzenie(tekst, mid="80"), gateway=brama))["action"] == "skip"   # ponowienie
     assert len(karty) == 1
     k = karty[0]
-    assert k["profil"] == "jarvo-jarodev" and k["klucz"] == "telegram:777:80"
+    assert k["profil"] == "jarvo-sklep" and k["klucz"] == "telegram:777:80"
     assert k["tytul"] == "Dodaj eksport CSV do raportu kosztów w panelu, z filtrem…"
     assert k["tresc"] == ("Dodaj eksport CSV do raportu kosztów w panelu, z filtrem dat i sumą na końcu\n\n"
                           "— od właściciela przez Telegram, dopisek dev")
-    assert brama.wyslane == [("777", "📥 Jarodev: przyjąłem, karta t_abc123.")]
+    assert brama.wyslane == [("777", "📥 Sklep: przyjąłem, karta t_abc123.")]
 
 
 def test_karta_przez_api_kanbana_hermesa(monkeypatch):
@@ -264,14 +264,14 @@ def test_karta_przez_api_kanbana_hermesa(monkeypatch):
     pakiet.kanban_db, pakiet.kanban_db_connect = kb, kbc
     for nazwa, mod in (("hermes_cli", pakiet), ("hermes_cli.kanban_db", kb), ("hermes_cli.kanban_db_connect", kbc)):
         monkeypatch.setitem(sys.modules, nazwa, mod)
-    assert s.zaloz_karte("jarvo-jarodev", "Tytuł", "Treść", "telegram:1:2") == "t_42"
-    assert wolania == [("polaczenie", {"title": "Tytuł", "body": "Treść", "assignee": "jarvo-jarodev",
+    assert s.zaloz_karte("jarvo-sklep", "Tytuł", "Treść", "telegram:1:2") == "t_42"
+    assert wolania == [("polaczenie", {"title": "Tytuł", "body": "Treść", "assignee": "jarvo-sklep",
                                        "created_by": "user", "idempotency_key": "telegram:1:2"})]
 
 
 def test_nieudana_karta_idzie_do_jarva_i_mozna_ponowic(tmp_path, monkeypatch):
     s = load()
-    konfig_sesji(tmp_path, monkeypatch, {"dev": {"nazwa": "Jarodev", "profil": "jarvo-jarodev"}})
+    konfig_sesji(tmp_path, monkeypatch, {"dev": {"nazwa": "Sklep", "profil": "jarvo-sklep"}})
     monkeypatch.setattr(s, "zaloz_karte", lambda *a: (_ for _ in ()).throw(RuntimeError("kanban zajęty")))
     assert asyncio.run(s.przechwyc(event=zdarzenie("napraw build dev", mid="90"), gateway=Brama())) is None
     monkeypatch.setattr(s, "zaloz_karte", lambda *a: "t_1")

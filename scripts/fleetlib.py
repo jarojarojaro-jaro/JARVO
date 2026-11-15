@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import re
 import shutil
 import unicodedata
@@ -20,6 +21,15 @@ PROFILES_DIR = REPO_ROOT / "profiles"
 SHARED_DIR = REPO_ROOT / "shared"
 VENDOR_LOCK = REPO_ROOT / "vendor" / "skills.lock.yaml"
 FLEET_FILE = REPO_ROOT / "fleet.yaml"
+# nakładka prywatna (docs/FLEET.md „Agenci biznesowi”): katalog z agentami jednej instalacji, poza publicznym repo,
+# w układzie repo (fleet.yaml z samą listą `agents:`, profiles/, evals/, security/redteam/testy.yaml, skills.lock.yaml,
+# wzorce.md). Skrypty widzą ją tylko przez tę zmienną; domyślne `<root>/nakladka` instalacji podaje jarvo/flota.py.
+NAKLADKA_ENV = "JARVO_NAKLADKA"
+NAKLADKA_WZORCE = "wzorce.md"                 # wzorce misji agentów nakładki, doklejane do dispatch-playbook Jarva
+NAKLADKA_REDTEAM = Path("security") / "redteam" / "testy.yaml"
+_Z_ENV: Any = object()                         # domyślny argument: nakładka z JARVO_NAKLADKA
+# wzorce misji Jarva (dispatch-playbook) w profilu orkiestratora; validate sprawdza, build dokleja wzorce nakładki
+PATTERNS_FILE = "skills/fleet/dispatch-playbook/references/patterns.md"
 
 CALIBRATION_DIR = SHARED_DIR / "calibration"
 # prefiks identyfikatora modelu (bez dostawcy) → plik kalibracji w shared/calibration/
@@ -153,10 +163,20 @@ class Agent:
     # agent biznesowy: slug marki = katalog brands/<marka>/ w skarbcu; widzi w wiedzy tylko swoją markę
     # (docs/FLEET.md „Agenci biznesowi”); "" = bez marki, widzi wszystko
     marka: str = ""
+    root: Path | None = None                  # katalog nakładki prywatnej, z której jest agent; None = publiczne repo
 
     @property
     def dir(self) -> Path:
-        return PROFILES_DIR / self.name
+        return self.root / "profiles" / self.name if self.root else PROFILES_DIR / self.name
+
+    @property
+    def korzen(self) -> Path:
+        """Repo (publiczne albo nakładka), w którym agent ma profiles/, evals/ i resztę."""
+        return self.root or REPO_ROOT
+
+    @property
+    def evals_file(self) -> Path:
+        return self.korzen / "evals" / self.name / "scenarios.yaml"
 
     @property
     def aliasy(self) -> list[str]:
@@ -170,6 +190,7 @@ class Agent:
 class Fleet:
     raw: dict
     agents: list[Agent]
+    nakladka: Path | None = None              # nakładka prywatna, z której doszli agenci (load_fleet)
 
     @property
     def orchestrator(self) -> str:
@@ -249,36 +270,96 @@ class Fleet:
         return self.tiers[tier]
 
 
-def load_fleet(path: Path | None = None) -> Fleet:
+def katalog_nakladki() -> Path | None:
+    """Nakładka prywatna z JARVO_NAKLADKA (pusto albo brak = bez nakładki); zmienna wskazująca nie-katalog to błąd."""
+    wartosc = os.environ.get(NAKLADKA_ENV, "").strip()
+    if not wartosc:
+        return None
+    p = Path(wartosc).expanduser().resolve()
+    if not p.is_dir():
+        raise SystemExit(f"{NAKLADKA_ENV}={wartosc}: nie ma takiego katalogu (nakładka prywatna, docs/FLEET.md)")
+    return p
+
+
+def _nakladka(nakladka: Any) -> Path | None:
+    return katalog_nakladki() if nakladka is _Z_ENV else (Path(nakladka).resolve() if nakladka else None)
+
+
+def _plik_nakladki(n: Path, nazwa: str, klucze: set[str]) -> dict:
+    """YAML nakładki (fleet.yaml, skills.lock.yaml) tylko z kluczami `klucze`; brak pliku = pusto."""
+    plik = n / nazwa
+    if not plik.is_file():
+        return {}
+    dane = load_yaml(plik) or {}
+    obce = sorted(set(dane) - klucze) if isinstance(dane, dict) else ["(to nie mapa)"]
+    if obce:
+        raise SystemExit(f"nakładka {n}: {nazwa} ma tylko {', '.join(sorted(klucze))}, a ma też {', '.join(map(str, obce))} "
+                         "(reszta konfiguracji floty jest w publicznym repo)")
+    return dane
+
+
+def _agent(entry: dict, root: Path | None = None) -> Agent:
+    return Agent(
+        name=entry["name"],
+        kind=entry["kind"],
+        title=entry.get("title", ""),
+        description=" ".join(str(entry.get("description", "")).split()),
+        model_tier=entry.get("model_tier", "strong"),
+        delegation_tier=entry.get("delegation_tier", "fast"),
+        autonomy_max=entry.get("autonomy_max", "A1"),
+        telegram_topic=entry.get("telegram_topic", ""),
+        status=entry.get("status", "planned"),
+        emoji=entry.get("emoji", ""),
+        pin_skills=list(entry.get("pin_skills", []) or []),
+        hq_room=entry.get("hq_room", "office"),
+        hq_label=entry.get("hq_label", "") or entry.get("title", ""),
+        hq_short=entry.get("hq_short", "") or entry["name"].removeprefix("jarvo-").capitalize(),
+        rola=" ".join(str(entry.get("rola", "") or "").split()),
+        handle=str(entry.get("handle", "") or ""),
+        aliasy_extra=[str(x) for x in (entry.get("aliasy") or [])],
+        en={k: " ".join(str(v).split()) for k, v in (entry.get("en") or {}).items() if v},
+        oddaj_gdy=" ".join(str(entry.get("oddaj_gdy", "") or "").split()),
+        komputer=entry.get("komputer") is True,
+        marka=str(entry.get("marka") or ""),
+        root=root,
+    )
+
+
+def load_fleet(path: Path | None = None, nakladka: Path | None = _Z_ENV) -> Fleet:
+    """Flota z fleet.yaml i agenci nakładki prywatnej (`nakladka`, domyślnie z JARVO_NAKLADKA; None = bez nakładki).
+    Agent nakładki dochodzi na koniec listy (też do `raw["agents"]`) i zna swój katalog (`Agent.root`); nazwa jak
+    u agenta publicznego to błąd, nie podmiana."""
     raw = load_yaml(path or FLEET_FILE)
-    agents = []
-    for entry in raw.get("agents", []):
-        agents.append(
-            Agent(
-                name=entry["name"],
-                kind=entry["kind"],
-                title=entry.get("title", ""),
-                description=" ".join(str(entry.get("description", "")).split()),
-                model_tier=entry.get("model_tier", "strong"),
-                delegation_tier=entry.get("delegation_tier", "fast"),
-                autonomy_max=entry.get("autonomy_max", "A1"),
-                telegram_topic=entry.get("telegram_topic", ""),
-                status=entry.get("status", "planned"),
-                emoji=entry.get("emoji", ""),
-                pin_skills=list(entry.get("pin_skills", []) or []),
-                hq_room=entry.get("hq_room", "office"),
-                hq_label=entry.get("hq_label", "") or entry.get("title", ""),
-                hq_short=entry.get("hq_short", "") or entry["name"].removeprefix("jarvo-").capitalize(),
-                rola=" ".join(str(entry.get("rola", "") or "").split()),
-                handle=str(entry.get("handle", "") or ""),
-                aliasy_extra=[str(x) for x in (entry.get("aliasy") or [])],
-                en={k: " ".join(str(v).split()) for k, v in (entry.get("en") or {}).items() if v},
-                oddaj_gdy=" ".join(str(entry.get("oddaj_gdy", "") or "").split()),
-                komputer=entry.get("komputer") is True,
-                marka=str(entry.get("marka") or ""),
-            )
-        )
-    return Fleet(raw=raw, agents=agents)
+    agents = [_agent(entry) for entry in raw.get("agents", [])]
+    n = _nakladka(nakladka)
+    if n is not None:
+        wpisy = list(_plik_nakladki(n, "fleet.yaml", {"agents"}).get("agents") or [])
+        publiczni = {a.name for a in agents}
+        for entry in wpisy:
+            if entry.get("name") in publiczni:
+                raise SystemExit(f"nakładka {n}: agent {entry['name']} jest już we flocie publicznej (fleet.yaml); "
+                                 "agent nakładki potrzebuje własnej nazwy")
+        raw["agents"] = [*(raw.get("agents") or []), *wpisy]
+        agents += [_agent(entry, n) for entry in wpisy]
+    return Fleet(raw=raw, agents=agents, nakladka=n)
+
+
+def w_repo_albo_nakladce(rel: str | Path, repo: Path | None = None) -> Path:
+    """Plik `rel` (np. evals/<agent>/scenarios.yaml) w repo, a gdy go tam nie ma, w nakładce z JARVO_NAKLADKA."""
+    p = (repo or REPO_ROOT) / rel
+    n = katalog_nakladki()
+    if not p.exists() and n is not None and (n / rel).exists():
+        return n / rel
+    return p
+
+
+def sciezka_w_repo(path: Path) -> str:
+    """Ścieżka pliku floty względem jego repo (publicznego albo nakładki), z „/”: ten sam układ w obu."""
+    path = path.resolve()
+    for korzen in (REPO_ROOT, katalog_nakladki()):
+        if korzen is not None and path.is_relative_to(korzen.resolve()):
+            return path.relative_to(korzen.resolve()).as_posix()
+    return path.as_posix()
 
 
 def bash() -> str | None:
@@ -310,8 +391,23 @@ def zloz(s: str) -> str:
     return s.replace("ł", "l").replace("Ł", "L").lower()
 
 
-def load_lock(path: Path | None = None) -> dict:
-    return load_yaml(path or VENDOR_LOCK)
+def load_lock(path: Path | None = None, nakladka: Path | None = _Z_ENV) -> dict:
+    """Lock skilli z `agents:` nakładki prywatnej (skills.lock.yaml w nakładce, opcjonalny; źródła tylko z repo)."""
+    lock = load_yaml(path or VENDOR_LOCK)
+    n = _nakladka(nakladka)
+    wpisy = _plik_nakladki(n, "skills.lock.yaml", {"agents"}).get("agents") or {} if n is not None else {}
+    agenci = lock.setdefault("agents", {}) if wpisy else {}
+    for agent, entries in wpisy.items():
+        if agent in agenci:
+            raise SystemExit(f"nakładka {n}: skills.lock.yaml: agent {agent} ma już wpisy w vendor/skills.lock.yaml")
+        agenci[agent] = entries
+    return lock
+
+
+def wzorce_nakladki(n: Path | None) -> str:
+    """Wzorce misji Jarva dla agentów nakładki (wzorce.md), pusto bez nakładki albo pliku."""
+    plik = n / NAKLADKA_WZORCE if n else None
+    return plik.read_text(encoding="utf-8") if plik and plik.is_file() else ""
 
 
 def w_nakladce(dest: str) -> bool:

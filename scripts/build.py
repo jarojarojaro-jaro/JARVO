@@ -30,6 +30,10 @@ Kroki dla każdego aktywnego agenta z fleet.yaml:
      zatrzymuje build; wspólne skille Jarva (shared/skills) dostają tokeny jak skille własne,
   6. dla Jarva: skill `roster` i rubryki sędziego generowane z fleet.yaml i quality/rubric.md,
   7. cron/jobs.yaml → cron/jobs.json (przez API crona Hermesa, stałe ID zadań).
+
+Nakładka prywatna (JARVO_NAKLADKA, docs/FLEET.md „Agenci biznesowi”): jej agenci (fleet.yaml, profiles/, evals/,
+skills.lock.yaml) przechodzą te same kroki co agenci repo; jej wzorce.md dochodzą na koniec wzorców misji Jarva,
+skille jej specjalistów do skills.external_dirs generalisty, a ścieżka i commit nakładki do BUILD.json (`nakladka`).
 """
 
 from __future__ import annotations
@@ -580,6 +584,19 @@ def _git(args: list[str], cwd: Path | None = None) -> str:
                           errors="replace").stdout
 
 
+def stan_nakladki(n: Path | None) -> dict | None:
+    """Nakładka prywatna tego buildu dla BUILD.json i `jarvo status`: ścieżka i commit (pusto, gdy to nie repo git)."""
+    if n is None:
+        return None
+    commit = ""
+    if (n / ".git").exists():
+        try:
+            commit = _git(["rev-parse", "HEAD"], cwd=n).strip()
+        except (OSError, subprocess.CalledProcessError):
+            commit = ""
+    return {"sciezka": n.as_posix(), "commit": commit}
+
+
 def vendor_skills(agent: str, out_skills: Path, lock: dict, resolver: SourceResolver, report: list,
                   straznik: skan_skilli.Straznik | None = None, tokens: dict[str, str] | None = None) -> None:
     """Skille z locka. Wspólne skille Jarva (źródło repo-tree, shared/skills) dostają tokeny @@…@@ w plikach .md jak
@@ -818,10 +835,7 @@ def opis_skilla(path: Path, skrypty: set[str]) -> dict:
     skrypty floty wymienione w treści i własne skrypty skilla, sekcje i plik w repo."""
     fm, body = fl.read_skill(path)
     meta = fm.get("metadata") or {}
-    try:
-        plik = path.resolve().relative_to(fl.REPO_ROOT).as_posix()
-    except ValueError:
-        plik = path.as_posix()
+    plik = fl.sciezka_w_repo(path)
     return {"name": path.parent.name, "description": " ".join(str(fm.get("description", "")).split()), "path": plik,
             "version": str(fm.get("version") or ""), "reviewed": str((meta.get("jarvo") or {}).get("reviewed") or ""),
             "related": [str(s) for s in (meta.get("hermes") or {}).get("related_skills") or []],
@@ -852,8 +866,8 @@ def zmienne_srodowiska(agent_dir: Path) -> list[str]:
     return list(dict.fromkeys(nazwy))
 
 
-def evale_agenta(name: str) -> list[dict]:
-    plik = fl.REPO_ROOT / "evals" / name / "scenarios.yaml"
+def evale_agenta(agent: fl.Agent) -> list[dict]:
+    plik = agent.evals_file
     dane = fl.load_yaml(plik) if plik.is_file() else {}
     return [{"id": str(s["id"]), "type": str(s.get("type", ""))} for s in (dane or {}).get("scenarios") or [] if s.get("id")]
 
@@ -899,7 +913,7 @@ def repo_do_skarbca(fleet: fl.Fleet, out: Path, dane: dict) -> int:
             kopiuj(a.dir / rel, f"{baza}/{rel}")
     for a in dane["agents"]:
         for s in [*a["skills"], *a["shared_skills"]]:
-            katalog = (fl.REPO_ROOT / s["path"]).parent
+            katalog = fl.w_repo_albo_nakladce(s["path"]).parent
             for r in s.get("references") or []:
                 kopiuj(katalog / "references" / f"{r}.md", f"{Path(s['path']).parent.as_posix()}/references/{r}.md")
     wiersze = ["# Źródła zewnętrzne (vendor/zrodla.yaml)", "",
@@ -941,7 +955,7 @@ def wiedza_fleet(fleet: fl.Fleet, profiles_out: Path) -> dict:
                        "shared_skills": [opis_skilla(fl.SHARED_DIR / "skills" / n / "SKILL.md", znane) for n in wspolne],
                        "external_skills": [n for n in obce if n not in wspolne], "scripts": skrypty,
                        "mcp": serwery_mcp(a.dir / "config.yaml"), "env": zmienne_srodowiska(a.dir),
-                       "tools": narzedzia_agenta(a.dir), "evals": evale_agenta(a.name),
+                       "tools": narzedzia_agenta(a.dir), "evals": evale_agenta(a),
                        "changes_section": sekcja, "changes": zmiany, **({"marka": a.marka} if a.marka else {})})
     return {"orchestrator": fleet.orchestrator, "agents": agents, "repo_scripts": skrypty_repo, "zrodla": zrodla_zewnetrzne()}
 
@@ -1189,6 +1203,13 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         wtyczki["enabled"] = wlaczone + [w for w in [WIEDZA_PLUGIN] + ([KOMPUTER_PLUGIN] if agent.komputer else [])
                                          + ([ZGODY_PLUGIN, SESJE_PLUGIN] if u.natywny else []) if w not in wlaczone]
         cfg.setdefault("auxiliary", {})["jarvo_wiedza"] = {"model": fleet.model_for("frontier"), "timeout": CZAS_ZADANIA_WIEDZY}
+        if agent.kind == "generalist":
+            # skille specjalistów nakładki prywatnej: publiczny config wymienia tylko agentów repo (validate.py)
+            sk = cfg.setdefault("skills", {})
+            katalogi = [str(k) for k in sk.get("external_dirs") or []]
+            sk["external_dirs"] = katalogi + [k for k in (f"{tokens['BUILD_DIR']}/profiles/{s.name}/skills"
+                                                         for s in fleet.active() if s.root and s.kind == "specialist")
+                                              if k not in katalogi]
         naglowek = "# Wygenerowane przez scripts/build.py (tokeny, wspólne zakazy floty, skarbiec wiedzy, głos floty)."
         if u.natywny:
             ustaw_natywnie(cfg, fleet, u, czat=agent.name == fleet.orchestrator)
@@ -1208,6 +1229,12 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         with (dest / "config.yaml").open("a", encoding="utf-8", newline="\n") as f:
             f.write(f'\nfallback_providers:\n  - provider: "{fb["provider"]}"\n    model: "{fb["model"]}"\n')
 
+    # wzorce misji Jarva dla agentów nakładki prywatnej (wzorce.md) na końcu dispatch-playbook, z tokenami jak reszta
+    wzorce = fl.wzorce_nakladki(fleet.nakladka) if agent.name == fleet.orchestrator else ""
+    if wzorce and (dest / fl.PATTERNS_FILE).is_file():
+        tekst = (dest / fl.PATTERNS_FILE).read_text(encoding="utf-8").rstrip("\n")
+        zapisz(dest / fl.PATTERNS_FILE, f"{tekst}\n\n<!-- Wzorce agentów nakładki prywatnej ({fl.NAKLADKA_WZORCE}) -->\n\n"
+                                       + wzorce.lstrip("\n").rstrip("\n") + "\n")
     # skille własne → tokeny w SKILL.md i references; tabela „komu oddać” z fleet.yaml
     for md in (dest / "skills").rglob("*.md"):
         tekst = md.read_text(encoding="utf-8")
@@ -1378,10 +1405,15 @@ def main(argv: list[str] | None = None) -> int:
         repo_rev = _git(["rev-parse", "HEAD"], cwd=fl.REPO_ROOT).strip()
     except Exception:
         repo_rev = "unknown"
+    nakladka = stan_nakladki(fleet.nakladka)
+    if nakladka:
+        print(f"✓ nakładka prywatna: {nakladka['sciezka']} {nakladka['commit'] or '(bez gita)'}: "
+              + ", ".join(a.name for a in fleet.active() if a.root))
     manifest = {
         "built_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "repo_rev": repo_rev,
         "agents": summary,
+        "nakladka": nakladka,
         # JARVO_MODEL_PROVIDER z jarvo.env przy tym buildzie: aplikacja zapisuje go jako `nad` przy wyborze dostawcy
         "modele": {"env": provider_env, "dostawca": fleet.provider, "z_aplikacji": z_aplikacji},
         "plugins": wtyczki,

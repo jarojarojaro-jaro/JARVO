@@ -642,6 +642,12 @@ def _porty(u: Uklad, env: dict) -> list[tuple[str, int]]:
     return [(nazwa, port if port else dynamiczne[nazwa]) for nazwa, port in PORTY]
 
 
+def stan_nakladki(u: Uklad) -> dict | None:
+    """Nakładka prywatna ostatniego buildu floty (`nakladka` w `<root>/build/BUILD.json`: ścieżka i commit)."""
+    n = srodowisko.wczytaj_json(u.build / "BUILD.json").get("nakladka")
+    return n if isinstance(n, dict) and n.get("sciezka") else None
+
+
 def zbierz_status(u: Uklad, ot: Otoczenie) -> dict:
     biez = srodowisko.biezace(u)
     stan, powod = stan_serwisu(u, ot)
@@ -665,6 +671,7 @@ def zbierz_status(u: Uklad, ot: Otoczenie) -> dict:
         "autostart": instalator.stan_autostartu(u, ot),
         "porty": porty,
         "panel": adres_panelu(ot.env),
+        "nakladka": stan_nakladki(u),
         "panel_jarva": panel,
     }
 
@@ -739,6 +746,8 @@ def opis_statusu(r: dict) -> str:
     w.append("  porty:      " + ", ".join(f"{port} {'zajęty' if p['zajety'] else 'wolny'} ({p['nazwa']})"
                                           for port, p in r["porty"].items()))
     w.append(f"  panel:      {r['panel']} ({_opis_panelu(r.get('panel_jarva') or {})})")
+    n = r.get("nakladka")
+    w.append("  nakładka:   " + (f"{n.get('sciezka')} {n.get('commit') or '(bez gita)'}" if n else "brak"))
     return "\n".join(w)
 
 

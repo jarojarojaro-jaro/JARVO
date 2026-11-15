@@ -23,7 +23,7 @@ GRUPA = "-1001234567890"
 FLOTA = {"orchestrator": "jarvo", "agents": [
     {"name": "jarvo", "short": "Jarvo", "telegram_topic": "general"},
     {"name": "jarvo-sherlock", "short": "Sherlock", "telegram_topic": "sherlock"},
-    {"name": "jarvo-jarodev", "short": "Jarodev", "telegram_topic": "jarodev"},
+    {"name": "jarvo-sklep", "short": "Sklep", "telegram_topic": "sklep"},
     {"name": "jarvo-bez-watku", "short": "Cichy", "telegram_topic": ""}]}
 
 
@@ -91,7 +91,7 @@ def inst(tmp_path, monkeypatch):
     skrzynka = tmp_path / "kernel" / "skrzynka"
     (wc.konfig(u) / "sesje.json").write_text(json.dumps({
         "gpu": {"nazwa": "Kernel", "skrzynka": str(skrzynka)},
-        "dev": {"nazwa": "Jarodev", "profil": "jarvo-jarodev"}}), encoding="utf-8")
+        "dev": {"nazwa": "Sklep", "profil": "jarvo-sklep"}}), encoding="utf-8")
     api = BotAPI()
     monkeypatch.setattr(wc, "api_telegrama", api)
     flota = Flota()
@@ -122,17 +122,17 @@ def test_tematy_zaklada_brakujace_i_zapisuje_trasy(inst, capsys):
                                                                     "55": {"nazwa": "🔎 Sherlock"}}}})
     assert wc.polecenie_telegram_tematy(u, _a(), [], ot) == 0
     zalozone = api.metody("createForumTopic")
-    assert [d["name"] for d in zalozone] == ["Jarodev", "Kernel"] and all(d["chat_id"] == GRUPA for d in zalozone)
+    assert [d["name"] for d in zalozone] == ["Sklep", "Kernel"] and all(d["chat_id"] == GRUPA for d in zalozone)
     env = wc.czytaj_env(wc.konfig(u) / "jarvo.env")
     assert env["TELEGRAM_HQ_CHAT_ID"] == GRUPA and env["TELEGRAM_TOPIC_SHERLOCK"] == "55"
-    assert env["TELEGRAM_TOPIC_JARODEV"] == "101" and env["TELEGRAM_TOPIC_KERNEL"] == "102"
+    assert env["TELEGRAM_TOPIC_SKLEP"] == "101" and env["TELEGRAM_TOPIC_KERNEL"] == "102"
     assert env["TELEGRAM_OWNER_ID"] == "123456789"                             # reszta pliku zostaje
     sesje = json.loads((wc.konfig(u) / "sesje.json").read_text(encoding="utf-8"))
     assert sesje["gpu"]["czat"] == GRUPA and sesje["gpu"]["watek"] == "102"
-    assert sesje["dev"] == {"nazwa": "Jarodev", "profil": "jarvo-jarodev"}
+    assert sesje["dev"] == {"nazwa": "Sklep", "profil": "jarvo-sklep"}
     assert flota.wywolania == 1
     out = capsys.readouterr().out
-    assert "Sherlock: wątek 55 (był)" in out and "Jarodev: wątek 101 (nowy)" in out and "Kernel: wątek 102 (nowy)" in out
+    assert "Sherlock: wątek 55 (był)" in out and "Sklep: wątek 101 (nowy)" in out and "Kernel: wątek 102 (nowy)" in out
     assert "Flota wdrożona" in out and TOKEN not in out
     # drugi raz: wszystko znane (jarvo.env, sesje.json), nic nowego, bez wdrożenia
     api.wolania.clear()
@@ -145,12 +145,12 @@ def test_tematy_zaklada_brakujace_i_zapisuje_trasy(inst, capsys):
 def test_tematy_zaklada_od_nowa_usuniety_watek(inst, capsys):
     u, ot, api, flota = inst
     wc.zapisz_env(wc.konfig(u) / "jarvo.env", {"TELEGRAM_HQ_CHAT_ID": GRUPA, "TELEGRAM_TOPIC_SHERLOCK": "55",
-                                               "TELEGRAM_TOPIC_JARODEV": "56", "TELEGRAM_TOPIC_KERNEL": "57"})
+                                               "TELEGRAM_TOPIC_SKLEP": "56", "TELEGRAM_TOPIC_KERNEL": "57"})
     api.usuniete = {56}
     assert wc.polecenie_telegram_tematy(u, _a(bez_wdrozenia=True), [], ot) == 0
-    assert [d["name"] for d in api.metody("createForumTopic")] == ["Jarodev"]
+    assert [d["name"] for d in api.metody("createForumTopic")] == ["Sklep"]
     env = wc.czytaj_env(wc.konfig(u) / "jarvo.env")
-    assert env["TELEGRAM_TOPIC_JARODEV"] == "101" and env["TELEGRAM_TOPIC_KERNEL"] == "57"
+    assert env["TELEGRAM_TOPIC_SKLEP"] == "101" and env["TELEGRAM_TOPIC_KERNEL"] == "57"
     assert flota.wywolania == 0 and "wejdą przy następnym wdrożeniu" in capsys.readouterr().out
 
 

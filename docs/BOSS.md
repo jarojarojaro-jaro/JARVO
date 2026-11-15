@@ -42,8 +42,7 @@ Dzięki temu po każdym restarcie, kompresji czy nowej rozmowie Jarvo odtwarza p
          ▼                                                          ▼
   missions/<ID>/MISSION.md                         jarvo-sherlock / jarvo-web / jarvo-studio /
                                                    jarvo-wideo / jarvo-ads / jarvo-lowca /
-                                                   jarvo-mobile / jarvo-jarodev / jarvo-reka /
-                                                   jarvo (ekran, długie)
+                                                   jarvo-mobile / jarvo-reka / jarvo (ekran, długie)
                                                             │ kanban_request_review(reviewer="jarvo")
                                                             ▼
                                                    jarvo (pracownik-sędzia, lane "review")
@@ -308,7 +307,6 @@ albo daje kartę `jarvo-reka` z adnotacją „poza snajperami”.
 | leady, nowi klienci, komu sprzedać, przetargi do wzięcia, nowe firmy w branży, kontakt do firm | `jarvo-lowca` |
 | aplikacja mobilna, „czy potrzebujemy aplikacji”, PWA czy natywna, App Store, Google Play, audyt aplikacji | `jarvo-mobile` |
 | kliknij w panelu albo programie w przeglądarce, wypełnij formularz, przejdź stronę jak klient, przepisz z ekranu, załóż konto, zaloguj się, telefon, gdzie nie ma API | `jarvo` sam (gdy Komputer jest włączony); dłuższe niż kilka minut: karta przypisana do siebie (`assignee: jarvo`); płatność, wysyłka i publikacja tylko z `ZGODA WŁAŚCICIELA` w karcie |
-| klienci dla jarodev.pl: prośby o stronę w grupach FB, firmy bez strony z Map, szybki audyt strony firmy pod ofertę, lejek i szkice ofert jarodev (agent biznesowy: w karcie tylko kontekst jarodev) | `jarvo-jarodev` |
 | szybkie sprawy, dokumenty, konwersje, sklejanie wyników, organizacja, „ogarnij” | `jarvo-reka` |
 
 ---

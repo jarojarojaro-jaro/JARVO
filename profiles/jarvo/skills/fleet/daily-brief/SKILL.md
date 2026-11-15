@@ -43,7 +43,7 @@ Odpowiedz np. „1 ok, 2 nie”.
   Pozycja z wcześniejszego briefu dostaje na końcu jego numer w nawiasie, dokładnie „(z B-RRRR-MM-DD/n)”: skrypt
   zamyka wtedy starą pozycję, a odpowiedź trafi do nowej. Pozycja otwarta ≥ 3 dni: zapytaj, czy jest jeszcze aktualna.
 - **Agenci biznesowi** (`agenci_biznesowi`, `szkice_do_zgody`): jedno-dwa zdania. Najpierw szkice czekające na zgodę
-  z numerami lejka („Jarodev: 3 szkice do zgody, L-0002, L-0004, L-0007”); każdy szkic to pozycja w „Czeka na Ciebie”.
+  z numerami lejka („Sklep: 3 szkice do zgody, L-0002, L-0004, L-0007”); każdy szkic to pozycja w „Czeka na Ciebie”.
   Potem czego brakuje do startu: telefon („brak przydziału”), brand kit, wstrzymana rutyna, lejek nie założony, z jednym
   krokiem dla właściciela. Nic nowego i niczego nie brakuje → bez linii. Linię Kernela podaj tylko, gdy zwiad coś znalazł
   albo jest starszy niż 2 dni.

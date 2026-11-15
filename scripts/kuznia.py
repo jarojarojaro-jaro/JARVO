@@ -72,7 +72,8 @@ PORAŻKI ({n}):
 # ---------- ścieżki i pliki ----------
 
 def plik_skilla(agent: str, skill: str, repo: Path = fl.REPO_ROOT) -> Path:
-    p = repo / "profiles" / agent / "skills" / skill / "SKILL.md"
+    """SKILL.md agenta z repo, a agenta nakładki prywatnej (JARVO_NAKLADKA) z nakładki (patch idzie do jej repo)."""
+    p = fl.w_repo_albo_nakladce(Path("profiles") / agent / "skills" / skill / "SKILL.md", repo)
     if ".." in Path(skill).parts or not p.is_file():
         raise SystemExit(f"nie ma skilla {agent}:{skill} ({p})")
     return p

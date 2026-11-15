@@ -83,7 +83,6 @@ def test_uchwyty_i_aliasy_floty_jak_w_specyfikacji():
     assert a["jarvo-reka"].aliasy == ["reka", "jarvo-reka"]
     assert a["jarvo-wideo"].aliasy == ["wideo", "jarvo-wideo", "wideograf"]
     assert a["jarvo-mobile"].aliasy == ["mobile", "jarvo-mobile", "aplikacje"]
-    assert a["jarvo-jarodev"].aliasy == ["jarodev", "jarvo-jarodev"]   # agent biznesowy: hq_short = uchwyt
     assert all(re.fullmatch(r"[a-z][a-z0-9]{1,15}", x.handle) for x in a.values())
 
 

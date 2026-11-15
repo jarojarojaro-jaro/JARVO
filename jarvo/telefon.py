@@ -4,7 +4,7 @@
 PHONEUSE (osobne repo właściciela) steruje telefonem z Androidem przez usługę dostępności na telefonie; jego serwer
 MCP `tools/phone_mcp.py` (stdio) daje narzędzia list_phones, ping, screen, act, shot, wait i batch. Jarvo dopisuje
 go jako serwer `phone` w configu profilu `jarvo` ze wszystkimi narzędziami i telefonami (Jarvo sam steruje
-telefonem), więc w Hermesie są `mcp__phone__screen`, `mcp__phone__act` itd. Agent biznesowy (np. `jarvo-jarodev`)
+telefonem), więc w Hermesie są `mcp__phone__screen`, `mcp__phone__act` itd. Agent biznesowy (np. `jarvo-sklep`)
 dostaje ten sam serwer tylko z przydziałem właściciela i tylko na JEDEN telefon: env PHONEUSE_ONLY=<telefon>
 (phone_mcp.py pokazuje wtedy tylko ten telefon i odrzuca każde wywołanie z inną nazwą). Bez `jarvo telefon on`
 w żadnym configu nie ma wpisu `phone` (repo go nie zawiera); bez przydziału agent biznesowy nie ma serwera phone.
@@ -20,7 +20,7 @@ w żadnym configu nie ma wpisu `phone` (repo go nie zawiera); bez przydziału ag
   jarvo telefon status [--json]
         stan, pliki, SDK, adb, wpis w zainstalowanych profilach
   jarvo telefon przydziel PROFIL TELEFON
-        przydział jednego telefonu agentowi biznesowemu (`profile` w telefon.json, np. {"jarvo-jarodev": "fb"});
+        przydział jednego telefonu agentowi biznesowemu (`profile` w telefon.json, np. {"jarvo-sklep": "fb"});
         przy włączonym telefonie od razu wpis phone z PHONEUSE_ONLY w tym profilu (ta sama zasada restartu)
   jarvo telefon zabierz PROFIL
         zdejmuje przydział: mcp_servers.phone.enabled: false w tym profilu, następne jarvo update usuwa wpis
@@ -427,7 +427,7 @@ def polecenie_off(u: Uklad, a, _reszta=(), _ot=None) -> int:
 def _zly_profil(profil: str) -> bool:
     if PROFIL_BIZNESOWY.fullmatch(profil):
         return False
-    print(f"{profil!r}: przydział dostaje agent biznesowy floty (jarvo-<nazwa>, np. jarvo-jarodev); Jarvo ma "
+    print(f"{profil!r}: przydział dostaje agent biznesowy floty (jarvo-<nazwa>, np. jarvo-sklep); Jarvo ma "
           "wszystkie telefony bez przydziału.", file=sys.stderr)
     return True
 
@@ -594,7 +594,7 @@ def dodaj_polecenia(sub) -> None:
     k = t.add_parser("off", help="wyłącz: enabled: false w profilach, restart bramy bez kart w toku")
     k.set_defaults(funkcja=polecenie_off)
     k = t.add_parser("przydziel", help="jeden telefon dla agenta biznesowego (PHONEUSE_ONLY), restart bez kart w toku")
-    k.add_argument("profil", metavar="PROFIL", help="agent biznesowy, np. jarvo-jarodev")
+    k.add_argument("profil", metavar="PROFIL", help="agent biznesowy, np. jarvo-sklep")
     k.add_argument("telefon", metavar="TELEFON", help="nazwa telefonu z PHONEUSE (list_phones)")
     k.set_defaults(funkcja=polecenie_przydziel)
     k = t.add_parser("zabierz", help="zdejmij przydział: enabled: false w profilu agenta")

@@ -216,20 +216,6 @@ Wszystkie źródła bez kluczy. Odmowa źródła = blokada, bez obchodzenia; opi
 
 ---
 
-## `jarvo-jarodev`: Jarodev (agent biznesowy jarodev.pl)
-
-| Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
-|---|---|---|---|---|
-| PHONEUSE `tools/phone_mcp.py` (repo właściciela) | grupy i posty na Facebooku na **jednym** przydzielonym telefonie: `PHONEUSE_ONLY=<telefon>` (lista i każde wywołanie tylko z tym telefonem); `confirm=true` tylko za „tak” właściciela | własny kod | n/d | serwer MCP `phone` dopisany przez `jarvo telefon przydziel` ([MOBILE.md](MOBILE.md)) |
-| Komputer Jarva (`komputer/plugin`, wejście z twardymi zasadami) | Mapy Google w przeglądarce, bez Places API (decyzja właściciela); jedna sesja steruje naraz | MIT (kod Jarva), Chromium BSD-3-Clause | n/d | narzędzie `komputer` i `computer_use` na karcie i w CLI ([KOMPUTER.md](KOMPUTER.md)) |
-| `seo_check.py` (skrypt Weba) | szybki audyt jednej strony firmy: head, OG, treść, robots.txt, sitemap, 404 | własny kod | n/d | `wygrane.py --web-skrypty` |
-| [Lighthouse](https://github.com/GoogleChrome/lighthouse) | jeden przebieg mobilny: wydajność i SEO (LCP, wynik, waga strony) | Apache-2.0 | see-infra | `wygrane.py --lighthouse` (Chromium i flagi z `audit.py` Weba) |
-| `lejek.py`, `poranek.py`, `wygrane.py` | lejek (statusy z zapisem zgody, odmowa maila, telefonu i SMS-a do firm z Map, retencja RODO, limity dnia), rutyna poranna bez modelu, 3 łatwe wygrane z audytu | własny kod | n/d | skrypt |
-
-Bez kluczy API: Facebook przez telefon z kontem właściciela, Mapy w przeglądarce Komputera, audyt bez kluczy.
-
----
-
 ## `jarvo-reka`: Prawa ręka
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |

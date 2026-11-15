@@ -8,14 +8,17 @@ Tworzy profiles/<name>/ (SOUL, config, distribution, toolbox, rubric, README, CH
 i evals/<name>/scenarios.yaml. Agent wchodzi do floty dopiero po spełnieniu Definition of Ready
 (docs/PROFILE-SPEC.md) i zmianie statusu na `active`.
 
-`--marka <slug>` zakłada agenta biznesowego jednej firmy (docs/FLEET.md „Agenci biznesowi”): wpis z `marka`, SOUL
-z zasadami agenta biznesowego (zgoda właściciela, art. 398 PKE, RODO, wiedza tylko z marki), config bez ekranu
-w rozmowie, wstrzymana rutyna dnia w cron/jobs.yaml i evals ze scenariuszami izolacji marki i odmowy bez zgody.
+`--marka <slug>` zakłada agenta biznesowego jednej firmy (docs/FLEET.md „Agenci biznesowi”) w nakładce prywatnej
+(`--nakladka KATALOG`, domyślnie JARVO_NAKLADKA, inaczej <root>/nakladka; brakujący szkielet nakładki zakłada sam;
+do publicznego repo tylko z `--publiczny`): wpis z `marka`, SOUL z zasadami agenta biznesowego (zgoda właściciela,
+art. 398 PKE, RODO, wiedza tylko z marki), config bez ekranu w rozmowie, wstrzymana rutyna dnia w cron/jobs.yaml
+i evals ze scenariuszami izolacji marki i odmowy bez zgody.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import secrets
 import shutil
@@ -33,7 +36,7 @@ def zapisz(path: Path, tekst: str) -> None:
     """Plik w repo z LF także na Windows (repo trzyma LF, .gitattributes)."""
     path.write_text(tekst, encoding="utf-8", newline="\n")
 
-# ------------------------------------------------------------- agent biznesowy (--marka), wzór: profiles/jarvo-jarodev
+# ------------------------------------------------------------- agent biznesowy (--marka), docs/FLEET.md „Agenci biznesowi”
 def soul_biznesowy(name: str, marka: str, nazwa: str, tytul: str) -> str:
     """SOUL agenta biznesowego: zasady wspólne dla każdej marki (zgoda, art. 398 PKE, RODO, izolacja wiedzy) gotowe,
     dziedzina marki jako {{…}} do uzupełnienia."""
@@ -99,12 +102,12 @@ Z właścicielem po polsku; szkice w języku odbiorcy („Pan/Pani” do firm, w
 
 
 def config_biznesowy(name: str, marka: str) -> str:
-    """Config jak u jarvo-jarodev, ale bez ekranu: Komputer Jarva włącza się świadomie (`komputer: true`)."""
+    """Config agenta biznesowego bez ekranu: Komputer Jarva włącza się świadomie (`komputer: true`)."""
     return f"""# {name}: agent biznesowy marki {marka} (docs/FLEET.md „Agenci biznesowi”). Tokeny @@...@@ podstawia
 # scripts/build.py. Telefon: serwer MCP phone z PHONEUSE_ONLY (jeden przydzielony telefon) dopisuje do
 # zainstalowanego configu dopiero `jarvo telefon przydziel {name} <telefon>`, nie ten plik.
 # Komputer Jarva (Mapy, przeglądarka na ekranie): `komputer: true` we fleet.yaml, `computer_use, komputer` tylko
-# w platform_toolsets.cli i command_allowlist `cua:*` jak w profiles/jarvo-jarodev/config.yaml (docs/KOMPUTER.md §6).
+# w platform_toolsets.cli i command_allowlist `cua:*` (docs/KOMPUTER.md §6).
 model:
   provider: "@@PROVIDER@@"
   default: "@@MODEL@@"
@@ -308,19 +311,71 @@ scenarios:
 """
 
 
-def dalej_biznesowy(name: str, slug: str, marka: str) -> str:
+def domyslna_nakladka() -> Path:
+    """JARVO_NAKLADKA, a bez niej `<root>/nakladka` instalacji (jarvo/sciezki.py, JARVO_ROOT przenosi)."""
+    wartosc = os.environ.get(fl.NAKLADKA_ENV, "").strip()
+    if wartosc:
+        return Path(wartosc)
+    sys.path.insert(0, str(fl.REPO_ROOT))
+    try:
+        from jarvo import sciezki
+    except ImportError:
+        raise SystemExit(f"Nie znam katalogu nakładki: podaj --nakladka KATALOG albo ustaw {fl.NAKLADKA_ENV}.") from None
+    return sciezki.uklad().nakladka_domyslna
+
+
+# szkielet nakładki prywatnej (docs/FLEET.md „Agenci biznesowi”): pliki, których brakuje, przy pierwszym agencie
+SZKIELET_NAKLADKI = {
+    "fleet.yaml": "# Agenci nakładki prywatnej: ten sam format co `agents:` publicznego fleet.yaml (docs/FLEET.md\n"
+                  "# „Agenci biznesowi”). Nazwa jak u agenta publicznego = błąd buildu.\nagents: []\n",
+    "wzorce.md": "# Wzorce misji agentów nakładki\n\nDoklejane przy buildzie na koniec wzorców misji Jarva "
+                 "(dispatch-playbook, references/patterns.md). Każdy aktywny agent nakładki występuje tu jako `jarvo-…`.\n",
+    "security/redteam/testy.yaml": "# Ataki red teamu na agentów nakładki: lista testów promptfoo jak `tests:` w\n"
+                                   "# security/redteam/promptfooconfig.yaml publicznego repo (scripts/redteam.sh je dopisuje).\n[]\n",
+    ".gitignore": "secrets/\n*.env\n.env\n__pycache__/\n",
+    "README.md": "# Nakładka prywatna Jarva\n\nPrywatni agenci tej instalacji (docs/FLEET.md „Agenci biznesowi” w publicznym "
+                 "repo JARVO). Klon w `<root>/nakladka` albo katalog z `JARVO_NAKLADKA`; `jarvo update` robi\n"
+                 "`git pull --ff-only` i buduje agentów razem z flotą. Sprawdzenie: "
+                 "`python3 scripts/validate.py --nakladka <ten katalog>` w publicznym repo.\n\n"
+                 "Klucze i sekrety nigdy tutaj: `<dane>/jarvo/konfig/<agent>.env` instalacji.\n",
+}
+
+
+def szkielet_nakladki(n: Path) -> None:
+    for rel, tekst in SZKIELET_NAKLADKI.items():
+        p = n / rel
+        if not p.exists():
+            p.parent.mkdir(parents=True, exist_ok=True)
+            zapisz(p, tekst)
+
+
+def dalej_biznesowy(name: str, slug: str, marka: str, n: Path | None) -> str:
+    if n is None:
+        kroki = [
+            "  2. fleet.yaml: description, rola + en (title, rola, description), oddaj_gdy, emoji, hq_room; "
+            "komputer: true tylko, gdy agent pracuje na Komputerze Jarva.",
+            "  3. Wzorzec misji Jarva (profiles/jarvo/skills/fleet/dispatch-playbook/references/patterns.md) i skille "
+            "agenta w profiles/jarvo-reka/config.yaml (skills.external_dirs).",
+            f"  4. Para red-team: zimna wysyłka i obca wiedza dla {name} w security/redteam/promptfooconfig.yaml "
+            "+ wiersz w security/redteam/README.md.",
+            "  5. Tabele w docs: README.md (flota), docs/FLEET.md (sekcja agenta), "
+            "docs/RUNBOOK.md (budżet klucza, sekrety, rutyna), profilowy CHANGELOG.",
+            "  6. `make validate`; status → active (Definition of Ready, docs/PROFILE-SPEC.md).",
+        ]
+    else:
+        kroki = [
+            f"  2. {n}/fleet.yaml: description, rola + en (title, rola, description), oddaj_gdy, emoji, hq_room; "
+            "komputer: true tylko, gdy agent pracuje na Komputerze Jarva.",
+            f"  3. Wzorzec misji Jarva z `{name}` w {n}/wzorce.md (skille dla Ręki dopisuje build).",
+            f"  4. Para red-team: zimna wysyłka i obca wiedza dla {name} w {n}/security/redteam/testy.yaml.",
+            "  5. README i CHANGELOG profilu (dokumenty publicznego repo opisują tylko agentów repo).",
+            f"  6. `python3 scripts/validate.py --nakladka {n}`; status → active (Definition of Ready, "
+            "docs/PROFILE-SPEC.md); commit w repo nakładki (prywatnym), klon w <root>/nakladka, `jarvo update`.",
+        ]
     return "\n".join([
-        f"Dalej (agent biznesowy marki {marka}, wzór: profiles/jarvo-jarodev, docs/FLEET.md „Agenci biznesowi”):",
+        f"Dalej (agent biznesowy marki {marka}, docs/FLEET.md „Agenci biznesowi”):",
         f"  1. SOUL ({{{{…}}}}), skille (≥ 3 workflowy z DoD), rubryka, toolbox; evals/{name}: scenariusze in_scope z TODO.",
-        "  2. fleet.yaml: description, rola + en (title, rola, description), oddaj_gdy, emoji, hq_room; "
-        "komputer: true tylko, gdy agent pracuje na Komputerze Jarva.",
-        "  3. Wzorzec misji Jarva (profiles/jarvo/skills/fleet/dispatch-playbook/references/patterns.md) i skille "
-        "agenta w profiles/jarvo-reka/config.yaml (skills.external_dirs).",
-        f"  4. Para red-team: zimna wysyłka i obca wiedza dla {name} w security/redteam/promptfooconfig.yaml "
-        f"+ wiersz w security/redteam/README.md.",
-        "  5. Tabele w docs: README.md (flota), docs/FLEET.md (tabela „Agenci biznesowi” i sekcja agenta), "
-        "docs/RUNBOOK.md (budżet klucza, sekrety, rutyna), profilowy CHANGELOG.",
-        "  6. `make validate`; status → active (Definition of Ready, docs/PROFILE-SPEC.md).",
+        *kroki,
         f"  7. Po wdrożeniu: `jarvo telegram tematy` (wątek {slug} w grupie Jarvo HQ), "
         f"`jarvo telefon przydziel {name} <telefon>` (jeden telefon, gdy potrzebny),",
         f"     potem `hermes -p {name} cron resume {slug}-dzien` (rutyna instaluje się wstrzymana).",
@@ -334,13 +389,23 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--kind", default="specialist", choices=sorted(fl.AGENT_KINDS))
     ap.add_argument("--tier", default="strong")
     ap.add_argument("--marka", help="agent biznesowy jednej firmy: slug [a-z0-9-]+ = katalog brands/<marka>/ skarbca")
+    ap.add_argument("--nakladka", metavar="KATALOG", type=Path,
+                    help="nakładka prywatna dla agenta z --marka (domyślnie JARVO_NAKLADKA, inaczej <root>/nakladka)")
+    ap.add_argument("--publiczny", action="store_true",
+                    help="agent z --marka w publicznym repo zamiast w nakładce prywatnej (zwykle nie: patrz docs/FLEET.md)")
     args = ap.parse_args(argv)
+    n = None                                  # nakładka prywatna, do której idzie agent biznesowy
     if args.marka is not None:
         if not MARKA_RE.fullmatch(args.marka):
             raise SystemExit(f"Marka {args.marka!r} musi pasować do [a-z0-9-]+ (katalog brands/<marka>/ w skarbcu).")
         if args.kind != "specialist":
             raise SystemExit("Agent biznesowy (--marka) to zawsze specjalista: orkiestrator i generalista widzą całą wiedzę.")
-        marki = {a.marka: a.name for a in fl.load_fleet().agents if a.marka}
+        n = None if args.publiczny else (args.nakladka or domyslna_nakladka()).expanduser().resolve()
+    elif args.nakladka or args.publiczny:
+        raise SystemExit("--nakladka i --publiczny dotyczą tylko agenta biznesowego (--marka).")
+    fleet = fl.load_fleet(nakladka=n if n is not None and n.is_dir() else None)
+    if args.marka is not None:
+        marki = {a.marka: a.name for a in fleet.agents if a.marka}
         zajeta = marki.get(args.marka)
         if zajeta:
             raise SystemExit(f"Marka {args.marka!r} należy już do {zajeta} (jedna marka = jeden agent).")
@@ -350,9 +415,14 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("Podaj --name jarvo-<slug> (albo --marka <slug> dla agenta biznesowego).")
     if not re.fullmatch(r"jarvo-[a-z0-9-]+", args.name):
         raise SystemExit("Nazwa musi mieć postać jarvo-<slug> (małe litery, cyfry, myślniki).")
-    dest = fl.PROFILES_DIR / args.name
+    if args.name in {a.name for a in fleet.agents}:
+        raise SystemExit(f"Agent {args.name} jest już we flocie.")
+    korzen = n or fl.REPO_ROOT
+    dest = korzen / "profiles" / args.name
     if dest.exists():
         raise SystemExit(f"{dest} już istnieje.")
+    if n is not None:
+        szkielet_nakladki(n)
     slug = args.name.removeprefix("jarvo-")
     (dest / "skills" / slug / f"{slug}-workflow").mkdir(parents=True)
     for d in ["scripts", "cron", "quality"]:
@@ -388,13 +458,14 @@ def main(argv: list[str] | None = None) -> int:
     zapisz(dest / "CHANGELOG.md", f"# Changelog: {args.name}\n\n## 0.0.1\n- Szkielet.\n")
     zapisz(dest / ".no-bundled-skills", "Jarvo sniper profile: only its own and vendored skills.\n")
 
-    ev = fl.REPO_ROOT / "evals" / args.name
+    ev = korzen / "evals" / args.name
     ev.mkdir(parents=True, exist_ok=True)
     kanarek = "JARVO-KANAREK-" + secrets.token_hex(6)   # znacznik-pułapka evals (docs/RSI.md)
     zapisz(ev / "scenarios.yaml", evals_biznesowe(args.name, args.marka, kanarek, inna) if args.marka
            else f'agent: {args.name}\nkanarek: "{kanarek}"\nscenarios: []\n')
 
-    fleet_text = fl.FLEET_FILE.read_text(encoding="utf-8")
+    plik_floty = n / "fleet.yaml" if n is not None else fl.FLEET_FILE
+    fleet_text = plik_floty.read_text(encoding="utf-8")
     oddaj = ("    oddaj_gdy: \"TODO: kiedy Ręka ma oddać zadanie temu agentowi (tabela generowana)\"\n"
              if args.kind == "specialist" else "")
     # uchwyt `@…` w rozmowie aplikacji: ze slugu, sama ASCII (walidator sprawdza unikalność i kolizje z aliasami)
@@ -409,11 +480,15 @@ def main(argv: list[str] | None = None) -> int:
              f"{oddaj}"
              f"    model_tier: {args.tier}\n    delegation_tier: fast\n    autonomy_max: A1\n"
              f"    telegram_topic: {slug}\n    status: planned\n")
-    fleet_text = fleet_text.replace("\nshared:", entry + "\nshared:", 1)
-    zapisz(fl.FLEET_FILE, fleet_text)
-    print(f"✓ Szkielet: {dest}\n✓ evals/{args.name}/scenarios.yaml\n✓ wpis w fleet.yaml (status: planned)")
+    if n is not None:                         # fleet.yaml nakładki to sama lista `agents:`: wpis na końcu
+        fleet_text = fleet_text.rstrip("\n").removesuffix(" []") + "\n" + entry
+    else:
+        fleet_text = fleet_text.replace("\nshared:", entry + "\nshared:", 1)
+    zapisz(plik_floty, fleet_text)
+    gdzie = f"nakładka {n}: " if n is not None else ""
+    print(f"✓ Szkielet: {dest}\n✓ {gdzie}evals/{args.name}/scenarios.yaml\n✓ wpis w {gdzie}fleet.yaml (status: planned)")
     if args.marka:
-        print(dalej_biznesowy(args.name, slug, args.marka))
+        print(dalej_biznesowy(args.name, slug, args.marka, n))
         return 0
     print("Dalej: uzupełnij SOUL, skille, rubrykę, evals, `oddaj_gdy` i `rola` (+ `en.rola`) w fleet.yaml i wzorzec misji Jarva "
           "(profiles/jarvo/skills/fleet/dispatch-playbook/references/patterns.md); `make validate`; status → active "

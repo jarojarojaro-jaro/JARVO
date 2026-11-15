@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
 import threading
 import time
@@ -293,6 +294,33 @@ def przygotuj_powloki(u: Uklad, agenci: list[str]) -> None:
 
 # --- przebieg -----------------------------------------------------------------------------------------------------
 
+NAKLADKA_ENV = "JARVO_NAKLADKA"                      # jak scripts/fleetlib.py
+CZAS_PULL = 120.0                                    # git pull nakładki: dłużej nie czekamy, aktualizacja idzie dalej
+
+
+def nakladka_floty(u: Uklad, env: dict, log: Callable[[str], None] = print) -> Path | None:
+    """Nakładka prywatna tej instalacji (sciezki.nakladka: JARVO_NAKLADKA albo `<root>/nakladka`). Gdy jest repo git,
+    najpierw `git pull --ff-only`, najlepiej jak się da: błąd idzie do logu i nie zatrzymuje instalacji."""
+    n = sciezki.nakladka(u, env)
+    if n is None:
+        return None
+    log(f"Nakładka prywatna: {n}")
+    if (n / ".git").exists():
+        git = shutil.which("git", path=env.get("PATH"))
+        if git is None:
+            log("  ! bez gita: nakładka bez git pull")
+            return n
+        try:
+            w = subprocess.run([git, "-C", str(n), "pull", "--ff-only", "--quiet"], env={**env, "GIT_TERMINAL_PROMPT": "0"},
+                               stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8",
+                               errors="replace", timeout=CZAS_PULL, creationflags=_FLAGI)
+            if w.returncode:
+                log(f"  ! git pull nakładki (kod {w.returncode}): {(w.stderr or w.stdout).strip()[-300:]}; buduję to, co jest")
+        except (OSError, subprocess.TimeoutExpired) as ex:
+            log(f"  ! git pull nakładki: {ex}; buduję to, co jest")
+    return n
+
+
 def zainstaluj_flote(u: Uklad, env: dict, *, log: Callable[[str], None] = print, pierwsza: bool | None = None,
                      wznow_rutyny: bool = False) -> dict:
     """Build profili do `<root>/build` i instalacja floty w `<dane>` (opis w docstringu modułu). Zwraca podsumowanie
@@ -302,6 +330,9 @@ def zainstaluj_flote(u: Uklad, env: dict, *, log: Callable[[str], None] = print,
     for k in (u.build, u.cache, u.stan, u.dane):
         k.mkdir(parents=True, exist_ok=True)
     e = _env(u, env, python)
+    n = nakladka_floty(u, e, log)
+    if n is not None:
+        e[NAKLADKA_ENV] = str(n)                  # build.py i install_fleet.py (fleetlib) biorą agentów nakładki
     py_floty = python_floty(u, python)
     build_py = app / "scripts" / "build.py"
     if not build_py.is_file() or not (app / "scripts" / "install_fleet.py").is_file():

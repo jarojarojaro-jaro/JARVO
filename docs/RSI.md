@@ -66,16 +66,14 @@ są w `vendor/zrodla.yaml`, licencje w [SOURCES.md](SOURCES.md).
 | R3 | workflowy zespołowe Jarva (`dispatch-playbook`) | ⬜ po R2 |
 | R4 | ewolucja skryptów z twardym sprawdzianem, z limitem kosztu | ⬜ opcjonalnie |
 
-**Agenci biznesowi w pętli (od 14.11.2026, `jarvo-jarodev`).** Agent biznesowy ([FLEET.md](FLEET.md#agenci-biznesowi))
-wchodzi do RSI tą samą drogą co specjaliści, bez osobnego mechanizmu: evals `evals/jarvo-jarodev/scenarios.yaml`
-(12 scenariuszy, własny kanarek, 4 w zbiorze odłożonym), sędzia z innej rodziny niż jego model, poczekalnia skilli
-(`skills.write_approval: true`, R1), lekcje w księdze i kuźnia (`kuznia.sh --agent jarvo-jarodev --skill
-jarodev/<skill>`, R2). Scenariusze pilnują tego, co u agenta biznesowego najważniejsze: nic nie wychodzi bez „tak”
-właściciela (także na karcie bez linii `ZGODA WŁAŚCICIELA`), żadnego maila, telefonu ani SMS-a do firm z Map
-(art. 398 PKE), minimum danych osób z postów (RODO), trzy scenariusze poza zakresem i pytanie o cudzy obszar
-(„co wiesz o Enigmie?” → nie mój obszar, zapytaj Jarva). Zbioru odłożonego kuźnia nie widzi, a scenariusz `safety`,
-który przestaje przechodzić, zatrzymuje każdą propozycję. Pierwszy pomiar (`evals-staging.sh --agent jarvo-jarodev
---powtorzenia 3 --ustaw-odniesienie`) po wdrożeniu szkieletu.
+**Agenci biznesowi w pętli.** Agent biznesowy z prywatnej nakładki ([FLEET.md](FLEET.md#agenci-biznesowi))
+wchodzi do RSI tą samą drogą co specjaliści, bez osobnego mechanizmu: evals `evals/<agent>/scenarios.yaml` w nakładce
+(szkielet ma 10 scenariuszy, walidator wymaga ≥ 10), sędzia z innej rodziny niż jego model, poczekalnia skilli
+(`skills.write_approval: true`, R1), lekcje w księdze i kuźnia (`kuznia.sh --agent jarvo-sklep --skill sklep/<skill>`,
+R2; skrypty widzą nakładkę z `JARVO_NAKLADKA`). Scenariusze pilnują tego, co u agenta biznesowego najważniejsze:
+nic nie wychodzi bez „tak” właściciela (także na karcie bez linii `ZGODA WŁAŚCICIELA`), żadnego maila, telefonu ani
+SMS-a do firm (art. 398 PKE), minimum danych osób (RODO) i pytanie o cudzą markę (→ nie mój obszar, zapytaj Jarva).
+Scenariusz `safety`, który przestaje przechodzić, zatrzymuje każdą propozycję.
 
 ## 4. R0: pomiar
 
@@ -214,9 +212,9 @@ godzinę, z kluczami i 3 powtórzeniami licz kilka godzin. Uruchamiaj w tle: `no
 ## 7. Koszty
 
 Sędzia `claude-sonnet-5.5`: ok. 2 $ za 1 mln tokenów wejścia i 10 $ za 1 mln wyjścia (OpenRouter, 2026-10-13).
-Jedna ocena to ok. 8 tys. tokenów wejścia, czyli ok. 0,02 $. Pełny przebieg floty (232 scenariusze) z 3 powtórzeniami
-to ok. 700 ocen, ok. 14 $ za sędziego. Do tego przebiegi agentów z ich limitu (subskrypcja albo klucze agentów).
-Przebieg jednego agenta (12–49 scenariuszy × 3) to ok. 1–2,5 $ za sędziego.
+Jedna ocena to ok. 8 tys. tokenów wejścia, czyli ok. 0,02 $. Pełny przebieg floty (220 scenariuszy) z 3 powtórzeniami
+to ok. 660 ocen, ok. 13 $ za sędziego. Do tego przebiegi agentów z ich limitu (subskrypcja albo klucze agentów).
+Przebieg jednego agenta (14–49 scenariuszy × 3) to ok. 1–2,5 $ za sędziego.
 Kuźnia: dwa takie przebiegi (baza i kandydat), czyli ok. 2–5 $ za sędziego, plus jedno wywołanie proponującego
 `gpt-6.1-sol` (2 $ / 10 $ za 1 mln tokenów, ok. 20 tys. tokenów, poniżej 0,1 $). Budżet sprawdza `--budzet` przed startem.
 

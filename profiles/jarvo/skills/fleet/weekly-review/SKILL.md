@@ -76,7 +76,7 @@ Poczekalnia: web chce dodać skill `zrzuty-mobile` (sam po zadaniu, skan czysty)
 Skarbiec: +7 notatek, 1 sprzeczność do rozstrzygnięcia (link w zakładce Wiedza)
 Styl: 18/20 wiadomości prostym polskim (najczęściej: za długie zdania)
 Briefy: 4 (B-2026-11-09…12), 11 decyzji, 8 z odpowiedzią, 2 przeniesione; czeka B-2026-11-12/2 (5 dni)
-Agenci biznesowi: Jarodev 9 nowych, 1 klient; 2 szkice do zgody (L-0002, L-0004); brakuje brand kitu
+Agenci biznesowi: Sklep 9 nowych, 1 klient; 2 szkice do zgody (L-0002, L-0004); brakuje brand kitu
 Proponuję ulepszyć:
 1. <agent>: <zmiana> (<dowód>)
 Decyzja: wdrożyć propozycje 1–2? Zatwierdzić skill z poczekalni? (nic nie wchodzi bez Twojego „ok”)

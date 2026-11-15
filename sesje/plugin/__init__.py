@@ -17,7 +17,7 @@ gateway/run_adapters.py `_make_profile_message_handler`) i bierze haki z menedż
 wtyczka tylko w hoście, wiadomość poszła do Jarva). Konfiguracja (bez sekretów):
 
     {"gpu": {"nazwa": "Kernel", "skrzynka": "/home/<użytkownik>/kernel/skrzynka", "czat": "-100…", "watek": "7"},
-     "dev": {"nazwa": "Jarodev", "profil": "jarvo-jarodev"}}
+     "sklep": {"nazwa": "Sklep", "profil": "jarvo-sklep"}}
 
 Plik w skrzynce: `nowe/<RRRRMMDD-HHMMSS>-<id wiadomości>.json` z polami dopisek, nazwa, tekst (bez dopisku),
 odpowiedz_na (cytowana wiadomość), media (kopie zdjęć i plików obok JSON-a), czas, chat_id, message_id, watek
@@ -25,9 +25,9 @@ odpowiedz_na (cytowana wiadomość), media (kopie zdjęć i plików obok JSON-a)
 
 Grupa „Jarvo HQ” z tematami (14.11): wątek na agenta. Wpis skrzynki z `czat` i `watek` (zapisuje je
 `jarvo telegram tematy`) łapie każdą wiadomość właściciela w tym wątku, bez dopisku. Wpis z `profil` zamiast
-`skrzynka` to agent floty: „… dev” zakłada kartę kanbana przypisaną do tego profilu (API kanbana Hermesa, jak
+`skrzynka` to agent floty: „… sklep” zakłada kartę kanbana przypisaną do tego profilu (API kanbana Hermesa, jak
 narzędzie kanban_create; recenzenta wybiera pracownik przy kanban_request_review według floty), bot odpowiada
-„📥 Jarodev: przyjąłem, karta <id>”. Każda wiadomość właściciela w grupie zapisuje też grupę i wątek (nazwa tematu
+„📥 Sklep: przyjąłem, karta <id>”. Każda wiadomość właściciela w grupie zapisuje też grupę i wątek (nazwa tematu
 z `reply_to_message.forum_topic_created`) w `<dane>/jarvo/state/telegram-grupy.json`: stąd `jarvo telegram tematy`
 bierze ID grupy i istniejące tematy. Samo „start” w grupie tylko to zapisuje i potwierdza (nie budzi Jarva), a gdy
 grupa nie ma jeszcze wątków agentów, dopisuje jedno zlecenie dla Claude Code w `missions/DLA-CLAUDE.md`

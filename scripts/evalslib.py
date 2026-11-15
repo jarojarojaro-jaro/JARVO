@@ -42,15 +42,19 @@ def zbior(scn: dict) -> str:
 
 
 def wczytaj(repo: Path, agent: str) -> dict:
+    """Scenariusze agenta z repo, a agenta nakładki prywatnej (JARVO_NAKLADKA) z nakładki."""
     import fleetlib as fl
-    return fl.load_yaml(repo / "evals" / agent / "scenarios.yaml") or {}
+    return fl.load_yaml(fl.w_repo_albo_nakladce(Path("evals") / agent / "scenarios.yaml", repo)) or {}
 
 
 def kanarki(repo: Path) -> dict[str, str]:
-    """{agent: znacznik} ze wszystkich plików evals/*/scenarios.yaml."""
+    """{agent: znacznik} ze wszystkich plików evals/*/scenarios.yaml repo i nakładki prywatnej (JARVO_NAKLADKA)."""
     import fleetlib as fl
     out = {}
-    for path in sorted((repo / "evals").glob("*/scenarios.yaml")):
+    sciezki = sorted((repo / "evals").glob("*/scenarios.yaml"))
+    if (n := fl.katalog_nakladki()) is not None:
+        sciezki += sorted((n / "evals").glob("*/scenarios.yaml"))
+    for path in sciezki:
         tok = (fl.load_yaml(path) or {}).get("kanarek")
         if isinstance(tok, str):
             out[path.parent.name] = tok

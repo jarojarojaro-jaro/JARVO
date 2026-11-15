@@ -169,7 +169,7 @@ Pełna, zweryfikowana lista: [TOOLBOX.md](TOOLBOX.md). Instalacja na VPS: [VPS.m
 ## 8. Rutyny
 
 `cron/jobs.yaml` → `cron/jobs.json` przy buildzie: zadania cykliczne agenta. Dziś ma je Jarvo (patrol, poranny brief,
-przegląd tygodnia, świeżość wiedzy) i agent biznesowy `jarvo-jarodev` (`jarodev-dzien` z `paused: true`: włącza go
+przegląd tygodnia, świeżość wiedzy) i agenci biznesowi (np. `sklep-dzien` agenta `jarvo-sklep` z `paused: true`: włącza go
 właściciel po przydziale telefonu). Rutyny snajperów (np. monitoring Sherlocka) zakłada Jarvo po Twojej zgodzie.
 Z dystrybucji instalują się **wstrzymane**, a włączasz je świadomie.
 

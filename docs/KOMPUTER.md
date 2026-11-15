@@ -13,7 +13,7 @@ odtwarzamy własnym kodem na Hermesie i otwartym sterowniku `cua-driver` (MIT).
 |---|---|---|
 | **Komputer Jarva**: pulpit z Chromium i terminalem w osobnym kontenerze `jarvo-komputer`, włączany `jarvo komputer on` | Linux, macOS (Colima), Windows (WSL), VPS bez monitora | pulpit, wejście sterownika i twarde zasady działają (K1, K2); sprawdzone na Linuksie amd64, macOS i arm64 czekają na pierwszą próbę na prawdziwym sprzęcie |
 | **Jarvo przy ekranie** (`jarvo`, `komputer: true`): sam steruje ekranem (najpierw drzewo dostępności, zrzut tylko gdy trzeba) | wszędzie tam, gdzie Komputer | działa (K3) |
-| **Agent biznesowy przy ekranie** (`jarvo-jarodev`, `komputer: true`): Mapy Google w tej samej przeglądarce, ta sama bramka i twarde zasady, jedna sesja steruje naraz (§7) | wszędzie tam, gdzie Komputer | w kodzie (szkielet 14.11.2026), pierwsza próba przed nami |
+| **Agent biznesowy przy ekranie** (dowolny agent z `marka` i `komputer: true`): ta sama przeglądarka, ta sama bramka i twarde zasady, jedna sesja steruje naraz (§7) | wszędzie tam, gdzie Komputer | w kodzie, pierwsza próba przed nami |
 | **Ekran w HQ**: podgląd na żywo, Przejmij, Oddaj, Zatrzymaj | zalogowany dashboard | etap K4 |
 | **Terminal i serwery**: powłoka w Komputerze, ekrany programów tekstowych, Twoje serwery przez SSH | wszędzie | etap K5 |
 | **Ręce**: Twój komputer na czas, który sam ustawisz, tylko w aplikacjach, które wskażesz | Windows, macOS, Linux (X11 albo XWayland), instalacja natywna | działa w kodzie (K6, §9): `jarvo komputer rece on/off/status`, zgoda, bramka, profil rąk `jarvo-ekran`; próba na żywo z prawdziwym sterownikiem przed nami |
@@ -344,11 +344,11 @@ naraz, prośba Jarva, pauza i wznowienie, dziennik).
 ## 7. Jarvo przy ekranie (K3)
 
 Jarvo (`jarvo`, `profiles/jarvo/`) ma `komputer: true` we `fleet.yaml`; od 2026-11-14 pracuje na ekranie sam,
-osobnego agenta ekranu nie ma. Drugi agent z ekranem to agent biznesowy `jarvo-jarodev` (opis niżej, „Drugi agent
+osobnego agenta ekranu nie ma. Ekran może dostać też agent biznesowy z `komputer: true` (opis niżej, „Drugi agent
 na ekranie”). Walidator pilnuje, że tylko taki agent ma `computer_use` i klucze `cua:`
 w zgodach, a build daje mu dodatki poniżej. Zadania „kliknij”, „wypełnij”, „sprawdź jak klient”, dane z ekranu,
 konta i logowania, gdzie nie ma API, robi sam; dłuższe niż kilka minut daje na kartę kanbana przypisaną do siebie
-(`assignee: jarvo`), żeby czat był wolny. Pokój Sterownia (`control`) w HQ to od 14.11 Biuro Jarodev (`jarvo-jarodev`).
+(`assignee: jarvo`), żeby czat był wolny. Pokój Sterownia (`control`) w HQ zostaje bez agenta.
 
 **Profil** (`config.yaml`):
 
@@ -417,20 +417,20 @@ Bez włączonego Komputera narzędzie odpowiada, że Komputer jest wyłączony i
 natywnie (sterownik CDP); w kontenerze sterownik nie ma `navigate`, `run_steps` ani `wait_for`, więc strony robi
 tam `computer_use`.
 
-**Drugi agent na ekranie (`jarvo-jarodev`, 14.11.2026).** Kod Komputera nie zakłada jednego profilu: walidator
+**Drugi agent na ekranie (agent biznesowy z `komputer: true`).** Kod Komputera nie zakłada jednego profilu: walidator
 dopuszcza `computer_use` i klucze `cua:` każdemu agentowi z `komputer: true`, build włącza mu wtyczkę `jarvo-komputer`,
 a `HERMES_CUA_DRIVER_CMD` mają wszystkie procesy floty. Ekran jest jeden i to jest zamek: wejście daje sterowanie jednej
-sesji naraz (§6), więc gdy Jarvo działa, sesja Jarodev dostaje `zajete` (`wait_and_retry`) i odwrotnie; ekran zwalnia
+sesji naraz (§6), więc gdy Jarvo działa, sesja agenta biznesowego dostaje `zajete` (`wait_and_retry`) i odwrotnie; ekran zwalnia
 koniec sesji albo 120 s bez działań. Grupa ekranu (`JARVO_KOMPUTER_GRUPA`) jest losowa na proces Hermesa, a brama
-Telegrama i czatu HQ to jeden proces wszystkich profili: rozmowa Jarodev i rozmowa Jarva w bramie liczyłyby się jak
-jedna sesja i zamek by między nimi nie działał. Dlatego Jarodev ma ekran (`computer_use`, `komputer`) tylko w `cli`:
-na karcie kanbana (osobny proces pracownika) i w `hermes -p jarvo-jarodev chat`; w rozmowie Mapy zleca sobie kartą
-(toolset `kanban`). Karta Jarodev i karta albo rozmowa Jarva to zawsze różne procesy. Jarodev ma te same twarde zasady,
+Telegrama i czatu HQ to jeden proces wszystkich profili: rozmowa agenta biznesowego i rozmowa Jarva w bramie liczyłyby się jak
+jedna sesja i zamek by między nimi nie działał. Dlatego agent biznesowy ma ekran (`computer_use`, `komputer`) tylko w `cli`:
+na karcie kanbana (osobny proces pracownika) i w `hermes -p <profil> chat`; w rozmowie pracę na ekranie zleca sobie kartą
+(toolset `kanban`). Karta agenta biznesowego i karta albo rozmowa Jarva to zawsze różne procesy. Agent ma te same twarde zasady,
 dziennik, pauzę i zgody z karty, ten sam zestaw stałych zgód co Jarvo (bez okna na wierzch), bez `code_execution`,
 w rutynie (cron) bez ekranu; pod YOLO ekran i telefon są zablokowane w każdym profilu (wtyczka `jarvo-zgody`).
-Czego zamek nie daje: przeglądarka jest wspólna (te same zalogowane konta, karty i historia), więc Jarodev **może
+Czego zamek nie daje: przeglądarka jest wspólna (te same zalogowane konta, karty i historia), więc agent biznesowy **może
 zobaczyć** karty Jarva i odwrotnie. Podział wiedzy agenta biznesowego dotyczy skarbca, nie ekranu (to skupienie, nie
-szyfr; [FLEET.md](FLEET.md#agenci-biznesowi)); skill `mapy-firmy` każe nie zamykać cudzych kart i nie przestawiać okien.
+szyfr; [FLEET.md](FLEET.md#agenci-biznesowi)); jego skille ekranu powinny kazać nie zamykać cudzych kart i nie przestawiać okien.
 Osobny profil przeglądarki na agenta to możliwy kolejny krok.
 
 **Skarbiec bez wyciągów z sesji ekranu i telefonu.** Wyniki narzędzi ekranu i telefonu to treść ekranu: cudze dane,
@@ -475,7 +475,7 @@ dotąd; czytanie skarbca i orzeczeń działa bez zmian.
   obraz idzie do modelu (dostawca z `config.yaml`) i do pliku `screenshot_path` w profilu `jarvo`. Dlatego Jarvo
   patrzy najpierw drzewem (`ax`), a zrzut robi tylko, gdy drzewo nie wystarcza. Zamazywanie obrazu (rozpoznanie
   tekstu i maska na sekretach) to możliwy kolejny krok.
-- **Ryzyko resztkowe: wspólna przeglądarka dwóch agentów.** Jarvo i agent biznesowy `jarvo-jarodev` sterują tym
+- **Ryzyko resztkowe: wspólna przeglądarka dwóch agentów.** Jarvo i agent biznesowy z `komputer: true` sterują tym
   samym Chromium (zamek: jedna sesja naraz, §6), więc każdy widzi karty, historię i zalogowane konta drugiego.
   Twarde zasady obowiązują obu; odczytu cudzej karty zamek nie zatrzymuje (§7, „Drugi agent na ekranie”).
 - **Działania na wierzchu.** Klawiatura, przewijanie, przeciąganie i klik w punkt idą przez globalne wejście X11

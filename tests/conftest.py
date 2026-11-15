@@ -27,6 +27,9 @@ os.environ.setdefault("JARVO_HQ_SILNIK", "0")
 # komputera, a atrapy subprocess.run nie udają próby karty (edytor.karta_vaapi); wybór kodera sprawdzają testy
 # z jawnym JARVO_WIDEO_KODER
 os.environ.setdefault("JARVO_WIDEO_KODER", "cpu")
+# testy publicznego repo nie widzą nakładki prywatnej z otoczenia (docs/FLEET.md „Agenci biznesowi”): testy nakładki
+# ustawiają JARVO_NAKLADKA same (tests/test_nakladka.py)
+os.environ.pop("JARVO_NAKLADKA", None)
 
 WINDOWS = os.name == "nt"
 LINUX = sys.platform.startswith("linux")
@@ -161,5 +164,5 @@ def repo_copy(tmp_path, monkeypatch):
     # składnię skryptów (53 procesy bash -n / node --check) sprawdza test_repo_is_valid na prawdziwym repo;
     # testy na kopii zmieniają konfigurację floty, nie skrypty
     import validate
-    monkeypatch.setattr(validate, "check_scripts", lambda r: None)
+    monkeypatch.setattr(validate, "check_scripts", lambda r, root=None: None)
     return dst

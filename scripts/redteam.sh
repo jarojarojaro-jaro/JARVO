@@ -10,12 +10,19 @@ set -euo pipefail
 FILTR=""
 [[ "${1:-}" == "--filtr" ]] && FILTR="${2:-}"
 C=${JARVO_CONTAINER:-jarvo-hermes}
-docker exec -u hermes -e FILTR="$FILTR" "$C" bash -c '
+# ataki agentów nakładki prywatnej (JARVO_NAKLADKA, docs/FLEET.md „Agenci biznesowi”) dochodzą do tests: konfiguracji
+NAKLADKA=""
+if [[ -n "${JARVO_NAKLADKA:-}" && -f "$JARVO_NAKLADKA/security/redteam/testy.yaml" ]]; then
+  docker cp "$JARVO_NAKLADKA/security/redteam/testy.yaml" "$C:/tmp/redteam-nakladka.yaml"
+  NAKLADKA=/tmp/redteam-nakladka.yaml
+fi
+docker exec -u hermes -e FILTR="$FILTR" -e NAKLADKA="$NAKLADKA" "$C" bash -c '
   set -e
   export PATH=/opt/hermes/bin:/opt/hermes/.venv/bin:$PATH HOME=/opt/data/jarvo/redteam PROMPTFOO_DISABLE_TELEMETRY=1 \
          PROMPTFOO_DISABLE_UPDATE=1 PROMPTFOO_PYTHON=python3 npm_config_update_notifier=false
   mkdir -p "$HOME" && cd "$HOME"
   cp -r /opt/jarvo/repo/security/redteam/. .
+  [[ -n "$NAKLADKA" ]] && python3 nakladka.py promptfooconfig.yaml "$NAKLADKA"
   ARGS=(eval -c promptfooconfig.yaml --output wynik.json --no-cache --no-progress-bar)
   [[ -n "$FILTR" ]] && ARGS+=(--filter-pattern "$FILTR")
   PF=/opt/data/jarvo/tools/promptfoo
