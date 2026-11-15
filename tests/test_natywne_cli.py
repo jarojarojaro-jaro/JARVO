@@ -1855,6 +1855,9 @@ def test_korzen_musi_byc_osobnym_katalogiem(tmp_path, stanowisko):
     from jarvo import migracja
     (zdjecia / migracja.KATALOG / "kopia-zapasowa").mkdir(parents=True)
     assert instalator.korzen_nieosobny(uklad(zdjecia)) is None
+    # nakładka prywatna (klon repo agentów w <root>/nakladka) też jest Jarva: 15.11 `jarvo update` odmawiało
+    (zdjecia / uklad(zdjecia).nakladka_domyslna.name / "profiles").mkdir(parents=True)
+    assert instalator.korzen_nieosobny(uklad(zdjecia)) is None
     s, u = stanowisko, stanowisko["u"]
     u.root.mkdir(parents=True)
     (u.root / "dokument.docx").write_bytes(b"x")
