@@ -162,7 +162,12 @@ def test_zrodla_paczka_tylko_tar_albo_zip(repo_copy):
 
 def test_profile_without_fleet_entry(repo_copy):
     (repo_copy / "profiles/jarvo-nieznany").mkdir()
+    (repo_copy / "profiles/jarvo-nieznany/SOUL.md").write_text("# Nieznany\n", encoding="utf-8")
     assert errors_matching(validate.run(), r"profiles/jarvo-nieznany: brak wpisu w fleet.yaml")
+    # resztka po profilu usuniętym z repo (sam __pycache__, git go nie kasuje) to nie profil
+    (repo_copy / "profiles/jarvo-dawny/scripts/__pycache__").mkdir(parents=True)
+    (repo_copy / "profiles/jarvo-dawny/scripts/__pycache__/x.cpython-313.pyc").write_bytes(b"\0")
+    assert not errors_matching(validate.run(), r"profiles/jarvo-dawny")
 
 
 def test_docs_count_must_match_repo(repo_copy):

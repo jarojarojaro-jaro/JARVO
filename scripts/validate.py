@@ -124,7 +124,10 @@ def check_fleet(fleet: fl.Fleet, r: Report) -> None:
     katalogi = [(fl.PROFILES_DIR, "")] + ([(fleet.nakladka / "profiles", "nakładka: ")] if fleet.nakladka else [])
     for katalog, przedrostek in katalogi:
         for d in katalog.iterdir() if katalog.is_dir() else []:
-            if d.is_dir() and not d.name.startswith("_") and d.name not in names:
+            # katalog z samym __pycache__ to resztka po profilu usuniętym z repo (git nie kasuje plików nieśledzonych),
+            # nie profil: 15.11 po przeniesieniu jarvo-jarodev do nakładki validate zgłaszał go w każdej starej kopii
+            if d.is_dir() and not d.name.startswith("_") and d.name not in names \
+                    and any("__pycache__" not in p.parts for p in d.rglob("*") if p.is_file()):
                 r.err(f"{przedrostek}profiles/{d.name}: brak wpisu w {przedrostek}fleet.yaml")
 
 
