@@ -375,6 +375,29 @@ def test_nazwy_i_frontmatter():
     assert w.Indeks.zapytanie("Jak jest z wydajnością strony?") == '"jak"*' if False else '"wydajnością"* OR "strony"*' in w.Indeks.zapytanie("Jak jest z wydajnością strony?")
 
 
+def test_frontmatter_zawsze_poprawny_yaml_i_lint_lapie_reczny(skarbiec):
+    """15.11: ręczna notatka z `zrodlo: … (orzeczen: 3, …)` przerwała budowę Mózgu (Quartz), a `sklej` pisał
+    `aliasy: [@nazwa]` i `"…\\"` z ukośnikiem na końcu: YAML (Obsidian, Quartz) tego nie czyta. Teraz `sklej`
+    zawsze daje poprawny YAML, `podziel` czyta to z powrotem bez zmian, a lint wskazuje złe nagłówki pisane ręcznie."""
+    yaml = pytest.importorskip("yaml")
+    sk = skarbiec
+    trudne = ["log (orzeczen: 3, znakow: 2200)", "@Numes_ai", "C:\\katalog\\", 'nazwa „KONTEKST\\"', "- punkt", "# nie komentarz"]
+    fm = {"typ": "fakt", "zrodlo": trudne[0], "aliasy": trudne[1:] + ["zwykły"], "opis": trudne[2]}
+    tekst = w.sklej(fm, "# T\n")
+    assert yaml.safe_load(tekst[4:tekst.find("\n---", 4)]) == fm
+    assert w.podziel(tekst)[0] == fm and w.sklej(w.podziel(tekst)[0], "# T\n") == tekst and w.zly_naglowek(tekst) == ""
+    notatka(sk, "pojecia/dobra", "Dobra", "Nagłówek ze sklej.", typ="pojecie", zrodlo=trudne[0], linki=["pojecia/_hub-pojecia"])
+    reczna = ("---\ntyp: pojecie\ntagi: [test]\nutworzono: 2026-09-30\nzmieniono: 2026-09-30\nstatus: aktualna\n"
+              "zrodlo: dziennik (orzeczen: 3, znakow: 2200)\n---\n# Ręczna\n\n**Pisana ręcznie.**\n")
+    sk.zapisz_plik("pojecia/reczna", reczna)
+    ix = w.Indeks(sk)
+    bledy = [b for b in w.lint(sk, ix)["bledy"] if "poprawnym YAML" in b]
+    ix.zamknij()
+    assert bledy == ["frontmatter nie jest poprawnym YAML (wartość w cudzysłów): `zrodlo: dziennik (orzeczen: 3, "
+                     "znakow: 2200)` w [[pojecia/reczna]]"]
+    assert w.zly_naglowek("---\naliasy: [@Numes_ai, Numes.ai]\n---\n") and not w.zly_naglowek("---\naliasy: [\"@x\"]\n---\n")
+
+
 def test_skille_floty_to_wezly_grafu(skarbiec, tmp_path):
     """Każdy skill floty (własny i wspólny) to notatka-węzeł w `fleet/skille/`: linki do hubów agentów, powiązanych skilli
     i skryptów; poza domyślnym szukaniem i przypomnieniami (folder="fleet" je zwraca); zmienia się tylko ze skillem."""

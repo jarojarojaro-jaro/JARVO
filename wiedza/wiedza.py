@@ -438,25 +438,64 @@ def podziel(text: str) -> tuple[dict, str]:
 
 def _wartosc(v: str):
     if v.startswith("[") and v.endswith("]"):
-        return [x.strip().strip("'\"") for x in v[1:-1].split(",") if x.strip()]
-    if len(v) >= 2 and v[0] == v[-1] and v[0] in "'\"":
+        return [_wartosc(x) if x[0] in "'\"" else x for x in (e.strip() for e in v[1:-1].split(",")) if x]
+    if len(v) >= 2 and v[0] == v[-1] == '"':
+        return re.sub(r'\\(["\\])', r"\1", v[1:-1])   # odwrotność `_w_cudzyslow`
+    if len(v) >= 2 and v[0] == v[-1] == "'":
         return v[1:-1]
     if v in ("true", "false"):
         return v == "true"
     return v
 
 
+def goly_yaml(s: str, w_liscie: bool = False) -> bool:
+    """Czy `s` przejdzie w YAML-u bez cudzysłowu (wartość albo element listy `[a, b]`): bez znaku specjalnego na
+    początku, bez „: ” i „ #” w środku, w liście bez przecinków i nawiasów."""
+    if not s or s != s.strip() or s[0] in "{}[]&*!%@`,|>#'\"" or s in ("-", "?") or s.startswith(("- ", "? ")):
+        return False
+    if ": " in s or s.endswith(":") or " #" in s:
+        return False
+    return not (w_liscie and any(c in s for c in ",[]{}"))
+
+
+def zly_naglowek(text: str) -> str:
+    """Linia frontmatteru, której YAML (Obsidian, Quartz) nie przeczyta, albo "". `podziel` jest pobłażliwy (bierze
+    wszystko po pierwszym „:”), więc `zrodlo: log (orzeczen: 3)` przechodzi u nas, a Quartz przerywa całą budowę
+    („bad indentation of a mapping entry”, Mózg 15.11); tak samo `aliasy: [@nazwa]`. Bez PyYAML (`goly_yaml`)."""
+    if not text.startswith("---\n"):
+        return ""
+    koniec = text.find("\n---", 4)
+    for linia in text[4:koniec if koniec >= 0 else 4].splitlines():
+        if not linia.strip() or linia.lstrip().startswith("#") or linia[:1] in " \t":
+            continue
+        _k, sep, wart = linia.partition(":")
+        v = wart.strip()
+        if not sep or not v or v[0] in "'\"" or v in ("|", ">", "|-", ">-"):
+            continue
+        if v.startswith("[") and v.endswith("]"):
+            elementy = [x.strip() for x in v[1:-1].split(",") if x.strip()]
+            if any(x[0] not in "'\"" and not goly_yaml(x, w_liscie=True) for x in elementy):
+                return linia
+        elif not goly_yaml(v):
+            return linia
+    return ""
+
+
+def _w_cudzyslow(s: str) -> str:
+    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
 def sklej(fm: dict, tresc: str) -> str:
     linie = ["---"]
     for k, v in fm.items():
         if isinstance(v, list):
-            linie.append(f"{k}: [{', '.join(str(x) for x in v)}]")
+            linie.append(f"{k}: [{', '.join(x if goly_yaml(x := str(e), w_liscie=True) else _w_cudzyslow(x) for e in v)}]")
         elif isinstance(v, bool):
             linie.append(f"{k}: {'true' if v else 'false'}")
         else:
             s = str(v)
-            if s == "" or any(c in s for c in ":#{}\"'") or s != s.strip():
-                s = '"' + s.replace('"', '\\"') + '"'
+            if s == "" or any(c in s for c in ":#{}\"'") or s != s.strip() or not goly_yaml(s):
+                s = _w_cudzyslow(s)
             linie.append(f"{k}: {s}")
     linie.append("---")
     return "\n".join(linie) + "\n" + tresc.lstrip("\n")
@@ -1713,6 +1752,9 @@ def lint(sk: Skarbiec, ix: Indeks) -> dict:
         sekret = zawiera_sekret(n.tresc)
         if sekret:
             bledy.append(f"sekret w treści ({sekret}): [[{rel}]]")
+        zly = zly_naglowek(sk.plik(rel).read_text(encoding="utf-8", errors="replace")) if sk.plik(rel).exists() else ""
+        if zly:
+            bledy.append(f"frontmatter nie jest poprawnym YAML (wartość w cudzysłów): `{zly[:80]}` w [[{rel}]]")
         if skrypty_repo is not None and rel.startswith(O_FLOCIE) and not r["hub"]:
             for nazwa_s in sorted({m.group(1) for m in SKRYPT_RE.finditer(n.tresc)} - skrypty_repo):
                 ostrz.append(f"nieaktualna wobec repo: skryptu `{nazwa_s}` nie ma we flocie: [[{rel}]]")

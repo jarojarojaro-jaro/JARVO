@@ -88,11 +88,13 @@ CZAS_HERMESA = 120.0
 
 
 class BladTelegrama(RuntimeError):
-    """Błąd Bot API: kod HTTP albo z odpowiedzi (0 = brak sieci) i opis bez tokenu."""
+    """Błąd Bot API: kod HTTP albo z odpowiedzi (0 = brak sieci) i opis bez tokenu; `nowy_czat` = ID supergrupy
+    z `parameters.migrate_to_chat_id` (grupa przeniesiona po włączeniu tematów), inaczej pusty."""
 
-    def __init__(self, kod: int, opis: str):
+    def __init__(self, kod: int, opis: str, nowy_czat: str = ""):
         super().__init__(opis)
         self.kod = kod
+        self.nowy_czat = nowy_czat
 
 
 def _wynik(nazwa: str, stan: str, opis: str, rada: str = "") -> dict:
@@ -247,6 +249,12 @@ def _na_pierwszym_planie(argv: list[str], env: dict, cwd: Path | None) -> int:
 def polecenie_wiedza_kompiluj(u: Uklad, a, _reszta, ot, *, uruchom: Callable | None = None) -> int:
     if not _zainstalowane(u):
         return _brak_instalacji(u)
+    obcy = getattr(a, "skarbiec", "")
+    if obcy and Path(obcy).resolve() != skarbiec(u).resolve():
+        print(f"`jarvo wiedza kompiluj` kompiluje tylko skarbiec Jarva ({skarbiec(u)}), a nie {obcy}. Inny skarbiec: "
+              "kompilacja.py --skarbiec … Pythonem z venvu Hermesa (HERMES_HOME z modelem jarvo_wiedza) albo --na-sucho. "
+              "Nic nie zmieniłem.", file=sys.stderr)
+        return 2
     if not skarbiec(u).is_dir():
         print(f"Skarbiec {skarbiec(u)} jeszcze nie istnieje: zakłada go instalacja floty (zasiew). Uruchom instalację "
               "ponownie.", file=sys.stderr)
@@ -967,7 +975,9 @@ def api_telegrama(token: str, metoda: str, dane: dict | None = None, *, czas: fl
         raise BladTelegrama(0, _bez_tokenu(f"brak połączenia z Telegramem ({powod})", token)) from None
     if not isinstance(odp, dict) or not odp.get("ok"):
         odp = odp if isinstance(odp, dict) else {}
-        raise BladTelegrama(int(odp.get("error_code") or 0), _bez_tokenu(str(odp.get("description") or "błąd API"), token))
+        nowy = str((odp.get("parameters") or {}).get("migrate_to_chat_id") or "") if isinstance(odp.get("parameters"), dict) else ""
+        raise BladTelegrama(int(odp.get("error_code") or 0), _bez_tokenu(str(odp.get("description") or "błąd API"), token),
+                            nowy)
     return odp.get("result")
 
 
@@ -1207,6 +1217,20 @@ def wybierz_grupe(u: Uklad, podana: str | None) -> tuple[str | None, str]:
     return None, f"Bot zna kilka grup: {lista}. Wybierz jedną: jarvo telegram tematy --grupa <ID>."
 
 
+def nowy_numer_grupy(token: str, grupa: str) -> str:
+    """ID supergrupy, gdy zwykła grupa `grupa` została przeniesiona (włączenie tematów zmienia ją w supergrupę z nowym
+    ID -100…, a getChat pod starym ID dalej mówi „bez tematów”: 15.11 właściciel włączył tematy, bot znał stary numer).
+    Telegram podaje nowy numer tylko w błędzie wysyłki, więc pytamy wskaźnikiem „pisze…” (bez wiadomości w grupie).
+    "" = grupa nieprzeniesiona albo już supergrupa."""
+    if grupa.startswith("-100"):
+        return ""
+    try:
+        api_telegrama(token, "sendChatAction", {"chat_id": grupa, "action": "typing"})
+    except BladTelegrama as e:
+        return e.nowy_czat if ID_GRUPY_RE.match(e.nowy_czat) else ""
+    return ""
+
+
 def tematy_do_zalozenia(u: Uklad, sesje: dict) -> list[dict]:
     """Wątki grupy: aktywni agenci floty z `telegram_topic` (zbudowana flota, <build>/wiedza/fleet.json; „general” =
     temat General, bez zakładania) i sesje zewnętrzne ze skrzynką z sesje.json (Kernel)."""
@@ -1252,6 +1276,11 @@ def polecenie_telegram_tematy(u: Uklad, a, _reszta, ot) -> int:
         return 1
     try:
         czat = api_telegrama(token, "getChat", {"chat_id": grupa}) or {}
+        nowa = "" if czat.get("is_forum") else nowy_numer_grupy(token, grupa)
+        if nowa:
+            print(f"Grupa {grupa} dostała nowy numer {nowa} po włączeniu tematów: biorę nowy.")
+            grupa = nowa
+            czat = api_telegrama(token, "getChat", {"chat_id": grupa}) or {}
         if not czat.get("is_forum"):
             raise BladTelegrama(400, "Bad Request: the chat is not a forum")
         ja = api_telegrama(token, "getMe") or {}
@@ -1515,6 +1544,7 @@ def dodaj_polecenia(sub) -> None:
     k.add_argument("--na-sucho", action="store_true", help="tylko szkice i kandydaci, bez modelu i bez zapisu")
     k.add_argument("--limit", type=int, default=0, help="najwięcej szkiców w tym przebiegu (domyślnie 40)")
     k.add_argument("--json", action="store_true", help="raport w JSON")
+    k.add_argument("--skarbiec", default="", help="tylko sprawdzenie: inny skarbiec niż Jarva = odmowa (przekazanie z kompilacja.py)")
     k.set_defaults(funkcja=polecenie_wiedza_kompiluj)
     k = w.add_parser("lint", help="raport zdrowia skarbca (LINT.md), także nazwy nieprzenośne")
     k.add_argument("--json", action="store_true")

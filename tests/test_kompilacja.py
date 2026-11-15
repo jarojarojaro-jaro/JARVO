@@ -126,6 +126,47 @@ def test_dwa_szkice_fali_aktualizuja_te_sama_notatke_bez_utraty_faktu(sk, monkey
     assert "Fakt A." in tresc and "Fakt B." in tresc
 
 
+def test_nowsza_wersja_szkicu_zastepuje_starsza_w_jednej_fali(sk, monkeypatch):
+    """15.11 (karta t_279a537b): wersja przed recenzją i poprawka po niej (ten sam agent, tytuł, źródło i sesja) szły
+    w jednej fali; starsza wygrywała, poprawkę model odrzucał jako duplikat. Liczy się tylko najnowsza wersja."""
+    monkeypatch.setattr(k, "ROWNOLEGLE", 3)
+    stary = szkic(sk, "fakt", "Ton strony klienta", "Zdania mają od 3 do 11 słów.", zrodlo="karta t_50")
+    szkic(sk, "fakt", "Ton strony klienta", "Zdania mają od 2 do 11 słów.", zrodlo="karta t_50")
+    szkic(sk, "fakt", "Ton strony klienta", "Inne źródło: zdania są długie.", zrodlo="karta t_51")
+    model = model_z([{"wyniki": [{"decyzja": "nowa", "sciezka": "agenci/jarvo-web/ton strony klienta", "typ": "fakt",
+                                  "tytul": "Ton strony klienta", "streszczenie": "Zdania mają od 2 do 11 słów.",
+                                  "tresc": "Zdania mają od 2 do 11 słów.", "powod": "nowy fakt"}]},
+                     {"wyniki": [{"decyzja": "odrzuc", "powod": "inne źródło, osobno"}]}])
+    r = k.Kompilacja(sk, model).uruchom()
+    assert r["zastapione"] == 1 and "od 3 do 11" not in "".join(model.prompty)          # starszy nie idzie do modelu
+    assert len(model.prompty) == 2 + r.get("ponowione", 0)     # nowszy + inne źródło (+ ponowienie strażnika fali)
+    assert "od 2 do 11" in sk.wczytaj("agenci/jarvo-web/ton strony klienta").tresc
+    assert (sk.root / "skrzynka/zrobione" / f"{stary.rsplit('/', 1)[-1]}.md").exists()
+    assert "zastąpiony nowszą wersją" in (sk.root / "LOG.md").read_text(encoding="utf-8")
+
+
+def test_nowa_wersja_wlasnej_notatki_zastepuje_tresc_bez_scalania(sk):
+    """Szkic tego samego agenta z tego samego źródła pod tytułem jego notatki = jej nowa wersja: treść ze szkicu, nawet
+    gdy model scalił starą treść albo uznał szkic za duplikat (15.11 wracały słowa usunięte przez poprawkę). Szkic
+    z innego źródła idzie zwykłą drogą (model scala, SCHEMA zasada 4)."""
+    cel = "agenci/jarvo-web/lightpanda nie renderuje three.js"
+    scalona = {"decyzja": "aktualizacja", "sciezka": cel, "typ": "fakt", "tytul": "Lightpanda nie renderuje three.js",
+               "streszczenie": "Zrzuty stron z WebGL robimy Chromium.", "powod": "scalone"}
+    szkic(sk, "fakt", "Lightpanda nie renderuje three.js", "Zrzuty stron z WebGL robimy Chromium 157.", zrodlo="karta t_1")
+    r = k.Kompilacja(sk, model_z([{"wyniki": [{**scalona, "tresc": "Zrzuty stron z WebGL robimy Chromium 157. Słowo rama."}]}])).uruchom()
+    tresc = sk.wczytaj(cel).tresc
+    assert r["aktualizacje"] == 1 and "Chromium 157." in tresc and "rama" not in tresc
+    szkic(sk, "fakt", "Lightpanda nie renderuje three.js", "Zrzuty robimy Chromium 158.", zrodlo="karta t_1")
+    r = k.Kompilacja(sk, model_z([{"wyniki": [{"decyzja": "odrzuc", "powod": "Duplikat bez nowych informacji."}]}])).uruchom()
+    assert r["aktualizacje"] == 1 and "Chromium 158." in sk.wczytaj(cel).tresc and "157" not in sk.wczytaj(cel).tresc
+    szkic(sk, "fakt", "Lightpanda nie renderuje three.js", "Zrzuty robimy Chromium 158.", zrodlo="karta t_1")
+    r = k.Kompilacja(sk, model_z([{"wyniki": [scalona | {"tresc": "x"}]}])).uruchom()
+    assert r["odrzucone"] == 1 and r["aktualizacje"] == 0                 # ta sama treść: bez zapisu
+    szkic(sk, "fakt", "Lightpanda nie renderuje three.js", "Lightpanda 0.9 renderuje WebGL.", zrodlo="karta t_77")
+    r = k.Kompilacja(sk, model_z([{"wyniki": [{**scalona, "tresc": "Zrzuty robimy Chromium 158. Lightpanda 0.9 renderuje WebGL."}]}])).uruchom()
+    assert "Chromium 158. Lightpanda 0.9" in sk.wczytaj(cel).tresc         # inne źródło: scalenie modelu jak dotąd
+
+
 def test_nowa_aktualizacja_sprzecznosc_odrzucenie(sk):
     szkic(sk, "lekcja", "Zrzuty mobile zawsze przed oddaniem", "Sędzia odsyła strony bez zrzutów mobile.")
     szkic(sk, "fakt", "Lightpanda a WebGL", "Lightpanda od wersji 0.5 renderuje WebGL, więc Chromium nie jest potrzebne.", zrodlo="karta t_10")
@@ -521,7 +562,7 @@ def test_main_bez_modelu_hermesa_przekazuje_do_jarvo(sk, monkeypatch):
     monkeypatch.setenv("HERMES_HOME", "/tmp/profil")
     assert k.main(["--skarbiec", str(sk.root), "--limit", "5"]) == 0
     argv, env = wywolania[0]
-    assert argv == ["/opt/bin/jarvo", "wiedza", "kompiluj", "--limit", "5"]
+    assert argv == ["/opt/bin/jarvo", "wiedza", "kompiluj", "--skarbiec", str(sk.root), "--limit", "5"]   # jarvo sprawdza skarbiec
     assert env["JARVO_KOMPILACJA_PRZEKAZANA"] == "1" and "HERMES_HOME" not in env
     monkeypatch.setenv("JARVO_KOMPILACJA_PRZEKAZANA", "1")                   # drugi raz (już z jarvo): błąd, bez pętli
     assert k.main(["--skarbiec", str(sk.root)]) == 2 and len(wywolania) == 1

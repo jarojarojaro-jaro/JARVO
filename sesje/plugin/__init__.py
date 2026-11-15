@@ -29,7 +29,9 @@ Grupa „Jarvo HQ” z tematami (14.11): wątek na agenta. Wpis skrzynki z `czat
 narzędzie kanban_create; recenzenta wybiera pracownik przy kanban_request_review według floty), bot odpowiada
 „📥 Jarodev: przyjąłem, karta <id>”. Każda wiadomość właściciela w grupie zapisuje też grupę i wątek (nazwa tematu
 z `reply_to_message.forum_topic_created`) w `<dane>/jarvo/state/telegram-grupy.json`: stąd `jarvo telegram tematy`
-bierze ID grupy i istniejące tematy. Samo „start” w grupie tylko to zapisuje i potwierdza (nie budzi Jarva).
+bierze ID grupy i istniejące tematy. Samo „start” w grupie tylko to zapisuje i potwierdza (nie budzi Jarva), a gdy
+grupa nie ma jeszcze wątków agentów, dopisuje jedno zlecenie dla Claude Code w `missions/DLA-CLAUDE.md`
+(`jarvo telegram tematy`): polecenia na serwerze uruchamia operator, nigdy właściciel (15.11).
 """
 
 from __future__ import annotations
@@ -47,6 +49,7 @@ logger = logging.getLogger(__name__)
 
 PLIK_KONFIGURACJI = "sesje.json"
 PLIK_GRUP = "telegram-grupy.json"
+PLIK_ZLECEN = "DLA-CLAUDE.md"                    # zlecenia dla Claude Code w katalogu misji (SOUL Jarva, zasada 8)
 TYPY_GRUP = frozenset({"group", "forum"})        # Hermes: supergrupa = "group" (adapter._build_message_event)
 WATEK_OGOLNY = "1"                               # temat General forum (adapter._GENERAL_TOPIC_THREAD_ID)
 MAKS_GRUP, MAKS_WATKOW = 20, 200
@@ -247,6 +250,28 @@ def zapamietaj_grupe(event: Any, dane: Optional[Path] = None) -> bool:
     return True
 
 
+def zlec_tematy(czat: str, dopiski: dict[str, dict], dane: Optional[Path] = None) -> bool:
+    """„start” w grupie bez wątków agentów: zlecenie `jarvo telegram tematy --grupa <czat>` dla Claude Code
+    (operatora) w `<dane>/jarvo/missions/DLA-CLAUDE.md`; jedno otwarte na grupę. Bez zlecenia, gdy któraś skrzynka
+    ma już wątek w tej grupie (tematy założone). 14.11 bot kazał właścicielowi uruchomić to na serwerze."""
+    dane = dane or _dane()
+    if dane is None or not _ID_GRUPY.fullmatch(czat) or any(c.get("czat") == czat for c in dopiski.values()):
+        return False
+    plik = dane / "jarvo" / "missions" / PLIK_ZLECEN
+    try:
+        tekst = plik.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        tekst = "# Zlecenia dla Claude Code\n"
+    polecenie = f"jarvo telegram tematy --grupa {czat}"
+    if any(l.startswith("- [ ]") and polecenie in l for l in tekst.splitlines()):
+        return False
+    wiersz = (f"- [ ] {time.strftime('%Y-%m-%d')} · `{polecenie}` (właściciel napisał „start” w grupie Jarvo HQ) · wątki "
+              f"agentów w grupie, właściciel nie uruchamia poleceń na serwerze · {dane / 'jarvo' / 'state' / PLIK_GRUP}")
+    plik.parent.mkdir(parents=True, exist_ok=True)
+    _zapisz_atomowo(plik, tekst.rstrip("\n") + "\n" + wiersz + "\n")
+    return True
+
+
 # ---------------------------------------------------------------- hak bramy
 
 def _cel_watku(dopiski: dict[str, dict], zrodlo: Any) -> Optional[tuple[str, dict]]:
@@ -309,8 +334,12 @@ async def przechwyc(event: Any = None, gateway: Any = None, **_kw) -> Optional[d
             _klucz, bylo = _juz_przyjeta(zrodlo, event)
             if not bylo:
                 temat = nazwa_tematu(event) or ("General" if _watek_grupy(zrodlo) == WATEK_OGOLNY else "")
+                try:
+                    zlec_tematy(str(getattr(zrodlo, "chat_id", "") or ""), dopiski)
+                except Exception as e:            # zlecenie to dodatek: potwierdzenie idzie i tak
+                    logger.warning("jarvo-sesje: zlecenie wątków: %s", e)
                 await _odpowiedz(gateway, zrodlo, f"✅ Jarvo HQ: zapisałem ten wątek{f' „{temat}”' if temat else ''}. "
-                                 "Gdy napiszesz „start” we wszystkich, uruchom na serwerze: jarvo telegram tematy.")
+                                 "Wątki agentów zakłada operator, Ty nic nie uruchamiasz.")
             return {"action": "skip", "reason": "start w grupie Jarvo HQ (zapis wątku)"}
         if z_watku:
             dopisek, cel = z_watku

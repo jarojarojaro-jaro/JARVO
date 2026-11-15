@@ -273,7 +273,12 @@ pilnuje, żeby z dziesięciu profili kompilował jeden; ręcznie: przycisk w zak
    **sprzeczność** (obie wersje, `status: sprzeczna`) tylko przy nierozstrzygniętej różnicy źródeł; decyzja właściciela nowsza
    niż notatka (albo powtarzająca orzeczenie) to aktualizacja, która przepisuje notatkę na nową decyzję. „Nowa” obok notatki
    o prawie tym samym tytule w tym samym folderze (Jaccard rdzeni słów nazwy ≥ 0,75, poza `rozmowy/`) nie powstaje: bez nowych
-   zdań to odrzucenie (duplikat), z nowymi aktualizacja istniejącej (dopisane zdania, tytuł i ścieżka zostają),
+   zdań to odrzucenie (duplikat), z nowymi aktualizacja istniejącej (dopisane zdania, tytuł i ścieżka zostają).
+   **Wersje tej samej notatki (od 2026-11-15):** kilka szkiców o tym samym tytule od tego samego agenta, z tym samym
+   źródłem i sesją (np. wersja przed recenzją i poprawka po niej) = liczy się najnowszy, starsze idą do `zrobione/`
+   bez modelu (LOG: „zastąpiony nowszą wersją”). Szkic o tytule notatki, którą ten sam agent napisał z tego samego
+   źródła, to jej nowa wersja: treść notatki = treść szkicu, bez scalania (scalanie przywracało słowa usunięte
+   poprawką); ta sama treść = odrzucenie. Inne źródło dalej idzie zwykłą drogą (aktualizacja albo sprzeczność, §1 zasada 4),
 2. pisze notatkę według §3 (frontmatter, streszczenie, linki: hub + 2 sąsiadów + 1 między folderami; bez linku do nieistniejącej
    notatki: albo tworzy ją jako krótką, albo linkuje hub),
 3. dopisuje `LOG.md` (`## [data] kompilacja | szkic X → notatka Y (nowa/aktualizacja)`); `INDEX.md` i listy w hubach
@@ -299,7 +304,9 @@ i zmienione notatki. Podmioty i notatki w `user/` mogą dostać od kompilacji `a
 w fali przerywa przebieg jak wyżej: dalsze szkice tej fali czekają bez zmiany licznika.
 
 **Lint** (`wiedza.py lint`, 0 tokenów, co tydzień w niedzielę przed przeglądem tygodnia i przed każdą kompilacją):
-martwe linki, sieroty (bez linku przychodzącego), brak obowiązkowych kluczy frontmatteru, notatka bez `zrodlo`, duplikaty
+martwe linki, sieroty (bez linku przychodzącego), brak obowiązkowych kluczy frontmatteru, frontmatter, którego YAML nie
+przeczyta (wartość z „: ”, „ #” albo znakiem specjalnym na początku bez cudzysłowu: Obsidian i Quartz odrzucają cały
+plik), notatka bez `zrodlo`, duplikaty
 (tytuły podobne, ten sam temat), `wazne_do` w przeszłości, `status: sprzeczna`, notatki > 250 słów, INDEX niezgodny
 z plikami, wzorce sekretów, foldery „cienkie” (hub z < 3 notatkami). Wynik: `LINT.md` i panel w zakładce.
 

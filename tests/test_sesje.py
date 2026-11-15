@@ -188,16 +188,23 @@ def test_wiadomosc_w_grupie_zapisuje_grupe_i_watek_a_idzie_dalej(tmp_path, monke
     assert brama.wyslane == []
 
 
-def test_start_w_watku_tylko_zapisuje_i_potwierdza(tmp_path, monkeypatch):
+def test_start_w_watku_zapisuje_potwierdza_i_zleca_watki_operatorowi(tmp_path, monkeypatch):
+    """„start” nie budzi Jarva i nie każe właścicielowi nic uruchamiać (14.11: „uruchom na serwerze: jarvo telegram
+    tematy”): bot potwierdza, a zlecenie wątków idzie do Claude Code w DLA-CLAUDE.md, jedno na grupę."""
     s = load()
     dane = konfig_sesji(tmp_path, monkeypatch, {})
     brama = BramaGrupy()
     wynik = asyncio.run(s.przechwyc(event=w_grupie("Start", watek="12", temat="Kernel", mid="60"), gateway=brama))
     assert wynik["action"] == "skip"
     assert brama.wyslane[0][0] == GRUPA and brama.wyslane[0][2] == "12" and "„Kernel”" in brama.wyslane[0][1]
-    assert "jarvo telegram tematy" in brama.wyslane[0][1]
+    assert "jarvo " not in brama.wyslane[0][1] and "uruchom" not in brama.wyslane[0][1]
     assert json.loads((dane / "jarvo" / "state" / "telegram-grupy.json").read_text(encoding="utf-8"))[
         "grupy"][GRUPA]["watki"]["12"]["nazwa"] == "Kernel"
+    zlecenia = dane / "jarvo" / "missions" / "DLA-CLAUDE.md"
+    asyncio.run(s.przechwyc(event=w_grupie("start", watek="1", mid="61"), gateway=brama))     # drugi „start”: bez drugiego
+    otwarte = [l for l in zlecenia.read_text(encoding="utf-8").splitlines() if l.startswith("- [ ]")]
+    assert len(otwarte) == 1 and f"jarvo telegram tematy --grupa {GRUPA}" in otwarte[0]
+    assert s.zlec_tematy(GRUPA, {"gpu": {"nazwa": "Kernel", "czat": GRUPA, "watek": "12"}}, dane) is False  # wątki są
 
 
 def test_wiadomosc_w_watku_kernela_idzie_do_skrzynki_bez_dopisku(tmp_path, monkeypatch):

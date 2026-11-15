@@ -166,6 +166,18 @@ def test_kompiluj_bez_profilu_tylko_na_sucho(inst, capsys):
     assert "--na-sucho" in argv and argv[argv.index("--limit") + 1] == "5" and "--json" in argv
 
 
+def test_kompiluj_odmawia_obcego_skarbca(inst, tmp_path, capsys):
+    """Przekazanie z kompilacja.py podaje `--skarbiec`: inny skarbiec niż Jarva = kod 2 bez procesu (15.11 przebieg
+    na skarbcu testu kompilował skarbiec Jarva); ten sam skarbiec (także inna pisownia ścieżki) idzie normalnie."""
+    u, ot = inst
+    wolane = []
+    assert wc.polecenie_wiedza_kompiluj(u, _a(na_sucho=False, limit=0, json=False, skarbiec=str(tmp_path / "inny")), [], ot,
+                                        uruchom=lambda *x: wolane.append(x) or 0) == 2
+    assert not wolane and "kompiluje tylko skarbiec Jarva" in capsys.readouterr().err
+    assert wc.polecenie_wiedza_kompiluj(u, _a(na_sucho=False, limit=0, json=False, skarbiec=str(wc.skarbiec(u) / ".")), [], ot,
+                                        uruchom=lambda *x: wolane.append(x) or 0) == 0 and len(wolane) == 1
+
+
 def test_lint_indeksuj_status(inst, capsys):
     u, ot = inst
     assert wc.polecenie_wiedza_lint(u, _a(json=False, strict=True), [], ot) == 0

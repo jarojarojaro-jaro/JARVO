@@ -149,6 +149,7 @@ def test_compile_process(panel, tmp_path, monkeypatch):
     assert st["wynik"]["lint"]["bledy"] == 1 and not list((p.sk.root / "skrzynka").glob("*.md"))   # martwy [[nie/ma]]
     w.zapisz_szkic(p.sk, "fakt", "Drugi fakt", "Treść drugiego faktu.", "karta t_2", "jarvo-web")
     monkeypatch.setenv("HERMES_SRC", str(tmp_path / "nie-ma"))               # bez Hermesa: komunikat z ogonkami w UTF-8
+    monkeypatch.setenv("PATH", str(tmp_path / "bez-jarvo"))   # bez `jarvo` w PATH: inaczej przekazanie do prawdziwego jarvo
     p.compile_start()
     assert "brak dostępu do modelu Hermesa" in _czekaj_na_kompilacje(p)["blad"]
     blok = w.Blokada(p.sk.stan)                                              # inna kompilacja trwa: raport „zablokowana”

@@ -419,6 +419,65 @@ class Kompilacja:
                 najlepsza, wynik = f"{folder}/{p.stem}", j
         return najlepsza
 
+    def _klucz_wersji(self, szkic: dict) -> tuple:
+        """Ta sama notatka u tego samego autora: agent, tytuł (bez ogonków, małymi), źródło i sesja szkicu."""
+        tytul = " ".join(self.lib.bez_ogonkow(szkic["tytul"]).lower().split())
+        return (szkic.get("agent") or "", tytul, szkic.get("zrodlo") or "", szkic.get("skad") or "")
+
+    def zastapione(self, szkice: List[Path]) -> Dict[Path, str]:
+        """Starsze szkice, które nowszy szkic tego samego autora zastępuje (`_klucz_wersji`): {plik: nazwa nowszego}.
+        15.11 (karta t_279a537b): wersja przed recenzją i poprawka po niej szły w jednej fali, starsza aktualizowała
+        notatkę, a poprawkę model odrzucał jako „duplikat bez nowych informacji”. Liczy się tylko ostatnia wersja.
+        Szkice bez agenta (ręczne, lustro pamięci) i różne źródła albo sesje idą jak dotąd, każdy osobno."""
+        ostatni: Dict[tuple, Path] = {}
+        klucze: Dict[Path, tuple] = {}
+        for p in szkice:                         # od najstarszego: na końcu w `ostatni` zostaje najnowszy
+            try:
+                s = self._wczytaj_szkic(p)
+            except OSError:
+                continue
+            if not s.get("agent") or self.lustro_pamieci(s):
+                continue
+            klucze[p] = self._klucz_wersji(s)
+            ostatni[klucze[p]] = p
+        return {p: ostatni[k].name for p, k in klucze.items() if ostatni[k] != p}
+
+    def wlasna_notatka(self, szkic: dict) -> Optional[str]:
+        """Notatka, którą ten sam agent napisał wcześniej z tego samego źródła pod tym samym tytułem, albo None. Szkic
+        jest wtedy jej nową wersją (poprawka po recenzji): treść zastępuje, a nie scala, bo scalanie przywracało słowa
+        usunięte przez poprawkę (15.11: „rama”, „w każdym pikselu”). Inne źródło przeczące notatce to dalej
+        sprzeczność (SCHEMA, zasada 4). Huby, briefy, pliki własnego formatu i cudze foldery marki się nie liczą."""
+        agent, zrodlo = szkic.get("agent") or "", szkic.get("zrodlo") or ""
+        if not agent or not zrodlo or self.lustro_pamieci(szkic):
+            return None
+        nazwa, wlasne = self.lib.nazwa_pliku(szkic["tytul"]), self.foldery_marki(szkic)
+        for p in sorted(self.sk.root.rglob(f"{nazwa}.md") if "[" not in nazwa and "*" not in nazwa and "?" not in nazwa else []):
+            rel = self.sk.rel(p)
+            if rel.startswith(("zrodla/", "skrzynka/", "briefy/")) or p.stem.startswith("_hub-") or self.wlasny_format(rel):
+                continue
+            if wlasne and not any(rel.startswith(f + "/") for f in wlasne):
+                continue
+            n = self.sk.wczytaj(rel)
+            zrodla = [z.strip() for z in str(n.fm.get("zrodlo") or "").split(";")]
+            if str(n.fm.get("agent") or "") == agent and zrodlo in zrodla:
+                return rel
+        return None
+
+    def nowa_wersja(self, szkic: dict, wyniki: List[dict], cel: str) -> dict:
+        """Jeden wynik dla szkicu-nowej wersji notatki `cel`: treść ze szkicu (nie z modelu); streszczenie, tagi i linki
+        z odpowiedzi modelu dla tej notatki, gdy ją zaktualizował; ta sama treść = odrzucenie."""
+        n = self.sk.wczytaj(cel)
+        tresc = bez_ramy(szkic["tresc"])
+        if " ".join(tresc.split()) == " ".join(self.tresc_wlasciwa(n).split()):
+            return {"decyzja": "odrzuc", "powod": f"bez zmian względem własnej notatki [[{cel}]]"}
+        cel_md = cel + ".md"
+        model = next((w for w in wyniki if str(w.get("decyzja")) in ("aktualizacja", "sprzecznosc")
+                      and str(w.get("sciezka") or "").strip().strip("/") in (cel, cel_md)), {})
+        return {"decyzja": "aktualizacja", "sciezka": cel, "tytul": n.tytul, "typ": n.typ,
+                "streszczenie": model.get("streszczenie") or n.streszczenie or n.tytul, "tresc": tresc,
+                "tagi": model.get("tagi") or [], "linki": model.get("linki") or [],
+                "powod": "nowa wersja własnej notatki agenta (to samo źródło): treść ze szkicu, bez scalania"}
+
     def tresc_wlasciwa(self, n) -> str:
         """Treść notatki bez nagłówka, pogrubionego streszczenia, bloków generowanych i sekcji „Powiązane”."""
         return bez_ramy(self.lib.GEN_RE.sub("", n.tresc))
@@ -594,6 +653,7 @@ class Kompilacja:
             if not self.na_sucho:
                 self.raport["lint_przed"] = self._lint(ix)      # docs/WIEDZA.md §6: lint przed każdą kompilacją
             do_zrobienia = szkice[:self.limit_szkicow]
+            zastapione = self.zastapione(do_zrobienia)
             k = lib.KlientWektorow(self.sk.stan, lib.WEKTORY_CZAS_NARZEDZIA_S)
             self.wektory = k if k.dostepny else None             # kandydaci po znaczeniu, bez usługi słowami
             i, przerwany = 0, False
@@ -606,6 +666,12 @@ class Kompilacja:
                         self.raport["pominiete"] += 1
                         continue
                     szkic = self._wczytaj_szkic(p)
+                    if p in zastapione:
+                        if not self.na_sucho:
+                            self._zrobione(p)
+                        wpisy.append(f"{p.name}: zastąpiony nowszą wersją {zastapione[p]}")
+                        self.raport["zastapione"] = self.raport.get("zastapione", 0) + 1
+                        continue
                     if not szkic["tresc"] or not szkic["zrodlo"]:
                         if not self.na_sucho:
                             self._zrobione(p)
@@ -636,6 +702,9 @@ class Kompilacja:
                             odp = self.zapytaj_model(szkic, kand)
                             self.raport["ponowione"] = self.raport.get("ponowione", 0) + 1
                     wyniki = self._zapisz_odpowiedz(odp)
+                    wlasna = self.wlasna_notatka(szkic) if wyniki is not None else None
+                    if wlasna:
+                        wyniki = [self.nowa_wersja(szkic, wyniki, wlasna)]
                     if wyniki is None:
                         self.raport["bledy"] += 1
                         if szkic["proby"] + 1 >= LIMIT_PROB:
@@ -763,13 +832,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         except Exception as e:
             # 15.11 (zlecenie Jarva): ręczne `python3 kompilacja.py` z pythona narzędzi kończyło się „No module named
             # 'yaml'” (Hermes poza venvem), a szkice leżały. Gdy jest polecenie `jarvo`, przebieg idzie przez nie
-            # (Python z venvu Hermesa, HERMES_HOME profilu); znacznik w env chroni przed pętlą.
+            # (Python z venvu Hermesa, HERMES_HOME profilu); znacznik w env chroni przed pętlą. `--skarbiec` jest
+            # obowiązkowe: `jarvo wiedza kompiluj` kompiluje tylko skarbiec Jarva i odmawia innego, bo bez niego
+            # przebieg na innym skarbcu (test, baza operatora) kompilował skarbiec Jarva (15.11).
             jarvo = None if os.environ.get("JARVO_KOMPILACJA_PRZEKAZANA") else shutil.which("jarvo")
             if jarvo:
                 print(f"… model Hermesa niedostępny w tym Pythonie ({e}); przekazuję do `jarvo wiedza kompiluj`", file=sys.stderr)
                 env = {k: v for k, v in os.environ.items() if k not in ("HERMES_HOME", "HERMES_SRC")}
                 env["JARVO_KOMPILACJA_PRZEKAZANA"] = "1"
-                argv_jarvo = [jarvo, "wiedza", "kompiluj", "--limit", str(a.limit)] + (["--json"] if a.json else [])
+                argv_jarvo = [jarvo, "wiedza", "kompiluj", "--skarbiec", str(sk.root), "--limit", str(a.limit)] \
+                    + (["--json"] if a.json else [])
                 return subprocess.run(argv_jarvo, env=env).returncode
             print(f"✗ brak dostępu do modelu Hermesa ({e}); uruchom `jarvo wiedza kompiluj` (Python z venvu Hermesa, "
                   "HERMES_HOME profilu jarvo; w kontenerze scripts/wiedza-kompiluj.sh) albo użyj --na-sucho", file=sys.stderr)

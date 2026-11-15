@@ -1,5 +1,5 @@
 name: jarvo-sesje
-version: 0.2.0
+version: 0.2.1
 description: "Skrzynki sesji i dopiski Telegrama: wiadomość właściciela z dopiskiem (np. „gpu”) albo z wątku sesji w grupie Jarvo HQ idzie do skrzynki innej sesji agenta, dopisek profilu (np. „dev”) zakłada kartę kanbana; zapisuje grupę i wątki dla `jarvo telegram tematy`. Także gdy Jarvo jest zajęty. Hak pre_gateway_dispatch bramy."
 kind: standalone
 provides_hooks: [pre_gateway_dispatch]

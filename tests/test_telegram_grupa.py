@@ -198,6 +198,32 @@ def test_tematy_ostrzega_gdy_bot_nie_jest_adminem(inst, capsys):
     assert "nie jest administratorem" in capsys.readouterr().out
 
 
+def test_tematy_bierze_nowy_numer_grupy_po_wlaczeniu_tematow(inst, monkeypatch, capsys):
+    """15.11: bot znał tylko stary numer zwykłej grupy (wiadomość „start” przed włączeniem tematów); getChat pod nim
+    mówi „bez tematów”, a nowy numer supergrupy Telegram podaje dopiero w błędzie wysyłki (migrate_to_chat_id).
+    `tematy` sam go bierze, bez drugiego „start” właściciela; grupa nieprzeniesiona = dawna rada o tematach."""
+    u, ot, api, _f = inst
+    stara = "-5318577883"
+    _grupy(u, {stara: {"nazwa": "JARVO", "watki": {}}})
+    przeniesiona = {"tak": True}
+
+    def telegram(token, metoda, dane=None, **kw):
+        if (dane or {}).get("chat_id") == stara:
+            if metoda == "getChat":
+                return {"id": int(stara), "title": "JARVO", "type": "group", "is_forum": False}
+            if metoda == "sendChatAction" and przeniesiona["tak"]:
+                raise wc.BladTelegrama(400, "Bad Request: group chat was upgraded to a supergroup chat", GRUPA)
+        return api(token, metoda, dane, **kw)
+    monkeypatch.setattr(wc, "api_telegrama", telegram)
+    assert wc.polecenie_telegram_tematy(u, _a(bez_wdrozenia=True), [], ot) == 0
+    assert f"dostała nowy numer {GRUPA}" in capsys.readouterr().out
+    assert {d["chat_id"] for d in api.metody("createForumTopic")} == {GRUPA}
+    assert wc.czytaj_env(wc.konfig(u) / "jarvo.env")["TELEGRAM_HQ_CHAT_ID"] == GRUPA
+    przeniesiona["tak"] = False
+    assert wc.polecenie_telegram_tematy(u, _a(grupa=stara), [], ot) == 1
+    assert "Tematy (Topics)" in capsys.readouterr().err
+
+
 def test_wyslij_do_watku_grupy(inst, monkeypatch):
     u, ot, api, _f = inst
     monkeypatch.setattr(sys, "stdin", io.StringIO("⚡ Kernel\n\nodpowiedź"))

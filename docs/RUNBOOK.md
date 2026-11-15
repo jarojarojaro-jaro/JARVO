@@ -96,6 +96,11 @@ Zainstaluj Tailscale też na laptopie i telefonie. Od teraz łącz się przez `s
    ```
    `chat` (zaczyna się od `-100`) → `TELEGRAM_HQ_CHAT_ID`, `thread` dla każdego tematu → `TELEGRAM_TOPIC_*`.
    Alternatywa: w aplikacji „Kopiuj link” do tematu → `https://t.me/c/<grupa>/<ID-wątku>`.
+   **Natywnie (bez ręcznego kopiowania ID):** właściciel pisze w grupie „start”; bot zapisuje grupę i wątek, a gdy grupa
+   nie ma jeszcze wątków agentów, dopisuje zlecenie dla Claude Code w `missions/DLA-CLAUDE.md`. Operator uruchamia
+   `jarvo telegram tematy`: zakłada brakujące wątki, a gdy bot zna tylko numer grupy sprzed włączenia tematów, sam
+   pobiera nowy numer supergrupy (Telegram podaje go w błędzie wysyłki, `migrate_to_chat_id`). Właściciel nie uruchamia
+   niczego na serwerze.
 
 ---
 
