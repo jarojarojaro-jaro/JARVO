@@ -435,7 +435,9 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    `vendor/zrodla.yaml`) i `build/wiedza/repo/` (SOUL bez znacznika protokołu, README, CHANGELOG, rubryka, `references/**/*.md`
    skilli, `vendor/zrodla.md`), `install-fleet.sh`
    zasiewa przy każdym wdrożeniu (części ręczne hubów zostają, bloki `Jarvo:GEN` odświeżane; pogrubiony opis huba agenta idzie
-   za opisem z `fleet.yaml`, dopóki człowiek go nie zmienił; lustro `zrodla/jarvo-repo/` traci dokumenty i pliki usunięte z repo).
+   za opisem z `fleet.yaml`, dopóki człowiek go nie zmienił; lustro `zrodla/jarvo-repo/` traci dokumenty i pliki usunięte z repo;
+   hub agenta usuniętego z floty zostaje z notatkami, a jego blok `Jarvo:GEN fleet` mówi tylko, że agenta nie ma, bez linków
+   do usuniętego lustra).
    **Kopia repo w grafie:** `zrodla/jarvo-repo/` jest poza domyślnym szukaniem (`--zrodla` ją włącza), ale w grafie:
    hub skarbca linkuje dokumenty repo i spis źródeł, hub agenta jego zasady (SOUL), README, rubrykę i cały CHANGELOG,
    a węzeł skilla jego materiały (`references`).

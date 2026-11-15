@@ -398,6 +398,24 @@ def test_frontmatter_zawsze_poprawny_yaml_i_lint_lapie_reczny(skarbiec):
     assert w.zly_naglowek("---\naliasy: [@Numes_ai, Numes.ai]\n---\n") and not w.zly_naglowek("---\naliasy: [\"@x\"]\n---\n")
 
 
+def test_hub_agenta_usunietego_z_floty_bez_martwych_linkow(skarbiec):
+    """14.11 jarvo-operator wypadł z floty: zasiew nie odświeżał już jego huba, a lustro repo zniknęło, więc blok
+    z rejestru linkował do 4 nieistniejących plików (błędy lintu). Teraz blok mówi, że agenta nie ma; notatki zostają."""
+    sk = skarbiec
+    martwy = "zrodla/jarvo-repo/profiles/jarvo-stary/SOUL"
+    sk.zapisz_plik("agenci/jarvo-stary/_hub-stary", w.sklej(w._hub_frontmatter("agent", "fleet.yaml", agent="jarvo-stary"),
+                   "# Stary (jarvo-stary)\n\n**Był agent.**\n\nRęczny opis zostaje.\n\n## Powiązane\n- hub: [[agenci/_hub-agenci|Agenci]]\n\n"
+                   f"<!-- Jarvo:GEN fleet -->\n## Z rejestru floty (fleet.yaml)\n- z repo: [[{martwy}|zasady (SOUL)]]\n"
+                   "<!-- /Jarvo:GEN fleet -->\n"))
+    w.zasiej(sk, FLEET, None, None)
+    tekst = sk.plik("agenci/jarvo-stary/_hub-stary").read_text(encoding="utf-8")
+    assert martwy not in tekst and "`jarvo-stary` nie ma już we flocie" in tekst and "Ręczny opis zostaje." in tekst
+    ix = w.Indeks(sk)
+    assert not [b for b in w.lint(sk, ix)["bledy"] if "jarvo-stary" in b]
+    ix.zamknij()
+    assert "nie ma już we flocie" not in sk.plik("agenci/jarvo-web/_hub-web").read_text(encoding="utf-8")
+
+
 def test_skille_floty_to_wezly_grafu(skarbiec, tmp_path):
     """Każdy skill floty (własny i wspólny) to notatka-węzeł w `fleet/skille/`: linki do hubów agentów, powiązanych skilli
     i skryptów; poza domyślnym szukaniem i przypomnieniami (folder="fleet" je zwraca); zmienia się tylko ze skillem."""

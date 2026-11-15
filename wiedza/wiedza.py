@@ -1613,6 +1613,18 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
                                           f"## Powiązane\n- hub: [[orzeczenia/_hub-orzeczenia|Orzeczenia]]\n- [[{rel}|{a.get('short') or krotki}]]\n\n## Linie\n"))
             if marka:
                 zasiej_marke(sk, marka, a, rel)
+        # huby agentów usuniętych z floty (14.11 jarvo-operator): blok z rejestru bez linków do lustra repo, którego
+        # już nie ma (4 martwe linki w lincie od 14.11); hub i notatki agenta zostają jako historia
+        w_flocie = {a["name"] for a in fleet.get("agents", [])}
+        for hub in sorted((sk.root / "agenci").glob("*/_hub-*.md")):
+            rel_h = sk.rel(hub)
+            agent = str(sk.wczytaj(rel_h).fm.get("agent") or "")
+            if agent and agent not in w_flocie:
+                tekst = hub.read_text(encoding="utf-8")
+                nowy = zastap_blok(tekst, "fleet", f"## Z rejestru floty (fleet.yaml)\n- `{agent}` nie ma już we flocie: "
+                                                    "hub i notatki zostają jako historia")
+                if nowy != tekst:
+                    sk.zapisz_plik(rel_h, nowy)
         (sk.stan).mkdir(parents=True, exist_ok=True)
         (sk.stan / "wiedza-agenci.json").write_text(json.dumps(agenci_meta, ensure_ascii=False, indent=1), encoding="utf-8",
                                                     newline="\n")
