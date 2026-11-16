@@ -13,7 +13,8 @@ Decyzje:
               publikacja (`publikacja`), usunięcie konta (`usuniecie_konta`); ze zgodą przechodzi,
   wstrzymane  Komputer zatrzymany (właściciel: jarvo komputer pauza; Jarvo: czeka na właściciela);
               patrzeć wolno, działać nie, wznawia tylko właściciel.
-Przy dwóch sesjach naraz zmieniać ekran może jedna (odmowa `zajete`, wejscie.py: Ekran.zajmij).
+Przy dwóch sesjach naraz patrzeć na stronę i ją zmieniać może jedna (odmowa `zajete` z tym, kto ma ekran i kiedy się
+zwolni; po utracie ekranu najpierw nowy odczyt strony: `ekran_zmieniony`; wejscie.py: Ekran.zajmij).
 Działanie z delivery_mode foreground (klawiatura, przewijanie, przeciąganie i podwójny klik na pulpicie X11 mają tylko
 tę drogę) przechodzi tylko w oknie, które już jest aktywne: wejście sprawdza cel i pole z fokusem w tym oknie,
 a przełączenie okna przez sterownik posłałoby klawisze tam, gdzie nikt nie patrzył.
@@ -58,10 +59,20 @@ DOSTEPNE = ODCZYT | SESJA | DZIALANIA
 SESJA_BEZ_EKRANU = frozenset({"start_session", "end_session", "escalate_session", "set_config",
                               "set_agent_cursor_enabled", "set_agent_cursor_motion", "set_agent_cursor_theme"})
 
-# zmieniają ekran: przy dwóch sesjach naraz działa tylko jedna (wejscie.py, Ekran.zajmij)
+# zmieniają ekran
 ZMIANY_EKRANU = DZIALANIA | (SESJA - SESJA_BEZ_EKRANU)
+# czytają to, co jest na ekranie: drzewo, zrzut, karty z adresami, tekst strony
+ODCZYT_EKRANU = frozenset({"list_windows", "get_window_state", "verify_state", "get_desktop_state",
+                           "get_accessibility_tree", "zoom", "wait_for"})
+# ekran jednej sesji (wejscie.py, Ekran.zajmij): przy dwóch sesjach naraz patrzy i działa tylko ta, która ma ekran,
+# bo strona należy do jej zadania (16.11 paczka kroków jednej karty poszła w rejestrację otwartą przez drugą kartę)
+EKRAN_SESJI = ZMIANY_EKRANU | ODCZYT_EKRANU
+# pokazują stronę albo wczytują nową: po nich sesja, której inna zabrała ekran, wie, na czym działa
+WIDOK = (ODCZYT_EKRANU - {"list_windows", "wait_for"}) | {"navigate", "launch_app"}
 # odmowy, po których agent czeka i próbuje znowu (nie szuka innej drogi)
 CZEKAJ = frozenset({"zajete", "limit"})
+# odmowy, po których agent najpierw patrzy na stronę od nowa (next_step fresh_state, jak w computer_use Hermesa)
+OD_NOWA = frozenset({"ekran_zmieniony"})
 
 KLUCZE_KONFIGURACJI = frozenset({"capture_scope", "capture_mode", "max_image_dimension"})
 PRZEGLADARKA = re.compile(r"^(chromium|chromium[- ]browser|chromium web browser|chromium\.desktop)$", re.I)
@@ -799,6 +810,9 @@ def wynik_odmowy(w: Werdykt) -> dict:
     elif w.kod in CZEKAJ:
         tekst = f"Komputer Jarva: {w.powod}."
         dalej = "wait_and_retry"
+    elif w.kod in OD_NOWA:
+        tekst = f"Komputer Jarva: {w.powod}."
+        dalej = "fresh_state"
     else:
         tekst = f"Zablokowane przez Komputer Jarva: {w.powod}."
         dalej = "choose_another_way"
@@ -806,6 +820,10 @@ def wynik_odmowy(w: Werdykt) -> dict:
     sc = {"ok": False, "code": kod, "rule": w.kod, "decision": w.decyzja, "message": tekst, "next_step": dalej}
     if kat:
         sc["consent_category"] = kat
+    if w.kod == "zajete" and w.dane.get("przez"):     # kto ma ekran i za ile sekund najpóźniej go odda
+        sc["held_by"] = w.dane["przez"]
+        if isinstance(w.dane.get("za_s"), int):
+            sc["free_in_s"] = w.dane["za_s"]
     return {"content": [{"type": "text", "text": tekst}], "isError": True, "structuredContent": sc}
 
 

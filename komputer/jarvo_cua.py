@@ -23,9 +23,10 @@ potok nazwany z DACL właściciela na Windows, gniazdo 0600 na macOS i Linuksie)
 z `<stan>/komputer/usluga.json`. Manifest podaje wtedy jako polecenie MCP Pythona z tą bramką, bo Windows nie
 uruchomi pliku .py wprost.
 Przed rozmową bramka wysyła wejściu powiadomienie `notifications/jarvo/grupa` z kluczem z JARVO_KOMPUTER_GRUPA
-(ustawia go wtyczka jarvo-komputer w procesie Hermesa): computer_use i narzędzie `komputer` jednego procesu agenta
-dzielą wtedy ekran (wejście nie odmawia im sobie nawzajem `zajete`). Natywnie jeszcze wcześniej, jako pierwszą
-wiadomość, `notifications/jarvo/karta` z kartą kanbana pracownika (HERMES_KANBAN_TASK, HERMES_KANBAN_BOARD; ustawia
+(ustawia go wtyczka jarvo-komputer w procesie Hermesa) i kartą kanbana pracownika (HERMES_KANBAN_TASK): computer_use
+i narzędzie `komputer` jednego procesu agenta dzielą wtedy ekran (wejście nie odmawia im sobie nawzajem `zajete`),
+sesje różnych kart nie dzielą go nigdy, a odmowa `zajete` mówi, która karta ma ekran. Natywnie jeszcze wcześniej, jako
+pierwszą wiadomość, `notifications/jarvo/karta` z kartą i tablicą (HERMES_KANBAN_TASK, HERMES_KANBAN_BOARD; ustawia
 je dispatcher Hermesa): wejście czyta z tej karty zgodę właściciela (komputer/zgoda_karty.py, docs/KOMPUTER.md §6).
 """
 
@@ -140,12 +141,16 @@ def komputer_dostepny() -> bool:
 
 
 def powiadomienie_grupy() -> bytes:
-    """Wiersz MCP z grupą ekranu procesu agenta dla wejścia (pusty bez poprawnego klucza w JARVO_KOMPUTER_GRUPA)."""
+    """Wiersz MCP z grupą ekranu procesu agenta i kartą kanbana pracownika dla wejścia (pusty bez poprawnego klucza
+    w JARVO_KOMPUTER_GRUPA; karta tylko przy poprawnym numerze)."""
     grupa = os.environ.get(GRUPA_ENV, "")
     if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", grupa):
         return b""
-    return (json.dumps({"jsonrpc": "2.0", "method": "notifications/jarvo/grupa", "params": {"grupa": grupa}})
-            + "\n").encode()
+    params = {"grupa": grupa}
+    karta = os.environ.get(KARTA_ENV, "").strip()
+    if re.fullmatch(r"[A-Za-z0-9_-]{1,64}", karta):
+        params["karta"] = karta
+    return (json.dumps({"jsonrpc": "2.0", "method": "notifications/jarvo/grupa", "params": params}) + "\n").encode()
 
 
 def powiadomienie_karty() -> bytes:

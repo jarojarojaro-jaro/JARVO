@@ -19,9 +19,12 @@ zasady:
              `obserwuj` dokłada migawkę po ostatnim kroku (z `*` przy nowych elementach),
   czekaj     wait_for: tekst, jego zniknięcie albo adres, do 30 s, liczone w sterowniku.
 Rozmowa trwa na sesję Hermesa (snapshot_id ostatniego `patrz` dokłada się do `kroki`) i kończy się po BEZCZYNNOSC s
-bez wywołań. Ekran: wejście daje go jednej sesji naraz (`zajete` przez 120 s), ale wtyczka ustawia w procesie
-Hermesa klucz grupy ekranu (JARVO_KOMPUTER_GRUPA), który dziedziczą bramki computer_use, i bramka podaje go
-wejściu: computer_use (zrzut, canvas) i `komputer` jednego procesu agenta liczą się jak jedna sesja.
+bez wywołań. Ekran: wejście daje go jednej sesji naraz (patrzenie i działanie; inna dostaje `zajete` z kartą, która ma
+ekran, i czasem do zwolnienia, najdłużej 120 s od jej ostatniego wywołania), ale wtyczka ustawia w procesie Hermesa
+klucz grupy ekranu (JARVO_KOMPUTER_GRUPA), który dziedziczą bramki computer_use, i bramka podaje go wejściu razem
+z kartą kanbana: computer_use i `komputer` jednego procesu agenta liczą się jak jedna sesja. Klucz zaczyna się od PID
+procesu, który go ustawił: pracownik karty kanbana dostaje otoczenie bramy Hermesa (z jej kluczem), więc tu bierze
+własny (16.11 dwie karty z kluczem bramy sterowały ekranem naraz).
 
 build.py kopiuje wtyczkę do plugins/jarvo-komputer, install-fleet.sh dowiązuje ją w profilach z `komputer: true`.
 
@@ -110,7 +113,9 @@ MAKS_WPISOW = 50
 DALEJ = {"ask_owner": "Dalej: to krok właściciela. `komputer` akcja=oddaj z dokładną prośbą (gdzie i co kliknąć), "
                       "potem kanban_block z tym samym zdaniem (skill oddaj-ekran). Nie obchodź tego innym krokiem.",
          "wait_for_owner": "Dalej: Komputer jest wstrzymany; nic nie klikaj, czekaj na właściciela.",
-         "wait_and_retry": "Dalej: poczekaj chwilę i spróbuj raz jeszcze.",
+         "wait_and_retry": "Dalej: odczekaj (przy zajętym ekranie podany czas, wait albo sleep) i spróbuj raz jeszcze; "
+                           "ekran dalej zajęty → stan w karcie i kanban_block z tym powodem, bez pracy obok.",
+         "fresh_state": "Dalej: najpierw akcja=patrz (albo idz), potem kroki z numerami z nowego patrz.",
          "choose_another_way": "Dalej: zasady tego nie przepuszczą; inna droga bez tego działania."}
 
 SCHEMAT: Dict[str, Any] = {
@@ -213,8 +218,14 @@ def _stan(odp: Dict[str, Any]) -> Dict[str, Any]:
 
 def grupa_ekranu() -> str:
     """Klucz grupy ekranu tego procesu Hermesa, ustawiany raz w jego otoczeniu: dziedziczą go bramki, które Hermes
-    uruchamia dla computer_use, więc ich sesje i sesje tej wtyczki dzielą ekran (wejście: GRUPA)."""
-    return os.environ.setdefault(GRUPA_ENV, secrets.token_hex(16))
+    uruchamia dla computer_use, więc ich sesje i sesje tej wtyczki dzielą ekran (wejście: GRUPA). Klucz z PID tego
+    procesu: klucz odziedziczony po rodzicu (pracownik karty kanbana dostaje otoczenie bramy Hermesa, w której ta
+    wtyczka też działa) zastępuje nowy, inaczej wszystkie karty i rozmowy bramy byłyby dla wejścia jedną sesją."""
+    przedrostek = f"p{os.getpid()}-"
+    klucz = os.environ.get(GRUPA_ENV, "")
+    if not klucz.startswith(przedrostek):
+        klucz = os.environ[GRUPA_ENV] = przedrostek + secrets.token_hex(16)
+    return klucz
 
 
 class BrakBramki(RuntimeError):

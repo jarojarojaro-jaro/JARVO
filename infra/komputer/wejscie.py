@@ -11,8 +11,10 @@ uruchamia `cua-driver mcp` dopiero przy pierwszej wiadomości i przepuszcza rozm
     element w punkcie), nie z deklaracji agenta,
   - działanie na element numerem z migawki idzie dalej dopiero po sprawdzeniu tego numeru w świeżej migawce okna
     (sterownik szuka elementu po numerze w drzewie z chwili działania),
-  - zmieniać ekran może jedna sesja naraz (`zajete` przez ZAJETE_S s); sesje z tą samą grupą ekranu (powiadomienie
-    GRUPA od bramki: computer_use i narzędzie `komputer` jednego procesu agenta) liczą się jak jedna.
+  - ekran ma jedna sesja naraz: patrzeć na stronę (drzewo, zrzut, karty, czekanie na tekst) i ją zmieniać może tylko
+    ona (`zajete` przez ZAJETE_S s od jej ostatniego wywołania, z tym, kto ma ekran i kiedy się zwolni); sesje
+    z tą samą grupą ekranu i kartą kanbana (powiadomienie GRUPA od bramki: computer_use i narzędzie `komputer`
+    jednego procesu agenta) liczą się jak jedna, a sesja, której inna zabrała ekran, najpierw patrzy od nowa.
 Na gnieździe ster.sock polecenia JSON: stan, pauza, wznow, dziennik. Pauzę włączy każdy, kto widzi gniazdo
 (flota, HQ), wznowić może tylko właściciel: proces pulpitu albo root w tym kontenerze (jarvo komputer wznow),
 sprawdzane po SO_PEERCRED, więc agent z terminalem we flocie nie zdejmie sobie pauzy. Dziennik
@@ -22,6 +24,7 @@ sprawdzane po SO_PEERCRED, więc agent z terminalem we flocie nie zdejmie sobie 
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import signal
@@ -59,7 +62,8 @@ MAKS_PRZODKOWIE = 200           # poziomów w górę od pola do dokumentu (szuka
 ROLE_DOKUMENTU = {"document web", "document frame"}
 STANY_POLA = {"editable", "multi-line", "single-line"}
 BLAD = object()                 # AT-SPI nie odpowiedział albo rzucił wyjątek: cel nieznany, działanie nie przechodzi
-ZAJETE_S = 120                  # tyle sekund po ostatnim działaniu ekran należy do sesji, która działała
+ZAJETE_S = 120                  # tyle sekund po ostatnim wywołaniu (patrzenie, działanie) ekran ma sesja, która go użyła
+MAKS_STRACONYCH = 64            # pamiętanych sesji, którym inna zabrała ekran (Ekran.zajmij: `ekran_zmieniony`)
 MAKS_POWOD = 300                # znaków powodu pauzy (prośba Jarva do właściciela)
 PROBY_TRAFIENIA = 3             # zapytań o element w punkcie: dwa zgodne z rzędu albo cel nieznany
 PAUZA_TRAFIENIA = 0.12          # s między nimi: Chromium najpierw zgaduje z drzewa, potem pyta silnik strony
@@ -67,10 +71,13 @@ WEWNETRZNE = "jarvo-wejscie:"   # id zapytań wejścia do sterownika (świeża m
 CZAS_MIGAWKI = 30               # s na świeżą migawkę (sterownik sam kończy przejście drzewa po 25 s)
 # Grupa ekranu: sesje jednego procesu agenta (computer_use Hermesa i narzędzie `komputer` Jarva, każde przez
 # bramkę jarvo_cua.py) dzielą ekran zamiast odmawiać sobie `zajete`. Bramka wysyła to powiadomienie przed rozmową,
-# z kluczem ze zmiennej JARVO_KOMPUTER_GRUPA, którą ustawia wtyczka jarvo-komputer w procesie Hermesa. To nie jest
-# granica bezpieczeństwa: każdy krok i tak oceniają twarde zasady, a grupa tylko nie każe czekać 120 s.
+# z kluczem ze zmiennej JARVO_KOMPUTER_GRUPA, którą ustawia wtyczka jarvo-komputer w procesie Hermesa (klucz z PID
+# procesu: pracownik karty, który odziedziczył klucz bramy, dostaje własny), i z kartą kanbana pracownika
+# (HERMES_KANBAN_TASK): sesje różnych kart nie dzielą ekranu nawet z tym samym kluczem. To nie jest granica
+# bezpieczeństwa: każdy krok i tak oceniają twarde zasady, a grupa tylko nie każe czekać 120 s.
 GRUPA = "notifications/jarvo/grupa"
 WZOR_GRUPY = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
+WZOR_KARTY = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
 def wolno_wznowic(uid: int) -> bool:
@@ -327,14 +334,20 @@ def czysty_powod(tekst) -> str:
 
 
 class Ekran:
-    """Wspólny stan dla zasad: pauza (z powodem), sesja, która zajmuje ekran, AT-SPI, limit działań."""
+    """Wspólny stan dla zasad: pauza (z powodem), sesja, która ma ekran, AT-SPI, limit działań."""
 
     def __init__(self, dostepnosc: Dostepnosc) -> None:
         self.dostepnosc = dostepnosc
         self.x11 = okna.X11()
         self.pauza: dict | None = self._wczytaj_pauze()
+        self._stan_sesji()
+
+    def _stan_sesji(self) -> None:
+        """Sesja przy ekranie i limit działań (także EkranNatywny, który tego __init__ nie woła)."""
         self._dzialania: deque = deque()
-        self._zajete: tuple[int, float] | None = None     # (nr sesji, czas ostatniego działania)
+        self._zajete: tuple | None = None       # (klucz sesji, czas jej ostatniego wywołania, opis: kto to)
+        self._ostatni = None                    # klucz sesji, która miała ekran ostatnio (także po zwolnieniu)
+        self._stracili: dict = {}               # klucz sesji, której inna zabrała ekran -> opis tamtej
         self._lock = threading.Lock()
 
     @staticmethod
@@ -379,16 +392,37 @@ class Ekran:
             except FileNotFoundError:
                 pass
             self.pauza = None
+            self._po_pauzie()
 
-    def zajmij(self, klucz) -> float | None:
-        """Sesja (klucz: numer sesji albo jej grupa ekranu) chce zmienić ekran: None, gdy wolno (ekran jest odtąd
-        jej), albo ile sekund temu działała sesja, która go zajmuje. Ekran zwalnia koniec tamtej sesji (ostatniej
-        z grupy) albo ZAJETE_S bez jej działań."""
+    def _po_pauzie(self) -> None:
+        """Po wznowieniu sesja, która miała ekran przed pauzą (oddała krok właścicielowi), ma go jeszcze ZAJETE_S s:
+        wraca do strony po kroku właściciela, zanim weźmie ją inna."""
+        with self._lock:
+            if self._zajete:
+                self._zajete = (self._zajete[0], time.monotonic(), self._zajete[2])
+
+    def zajmij(self, klucz, opis: str = "", widok: bool = True) -> dict | None:
+        """Sesja (klucz: grupa ekranu z kartą albo sama sesja; opis: kto to, np. „karta t_…”) patrzy na stronę albo
+        ją zmienia. None: wolno, ekran jest odtąd jej. Odmowa: {"przez", "temu", "za"}, gdy ekran ma inna sesja
+        (opis, sekundy od jej ostatniego wywołania i do zwolnienia; "za" None przy pauzie, bo wtedy czas nie płynie),
+        albo {"zmieniony": opis}, gdy inna sesja zabrała tej ekran, a to wywołanie nie pokazuje strony ani nie wczytuje
+        nowej (`widok` False): działałoby na stronie, której sesja nie widziała. Ekran zwalnia koniec tamtej sesji
+        (ostatniej z grupy) albo ZAJETE_S bez jej wywołań."""
         teraz = time.monotonic()
         with self._lock:
-            if self._zajete and self._zajete[0] != klucz and teraz - self._zajete[1] < ZAJETE_S:
-                return teraz - self._zajete[1]
-            self._zajete = (klucz, teraz)
+            z = self._zajete
+            if z and z[0] != klucz and (self.wstrzymane or teraz - z[1] < ZAJETE_S):
+                temu = teraz - z[1]
+                return {"przez": z[2], "temu": temu, "za": None if self.wstrzymane else ZAJETE_S - temu}
+            if self._ostatni is not None and self._ostatni != klucz:
+                self._stracili[self._ostatni] = opis
+                while len(self._stracili) > MAKS_STRACONYCH:
+                    del self._stracili[next(iter(self._stracili))]
+            self._zajete, self._ostatni = (klucz, teraz, opis), klucz
+            if widok:
+                self._stracili.pop(klucz, None)
+            elif klucz in self._stracili:
+                return {"zmieniony": self._stracili[klucz]}
             return None
 
     def zwolnij(self, klucz) -> None:
@@ -662,11 +696,18 @@ class Sesja:
         self._wewn_n = 0
         self._wewn_lock = threading.Lock()
         self.grupa: str | None = None                 # grupa ekranu (GRUPA) od bramki, pierwsza wygrywa
+        self.karta: str | None = None                 # karta kanbana pracownika od bramki (GRUPA, natywnie KARTA)
 
     @property
     def klucz_ekranu(self):
-        """Kto zajmuje ekran: grupa ekranu sesji albo sama sesja."""
-        return ("grupa", self.grupa) if self.grupa else self.nr
+        """Kto ma ekran: grupa ekranu sesji z jej kartą kanbana (dwie karty nigdy nie dzielą ekranu, nawet gdy ich
+        pracownicy odziedziczyli ten sam klucz grupy) albo sama sesja."""
+        return ("grupa", self.grupa, self.karta) if self.grupa else self.nr
+
+    @property
+    def opis_ekranu(self) -> str:
+        """Kto ma ekran, w odmowie `zajete` dla innej sesji."""
+        return f"karta {self.karta}" if self.karta else f"rozmowa Jarva bez karty kanbana, sesja {self.nr}"
 
     # --- wysyłanie
     def do_agenta(self, wiadomosc: dict) -> None:
@@ -726,10 +767,13 @@ class Sesja:
                             "error": {"code": -32600, "message": "batch wyłączony w Komputerze Jarva"}})
             return
         metoda, ident = msg.get("method"), msg.get("id")
-        if metoda == GRUPA and ident is None:   # powiadomienie bramki: grupa ekranu procesu agenta
-            grupa = (msg.get("params") or {}).get("grupa") if isinstance(msg.get("params"), dict) else None
+        if metoda == GRUPA and ident is None:   # powiadomienie bramki: grupa ekranu procesu agenta i jego karta
+            params = msg.get("params") if isinstance(msg.get("params"), dict) else {}
+            grupa, karta = params.get("grupa"), params.get("karta")
             if self.grupa is None and isinstance(grupa, str) and WZOR_GRUPY.match(grupa):
                 self.grupa = grupa
+                if self.karta is None and isinstance(karta, str) and WZOR_KARTY.match(karta):
+                    self.karta = karta
             return
         if metoda is None:                      # odpowiedź agenta na żądanie sterownika
             self.do_sterownika(msg)
@@ -772,15 +816,36 @@ class Sesja:
         except Exception as e:  # noqa: BLE001 - błąd zasady to odmowa, nigdy przepuszczenie
             log(f"sesja {self.nr}: błąd zasady dla {nazwa}: {e!r}")
             return zasady.Werdykt(zasady.ODMOWA, "blad_zasady", "wewnętrzny błąd zasad; działanie wstrzymane")
-        if w.wolno and nazwa in zasady.ZMIANY_EKRANU:
-            temu = self.wejscie.ekran.zajmij(self.klucz_ekranu)
-            if temu is not None:
-                return zasady.Werdykt(zasady.ODMOWA, "zajete",
-                                      f"ekranem steruje teraz inna sesja Jarva (działała {int(temu)} s temu); "
-                                      f"poczekaj, aż skończy (ekran zwalnia się po {ZAJETE_S} s bez jej działań)")
+        if w.wolno and nazwa in zasady.EKRAN_SESJI:
+            odmowa = self._ekran_sesji(nazwa)
+            if odmowa is not None:
+                return odmowa
         if w.wolno and nazwa in zasady.DZIALANIA and self.wejscie.ekran.limit():
             return zasady.Werdykt(zasady.ODMOWA, "limit", f"ponad {LIMIT_DZIALAN} działań na minutę; zwolnij")
         return w
+
+    def _ekran_sesji(self, nazwa: str) -> zasady.Werdykt | None:
+        """Ekran jednej sesji naraz (Ekran.zajmij): patrzeć na stronę i ją zmieniać może sesja, która ma ekran; inna
+        dostaje `zajete` z tym, kto go ma i za ile najpóźniej się zwolni, więc czeka albo odkłada pracę, zamiast
+        działać na stronie cudzego zadania. Sesja, której inna zabrała ekran, przed działaniem patrzy od nowa albo
+        przechodzi pod adres (`ekran_zmieniony`). `nazwa`: narzędzie albo run_steps (natywnie cała paczka)."""
+        z = self.wejscie.ekran.zajmij(self.klucz_ekranu, self.opis_ekranu, nazwa in zasady.WIDOK)
+        if z is None:
+            return None
+        if "zmieniony" in z:
+            return zasady.Werdykt(zasady.ODMOWA, "ekran_zmieniony",
+                                  f"od Twojego ostatniego wywołania ekranem sterowała inna sesja Jarva "
+                                  f"({z['zmieniony']}), więc strona może być inna niż wtedy; najpierw get_window_state "
+                                  "(narzędzie `komputer`: patrz) albo navigate (idz), potem działaj")
+        za = None if z["za"] is None else math.ceil(z["za"])
+        kiedy = (f"zwolni się najpóźniej za {za} s" if za is not None else
+                 f"Komputer jest wstrzymany, a ekran czeka na tamtą sesję: zwolni się {ZAJETE_S} s po wznowieniu "
+                 "bez jej wywołań")
+        return zasady.Werdykt(zasady.ODMOWA, "zajete",
+                              f"ekran ma teraz inna sesja Jarva ({z['przez']}, ostatnie wywołanie {int(z['temu'])} s "
+                              f"temu); {kiedy} albo wcześniej, gdy tamta sesja skończy. Do tego czasu nie patrz na "
+                              "stronę i nic na niej nie rób: odczekaj i spróbuj znowu albo odłóż pracę na ekranie",
+                              dane={"przez": z["przez"], **({"za_s": za} if za is not None else {})})
 
     def _swiezy_element(self, args: dict, w: zasady.Werdykt) -> tuple[zasady.Werdykt, dict]:
         """Sterownik szuka elementu po numerze w drzewie z chwili działania, a strona zmieniona od migawki agenta

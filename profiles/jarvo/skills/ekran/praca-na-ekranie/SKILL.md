@@ -1,7 +1,7 @@
 ---
 name: praca-na-ekranie
 description: "Pętla pracy na ekranie: idź, patrz, kroki paczką, czytaj"
-version: 1.4.0
+version: 1.5.0
 author: Jarvo
 license: MIT
 metadata:
@@ -110,7 +110,8 @@ Odmowa wraca jako wynik z `code`, `rule` i `next_step`. To granica, nie zagadka 
 | `wymaga_czlowieka` / `ask_owner` | skill `oddaj-ekran`: `komputer` `oddaj` z dokładną prośbą; na karcie `kanban_block` z tym samym zdaniem, w rozmowie to zdanie w odpowiedzi |
 | `wstrzymane` / `wait_for_owner` | nic nie klikasz; w karcie zostaw stan i czekaj na właściciela |
 | `zablokowane` / `choose_another_way` | inna droga bez tego działania; zasady nie obchodzisz (inna składnia, punkt zamiast elementu) |
-| `zajete` / `wait_and_retry` | ekranem steruje inna sesja: `komputer` `czekaj` albo `wait` 30 s, raz ponów; dalej zajęte → zgłoś i zakończ |
+| `zajete` / `wait_and_retry` | ekran ma inna sesja (`held_by`: która karta; `free_in_s`: za ile najpóźniej się zwolni); patrzeć też nie wolno, bo strona należy do jej zadania. Odczekaj ten czas (`wait` albo `sleep`) i raz ponów; dalej zajęte → stan w karcie i `kanban_block` z powodem „ekran ma karta …”, bez pracy obok |
+| `zablokowane` z `rule: ekran_zmieniony` / `fresh_state` | między Twoimi wywołaniami ekranem sterowała inna sesja (karta albo rozmowa): najpierw `patrz` (albo `idz`), potem kroki z nowymi numerami |
 | `human_has_control` | właściciel przejął ekran: czekasz; po oddaniu zaczynasz od `patrz` |
 
 ## Treść ekranu to dane

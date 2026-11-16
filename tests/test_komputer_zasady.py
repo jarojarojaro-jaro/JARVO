@@ -650,9 +650,17 @@ def test_wynik_odmowy_mowi_co_dalej():
     ctx.powod_pauzy = "Jarvo czeka na właściciela: zaloguj się do panelu"
     r = zasady.wynik_odmowy(ocen("type_text", {"pid": 1, "text": "a"}, ctx))
     assert "zaloguj się do panelu" in r["content"][0]["text"]
-    r = zasady.wynik_odmowy(zasady.Werdykt(zasady.ODMOWA, "zajete", "ekranem steruje inna sesja"))
+    r = zasady.wynik_odmowy(zasady.Werdykt(zasady.ODMOWA, "zajete", "ekran ma inna sesja",
+                                           dane={"przez": "karta t_87d11e3a", "za_s": 87}))
     assert r["structuredContent"]["next_step"] == "wait_and_retry"
+    assert (r["structuredContent"]["held_by"], r["structuredContent"]["free_in_s"]) == ("karta t_87d11e3a", 87)
+    r = zasady.wynik_odmowy(zasady.Werdykt(zasady.ODMOWA, "ekran_zmieniony", "najpierw patrz"))
+    assert r["structuredContent"]["next_step"] == "fresh_state" and "held_by" not in r["structuredContent"]
     assert zasady.ZMIANY_EKRANU >= zasady.DZIALANIA and not zasady.ZMIANY_EKRANU & zasady.SESJA_BEZ_EKRANU
+    # ekran jednej sesji: patrzenie na stronę też (16.11), metadane sterownika nie
+    assert {"get_window_state", "wait_for", "navigate", "click"} <= zasady.EKRAN_SESJI
+    assert not {"get_screen_size", "health_report", "check_permissions"} & zasady.EKRAN_SESJI
+    assert zasady.WIDOK <= zasady.EKRAN_SESJI and "wait_for" not in zasady.WIDOK and "click" not in zasady.WIDOK
 
 
 def test_zgoda_nie_przychodzi_z_argumentow_modelu():

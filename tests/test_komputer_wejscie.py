@@ -397,31 +397,73 @@ def test_prosba_jarva_to_pauza_z_powodem(komputer, monkeypatch):
     k.zamknij()
 
 
+def _patrz(k: Klient) -> dict:
+    return k.narzedzie("get_window_state", {"pid": 7, "window_id": 3})
+
+
 @pytest.mark.posix_only
 def test_ekranem_steruje_jedna_sesja_naraz(komputer, monkeypatch):
+    """Ekran ma jedna sesja naraz: druga ani nie patrzy, ani nie działa (`zajete` z kartą, która ma ekran, i czasem
+    do zwolnienia). Koniec sesji zwalnia ekran od razu, ZAJETE_S s bez jej wywołań też; sesja, której inna zabrała
+    ekran, przed działaniem patrzy od nowa (`ekran_zmieniony`, next_step fresh_state)."""
     a, b = Klient(wejscie.CUA), Klient(wejscie.CUA)
+    a.wyslij({"jsonrpc": "2.0", "method": wejscie.GRUPA, "params": {"grupa": "a" * 32, "karta": "t_87d11e3a"}})
     for k in (a, b):
         k.rpc("initialize")
-        k.narzedzie("get_window_state", {"pid": 7, "window_id": 3})          # patrzeć wolno obu
-    assert kod(a.narzedzie("click", {"element_token": "s1:2"})) == "ok"
-    w = b.narzedzie("click", {"element_token": "s1:2"})
-    assert zasada(w) == "zajete" and w["structuredContent"]["next_step"] == "wait_and_retry"
-    assert kod(b.narzedzie("get_window_state", {"pid": 7, "window_id": 3})) == "ok"
+    assert kod(_patrz(a)) == "ok" and kod(a.narzedzie("click", {"element_token": "s1:2"})) == "ok"
+    przed = len(komputer.do_sterownika())
+    for w in (_patrz(b), b.narzedzie("launch_app", {"name": "chromium"})):
+        sc = w["structuredContent"]
+        assert zasada(w) == "zajete" and sc["next_step"] == "wait_and_retry" and sc["held_by"] == "karta t_87d11e3a"
+        assert 0 < sc["free_in_s"] <= wejscie.ZAJETE_S and "karta t_87d11e3a" in sc["message"]
+    assert len(komputer.do_sterownika()) == przed                          # odmowy nie doszły do sterownika
     assert kod(a.narzedzie("click", {"element_token": "s1:2"})) == "ok"
     a.zamknij()                                                             # koniec sesji zwalnia ekran
     for _ in range(300):
         if len(komputer.wejscie.sesje) == 1:
             break
         time.sleep(0.02)
-    assert kod(b.narzedzie("click", {"element_token": "s1:2"})) == "ok"
+    assert kod(_patrz(b)) == "ok" and kod(b.narzedzie("click", {"element_token": "s1:2"})) == "ok"
     c = Klient(wejscie.CUA)
     c.rpc("initialize")
-    c.narzedzie("get_window_state", {"pid": 7, "window_id": 3})
-    assert zasada(c.narzedzie("click", {"element_token": "s1:2"})) == "zajete"
-    monkeypatch.setattr(wejscie, "ZAJETE_S", 0)                             # sesja bez działań oddaje ekran
-    assert kod(c.narzedzie("click", {"element_token": "s1:2"})) == "ok"
+    w = _patrz(c)
+    assert zasada(w) == "zajete" and w["structuredContent"]["held_by"].startswith("rozmowa Jarva bez karty")
+    monkeypatch.setattr(wejscie, "ZAJETE_S", 0)                             # sesja bez wywołań oddaje ekran
+    assert kod(_patrz(c)) == "ok" and kod(c.narzedzie("click", {"element_token": "s1:2"})) == "ok"
+    w = b.narzedzie("click", {"element_token": "s1:2"})                    # b straciło ekran na rzecz c
+    assert zasada(w) == "ekran_zmieniony" and w["structuredContent"]["next_step"] == "fresh_state"
+    assert kod(_patrz(b)) == "ok" and kod(b.narzedzie("click", {"element_token": "s1:2"})) == "ok"
     b.zamknij()
     c.zamknij()
+
+
+@pytest.mark.posix_only
+def test_karty_z_kluczem_bramy_nie_dziela_ekranu_przez_bramke(komputer):
+    """Bramka podaje wejściu grupę ekranu razem z kartą pracownika (HERMES_KANBAN_TASK): dwie karty z tym samym
+    kluczem (odziedziczonym po bramie Hermesa, 16.11) to dwie sesje przy ekranie, a odmowa mówi, która karta go ma."""
+    def bramka(karta: str) -> subprocess.Popen:
+        return subprocess.Popen([sys.executable, "-I", str(REPO / "komputer" / "jarvo_cua.py"), "mcp"],
+                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                env={**os.environ, "JARVO_KOMPUTER_GNIAZDO": wejscie.CUA,
+                                     "JARVO_KOMPUTER_GRUPA": "p1-" + "b" * 32, "HERMES_KANBAN_TASK": karta})
+
+    def rpc(p: subprocess.Popen, ident: int, nazwa: str) -> dict:
+        p.stdin.write((json.dumps({"jsonrpc": "2.0", "id": ident, "method": "tools/call", "params": {
+            "name": nazwa, "arguments": {"pid": 7, "window_id": 3}}}) + "\n").encode())
+        p.stdin.flush()
+        return json.loads(p.stdout.readline())["result"]
+
+    a, b = bramka("t_87d11e3a"), bramka("t_8a2f5f5e")
+    try:
+        assert kod(rpc(a, 1, "get_window_state")) == "ok"
+        w = rpc(b, 1, "get_window_state")
+        assert zasada(w) == "zajete" and w["structuredContent"]["held_by"] == "karta t_87d11e3a"
+    finally:
+        for p in (a, b):
+            p.stdin.close()
+            p.wait(timeout=20)
+            p.stdout.close()
+            p.stderr.close()
 
 
 @pytest.mark.linux_only
@@ -440,9 +482,10 @@ def test_wtyczka_jarva_przez_ster(komputer, monkeypatch):
         def register_tool(self, **kw):
             narzedzia.append(kw)
 
-    monkeypatch.setenv("JARVO_KOMPUTER_GRUPA", "g" * 32)                       # register ustawia ją tylko, gdy jej nie ma
+    monkeypatch.setenv("JARVO_KOMPUTER_GRUPA", "g" * 32)                       # klucz rodzica (brama Hermesa)
     pl.register(Ctx())
-    assert os.environ["JARVO_KOMPUTER_GRUPA"] == "g" * 32
+    klucz = os.environ["JARVO_KOMPUTER_GRUPA"]                                # własny klucz procesu, stały
+    assert klucz.startswith(f"p{os.getpid()}-") and wejscie.WZOR_GRUPY.match(klucz) and pl.grupa_ekranu() == klucz
     assert [n["name"] for n in narzedzia] == ["komputer"] and narzedzia[0]["toolset"] == "komputer"
     assert narzedzia[0]["schema"]["parameters"]["properties"]["akcja"]["enum"] == [
         "stan", "dziennik", "oddaj", "idz", "patrz", "kroki", "czekaj"]

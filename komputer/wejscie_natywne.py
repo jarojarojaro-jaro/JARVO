@@ -125,9 +125,7 @@ class EkranNatywny(wejscie.Ekran):
         self.x11 = None
         self.plik_pauzy = Path(plik_pauzy)
         self.pauza = self._wczytaj()
-        self._dzialania: deque = deque()
-        self._zajete = None
-        self._lock = threading.Lock()
+        self._stan_sesji()
 
     def _wczytaj(self) -> dict | None:
         try:
@@ -159,6 +157,7 @@ class EkranNatywny(wejscie.Ekran):
             except FileNotFoundError:
                 pass
             self.pauza = None
+            self._po_pauzie()
 
 
 class KontekstCDP(wejscie.KontekstSesji):
@@ -268,6 +267,7 @@ class SesjaNatywna(wejscie.Sesja):
         if isinstance(karta, str) and zgoda_karty.KARTA.match(karta) \
                 and isinstance(tablica, str) and zgoda_karty.TABLICA.match(tablica):
             self.ctx.karta = (karta, tablica)
+            self.karta = karta                        # kto ma ekran (odmowa `zajete`) i klucz ekranu z grupą
             log(f"sesja {self.nr}: karta {karta} (tablica {tablica})")
 
     def do_sterownika(self, wiadomosc: dict) -> None:
@@ -341,11 +341,15 @@ class SesjaNatywna(wejscie.Sesja):
         return super()._ocen(nazwa, args)
 
     def _ocen_paczke(self, args: dict) -> zasady.Werdykt:
-        """Sama paczka: przy pauzie nie idzie wcale; inaczej przechodzi do sterownika, a każdy jej krok ocenia
-        `_krok` przed wykonaniem (paczka bez wejścia nie działa: sterownik bez `wykonaj` odmawia)."""
+        """Sama paczka: przy pauzie nie idzie wcale, przy ekranie innej sesji też nie (`zajete`, a po utracie ekranu
+        `ekran_zmieniony`: najpierw patrz); inaczej przechodzi do sterownika, a każdy jej krok ocenia `_krok` przed
+        wykonaniem (paczka bez wejścia nie działa: sterownik bez `wykonaj` odmawia)."""
         if self.ctx.wstrzymane:
             powod = self.ctx.powod_pauzy or "właściciel zatrzymał Komputer"
             return zasady.Werdykt(zasady.WSTRZYMANE, "wstrzymane", f"{powod}; patrzeć wolno, działać nie")
+        odmowa = self._ekran_sesji("run_steps")
+        if odmowa is not None:
+            return odmowa
         kroki = args.get("steps")
         return zasady.Werdykt(zasady.TAK, cel=f"{len(kroki) if isinstance(kroki, list) else 0} kroków")
 
