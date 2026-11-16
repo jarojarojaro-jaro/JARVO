@@ -362,6 +362,21 @@ def test_ustaw_wdraza_flote_i_restartuje_uslugi(inst, api, monkeypatch, capsys):
     assert flota.wywolania == 1
 
 
+def test_wdrozenie_bez_restartu_nie_mowi_ze_serwis_stoi(inst, monkeypatch, capsys):
+    """16.11: `jarvo telegram tematy --usun-zbedne` po aktualizacji napisało „serwis nie działa”, choć brama działała:
+    wdrożenie bez zmian w usługach nie restartuje nic, więc brak restartu ≠ serwis nie działa."""
+    u, ot, nadzorca, flota = inst
+    nadzorca.dziala = True
+    (wc.profil(u) / "distribution.yaml").write_text("name: jarvo\n", encoding="utf-8")
+    monkeypatch.setattr(flota, "zainstaluj_flote", lambda *a, **k: {})
+    assert wc.wdroz_trasy(u, ot, zmienione_bramy=False, wdrozenie=True, bez_wdrozenia=False) == 0
+    out = capsys.readouterr().out
+    assert "bez restartu" in out and "serwis nie działa" not in out
+    nadzorca.dziala = False
+    assert wc.wdroz_trasy(u, ot, zmienione_bramy=False, wdrozenie=True, bez_wdrozenia=False) == 0
+    assert "serwis nie działa" in capsys.readouterr().out
+
+
 # -- test i rutyny (I36)
 
 def _ustawiony(u, wlasciciel="123456789"):

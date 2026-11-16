@@ -1065,6 +1065,7 @@ def wdroz_flote(u: Uklad, ot, log: Callable = print) -> dict:
     wynik = flota.zainstaluj_flote(u, srodowisko.srodowisko(u, ot.env), log=log)
     stan, _ = instalator.stan_serwisu(u, ot)
     wynik["zrestartowane"] = []
+    wynik["serwis_dziala"] = stan is not None
     if stan is not None:
         klient = ot.modul("nadzorca").polacz(u)
         for nazwa in flota.uslugi_do_restartu(wynik):
@@ -1169,7 +1170,8 @@ def wdroz_trasy(u: Uklad, ot, *, zmienione_bramy: bool, wdrozenie: bool, bez_wdr
     if "brama" not in restarty and zmienione_bramy and restart_bramy(u, ot):
         restarty.append("brama")
     print("Flota wdrożona" + (f"; restart: {', '.join(restarty)}" if restarty else
-                              "; serwis nie działa: zmiany wejdą przy jarvo up") + ".")
+                              "; bez restartu: w działających usługach nic się nie zmieniło" if wynik.get("serwis_dziala")
+                              else "; serwis nie działa: zmiany wejdą przy jarvo up") + ".")
     return 0
 
 
