@@ -34,6 +34,10 @@ Zawsze, w każdym trybie:
 - o polecenia, które Hermes sam uzna za niebezpieczne, pyta tylko Hermes (bez drugiego pytania). Pliki instrukcji
   przez `write_file` i `patch` też pyta sam Hermes (zawsze, także pod YOLO). Wyjątek: masowe kasowanie blokuje
   strażnik kasowania (niżej), zanim Hermes o nie zapyta;
+- `kill`, `pkill` i `killall` pracownika karty kanbana albo Hermesa = blokada z radą `kanban_block` / `kanban_complete`
+  ([strażnik pracowników kart](#strażnik-pracowników-kart));
+- decyzja przypisana właścicielowi bez jego cytatu i czasu (tekst narzędzi kanbana, zapis w misjach i skarbcu) =
+  blokada z radą ([decyzja właściciela tylko z cytatem](#decyzja-właściciela-tylko-z-cytatem));
 - telefon (serwer MCP `phone` z PHONEUSE po `jarvo telefon on`, [docs/MOBILE.md](../docs/MOBILE.md)):
   `mcp__phone__act` i `mcp__phone__batch` z `confirm: true` (na wierzchu, w `args` albo w kroku `batch`) omijają
   bramkę `needs_confirm` telefonu, więc z człowiekiem to prośba z treścią akcji (zgoda = „tak” dla tej jednej akcji;
@@ -92,3 +96,46 @@ Wolno: sprzątać katalog karty i katalogi tymczasowe (także klony repozytorió
 w projekcie (`node_modules`, `dist`, `.svelte-kit`, `__pycache__`), podkatalogi i pojedyncze pliki w drzewie roboczym,
 używać zawężonego `find` (np. `find . -name '*.pyc' -delete`), dopisywać (`>>`), kasować samo dowiązanie (`rm link`).
 Repozytorium zagnieżdżone w kasowanym katalogu strażnik szuka do 4 poziomów w głąb i w najwyżej 3000 katalogach.
+
+## Strażnik pracowników kart
+
+16.11 wtyczka odmówiła rozmowie `kanban_block` na karcie w pracy, więc Jarvo zabił jej pracownika poleceniem `kill`.
+Dyspozytor kanbana uznaje zabitego pracownika za awarię („protocol violation”) i uruchamia kartę od nowa: trzy razy
+z rzędu. Teraz, w każdym trybie (z człowiekiem, na karcie, w rutynie i pod YOLO), blokada bez pytania dla `kill`,
+`pkill` i `killall`, które trafiają w:
+
+- pracownika karty kanbana: linia poleceń `… chat -q "work kanban task <karta>"` (tak uruchamia go Hermes) albo
+  `HERMES_KANBAN_TASK` w otoczeniu procesu Hermesa (Linux: `/proc`, macOS: `ps`; Windows: tylko treść polecenia);
+- proces Hermesa, w którym działa wtyczka (rozmowa, brama, sam pracownik karty);
+- wszystkie procesy (`kill -1`) albo grupę procesów z pracownikiem (`kill -- -PGID`);
+- cel albo wzorzec, w którym widać `kanban`, `hermes`, numer karty (`t_` + 8 znaków) albo `$PPID` (`kill $(pgrep -f
+  'work kanban task')`, `pgrep -f kanban | xargs kill`, `pkill -f hermes_cli`).
+
+`pkill` i `killall` sprawdzamy na żywej tablicy procesów jak one same (nazwa albo z `-f` cała linia, `-x`, `-i`,
+`-v`, `-P`, `-g`; `killall -r`, `-I`). Formy jak u strażnika kasowania: owijki (`sudo`, `nice`, `env`), `bash -c`,
+`$(…)`, `xargs`, `python -c` i `execute_code` z `os.kill`/`os.killpg`, wejście procesu w tle.
+
+Rada w blokadzie: na karcie `kanban_block(kind="needs_input", reason="…")` albo `kanban_complete(summary="…")`;
+w rozmowie `kanban_block(task_id="<karta>", reason="…")`, po którym pracownika zamyka sam dyspozytor
+(`reap_terminal_workers`). Dlatego rozmowa może zrobić `kanban_block` na karcie `running` (zatrzymanie, nie ocena;
+komentarz z rozmowy nie dociera do pracownika karty tego samego profilu). Werdykty na kartach w toku dalej wydaje
+tylko pracownik. Własne procesy (nagrywanie, serwer, `kill %1`, `kill -0`) wolno zatrzymać jak dotąd.
+
+## Decyzja właściciela tylko z cytatem
+
+16.11 Jarvo napisał w komentarzu karty „Decyzja Jarva: zaznaczyć NDA”, a 27 minut później w raporcie misji „decyzja
+właściciela z 23:15”, choć właściciel nic wtedy nie napisał. Teraz, w każdym trybie, blokada z radą, gdy tekst
+przypisuje decyzję właścicielowi („decyzja / zgoda / polecenie / wybór właściciela” albo „użytkownika”, „właściciel
+zdecydował / zgodził się / zatwierdził / wybrał / kazał / polecił / zlecił / potwierdził / pozwolił”, „owner decided”)
+bez jego słów w cudzysłowie („…”) i godziny albo daty w tym samym akapicie (do 300 znaków od przypisania):
+
+- tekst narzędzi kanbana: `kanban_comment` (body), `kanban_block` i `kanban_request_changes` (reason),
+  `kanban_complete` (summary, result), `kanban_request_review` (summary), `kanban_create` (title, body),
+  `kanban_heartbeat` (note);
+- nowe linie `write_file` i `patch` w misjach (`MISSION.md`, `DLA-CLAUDE.md`, raporty) i w skarbcu; linia, która już
+  była w pliku, nie blokuje poprawki obok niej.
+
+Przechodzi: `decyzja właściciela (16.11 23:15): „tak, zaznacz NDA”`, linia `ZGODA WŁAŚCICIELA` z cytatem i datą,
+„decyzja Jarva: …”, prośba o decyzję, pytanie i przeczenie („potrzebna decyzja właściciela”, „czekam na decyzję
+właściciela”, „czy właściciel zatwierdził”, „bez zgody właściciela”). Rada w blokadzie: cytat z czasem albo „decyzja
+Jarva: …”, a gdy potrzebne jest „tak” właściciela, pytanie (na karcie `kanban_block(kind="needs_input")`).

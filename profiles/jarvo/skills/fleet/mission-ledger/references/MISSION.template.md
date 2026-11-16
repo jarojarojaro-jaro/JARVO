@@ -12,9 +12,10 @@ utworzona: <RRRR-MM-DD HH:MM> · kanał: <telegram DM / Jarvo HQ / cli>
 - Nie ruszać: <…>
 
 ## Decyzje
-| # | Decyzja | Kto | Kiedy |
-|---|---|---|---|
-| 1 | <np. nazwa produktu: „Nova”> | Jarvo (domyślna) / użytkownik | <data> |
+| # | Decyzja | Kto | Kiedy | Słowa właściciela |
+|---|---|---|---|---|
+| 1 | <np. nazwa produktu: „Nova”> | Jarvo (domyślna) | <data godzina> | — |
+<!-- „właściciel” w kolumnie Kto tylko z jego słowami i godziną jego wiadomości, np. | 2 | publikacja: tak | właściciel | 2026-11-16 23:15 | „tak, publikuj” | -->
 
 ## Plan (karty)
 | Karta | Agent | Rola | Zależy od | Status | Wynik |

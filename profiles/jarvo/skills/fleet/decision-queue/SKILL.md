@@ -1,7 +1,7 @@
 ---
 name: decision-queue
 description: "Decyzje dla użytkownika: zbierz, zapytaj zbiorczo, wdroż."
-version: 1.2.1
+version: 1.3.0
 author: Jarvo
 license: MIT
 metadata:
@@ -47,11 +47,13 @@ Zasady:
 Odpowiedź na brief („1 ok, 2 nie” po porannym briefie albo „B-2026-11-12/3 ok” po czasie): numer briefu bierzesz
 z jego nagłówka w historii rozmowy albo z cytatu, a pozycje z `@@KNOWLEDGE_DIR@@/briefy/<numer>.md`.
 Dla każdej odpowiedzi:
-1. `kanban_comment(task_id, "Decyzja użytkownika (<data>): <treść>")`; przy A2 z odciskiem: „… tak, wersja <odcisk>”,
+1. `kanban_comment(task_id, "Decyzja właściciela (<data> <godzina>): „<jego słowa z wiadomości>”")`; przy A2 z odciskiem:
+   „… tak, wersja <odcisk>”,
 2. `kanban_unblock(task_id)` (karta wraca do wykonawcy z komentarzem w kontekście),
-3. wpis w MISSION.md (tabela *Decyzje*), status misji z powrotem na `w toku`,
-4. dla A2: zlecenie wykonania akcji (np. karta „wdrożenie” dla `jarvo-web` z wyraźnym „użytkownik zatwierdził <data>,
-   wersja <odcisk>”). Wykonawca sprawdza odcisk przed akcją; niezgodny = pliki zmieniły się po zgodzie = nowe pytanie,
+3. wpis w MISSION.md (tabela *Decyzje*, z jego słowami w kolumnie „Słowa właściciela”), status misji z powrotem na `w toku`,
+4. dla A2: zlecenie wykonania akcji (np. karta „wdrożenie” dla `jarvo-web` z wyraźnym „właściciel zatwierdził
+   (<data> <godzina>): „<jego słowa>”, wersja <odcisk>”). Wykonawca sprawdza odcisk przed akcją; niezgodny = pliki
+   zmieniły się po zgodzie = nowe pytanie,
 5. **brief w skarbcu:** w tabeli „Decyzje” notatki briefu wypełnij wiersz tej pozycji (`read_file`, potem jeden `patch`
    na wszystkie odpowiedzi): odpowiedź właściciela jego słowami, krótko; data RRRR-MM-DD; co zrobione („karta t_… założona”,
    „wstrzymane do pilota”, „cennik zapisany w misji”). To jedyne źródło prawdy: `briefy.py otwarte` czyta tylko kolumnę
@@ -64,6 +66,13 @@ Dla każdej odpowiedzi:
 Pozycja „🛠” (pomysł z kopalni): „ok” → budowa według skilla `kopalnia-pomyslow` (sekcja „Po ok”), „nie” → tylko wiersz
 w tabeli briefu (kopalnia nie wraca z odrzuconym pomysłem).
 Niejasna odpowiedź → dopytaj tylko o niejasną pozycję. Resztę wdroż od razu.
+
+**Decyzja właściciela = jego słowa.** „Decyzja właściciela”, „właściciel zdecydował / zgodził się / zatwierdził” albo
+„właściciel” w kolumnie „Kto” piszesz tylko z jego słowami w cudzysłowie i godziną jego wiadomości (karta, komentarz,
+powód blokady, MISSION.md, DLA-CLAUDE.md, raport). Wybrałeś sam (rekomendacja bez odpowiedzi, domyślna, „ruszam”)?
+To `decyzja Jarva: …`, a gdy potrzebne jest jego „tak”, pytasz. Wtyczka `jarvo-zgody` odrzuca przypisanie bez cytatu
+i czasu. 16.11: „Decyzja Jarva: zaznaczyć NDA” w komentarzu, a 27 min później w raporcie „decyzja właściciela
+z 23:15”, choć właściciel nic wtedy nie napisał.
 
 Odpowiedzi przychodzą też z **Jarvo HQ** (panel „Decyzje” w dashboardzie) jako wiadomość w formacie
 `Decyzja do karty <task_id> („<tytuł>”, <agent>): <treść>`. Traktuj ją tak samo jak odpowiedź na liście:

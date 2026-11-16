@@ -1,7 +1,7 @@
 ---
 name: mission-ledger
 description: "Dziennik misji: MISSION.md, INDEX.md, raport końcowy."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -30,13 +30,18 @@ ID: `M-RRMMDD-slug` (misja) albo `Z-RRMMDD-slug` (pojedyncze zlecenie). Slug: 2�
 | Moment | Co zapisać |
 |---|---|
 | start misji | MISSION.md (intencja dosłownie, granice, decyzje, plan kart) + wiersz w INDEX.md (`w toku`) |
-| decyzja użytkownika | wiersz w tabeli *Decyzje* (co, kto, kiedy) |
+| decyzja użytkownika | wiersz w tabeli *Decyzje* (co, kto, kiedy, jego słowa w cudzysłowie) |
 | zmiana zakresu | nowa decyzja + aktualizacja planu; stary plan zostaje w historii |
 | karta zaakceptowana | status i link do wyniku w tabeli *Plan* |
 | czeka na użytkownika | status misji `czeka na decyzję` w INDEX.md |
 | zamknięcie | *Artefakty*, *Raport końcowy*, status `zakończona`, data w INDEX.md |
 
 Zapisuj od razu, nie „na końcu tury”. Jeśli rozmowa się urwie, dziennik ma być aktualny.
+
+**Kto zdecydował.** W kolumnie „Kto” „właściciel” tylko z jego słowami w cudzysłowie („Słowa właściciela”) i godziną
+jego wiadomości; co wybrałeś sam (domyślnie, z rekomendacji, bez odpowiedzi), to „Jarvo”. To samo w raporcie, w `DLA-CLAUDE.md`
+i na kartach: bez cytatu i czasu piszesz „decyzja Jarva”, nie „decyzja właściciela” (wtyczka `jarvo-zgody` odrzuca
+taki zapis; 16.11 raport misji podał „decyzja właściciela z 23:15”, choć właściciel nic nie napisał).
 
 ## Odtwarzanie stanu (po restarcie, kompresji, nowej sesji)
 1. Przeczytaj `INDEX.md`: misje `w toku` i `czeka na decyzję`.
@@ -58,5 +63,7 @@ Dalej proponuję: <maks. 2 propozycje, opcjonalnie>
 Potem: raport do MISSION.md, status w INDEX.md, trwałe wnioski o preferencjach użytkownika do pamięci.
 
 ## Anulowanie
-Użytkownik odwołuje → karty w toku: `kanban_comment` („anulowane przez użytkownika”) + `kanban_complete`
-z adnotacją; misja: status `anulowana` + powód. Potwierdź jednym zdaniem.
+Użytkownik odwołuje → karty w pracy (`running`): `kanban_block(task_id, reason="anulowane przez właściciela:
+„<jego słowa>” (<godzina>)")`, pracownika zamknie dyspozytor; pozostałe karty: `kanban_comment` („anulowane przez
+użytkownika”) + `kanban_complete` z adnotacją. Nigdy `kill` pracownika (dyspozytor uruchamia kartę od nowa); misja:
+status `anulowana` + powód. Potwierdź jednym zdaniem.

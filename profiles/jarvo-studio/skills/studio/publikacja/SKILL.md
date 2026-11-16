@@ -1,7 +1,7 @@
 ---
 name: publikacja
 description: "Publikacja (A2): tylko ze zgodą, przez kolejkę Postiz."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -16,8 +16,9 @@ metadata:
 
 # Publikacja
 
-**A2: tylko z wyraźną zgodą użytkownika**, zapisaną w karcie albo komentarzu (data + zakres + wersja, np.
-„Decyzja użytkownika 2026-10-03: publikuj posty 1–5 z kalendarza na LinkedIn i IG, wersja 3f9c0a1b2d4e”).
+**A2: tylko z wyraźną zgodą użytkownika**, zapisaną w karcie albo komentarzu (jego słowa w cudzysłowie, data i godzina,
+zakres, wersja, np. `Decyzja właściciela (2026-10-03 21:40): „publikuj posty 1–5 z kalendarza na LinkedIn i IG”,
+wersja 3f9c0a1b2d4e`). „Decyzja Jarva” albo decyzja bez słów właściciela to nie zgoda.
 Brak zgody → odcisk paczki (`@@PY@@ "@@REPO_DIR@@/scripts/odcisk.py" out/do-publikacji out/kalendarz.csv`) i
 `kanban_block(kind="needs_input", reason="Pakiet gotowy (wersja <odcisk>). Publikować? <co, gdzie, kiedy>")`.
 

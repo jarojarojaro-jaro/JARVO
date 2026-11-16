@@ -1,7 +1,7 @@
 ---
 name: wdrozenie
 description: "Podgląd (A1) i wdrożenie produkcyjne (A2, tylko za zgodą)."
-version: 1.2.0
+version: 1.3.0
 author: Jarvo
 license: MIT
 metadata:
@@ -29,7 +29,8 @@ podmieniasz zawartością `build/`, reszta repo bez zmian), podgląd w `<dane>/j
 (skill `wgrywanie-stron`) po zgodzie właściciela; na hosting się nie łączysz (ssh, rsync, FTP). Procedura niżej dotyczy
 innych celów (GitHub Pages, Cloudflare Pages, Netlify).
 
-Warunek: w karcie albo w komentarzu jest **wyraźna zgoda użytkownika** z datą (np. „Decyzja użytkownika 2026-10-02: wdrożyć na nova.pl”).
+Warunek: w karcie albo w komentarzu jest **wyraźna zgoda użytkownika** jego słowami, z datą i godziną (np. `Decyzja
+właściciela (2026-10-02 14:05): „wdrażaj na nova.pl”`). „Decyzja Jarva” albo decyzja bez słów właściciela to nie zgoda.
 Bez tego: `kanban_block(kind="needs_input", reason="Gotowe do wdrożenia na <cel> (wersja <odcisk dist/>). Potrzebna zgoda użytkownika.")`.
 
 Z zgodą:

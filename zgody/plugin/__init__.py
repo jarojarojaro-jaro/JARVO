@@ -45,6 +45,14 @@ mkfs/wipefs, `>`, tee i cp /dev/null na chroniony plik, write_file z pustą tre�
 glob w nieznanym katalogu), też block. Wolno: sprzątanie katalogu karty i katalogów tymczasowych, wyniki budowania
 w projekcie (node_modules, dist, .svelte-kit, __pycache__), podkatalogi i pojedyncze pliki w drzewie roboczym,
 zawężone find. Blokada idzie do logu (logger.warning) i ma w treści poradę, co zrobić zamiast.
+Strażnik pracowników kart (razem ze strażnikiem kasowania, w każdym trybie): block dla kill, pkill i killall (także
+spod owijek, w bash -c, $(…), xargs, python -c i execute_code z os.kill), które trafiają w pracownika karty kanbana
+(`… chat -q work kanban task <karta>` albo HERMES_KANBAN_TASK w otoczeniu procesu), w proces Hermesa tej wtyczki albo
+we wszystkie procesy (kill -1), oraz dla celu, w którego treści widać kanban, hermes, numer karty albo $PPID. Rada:
+kartę zatrzymuje kanban_block albo kanban_complete, bo zabitego pracownika dyspozytor uruchamia od nowa.
+Przypisanie decyzji właścicielowi (w każdym trybie): tekst narzędzi kanbana (komentarz, powód blokady, podsumowanie,
+treść karty) i zapis w misjach albo skarbcu z „decyzja właściciela”, „właściciel zdecydował” i podobnymi bez cytatu
+jego słów („…”) i godziny albo daty obok = block z radą: cytat z czasem albo „decyzja Jarva”.
 
 Jak to działa w Hermesie f97608f (sprawdzone w kodzie, plik:linia):
   - hermes_cli/plugins.py:1854-1906: dyrektywy pre_tool_call; block (z niepustym message) wygrywa z approve, a z wielu
@@ -1663,6 +1671,8 @@ def _analizuj_terminal(polecenie: str, cwd0: Optional[str], dom: str, kasowania:
         w_potoku = p.lacznik in ("|", "|&")
     if a.nieznane:
         a.tylko_odczyt = False
+    if kasowania is not None:
+        _zabijanie_z_potoku(polecenie, kasowania)
     return a
 
 
@@ -1740,15 +1750,17 @@ _PY_POWLOKA = frozenset({"system", "popen", "run", "call", "check_call", "check_
 
 @dataclass
 class _Kasowanie:
-    """Jedno usunięcie albo nadpisanie znalezione w poleceniu, kodzie albo zapisie pliku."""
+    """Jedno usunięcie albo nadpisanie znalezione w poleceniu, kodzie albo zapisie pliku; także zabicie pracownika
+    karty (rodzaj `zabij`: strażnik pracowników kart) albo `xargs kill` o celach z potoku (`zabij_xargs`)."""
     forma: str                       # jak kasuje (do komunikatu): rm -rf, find -delete, rmtree (Python), git clean…
-    rodzaj: str                      # usun | zawartosc | filtr | plik | oproznij | repo | urzadzenie | xargs
+    rodzaj: str                      # usun | zawartosc | filtr | plik | oproznij | repo | urzadzenie | xargs | zabij…
     sciezki: Optional[List[str]]     # rzeczywiste ścieżki; None = nie wiadomo (zmienna, $(…), nieznany katalog)
     pokaz: str                       # argument do komunikatu
     rekurencyjne: bool = False
     wymuszone: bool = False
     pusto: bool = False              # oproznij: po zmianie plik na pewno jest pusty
-    uwaga: str = ""                  # powód, gdy celu nie da się ustalić
+    uwaga: str = ""                  # powód, gdy celu nie da się ustalić (zabij: powód blokady)
+    karta: str = ""                  # zabij: karta kanbana zabijanego pracownika, gdy wiadomo
 
 
 @dataclass
@@ -2197,6 +2209,12 @@ def _kasowania_polecenia(prog: str, argi: List["_Arg"], p: _Polecenie, cwd: Opti
     prog, argi, cwd, xargs = _bez_owijek(prog, argi, cwd, dom)
     if not prog:
         return
+    if prog in _ZABIJAJACE:
+        if xargs:                                  # cele z potoku: ocenia je _analizuj_terminal po treści polecenia
+            pokaz = _poczatek(" ".join(a.pokaz for a in argi), 80)
+            wynik.append(_Kasowanie(f"xargs {prog}", "zabij_xargs", None, pokaz))
+        _zabijanie(prog, argi, wynik)
+        return
     if xargs and (prog in _KASUJACE_PROGRAMY or prog in _POWLOKI):
         wynik.append(_Kasowanie(f"xargs {prog}", "xargs", None, _poczatek(" ".join(a.pokaz for a in argi), 80)))
     teksty = [a.plaski for a in argi]
@@ -2465,6 +2483,8 @@ def _kasowania_pythona(kod: str, cwd: Optional[str], dom: str, wynik: List[_Kaso
             sciezka = ocena.wartosc(f.value)
             if sciezka:
                 _dodaj_cel(wynik, _Arg(sciezka, sciezka), cwd, dom, "Path.unlink (Python)", "plik")
+        elif pelna in ("os.kill", "os.killpg", "kill", "killpg") and arg0 is not None:
+            _zabijanie_pid(f"{pelna} (Python)", _py_pid(arg0, grupa=ostatnia == "killpg"), pokaz, wynik)
         elif ostatnia in _PY_POWLOKA and arg0 is not None:
             polecenie = ocena.polecenie(arg0)
             if polecenie:
@@ -2472,6 +2492,329 @@ def _kasowania_pythona(kod: str, cwd: Optional[str], dom: str, wynik: List[_Kaso
     if not drzewa and re.search(r"\b(?:rmtree|removedirs)\b", kod):
         wynik.append(_Kasowanie("rmtree (Python)", "usun", None, "rmtree", True, True,
                                 uwaga="rmtree albo removedirs pod inną nazwą, więc nie wiadomo, co skasuje"))
+
+
+# ------------------------------------------------------------------------------------------------ strażnik pracowników
+# 16.11 22:35 wtyczka odmówiła rozmowie kanban_block na karcie w toku (t_87d11e3a), więc Jarvo zabił jej pracownika
+# poleceniem kill. Dyspozytor kanbana uznaje zabitego pracownika za awarię (protocol violation) i uruchamia kartę od
+# nowa: trzy takie awarie z rzędu. Pracownika rozpoznajemy po tym, jak uruchamia go Hermes
+# (hermes_cli/kanban_db_dispatch.py:2676-2706: `… chat -q "work kanban task <karta>"`, :2821: HERMES_KANBAN_TASK).
+# Kartę kończy kanban_block albo kanban_complete; po końcu przebiegu pracownika zamyka sam dyspozytor
+# (reap_terminal_workers, kanban_db_dispatch.py:503).
+
+_ZABIJAJACE = frozenset({"kill", "pkill", "killall"})
+# cel albo wzorzec, w którym widać Hermesa, kanban, numer karty albo rodzica powłoki terminala (proces Hermesa)
+_SLOWA_PRACOWNIKA = re.compile(r"kanban|hermes|\bt_[0-9a-f]{8}\b|\$\{?PPID\b|getppid", re.I)
+_KARTA_PRACOWNIKA = re.compile(r"\bwork kanban task\s+(\S+)")
+_SYGNAL = re.compile(r"(?:SIG)?(?:HUP|INT|QUIT|ILL|TRAP|ABRT|IOT|BUS|FPE|KILL|USR1|SEGV|USR2|PIPE|ALRM|TERM|STKFLT|CHLD|"
+                     r"CONT|STOP|TSTP|TTIN|TTOU|URG|XCPU|XFSZ|VTALRM|PROF|WINCH|IO|POLL|PWR|SYS|RTMIN(?:\+\d+)?|"
+                     r"RTMAX(?:-\d+)?)|\d+")
+# krótkie opcje z wartością (procps-ng pkill, psmisc killall) i długie opcje z wartością
+_PKILL_Z_WARTOSCIA = {"pkill": "sugGPtFrq", "killall": "suoynZ"}
+_PKILL_DLUGIE_Z_WARTOSCIA = frozenset({"--signal", "--session", "--euid", "--uid", "--group", "--parent", "--pgroup",
+                                       "--terminal", "--pidfile", "--ns", "--nslist", "--runstates", "--queue",
+                                       "--user", "--older-than", "--younger-than", "--context", "--cgroup", "--env"})
+
+
+@dataclass
+class _Proces:
+    pid: int
+    ppid: int
+    pgid: int
+    nazwa: str                 # comm (pkill bez -f, killall), najwyżej 15 znaków
+    polecenie: str             # pełna linia poleceń (pkill -f)
+    program: str = ""          # nazwa pliku z argv[0] (killall)
+    karta: str = ""            # karta kanbana, gdy to jej pracownik
+
+
+def _ja() -> int:
+    return os.getpid()
+
+
+def _procesy() -> List[_Proces]:
+    """Procesy komputera: /proc na Linuksie, `ps` na macOS; na Windows pusto (zostaje sprawdzanie treści polecenia)."""
+    wynik: List[_Proces] = []
+    if os.path.isdir("/proc/self"):
+        for wpis in os.scandir("/proc"):
+            if not wpis.name.isdigit():
+                continue
+            try:
+                with open(f"/proc/{wpis.name}/stat", "rb") as f:
+                    stat = f.read().decode("utf-8", "replace")
+                with open(f"/proc/{wpis.name}/cmdline", "rb") as f:
+                    argv = [a.decode("utf-8", "replace") for a in f.read().split(b"\0") if a]
+            except OSError:
+                continue
+            pola = stat[stat.rfind(")") + 2:].split()
+            if len(pola) < 3:
+                continue
+            p = _Proces(int(wpis.name), int(pola[1]), int(pola[2]), stat[stat.find("(") + 1:stat.rfind(")")],
+                        " ".join(argv), os.path.basename(argv[0]) if argv else "")
+            m = _KARTA_PRACOWNIKA.search(p.polecenie)
+            if m:
+                p.karta = m.group(1)
+            elif p.nazwa == "hermes" or "hermes_cli" in p.polecenie:
+                try:
+                    with open(f"/proc/{wpis.name}/environ", "rb") as f:
+                        m2 = re.search(rb"(?:^|\0)HERMES_KANBAN_TASK=([^\0]+)", f.read())
+                    p.karta = m2.group(1).decode("utf-8", "replace").strip() if m2 else ""
+                except OSError:
+                    pass
+            wynik.append(p)
+    elif not WINDOWS:
+        import subprocess
+        try:
+            wyjscie = subprocess.run(["ps", "-axww", "-o", "pid=,ppid=,pgid=,args="], capture_output=True, text=True,
+                                     timeout=5, check=False).stdout
+        except (OSError, subprocess.SubprocessError):
+            return wynik
+        for linia in wyjscie.splitlines():
+            pola = linia.split(None, 3)
+            if len(pola) < 4 or not all(x.isdigit() for x in pola[:3]):
+                continue
+            program = os.path.basename(pola[3].split()[0])
+            m = _KARTA_PRACOWNIKA.search(pola[3])
+            wynik.append(_Proces(int(pola[0]), int(pola[1]), int(pola[2]), program[:15], pola[3], program,
+                                 m.group(1) if m else ""))
+    return wynik
+
+
+def _chronione() -> List[Tuple[_Proces, str]]:
+    """Procesy, których agent nie zabija, z opisem: pracownicy kart i proces Hermesa, w którym działa ta wtyczka."""
+    ja = _ja()
+    wynik: List[Tuple[_Proces, str]] = []
+    for p in _procesy():
+        if p.karta:
+            wynik.append((p, f"pracownika karty {p.karta}" + (" (to Ty)" if p.pid == ja else "")))
+        elif p.pid == ja:
+            wynik.append((p, "proces Hermesa, w którym działasz (rozmowa albo brama)"))
+    if not any(p.pid == ja for p, _ in wynik):
+        wynik.append((_Proces(ja, -1, -1, "", ""), "proces Hermesa, w którym działasz"))
+    return wynik
+
+
+def _zabij(wynik: List[_Kasowanie], forma: str, pokaz: str, powod: str, karta: str = "") -> None:
+    wynik.append(_Kasowanie(forma, "zabij", None, pokaz, uwaga=powod, karta=karta))
+
+
+def _zabijanie_pid(forma: str, pid: Optional[int], pokaz: str, wynik: List[_Kasowanie],
+                   chronione: Optional[List[Tuple[_Proces, str]]] = None) -> None:
+    """Jeden cel kill/os.kill: PID (ujemny = grupa procesów) albo None, gdy celu nie znamy (zmienna, $(…))."""
+    if pid is None:
+        slad = _SLOWA_PRACOWNIKA.search(pokaz)
+        if slad:
+            _zabij(wynik, forma, pokaz, f"`{forma} {pokaz}` celuje w proces Hermesa albo pracownika karty (widać "
+                                        f"`{slad.group(0)}`)")
+        return
+    if pid == -1:
+        _zabij(wynik, forma, pokaz, f"`{forma} -1` wysyła sygnał do wszystkich Twoich procesów, także do Hermesa "
+                                    "i pracowników kart")
+        return
+    for p, opis in (_chronione() if chronione is None else chronione):
+        if (pid > 0 and p.pid == pid) or (pid < -1 and p.pgid == -pid):
+            co = f"grupę procesów {-pid}, a w niej {opis}" if pid < 0 else opis
+            _zabij(wynik, forma, pokaz, f"`{forma} {pid}` zabija {co}", p.karta)
+            return
+
+
+def _py_pid(n: Any, *, grupa: bool = False) -> Optional[int]:
+    """PID z os.kill(…)/os.killpg(…) w kodzie Pythona: stała liczba (killpg: grupa, czyli ujemny); None = nie wiadomo."""
+    znak = 1
+    if isinstance(n, ast.UnaryOp) and isinstance(n.op, ast.USub):
+        znak, n = -1, n.operand
+    if not (isinstance(n, ast.Constant) and isinstance(n.value, int) and not isinstance(n.value, bool)):
+        return None
+    pid = znak * n.value
+    return -pid if grupa and pid > 0 else pid
+
+
+def _bez_sygnalu(sygnal: str) -> bool:
+    """Sygnał 0 (kill -0, pkill -0) tylko sprawdza, czy proces żyje."""
+    s = sygnal.strip().upper()
+    return (s[3:] if s.startswith("SIG") else s) == "0"
+
+
+def _kill(argi: List["_Arg"], wynik: List[_Kasowanie]) -> None:
+    """kill [-SYGNAŁ | -s SYGNAŁ | -n NUMER] [--] PID… (jeden sygnał, jak w bash); %zadanie to zadanie powłoki."""
+    sygnal, i = "", 0
+    while i < len(argi):
+        t = argi[i].plaski
+        if t is None or not t.startswith("-") or t == "-":
+            break
+        i += 1
+        if t == "--":
+            break
+        if t in ("-l", "-L", "--list", "--table"):
+            return                                 # lista sygnałów
+        if t in ("-s", "-n", "--signal"):
+            sygnal = (argi[i].plaski or "?") if i < len(argi) else ""
+            i += 1
+        elif t.startswith("--signal="):
+            sygnal = t.split("=", 1)[1]
+        else:
+            sygnal = t[1:]
+        break                                      # po sygnale same cele (kill -9 -1: -1 to wszystkie procesy)
+    if _bez_sygnalu(sygnal):
+        return
+    forma = "kill" + (f" -{sygnal}" if sygnal else "")
+    chronione: Optional[List[Tuple[_Proces, str]]] = None
+    for a in argi[i:]:
+        t = a.plaski
+        if t is not None and t.startswith("%"):
+            continue
+        if t is not None and re.fullmatch(r"-?\d+", t):
+            chronione = _chronione() if chronione is None else chronione
+            _zabijanie_pid(forma, int(t), a.pokaz, wynik, chronione)
+        else:
+            _zabijanie_pid(forma, None, a.pokaz if t is None else t, wynik)
+
+
+def _liczby(wartosc: str) -> Optional[set]:
+    """Lista PID-ów po przecinku (pkill -P, -g); None = nie wiadomo (wtedy bez zawężenia)."""
+    try:
+        return {int(x) for x in wartosc.split(",") if x.strip()} or None
+    except ValueError:
+        return None
+
+
+def _pasuje(wzorzec: str, tekst: str, bez_wielkosci: bool, dokladnie: bool) -> bool:
+    try:
+        r = re.compile(wzorzec, re.I if bez_wielkosci else 0)
+    except re.error:
+        return (wzorzec.lower() in tekst.lower()) if bez_wielkosci else wzorzec in tekst
+    return bool(r.fullmatch(tekst) if dokladnie else r.search(tekst))
+
+
+def _pkill(prog: str, argi: List["_Arg"], wynik: List[_Kasowanie]) -> None:
+    """pkill (wzorzec na nazwie albo z -f na całej linii poleceń, -x, -i, -v, -P rodzic, -g grupa) i killall (nazwy,
+    -r wzorce, -I bez wielkości liter): czy trafia w pracownika karty albo proces Hermesa tej wtyczki."""
+    z_wartoscia = _PKILL_Z_WARTOSCIA[prog]
+    pelny = dokladnie = bez_wielkosci = odwrotnie = wyrazenie = po = False
+    sygnal = ""
+    rodzice: Optional[set] = None
+    grupy: Optional[set] = None
+    wzorce: List[_Arg] = []
+    i = 0
+    while i < len(argi):
+        a, t = argi[i], argi[i].plaski
+        i += 1
+        if t is None or po or not t.startswith("-") or t == "-":
+            wzorce.append(a)
+            continue
+        if t == "--":
+            po = True
+            continue
+        if t.startswith("--"):
+            nazwa, rowna, wart = t.partition("=")
+            if not rowna and nazwa in _PKILL_DLUGIE_Z_WARTOSCIA and i < len(argi):
+                wart, i = argi[i].plaski or "", i + 1
+            pelny = pelny or nazwa == "--full"
+            dokladnie = dokladnie or nazwa == "--exact"
+            bez_wielkosci = bez_wielkosci or nazwa == "--ignore-case"
+            odwrotnie = odwrotnie or nazwa == "--inverse"
+            wyrazenie = wyrazenie or nazwa == "--regexp"
+            if nazwa == "--parent":
+                rodzice = _liczby(wart)
+            elif nazwa == "--pgroup":
+                grupy = _liczby(wart)
+            elif nazwa == "--signal":
+                sygnal = wart
+            continue
+        if _SYGNAL.fullmatch(t[1:]):               # -9, -KILL, -SIGTERM
+            sygnal = t[1:]
+            continue
+        for j, litera in enumerate(t[1:], start=1):
+            if litera in z_wartoscia:
+                wart = t[j + 1:]
+                if not wart and i < len(argi):
+                    wart, i = argi[i].plaski or "", i + 1
+                if prog == "pkill" and litera == "P":
+                    rodzice = _liczby(wart)
+                elif prog == "pkill" and litera == "g":
+                    grupy = _liczby(wart)
+                elif prog == "killall" and litera == "s":
+                    sygnal = wart
+                break
+            if prog == "pkill":
+                pelny = pelny or litera == "f"
+                dokladnie = dokladnie or litera == "x"
+                bez_wielkosci = bez_wielkosci or litera == "i"
+                odwrotnie = odwrotnie or litera == "v"
+            else:
+                dokladnie = dokladnie or litera == "e"
+                bez_wielkosci = bez_wielkosci or litera == "I"
+                wyrazenie = wyrazenie or litera == "r"
+    if _bez_sygnalu(sygnal):
+        return
+    forma = prog + (f" -{sygnal}" if sygnal else "") + (" -f" if pelny else "")
+    for a in wzorce:
+        slad = _SLOWA_PRACOWNIKA.search(a.pokaz if a.plaski is None else a.plaski)
+        if slad:
+            _zabij(wynik, forma, a.pokaz, f"`{forma} {a.pokaz}`: wzorzec trafia w procesy Hermesa albo pracowników "
+                                          f"kart (widać `{slad.group(0)}`)")
+            return
+    if any(a.plaski is None for a in wzorce) or (not wzorce and rodzice is None and grupy is None):
+        return                                     # nieznany wzorzec bez śladu Hermesa albo brak celu (błąd pkill)
+    for p, opis in _chronione():
+        if prog == "pkill":
+            if (rodzice is not None and p.ppid not in rodzice) or (grupy is not None and p.pgid not in grupy):
+                continue
+            trafia = not wzorce or _pasuje(wzorce[0].plaski, p.polecenie if pelny else p.nazwa, bez_wielkosci,
+                                           dokladnie)
+            trafia = trafia != (odwrotnie and bool(wzorce))
+        elif wyrazenie:
+            trafia = any(_pasuje(a.plaski, p.nazwa, bez_wielkosci, False) for a in wzorce)
+        else:
+            male = (lambda s: s.lower()) if bez_wielkosci else (lambda s: s)       # noqa: E731
+            nazwy = {male(n) for n in (p.nazwa, p.program) if n}
+            trafia = any(male(a.plaski) in nazwy or male(a.plaski[:15]) in nazwy for a in wzorce)
+        if trafia:
+            cel = _poczatek(" ".join(a.pokaz for a in argi), 80)
+            _zabij(wynik, forma, cel, f"`{prog} {cel}` zabija {opis}", p.karta)
+            return
+
+
+def _zabijanie(prog: str, argi: List["_Arg"], wynik: List[_Kasowanie]) -> None:
+    if prog == "kill":
+        _kill(argi, wynik)
+    else:
+        _pkill(prog, argi, wynik)
+
+
+def _zabijanie_z_potoku(polecenie: str, kasowania: List[_Kasowanie]) -> None:
+    """`… | xargs kill`: PID-y przychodzą z potoku; blokada, gdy w poleceniu widać Hermesa, kanban albo numer karty."""
+    slad = _SLOWA_PRACOWNIKA.search(polecenie)
+    for i in range(len(kasowania) - 1, -1, -1):
+        k = kasowania[i]
+        if k.rodzaj != "zabij_xargs":
+            continue
+        if slad:
+            kasowania[i] = _Kasowanie(k.forma, "zabij", None, k.pokaz,
+                                      uwaga=f"`{k.forma}` bierze PID-y z potoku, a w poleceniu widać "
+                                            f"`{slad.group(0)}` (proces Hermesa albo pracownik karty)")
+        else:
+            del kasowania[i]
+
+
+def _straznik_zabijania(narzedzie: str, zabicia: List[_Kasowanie], m: _Miejsca) -> Dict[str, str]:
+    """Blokada zabicia pracownika karty albo Hermesa: w każdym trybie, z radą, jak zatrzymać kartę."""
+    powody = "; ".join(dict.fromkeys(k.uwaga for k in zabicia[:3]))
+    karta = next((k.karta for k in zabicia if k.karta), "") or "<karta>"
+    kontekst = KONTEKSTY.get(m.bez_czl or "", "pełny (YOLO)" if m.yolo else f"tryb {m.tryb} z człowiekiem")
+    logger.warning("jarvo-zgody: zablokowane zabicie pracownika karty (%s, %s): %s", narzedzie, kontekst,
+                   _maskuj(powody)[:600])
+    if m.bez_czl == "kanban":
+        rada = ("swoją kartę kończysz narzędziem kanbana: kanban_block(kind=\"needs_input\", reason=\"…\"), gdy czekasz "
+                "na właściciela albo coś Cię blokuje, albo kanban_complete(summary=\"…\"), gdy praca jest skończona")
+    else:
+        rada = (f"kartę zatrzymaj narzędziem kanbana: kanban_block(task_id=\"{karta}\", kind=\"needs_input\", "
+                "reason=\"…\") (pracownika zamknie sam dyspozytor), a skończoną kończy kanban_complete")
+    return _blok(f"zabicie pracownika karty albo Hermesa ({narzedzie}): {_maskuj(powody)}. Dyspozytor kanbana uznaje "
+                 "zabitego pracownika za awarię (protocol violation) i uruchamia kartę od nowa (16.11 trzy razy "
+                 "z rzędu). Ta blokada działa w każdym trybie i nie da się jej zatwierdzić. Co zrobić: "
+                 f"{rada}. Proces, który sam uruchomiłeś (nagrywanie, serwer), zatrzymasz przez "
+                 "process_manage(action=\"kill\") albo kill jego własnego PID.")
+
 
 
 def _powod_kasowania(ks: _Kasowanie, kr: _Krytyczne) -> Optional[str]:
@@ -2575,7 +2918,12 @@ def _rada_kasowania(kasowania: List[_Kasowanie], m: _Miejsca) -> str:
 
 
 def _straznik_kasowania(narzedzie: str, kasowania: List[_Kasowanie], m: _Miejsca) -> Optional[Dict[str, str]]:
-    """Blokada masowego kasowania i niszczenia danych: w każdym trybie, z człowiekiem i pod YOLO, bez pytania."""
+    """Blokada masowego kasowania i niszczenia danych: w każdym trybie, z człowiekiem i pod YOLO, bez pytania.
+    Najpierw zabicie pracownika karty albo Hermesa (strażnik pracowników, zbierany razem z kasowaniami)."""
+    zabicia = [k for k in kasowania if k.rodzaj == "zabij"]
+    if zabicia:
+        return _straznik_zabijania(narzedzie, zabicia, m)
+    kasowania = [k for k in kasowania if k.rodzaj != "zabij_xargs"]
     if not kasowania:
         return None
     kr = _krytyczne(m)
@@ -2873,6 +3221,10 @@ def _telefon(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[str, str]]:
 # pracownik karty (tor review: osobny pracownik-sędzia). 12.11 Jarvo w czacie z właścicielem, budzony zdarzeniami
 # tablicy (Hermes subskrybuje czat przy kanban_create w trybie notify+wake), oceniał te same karty co tor review:
 # sprzeczne werdykty, wycofania i godzina wiadomości na Telegramie.
+# Wyjątek: kanban_block karty `running` z rozmowy to zatrzymanie, nie ocena. 16.11 22:35 wtyczka go odmówiła
+# (karta t_87d11e3a), a Jarvo zabił pracownika poleceniem kill i dyspozytor trzy razy uruchamiał kartę od nowa.
+# Komentarz z rozmowy nie zatrzyma karty Jarva: pracownik pomija komentarze własnego profilu
+# (tools/kanban_tools.py:574-612), a po blokadzie z rozmowy pracownika zamyka dyspozytor (reap_terminal_workers).
 WERDYKTY_KART = frozenset({"kanban_complete", "kanban_request_review", "kanban_request_changes", "kanban_block"})
 KARTA_W_TOKU = frozenset({"running", "review"})
 
@@ -2898,11 +3250,104 @@ def _werdykt_z_rozmowy(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[st
     if not tid:
         return None
     status = _status_karty(tid, str(args.get("board") or "").strip() or None)
-    if status not in KARTA_W_TOKU:
-        return None
+    if status not in KARTA_W_TOKU or (tool_name == "kanban_block" and status == "running"):
+        return None       # zatrzymanie karty w pracy z powodem: pracownika zamknie dyspozytor
     return _blok(f"karta {tid} jest w toku ({status}): pracuje nad nią albo ocenia ją pracownik karty (tor review). "
                  "Werdykt wydaje tylko on, rozmowa nie ocenia kart. Zdarzenie tablicy w rozmowie przemilcz ([SILENT]); "
-                 "uwagę właściciela do karty przekaż przez kanban_comment.")
+                 "uwagę właściciela do karty przekaż przez kanban_comment, a kartę w pracy (running) zatrzymasz "
+                 "przez kanban_block z powodem.")
+
+
+# ------------------------------------------------------------------------------------------------ decyzje właściciela
+# 16.11 23:10 Jarvo napisał w komentarzu karty t_87d11e3a „Decyzja Jarva: zaznaczyć NDA”, a 27 min później w raporcie
+# misji „decyzja właściciela z 23:15”, choć właściciel od 22:49 do 23:36 nic nie napisał. Decyzję właściciela wolno
+# zapisać tylko z jego słowami w cudzysłowie i czasem (godzina albo data); inaczej to decyzja agenta.
+TEKSTY_KANBANA = {"kanban_comment": ("body",), "kanban_block": ("reason",), "kanban_complete": ("summary", "result"),
+                  "kanban_request_review": ("summary",), "kanban_request_changes": ("reason",),
+                  "kanban_create": ("title", "body"), "kanban_heartbeat": ("note",)}
+_KTO_DECYDUJE = r"(?:w[łl]a[śs]ciciel\w*|u[żz]ytkownik\w*)"
+_PRZYPISANIE_DECYZJI = re.compile(
+    rf"\b(?:decyzj\w*|zgod\w*|polece\w*|wyb[oó]r\w*)\s+{_KTO_DECYDUJE}"
+    rf"|\b{_KTO_DECYDUJE}\s+(?:(?!nie\b)\w+\s+){{0,2}}?(?:zdecydowa\w*|postanowi\w*|zgodzi\w*|zatwierdzi\w*|"
+    r"wybra\w*|kaza\w*|poleci\w*|zleci\w*|potwierdzi\w*|pozwoli\w*|da\w*\s+zgod\w*)"
+    r"|\bowner(?:'s)?\s+(?:decided|decision|approved|chose|confirmed)"
+    rf"|\|\s*{_KTO_DECYDUJE}\s*(?=[|(])", re.I)      # kolumna „Kto” tabeli Decyzje w MISSION.md
+# tuż przed: prośba o decyzję, pytanie, przeczenie albo warunek („czeka na decyzję właściciela”, „bez zgody …”)
+_PROSBA_O_DECYZJE = re.compile(
+    r"(?:\b(?:nie|bez|czy|do|na|o|jeśli|jeżeli|gdy|aż|until|without|no|needs?|awaiting)\s+"
+    r"|\b(?:brak\w*|wymag\w*|potrzeb\w*|czeka\w*|oczekuj\w*|pytani\w*|pytam|zapyta\w*|prośb\w*|prosz\w*|proś\w*)"
+    r"\s+(?:\w+\s+){0,2})$", re.I)
+_CYTAT = re.compile(r"„[^„”“\n]{3,}[”“]|“[^”\n]{3,}”|\"[^\"\n]{3,}\"|«[^»\n]{3,}»")
+_CZAS = re.compile(r"\b(?:[01]?\d|2[0-3])[:.][0-5]\d\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\.\d{1,2}\.\d{2,4}\b")
+
+
+def _decyzje_bez_cytatu(tekst: str, stary: str = "") -> List[str]:
+    """Fragmenty, które przypisują decyzję właścicielowi bez jego cytatu („…”) i czasu w tym samym akapicie (do 300
+    znaków od przypisania; w wierszu tabeli: w tym wierszu). Linie, które już są w `stary` (poprzednia treść pliku),
+    pomijamy."""
+    stare = {linia.strip() for linia in stary.splitlines() if linia.strip()}
+    wynik: List[str] = []
+    for m in _PRZYPISANIE_DECYZJI.finditer(tekst):
+        s, e = m.span()
+        if _PROSBA_O_DECYZJE.search(tekst[max(0, s - 40):s]):
+            continue
+        l0, l1 = tekst.rfind("\n", 0, s) + 1, tekst.find("\n", e)
+        l1 = len(tekst) if l1 < 0 else l1
+        if tekst[l0:l1].lstrip().startswith("|"):
+            okno = tekst[l0:l1]
+        else:
+            a0, a1 = tekst.rfind("\n\n", 0, s), tekst.find("\n\n", e)
+            okno = tekst[max(a0 + 1, s - 300):min(a1 if a1 >= 0 else len(tekst), e + 300)]
+        if (_CYTAT.search(okno) and _CZAS.search(okno)) or tekst[l0:l1].strip() in stare:
+            continue
+        wynik.append(" ".join(tekst[max(l0, s - 40):min(l1, e + 40)].split()))
+    return wynik
+
+
+def _blok_przypisania(gdzie: str, fragmenty: List[str]) -> Dict[str, str]:
+    profil = _profil(_hermes_home())
+    ja = "decyzja Jarva" if profil in ("jarvo", "host") else f"decyzja agenta {profil}"
+    pokaz = _maskuj(_poczatek(fragmenty[0], 120))
+    logger.warning("jarvo-zgody: zablokowane przypisanie decyzji właścicielowi (%s): %s", gdzie, pokaz)
+    return _blok(f"{gdzie} przypisuje decyzję właścicielowi bez jego słów w cudzysłowie i czasu: „{pokaz}”. Właściciel "
+                 "zdecydował tylko to, co sam napisał: podaj jego cytat z godziną, np. `decyzja właściciela (16.11 "
+                 "23:15): „tak, zaznacz NDA”`. Jeśli tego nie napisał, to Twoja decyzja: napisz `" + ja + ": …`, "
+                 "a gdy potrzebne jest jego „tak”, zapytaj go (na karcie: kanban_block(kind=\"needs_input\", "
+                 "reason=\"…\")). Ta blokada działa w każdym trybie.")
+
+
+def _przypisanie_w_kanbanie(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[str, str]]:
+    teksty = [args.get(k) for k in TEKSTY_KANBANA[tool_name]]
+    fragmenty = [f for t in teksty if isinstance(t, str) for f in _decyzje_bez_cytatu(t)]
+    return _blok_przypisania(tool_name, fragmenty) if fragmenty else None
+
+
+def _przypisanie_w_zapisie(tool_name: str, args: Dict[str, Any], m: _Miejsca, task_id: str
+                           ) -> Optional[Dict[str, str]]:
+    """write_file i patch w misjach albo skarbcu (MISSION.md, DLA-CLAUDE.md, raporty, notatki): nowe linie."""
+    korzenie = [k for k in (_k_realny(m.misje), _k_realny(m.wiedza)) if k]
+    baza = _baza(task_id)
+    sciezki = [args.get("path")] if tool_name == "write_file" else sciezki_latki(args)
+    realne = [r for p in sciezki if isinstance(p, str) and p.strip() for r in [_realna(p, baza)] if r]
+    if not any(_wewnatrz(_klucz(r), k) for r in realne for k in korzenie):
+        return None
+    if tool_name == "write_file":
+        nowy, stary = args.get("content"), ""
+        try:
+            if realne and os.path.isfile(realne[0]) and os.path.getsize(realne[0]) <= 2_000_000:
+                stary = Path(realne[0]).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            stary = ""
+    elif isinstance(args.get("patch"), str):
+        linie = args["patch"].replace("\r\n", "\n").split("\n")
+        nowy = "\n".join(x[1:] for x in linie if x.startswith("+"))
+        stary = "\n".join(x[1:] for x in linie if x.startswith(("-", " ")))
+    else:
+        nowy, stary = args.get("new_string"), args.get("old_string")
+    if not isinstance(nowy, str):
+        return None
+    fragmenty = _decyzje_bez_cytatu(nowy, stary if isinstance(stary, str) else "")
+    return _blok_przypisania(f"{tool_name} {_pokaz(realne[0], 60)}", fragmenty) if fragmenty else None
 
 
 def _decyzja(tool_name: str, args: Dict[str, Any], task_id: str) -> Optional[Dict[str, str]]:
@@ -2912,6 +3357,10 @@ def _decyzja(tool_name: str, args: Dict[str, Any], task_id: str) -> Optional[Dic
                      "bez ograniczeń. Uruchom czat bez --yolo albo wpisz /yolo, żeby je wyłączyć.")
     if tool_name in TELEFON_POTWIERDZENIA:
         return _telefon(tool_name, args)
+    if tool_name in TEKSTY_KANBANA:
+        przypisanie = _przypisanie_w_kanbanie(tool_name, args)
+        if przypisanie:
+            return przypisanie
     if tool_name in WERDYKTY_KART:
         return _werdykt_z_rozmowy(tool_name, args)
     if tool_name not in OBSLUGIWANE:
@@ -2920,7 +3369,8 @@ def _decyzja(tool_name: str, args: Dict[str, Any], task_id: str) -> Optional[Dic
     tryb, _ = tryb_zgod()
     m = _miejsca(tryb, bez_czl, yolo and not bez_czl)
     if tool_name in ("write_file", "patch"):
-        straznik = _straznik_kasowania(tool_name, _kasowania_zapisu(tool_name, args, _baza(task_id), _dom()), m)
+        straznik = (_straznik_kasowania(tool_name, _kasowania_zapisu(tool_name, args, _baza(task_id), _dom()), m)
+                    or _przypisanie_w_zapisie(tool_name, args, m, task_id))
         if straznik:
             return straznik
     if tool_name == "write_file":

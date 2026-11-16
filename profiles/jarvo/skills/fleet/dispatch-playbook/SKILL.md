@@ -1,7 +1,7 @@
 ---
 name: dispatch-playbook
 description: "Rozdawanie pracy: karty z kontraktem, zależności, misje."
-version: 1.6.0
+version: 1.7.0
 author: Jarvo
 license: MIT
 metadata:
@@ -115,6 +115,12 @@ cel: jeden pakiet w `@@MISSIONS_DIR@@/<MISJA>/zlozenie/out/` (INDEX.md z opisem 
 
 Nie relacjonuj każdego zdarzenia. Mów tylko wtedy, gdy to zmienia coś dla użytkownika.
 
+**Zatrzymanie karty w pracy** (właściciel mówi „stop”, karta utknęła, ekran przejmujesz sam):
+`kanban_block(task_id, kind="needs_input", reason="<co dalej i kto>")`; pracownika zamknie dyspozytor. Pracownik
+karty kończy swoją kartę sam: `kanban_block` albo `kanban_complete`. Nigdy `kill`, `pkill` ani `killall` procesu
+pracownika: dyspozytor uznaje to za awarię i uruchamia kartę od nowa (16.11 t_87d11e3a trzy razy z rzędu); wtyczka
+`jarvo-zgody` takie polecenie blokuje. `kill` wolno tylko na proces, który sam uruchomiłeś (nagrywanie, serwer).
+
 ## Typowe błędy
 - Karta bez DoD → recenzja nie ma wobec czego oceniać. Zawsze mierzalne DoD.
 - Dwie równoległe karty wymyślające tę samą rzecz → zdecyduj wcześniej.
@@ -122,3 +128,6 @@ Nie relacjonuj każdego zdarzenia. Mów tylko wtedy, gdy to zmienia coś dla uż
 - `scratch` workspace dla wyników misji → pliki znikną po akceptacji. Używaj `dir` w katalogu misji.
 - KONTEKST przepisany z rozmowy (historia, warianty, cudze wyniki wklejone treścią) → podwójny koszt w każdej turze
   wykonawcy. Najwyżej 5 punktów, wyniki rodziców ścieżką.
+- „Decyzja właściciela” albo „właściciel zdecydował” w karcie, komentarzu, powodzie blokady, MISSION.md bez jego
+  słów w cudzysłowie i godziny → przypisujesz mu coś, czego nie powiedział. Bez cytatu to `decyzja Jarva: …`
+  (`decision-queue`, „Decyzja właściciela = jego słowa”); wtyczka `jarvo-zgody` odrzuca taki zapis.

@@ -755,7 +755,11 @@ def test_rozmowa_nie_ocenia_karty_w_toku(sr, monkeypatch, narzedzie):
     monkeypatch.setattr(z, "_status_karty", lambda tid, tablica: statusy.get(tid))
     for tid in ("t_w_toku", "t_ocena"):
         w = hak(narzedzie, task_id=tid, summary="Zaakceptowane")
+        if narzedzie == "kanban_block" and tid == "t_w_toku":
+            assert w is None          # zatrzymanie karty w pracy (16.11: odmowa skończyła się kill pracownika)
+            continue
         assert akcja(w) == "block" and tid in w["message"] and "[SILENT]" in w["message"]
+        assert "kanban_block z powodem" in w["message"]
     assert hak(narzedzie, task_id="t_stoi", summary="Przeniesione do t_9") is None   # przeniesienie zablokowanej karty
     assert hak(narzedzie, task_id="t_gotowa") is None
     assert hak(narzedzie, task_id="t_nieznana") is None                               # brak statusu: bez blokady
@@ -1119,3 +1123,190 @@ def test_blokada_kasowania_w_dzienniku(sr, monkeypatch, caplog):
 def test_rozbior_zachowuje_tresc_heredocow():
     polecenia, _ = z._rozbierz("python3 - <<'EOF'\nimport shutil\nEOF\ncat <<-X\n\tlinia\n\tX\n")
     assert polecenia[0].heredoki == ["import shutil"] and polecenia[1].heredoki == ["linia"]
+
+
+# ------------------------------------------------------------------------------------------------ pracownicy kart
+# 16.11 22:38 Jarvo w rozmowie zabił poleceniem kill pracownika karty t_87d11e3a; dyspozytor trzy razy uruchamiał ją
+# od nowa (protocol violation). Atrapa tablicy procesów: pracownik karty, ffmpeg agenta i brama Hermesa (ten proces).
+
+PRACOWNIK, FFMPEG, BRAMA = 500, 700, 100
+
+
+def procesy_atrapa(monkeypatch):
+    p = z._Proces
+    monkeypatch.setattr(z, "_procesy", lambda: [
+        p(PRACOWNIK, BRAMA, PRACOWNIK, "hermes",
+          "/x/python -P -m hermes_cli.main -p jarvo --cli --accept-hooks chat -q work kanban task t_87d11e3a", "python",
+          "t_87d11e3a"),
+        p(FFMPEG, 1, FFMPEG, "ffmpeg", "ffmpeg -f x11grab -i :1 nagranie.mp4", "ffmpeg"),
+        p(BRAMA, 1, BRAMA, "hermes", "/x/python -P -m hermes_cli.main gateway run", "python")])
+    monkeypatch.setattr(z, "_ja", lambda: BRAMA)
+
+
+ZABIJANIE = [
+    f"kill {PRACOWNIK}", f"kill -9 {PRACOWNIK}", f"kill -s KILL {PRACOWNIK}", f"sudo kill -TERM {PRACOWNIK}",
+    f"kill -- -{PRACOWNIK}", "kill -9 -1", f"kill {BRAMA}", "kill $PPID", "kill -9 $(pgrep -f 'work kanban task')",
+    "kill $(pgrep -f t_87d11e3a)", "pgrep -f kanban | xargs kill -9", "pkill -f 'kanban task'", "pkill -f hermes_cli",
+    "pkill -9 -f 'python -P'", f"pkill -P {BRAMA}", "killall hermes", "killall -9 python",
+    f"bash -c 'kill {PRACOWNIK}'", f"nice -n 10 kill {PRACOWNIK}", f"python3 -c 'import os; os.kill({PRACOWNIK}, 9)'",
+]
+
+
+@pytest.mark.parametrize("tryb", TRYBY_PRACY)
+@pytest.mark.parametrize("polecenie", ZABIJANIE)
+def test_zabicie_pracownika_karty_zablokowane_w_kazdym_trybie(sr, monkeypatch, tryb, polecenie):
+    procesy_atrapa(monkeypatch)
+    tryb_pracy(sr, monkeypatch, tryb)
+    w = hak("terminal", command=polecenie)
+    assert akcja(w) == "block" and "zabicie pracownika karty" in w["message"], (polecenie, w)
+    assert "uruchamia kartę od nowa" in w["message"] and "nie da się jej zatwierdzić" in w["message"]
+    if tryb == "kanban":
+        assert 'kanban_block(kind="needs_input"' in w["message"] and "kanban_complete(summary=" in w["message"]
+    else:
+        assert "kanban_block(task_id=" in w["message"]
+
+
+def test_zabicie_pracownika_rada_z_numerem_karty(sr, monkeypatch):
+    procesy_atrapa(monkeypatch)
+    w = hak("terminal", command=f"kill -9 {PRACOWNIK}")
+    assert 'kanban_block(task_id="t_87d11e3a"' in w["message"] and "pracownika karty t_87d11e3a" in w["message"]
+
+
+ZABIJANIE_DOZWOLONE = [
+    f"kill {FFMPEG}", f"kill -INT {FFMPEG}", "pkill ffmpeg", "pkill -f x11grab", "killall ffmpeg",
+    f"kill -0 {PRACOWNIK}", "kill %1", "kill $(cat /tmp/nagranie.pid)", "pgrep ffmpeg | xargs kill",
+    "kill -l", f"python3 -c 'import os; os.kill({FFMPEG}, 2)'",
+]
+
+
+@pytest.mark.parametrize("tryb", TRYBY_PRACY)
+@pytest.mark.parametrize("polecenie", ZABIJANIE_DOZWOLONE)
+def test_zatrzymanie_wlasnego_procesu_bez_blokady(sr, monkeypatch, tryb, polecenie):
+    procesy_atrapa(monkeypatch)
+    tryb_pracy(sr, monkeypatch, tryb)
+    w = hak("terminal", command=polecenie)
+    assert w is None or "zabicie pracownika" not in w["message"], (polecenie, w)
+
+
+def test_zabicie_pracownika_z_execute_code_i_procesu_w_tle(sr, monkeypatch):
+    procesy_atrapa(monkeypatch)
+    tryb_pracy(sr, monkeypatch, "kanban")
+    assert akcja(hak("execute_code", code=f"import os, signal\nos.kill({PRACOWNIK}, signal.SIGKILL)\n")) == "block"
+    assert akcja(hak("execute_code", code="import os\nos.system('pkill -f \"work kanban task\"')\n")) == "block"
+    w = hak("process_manage", action="write", session_id="proc_1", data=f"kill {PRACOWNIK}\n")
+    assert akcja(w) == "block" and "zabicie pracownika karty" in w["message"]
+
+
+@pytest.mark.skipif(not LINUX, reason="tablica procesów z /proc")
+def test_pracownik_karty_rozpoznany_w_prawdziwych_procesach(sr, monkeypatch):
+    """Jak Hermes uruchamia pracownika (kanban_db_dispatch._worker_argv: `… chat -q "work kanban task <karta>"`,
+    otoczenie HERMES_KANBAN_TASK): rozpoznanie po linii poleceń i po otoczeniu procesu Hermesa."""
+    import subprocess
+    import time
+    spi = "import time; time.sleep(60)"
+    po_linii = subprocess.Popen([sys.executable, "-c", spi, "chat", "-q", "work kanban task t_0badc0de"])
+    po_otoczeniu = subprocess.Popen([sys.executable, "-c", spi, "hermes_cli"],
+                                    env={**os.environ, "HERMES_KANBAN_TASK": "t_0ddba11a"})
+    obcy = subprocess.Popen([sys.executable, "-c", spi, "ffmpeg"])
+    try:
+        for _ in range(50):
+            karty = {p.pid: p.karta for p in z._procesy()}
+            if karty.get(po_linii.pid) and karty.get(po_otoczeniu.pid):
+                break
+            time.sleep(0.1)
+        assert karty.get(po_linii.pid) == "t_0badc0de" and karty.get(po_otoczeniu.pid) == "t_0ddba11a"
+        assert not karty.get(obcy.pid)
+        w = hak("terminal", command=f"kill -9 {po_linii.pid}")
+        assert akcja(w) == "block" and "t_0badc0de" in w["message"]
+        assert akcja(hak("terminal", command=f"kill {os.getpid()}")) == "block"     # proces Hermesa tej wtyczki
+        w = hak("terminal", command=f"kill {obcy.pid}")
+        assert w is None or "zabicie pracownika" not in w["message"]
+    finally:
+        for p in (po_linii, po_otoczeniu, obcy):
+            p.kill()
+            p.wait()
+
+
+def test_blokada_zabicia_w_dzienniku(sr, monkeypatch, caplog):
+    procesy_atrapa(monkeypatch)
+    tryb_pracy(sr, monkeypatch, "yolo")
+    with caplog.at_level("WARNING", logger=z.__name__):
+        assert akcja(hak("terminal", command=f"kill -9 {PRACOWNIK}")) == "block"
+    assert any("zablokowane zabicie pracownika karty" in r.getMessage() for r in caplog.records)
+
+
+# ------------------------------------------------------------------------------------------------ decyzje właściciela
+# 16.11 23:10 komentarz karty t_87d11e3a: „Decyzja Jarva: zaznaczyć NDA”; 23:37 raport misji: „decyzja właściciela
+# z 23:15”, choć właściciel od 22:49 do 23:36 nic nie napisał.
+
+NDA_1611 = ("**Konto powstało.** 16.11.2026 23:17, e-mail x@gmail.com (decyzja właściciela z 23:15), "
+            "imię z konta; NDA zaznaczone.")
+
+BEZ_CYTATU = [
+    NDA_1611, "Właściciel zdecydował: zaznaczamy NDA.", "Zaznaczam NDA, właściciel się zgodził.",
+    "Zgodnie z decyzją właściciela robimy konto na Outlier.", "Owner decided to accept the NDA.",
+]
+Z_CYTATEM_ALBO_BEZ_PRZYPISANIA = [
+    "Decyzja Jarva: zaznaczyć NDA (bez niego nie ma konta).",
+    "Decyzja właściciela (16.11 23:15): „tak, zaznacz NDA”.",
+    "ZGODA WŁAŚCICIELA: konto — „załóż konto na Outlier” (2026-11-16)",
+    "Potrzebna decyzja właściciela: czy zaznaczyć NDA? Czekam na decyzję właściciela.",
+    "Bez zgody właściciela nie klikam. Czy właściciel zatwierdził plan? Właściciel nie zdecydował.",
+    "Turnstile odrzucił Komputer: właściciel klika „Potwierdź, że jesteś człowiekiem” przez VNC.",
+]
+
+
+@pytest.mark.parametrize("tryb", TRYBY_PRACY)
+@pytest.mark.parametrize("narzedzie,pole", [("kanban_comment", "body"), ("kanban_block", "reason"),
+                                            ("kanban_complete", "summary"), ("kanban_create", "body")])
+def test_decyzja_wlasciciela_bez_cytatu_zablokowana(sr, monkeypatch, tryb, narzedzie, pole):
+    monkeypatch.setattr(z, "_status_karty", lambda tid, tablica: "running")
+    tryb_pracy(sr, monkeypatch, tryb)
+    for tekst in BEZ_CYTATU:
+        w = hak(narzedzie, task_id="t_87d11e3a", **{pole: tekst})
+        assert akcja(w) == "block" and "decyzję właścicielowi" in w["message"], (tekst, w)
+        assert "decyzja Jarva: …" in w["message"] and "„tak, zaznacz NDA”" in w["message"]
+    for tekst in Z_CYTATEM_ALBO_BEZ_PRZYPISANIA:
+        w = hak(narzedzie, task_id="t_87d11e3a", **{pole: tekst})
+        assert w is None or "decyzję właścicielowi" not in w["message"], (tekst, w)
+
+
+@pytest.mark.parametrize("tryb", TRYBY_PRACY)
+def test_decyzja_wlasciciela_w_misjach_i_skarbcu(sr, monkeypatch, tryb):
+    tryb_pracy(sr, monkeypatch, tryb)
+    monkeypatch.setenv("JARVO_MISSIONS_DIR", str(sr.misje))
+    monkeypatch.setenv("JARVO_KNOWLEDGE_DIR", str(sr.wiedza))
+    raport = sr.misje / "M-261116-pilot-ankiety" / "RAPORT.md"
+    raport.parent.mkdir(parents=True)
+    for sciezka in (raport, sr.misje / "DLA-CLAUDE.md", sr.wiedza / "notatka.md"):
+        w = hak("write_file", path=str(sciezka), content=f"# Raport\n\n{NDA_1611}\n")
+        assert akcja(w) == "block" and "decyzję właścicielowi" in w["message"], (sciezka, w)
+        w = hak("write_file", path=str(sciezka), content="# Raport\n\nDecyzja Jarva: zaznaczyć NDA.\n")
+        assert w is None or "decyzję właścicielowi" not in w["message"]
+    w = hak("patch", path=str(raport), old_string="NDA: ?", new_string=f"NDA: tak.\n{NDA_1611}")
+    assert akcja(w) == "block"
+    latka = f"*** Begin Patch\n*** Add File: {raport.as_posix()}\n+{NDA_1611}\n*** End Patch\n"
+    assert akcja(hak("patch", mode="patch", patch=latka)) == "block"
+    # stara linia zostaje bez zmian: poprawka obok niej przechodzi
+    raport.write_text(f"# Raport\n\n{NDA_1611}\n", encoding="utf-8")
+    w = hak("write_file", path=str(raport), content=f"# Raport\n\n{NDA_1611}\n\nKoniec: 23:40.\n")
+    assert w is None or "decyzję właścicielowi" not in w["message"]
+    w = hak("patch", path=str(raport), old_string=f"{NDA_1611}\n", new_string=f"{NDA_1611}\nDopisek Jarva.\n")
+    assert w is None or "decyzję właścicielowi" not in w["message"]
+    # poza misjami i skarbcem (kod, strona w projekcie) tekst nie jest dziennikiem decyzji
+    w = hak("write_file", path=str(sr.proj / "strona.md"), content=NDA_1611)
+    assert w is None or "decyzję właścicielowi" not in w["message"]
+
+
+def test_decyzja_wlasciciela_w_tabeli_decyzji_misji(sr, monkeypatch):
+    monkeypatch.setenv("JARVO_MISSIONS_DIR", str(sr.misje))
+    misja = sr.misje / "M-261116-pilot-ankiety" / "MISSION.md"
+    misja.parent.mkdir(parents=True)
+    naglowek = "## Decyzje\n| # | Decyzja | Kto | Kiedy | Słowa właściciela |\n|---|---|---|---|---|\n"
+    w = hak("write_file", path=str(misja), content=naglowek + "| 2 | NDA: zaznaczyć | właściciel | 16.11 23:15 | — |\n")
+    assert akcja(w) == "block" and "decyzję właścicielowi" in w["message"]
+    for wiersz in ("| 2 | NDA: zaznaczyć | właściciel | 16.11 23:15 | „tak, zaznacz NDA” |\n",
+                   "| 2 | NDA: zaznaczyć | Jarvo | 16.11 23:10 | — |\n"):
+        w = hak("write_file", path=str(misja), content=naglowek + "| 1 | nazwa: „Nova” | właściciel | 16.11 22:01 | "
+                                                                   "„niech będzie Nova” |\n" + wiersz)
+        assert w is None or "decyzję właścicielowi" not in w["message"], wiersz
