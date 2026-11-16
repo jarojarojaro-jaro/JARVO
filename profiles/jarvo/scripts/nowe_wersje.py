@@ -39,7 +39,8 @@ NODE = re.compile(r"^https://nodejs\.org/dist/v([\d.]+)/")
 CFT_STABLE = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json"
 NODE_INDEX = "https://nodejs.org/dist/index.json"
 NPM = "https://registry.npmjs.org/{}/latest"
-PO_CO = "decyzja właściciela 14.11: nowe wersje aktualizujemy po przeglądzie (docs/SOURCES.md)"
+PO_CO = ("decyzja właściciela 16.11: nowe wersje bierzemy od razu, bez testów porównawczych (sprawdził je producent); "
+         "zostają automatyczne testy repo i sumy pobrań")
 
 Pobierz = Callable[[str], object]
 
