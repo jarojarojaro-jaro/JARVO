@@ -344,11 +344,52 @@ def test_stan_wspolny_dla_agentow_w_danych_jarva(tmp_path, monkeypatch):
 
 
 def test_brak_paczki_camoufox_to_kod_1_z_rada(cli, monkeypatch, tmp_path, capsys):
-    """Natywnie Camoufox jest dodatkiem pobieranym przy pierwszym użyciu: bez paczki kod 1 i rada, bez startu."""
+    """Bez instalacji natywnej (obraz bez paczki): kod 1 i rada, bez startu i bez „poproś właściciela”."""
     monkeypatch.setattr(O, "EXE", str(tmp_path / "nie-ma" / "camoufox.exe"))
+    monkeypatch.setattr(O, "_przy_uzyciu", lambda: (None, None))
     assert O.main(["https://firma.pl/"]) == 1
-    assert "nie jest zainstalowany" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "nie jest zainstalowany" in err and "poproś właściciela o" not in err
     assert O.sprawdz() == 1 and "pobierany przy pierwszym użyciu" in capsys.readouterr().err
+
+
+def test_natywnie_camoufox_z_manifestu_przy_pierwszym_uzyciu(cli, monkeypatch, tmp_path):
+    """16.11: skrypt kazał „poprosić właściciela”, więc agent pobrał `camoufox fetch` niepilnowaną wersję do ~/.cache,
+    której skrypt nie widział. Natywnie brak paczki = pobranie wpisu `camoufox` z manifestu (wersja i suma), a ścieżka
+    programu z wpisu; --sprawdz niczego nie pobiera."""
+    exe = tmp_path / "narzedzia" / "camoufox" / "159" / "camoufox-bin"
+    wolania = []
+
+    class Pu:
+        class BladPrzyUzyciu(Exception):
+            pass
+
+        @staticmethod
+        def gotowe_narzedzie(u, nazwa):
+            wolania.append(("gotowe", nazwa))
+            return None
+
+        @staticmethod
+        def narzedzie(u, nazwa):
+            wolania.append(("pobierz", nazwa))
+            exe.parent.mkdir(parents=True, exist_ok=True)
+            exe.write_text("#!/bin/sh\n", encoding="utf-8")
+            return {"wersja": "159.0-beta.42", "env": {"JARVO_CAMOUFOX": str(exe)}}
+
+    monkeypatch.setattr(O, "EXE", str(tmp_path / "opt" / "camoufox-bin"))
+    monkeypatch.setattr(O, "_przy_uzyciu", lambda: (Pu, "uklad"))
+    O.sprawdz()
+    assert wolania == [("gotowe", "camoufox")]            # healthcheck bez sieci
+    O.zapewnij_paczke()
+    assert wolania[-1] == ("pobierz", "camoufox") and O.EXE == str(exe) and O.jest_paczka()
+
+    def blad(u, nazwa):
+        raise Pu.BladPrzyUzyciu("inna suma")
+
+    monkeypatch.setattr(Pu, "narzedzie", staticmethod(blad))
+    monkeypatch.setattr(O, "EXE", str(tmp_path / "opt" / "camoufox-bin"))
+    with pytest.raises(O.BrakPaczki, match="inna suma"):
+        O.zapewnij_paczke()
 
 
 @pytest.mark.parametrize("system", ["windows", "macos"])

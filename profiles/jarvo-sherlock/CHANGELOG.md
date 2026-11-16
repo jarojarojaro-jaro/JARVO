@@ -1,6 +1,7 @@
 # Changelog: jarvo-sherlock
 
 ## Niewydane
+- `ostrozna-przegladarka` 1.2.0: w instalacji natywnej pierwsza strona sama pobiera przypiętego Camoufoxa (wersja i suma z manifestu, ok. 1,3 GB); nie prosisz właściciela i nie używasz `camoufox fetch` (16.11 dało niepilnowaną wersję 158 w ~/.cache, której skrypt nie widział, więc zapasowa przeglądarka nie działała).
 - Zapasowa przeglądarka Camoufox 159.0-beta.42 (było 152.0.4-beta.30; `ostrozna-przegladarka` 1.1.1): pobranie przy pierwszym użyciu ok. 1,3 GB (było ok. 0,5 GB), na Linuksie instalacja usuwa fonty macOS i Windows z paczki; przy starcie bez pobierania wtyczek GMP (OpenH264, Widevine). Polecenia, kody wyjścia i limity bez zmian.
 - Zapis w kodzie floty (zainstalowane skille, wtyczki, haki, skrypty floty, `SOUL.md` i `mcp.json` profili, program Jarva, kod Hermesa) blokuje wtyczka `jarvo-zgody` w każdym trybie, bez prośby do właściciela, z radą: zmiana floty to zlecenie dla Claude Code (`missions/DLA-CLAUDE.md`), bo zapis w zainstalowanym profilu znika przy aktualizacji i omija skan skilli (14.11). Prośba o pozostałe chronione miejsca mówi wprost, że „Always” obejmie tylko ten sam plik albo to samo polecenie. Lekcję na następny raz zapisujesz jak dotąd przez `skill_manage` (poczekalnia).
 - Przeglądarka narzędzi `browser_*`: agent-browser 0.43.0 (było 0.38.1; poprawki bezpieczeństwa, zawieszona karta nie psuje sesji, podpowiedzi przy przyciskach bez nazwy) i Lightpanda 1.0.4 (było 1.0.0).

@@ -10,9 +10,10 @@
 
 Tylko po blokadzie zwykłej drogi (extract.py, strona.py, browser_* z Lightpandą albo Chromium): 403/429,
 „Just a moment…”, „Human Verification”, captcha. Nigdy domyślnie. Camoufox to Firefox z podmienionym odciskiem
-przeglądarki (MPL-2.0): w obrazie `/opt/jarvo/camoufox`, natywnie paczka z manifestu instalacji (JARVO_CAMOUFOX,
-pobierana przy pierwszym użyciu, ok. 1,3 GB); RAM ok. 800 MB na czas jednej strony. Odcisk przeglądarki udaje system,
-na którym działa (Windows, macOS, Linux), bo strona widzi fonty tego systemu.
+przeglądarki (MPL-2.0): w obrazie `/opt/jarvo/camoufox`, natywnie paczka z manifestu instalacji (JARVO_CAMOUFOX;
+brak = pierwsza strona pobiera ją sama przez jarvo/przy_uzyciu.py, ok. 1,3 GB z sumą); RAM ok. 800 MB na czas
+jednej strony. Odcisk przeglądarki udaje system, na którym działa (Windows, macOS, Linux), bo strona widzi fonty
+tego systemu.
 
 Zasady pilnowane w kodzie, nie tylko w skillu:
 - jedna strona na wywołanie, jedna przeglądarka naraz na tym komputerze (blokada pliku), co najmniej 20 s między
@@ -340,6 +341,7 @@ def opcje_camoufox(zrzut: bool, dom: Path | None = None) -> dict:
 def otworz(zrzut: bool = False):
     """Przeglądarka z czystym profilem (testy podmieniają tę funkcję)."""
     # pliki przeglądarki (profil Firefoksa, cache fontów, „Downloads”) w katalogu skryptu, nie w katalogu domowym
+    zapewnij_paczke()                    # natywnie przy pierwszym użyciu: pobranie z sumą z manifestu
     if not jest_paczka():
         raise BrakPaczki(BRAK_PACZKI)
     dom = STAN / "dom"
@@ -426,17 +428,69 @@ def czytaj(url: str, tryb: str = "markdown", zrzut: str | None = None, czekaj_s:
 # (od 158 w grupach fonts/{L,LM,LMW,LW}: litery = systemy, które je czytają; fonts/groups.json, L = tylko Linux)
 PLIKI_PACZKI = {"linux": ("fontconfig/linux/fonts.conf", "fonts/groups.json", "fonts/L", "properties.json"),
                 "windows": ("application.ini", "properties.json"), "macos": ("application.ini", "properties.json")}
-BRAK_PACZKI = ("Camoufox nie jest zainstalowany na tym komputerze (dodatek pobierany przy pierwszym użyciu, ok. 1,3 GB, "
-               "z sumą z manifestu instalacji): poproś właściciela o jego instalację; do tego czasu odmowa strony "
-               "zostaje blokadą")
+BRAK_PACZKI = ("Camoufox nie jest zainstalowany na tym komputerze: w instalacji natywnej to dodatek pobierany przy "
+               "pierwszym użyciu (pierwsza strona przez ostrozna.py pobiera go sama, ok. 1,3 GB, z sumą z manifestu; "
+               "nie instaluj go `camoufox fetch` ani nie proś właściciela), w obrazie Jarva jest w /opt/jarvo/camoufox")
 
 
 def jest_paczka() -> bool:
     return os.path.isfile(EXE)
 
 
+def _przy_uzyciu():
+    """(moduł jarvo/przy_uzyciu.py aktywnej wersji Jarva, układ katalogów) w instalacji natywnej (JARVO_ROOT
+    z program/current.json), inaczej (None, None): w obrazie paczka jest gotowa. Ten sam wzór co cad.py."""
+    import importlib
+    import importlib.util
+
+    korzen = os.environ.get("JARVO_ROOT")
+    biezace = Path(korzen) / "program" / "current.json" if korzen else None
+    if biezace is None or not biezace.is_file():
+        return None, None
+    try:
+        sciezka_app = str(os.environ.get("JARVO_REPO") or json.loads(biezace.read_text(encoding="utf-8-sig")).get("app")
+                          or "")
+    except (OSError, ValueError, AttributeError):
+        return None, None
+    app = Path(sciezka_app)
+    if not os.path.isabs(sciezka_app) or not (app / "jarvo" / "przy_uzyciu.py").is_file():
+        return None, None                  # nigdy kod z katalogu bieżącego (pusta albo względna ścieżka)
+    if "jarvo" not in sys.modules:
+        spec = importlib.util.spec_from_file_location("jarvo", app / "jarvo" / "__init__.py",
+                                                      submodule_search_locations=[str(app / "jarvo")])
+        modul = importlib.util.module_from_spec(spec)
+        sys.modules["jarvo"] = modul
+        spec.loader.exec_module(modul)
+    try:
+        pu = importlib.import_module("jarvo.przy_uzyciu")
+    except ImportError:
+        return None, None
+    return pu, pu.uklad({"JARVO_ROOT": korzen})
+
+
+def zapewnij_paczke(instaluj: bool = True) -> None:
+    """Natywnie Camoufox to wpis `kiedy: przy-uzyciu` manifestu: gotowy bierzemy bez sieci, brak (gdy `instaluj`)
+    pobieramy teraz tą samą drogą co instalator (wersja i suma z manifestu, fonty innych systemów usunięte), bez
+    pytania właściciela. 16.11 skrypt kazał „poprosić właściciela”, więc Jarvo ściągnął `camoufox fetch` niepilnowaną
+    wersję 158 (2,5 GB) do ~/.cache, której ostrozna.py i tak nie widziała."""
+    global EXE
+    if jest_paczka():
+        return
+    pu, u = _przy_uzyciu()
+    if pu is None:
+        return
+    try:
+        wpis = pu.gotowe_narzedzie(u, "camoufox") or (pu.narzedzie(u, "camoufox") if instaluj else None)
+    except pu.BladPrzyUzyciu as e:
+        raise BrakPaczki(f"Camoufox: {e}") from None
+    exe = ((wpis or {}).get("env") or {}).get("JARVO_CAMOUFOX")
+    if exe:
+        EXE = exe
+
+
 def sprawdz() -> int:
     """Healthcheck bez sieci i bez uruchamiania przeglądarki: pakiet, binarka i pliki paczki dla tego systemu."""
+    zapewnij_paczke(instaluj=False)       # natywnie: paczka z manifestu, gdy już pobrana (bez sieci)
     braki = []
     if not ma_camoufox():
         braki.append("pakiet camoufox (Python narzędzi Jarva)")

@@ -1,7 +1,7 @@
 ---
 name: ostrozna-przegladarka
 description: "Odmowa zwykłej przeglądarki → jedna próba Camoufoxem."
-version: 1.1.1
+version: 1.2.0
 author: "Jarvo (przeglądarka: Camoufox, MPL-2.0)"
 license: MIT
 metadata:
@@ -46,8 +46,10 @@ Kody: 0 strona przeczytana, 1 błąd (sieć, 404, brak Camoufoxa na tym komputer
 - **3:** koniec. Zapisz w `risks` „<domena>: odmowa także w Camoufoxie (<powód>)” i zgłoś blokadę jednym zdaniem.
   Bez drugiej próby, innego adresu tej samej strony, archiwum na siłę ani innego narzędzia.
 - **4:** limit domeny albo przeglądarka zajęta. Nie omijasz go: odłóż stronę albo zgłoś.
-- **1 z „Camoufox nie jest zainstalowany”:** przeglądarka to dodatek pobierany przy pierwszym użyciu (ok. 1,3 GB).
-  Nie instalujesz jej sam: zgłoś to właścicielowi jednym zdaniem, a strona zostaje blokadą do czasu instalacji.
+- **1 z „Camoufox nie jest zainstalowany”:** w instalacji natywnej skrypt sam pobiera przypiętą wersję przy pierwszej
+  stronie (ok. 1,3 GB, z sumą z manifestu), więc ten komunikat znaczy, że pobranie się nie udało (powód w nim).
+  Nie instalujesz jej `camoufox fetch` ani `pip` (inna wersja, w innym miejscu, skrypt jej nie widzi). Zgłoś powód
+  w `risks`, a strona zostaje blokadą.
 
 ## Granice (pilnuje ich skrypt)
 - jedna strona na wywołanie; jedna przeglądarka naraz na tym komputerze (~0,8 GB RAM, zwykła ~0,03–0,3 GB),
