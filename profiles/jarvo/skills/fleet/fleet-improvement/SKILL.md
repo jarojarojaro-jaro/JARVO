@@ -1,7 +1,7 @@
 ---
 name: fleet-improvement
-description: "Ulepszanie floty: z błędów recenzji zrób zmiany w skillach."
-version: 1.3.1
+description: "Ulepszanie floty: lekcje z recenzji i księga błędów."
+version: 1.4.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A2
-    reviewed: "2026-11-16"
+    reviewed: "2026-11-17"
 ---
 
 # Ulepszanie floty
@@ -29,6 +29,21 @@ Flota uczy się na własnych błędach, ale **repo jest źródłem prawdy**. Ule
 
 Nauka z zewnątrz (link, paper) to nie lekcja z błędu: próba z miarą rusza od razu według `skrzynka-linkow` (krok 5),
 bez czekania na 3 potwierdzenia; do księgi trafia dopiero jej wynik, z liczbami przed i po.
+
+## Księga błędów (`bledy/`): błąd narzędzia albo pracy
+Księga lekcji (niżej) to reguły z recenzji sędziego. Błędy narzędzi i pracy (odmowa, blokada strony, limit, zła droga)
+mają w skarbcu osobną księgę: `@@KNOWLEDGE_DIR@@/bledy/`, jedna notatka na rodzaj błędu (sygnatury, objaw, przyczyna,
+jak poprawnie, licznik wystąpień). Wtyczka skarbca sama dopisuje pod wynikiem narzędzia z sygnaturą notatki
+„[księga błędów] To już było: … → jak poprawnie: …”.
+1. Trafiasz na błąd albo odmowę: najpierw czytasz ten dopisek i robisz krok „jak poprawnie”. Bez dopisku sprawdzasz
+   `wiedza_szukaj` z `folder: bledy` i słowami komunikatu. Tego samego kroku nie ponawiasz drugi raz bez zmiany drogi.
+2. Rozwiązałeś nowy błąd, który może wrócić (nie literówka ani zły argument): od razu `wiedza_zapisz` z `typ: blad`,
+   `sygnatury` (dosłowne krótkie fragmenty komunikatu, bez danych osób i sekretów) i treścią w trzech akapitach
+   „Objaw: …”, „Przyczyna: …”, „Jak poprawnie: …” (konkretny następny krok). Ten sam błąd jeszcze raz = znowu szkic:
+   kompilacja dopisze przypadek i doliczy wystąpienie.
+3. Wykonawca opisał w raporcie albo blokadzie karty błąd, którego księga nie zna: szkic piszesz Ty (źródło: karta).
+4. Przegląd tygodnia: notatki z hubu `bledy/_hub-bledy` z największą liczbą wystąpień i przypomnień to kandydaci na
+   poprawkę w kodzie albo skillu (zlecenie w `DLA-CLAUDE.md`, notatka jako dowód), bo przypomnienie nie usuwa przyczyny.
 
 ## Księga lekcji (zanim cokolwiek zaproponujesz)
 Pojedynczy błąd to jeszcze nie reguła. Każdą obserwację zapisujesz w `@@KNOWLEDGE_DIR@@/fleet/lekcje.md` (utwórz, jeśli nie ma):

@@ -23,11 +23,11 @@ const bilingual = (pairs) => Object.defineProperties({}, Object.fromEntries(
 const FOLDER_NAMES = bilingual({
   "": ["Skarbiec", "Vault"], agenci: ["Agenci", "Agents"], projekty: ["Projekty", "Projects"], brands: ["Marki", "Brands"],
   inspiracje: ["Inspiracje", "Inspiration"], user: ["Ty", "You"], podmioty: ["Podmioty", "Entities"], pojecia: ["Pojęcia", "Concepts"], orzeczenia: ["Orzeczenia", "Rulings"],
-  rozmowy: ["Rozmowy", "Conversations"], fleet: ["Flota", "Fleet"],
+  rozmowy: ["Rozmowy", "Conversations"], fleet: ["Flota", "Fleet"], bledy: ["Księga błędów", "Error book"],
 });
 const FOLDER_COLORS = {
   agenci: "#2C6ED5", projekty: "#D98A00", brands: "#C2185B", inspiracje: "#0E9FB8", user: "#1E9A61", podmioty: "#7B4FCF", pojecia: "#00897B",
-  orzeczenia: "#D2392E", rozmowy: "#8793A2", fleet: "#5D4037", "": "#9AA6B4",
+  orzeczenia: "#D2392E", rozmowy: "#8793A2", fleet: "#5D4037", bledy: "#E65100", "": "#9AA6B4",
 };
 const folderName = (f) => FOLDER_NAMES[f] || f;
 const folderColor = (f) => FOLDER_COLORS[f] || "#9AA6B4";
@@ -35,7 +35,7 @@ const folderColor = (f) => FOLDER_COLORS[f] || "#9AA6B4";
 const TYPE_NAMES = bilingual({
   hub: ["hub", "hub"], agent: ["agent", "agent"], projekt: ["projekt", "project"], podmiot: ["podmiot", "entity"], pojecie: ["pojęcie", "concept"],
   fakt: ["fakt", "fact"], decyzja: ["decyzja", "decision"], lekcja: ["lekcja", "lesson"], zrodlo: ["źródło", "source"], rozmowa: ["rozmowa", "conversation"],
-  orzeczenia: ["orzeczenia", "rulings"], skill: ["skill", "skill"],
+  orzeczenia: ["orzeczenia", "rulings"], skill: ["skill", "skill"], blad: ["błąd", "error"],
 });
 const STATUS_NAMES = bilingual({
   aktualna: ["aktualna", "current"], "do-sprawdzenia": ["do sprawdzenia", "to verify"], sprzeczna: ["sprzeczna", "contradictory"],

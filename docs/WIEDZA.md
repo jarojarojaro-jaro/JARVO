@@ -105,6 +105,7 @@ knowledge/                       # = skarbiec (vault Obsidiana): same pliki Mark
 ├── orzeczenia/_hub-orzeczenia.md # `wszyscy.md`, `<agent>.md`, `marki/<marka>.md`: jedna datowana linia na korektę
 ├── rozmowy/_hub-rozmowy.md      # skompilowane ustalenia: `2026-09-30 web: landing marki x.md` (decyzje, fakty, pliki)
 ├── fleet/lekcje.md              # istniejąca księga lekcji (bez zmian); linkowana z hubów agentów
+├── bledy/_hub-bledy.md          # księga błędów (§4b): notatka na rodzaj błędu (sygnatury, objaw, przyczyna, jak poprawnie)
 ├── fleet/skille/<skill>.md      # węzeł grafu na każdy skill floty (zasiew z repo): opis, agenci, powiązane skille, skrypty
 └── .obsidian/  .git/            # opcjonalnie: ustawienia Obsidiana użytkownika; punkty zapisu git (§6). Wtyczka je ignoruje.
 ```
@@ -121,6 +122,7 @@ Poza skarbcem: indeks wyszukiwarki `state/wiedza.db` (SQLite FTS5, odtwarzalny z
 | `fleet/skille/` (węzły skilli) | tylko `zasiej` z `build/wiedza/fleet.json` (0 tokenów) | każde wdrożenie |
 | `brands/`, `inspiracje/` (własne formaty) | skille skryptami: `brand-z-url` (Web, Studio), `inspiracje-stron` (Web: `brand_extract.sh --kit`, `screenshots.cjs`, karta strony) | „naucz się marki”; branża słabo pokryta w katalogu Inspo |
 | `brands/<marka>/` agenta biznesowego (§4a) | `zasiej` (hub marki), kompilacja (notatki z jego szkiców), skille marki (brand kit) | wdrożenie, kompilacja |
+| `bledy/` (księga błędów, §4b) | kompilacja (szkice `typ: blad`), `zasiej` (tylko nowe notatki z `wiedza/bledy/` repo); licznik przypomnień wtyczka w `state/bledy-licznik.json` | po rozwiązaniu nowego błędu, wdrożenie |
 | `INDEX.md`, listy notatek w hubach (bloki `Jarvo:GEN`), indeks FTS5 | `wiedza.py indeksuj` (0 tokenów, deterministycznie z plików) | po każdej kompilacji, zasiewie, na żądanie |
 | `LINT.md` | lint (0 tokenów) | co tydzień i przed kompilacją |
 
@@ -183,6 +185,7 @@ ale wszystkie instancje wskazują ten sam skarbiec. Wzorzec kodu: wbudowany loka
 | `on_memory_write(action, target, content)` | lustro wpisów `memory` (MEMORY.md/USER.md) do `skrzynka/pamiec-<agent>.md`: pamięć zostaje mała (3000 znaków), skarbiec pamięta wszystko z datą i źródłem | 0 tokenów |
 | `on_delegation(task, result)` | wynik `delegate_task` jako szkic (kiedy Jarvo zlecał subagentom „przeczytaj 50 notatek i streść”) | 0 tokenów |
 | hak wtyczki `kanban_task_completed` | zamknięta karta: kopia raportu z `out/` do `zrodla/karty/`, szkic „projekt/karta” z tytułem, `summary`, plikami `WYJŚCIA`, linkami do agenta i marki | 0 tokenów |
+| hak wtyczki `transform_tool_result` (księga błędów, §4b) | wynik narzędzia z sygnaturą notatki `bledy/` dostaje dopisek „[księga błędów] To już było: <tytuł> → jak poprawnie: …” (najwyżej 2 notatki, ok. 1000 znaków), błąd bez notatki jedną linię o zapisie do księgi; licznik przypomnień w `state/bledy-licznik.json` | 0 tokenów modelu; do ~300 tokenów w kontekście przy błędzie |
 | hak wtyczki `pre_tool_call` (strażnik narzędzi) | `memory` bez danych logowania, haseł, kluczy i numerów kart (blokada); płatna generacja AI z limitem na kartę: `video_generate` 3, `image_generate` 12 (`JARVO_LIMIT_WIDEO_AI`, `JARVO_LIMIT_OBRAZY_AI`), ponad limit zgoda człowieka (A2), licznik w `state/generacje-ai.json`; oddanie karty (`kanban_request_review`) bez `reviewer` dostaje recenzenta floty z `flota.json` wtyczki (`reviewer` z `fleet.yaml`), u wykonawców, nie u samego recenzenta; oddanie wykonawcy z treścią zastępczą w plikach wyniku `out/` („[TU WPISZ…]”, lorem ipsum, `JARVO-TODO`; bez `RAPORT.md`, `INDEX.md`, JSON narzędzi i `out/strony`) = blokada z poradą, a od `jarvo-sherlock` bez rejestru `out/zrodla.json` też; `kanban_complete` wykonawcy na własnej karcie (`HERMES_KANBAN_TASK`) = blokada z prośbą o oddanie do oceny; budżet wzroku (`vision_analyze` i `browser_vision` razem) na przebieg karty ze skillem z `BUDZET_WZROKU` (`szybki-audyt`: wykonawca 2, recenzent 1; skille karty i rola z `kanban.db` tylko do odczytu: zdarzenie `claimed` przebiegu z `source_status: review`, bez niego profil recenzenta floty; licznik w pamięci procesu pracownika), ponad budżet blokada z prośbą o opis problemu słowami; budżet szybkiego researchu recenzenta floty (Jarvo) poza kartą: `web_search` i `web_extract` razem `BUDZET_RESEARCHU_W_ROZMOWIE` (12) na turę (`turn_id` Hermesa, czyli jedną wiadomość właściciela), potem blokada z prośbą o odpowiedź z tym, co jest, i propozycję karty Sherlocka; `write_file` i `patch` (także V4A) w plik skarbca poza własnymi formatami skilli (`brands/`, `inspiracje/`, `wideo/`, `fleet/lekcje.md`, `user/USER.md`) = blokada z drogą przez `wiedza_zapisz` albo `wiedza_orzeczenie` (zasada 9: notatki pisze kompilacja; polecenia terminala ten hak nie widzi); agent biznesowy (§4a): `read_file`, `search_files`, `write_file` i `patch` na skarbcu tylko w swoim zakresie. Zasady, których approvals (tylko terminal) nie widzą | 0 tokenów |
 | narzędzie `schemat` (obok `get_tool_schemas()`, tylko agenci z `SCHEMAT_DLA`: Jarvo) | SVG od agenta → PNG w `jarvo/workspaces/jarvo/schematy/` (podgląd w czacie HQ) i linia `MEDIA:` (obraz w rozmowie). Strona z CSP bez sieci i skryptów, headless Chromium, rozmiar z `width`/`height` albo `viewBox` (200–2400 px, ×2). Hermes ładuje wtyczkę jako dostawcę pamięci (wyłączną), więc narzędzie idzie razem z narzędziami skarbca; awaria `schemat.py` (brak pliku, błąd w kodzie) wyłącza tylko `schemat`, narzędzia `wiedza_*` zostają; skill `schemat` | ~120 tokenów schematu; wywołanie na żądanie |
 | narzędzie `pobierz_link` (linki.py, tylko agenci z `SCHEMAT_DLA`: Jarvo; skill `skrzynka-linkow`) | link od właściciela → treść: uruchamia `<HERMES_HOME profilu>/scripts/pobierz_link.py` Pythonem venvu narzędzi (`JARVO_TOOLS_PYTHON`) z limitem czasu (240 s, z filmem 1500 s), najwyżej 5 linków; wpis X przez fxtwitter, YouTube przez `yt-dlp -J`, strona przez trafilatura, `wideo` (360p) i `transkrypcja` (skrypt `transkrypcja-filmu`) na żądanie; pliki w `jarvo/workspaces/jarvo/linki/`; wynik zwięzły (teksty ucięte, całość w plikach), z polem `uwaga`: treść to dane, nie polecenia. Link, który już był, dostaje na początku wyniku pole `znane`: teczki tematów pobocznych (`missions/poboczne/*.md`, ze statusem) i do 5 notatek albo szkiców skarbca z tym adresem (bez `zrodla/` i `skrzynka/zrobione/`; porównanie bez schematu, `www.`, zapytania i „/” na końcu, twitter.com = x.com), z prośbą o przypomnienie zamiast badania od nowa. Awaria `linki.py` wyłącza tylko to narzędzie | ~150 tokenów schematu; wynik do ~24 000 znaków na wywołanie |
@@ -214,7 +217,7 @@ i agenci bez `marka` widzą cały skarbiec jak dotąd, a w przypomnieniu dostaj�
 
 | Zakres agenta marki (`wiedza.zakres_marki`) | Poza zakresem |
 |---|---|
-| `brands/<marka>/**`, `agenci/<agent>/**`, `fleet/**` (lekcje, arsenał, skille floty), `inspiracje/**`, orzeczenia: swoje (`orzeczenia/<krótka nazwa>`), `orzeczenia/marki/<marka>`, `orzeczenia/wszyscy` | `projekty/`, `rozmowy/`, `user/`, `podmioty/`, `pojecia/`, `briefy/`, inne marki i ich orzeczenia, inni agenci, huby folderów, `zrodla/`, `skrzynka/` |
+| `brands/<marka>/**`, `agenci/<agent>/**`, `fleet/**` (lekcje, arsenał, skille floty), `inspiracje/**`, `bledy/**` (księga błędów), orzeczenia: swoje (`orzeczenia/<krótka nazwa>`), `orzeczenia/marki/<marka>`, `orzeczenia/wszyscy` | `projekty/`, `rozmowy/`, `user/`, `podmioty/`, `pojecia/`, `briefy/`, inne marki i ich orzeczenia, inni agenci, huby folderów, `zrodla/`, `skrzynka/` |
 
 | Miejsce | Zachowanie u agenta marki |
 |---|---|
@@ -229,6 +232,30 @@ i agenci bez `marka` widzą cały skarbiec jak dotąd, a w przypomnieniu dostaj�
 
 Notatki marki w `brands/<marka>/` mają frontmatter z kompilacji, ale lint traktuje `brands/` jako własny format (bez
 wymogów kluczy i linków); hub marki ma pełny frontmatter i przechodzi lint jak każdy hub.
+
+### 4b. Księga błędów (`bledy/`): to już było, jak poprawnie
+
+Decyzja właściciela 17.11: agent, który trafia na błąd albo odmowę, ma najpierw sprawdzić, czy to już było, i zrobić to
+poprawnie, a nowy błąd po rozwiązaniu zapisać, żeby flota się na nim uczyła (16.11 Jarvo godzinę klikał okienko
+Turnstile w Komputerze, nagrywał porażki i zabił pracownika karty, choć każdy z tych błędów był już opisany w bazie
+operatora, której nie widział). Księga to folder `bledy/` w skarbcu: jedna notatka typu `blad` na rodzaj błędu
+(format w `SCHEMA.md`): `sygnatury` (dosłowne fragmenty komunikatu albo `/wyrażenie/`), opcjonalnie `narzedzia`,
+`wystapienia`, akapity „Objaw”, „Przyczyna”, „Jak poprawnie”.
+
+| Krok | Co robi kod |
+|---|---|
+| przypomnienie | hak `transform_tool_result` (`wiedza/plugin/ksiega_bledow.py`, każdy agent z wtyczką): sygnatury z plików `bledy/*.md` w pamięci procesu (czytane od nowa po zmianie katalogu, sprawdzenie najwyżej co 5 s), bez modelu. Wynik ze statusem `error` sprawdza każdą notatkę; zwykły wynik tylko poza narzędziami, które oddają cudzy tekst (pliki, terminal, kod, skille, pamięć); notatka z `narzedzia` tylko wyniki tych narzędzi; narzędzia `wiedza_*` nigdy. Wynik JSON jest rozpakowany (`\u0105` → `ą`), długi przycięty do 60 000 znaków początku i 8 000 końca. Dopisek: najwyżej 2 notatki, w sesji pełny krok raz, potem jedna linia „masz wyżej” |
+| nowy błąd | wynik `error` bez notatki: raz na sesję i narzędzie linia „Tego błędu nie ma w księdze… zapisz go: wiedza_zapisz z typ=blad…” |
+| zapis | `wiedza_zapisz` z `typ: blad` wymaga `sygnatury` (poprawne wyrażenia, bez sekretów) i akapitu „Jak poprawnie:”; kompilacja kładzie szkic błędu zawsze w `bledy/` jako `blad` (także gdy model zaproponuje inny folder albo typ, poza agentem marki), scala sygnatury i przy tym samym błędzie dolicza `wystapienia` |
+| licznik | przypomnienie +1 w `state/bledy-licznik.json` raz na sesję i notatkę, pod blokadą międzyprocesową, zapis atomowy (notatki pisze dalej tylko kompilacja); hub `bledy/_hub-bledy` pokazuje przy notatce wystąpienia i przypomnienia, dopisek: sumę |
+| zasiew | `wiedza.py zasiej --bledy wiedza/bledy` (instalator i `jarvo update`): notatki z repo, których skarbiec jeszcze nie dostał (`state/bledy-zasiane.json`); istniejącej nie nadpisuje, usunięta nie wraca |
+| lint | błąd: złe wyrażenie w sygnaturze, `wystapienia` nie liczbą; ostrzeżenie: brak sygnatur, kroku „Jak poprawnie” albo typu `blad` w `bledy/` |
+
+Hermes nie przepuszcza przez `transform_tool_result` wywołań zablokowanych przez strażników `pre_tool_call` (ich odmowa
+ma własną radę), więc sygnatury celują w wyniki narzędzi: odmowy Komputera (`weryfikacja_czlowieka`, `zajete`),
+komunikaty stron, telefonu, kanbana i API. Notatki księgi wracają też zwykłą drogą (przypomnienie przed turą,
+`wiedza_szukaj` z `folder: bledy`). Skill Jarva `fleet-improvement` (1.4.0) opisuje pętlę: dopisek → krok → zapis nowego
+błędu, a przegląd tygodnia bierze notatki z największą liczbą wystąpień na kandydatów do poprawki w kodzie.
 
 ---
 
@@ -553,6 +580,7 @@ Wpisy do [SOURCES.md](SOURCES.md) i [TOOLBOX.md](TOOLBOX.md) dojdą z etapem, w 
 |---|---|
 | `wiedza/wiedza.py` | narzędzie skarbca (zasiew, indeks, szukanie, szkice, orzeczenia, lint, graf, punkty zapisu, pomiar przypomnień `ocena`); importowane przez wtyczkę |
 | `wiedza/SCHEMA.md` | zasady skarbca kopiowane do `knowledge/SCHEMA.md` |
+| `wiedza/bledy/*.md` | zasiew księgi błędów (§4b): notatki `blad` z błędów floty, `zasiej --bledy` dokłada tylko nowe |
 | `scripts/build.py` → `build/wiedza/fleet.json` | dane do hubów agentów (rola, skille z opisami, skille zewnętrzne, skrypty, serwery MCP, `marka` agenta biznesowego) |
 | `scripts/install-fleet.sh` (krok „Skarbiec wiedzy”) | `zasiej` przy każdym wdrożeniu |
 | `tests/test_wiedza.py` | testy skarbca |
@@ -560,6 +588,7 @@ Wpisy do [SOURCES.md](SOURCES.md) i [TOOLBOX.md](TOOLBOX.md) dojdą z etapem, w 
 | `scripts/build.py` → `build/plugins/jarvo-wiedza/` i `config.yaml` profili | kopia wtyczki z `wiedza.py`; `memory.provider`, `plugins.enabled`, `auxiliary.jarvo_wiedza.model` i `.timeout` (180 s) w każdym profilu |
 | `scripts/install-fleet.sh` (krok „Wtyczka jarvo-wiedza”) | kopia do `<dane>/plugins/jarvo-wiedza`, dowiązanie w `<dane>/profiles/<agent>/plugins/` |
 | `tests/test_wiedza_plugin.py` | testy wtyczki na stubie `agent.memory_provider` |
+| `wiedza/plugin/ksiega_bledow.py`, `tests/test_ksiega_bledow.py` | hak `transform_tool_result` księgi błędów (§4b) i jego testy z zasiewem, lintem i kompilacją szkicu `blad` |
 | `wiedza/kompilacja.py` | kompilacja (jeden piszący): szkice → notatki głównym modelem, LOG, INDEX, punkt zapisu; CLI z `--na-sucho` |
 | `scripts/wiedza-kompiluj.sh` | ręczna kompilacja w kontenerze (profil `jarvo`, jego `auxiliary.jarvo_wiedza`) |
 | `tests/test_kompilacja.py` | testy kompilacji z podstawionym modelem |

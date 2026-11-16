@@ -3,13 +3,14 @@
 
 Skarbiec to katalog zwykłych plików Markdown (projekt: docs/WIEDZA.md). Ten skrypt:
   zasiej      katalogi, SCHEMA.md, huby (z fleet.json), INDEX, LOG, orzeczenia, docs repo i pliki profili (SOUL, README,
-              CHANGELOG, rubryka, materiały skilli, spis źródeł) → zrodla/jarvo-repo, git init, indeks i wektory
+              CHANGELOG, rubryka, materiały skilli, spis źródeł) → zrodla/jarvo-repo, księga błędów z wiedza/bledy (tylko
+              nowe notatki), git init, indeks i wektory
   indeksuj    indeks FTS5 (state/wiedza.db), INDEX.md i listy w hubach z plików (0 tokenów, deterministycznie), wektory
               nowych i zmienionych notatek (gdy działa usługa wiedza/wektory.py)
   szukaj      wyszukiwanie po polsku (ogonki bez znaczenia, aliasy notatek): wektory (albo hybryda z BM25, --silnik),
               a bez usługi wektorów same słowa (BM25); wynik: ścieżka · streszczenie
   czytaj      cała notatka
-  zapisz      szkic do skrzynka/ (agent nie pisze notatek sam: zasada 9 schematu)
+  zapisz      szkic do skrzynka/ (agent nie pisze notatek sam: zasada 9 schematu); typ blad z --sygnatura
   orzeczenie  jedna datowana linia w orzeczenia/<kogo>.md (tylko od człowieka)
   lint        raport LINT.md (martwe linki, sieroty, brak źródła, sekrety, duplikaty, przeterminowane…)
   graf        węzły i linki jako JSON (zakładka „Wiedza”)
@@ -85,12 +86,12 @@ DOMYSLNY_SKARBIEC = _domyslny_skarbiec()
 
 FOLDERY = ("zrodla/rozmowy", "zrodla/karty", "zrodla/pliki", "zrodla/jarvo-repo", "skrzynka/zrobione", "agenci",
            "projekty", "brands", "inspiracje/strony", "user", "podmioty", "pojecia", "orzeczenia/marki", "rozmowy", "fleet",
-           "briefy")
+           "briefy", "bledy")
 # folder → (nazwa pliku huba, tytuł)
 HUBY = {"": ("_hub-skarbiec", "Skarbiec wiedzy"), "agenci": ("_hub-agenci", "Agenci"), "projekty": ("_hub-projekty", "Projekty"),
         "brands": ("_hub-marki", "Marki"), "inspiracje": ("_hub-inspiracje", "Inspiracje"), "user": ("_hub-ty", "Ty"),
         "podmioty": ("_hub-podmioty", "Podmioty"), "pojecia": ("_hub-pojecia", "Pojęcia"), "orzeczenia": ("_hub-orzeczenia", "Orzeczenia"),
-        "rozmowy": ("_hub-rozmowy", "Rozmowy"), "briefy": ("_hub-briefy", "Briefy")}
+        "rozmowy": ("_hub-rozmowy", "Rozmowy"), "briefy": ("_hub-briefy", "Briefy"), "bledy": ("_hub-bledy", "Księga błędów")}
 OPISY_FOLDEROW = {
     "agenci": "Jeden katalog na agenta: hub (rola, skille, skrypty z `fleet.yaml`) i notatki o tym, czego się nauczył.",
     "projekty": "Jedna notatka na misję albo projekt: stan, decyzje, wyniki (linki do plików), marka, agenci.",
@@ -104,6 +105,9 @@ OPISY_FOLDEROW = {
     "rozmowy": "Skompilowane ustalenia z rozmów i kart: decyzje, fakty, pliki. Surowe wyciągi leżą w `zrodla/rozmowy/`.",
     "briefy": ("Poranne briefy (`B-RRRR-MM-DD`) i przeglądy tygodnia (`T-RRRR-Wtt`) z treścią i tabelą decyzji: odpowiedź "
                "właściciela, kiedy, co z nią zrobiono. Pisze skrypt `briefy.py`, odpowiedzi dopisuje Jarvo."),
+    "bledy": ("Księga błędów: jedna notatka na rodzaj błędu narzędzia albo pracy, z sygnaturami (dosłowne fragmenty "
+              "komunikatu), objawem, przyczyną, krokiem „jak poprawnie” i licznikiem wystąpień. Gdy wynik narzędzia ma "
+              "sygnaturę, wtyczka dopisuje pod nim „To już było” z tym krokiem."),
 }
 POZA_WYSZUKIWANIEM = ("zrodla/", "skrzynka/")          # domyślnie nie wracają w wynikach (surowe i szkice)
 LUSTRO_REPO = "zrodla/jarvo-repo"                     # kopia repo przy wdrożeniu: poza wyszukiwaniem, ale w grafie
@@ -111,7 +115,8 @@ LUSTRO_KATALOGI = ("profiles", "shared", "vendor")     # podkatalogi z `--repo` 
 PLIKI_SPECJALNE = {"INDEX.md", "LOG.md", "LINT.md", "SCHEMA.md"}
 # własne formaty (brand kit, karta strony referencyjnej z DESIGN.md dembrandta, USER.md, źródła, szkice, archiwum briefów)
 BEZ_FRONTMATTERU = ("brands/", "inspiracje/", "user/", "zrodla/", "skrzynka/", "briefy/")
-TYPY = {"hub", "agent", "projekt", "podmiot", "pojecie", "fakt", "decyzja", "lekcja", "zrodlo", "rozmowa", "orzeczenia", "skill"}
+TYPY = {"hub", "agent", "projekt", "podmiot", "pojecie", "fakt", "decyzja", "lekcja", "zrodlo", "rozmowa", "orzeczenia", "skill",
+        "blad"}
 STATUSY = {"aktualna", "do-sprawdzenia", "sprzeczna", "przestarzala", "generowane"}
 WYMAGANE = ("typ", "utworzono", "zmieniono", "status")
 BEZ_ZRODLA = {"hub", "agent", "orzeczenia", "skill"}         # generowane z repo i floty (linki robi zasiew)
@@ -188,9 +193,18 @@ PLIK_ZAMKA = "wiedza.zamek"
 BLOKADA_STARA_S = 2 * 3600         # starszy znacznik to resztka po awarii (jak w install_fleet.py)
 LINT_JSON = "wiedza-lint.json"     # state/: podsumowanie ostatniego lintu dla `jarvo doctor` i statusu
 # agent biznesowy (pole `marka` we fleet.yaml, docs/WIEDZA.md „Agenci biznesowi”): w skarbcu widzi tylko swoją markę,
-# siebie, wiedzę o flocie i inspiracje; reszta (projekty, rozmowy, user, inne marki, inni agenci) nie dla niego
-WSPOLNE_DLA_MAREK = ("fleet/", "inspiracje/")
+# siebie, wiedzę o flocie, inspiracje i księgę błędów; reszta (projekty, rozmowy, user, inne marki, inni agenci) nie dla niego
+WSPOLNE_DLA_MAREK = ("fleet/", "inspiracje/", "bledy/")
 MARKA_RE = re.compile(r"[a-z0-9][a-z0-9-]*")
+# księga błędów (docs/WIEDZA.md §4b): notatka `bledy/<tytuł>` typu `blad` z sygnaturami; wtyczka dopisuje jej krok „jak
+# poprawnie” pod wynikiem narzędzia z sygnaturą (hak transform_tool_result), licznik przypomnień w state/
+KSIEGA = "bledy"
+LICZNIK_BLEDOW = "bledy-licznik.json"     # state/: notatka → {"przypomnien", "ostatnio"} (pisze wtyczka pod blokadą)
+ZASIANE_BLEDY = "bledy-zasiane.json"      # state/: notatki z zasiewu repo (`wiedza/bledy/`): usunięta nie wraca
+MAX_SYGNATUR = 12
+MAX_ZNAKOW_SYGNATURY = 200
+JAK_POPRAWNIE_RE = re.compile(r"^\W*jak poprawnie\W*?:\**[ \t]*(.+?)\s*(?=\n\s*\n|\n\W*(?:objaw|przyczyna)\W*?:|\n#|\Z)",
+                              re.I | re.M | re.S)
 
 
 def dzis() -> str:
@@ -436,9 +450,17 @@ def podziel(text: str) -> tuple[dict, str]:
     return fm, tresc
 
 
+_ELEMENT_LISTY_RE = re.compile(r'\s*("(?:[^"\\]|\\.)*"|\'[^\']*\'|[^,]*)\s*(?:,|$)')
+
+
+def _elementy_listy(wnetrze: str) -> list[str]:
+    """Elementy listy `[a, "b, c", 'd']` (bez nawiasów): przecinek w cudzysłowie nie dzieli elementu (sygnatury błędów)."""
+    return [e for e in (m.group(1).strip() for m in _ELEMENT_LISTY_RE.finditer(wnetrze)) if e]
+
+
 def _wartosc(v: str):
     if v.startswith("[") and v.endswith("]"):
-        return [_wartosc(x) if x[0] in "'\"" else x for x in (e.strip() for e in v[1:-1].split(",")) if x]
+        return [_wartosc(x) if x[0] in "'\"" else x for x in _elementy_listy(v[1:-1])]
     if len(v) >= 2 and v[0] == v[-1] == '"':
         return re.sub(r'\\(["\\])', r"\1", v[1:-1])   # odwrotność `_w_cudzyslow`
     if len(v) >= 2 and v[0] == v[-1] == "'":
@@ -473,7 +495,7 @@ def zly_naglowek(text: str) -> str:
         if not sep or not v or v[0] in "'\"" or v in ("|", ">", "|-", ">-"):
             continue
         if v.startswith("[") and v.endswith("]"):
-            elementy = [x.strip() for x in v[1:-1].split(",") if x.strip()]
+            elementy = _elementy_listy(v[1:-1])
             if any(x[0] not in "'\"" and not goly_yaml(x, w_liscie=True) for x in elementy):
                 return linia
         elif not goly_yaml(v):
@@ -1330,6 +1352,133 @@ def ocena(ix: Indeks, zestaw: list, limit: int = 5, wektory=None, silnik: str | 
             "ms_mediana": round(mediana, 1), "ms_max": max(czasy, default=0.0), "silniki": silniki, "pytania": pytania}
 
 
+# ------------------------------------------------------------------------------------------------ księga błędów
+
+_ZNAKI_KOMUNIKATU = str.maketrans({"’": "'", "‘": "'", "ʼ": "'", "“": '"', "”": '"', "„": '"', "«": '"', "»": '"'})
+
+
+def norm_komunikatu(s: str) -> str:
+    """Tekst do porównania z sygnaturą: typograficzne apostrofy i cudzysłowy jak proste, białe znaki pojedynczo, małe
+    litery. Ogonki zostają: „zajęte” na stronie to nie kod odmowy `zajete`."""
+    return " ".join(str(s or "").translate(_ZNAKI_KOMUNIKATU).split()).casefold()
+
+
+def wzorzec_sygnatury(s: str) -> re.Pattern | None:
+    """Sygnatura notatki księgi błędów: `/…/` = wyrażenie regularne, inne = dosłowny fragment komunikatu; oba
+    sprawdzane na tekście po `norm_komunikatu` (małe litery, pojedyncze spacje). None = pusta albo błędne wyrażenie."""
+    s = str(s or "").strip()
+    if len(s) > 2 and s[0] == s[-1] == "/":
+        try:
+            return re.compile(s[1:-1], re.I)
+        except re.error:
+            return None
+    s = norm_komunikatu(s)
+    return re.compile(re.escape(s)) if s else None
+
+
+def _lista_fm(v) -> list[str]:
+    lista = v if isinstance(v, list) else [v] if isinstance(v, str) else []
+    return [str(x).strip() for x in lista if str(x).strip()]
+
+
+def sygnatury(fm: dict) -> list[str]:
+    """Pole `sygnatury:` notatki albo szkicu (lista albo jeden tekst), najwyżej MAX_SYGNATUR po MAX_ZNAKOW_SYGNATURY."""
+    return [s[:MAX_ZNAKOW_SYGNATURY] for s in _lista_fm(fm.get("sygnatury"))][:MAX_SYGNATUR]
+
+
+def wystapienia(fm: dict) -> int:
+    try:
+        return max(0, int(str(fm.get("wystapienia") or 0)))
+    except ValueError:
+        return 0
+
+
+def jak_poprawnie(tresc: str) -> str:
+    """Akapit „Jak poprawnie: …” notatki błędu w jednej linii, bez pogrubień i z etykietami zamiast linków (kod w `…`
+    zostaje, bo to nazwy narzędzi i poleceń); pusto, gdy go nie ma."""
+    m = JAK_POPRAWNIE_RE.search(tresc or "")
+    if not m:
+        return ""
+    t = LINK_RE.sub(lambda l: (l.group(3) or l.group(1)).strip(), m.group(1))
+    return " ".join(t.replace("**", "").split())
+
+
+def licznik_bledow(stan: str | Path) -> dict:
+    """state/bledy-licznik.json: notatka → {"przypomnien": n, "ostatnio": "RRRR-MM-DD GG:MM"}; {} bez pliku."""
+    try:
+        d = json.loads((Path(stan) / LICZNIK_BLEDOW).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+def wpisy_ksiegi(sk: Skarbiec) -> list[dict]:
+    """Notatki księgi błędów do dopasowania wyników narzędzi (bez huba, bez `przestarzala`, z choć jedną poprawną
+    sygnaturą): ścieżka, tytuł, krok „jak poprawnie” (bez niego streszczenie), wystąpienia, wzorce, narzędzia.
+    Same pliki, bez indeksu: wtyczka czyta to w milisekundach."""
+    out = []
+    for p in sorted((sk.root / KSIEGA).glob("*.md")):
+        if p.stem.startswith("_hub-"):
+            continue
+        rel = sk.rel(p)
+        try:
+            n = sk.wczytaj(rel)
+        except (OSError, ValueError):
+            continue
+        if str(n.fm.get("status") or "") == "przestarzala":
+            continue
+        wzorce = [w for w in (wzorzec_sygnatury(s) for s in sygnatury(n.fm)) if w]
+        if wzorce:
+            out.append({"sciezka": rel, "tytul": n.tytul, "jak": jak_poprawnie(n.tresc) or n.streszczenie,
+                        "wystapienia": wystapienia(n.fm), "wzorce": wzorce, "narzedzia": _lista_fm(n.fm.get("narzedzia"))})
+    return out
+
+
+def lint_bledu(n: Notatka) -> tuple[list[str], list[str]]:
+    """(błędy, ostrzeżenia) notatki księgi błędów: błędne wyrażenie w sygnaturze i nieliczbowe `wystapienia` to błąd
+    (wtyczka by ich nie użyła), brak sygnatur, kroku „Jak poprawnie” albo typu `blad` to ostrzeżenie."""
+    bledy, ostrz = [], []
+    syg = sygnatury(n.fm)
+    bledy += [f"błędne wyrażenie w sygnaturze `{s[:60]}`" for s in syg if wzorzec_sygnatury(s) is None]
+    v = n.fm.get("wystapienia")
+    if v not in (None, "") and not str(v).isdigit():
+        bledy.append(f"`wystapienia: {v}` nie jest liczbą")
+    if not syg:
+        ostrz.append("błąd bez sygnatur (wtyczka nie przypomni go pod wynikiem narzędzia)")
+    if not jak_poprawnie(n.tresc):
+        ostrz.append("błąd bez akapitu „Jak poprawnie:”")
+    if n.typ != "blad":
+        ostrz.append(f"w księdze błędów typ `{n.typ}` zamiast `blad`")
+    return bledy, ostrz
+
+
+def zasiej_bledy(sk: Skarbiec, katalog: Path | None) -> int:
+    """Notatki księgi błędów z repo (`wiedza/bledy/*.md`) do `bledy/`: tylko te, których skarbiec jeszcze nie dostał
+    (state/bledy-zasiane.json), i nigdy w miejsce istniejącej notatki; usunięta przez kompilację albo człowieka nie
+    wraca przy następnym wdrożeniu. Zwraca liczbę nowych notatek."""
+    if not katalog or not katalog.is_dir():
+        return 0
+    plik = sk.stan / ZASIANE_BLEDY
+    try:
+        zasiane = set(json.loads(plik.read_text(encoding="utf-8")))
+    except (OSError, ValueError, TypeError):
+        zasiane = set()
+    nowe = 0
+    for p in sorted(katalog.glob("*.md")):
+        rel = f"{KSIEGA}/{unicodedata.normalize('NFC', p.stem)}"
+        if rel in zasiane:
+            continue
+        if not sk.istnieje(rel):
+            sk.zapisz_plik(rel, p.read_text(encoding="utf-8"))
+            nowe += 1
+        zasiane.add(rel)
+    sk.stan.mkdir(parents=True, exist_ok=True)
+    tresc = json.dumps(sorted(zasiane), ensure_ascii=False, indent=1) + "\n"
+    if not plik.is_file() or plik.read_text(encoding="utf-8") != tresc:
+        plik.write_text(tresc, encoding="utf-8", newline="\n")
+    return nowe
+
+
 # ------------------------------------------------------------------------------------------------ INDEX.md i listy hubów
 
 def zbuduj_index(sk: Skarbiec, ix: Indeks) -> int:
@@ -1360,9 +1509,20 @@ def zbuduj_index(sk: Skarbiec, ix: Indeks) -> int:
     return n
 
 
+def _wiersz_bledu(sk: Skarbiec, r: dict, licznik: dict) -> str:
+    """Wiersz huba księgi błędów: link, wystąpienia z notatki (zgłoszenia i zasiew) i przypomnienia wtyczki ze state/."""
+    try:
+        n = wystapienia(sk.wczytaj(r["sciezka"]).fm)
+    except (OSError, ValueError):
+        n = 0
+    lic = licznik.get(r["sciezka"]) if isinstance(licznik.get(r["sciezka"]), dict) else {}
+    przyp = f" · przypomniano: {lic.get('przypomnien', 0)} (ostatnio {lic.get('ostatnio', '?')})" if lic.get("przypomnien") else ""
+    return f"- [[{r['sciezka']}|{r['tytul']}]] · wystąpień: {n}{przyp}"
+
+
 def odswiez_listy_hubow(sk: Skarbiec, ix: Indeks) -> int:
     """Blok `lista` w hubie folderu (i w hubie agenta albo marki agenta biznesowego, `brands/<marka>/_hub-<marka>`):
-    linki do wszystkich notatek folderu, 0 tokenów."""
+    linki do wszystkich notatek folderu, 0 tokenów. Hub księgi błędów ma przy notatce liczniki zamiast streszczenia."""
     notatki = [r for r in ix.notatki() if not r["hub"]]
     ile = 0
     for folder, (hub, _t) in HUBY.items():
@@ -1373,6 +1533,9 @@ def odswiez_listy_hubow(sk: Skarbiec, ix: Indeks) -> int:
             continue
         if folder == "agenci":
             wiersze = [f"- [[{r['sciezka']}|{r['tytul']}]]" for r in ix.notatki() if r["hub"] and r["sciezka"].startswith("agenci/") and r["sciezka"].count("/") == 2]
+        elif folder == KSIEGA:
+            licznik = licznik_bledow(sk.stan)
+            wiersze = [_wiersz_bledu(sk, r, licznik) for r in notatki if r["sciezka"].startswith(folder + "/")]
         else:
             wiersze = [f"- [[{r['sciezka']}|{r['tytul']}]]" + (f" · {r['streszczenie'][:90]}" if r["streszczenie"] else "")
                        for r in notatki if r["sciezka"].startswith(folder + "/")]
@@ -1515,11 +1678,12 @@ def zasiej_marke(sk: Skarbiec, marka: str, a: dict, hub_agenta_rel: str) -> None
                                   f"## Powiązane\n- hub: [[orzeczenia/_hub-orzeczenia|Orzeczenia]]\n- [[{hub}|Marka {marka}]]\n\n## Linie\n"))
 
 
-def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | None, repo: Path | None = None) -> dict:
+def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | None, repo: Path | None = None,
+           bledy: Path | None = None) -> dict:
     sk.root.mkdir(parents=True, exist_ok=True)
     for f in FOLDERY:
         (sk.root / f).mkdir(parents=True, exist_ok=True)
-    raport = {"huby": 0, "agenci": 0, "skille": 0, "docs": 0, "repo": 0, "git": False}
+    raport = {"huby": 0, "agenci": 0, "skille": 0, "docs": 0, "repo": 0, "bledy": 0, "git": False}
     w_lustrze: set[str] = set()
     if repo and repo.is_dir():
         raport["repo"], w_lustrze = zasiej_lustro(sk, repo)
@@ -1641,6 +1805,7 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
         sk.zapisz_plik("fleet/lekcje", sklej(_hub_frontmatter("lekcja", "przegląd tygodnia (skill fleet-improvement)"),
                                              "# Księga lekcji floty\n\n**Obserwacje z recenzji sędziego: jedna linia = jedna sprawdzalna reguła z licznikiem potwierdzeń.**\n\n"
                                              "## Powiązane\n- hub: [[agenci/_hub-agenci|Agenci]]\n"))
+    raport["bledy"] = zasiej_bledy(sk, bledy)            # księga błędów z repo: nowe notatki, istniejących nie rusza
     if docs and docs.is_dir():
         katalog_docs = sk.root / LUSTRO_REPO
         nazwy = set()
@@ -1667,7 +1832,8 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
         (sk.root / "LINT.md").write_text("# Lint skarbca\n\n_Jeszcze nie uruchomiono `wiedza.py lint`._\n", encoding="utf-8",
                                          newline="\n")
     sk.dopisz_log("zasiew", f"huby: {raport['huby']} folderów, {raport['agenci']} agentów; skille: {raport['skille']} zmienionych; "
-                            f"docs repo: {raport['docs']} plików; pliki profili: {raport['repo']} zmienionych")
+                            f"docs repo: {raport['docs']} plików; pliki profili: {raport['repo']} zmienionych; "
+                            f"księga błędów: {raport['bledy']} nowych")
     raport["git"] = sk.git_init() and sk.punkt_zapisu("zasiew skarbca")
     return raport
 
@@ -1675,22 +1841,38 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
 # ------------------------------------------------------------------------------------------------ szkice i orzeczenia
 
 def zapisz_szkic(sk: Skarbiec, typ: str, tytul: str, tresc: str, zrodlo: str, agent: str = "", tagi: list | None = None,
-                 linki: list | None = None, skad: str = "", marka: str = "") -> str:
+                 linki: list | None = None, skad: str = "", marka: str = "", sygnatury_bledu: list | None = None) -> str:
     """Szkic w skrzynka/. `marka`: szkic agenta biznesowego (kompilacja kładzie notatki tylko w `brands/<marka>/` albo
-    `agenci/<agent>/`)."""
+    `agenci/<agent>/`). Typ `blad` (księga błędów) wymaga sygnatur (dosłowne fragmenty komunikatu albo `/wyrażenie/`)
+    i akapitu „Jak poprawnie:” w treści."""
     if typ not in TYPY - {"hub", "orzeczenia"}:
         raise ValueError(f"typ spoza schematu: {typ} (dozwolone: {', '.join(sorted(TYPY - {'hub', 'orzeczenia'}))})")
     if not tytul.strip() or not tresc.strip():
         raise ValueError("szkic musi mieć tytuł i treść")
     if not zrodlo.strip():
         raise ValueError("szkic musi mieć źródło (karta, rozmowa, plik, adres)")
-    sekret = zawiera_sekret(tytul + "\n" + tresc)
+    syg = sygnatury({"sygnatury": list(sygnatury_bledu or [])})
+    sekret = zawiera_sekret("\n".join([tytul, tresc, *syg]))
     if sekret:
         raise ValueError(f"szkic zawiera sekret ({sekret}); sekrety nigdy nie trafiają do skarbca")
+    if typ == "blad":
+        if not syg:
+            raise ValueError("szkic błędu (typ blad) musi mieć `sygnatury`: dosłowne fragmenty komunikatu z wyniku narzędzia "
+                             "(np. „We couldn't verify you're human”) albo wyrażenie `/…/`")
+        zle = [s for s in syg if wzorzec_sygnatury(s) is None]
+        if zle:
+            raise ValueError(f"błędne wyrażenie w sygnaturach: {zle[0]} (popraw albo podaj dosłowny fragment)")
+        if not jak_poprawnie(tresc):
+            raise ValueError("szkic błędu (typ blad) ma treść w trzech akapitach: „Objaw: …”, „Przyczyna: …”, "
+                             "„Jak poprawnie: …” (konkretny następny krok)")
+    elif syg:
+        raise ValueError("`sygnatury` ma tylko szkic błędu (typ blad)")
     skrot = hashlib.sha1(f"{tytul}{tresc}{dzis()}".encode()).hexdigest()[:6]
     rel = f"skrzynka/{dzis()}-{slug_ascii(agent or 'agent', 16)}-{slug_ascii(tytul)}-{skrot}"
     fm = {"szkic": True, "typ": typ, "tytul": tytul.strip(), "agent": agent or "", "zrodlo": zrodlo.strip(), "utworzono": dzis(),
           "skad": skad or "", "tagi": tagi or [], "linki": linki or []}
+    if syg:
+        fm["sygnatury"] = syg
     if marka:
         fm["marka"] = marka
     sk.zapisz_plik(rel, sklej(fm, f"# {tytul.strip()}\n\n{tresc.strip()}\n"))
@@ -1798,6 +1980,10 @@ def lint(sk: Skarbiec, ix: Indeks) -> dict:
                 ostrz.append(f"za długa ({n.slowa} słów, limit {limit}): [[{rel}]]")
             if not r["hub"] and not n.streszczenie:
                 ostrz.append(f"bez streszczenia (pierwszy akapit po tytule): [[{rel}]]")
+            if not r["hub"] and rel.startswith(KSIEGA + "/"):
+                bledy_k, ostrz_k = lint_bledu(n)
+                bledy += [f"{b}: [[{rel}]]" for b in bledy_k]
+                ostrz += [f"{o}: [[{rel}]]" for o in ostrz_k]
         if not r["hub"] and not wlasny_format and n.typ not in BEZ_ZRODLA and rel != "fleet/lekcje":
             reczne = [(c, a) for c, _e, a in n.linki if not a]
             cele = [sk.rozwiaz(c, znane, zbior) for c, _a in reczne]
@@ -1949,6 +2135,8 @@ def main(argv: list[str] | None = None) -> int:
     z.add_argument("--docs", help="katalog docs/ repo → zrodla/jarvo-repo/")
     z.add_argument("--repo", help="wiedza/repo z buildu (pliki profili, materiały skilli, spis źródeł) → zrodla/jarvo-repo/")
     z.add_argument("--schema", default=str(Path(__file__).with_name("SCHEMA.md")), help="SCHEMA.md do skopiowania")
+    z.add_argument("--bledy", help="wiedza/bledy z repo: notatki księgi błędów do bledy/ (tylko nowe, istniejących nie "
+                                   "rusza, usunięta nie wraca)")
     i = sub.add_parser("indeksuj", help="indeks FTS5 + INDEX.md + listy hubów")
     i.add_argument("--pelny", action="store_true")
     s = sub.add_parser("szukaj", help="wyszukiwanie")
@@ -1971,6 +2159,8 @@ def main(argv: list[str] | None = None) -> int:
     w.add_argument("--tagi", default="")
     w.add_argument("--linki", default="")
     w.add_argument("--skad", default="")
+    w.add_argument("--sygnatura", action="append", default=[],
+                   help="typ blad: dosłowny fragment komunikatu albo /wyrażenie/ (można kilka razy)")
     o = sub.add_parser("orzeczenie", help="jedna datowana linia korekty od człowieka")
     o.add_argument("--kogo", required=True, help="wszyscy | <agent> | marki/<marka>")
     o.add_argument("--tresc", required=True)
@@ -1994,7 +2184,7 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "zasiej":
         fleet = json.loads(Path(a.fleet).read_text(encoding="utf-8")) if a.fleet else None
         r = zasiej(sk, fleet, Path(a.docs) if a.docs else None, Path(a.schema) if a.schema else None,
-                   Path(a.repo) if a.repo else None)
+                   Path(a.repo) if a.repo else None, Path(a.bledy) if a.bledy else None)
         ix = Indeks(sk)
         ix.odswiez(pelny=True)
         n = zbuduj_index(sk, ix)
@@ -2002,7 +2192,7 @@ def main(argv: list[str] | None = None) -> int:
         ix.odswiez()
         sk.punkt_zapisu("zasiew skarbca: indeks")
         print(f"✓ zasiew: {r['huby']} hubów folderów, {r['agenci']} hubów agentów, {r['skille']} skilli zmienionych, {r['docs']} docs, "
-              f"indeks {n} notatek, git: {'tak' if r['git'] else 'nie'}")
+              f"księga błędów {r['bledy']} nowych, indeks {n} notatek, git: {'tak' if r['git'] else 'nie'}")
         print(opis_wektorow(ix.odswiez_wektory(KlientWektorow(sk.stan, WEKTORY_CZAS_ZAPISU_S))))
         ix.zamknij()
         return 0
@@ -2042,7 +2232,7 @@ def main(argv: list[str] | None = None) -> int:
             tresc = a.tresc if a.tresc is not None else sys.stdin.read()
             try:
                 rel = zapisz_szkic(sk, a.typ, a.tytul, tresc, a.zrodlo, a.agent, [t.strip() for t in a.tagi.split(",") if t.strip()],
-                                   [x.strip() for x in a.linki.split(",") if x.strip()], a.skad)
+                                   [x.strip() for x in a.linki.split(",") if x.strip()], a.skad, sygnatury_bledu=a.sygnatura)
             except ValueError as e:
                 print(f"✗ {e}", file=sys.stderr)
                 return 3

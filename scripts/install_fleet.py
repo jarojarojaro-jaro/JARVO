@@ -17,7 +17,8 @@ Kroki (numeracja jak w install-fleet.sh):
       np. jarvo-operator po 2026-11-14) przeniesione do <dane>/profiles/.usuniete/<agent>-<RRRR-MM-DD> (nazwa z kropką:
       Hermes nie widzi jej jako profilu; dane zostają, nic nie kasujemy), katalogi floty, szablony wiedzy (INDEX.md
       misji, USER.md, brands/_szablon),
-  1b. skarbiec wiedzy (K02): `wiedza.py zasiej` (huby z build/wiedza, docs repo, indeks, punkt zapisu git) pod
+  1b. skarbiec wiedzy (K02): `wiedza.py zasiej` (huby z build/wiedza, docs repo, nowe notatki księgi błędów z
+      wiedza/bledy, indeks, punkt zapisu git) pod
       blokadą kompilacji `state/wiedza.lock` (ten sam plik i format co wiedza/kompilacja.py: PID i czas), w niej
       lint informacyjny (`lint --json`; błędy idą do logu i podsumowania, nie zatrzymują instalacji),
   2.  profil hosta: scalenie config.yaml (merge_host_config.py; --first-run wymusza model floty), SOUL.md, host.env,
@@ -691,7 +692,8 @@ class Flota:
                 self.uwaga("kompilacja skarbca trwa dłużej niż limit: zasiew pominięty, zrobi go następne wdrożenie")
                 return
             kod, ogon = self.uruchom([*baza, "zasiej", "--fleet", self.build / "wiedza" / "fleet.json",
-                                      "--docs", self.repo / "docs", "--repo", self.build / "wiedza" / "repo"],
+                                      "--docs", self.repo / "docs", "--repo", self.build / "wiedza" / "repo",
+                                      "--bledy", self.repo / "wiedza" / "bledy"],
                                      wciecie="  ", czas=1800)
             if kod:
                 raise BladFloty(f"zasiew skarbca nie przeszedł (kod {kod}): " + " / ".join(ogon[-3:]))

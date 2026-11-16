@@ -1,5 +1,5 @@
 """Agent biznesowy (fleet.yaml `marka`, docs/WIEDZA.md „Agenci biznesowi”): w skarbcu widzi tylko `brands/<marka>/`,
-`agenci/<siebie>/`, `fleet/`, `inspiracje/` i orzeczenia swoje, swojej marki i wszystkich. Szukanie (słowa i wektory),
+`agenci/<siebie>/`, `fleet/`, `inspiracje/`, księgę błędów `bledy/` i orzeczenia swoje, swojej marki i wszystkich. Szukanie (słowa i wektory),
 czytanie, przypomnienia, szkice, orzeczenia, strażnik narzędzi plików i kompilacja; agent bez marki widzi wszystko."""
 import importlib.util
 import json
@@ -50,7 +50,7 @@ def _agent(name, short, **extra):
 
 FLEET = {"orchestrator": "jarvo", "agents": [_agent("jarvo", "Jarvo"), _agent("jarvo-web", "Web"),
                                              _agent("jarvo-sklep", "Sklep", marka="sklep", handle="sklep")]}
-ZAKRES = ("brands/sklep/", "agenci/jarvo-sklep/", "fleet/", "inspiracje/", "orzeczenia/sklep", "orzeczenia/marki/sklep",
+ZAKRES = ("brands/sklep/", "agenci/jarvo-sklep/", "fleet/", "inspiracje/", "bledy/", "orzeczenia/sklep", "orzeczenia/marki/sklep",
           "orzeczenia/wszyscy")
 
 

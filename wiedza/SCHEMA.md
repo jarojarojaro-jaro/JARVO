@@ -53,6 +53,7 @@ i człowiek. Pełny projekt: `docs/WIEDZA.md` w repo (kopia w `zrodla/jarvo-repo
 | `fleet/lekcje.md` | księga lekcji floty (skill `fleet-improvement`) | linkowana z hubów agentów |
 | `fleet/arsenal.md` | arsenał floty: jedna linia na zasób (sprzęt, maszyny, konta, narzędzia), kiedy i jak go użyć; sekcja „## Zasoby” trafia do stałego bloku promptu każdego agenta i sesji Kernel; dopisuje Jarvo po udanej próbie (skill `skrzynka-linkow`), kompilacja go nie nadpisuje | linkowana z `_hub-skarbiec` |
 | `fleet/skille/` | jeden węzeł na skill floty (własny i wspólny), generowany przy zasiewie z repo: opis, agenci, powiązane skille, skrypty, materiały; nie edytuj, poza domyślnym szukaniem (`folder=fleet`) | linkowane z hubów agentów |
+| `bledy/` | księga błędów: jedna notatka (typ `blad`) na rodzaj błędu narzędzia albo pracy agenta, z sygnaturami, objawem, przyczyną, krokiem „jak poprawnie” i licznikiem wystąpień (format niżej); wtyczka dopisuje ten krok pod wynikiem narzędzia z sygnaturą; zasiew z repo dokłada tylko nowe notatki | `bledy/_hub-bledy` |
 
 Pliki specjalne w korzeniu: `_hub-skarbiec.md` (strona główna), `INDEX.md` (generowany), `LOG.md` (tylko dopisywanie),
 `LINT.md` (ostatni raport), `SCHEMA.md` (ten plik). Bloki `<!-- Jarvo:GEN … -->` w hubach są generowane: nie edytuj ich ręcznie.
@@ -61,7 +62,7 @@ Pliki specjalne w korzeniu: `_hub-skarbiec.md` (strona główna), `INDEX.md` (ge
 
 ```markdown
 ---
-typ: fakt              # hub | agent | projekt | podmiot | pojecie | fakt | decyzja | lekcja | zrodlo | rozmowa | skill (tylko zasiew)
+typ: fakt              # hub | agent | projekt | podmiot | pojecie | fakt | decyzja | lekcja | blad | zrodlo | rozmowa | skill (tylko zasiew)
 tagi: [web, wydajnosc]
 utworzono: 2026-09-30
 zmieniono: 2026-09-30
@@ -88,6 +89,24 @@ Linki: `[[ścieżka w skarbcu bez .md|etykieta]]`; sama nazwa pliku też działa
 `[właściciel, szef]`, dla klienta jego skrót. Gdy alias pada w pytaniu (także w odmianie: „szefa”, „szefowej”), szukanie
 dopisuje do pytania tytuł tej notatki, więc przypomnienie trafia w podmiot, choć pytanie go nie nazywa. Aliasy pisze
 człowiek albo kompilacja (tylko dla podmiotów i notatek w `user/`, przy aktualizacji dopisuje nowe).
+
+## Błąd (księga błędów `bledy/`)
+
+Notatka typu `blad` ma dodatkowo `sygnatury:` (najwyżej 12: dosłowne krótkie fragmenty komunikatu z wyniku narzędzia, bez
+danych osób i sekretów, albo wyrażenie regularne w `/…/`; wielkość liter i odstępy bez znaczenia, ogonki tak),
+`wystapienia:` (liczba zgłoszeń; kompilacja dolicza 1 przy każdym nowym szkicu tego błędu), opcjonalnie `narzedzia:`
+(sygnatury sprawdzane tylko w wynikach tych narzędzi, `mcp__phone__*` = przedrostek) i `karta:`. Treść w trzech akapitach:
+
+```markdown
+**Objaw:** co pokazało narzędzie i kiedy (data, karta).
+
+**Przyczyna:** dlaczego.
+
+**Jak poprawnie:** konkretny następny krok przy tym komunikacie (to zdanie wtyczka dopisuje pod wynikiem narzędzia).
+```
+
+Agent zgłasza błąd szkicem: `wiedza_zapisz` z `typ: blad`, `sygnatury` i treścią w tych akapitach (CLI: `wiedza.py zapisz
+--typ blad --sygnatura "…"`). Przypomnienia wtyczki liczy `state/bledy-licznik.json`; hub księgi pokazuje obie liczby.
 
 ## Orzeczenie
 

@@ -68,8 +68,9 @@ PELNA_TRESC_KANDYDATOW = 2
 MAX_ORZECZEN = 20                   # ostatnie orzeczenia z pliku (wszyscy, agent) w prompcie kompilacji
 PODOBNY_TYTUL = 0.75                # Jaccard rdzeni słów tytułu: od tyle „nowa” obok istniejącej notatki to ta sama notatka
 MAX_LINKOW = 8
-FOLDERY_NOTATEK = ("projekty", "podmioty", "pojecia", "rozmowy", "user")     # + agenci/<agent>, brands/<marka>
-TYP_DO_FOLDERU = {"podmiot": "podmioty", "pojecie": "pojecia", "projekt": "projekty", "decyzja": "projekty", "rozmowa": "rozmowy"}
+FOLDERY_NOTATEK = ("projekty", "podmioty", "pojecia", "rozmowy", "user", "bledy")   # + agenci/<agent>, brands/<marka>
+TYP_DO_FOLDERU = {"podmiot": "podmioty", "pojecie": "pojecia", "projekt": "projekty", "decyzja": "projekty", "rozmowa": "rozmowy",
+                  "blad": "bledy"}
 
 SYSTEM = """Jesteś kompilatorem skarbca wiedzy floty agentów Jarvo: jedynym, kto pisze notatki. Dostajesz jeden szkic i istniejące
 notatki-kandydatów. Zasady skarbca:
@@ -92,14 +93,19 @@ notatki-kandydatów. Zasady skarbca:
 Szkic typu "rozmowa" (wyciąg z rozmowy albo karty) → jedna notatka w folderze rozmowy/ (co ustalono, z linkami) plus najwyżej 3
 osobne notatki dla trwałych faktów, decyzji albo lekcji, które przydadzą się poza tą rozmową. Inne szkice → zwykle 1 wynik.
 Foldery: agenci/<agent>/ (o agencie: lekcje, narzędzia), projekty/, podmioty/ (firmy, ludzie w rolach publicznych, narzędzia),
-pojecia/ (metody, definicje), rozmowy/, user/ (o użytkowniku i jego firmie), brands/<marka>/ (o marce).
+pojecia/ (metody, definicje), rozmowy/, user/ (o użytkowniku i jego firmie), brands/<marka>/ (o marce), bledy/ (księga błędów).
 Podmiot albo notatka w user/: pole "aliasy" = inne nazwy, jak ludzie o nim mówią (np. „szef”, skrót firmy), najwyżej 8;
 przy aktualizacji tylko nowe aliasy; inne typy bez aliasów.
+Szkic typu "blad" (błąd narzędzia albo pracy agenta) → typ "blad" w folderze bledy/: jedna notatka na rodzaj błędu; "tresc" w
+trzech akapitach zaczynających się od „Objaw:” (co pokazało narzędzie), „Przyczyna:” i „Jak poprawnie:” (konkretny następny
+krok, który agent zrobi przy tym komunikacie); ten sam błąd co kandydat z bledy/ (ta sama sygnatura albo przyczyna) =
+"aktualizacja" z nowym przypadkiem i datą; pole "sygnatury" = dosłowne krótkie fragmenty komunikatu (bez danych osób, adresów
+kont i sekretów), w tym te ze szkicu.
 Odpowiadasz WYŁĄCZNIE JSON bez komentarzy:
 {"wyniki": [{"decyzja": "nowa|aktualizacja|sprzecznosc|odrzuc", "sciezka": "folder/tytuł jak się mówi (nowa) albo ścieżka kandydata",
-  "typ": "fakt|decyzja|lekcja|podmiot|pojecie|projekt|rozmowa", "tytul": "…", "streszczenie": "jedno zdanie",
+  "typ": "fakt|decyzja|lekcja|podmiot|pojecie|projekt|rozmowa|blad", "tytul": "…", "streszczenie": "jedno zdanie",
   "tresc": "50–150 słów", "tagi": ["…"], "linki": ["ścieżka z listy", "…"], "wazne_do": "RRRR-MM-DD albo null", "aliasy": ["…"],
-  "powod": "jedno zdanie"}]}"""
+  "sygnatury": ["tylko typ blad"], "powod": "jedno zdanie"}]}"""
 
 
 def _json_z_odpowiedzi(text: str) -> Optional[dict]:
@@ -255,7 +261,8 @@ class Kompilacja:
                  "SZKIC" + (" (lustro pamięci: tylko fakty, których nie ma w kandydatach)" if self.lustro_pamieci(szkic) else "") + ":",
                  f"- typ proponowany: {szkic['typ']}", f"- tytuł: {szkic['tytul']}", f"- źródło: {szkic['zrodlo']}",
                  f"- skąd: {szkic.get('skad') or '-'}", f"- utworzono: {szkic.get('utworzono') or '-'}",
-                 f"- tagi: {', '.join(szkic.get('tagi') or []) or '-'}", "- treść:",
+                 f"- tagi: {', '.join(szkic.get('tagi') or []) or '-'}",
+                 *([f"- sygnatury: {' | '.join(szkic['sygnatury'])}"] if szkic.get("sygnatury") else []), "- treść:",
                  szkic["tresc"][:6000], "", "ORZECZENIA WŁAŚCICIELA (wiążące, z datą; nowsze niż notatka rozstrzygają):"]
         if marka:
             linie[1:1] = [f"Marka agenta: {marka}. Notatki tylko w folderach: "
@@ -334,6 +341,8 @@ class Kompilacja:
         wlasne = self.foldery_marki(szkic)
         if wlasne:                    # agent marki: tylko brands/<marka>/ albo agenci/<agent>/, propozycja modelu inna = marka
             return f"{folder if folder in wlasne else wlasne[0]}/{lib.nazwa_pliku(tytul)}"
+        if typ == "blad":             # błąd zawsze w księdze błędów: tam szuka go wtyczka (sygnatury pod wynikiem narzędzia)
+            return f"{lib.KSIEGA}/{lib.nazwa_pliku(tytul)}"
         dozwolony = folder in FOLDERY_NOTATEK or (folder.startswith("agenci/") and folder.count("/") == 1 and (self.sk.root / folder).is_dir()) \
             or (folder.startswith("brands/") and folder.count("/") == 1 and (self.sk.root / folder).is_dir())
         if not dozwolony:
@@ -379,6 +388,13 @@ class Kompilacja:
                     dodaj(k["sciezka"])
                     break
         return out[:MAX_LINKOW]
+
+    def _sygnatury(self, szkic: dict, wynik: dict) -> List[str]:
+        """Sygnatury błędu ze szkicu (agent) i od modelu, bez błędnych wyrażeń i sekretów."""
+        lib = self.lib
+        od_modelu = wynik.get("sygnatury") if isinstance(wynik.get("sygnatury"), list) else []
+        surowe = lib.sygnatury({"sygnatury": [*(szkic.get("sygnatury") or []), *od_modelu]})
+        return [s for s in dict.fromkeys(surowe) if lib.wzorzec_sygnatury(s) is not None and not lib.zawiera_sekret(s)]
 
     # ---- zapis
     def _tresc_notatki(self, tytul: str, streszczenie: str, tresc: str, linki: List[str], dodatek: str = "") -> str:
@@ -510,6 +526,13 @@ class Kompilacja:
         typ = str(wynik.get("typ") or szkic["typ"])
         if typ not in lib.TYPY or typ in ("hub", "orzeczenia", "zrodlo"):
             typ = szkic["typ"] if szkic["typ"] in lib.TYPY else "fakt"
+        # księga błędów: szkic typu `blad` zostaje błędem (folder bledy/, sygnatury, licznik wystąpień), choćby model dał
+        # inny typ albo inny folder; agent marki pisze go w swoich folderach (foldery_marki)
+        wlasne = self.foldery_marki(szkic)
+        if szkic["typ"] == "blad" and not wlasne:
+            typ = "blad"
+            wynik = {**wynik, "typ": "blad"}
+        syg = self._sygnatury(szkic, wynik)
         # Tagi szkicu zostają (np. `skrzynka-linkow`, `poboczny`: po nich właściciel wyciąga swoje rzeczy), kompilator dokłada swoje.
         wg_klucza: dict = {}
         for t in [*(szkic.get("tagi") or []), *(wynik.get("tagi") or [])]:
@@ -526,9 +549,9 @@ class Kompilacja:
         cel_istnieje = bool(cel) and self.sk.istnieje(cel) and not cel.startswith(("zrodla/", "skrzynka/"))
         # hubów, archiwum briefów (`briefy/`, pisze skrypt briefy.py i Jarvo w tabeli decyzji) i plików własnego formatu
         # (brand kit) nie nadpisujemy; szkic agenta marki zmienia tylko notatki w swoich folderach (foldery_marki)
-        wlasne = self.foldery_marki(szkic)
         cel_hub = cel_istnieje and (cel.rsplit("/", 1)[-1].startswith("_hub-") or cel.startswith("briefy/") or self.wlasny_format(cel)
-                                    or bool(wlasne) and not any(cel.startswith(f + "/") for f in wlasne))
+                                    or bool(wlasne) and not any(cel.startswith(f + "/") for f in wlasne)
+                                    or typ == "blad" and not wlasne and not cel.startswith(lib.KSIEGA + "/"))
         if decyzja in ("aktualizacja", "sprzecznosc") and (not cel_istnieje or cel_hub):
             decyzja = "nowa"                                         # brak celu albo cel chroniony = nowa notatka
         zakres = self.zakres(szkic)                                  # agent marki: linki tylko do jego zakresu
@@ -558,6 +581,10 @@ class Kompilacja:
                 fm["agent"] = szkic["agent"]
             if wazne_do:
                 fm["wazne_do"] = wazne_do
+            if sciezka.startswith(lib.KSIEGA + "/"):                # w księdze błędów zawsze typ `blad`
+                fm["typ"] = typ = "blad"
+            if typ == "blad":
+                fm["sygnatury"], fm["wystapienia"] = syg, 1
             if not self.na_sucho:
                 self.sk.zapisz_plik(sciezka, lib.sklej(fm, self._tresc_notatki(tytul, streszczenie, tresc, linki)))
             self.raport["nowe"] += 1
@@ -583,6 +610,13 @@ class Kompilacja:
                 fm["aliasy"] = list(dict.fromkeys([*stare_aliasy, *aliasy]))[:8]
             if wazne_do:
                 fm["wazne_do"] = wazne_do
+            if fm.get("typ") == "blad" or cel.startswith(lib.KSIEGA + "/"):
+                fm["typ"] = "blad"
+                stare_syg = lib.sygnatury(stara.fm)
+                if syg or stare_syg:
+                    fm["sygnatury"] = list(dict.fromkeys([*stare_syg, *syg]))[:lib.MAX_SYGNATUR]
+                if szkic["typ"] == "blad":                           # zgłoszony znowu: jedno wystąpienie więcej
+                    fm["wystapienia"] = max(lib.wystapienia(stara.fm), 1) + 1
             linki = self.linki(wynik, cel, kandydaci, stare=stare_linki, zakres=zakres)
             if not self.na_sucho:
                 self.sk.zapisz_plik(cel, lib.sklej(fm, self._tresc_notatki(tytul, streszczenie, tresc, linki)))
@@ -609,6 +643,7 @@ class Kompilacja:
         return {"plik": p.name, "typ": str(fm.get("typ") or "fakt"), "tytul": str(fm.get("tytul") or p.stem), "tresc": tresc,
                 "zrodlo": str(fm.get("zrodlo") or ""), "agent": str(fm.get("agent") or ""), "skad": str(fm.get("skad") or ""),
                 "utworzono": str(fm.get("utworzono") or ""), "marka": str(fm.get("marka") or ""),
+                "sygnatury": self.lib.sygnatury(fm),
                 "tagi": list(fm.get("tagi") or []) if isinstance(fm.get("tagi"), list) else [], "proby": int(fm.get("proby") or 0), "fm": fm, "body": body}
 
     def _zrobione(self, p: Path) -> None:

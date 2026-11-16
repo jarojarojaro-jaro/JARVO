@@ -769,3 +769,37 @@ def test_huby_agentow_tylko_gdy_pytanie_nazywa_agenta(srodowisko):
     assert w.hub_agenta_nazwany("agenci/jarvo-lowca/_hub-łowca", {"jarvo", "lowca"})
     assert not w.hub_agenta_nazwany("agenci/jarvo-web/_hub-web", {"strona", "seo"})
     assert "_hub-web" not in p.prefetch("strony SEO nowa strona")
+
+
+def test_ksiega_bledow_hak_i_szkic_bledu(srodowisko, monkeypatch):
+    """Księga błędów (17.11, właściciel: „ma sprawdzać sekcję błędów i uczyć się”): hak `transform_tool_result`
+    zarejestrowany, dopisuje lekcję pod odmową z sygnaturą notatki `bledy/`, sukces zostawia bez zmian, a szkic błędu
+    idzie przez wiedza_zapisz z sygnaturami."""
+    root, home, sk, p = srodowisko
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    haki = {}
+
+    class Ctx:
+        def register_memory_provider(self, provider): pass
+        def register_hook(self, nazwa, f): haki[nazwa] = f
+        def register_auxiliary_task(self, *a, **k): pass
+
+    pl.register(Ctx())
+    assert haki["transform_tool_result"] is pl.ksiega_bledow
+    assert w.zasiej_bledy(sk, REPO / "wiedza" / "bledy") >= 12
+    odmowa = json.dumps({"error": "Google: This browser or app may not be secure."})
+    nowy = pl.ksiega_bledow(tool_name="komputer", result=odmowa, status="error", session_id="sesja-k")
+    assert nowy.startswith(odmowa) and "To już było: Google nie loguje w przeglądarce Komputera" in nowy
+    assert "telefonie floty" in nowy
+    assert pl.ksiega_bledow(tool_name="komputer", result='{"ok": true}', status="ok", session_id="sesja-k") is None
+    assert pl.ksiega_bledow(tool_name="komputer", result={"error": "x"}, status="error") is None      # nie tekst: bez zmian
+    assert "księga błędów" in p.system_prompt_block() and "typ=blad" in p.system_prompt_block()
+    schemat = next(t for t in p.get_tool_schemas() if t["name"] == "wiedza_zapisz")
+    assert "blad" in schemat["parameters"]["properties"]["typ"]["enum"] and "sygnatury" in schemat["parameters"]["properties"]
+    z = json.loads(p.handle_tool_call("wiedza_zapisz", {
+        "typ": "blad", "tytul": "Npm EINTEGRITY", "zrodlo": "karta t_7", "sygnatury": ["EINTEGRITY"],
+        "tresc": "Objaw: npm EINTEGRITY.\n\nPrzyczyna: uszkodzony cache.\n\nJak poprawnie: `npm cache verify` i jedno ponowienie."}))
+    assert z["szkic"].startswith("skrzynka/")
+    assert w.podziel(sk.plik(z["szkic"]).read_text(encoding="utf-8"))[0]["sygnatury"] == ["EINTEGRITY"]
+    zle = json.loads(p.handle_tool_call("wiedza_zapisz", {"typ": "blad", "tytul": "x", "tresc": "Objaw: y.", "zrodlo": "z"}))
+    assert "sygnatury" in zle["error"]

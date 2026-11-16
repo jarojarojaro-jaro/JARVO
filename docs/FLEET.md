@@ -11,7 +11,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 
 | Agent | Main prompt | Workflowy własne | Skille zewnętrzne | Skrypty | Evals |
 |---|---|---|---|---|---|
-| `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | 22: [17 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster`, [5 w `skills/ekran/`](../profiles/jarvo/skills/ekran) | 3 (`writing-for-agents`, mattpocock; wspólne `konwersja-plikow` i `odczyt-ekranu`) | patrol, brief, przegląd, raport floty, liczby floty, świeżość, linter kontraktu, prosty polski, księga lekcji, poczekalnia skilli, wgrywanie stron, skrzynka linków, kopalnia pomysłów; wtyczka `jarvo-komputer` (stan, dziennik, oddanie ekranu; natywnie strony: idz, patrz, kroki, czekaj) + narzędzie `computer_use` Hermesa przez bramkę `komputer/jarvo_cua.py` | [55](../evals/jarvo/scenarios.yaml) |
+| `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) | 22: [17 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster`, [5 w `skills/ekran/`](../profiles/jarvo/skills/ekran) | 3 (`writing-for-agents`, mattpocock; wspólne `konwersja-plikow` i `odczyt-ekranu`) | patrol, brief, przegląd, raport floty, liczby floty, świeżość, linter kontraktu, prosty polski, księga lekcji, poczekalnia skilli, wgrywanie stron, skrzynka linków, kopalnia pomysłów; wtyczka `jarvo-komputer` (stan, dziennik, oddanie ekranu; natywnie strony: idz, patrz, kroki, czekaj) + narzędzie `computer_use` Hermesa przez bramkę `komputer/jarvo_cua.py` | [57](../evals/jarvo/scenarios.yaml) |
 | `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [9 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 18 (Hermes, marketingskills, wspólne `transkrypcja-filmu`, `konwersja-plikow`, `odczyt-ekranu` i `ostrozna-przegladarka`) | search_fanout, extract, sources (rejestr cytowań), fakty (brief do filmu) | [16](../evals/jarvo-sherlock/scenarios.yaml) |
 | `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [12 w `skills/web/`](../profiles/jarvo-web/skills/web) | 62 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólne `graf-kodu`, `izometria`, `warsztat-3d`, `konwersja-plikow` i `odczyt-ekranu`) | audit, szybki_audyt, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [21](../evals/jarvo-web/scenarios.yaml) |
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [7 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 28 (marketingskills, Anthropic, Hermes, impeccable, lemo-wake, wspólne `hooki`, `izometria`, `konwersja-plikow` i `odczyt-ekranu`) | render_html, check_media, lemo_wake | [15](../evals/jarvo-studio/scenarios.yaml) |
@@ -87,7 +87,9 @@ Wszyscy znają też **Ciebie**:
 - **skarbiec wiedzy** (`knowledge/`, projekt: [WIEDZA.md](WIEDZA.md)): notatki z linkami o Tobie, markach, projektach,
   agentach i narzędziach, orzeczenia z Twoich korekt, wyciągi z rozmów i kart. Wtyczka `jarvo-wiedza` (dostawca pamięci
   Hermesa u każdego agenta) daje przypomnienia przed turą i narzędzia `wiedza_szukaj`, `wiedza_czytaj`, `wiedza_zapisz`,
-  `wiedza_orzeczenie`; agenci zgłaszają szkice, notatki pisze kompilacja.
+  `wiedza_orzeczenie`; agenci zgłaszają szkice, notatki pisze kompilacja. Pod wynikiem narzędzia z sygnaturą znanego
+  błędu wtyczka dopisuje lekcję z **księgi błędów** (`knowledge/bledy/`: „To już było → jak poprawnie”), a nowy błąd
+  po rozwiązaniu agent zapisuje tam szkicem `typ: blad`.
 
 ---
 
@@ -102,7 +104,7 @@ Mechanizm:
 - pole `marka: <slug>` we `fleet.yaml` (slug = katalog `brands/<slug>/` w skarbcu, `[a-z0-9-]+`, tylko specjalista,
   jedna marka = jeden agent; walidator pilnuje);
 - zakres wiedzy: w skarbcu widzi `brands/<marka>/`, swoje notatki (`agenci/<profil>/`), wspólne lekcje floty
-  (`fleet/`) i `inspiracje/`, z orzeczeń swoje, swojej marki i wspólne; reszty (projekty, rozmowy, Ty, inne marki,
+  (`fleet/`), `inspiracje/` i księgę błędów (`bledy/`), z orzeczeń swoje, swojej marki i wspólne; reszty (projekty, rozmowy, Ty, inne marki,
   inni agenci) nie znajdzie, nie przeczyta i nie dostanie w przypomnieniach, a jego szkice trafiają do jego marki
   ([WIEDZA.md](WIEDZA.md)). To podział dla skupienia, nie szyfr: wszyscy agenci działają jako ten sam użytkownik
   systemu. Jarvo i Claude (operator) wiedzą wszystko; agenci bez `marka` widzą całość;
