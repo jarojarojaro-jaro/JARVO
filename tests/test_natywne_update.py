@@ -732,6 +732,25 @@ def test_aktualizacja_czeka_na_karty_w_toku(tmp_path):
     assert kod == 0 and raport["wynik"] == "zaktualizowano", log
 
 
+def test_po_kartach_czeka_lokalnie_i_pyta_github_raz(tmp_path, monkeypatch):
+    """16.11: operator ponawiał `jarvo update` co 30 s w czasie karty; każde wywołanie pytało GitHub i po 15 min
+    skończył się limit 60 zapytań na godzinę. `--po-kartach` czeka na tablicę lokalnie, a wersję sprawdza raz."""
+    u, _ = _instalacja(tmp_path)
+    inst = Instalator(u)
+    ot = _ot(tmp_path, env={aktualizacja.FAKE: str(_kod(tmp_path / "zrodlo", SHA_NOWA))},
+             moduly={"nadzorca": Nadzorca(dziala=False), "autostart": Autostart(wlaczony=False)})
+    tablica = [["t_1 jarvo: Test rejestracji"], ["t_1 jarvo: Test rejestracji"], []]
+    monkeypatch.setattr(aktualizacja, "karty_w_toku", lambda u: tablica.pop(0))
+    snu = []
+    monkeypatch.setattr(aktualizacja, "_spij", lambda s: snu.append(s))
+    zdalne = []
+    prawdziwa = aktualizacja.zdalna_wersja
+    monkeypatch.setattr(aktualizacja, "zdalna_wersja", lambda *a, **k: zdalne.append(1) or prawdziwa(*a, **k))
+    kod, raport, log = _aktualizuj(u, ot, _zaplecze(strumien=inst, przechwyc=Doctor()), po_kartach=True)
+    assert kod == 0 and raport["wynik"] == "zaktualizowano", log
+    assert zdalne == [1] and snu.count(aktualizacja.CZEKAJ_NA_KARTY_S) == 2 and "Czekam na koniec 1 kart" in log
+
+
 def test_sprawdz_tylko_sprawdza(tmp_path):
     u, _ = _instalacja(tmp_path)
     inst = Instalator(u)

@@ -674,6 +674,10 @@ def _na_stderr(tekst: str) -> None:
     print(tekst, file=sys.stderr, flush=True)
 
 
+CZEKAJ_NA_KARTY_S = 30          # `--po-kartach`: odstęp lokalnego sprawdzania tablicy (bez sieci)
+_spij = time.sleep              # testy podmieniają (bez prawdziwego czekania)
+
+
 def karty_w_toku(u: Uklad) -> list[str]:
     """Karty kanbana, nad którymi pracuje agent (status `running`): „<id> <agent>: <tytuł>”. Brak tablicy = []."""
     db = u.dane / "kanban.db"
@@ -693,9 +697,11 @@ def karty_w_toku(u: Uklad) -> list[str]:
 
 class _Aktualizacja:
     def __init__(self, u: Uklad, ot: Otoczenie, z: Zaplecze, log: Callable[[str], None], *, ref: str | None,
-                 tylko_sprawdz: bool, magazyn: Callable[[Uklad], str | None], mimo_kart: bool = False):
+                 tylko_sprawdz: bool, magazyn: Callable[[Uklad], str | None], mimo_kart: bool = False,
+                 po_kartach: bool = False):
         self.u, self.ot, self.z, self._log = u, ot, z, log
         self.ref_jawny, self.tylko_sprawdz, self.magazyn, self.mimo_kart = ref, tylko_sprawdz, magazyn, mimo_kart
+        self.po_kartach = po_kartach
         self.wynik: dict = {"root": str(u.root), "wynik": None, "ref": None, "wersja_przed": None, "wersja_po": None,
                             "zdalna": None, "behind": 0, "zmiany": [], "regresje": [], "nowe_bledy": [],
                             "sprzatanie": None, "opis": "", "czas_s": None}
@@ -778,13 +784,22 @@ class _Aktualizacja:
             return self._koniec("dostepna", f"Jest nowa wersja {zdalna[:12]} ({opis_zmian}). Aktualizacja: "
                                 "jarvo update", kod=0)
         karty = [] if self.mimo_kart else karty_w_toku(u)
+        if karty and self.po_kartach:
+            # 16.11: operator ponawiał `jarvo update` co 30 s, każde pytało GitHub o wersję i po 15 min skończył się
+            # limit 60 zapytań na godzinę. Czekanie na karty idzie lokalnie (kanban.db), GitHub raz, przed nim.
+            self.log(f"Czekam na koniec {len(karty)} kart (tablica lokalnie co {CZEKAJ_NA_KARTY_S} s, bez zapytań "
+                     "do GitHuba)")
+            while karty:
+                _spij(CZEKAJ_NA_KARTY_S)
+                karty = karty_w_toku(u)
         if karty:
             # 16.11: operator puścił `jarvo update` w trakcie karty Sherlocka; instalator tylko ostrzegł „restart bramy
             # ją przerwie” i zrestartował bramę. Aktualizacja w trakcie karty czeka, aż karta się skończy.
             for k in karty[:5]:
                 self.podlog(f"  w toku: {k}")
             return self._koniec("karty", f"Na tablicy pracuje agent ({len(karty)} kart): aktualizuję po ich końcu, bo "
-                                "restart bramy przerywa kartę. Teraz mimo to: jarvo update --mimo-kart.", kod=1)
+                                "restart bramy przerywa kartę. Poczekaj na koniec: jarvo update --po-kartach; "
+                                "teraz mimo to: jarvo update --mimo-kart.", kod=1)
         return self._aktualizuj(Path(app), zdalna, ref)
 
     def _aktualizuj(self, stara: Path, zdalna: str, ref: str) -> int:
@@ -990,13 +1005,14 @@ def instalator_rada() -> str:
 
 def aktualizuj(u: Uklad, ot: Otoczenie | None = None, *, ref: str | None = None, tylko_sprawdz: bool = False,
                log: Callable[[str], None] | None = None, zaplecze: Zaplecze | None = None,
-               magazyn: Callable[[Uklad], str | None] = czytaj_magazyn, mimo_kart: bool = False) -> tuple[int, dict]:
+               magazyn: Callable[[Uklad], str | None] = czytaj_magazyn, mimo_kart: bool = False,
+               po_kartach: bool = False) -> tuple[int, dict]:
     """`jarvo update`: (kod wyjścia, raport). Jedna aktualizacja naraz (blokada `<stan>/aktualizacja.lock`)."""
     ot = ot or Otoczenie()
     z = zaplecze or Zaplecze()
     u = instalator.bezwzgledny(uklad_instalacji(u, ot.env))
     przebieg = _Aktualizacja(u, ot, z, log or _wypisz, ref=ref, tylko_sprawdz=tylko_sprawdz, magazyn=magazyn,
-                             mimo_kart=mimo_kart)
+                             mimo_kart=mimo_kart, po_kartach=po_kartach)
     if not u.stan.is_dir():
         return _bezpiecznie(przebieg), przebieg.wynik
     zamek = przenosne.Zamek(u.stan / ZAMEK, czekaj=False)
@@ -1250,7 +1266,8 @@ def polecenie(u: Uklad, a, ot: Otoczenie, *, zaplecze: Zaplecze | None = None,
     jako_json = bool(getattr(a, "json", False))
     kod, raport = aktualizuj(u, ot, ref=getattr(a, "ref", None), tylko_sprawdz=bool(getattr(a, "sprawdz", False)),
                              log=_na_stderr if jako_json else _wypisz, zaplecze=zaplecze, magazyn=magazyn,
-                             mimo_kart=bool(getattr(a, "mimo_kart", False)))
+                             mimo_kart=bool(getattr(a, "mimo_kart", False)),
+                             po_kartach=bool(getattr(a, "po_kartach", False)))
     if jako_json:
         print(json.dumps(raport, ensure_ascii=False, indent=2), flush=True)
     return kod

@@ -435,6 +435,8 @@ Droga rekomendowana w raporcie „dystrybucja”: wydania u źródła + jeden ma
 **Karty w toku:** `jarvo update` (także z panelu) nie zaczyna, gdy na tablicy jest karta w statusie `running`: wypisuje
 karty i kończy kodem 1 („aktualizuję po ich końcu”), bo restart bramy przerywa kartę. Świadomie mimo to:
 `jarvo update --mimo-kart` (16.11 aktualizacja w trakcie karty Sherlocka zrestartowała bramę; instalator tylko ostrzegał).
+Poczekać i zaktualizować zaraz po końcu kart: `jarvo update --po-kartach` (wersję z GitHuba sprawdza raz, potem patrzy
+na tablicę lokalnie co 30 s; 16.11 ponawianie `jarvo update` co 30 s wyczerpało limit 60 zapytań GitHuba na godzinę).
 
 **Prywatna nakładka** (agenci biznesowi, [FLEET.md](FLEET.md#agenci-biznesowi)): instalacja i `jarvo update` biorą
 `<root>/nakladka`, gdy istnieje (Linux `~/.local/share/jarvo/nakladka`, macOS `~/.jarvo/nakladka`, Windows
