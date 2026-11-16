@@ -353,7 +353,7 @@ def test_brak_paczki_camoufox_to_kod_1_z_rada(cli, monkeypatch, tmp_path, capsys
     assert O.sprawdz() == 1 and "pobierany przy pierwszym użyciu" in capsys.readouterr().err
 
 
-def test_natywnie_camoufox_z_manifestu_przy_pierwszym_uzyciu(cli, monkeypatch, tmp_path):
+def test_natywnie_camoufox_z_manifestu_przy_pierwszym_uzyciu(cli, monkeypatch, tmp_path, capsys):
     """16.11: skrypt kazał „poprosić właściciela”, więc agent pobrał `camoufox fetch` niepilnowaną wersję do ~/.cache,
     której skrypt nie widział. Natywnie brak paczki = pobranie wpisu `camoufox` z manifestu (wersja i suma), a ścieżka
     programu z wpisu; --sprawdz niczego nie pobiera."""
@@ -378,8 +378,8 @@ def test_natywnie_camoufox_z_manifestu_przy_pierwszym_uzyciu(cli, monkeypatch, t
 
     monkeypatch.setattr(O, "EXE", str(tmp_path / "opt" / "camoufox-bin"))
     monkeypatch.setattr(O, "_przy_uzyciu", lambda: (Pu, "uklad"))
-    O.sprawdz()
-    assert wolania == [("gotowe", "camoufox")]            # healthcheck bez sieci
+    assert O.sprawdz() == 0 and "pobierze się sam" in capsys.readouterr().out
+    assert wolania == [("gotowe", "camoufox")]            # healthcheck bez sieci, przed pierwszym użyciem bez alarmu
     O.zapewnij_paczke()
     assert wolania[-1] == ("pobierz", "camoufox") and O.EXE == str(exe) and O.jest_paczka()
 

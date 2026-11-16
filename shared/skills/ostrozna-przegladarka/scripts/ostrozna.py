@@ -491,6 +491,10 @@ def zapewnij_paczke(instaluj: bool = True) -> None:
 def sprawdz() -> int:
     """Healthcheck bez sieci i bez uruchamiania przeglądarki: pakiet, binarka i pliki paczki dla tego systemu."""
     zapewnij_paczke(instaluj=False)       # natywnie: paczka z manifestu, gdy już pobrana (bez sieci)
+    if not jest_paczka() and ma_camoufox() and _przy_uzyciu()[0] is not None:
+        # natywnie przed pierwszym użyciem to stan normalny, nie brak (ścieżka z obrazu tylko myliła)
+        print("✓ Camoufox jeszcze niepobrany: pobierze się sam przy pierwszej stronie (ok. 1,3 GB, z sumą z manifestu)")
+        return 0
     braki = []
     if not ma_camoufox():
         braki.append("pakiet camoufox (Python narzędzi Jarva)")
