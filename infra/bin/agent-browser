@@ -9,6 +9,8 @@
 # globalnymi: gdy demona jeszcze nie ma, startuje bez serwera podglądu, zanim otworzy jakąkolwiek stronę.
 # Gdy wyłączyć się nie da, polecenie nie idzie dalej. `stream enable`, `dashboard` i `mcp` (otwierają serwery
 # albo demony z pominięciem nakładki) odrzuca. Hermes znajduje nakładkę pierwszą w PATH (/opt/jarvo/bin).
+# Po pomocy `snapshot --help` dopisuje, że snapshot jest do klikania, a treść z cenami daje `read`
+# (docs/TOOLBOX.md „agent-browser: czytanie treści”).
 # Instalacja natywna (Windows, macOS, Linux) ma odpowiednik w Pythonie: infra/bin/agent_browser.py (program
 # w <program>/bin-floty). Te same scenariusze sprawdza dla obu tests/test_agent_browser_nakladka.py; natywnie dochodzą
 # odmowy `install`, `upgrade`, `plugin add` (pobieranie bez sumy) i profilu Chrome właściciela.
@@ -43,11 +45,14 @@ args=("$@")
 globalne=()
 polecenie=()
 json=0
+wprost=0
+pomoc=0
 i=0
 while (( i < ${#args[@]} )); do
   a=${args[i]}
   case "$a" in
-    --version|-V|--help|-h) exec "$AB" "$@" ;;
+    --help|-h) wprost=1; pomoc=1; i=$((i + 1)); continue ;;
+    --version|-V) wprost=1; i=$((i + 1)); continue ;;
   esac
   if [[ $Z_WARTOSCIA == *" $a "* ]]; then
     globalne+=("$a" "${args[i+1]-}")
@@ -68,6 +73,23 @@ while (( i < ${#args[@]} )); do
     i=$((i + 1))
   fi
 done
+
+# --version i --help prosto do binarki; po pomocy `snapshot` dopisek Jarva (ten sam co POMOC_SNAPSHOT w agent_browser.py)
+if (( wprost )); then
+  (( pomoc )) && [[ ${polecenie[0]-} == snapshot ]] || exec "$AB" "$@"
+  "$AB" "$@"
+  kod=$?
+  cat <<'EOF'
+
+Jarvo: snapshot jest do klikania, nie do czytania treści.
+  -i zostawia same kontrolki: tekst strony (ceny, opisy, tabele) znika.
+  -s <selektor> działa tylko wtedy, gdy strona ma taki element. x-kom.pl nie ma <main>: wyjście jest puste,
+     a na stderr „Selector 'main' did not match any element” (kod 1).
+  Treść z cenami: agent-browser read <url> albo, po open, samo agent-browser read (strona po JavaScripcie).
+  Refy do klikania: agent-browser snapshot -i -c.
+EOF
+  exit "$kod"
+fi
 
 odmowa() {
   if (( json )); then

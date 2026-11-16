@@ -433,6 +433,16 @@ Zasady obrazu Hermesa, których pilnujemy (`make pins` sprawdza piny przed zmian
   otworzy stronę (~0,2 s przy starcie sesji, ~10 ms na kolejne polecenie). Gdy wyłączyć się nie da, polecenie nie
   idzie dalej; `stream enable`, `dashboard` i `mcp` odrzuca. Zostaje rzadki przypadek demona uruchomionego od nowa
   w trakcie jednego polecenia: ma serwer do następnego polecenia, które go wyłącza,
+- agent-browser: czytanie treści (pomiar 2026-11-16, 0.43.0, Chrome i Lightpanda, misja Z-261116-przegladarka-test).
+  Treść strony z cenami daje `agent-browser read <url>` albo, po `open`, samo `read` (strona po JavaScripcie). Snapshot
+  służy do klikania: `-i` zostawia same kontrolki (lokal360.pl/cennik: 1 cena z 49), a `-s <selektor>` bez takiego
+  elementu na stronie kończy się błędem `Selector 'main' did not match any element` na stderr i kodem 1, z pustym
+  wyjściem (x-kom.pl nie ma `<main>`). Nawet pełny `snapshot -c` w Chrome nie ma ceny produktu z x-kom.pl: sklep
+  trzyma ją w `aria-label` zwykłego `<span>` (agent-browser go pomija), a cyfry na ekranie ma pod `aria-hidden`. `read`:
+  x-kom.pl (Insta360 X5) 14 cen przy ok. 3 400 tokenach, lokal360.pl/cennik 49 cen przy 6 000, enigmalabz.com/en 2 800
+  (1–6% `--dump-dom`). Przycięcie snapshotu do `<main>` (a bez niego do `body`) bez `-i` daje mniej cen albo więcej
+  tokenów niż `read` (lokal360 w Chrome 14 cen z 49; x-kom cała strona: 10 000 tokenów w Chrome, 18 000
+  w Lightpandzie), więc trybu `snapshot --main` nie ma; nakładka dopisuje to do `snapshot --help`,
 - Lightpanda (1.0.0, przegląd 2026-10-11): obraz `lightpanda/browser` przypięty digestem indeksu (amd64 + arm64),
   z niego tylko binarka po `strip` (74 MB). Lightpanda domyślnie wysyła telemetrię (identyfikator instalacji i liczniki
   do `telemetry.lightpanda.io`) i raporty awarii (`curl` do `crash.lightpanda.io`); obraz ustawia

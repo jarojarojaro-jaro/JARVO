@@ -152,6 +152,19 @@ def test_polecenia_bez_demona_bez_wylaczania(ab, impl, args):
 
 
 @pytest.mark.parametrize("impl", IMPL)
+def test_pomoc_snapshot_z_dopiskiem_o_czytaniu_tresci(ab, impl):
+    # `snapshot -i -c -s main` dawał na x-kom.pl puste wyjście (strona bez <main>), a -i gubi ceny: dopisek kieruje do read
+    for args in (["snapshot", "--help"], ["--session", "s1", "snapshot", "-i", "-s", "main", "-h"],
+                 ["--help", "snapshot"]):
+        p, wyw = ab(impl, *args, env={"KOD": "3"})
+        assert p.returncode == 3 and argv(wyw) == [" ".join(args)]
+        assert p.stdout == '{"success":true,"data":{"title":"x"},"error":null}\n' + AB.POMOC_SNAPSHOT
+    for args in (["open", "--help"], ["--session", "snapshot", "open", "--help"], ["snapshot", "--version"]):
+        p, wyw = ab(impl, *args)
+        assert p.returncode == 0 and argv(wyw) == [" ".join(args)] and "Jarvo:" not in p.stdout
+
+
+@pytest.mark.parametrize("impl", IMPL)
 def test_stream_status_i_close_tez_najpierw_wylaczaja(ab, impl):
     # pominięte uruchomiłyby demona z serwerem podglądu
     for args in (["--session", "s1", "stream", "status"], ["--session", "s1", "close"]):

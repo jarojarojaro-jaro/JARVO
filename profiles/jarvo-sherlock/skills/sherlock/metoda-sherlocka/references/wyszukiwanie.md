@@ -9,6 +9,10 @@
 - `@@PY@@ "$HERMES_HOME/scripts/extract.py" <url>`: czysta treść strony + data publikacji + autor (trafilatura). Lepsze niż surowy HTML.
 - strona z JavaScriptem (SPA), gdy `extract.py` zwraca pusto: przeglądarka (`browser_navigate` i `browser_snapshot`);
   na Linuksie i macOS także `lightpanda fetch --dump markdown <url>` (~30 MB RAM, bez Chromium; na Windows go nie ma).
+- ceny, cenniki, karty produktów: `agent-browser read <url>` (tekst strony z cenami, kilka tysięcy tokenów, także
+  na Windows); strona składana JavaScriptem: `agent-browser open <url>`, `agent-browser read`, `agent-browser close`.
+  Snapshot jest do klikania, nie do czytania: `-i` usuwa tekst (cennik lokal360.pl: 1 cena z 49), `-s main` na stronie
+  bez `<main>` (x-kom.pl) daje puste wyjście i błąd, a ceny x-kom.pl nie ma nawet w pełnym snapshocie Chrome.
 - przeglądarka (`browser_*`): klikanie, formularze wyszukiwania, tabele, zrzuty (silnik Lightpanda, Chromium przy
   zrzutach; na Windows zawsze Chromium); logowanie **nie**.
 - skille: `searxng-search`, `duckduckgo-search` (inny indeks = niezależność), `scrapling`, `blocked-page-recovery`,

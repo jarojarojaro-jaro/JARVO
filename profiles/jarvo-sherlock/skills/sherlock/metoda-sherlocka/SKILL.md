@@ -1,7 +1,7 @@
 ---
 name: metoda-sherlocka
 description: "Pełne śledztwo na zamówienie: wątki, źródła, weryfikacja."
-version: 1.4.0
+version: 1.4.1
 author: "Jarvo (metodologia inspirowana: langchain-ai/open_deep_research MIT, dzhng/deep-research MIT, STORM MIT)"
 license: MIT
 metadata:

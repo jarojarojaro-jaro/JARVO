@@ -1,6 +1,7 @@
 # Changelog: jarvo-reka
 
 ## Niewydane
+- agent-browser: tekst strony z cenami czytasz przez `agent-browser read <url>` (albo po `open` samo `read`), a snapshot służy do klikania: `-i` zostawia same kontrolki (cennik lokal360.pl: 1 cena z 49), a `-s main` na stronie bez `<main>` (x-kom.pl) kończy się błędem i pustym wyjściem. `read` dał 14 cen z karty produktu x-kom.pl przy ok. 3 400 tokenach (`--dump-dom`: 297 000). Nakładka Jarva dopisuje to do `agent-browser snapshot --help`.
 - Skille agentów biznesowych z prywatnej nakładki (docs/FLEET.md „Agenci biznesowi”) dostajesz w `skills.external_dirs` przy buildzie; publiczny config wymienia tylko specjalistów repo.
 - Zapis w kodzie floty (zainstalowane skille, wtyczki, haki, skrypty floty, `SOUL.md` i `mcp.json` profili, program Jarva, kod Hermesa) blokuje wtyczka `jarvo-zgody` w każdym trybie, bez prośby do właściciela, z radą: zmiana floty to zlecenie dla Claude Code (`missions/DLA-CLAUDE.md`), bo zapis w zainstalowanym profilu znika przy aktualizacji i omija skan skilli (14.11). Prośba o pozostałe chronione miejsca mówi wprost, że „Always” obejmie tylko ten sam plik albo to samo polecenie. Lekcję na następny raz zapisujesz jak dotąd przez `skill_manage` (poczekalnia).
 - Przeglądarka narzędzi `browser_*`: agent-browser 0.43.0 (było 0.38.1; poprawki bezpieczeństwa, zawieszona karta nie psuje sesji, podpowiedzi przy przyciskach bez nazwy) i Lightpanda 1.0.4 (było 1.0.0).

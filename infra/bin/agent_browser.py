@@ -20,6 +20,9 @@ Silnik chrome (Windows: zawsze, bo Lightpanda nie ma tam wydania; macOS i Linux:
 AGENT_BROWSER_EXECUTABLE_PATH = CHROME_PATH (chrome-headless-shell z manifestu), gdy nikt go nie ustawił; Lightpanda
 nigdy (agent-browser użyłby tej ścieżki także dla niej, infra/Dockerfile).
 
+`snapshot --help` (i `-h`) dostaje po pomocy binarki dopisek POMOC_SNAPSHOT: snapshot jest do klikania, a treść z cenami
+daje `read` (docs/TOOLBOX.md „agent-browser: czytanie treści”).
+
 Ostatnie polecenie: na POSIX exec (proces nakładki staje się agent-browserem, jak `exec` w bashu). Na Windows exec
 odpina proces od rodzica, więc nakładka uruchamia binarkę, czeka na nią i zwraca jej kod. Binarka dostaje tylko trzy
 uchwyty wejścia i wyjścia (STARTF_USESTDHANDLES, close_fds: cudze uchwyty konsoli zabijają demona, tak samo robi
@@ -69,6 +72,14 @@ POBIERANIE = ("agent-browser {0} pobiera z sieci bez sumy; w Jarvie Chromium i a
               "(manifest z sumami), a nową wersję daje aktualizacja Jarva")
 PROFIL_WLASCICIELA = ("{0}: to przeglądarka i profile Chrome właściciela z zalogowanymi kontami, w Jarvie wyłączone; "
                       "własny profil agenta podajesz jako ścieżkę katalogu (--profile <katalog>)")
+POMOC_SNAPSHOT = """
+Jarvo: snapshot jest do klikania, nie do czytania treści.
+  -i zostawia same kontrolki: tekst strony (ceny, opisy, tabele) znika.
+  -s <selektor> działa tylko wtedy, gdy strona ma taki element. x-kom.pl nie ma <main>: wyjście jest puste,
+     a na stderr „Selector 'main' did not match any element” (kod 1).
+  Treść z cenami: agent-browser read <url> albo, po open, samo agent-browser read (strona po JavaScripcie).
+  Refy do klikania: agent-browser snapshot -i -c.
+"""
 
 # program w bin-floty
 ARGUMENTY_PYTHONA = ("-I", "-S", "-X", "utf8")   # bez PYTHONPATH, site-packages i katalogu bieżącego; UTF-8 zawsze
@@ -116,6 +127,14 @@ def rozbierz(args: list[str]) -> tuple[list[str], list[str], bool] | None:
             polecenie.append(a)
             i += 1
     return globalne, polecenie, json_
+
+
+def pomoc_snapshot(args: list[str]) -> bool:
+    """`snapshot --help` albo `snapshot -h`: polecenie liczone jak w `rozbierz` (wartość flagi nie jest poleceniem)."""
+    if not any(a in ("--help", "-h") for a in args):
+        return False
+    _, polecenie, _ = rozbierz([a for a in args if a not in WPROST])
+    return polecenie[:1] == ["snapshot"]
 
 
 def wartosc(globalne: list[str], flaga: str) -> str | None:
@@ -311,18 +330,22 @@ def _czekaj(proces: subprocess.Popen) -> int:
         return 130
 
 
-def uruchom(ab: str, args: list[str], env: dict) -> int:
-    """Polecenie dla binarki z tym samym wejściem i wyjściem: na POSIX exec, na Windows proces potomny i jego kod."""
+def uruchom(ab: str, args: list[str], env: dict, dopisek: str = "") -> int:
+    """Polecenie dla binarki z tym samym wejściem i wyjściem: na POSIX exec, na Windows proces potomny i jego kod.
+    Z dopiskiem zawsze proces potomny: dopisek idzie na wyjście po binarce."""
     argv = [ab, *args]
     try:
-        if not WINDOWS:
+        if not WINDOWS and not dopisek:
             sys.stdout.flush()
             sys.stderr.flush()
             os.execve(ab, argv, env)
-        return _czekaj(_popen(argv, env, stdin=_uchwyt(0), stdout=_uchwyt(1), stderr=_uchwyt(2)))
+        kod = _czekaj(_popen(argv, env, stdin=_uchwyt(0), stdout=_uchwyt(1), stderr=_uchwyt(2)))
     except OSError as e:
         _pisz(sys.stderr, f"agent-browser: nie uruchomię {ab}: {e.strerror or e}\n")
         return 126 if isinstance(e, PermissionError) else 127
+    if dopisek:
+        _pisz(sys.stdout, dopisek)
+    return kod
 
 
 def wylacz_podglad(ab: str, globalne: list[str], env: dict) -> bool:
@@ -353,7 +376,7 @@ def main(argv: list[str] | None = None) -> int:
         return uruchom(ab, args, env)
     rozbior = rozbierz(args)
     if rozbior is None:                       # --version, --help: bez demona
-        return uruchom(ab, args, env)
+        return uruchom(ab, args, env, POMOC_SNAPSHOT if pomoc_snapshot(args) else "")
     globalne, polecenie, json_ = rozbior
     powod = powod_odmowy(globalne, polecenie, env)
     if powod:
