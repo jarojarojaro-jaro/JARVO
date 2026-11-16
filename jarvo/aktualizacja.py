@@ -674,11 +674,28 @@ def _na_stderr(tekst: str) -> None:
     print(tekst, file=sys.stderr, flush=True)
 
 
+def karty_w_toku(u: Uklad) -> list[str]:
+    """Karty kanbana, nad którymi pracuje agent (status `running`): „<id> <agent>: <tytuł>”. Brak tablicy = []."""
+    db = u.dane / "kanban.db"
+    if not db.is_file():
+        return []
+    try:
+        import sqlite3
+        conn = sqlite3.connect(f"{db.as_uri()}?mode=ro", uri=True, timeout=3)
+        try:
+            return [f"{i} {a or '?'}: {(t or '')[:70]}" for i, a, t in
+                    conn.execute("SELECT id, assignee, title FROM tasks WHERE status = 'running' ORDER BY id")]
+        finally:
+            conn.close()
+    except Exception:                         # noqa: BLE001 - odczyt pomocniczy; brak odpowiedzi tablicy nie blokuje
+        return []
+
+
 class _Aktualizacja:
     def __init__(self, u: Uklad, ot: Otoczenie, z: Zaplecze, log: Callable[[str], None], *, ref: str | None,
-                 tylko_sprawdz: bool, magazyn: Callable[[Uklad], str | None]):
+                 tylko_sprawdz: bool, magazyn: Callable[[Uklad], str | None], mimo_kart: bool = False):
         self.u, self.ot, self.z, self._log = u, ot, z, log
-        self.ref_jawny, self.tylko_sprawdz, self.magazyn = ref, tylko_sprawdz, magazyn
+        self.ref_jawny, self.tylko_sprawdz, self.magazyn, self.mimo_kart = ref, tylko_sprawdz, magazyn, mimo_kart
         self.wynik: dict = {"root": str(u.root), "wynik": None, "ref": None, "wersja_przed": None, "wersja_po": None,
                             "zdalna": None, "behind": 0, "zmiany": [], "regresje": [], "nowe_bledy": [],
                             "sprzatanie": None, "opis": "", "czas_s": None}
@@ -760,6 +777,14 @@ class _Aktualizacja:
         if self.tylko_sprawdz:
             return self._koniec("dostepna", f"Jest nowa wersja {zdalna[:12]} ({opis_zmian}). Aktualizacja: "
                                 "jarvo update", kod=0)
+        karty = [] if self.mimo_kart else karty_w_toku(u)
+        if karty:
+            # 16.11: operator puścił `jarvo update` w trakcie karty Sherlocka; instalator tylko ostrzegł „restart bramy
+            # ją przerwie” i zrestartował bramę. Aktualizacja w trakcie karty czeka, aż karta się skończy.
+            for k in karty[:5]:
+                self.podlog(f"  w toku: {k}")
+            return self._koniec("karty", f"Na tablicy pracuje agent ({len(karty)} kart): aktualizuję po ich końcu, bo "
+                                "restart bramy przerywa kartę. Teraz mimo to: jarvo update --mimo-kart.", kod=1)
         return self._aktualizuj(Path(app), zdalna, ref)
 
     def _aktualizuj(self, stara: Path, zdalna: str, ref: str) -> int:
@@ -965,12 +990,13 @@ def instalator_rada() -> str:
 
 def aktualizuj(u: Uklad, ot: Otoczenie | None = None, *, ref: str | None = None, tylko_sprawdz: bool = False,
                log: Callable[[str], None] | None = None, zaplecze: Zaplecze | None = None,
-               magazyn: Callable[[Uklad], str | None] = czytaj_magazyn) -> tuple[int, dict]:
+               magazyn: Callable[[Uklad], str | None] = czytaj_magazyn, mimo_kart: bool = False) -> tuple[int, dict]:
     """`jarvo update`: (kod wyjścia, raport). Jedna aktualizacja naraz (blokada `<stan>/aktualizacja.lock`)."""
     ot = ot or Otoczenie()
     z = zaplecze or Zaplecze()
     u = instalator.bezwzgledny(uklad_instalacji(u, ot.env))
-    przebieg = _Aktualizacja(u, ot, z, log or _wypisz, ref=ref, tylko_sprawdz=tylko_sprawdz, magazyn=magazyn)
+    przebieg = _Aktualizacja(u, ot, z, log or _wypisz, ref=ref, tylko_sprawdz=tylko_sprawdz, magazyn=magazyn,
+                             mimo_kart=mimo_kart)
     if not u.stan.is_dir():
         return _bezpiecznie(przebieg), przebieg.wynik
     zamek = przenosne.Zamek(u.stan / ZAMEK, czekaj=False)
@@ -1223,7 +1249,8 @@ def polecenie(u: Uklad, a, ot: Otoczenie, *, zaplecze: Zaplecze | None = None,
             return 0
     jako_json = bool(getattr(a, "json", False))
     kod, raport = aktualizuj(u, ot, ref=getattr(a, "ref", None), tylko_sprawdz=bool(getattr(a, "sprawdz", False)),
-                             log=_na_stderr if jako_json else _wypisz, zaplecze=zaplecze, magazyn=magazyn)
+                             log=_na_stderr if jako_json else _wypisz, zaplecze=zaplecze, magazyn=magazyn,
+                             mimo_kart=bool(getattr(a, "mimo_kart", False)))
     if jako_json:
         print(json.dumps(raport, ensure_ascii=False, indent=2), flush=True)
     return kod

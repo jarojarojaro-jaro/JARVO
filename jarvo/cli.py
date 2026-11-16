@@ -199,6 +199,8 @@ def _parser() -> argparse.ArgumentParser:
     s.add_argument("--sprawdz", action="store_true", help="tylko sprawdź, czy jest nowa wersja")
     s.add_argument("--ref", metavar="REF", help="gałąź, tag albo pełny SHA (zapamiętany dla następnych aktualizacji)")
     s.add_argument("--json", action="store_true", help="wynik w JSON (CI); komunikaty na stderr")
+    s.add_argument("--mimo-kart", action="store_true",
+                   help="aktualizuj mimo kart w toku (restart bramy je przerwie); bez tego update czeka na ich koniec")
     s.add_argument("--pomocnik", action="store_true",
                    help="pomocnik aktualizacji dla panelu: prośby z <dane>/jarvo/state/update-request (uruchamia go "
                         "nadzorca)")

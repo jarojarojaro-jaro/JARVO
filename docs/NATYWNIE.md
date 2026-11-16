@@ -432,6 +432,10 @@ Droga rekomendowana w raporcie „dystrybucja”: wydania u źródła + jeden ma
 6. Pracownicy kanbana kończą pracę na starej wersji. Starą usuwamy, gdy nic z niej nie działa (skan psutil).
 7. Nadzorca na końcu uruchamia się ponownie z nowej wersji.
 
+**Karty w toku:** `jarvo update` (także z panelu) nie zaczyna, gdy na tablicy jest karta w statusie `running`: wypisuje
+karty i kończy kodem 1 („aktualizuję po ich końcu”), bo restart bramy przerywa kartę. Świadomie mimo to:
+`jarvo update --mimo-kart` (16.11 aktualizacja w trakcie karty Sherlocka zrestartowała bramę; instalator tylko ostrzegał).
+
 **Prywatna nakładka** (agenci biznesowi, [FLEET.md](FLEET.md#agenci-biznesowi)): instalacja i `jarvo update` biorą
 `<root>/nakladka`, gdy istnieje (Linux `~/.local/share/jarvo/nakladka`, macOS `~/.jarvo/nakladka`, Windows
 `%LOCALAPPDATA%\Jarvo\nakladka`), a inny katalog wskazuje `JARVO_NAKLADKA`; ścieżkę dostają build.py i install_fleet.py

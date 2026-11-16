@@ -711,6 +711,27 @@ def test_jedna_aktualizacja_naraz(tmp_path):
     assert not aktualizacja.trwa(u)
 
 
+def test_aktualizacja_czeka_na_karty_w_toku(tmp_path):
+    """16.11: `jarvo update` w trakcie karty Sherlocka zrestartował bramę (instalator tylko ostrzegł). Karta w toku =
+    aktualizacja odmawia bez instalatora; `--mimo-kart` aktualizuje świadomie."""
+    import sqlite3
+    u, _ = _instalacja(tmp_path)
+    u.dane.mkdir(parents=True, exist_ok=True)
+    c = sqlite3.connect(u.dane / "kanban.db")
+    c.execute("CREATE TABLE tasks (id TEXT, assignee TEXT, title TEXT, status TEXT)")
+    c.execute("INSERT INTO tasks VALUES ('t_1', 'jarvo-sherlock', 'Research ankiet', 'running')")
+    c.commit()
+    c.close()
+    inst = Instalator(u)
+    ot = _ot(tmp_path, env={aktualizacja.FAKE: str(_kod(tmp_path / "zrodlo", SHA_NOWA))},
+             moduly={"nadzorca": Nadzorca(dziala=False), "autostart": Autostart(wlaczony=False)})
+    kod, raport, log = _aktualizuj(u, ot, _zaplecze(strumien=inst, przechwyc=Doctor()))
+    assert kod == 1 and raport["wynik"] == "karty" and not inst.wywolania
+    assert "t_1 jarvo-sherlock: Research ankiet" in log and "--mimo-kart" in log
+    kod, raport, log = _aktualizuj(u, ot, _zaplecze(strumien=inst, przechwyc=Doctor()), mimo_kart=True)
+    assert kod == 0 and raport["wynik"] == "zaktualizowano", log
+
+
 def test_sprawdz_tylko_sprawdza(tmp_path):
     u, _ = _instalacja(tmp_path)
     inst = Instalator(u)
