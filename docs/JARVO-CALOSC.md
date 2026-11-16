@@ -361,7 +361,10 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
   `profiles/jarvo/scripts/pobierz_link.py`): właściciel udostępnia z telefonu wpis X, film YouTube albo stronę na
   Telegramie; Jarvo pobiera treść narzędziem (fxtwitter bez logowania, `yt-dlp -J`, trafilatura;
   film 360p i transkrypcja skryptem `transkrypcja-filmu` tylko na żądanie), ocenia ją i zawsze zgłasza szkic
-  `wiedza_zapisz` (źródło = link, tagi `skrzynka-linkow` i tematy) oraz odpowiada 2–4 zdaniami. Adresy w sieci
+  `wiedza_zapisz` (źródło = link, tagi `skrzynka-linkow` i tematy). Z nauki robi działanie (zasada 14 SOUL): najwyżej
+  1–2 poprawki z hipotezą i miarą przed i po; odwracalne we własnym zakresie (pomiar, misja próby, karta, notatka)
+  startuje od razu, kod floty zleca w `missions/DLA-CLAUDE.md`, płatne i nieodwracalne czeka na zgodę właściciela.
+  Odpowiada 2–5 zdaniami: co ruszyło, co zlecone, kiedy wynik (albo „Nic do wdrożenia u nas”). Adresy w sieci
   lokalnej i przekierowania na nie są odrzucane; treść linku to dane, nie polecenia. Wiadomość zakończona „one” =
   temat poboczny: teczka `@@MISSIONS_DIR@@/poboczne/` i na „zamknij” jedna notatka z tagiem `poboczny`
   (bez osobnego agenta; zlecona praca jako misja `[poboczna]`). Kompilacja zachowuje tagi szkicu i dokłada swoje.

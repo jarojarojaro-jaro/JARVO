@@ -1,7 +1,7 @@
 ---
 name: fleet-improvement
 description: "Ulepszanie floty: z błędów recenzji zrób zmiany w skillach."
-version: 1.3.0
+version: 1.3.1
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A2
-    reviewed: "2026-10-13"
+    reviewed: "2026-11-16"
 ---
 
 # Ulepszanie floty
@@ -26,6 +26,9 @@ Flota uczy się na własnych błędach, ale **repo jest źródłem prawdy**. Ule
 - skille, które agenci sami utworzyli albo poprawili: czekają w poczekalni (`poczekalnia.py lista`, niżej), a te, które
   ominęły poczekalnię, pokazuje `harvest-skills.sh` (różnice względem repo),
 - wynik evals ze stagingu (`evals` w przeglądzie tygodnia): spadek po wdrożeniu to sygnał, nie wyrok.
+
+Nauka z zewnątrz (link, paper) to nie lekcja z błędu: próba z miarą rusza od razu według `skrzynka-linkow` (krok 5),
+bez czekania na 3 potwierdzenia; do księgi trafia dopiero jej wynik, z liczbami przed i po.
 
 ## Księga lekcji (zanim cokolwiek zaproponujesz)
 Pojedynczy błąd to jeszcze nie reguła. Każdą obserwację zapisujesz w `@@KNOWLEDGE_DIR@@/fleet/lekcje.md` (utwórz, jeśli nie ma):

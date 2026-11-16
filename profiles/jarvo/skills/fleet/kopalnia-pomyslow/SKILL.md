@@ -1,7 +1,7 @@
 ---
 name: kopalnia-pomyslow
 description: "Rano jedna rzecz warta zbudowania z 48 h, z dowodem."
-version: 1.0.2
+version: 1.0.3
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-11-14"
+    reviewed: "2026-11-16"
 ---
 
 # Kopalnia pomysłów
@@ -38,6 +38,7 @@ całą kopalnię najwyżej jedno `wiedza_szukaj` albo `wiedza_czytaj` (14.11: br
 2. **Dla pomysłu ustal:** co się wydarzyło (data i jego słowa, krótko), co zbudować (skill, rutyna, zasada, skrypt,
    zasób w arsenale) z jednozdaniową specyfikacją (nazwa, kiedy działa, co robi), któremu agentowi pomoże.
 3. **Odrzuć**, gdy to już jest (`skille_floty`, arsenał, SOUL): wtedy najwyżej jako konkretna poprawka tego skilla.
+   Link z nauką ma już swoją próbę albo zlecenie z rozmowy (`skrzynka-linkow`, krok 5): nie stawiasz go drugi raz.
    Nie wracaj z pomysłem, na który właściciel odpowiedział „nie”. Pomysł z „ok” i bez wyniku w „co zrobione” to nie
    nowa pozycja: zapytaj o niego tylko wtedy, gdy stoi ponad 3 dni.
 4. **Wybierz jeden:** najbardziej przydatny i najłatwiejszy do zbudowania. **Każdy pomysł wskazuje prawdziwe zdarzenie

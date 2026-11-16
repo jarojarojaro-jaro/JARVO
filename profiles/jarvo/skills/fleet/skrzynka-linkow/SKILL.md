@@ -1,23 +1,23 @@
 ---
 name: skrzynka-linkow
-description: "Link od właściciela do skarbca; „one” = temat poboczny."
-version: 1.7.0
+description: "Link od właściciela: skarbiec i działanie; „one” = poboczny."
+version: 1.8.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
     tags: [fleet, links, inbox, twitter, youtube, knowledge, one-off]
-    related_skills: [intake, prosty-polski]
+    related_skills: [intake, prosty-polski, mission-ledger]
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-11-14"
+    reviewed: "2026-11-16"
 ---
 
 # Skrzynka linków
 
 Właściciel udostępnia z telefonu wpis z X, film z YouTube albo stronę (zwykle na Telegramie), czasem z komentarzem.
-**Wysłanie linku to polecenie:** pobierz, oceń i zapisz w skarbcu. Nie pytasz, czy zapisać.
+**Wysłanie linku to polecenie:** pobierz, oceń, zapisz w skarbcu i zrób z tego działanie. Nie pytasz, czy zapisać.
 Używasz tego skilla, gdy wiadomość to link albo link z krótkim komentarzem. Gdy komentarz zleca pracę („zrób nam
 taki landing”, „sprawdź tę firmę”), najpierw ten skill, potem zwykła ścieżka `intake`. Wiadomość, której ostatnie
 słowo to „one”, otwiera temat poboczny (sekcja niżej). Wiadomości zakończone słowem „gpu” do Ciebie nie trafiają:
@@ -25,8 +25,9 @@ brama oddaje je sesji Kernel (silnik inferencji właściciela, kernele GPU), kt�
 testów. Link o optymalizacji inferencji albo GPU bez tego dopisku robisz normalnie, a w odpowiedzi dodajesz jedno
 zdanie: „Następnym razem dopisz „gpu”, to trafi prosto do sesji Kernel.”
 
-Budżet: 4–6 wywołań narzędzi i poniżej minuty dla wpisu bez filmu. Nie piszesz własnych skryptów, nie wołasz
-API ręcznie, nie otwierasz linku w przeglądarce: wszystko daje narzędzie `pobierz_link` (skrypt `pobierz_link.py`).
+Budżet: 4–6 wywołań narzędzi i poniżej minuty dla wpisu bez filmu; działanie z kroku 5 (pomiar, misja, zlecenie)
+dokłada 2–4. Nie piszesz własnych skryptów, nie wołasz API ręcznie, nie otwierasz linku w przeglądarce: treść daje
+narzędzie `pobierz_link` (skrypt `pobierz_link.py`).
 
 ## Kroki
 1. **Pobierz** wszystkie linki z wiadomości jednym wywołaniem: `pobierz_link(linki=[…])`. Dostajesz dla każdego:
@@ -40,32 +41,54 @@ API ręcznie, nie otwierasz linku w przeglądarce: wszystko daje narzędzie `pob
 3. **Sprawdź skarbiec** jednym `wiedza_szukaj` (temat albo autor): czy to już było i czego dotyczy w firmach
    i projektach właściciela.
 4. **Oceń** krótko: co to jest; dlaczego może być ważne dla biznesów albo projektów właściciela (konkretnie, z nazwą
-   marki lub projektu, gdy pasuje; bez naciągania); temat; możliwe działanie.
+   marki lub projektu, gdy pasuje; bez naciągania); temat.
    **Zawsze zestaw z wąskimi gardłami z profilu właściciela** (sekcja „Wąskie gardła”: CPU serwera najwyżej 80%,
    3 zadania naraz, testy kerneli na procesorze, render wideo, buildy i audyty) i powiedz wprost, które gardło to
-   rozwiązuje i jak („darmowe 4 vCPU = drugi procesor na render i testy kerneli”). Gdy rozwiązuje, jest darmowe
-   i odwracalne, **od razu zakładasz misję próby** (konto zakładasz sam w Komputerze Jarva, pierwsze prawdziwe zadanie, pomiar
-   względem serwera) i mówisz, że ruszyło; płatne albo nieodwracalne: propozycja z kosztem.
-   **Udana próba = wpis do arsenału** `@@KNOWLEDGE_DIR@@/fleet/arsenal.md` (sekcja „## Zasoby”, jedna linia:
+   rozwiązuje i jak („darmowe 4 vCPU = drugi procesor na render i testy kerneli”). Gardłem jest też sposób pracy
+   floty: koszt kontekstu na kartach, powtórna praca, przyjęcie za 1. razem.
+5. **Z nauki działanie** (zasada 14 SOUL). Właściciel 16.11: „PROAKTYWNOŚĆ PAMIĘTAJ, a nie zwykłe czekanie na
+   instrukcje”. Tego dnia przegląd paperów skończył się na „cztery rzeczy nas dotyczą” i „Jeśli chcesz, wciągnę
+   wnioski…”: to błąd. Gdy treść ma coś dla nas (metoda, narzędzie, wynik badań, wzorzec pracy):
+   - **Wybierz najwyżej 1–2 poprawki:** największy zysk przy najmniejszej zmianie. Dla każdej ustal **hipotezę** (co
+     się poprawi i o ile), **próbę** (najmniejsza zmiana, która to sprawdzi), **miarę przed i po** (liczba z naszych
+     danych: przyjęte za 1. razem i tokeny z `@@PY@@ "$HERMES_HOME/scripts/liczby.py" --dni 7`, czas, CPU; „przed”
+     mierzysz teraz) i **wykonawcę** (Ty, agent floty kartą albo Claude Code zleceniem).
+   - **Odwracalne i w Twoim zakresie startujesz od razu, w tej turze:** pomiar „przed”, misja próby (`mission-ledger`:
+     hipoteza, miara przed, data porównania), karta dla siebie albo agenta, sposób pisania Twoich kart, szkic notatki
+     albo rubryki w skarbcu, wpis w Twojej pamięci, darmowe konto do próby w Komputerze Jarva (pierwsze prawdziwe
+     zadanie, pomiar względem serwera). Link z czymś dla nas to polecenie, żeby to sprawdzić: nie pytasz o zgodę
+     i to nie jest poszerzanie zakresu (zasada 3).
+   - **Kod floty zlecasz sam** (skill, SOUL, wtyczka, skrypt, config agenta, `quality/rubric.md`): linia
+     `- [ ] RRRR-MM-DD · co · po co · plik` w `@@MISSIONS_DIR@@/DLA-CLAUDE.md` (zasada 8 SOUL), w „po co” hipoteza
+     i miara.
+   - **Płatne albo nieodwracalne** (płatność, publikacja, wysyłka do ludzi, usunięcie): nie startujesz; jedno pytanie
+     z kosztem i rekomendacją, zgoda jak w zasadzie 2 SOUL.
+   - **Nic dla nas:** jedno zdanie „Nic do wdrożenia u nas: <powód>”, bez wymyślonej próby i bez misji.
+   - **Wynik:** w dniu porównania mierzysz „po”, zamykasz misję liczbami przed i po i piszesz właścicielowi jedno
+     zdanie; nieudana próba = „nie warto, bo …” w misji, bez powrotu.
+   **Udana próba narzędzia albo usługi = wpis do arsenału** `@@KNOWLEDGE_DIR@@/fleet/arsenal.md` (sekcja „## Zasoby”, jedna linia:
    `- **Nazwa** · co (liczby z pomiaru) · kiedy użyć · jak (dokładne polecenie albo skill) · limity`), piszesz go wprost
    (`patch`). Każdy agent i sesja Kernel widzą arsenał w instrukcji od następnej rozmowy, więc nikomu tego nie mówisz
    osobno; właścicielowi piszesz jednym zdaniem, którzy agenci skorzystają i jak.
-5. **Zapisz zawsze** jeden szkic na link: `wiedza_zapisz` z polami:
+6. **Zapisz zawsze** jeden szkic na link: `wiedza_zapisz` z polami:
    - `typ`: `fakt` (wiadomość, liczba, ogłoszenie), `podmiot` (firma, narzędzie, człowiek w roli publicznej),
      `pojecie` (metoda, pomysł, wzorzec), `projekt` (dotyczy konkretnego projektu właściciela);
    - `tytul`: jak się o tym mówi, do 70 znaków;
    - `tresc`: 50–150 słów: co to, kto i kiedy (data wpisu), kluczowe liczby, dlaczego ważne dla właściciela,
-     sugerowane działanie, komentarz właściciela jego słowami;
+     co ruszyło albo co zlecone (miara, data porównania), komentarz właściciela jego słowami;
    - `zrodlo`: sam link (adres kanoniczny z wyniku `url`);
    - `tagi`: `skrzynka-linkow`, rodzaj (`x`, `youtube`, `strona`) i 1–3 tematy małymi literami bez polskich znaków
      (np. `ai`, `marketing`, `sprzedaz`, `strony`, `wideo`, `reklama`, `narzedzia`, nazwa marki).
      Tematy to tagi tymczasowe, do czasu podziału na profile.
-6. **Odpowiedz** 2–4 krótkimi zdaniami po polsku (skill `prosty-polski`): co to jest, które nasze gardło rozwiązuje,
-   co już ruszyło (albo sugerowane działanie), i że szkic jest w skarbcu (notatka po kompilacji, kilka minut).
+7. **Odpowiedz** 2–5 krótkimi zdaniami po polsku (skill `prosty-polski`): co to jest i które gardło dotyka; co ruszyło
+   u Ciebie i co zlecone (karta, DLA-CLAUDE) z miarą i datą wyniku, albo „Nic do wdrożenia u nas” z powodem; że szkic
+   jest w skarbcu (notatka po kompilacji, kilka minut). Bez „jeśli chcesz”, „mogę” i „daj znać” przy tym, co wolno Ci
+   zrobić samemu: pytanie zostaje tylko przy płatnym albo nieodwracalnym.
 
 ## Kilka linków
 Wszystkie w jednym `pobierz_link` (najwyżej 5; więcej = kolejne wywołanie). Szkic osobno dla każdego linku.
-Odpowiedź: jedna linia na link, na końcu jedno zdanie o skarbcu.
+Poprawki z kroku 5 wybierasz ze wszystkich linków razem, najwyżej 2. Odpowiedź: jedna linia na link, potem co ruszyło
+i co zlecone, na końcu jedno zdanie o skarbcu.
 
 ## Błędy
 Link z polem `blad`: powiedz jednym zdaniem, czego się nie dało (np. wpis usunięty, film prywatny, strona wymaga
@@ -78,8 +101,8 @@ jednorazowo, poza główną pracą. Może z tego coś wyjść, może nie; liczy 
 1. **Otwarcie.** Temat już był (`pobierz_link` oddał `znane`, albo `wiedza_szukaj` i teczki w
    `@@MISSIONS_DIR@@/poboczne/` mówią o nim): **pierwsze zdania odpowiedzi to przypomnienie** z teczki i notatek
    („Znam ten temat: teczka od 11.11, ustaliliśmy …, stanęło na …”), potem tylko to, co nowe; tę samą teczkę
-   uzupełniasz (`patch`), drugiej nie zakładasz, a szkic tylko z nowymi faktami. Nowy temat: z linkiem kroki 1–5,
-   w szkicu dodatkowo tag `poboczny`. Załóż teczkę `write_file`
+   uzupełniasz (`patch`), drugiej nie zakładasz, a szkic tylko z nowymi faktami. Nowy temat: z linkiem kroki 1–4 i 6
+   (zamiast prób z kroku 5 kierunki niżej), w szkicu dodatkowo tag `poboczny`. Załóż teczkę `write_file`
    `@@MISSIONS_DIR@@/poboczne/RRRR-MM-DD-<temat-krótko>.md` (datę masz w rozmowie, bez terminala): temat, link, data,
    komentarz właściciela, `status: otwarty`. Odpowiedz: ocena (2–3 zdania), 2–3 kierunki do zgłębienia (np. research, test, film, koszt)
    i jedno zdanie: „Temat poboczny otwarty, piszmy dalej; „zamknij” kończy i zapisuje”.
@@ -112,9 +135,15 @@ z teczki, co już wyszło i na czym stanęło, zanim zaczniesz szukać czegokolw
 - Bez sekretów i danych prywatnych w szkicu: ludzie tylko w rolach publicznych.
 - Film i transkrypcja zostają w `@@WORKSPACES_DIR@@/jarvo/linki/`; w odpowiedzi podajesz ścieżkę tylko na prośbę.
 
-## Przykład
-Właściciel: link do wpisu o nowym modelu wideo, komentarz „to dla nas?”.
-`pobierz_link` → wpis bez filmu wystarcza → `wiedza_szukaj("model wideo")` → `wiedza_zapisz(typ="podmiot",
-tytul="…", zrodlo="https://x.com/…/status/…", tagi=["skrzynka-linkow", "x", "wideo", "ai"])` → odpowiedź:
-„To zapowiedź modelu X do krótkich filmów od 10 s. Może skrócić robienie rolek dla Ziarno, warto dać Wideografowi
-test na jednym filmie. Zapisałem to w skarbcu; notatka będzie po kompilacji.”
+## Przykłady
+Właściciel 16.11: link do przeglądu 9 paperów tygodnia (DAIR.AI), bez komentarza. `pobierz_link` → strona newslettera
+→ `wiedza_szukaj("koszt kontekstu kart")` → dwie poprawki: (1) Agency (czytanie kontekstu do 73% kosztu): `liczby.py
+--dni 7` daje „przed” (tokeny na kartę), misja próby „karty z KONTEKSTEM tylko z tego, czego wykonawca potrzebuje”,
+porównanie po 7 dniach; (2) AutoRefine (sędzia kalibrowany sygnałami pracy): zlecenie w DLA-CLAUDE.md dla
+`sdlc-review`, miara: zgodność werdyktów z przyjęciem za 1. razem → `wiedza_zapisz(…)` → odpowiedź:
+„Przegląd 9 paperów; dla nas liczą się dwa. Agency: dziś karta czyta średnio N tys. tokenów, od teraz piszę karty
+z krótszym kontekstem, porównam 23.11. AutoRefine: zleciłem Claude'owi kalibrację sędziego na „przyjęte za 1. razem”,
+wynik w przeglądzie tygodnia. Szkic w skarbcu, notatka po kompilacji.”
+
+Link o nowym aparacie bez związku z firmami i gardłami: szkic jak zawsze → „To recenzja aparatu X. Nic do wdrożenia
+u nas: nie dotyka żadnej marki ani gardła. Zapisałem w skarbcu.”

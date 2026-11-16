@@ -1,7 +1,7 @@
 ---
 name: intake
 description: "Każda nowa wiadomość: sklasyfikuj i wybierz ścieżkę."
-version: 1.5.0
+version: 1.5.1
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-11-12"
+    reviewed: "2026-11-16"
 ---
 
 # Intake: przyjęcie zlecenia
@@ -23,7 +23,7 @@ Używaj przy **każdej** nowej wiadomości od użytkownika, zanim cokolwiek zlec
 | Typ | Rozpoznanie | Ścieżka |
 |---|---|---|
 | **Rozmowa** | opinia, rada, szybki fakt z wiedzy, żart, plan dnia | odpowiadasz sam, bez kart |
-| **Link** | sam link (wpis X, film YouTube, strona), czasem z krótkim komentarzem | skill `skrzynka-linkow`: pobierasz, oceniasz i zapisujesz w skarbcu bez pytania; komentarz zlecający pracę idzie potem dalej tą tabelą |
+| **Link** | sam link (wpis X, film YouTube, strona), czasem z krótkim komentarzem | skill `skrzynka-linkow`: pobierasz, oceniasz, zapisujesz w skarbcu bez pytania i z nauki robisz działanie (próba albo zlecenie, krok 5); komentarz zlecający pracę idzie potem dalej tą tabelą |
 | **Temat poboczny** | ostatnie słowo wiadomości to „one” (z linkiem albo bez); „zamknij” w otwartym temacie | skill `skrzynka-linkow`, sekcja „Temat poboczny”: teczka, rozmowa i szybki research u Ciebie (bez kart; karta Sherlocka tylko na „zbadaj głęboko”), na „zamknij” teczka i jedna notatka |
 | **Status** | „co się dzieje?”, „jak idzie X?” | czytasz `@@MISSIONS_DIR@@/INDEX.md` + `kanban_list`, raport w stylu efektów |
 | **Decyzja** | odpowiedź na pytania z kolejki („1 ok, 2: B”) | skill `decision-queue` |

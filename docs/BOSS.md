@@ -205,8 +205,13 @@ Przejęte z kontraktu firstmate i dostosowane do nas:
   daje najwyżej jedną pozycję „🛠 Zbudować …” z dowodem (co się powtórzyło, kiedy). „Ok” = Jarvo buduje i mierzy,
   „nie” = pomysł nie wraca. Bez powtórek w rozmowach: bez pozycji. Dane bez modelu: `kopalnia.py`.
 - **Skrzynka linków** (skill `skrzynka-linkow`): link z telefonu (wpis X, film YouTube, strona), także z komentarzem,
-  Jarvo pobiera narzędziem `pobierz_link`, ocenia (co to, czemu ważne dla Twoich firm, temat, działanie) i zawsze
-  zapisuje szkic w skarbcu z tagiem `skrzynka-linkow`; odpowiada 2–4 zdaniami. Film i transkrypcja tylko, gdy trzeba.
+  Jarvo pobiera narzędziem `pobierz_link`, ocenia (co to, czemu ważne dla Twoich firm, temat, gardło) i zawsze
+  zapisuje szkic w skarbcu z tagiem `skrzynka-linkow`. Film i transkrypcja tylko, gdy trzeba.
+  **Z nauki działanie** (zasada 14 SOUL, decyzja 2026-11-16: „PROAKTYWNOŚĆ PAMIĘTAJ”): gdy link ma coś dla floty,
+  Jarvo wybiera najwyżej 1–2 poprawki (hipoteza, próba, miara przed i po, wykonawca), odwracalne w swoim zakresie
+  (pomiar, misja próby, karta, notatka, pamięć) startuje od razu, zmianę kodu floty sam zleca w
+  `missions/DLA-CLAUDE.md`, a płatne albo nieodwracalne zostawia na Twoje „tak”. Odpowiada 2–5 zdaniami: co ruszyło,
+  co zlecone i kiedy wynik; bez „jeśli chcesz”. Nic dla nas = jedno zdanie „Nic do wdrożenia u nas”.
   **Temat poboczny:** wiadomość zakończona słowem „one” (z linkiem albo bez) otwiera jednorazowy temat poza główną pracą:
   rozmawiasz, ile chcesz (pracę Jarvo zleca jako misję `[poboczna]`), a „zamknij” kończy: Jarvo zapisuje teczkę
   `missions/poboczne/…` (ustalenia, wynik, ocena, jak odtworzyć) i jedną notatkę `projekty/` z tagiem `poboczny`;
