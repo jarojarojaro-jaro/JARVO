@@ -479,7 +479,7 @@ def main(argv: list[str] | None = None) -> int:
              f"    description: >-\n      TODO: jedno-dwa zdania o zakresie (routing kanbana).\n"
              f"{oddaj}"
              f"    model_tier: {args.tier}\n    delegation_tier: fast\n    autonomy_max: A1\n"
-             f"    telegram_topic: {slug}\n    status: planned\n")
+             + (f"    telegram_topic: {slug}\n" if args.marka else "") + "    status: planned\n")
     if n is not None:                         # fleet.yaml nakładki to sama lista `agents:`: wpis na końcu
         fleet_text = fleet_text.rstrip("\n").removesuffix(" []") + "\n" + entry
     else:

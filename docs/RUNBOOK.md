@@ -88,7 +88,9 @@ Zainstaluj Tailscale też na laptopie i telefonie. Od teraz łącz się przez `s
 3. **Twoje ID:** napisz do [@userinfobot](https://t.me/userinfobot) → liczba `Id` = `TELEGRAM_OWNER_ID`.
 4. **Supergrupa:** nowa grupa „Jarvo HQ” → Ustawienia → **Tematy (Topics): włącz**. Dodaj bota
    (**po** zmianie prywatności; jeśli był dodany wcześniej: usuń i dodaj ponownie) i nadaj mu admina.
-5. **Tematy:** utwórz `Sherlock`, `Web`, `Studio`, `Wideo`, `Ads`, `Łowca`, `Aplikacje`, `Ręka`. Wątek „General” należy do Jarva.
+5. **Tematy:** wątek „General” należy do Jarva; własny wątek ma tylko agent biznesowy z nakładki (np. `Sklep`) i sesja
+   zewnętrzna (Kernel). Specjaliści (Sherlock, Web, Studio, Wideograf, Ads, Łowca, Aplikacje, Ręka) wątków nie mają:
+   pracują przez Jarva (decyzja 16.11). Wątki zakłada `jarvo telegram tematy`.
 6. **ID grupy i wątków** (zanim uruchomisz flotę, bo gateway przejmie odbieranie wiadomości):
    napisz po jednej wiadomości w każdym temacie, potem:
    ```bash
@@ -126,14 +128,7 @@ JARVO_EXTRAS=                      # opcjonalnie: rembg media office docling man
 ```ini
 TELEGRAM_OWNER_ID=123456789
 TELEGRAM_HQ_CHAT_ID=-1001234567890
-TELEGRAM_TOPIC_SHERLOCK=2
-TELEGRAM_TOPIC_WEB=3
-TELEGRAM_TOPIC_STUDIO=4
-TELEGRAM_TOPIC_REKA=5
-TELEGRAM_TOPIC_WIDEO=6
-TELEGRAM_TOPIC_ADS=7
-TELEGRAM_TOPIC_LOWCA=8
-TELEGRAM_TOPIC_MOBILE=9
+TELEGRAM_TOPIC_SKLEP=2              # wątek agenta biznesowego z nakładki (przykład); specjaliści bez wątków
 JARVO_MODEL_PROVIDER=              # puste = openai-codex (niżej: „Dostawca modeli”)
 ```
 

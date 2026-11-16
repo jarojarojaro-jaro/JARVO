@@ -139,3 +139,12 @@ def test_publiczny_tylko_na_zyczenie(kopia):
     assert (kopia / "profiles" / "jarvo-kwiaty" / "SOUL.md").is_file()
     assert next(a for a in fl.load_fleet(kopia / "fleet.yaml", nakladka=None).agents if a.name == "jarvo-kwiaty").marka == "kwiaty"
     assert "security/redteam/promptfooconfig.yaml" in p.stdout
+
+
+def test_specjalista_bez_watku_telegrama(kopia):
+    """Wątek w grupie Jarvo HQ ma tylko Jarvo i agent biznesowy (decyzja 16.11): nowy specjalista bez telegram_topic."""
+    p = _uruchom(kopia, "--name", "jarvo-tlumacz", "--title", "Tłumacz")
+    assert p.returncode == 0, p.stderr
+    assert next(a for a in fl.load_fleet(kopia / "fleet.yaml", nakladka=None).agents if a.name == "jarvo-tlumacz").telegram_topic == ""
+    p = _uruchom(kopia, "--marka", "kwiaty", "--title", "X", "--publiczny")
+    assert next(a for a in fl.load_fleet(kopia / "fleet.yaml", nakladka=None).agents if a.name == "jarvo-kwiaty").telegram_topic == "kwiaty"

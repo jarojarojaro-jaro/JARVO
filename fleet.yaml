@@ -81,7 +81,7 @@ agents:
     model_tier: frontier
     delegation_tier: fast
     autonomy_max: A1
-    telegram_topic: general       # wątek ogólny grupy „Jarvo HQ” + Twój DM
+    telegram_topic: general       # wątek ogólny grupy „Jarvo HQ” + Twój DM; specjaliści bez wątków: pracują przez Jarva (16.11)
     hq_room: bridge    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Mostek dowodzenia"
     hq_short: "Jarvo"
@@ -108,7 +108,6 @@ agents:
     model_tier: strong
     delegation_tier: fast
     autonomy_max: A1
-    telegram_topic: sherlock
     pin_skills: [szybki-research]   # pełne śledztwo (metoda-sherlocka) tylko na zamówienie „pełny/głęboki” (12.11)
     hq_room: study    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Gabinet śledczy"
@@ -136,7 +135,6 @@ agents:
     model_tier: strong
     delegation_tier: fast
     autonomy_max: A1
-    telegram_topic: web
     hq_room: devlab    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Pracownia webowa"
     hq_short: "Web"
@@ -162,7 +160,6 @@ agents:
     model_tier: strong
     delegation_tier: fast
     autonomy_max: A1
-    telegram_topic: studio
     hq_room: atelier    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Atelier kreatywne"
     hq_short: "Studio"
@@ -191,7 +188,6 @@ agents:
     model_tier: strong
     delegation_tier: fast
     autonomy_max: A1
-    telegram_topic: wideo
     pin_skills: [krotki-film]
     hq_room: filmstudio    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Studio filmowe"
@@ -219,7 +215,6 @@ agents:
     model_tier: strong
     delegation_tier: fast
     autonomy_max: A1
-    telegram_topic: ads
     pin_skills: [plan-kampanii]
     hq_room: office    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Sala operacyjna"
@@ -247,7 +242,6 @@ agents:
     model_tier: strong
     delegation_tier: fast
     autonomy_max: A1
-    telegram_topic: lowca
     pin_skills: [profil-klienta]
     hq_room: radar    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Radar sprzedaży"
@@ -278,7 +272,6 @@ agents:
     model_tier: strong
     delegation_tier: fast
     autonomy_max: A1
-    telegram_topic: mobile
     pin_skills: [natywna-czy-pwa]
     hq_room: apps    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Pracownia aplikacji"
@@ -305,7 +298,6 @@ agents:
     model_tier: strong
     delegation_tier: fast
     autonomy_max: A1
-    telegram_topic: reka
     hq_room: workshop    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Warsztat"
     hq_short: "Ręka"

@@ -144,7 +144,7 @@ out/leady/<projekt>/
    na żywych źródłach w kontenerze. e-Zamówienia odcina za kilka ciężkich zapytań z rzędu (strona „Dostęp
    zablokowany”): pauza 4 s na zapytanie, pełny dzień dzielony na województwa, blokada = stop. Pokój „Radar” w HQ.
 3. ✅ Profil `jarvo-lowca`: SOUL, 7 skilli, rubryka, 16 scenariuszy evals, dokumentacja floty; wzorzec misji „Leady”
-   u Jarva, temat `Łowca` na Telegramie (`TELEGRAM_TOPIC_LOWCA`).
+   u Jarva; Łowca nie ma własnego wątku na Telegramie, pracuje przez Jarva.
 4. ⬜ Pierwszy prawdziwy przebieg na ofercie użytkownika i poprawki wag.
 5. ✅ CEIDG (2026-10-05, decyzja właściciela): `ceidg.py` (API v3, token właściciela), sygnał `ceidg-nowa-firma`,
    minimum danych osoby, testy offline, eval `lowca-ceidg`. ⬜ Pierwsze zapytanie z prawdziwym tokenem: sprawdzić

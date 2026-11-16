@@ -908,27 +908,28 @@ def czytaj_env(p: Path) -> dict[str, str]:
     return out
 
 
-def zapisz_env(p: Path, zmiany: dict[str, str]) -> list[str]:
+def zapisz_env(p: Path, zmiany: dict[str, str | None]) -> list[str]:
     """Scala `zmiany` z plikiem .env (inne linie i komentarze zostają), zapis atomowy z LF, plik tylko dla właściciela
-    (POSIX 0600, Windows ACL). Zwraca nazwy zmienionych kluczy; wartości nigdzie nie wypisujemy."""
+    (POSIX 0600, Windows ACL); wartość None usuwa klucz. Zwraca nazwy zmienionych kluczy; wartości nigdzie nie wypisujemy."""
     try:
         linie = p.read_text(encoding="utf-8-sig").splitlines()
     except FileNotFoundError:
         linie = []
     stare = czytaj_env(p)
-    zmienione = [k for k, v in zmiany.items() if stare.get(k) != v]
+    zmienione = [k for k, v in zmiany.items() if (k in stare if v is None else stare.get(k) != v)]
     if not zmienione and p.exists():
         return []
     widziane = set()
     for i, linia in enumerate(linie):
         m = LINIA_ENV.match(linia)
         if m and not linia.lstrip().startswith("#") and m.group(1) in zmiany:
-            if m.group(1) in widziane:
-                linie[i] = None            # druga linia z tym samym kluczem: zostaje jedna
+            if m.group(1) in widziane or zmiany[m.group(1)] is None:
+                linie[i] = None            # klucz do usunięcia albo druga linia z tym samym kluczem: zostaje jedna
                 continue
             linie[i] = f"{m.group(1)}={zmiany[m.group(1)]}"
             widziane.add(m.group(1))
-    linie = [x for x in linie if x is not None] + [f"{k}={v}" for k, v in zmiany.items() if k not in widziane]
+    linie = [x for x in linie if x is not None] + [f"{k}={v}" for k, v in zmiany.items()
+                                                   if k not in widziane and v is not None]
     przenosne.zapisz_atomowo(p, "\n".join(linie) + "\n", tryb=0o600)
     with contextlib.suppress(OSError):
         przenosne.chron(p)
@@ -1270,9 +1271,8 @@ def polecenie_telegram_tematy(u: Uklad, a, _reszta, ot) -> int:
     plik_sesji = konfig(u) / "sesje.json"
     sesje = _json(plik_sesji)
     tematy = tematy_do_zalozenia(u, sesje)
-    if not any(t["sesja"] is None for t in tematy):
-        print("Nie widzę zbudowanej floty z wątkami agentów (<build>/wiedza/fleet.json): najpierw jarvo instaluj.",
-              file=sys.stderr)
+    if not _json(u.build / "wiedza" / "fleet.json").get("agents"):   # bez agentów biznesowych wątek ma tylko Kernel
+        print("Nie widzę zbudowanej floty (<build>/wiedza/fleet.json): najpierw jarvo instaluj.", file=sys.stderr)
         return 1
     try:
         czat = api_telegrama(token, "getChat", {"chat_id": grupa}) or {}
@@ -1338,6 +1338,21 @@ def polecenie_telegram_tematy(u: Uklad, a, _reszta, ot) -> int:
     print("  Jarvo: temat General (cała grupa poza wątkami agentów)")
     for wiersz in wiersze:
         print(wiersz)
+    # wątki, których już nie ma mieć nikt (16.11: specjaliści pracują przez Jarva, bez własnych wątków): trasa z
+    # jarvo.env zawsze wypada; sam wątek w Telegramie kasujemy tylko na --usun-zbedne (może mieć rozmowę właściciela)
+    potrzebne = {f"TELEGRAM_TOPIC_{t['klucz']}" for t in tematy}
+    for klucz in sorted(k for k in env if k.startswith("TELEGRAM_TOPIC_") and k not in potrzebne):
+        zmiany_env[klucz] = None
+        watek = (env.get(klucz) or "").strip()
+        if not getattr(a, "usun_zbedne", False) or not ta_sama or not ID_WATKU_RE.match(watek):
+            print(f"  {klucz[len('TELEGRAM_TOPIC_'):].lower()}: trasa usunięta, wątek {watek or '?'} zostaje w grupie "
+                  "(usunie go --usun-zbedne)")
+            continue
+        try:
+            api_telegrama(token, "deleteForumTopic", {"chat_id": grupa, "message_thread_id": int(watek)})
+            print(f"  {klucz[len('TELEGRAM_TOPIC_'):].lower()}: wątek {watek} usunięty z grupy (agent pracuje przez Jarva)")
+        except BladTelegrama as e:
+            print(f"  {klucz[len('TELEGRAM_TOPIC_'):].lower()}: wątku {watek} nie usunąłem ({e}); trasa usunięta")
     zmienione = zapisz_env(konfig(u) / "jarvo.env", zmiany_env)
     if json.dumps(_json(plik_sesji), sort_keys=True) != json.dumps(sesje, sort_keys=True):
         przenosne.zapisz_atomowo(plik_sesji, json.dumps(sesje, ensure_ascii=False, indent=1) + "\n")
@@ -1586,9 +1601,11 @@ def dodaj_polecenia(sub) -> None:
     k.add_argument("--czat", metavar="ID", help="czat zamiast Twojego DM (grupa: -100…)")
     k.add_argument("--watek", metavar="ID", help="wątek grupy (bez --czat: grupa Jarvo HQ z jarvo.env)")
     k.set_defaults(funkcja=polecenie_telegram_wyslij)
-    k = t.add_parser("tematy", help="wątki grupy Jarvo HQ: agent na wątek, Kernel; trasy i wdrożenie floty")
+    k = t.add_parser("tematy", help="wątki grupy Jarvo HQ: Jarvo (General), agenci biznesowi, Kernel; trasy i wdrożenie floty")
     k.add_argument("--grupa", metavar="ID", help="ID supergrupy Jarvo HQ (-100…); bez niego: grupa, w której pisałeś")
     k.add_argument("--bez-wdrozenia", action="store_true", help="tylko zapis wątków (trasy przy następnym wdrożeniu)")
+    k.add_argument("--usun-zbedne", action="store_true",
+                   help="usuń z grupy wątki agentów, którzy nie mają już wątku (trasy wypadają zawsze)")
     k.set_defaults(funkcja=polecenie_telegram_tematy)
     k = t.add_parser("status", help="co jest ustawione (bez wartości) i konflikt 409")
     k.add_argument("--json", action="store_true")

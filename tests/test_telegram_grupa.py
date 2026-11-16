@@ -58,6 +58,8 @@ class BotAPI:
             return {"message_thread_id": self.nastepny - 1, "name": dane["name"]}
         if metoda == "sendMessage":
             return {"message_id": 1}
+        if metoda == "deleteForumTopic":
+            return True
         raise AssertionError(metoda)
 
     def metody(self, nazwa):
@@ -196,6 +198,25 @@ def test_tematy_ostrzega_gdy_bot_nie_jest_adminem(inst, capsys):
     api.status = "member"
     assert wc.polecenie_telegram_tematy(u, _a(grupa=GRUPA, bez_wdrozenia=True), [], ot) == 0
     assert "nie jest administratorem" in capsys.readouterr().out
+
+
+def test_tematy_usuwa_trasy_i_watki_specjalistow(inst, capsys):
+    """16.11: w grupie tylko Jarvo, agenci biznesowi i Kernel. Trasa wątku, którego flota już nie ma, wypada zawsze;
+    sam wątek w Telegramie znika tylko na --usun-zbedne (może mieć rozmowę właściciela)."""
+    u, ot, api, _f = inst
+    wc.zapisz_env(wc.konfig(u) / "jarvo.env", {"TELEGRAM_HQ_CHAT_ID": GRUPA, "TELEGRAM_TOPIC_SHERLOCK": "55",
+                                               "TELEGRAM_TOPIC_STUDIO": "56", "TELEGRAM_TOPIC_KERNEL": "57"})
+    (u.build / "wiedza" / "fleet.json").write_text(json.dumps({"orchestrator": "jarvo", "agents": [
+        {"name": "jarvo", "short": "Jarvo", "telegram_topic": "general"},
+        {"name": "jarvo-sherlock", "short": "Sherlock", "telegram_topic": ""}]}), encoding="utf-8")
+    assert wc.polecenie_telegram_tematy(u, _a(bez_wdrozenia=True), [], ot) == 0
+    env = wc.czytaj_env(wc.konfig(u) / "jarvo.env")
+    assert "TELEGRAM_TOPIC_SHERLOCK" not in env and "TELEGRAM_TOPIC_STUDIO" not in env and env["TELEGRAM_TOPIC_KERNEL"] == "57"
+    assert not api.metody("deleteForumTopic") and "usunie go --usun-zbedne" in capsys.readouterr().out
+    wc.zapisz_env(wc.konfig(u) / "jarvo.env", {"TELEGRAM_TOPIC_SHERLOCK": "55"})
+    assert wc.polecenie_telegram_tematy(u, _a(bez_wdrozenia=True, usun_zbedne=True), [], ot) == 0
+    assert api.metody("deleteForumTopic") == [{"chat_id": GRUPA, "message_thread_id": 55}]
+    assert "TELEGRAM_TOPIC_SHERLOCK" not in wc.czytaj_env(wc.konfig(u) / "jarvo.env")
 
 
 def test_tematy_bierze_nowy_numer_grupy_po_wlaczeniu_tematow(inst, monkeypatch, capsys):

@@ -158,11 +158,19 @@ def test_owner_deliver_token():
     assert build.base_tokens(fleet, jarvo, "/b", {})["OWNER_DELIVER"] == "local"
 
 
+def _z_watkiem(fleet, nazwa: str, temat: str):
+    """Flota, w której agent `nazwa` ma wątek (jak agent biznesowy z nakładki): w publicznym fleet.yaml wątek ma tylko
+    Jarvo (General), specjaliści pracują przez Jarva (decyzja 16.11)."""
+    import dataclasses
+    return dataclasses.replace(fleet, agents=[dataclasses.replace(a, telegram_topic=temat) if a.name == nazwa else a
+                                              for a in fleet.agents])
+
+
 def test_agent_deliver_token_watek_w_grupie_hq():
     """Rutyny agenta raportują do jego wątku w grupie Jarvo HQ (telegram:<grupa>:<wątek>), temat „general” do samej
     grupy; bez grupy albo tematu w .env jak OWNER_DELIVER (DM właściciela, bez niego lokalnie)."""
     import dataclasses
-    fleet = fl.load_fleet()
+    fleet = _z_watkiem(fl.load_fleet(), "jarvo-web", "web")
     web = fleet.agent("jarvo-web")
     assert build.base_tokens(fleet, web, "/b", ENV)["AGENT_DELIVER"] == "telegram:-1002222222222:12"
     ogolny = dataclasses.replace(web, telegram_topic="general")
@@ -172,9 +180,13 @@ def test_agent_deliver_token_watek_w_grupie_hq():
     bez_grupy = {k: v for k, v in ENV.items() if k != "TELEGRAM_HQ_CHAT_ID"}
     assert build.base_tokens(fleet, web, "/b", bez_grupy)["AGENT_DELIVER"] == "telegram:111111111"
     assert build.base_tokens(fleet, web, "/b", {})["AGENT_DELIVER"] == "local"
+    specjalista = fl.load_fleet().agent("jarvo-sherlock")               # bez wątku: wynik idzie przez Jarva / DM
+    assert build.base_tokens(fl.load_fleet(), specjalista, "/b", ENV)["AGENT_DELIVER"] == "telegram:111111111"
 
 
 def test_host_routes(tmp_path):
+    """Trasy bramy: DM i General do Jarva; specjaliści floty bez własnych wątków (16.11: grupa ma tylko Jarva, agentów
+    biznesowych i Kernela), więc w publicznej flocie innych tras nie ma; agent z wątkiem dostaje trasę z thread_id."""
     fleet = fl.load_fleet()
     notes = build.build_host(fleet, tmp_path, ENV)
     cfg = fl.load_yaml(tmp_path / "config.yaml")
@@ -183,16 +195,18 @@ def test_host_routes(tmp_path):
     assert routes["owner-dm"] == {"name": "owner-dm", "platform": "telegram", "chat_id": "111111111",
                                   "profile": fleet.orchestrator}
     assert routes["hq-jarvo"]["chat_id"] == "-1002222222222" and "thread_id" not in routes["hq-jarvo"]
-    assert routes["hq-jarvo-web"]["thread_id"] == "12" and routes["hq-jarvo-web"]["profile"] == "jarvo-web"
-    assert len(routes) == 1 + len(fleet.active())
+    assert set(routes) == {"owner-dm", "hq-jarvo"}
     assert cfg["gateway"]["multiplex_profiles"] is True
     # wiadomość wysłana w trakcie restartu bramy nie ginie (Hermes domyślnie wyrzuca kolejkę Telegrama przy starcie)
     assert cfg["platforms"]["telegram"]["drop_pending_on_cold_boot"] is False
     assert (tmp_path / "SOUL.md").exists()
+    build.build_host(_z_watkiem(fleet, "jarvo-web", "web"), tmp_path / "z", ENV)
+    trasy = {r["name"]: r for r in fl.load_yaml(tmp_path / "z" / "config.yaml")["gateway"]["profile_routes"]}
+    assert trasy["hq-jarvo-web"]["thread_id"] == "12" and trasy["hq-jarvo-web"]["profile"] == "jarvo-web"
 
 
 def test_host_routes_missing_ids_are_reported(tmp_path):
-    notes = build.build_host(fl.load_fleet(), tmp_path, {"TELEGRAM_HQ_CHAT_ID": "-100"})
+    notes = build.build_host(_z_watkiem(fl.load_fleet(), "jarvo-web", "web"), tmp_path, {"TELEGRAM_HQ_CHAT_ID": "-100"})
     joined = " ".join(notes)
     assert "TELEGRAM_OWNER_ID" in joined and "TELEGRAM_TOPIC_WEB" in joined
 

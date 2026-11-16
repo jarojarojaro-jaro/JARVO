@@ -170,6 +170,15 @@ def test_profile_without_fleet_entry(repo_copy):
     assert not errors_matching(validate.run(), r"profiles/jarvo-dawny")
 
 
+def test_watek_telegrama_tylko_jarvo_i_agenci_biznesowi(repo_copy):
+    """Decyzja 16.11: w grupie Jarvo HQ tylko Jarvo (General), agenci biznesowi (`marka`) i Kernel; specjalista
+    z `telegram_topic` to błąd walidacji."""
+    p = repo_copy / "fleet.yaml"
+    tekst = p.read_text(encoding="utf-8")
+    p.write_text(tekst.replace("  - name: jarvo-web\n", "  - name: jarvo-web\n    telegram_topic: web\n", 1), encoding="utf-8")
+    assert errors_matching(validate.run(), r"jarvo-web: telegram_topic tylko u Jarva")
+
+
 def test_docs_count_must_match_repo(repo_copy):
     import shutil
     shutil.rmtree(repo_copy / "profiles/jarvo-studio/skills/studio/copy-pl")

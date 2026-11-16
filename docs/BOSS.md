@@ -162,9 +162,9 @@ zdarzenie `completed`:
 Rutyny instalują się **wstrzymane**. Włączasz je po sprawdzeniu, że Telegram działa:
 `scripts/install-fleet.sh --resume-cron` (albo `hermes -p jarvo cron resume <id>`).
 
-Rutyny Jarva idą do Ciebie na DM (`@@OWNER_DELIVER@@`), a rutyny innych agentów do ich wątku w grupie Jarvo HQ
+Rutyny Jarva idą do Ciebie na DM (`@@OWNER_DELIVER@@`), a rutyny agentów biznesowych do ich wątku w grupie Jarvo HQ
 (`@@AGENT_DELIVER@@` w `cron/jobs.yaml` profilu: `telegram:<TELEGRAM_HQ_CHAT_ID>:<TELEGRAM_TOPIC_<temat>>`, temat `general` = sama
-grupa); bez grupy albo tematu w `.env` też na DM.
+grupa); bez grupy albo tematu w `.env` też na DM. Specjaliści wątków nie mają: ich wyniki przekazuje Jarvo (16.11).
 
 ---
 

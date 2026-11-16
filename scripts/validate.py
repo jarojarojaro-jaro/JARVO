@@ -120,6 +120,12 @@ def check_fleet(fleet: fl.Fleet, r: Report) -> None:
                 elif len(rola.split()) > 8:
                     r.err(f"{a.name}: {jez} ma {len(rola.split())} słów (najwyżej 8)")
     check_marki(fleet, r)
+    for a in fleet.agents:
+        # wątki grupy Jarvo HQ (decyzja właściciela 16.11): Jarvo (General), agenci biznesowi i sesje zewnętrzne (Kernel,
+        # sesje.json); specjaliści pracują przez Jarva, więc własnego wątku nie mają
+        if a.telegram_topic and not (a.telegram_topic == "general" and a.name == fleet.orchestrator or a.marka):
+            r.err(f"{a.name}: telegram_topic tylko u Jarva (general) i agentów biznesowych (marka); specjalista pracuje "
+                  "przez Jarva bez własnego wątku")
     check_uchwyty(fleet, r)
     katalogi = [(fl.PROFILES_DIR, "")] + ([(fleet.nakladka / "profiles", "nakładka: ")] if fleet.nakladka else [])
     for katalog, przedrostek in katalogi:
