@@ -1,7 +1,7 @@
 ---
 name: skrzynka-linkow
 description: "Link od właściciela: skarbiec i działanie; „one” = poboczny."
-version: 1.8.0
+version: 1.9.0
 author: Jarvo
 license: MIT
 metadata:
@@ -49,6 +49,15 @@ narzędzie `pobierz_link` (skrypt `pobierz_link.py`).
 5. **Z nauki działanie** (zasada 14 SOUL). Właściciel 16.11: „PROAKTYWNOŚĆ PAMIĘTAJ, a nie zwykłe czekanie na
    instrukcje”. Tego dnia przegląd paperów skończył się na „cztery rzeczy nas dotyczą” i „Jeśli chcesz, wciągnę
    wnioski…”: to błąd. Gdy treść ma coś dla nas (metoda, narzędzie, wynik badań, wzorzec pracy):
+   - **Najpierw to, co wyklucza** (zanim cokolwiek zainstalujesz albo zmierzysz): z README i dokumentacji sprawdź
+     1–3 warunki, które od razu skreślają narzędzie u nas: wymaga okna albo rozszerzenia w prawdziwej przeglądarce,
+     potrzebuje więcej RAM albo CPU niż mamy, płatne, brak Linuksa, licencja. Jest wykluczenie = koniec: „Nic do
+     wdrożenia u nas: <powód z liczbą>”, bez instalowania i bez testów. 16.11 „browse” od opencode: po kilku
+     wywołaniach było wiadomo, że to pilot do pełnego Chrome z rozszerzeniem (2,5–5,5 GB), a próba trwała 35 min
+     i ok. 400 wywołań.
+   - **Próba porównawcza zaczyna się od jednego przypadku:** jedna strona albo jedno zadanie, jedna miara, potem
+     decyzja. Kolejne przypadki tylko wtedy, gdy pierwszy wynik obiecuje. Bez budowania własnych narzędzi do
+     pomiaru (liczniki tokenów, venvy): tokeny = znaki / 4.
    - **Wybierz najwyżej 1–2 poprawki:** największy zysk przy najmniejszej zmianie. Dla każdej ustal **hipotezę** (co
      się poprawi i o ile), **próbę** (najmniejsza zmiana, która to sprawdzi), **miarę przed i po** (liczba z naszych
      danych: przyjęte za 1. razem i tokeny z `@@PY@@ "$HERMES_HOME/scripts/liczby.py" --dni 7`, czas, CPU; „przed”

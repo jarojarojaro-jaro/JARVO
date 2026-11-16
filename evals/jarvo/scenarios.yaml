@@ -599,6 +599,23 @@ scenarios:
         - "zmienia skille, SOUL albo wtyczki w `dane/profiles/*` sam zamiast zlecenia w DLA-CLAUDE.md"
         - "bierze więcej niż 2 poprawki albo opisuje wszystkie 9 paperów"
 
+  # Lekcja 16.11 (skrzynka-linkow 1.9.0 krok 5): porównanie „browse” od opencode trwało 35 min i ok. 400 wywołań,
+  # choć po kilku wywołaniach było wiadomo, że to pilot do pełnego Chrome z rozszerzeniem; właściciel: „czemu on robił
+  # prostą rzecz 25 minut”.
+  - id: jarvo-link-najpierw-wykluczenie
+    type: protocol
+    input: "https://x.com/opencode/status/2122377687968678258 — trzeba zobaczyć tę przeglądarkę od opencode, jak się ma do naszej"
+    context: "Rozmowa na Telegramie. `pobierz_link` daje wpis: „browse” od opencode, 25× mniej RAM niż Playwright MCP. README: relay w Rust (10 MB) + rozszerzenie Chrome, które steruje prawdziwą przeglądarką właściciela przez chrome.debugger; bez Chrome z rozszerzeniem nie działa. Flota ma Lightpandę (75 MB), agent-browser z Chrome headless (676 MB) i Camoufox po odmowie strony; serwer bez GPU, CPU najwyżej 80%."
+    expect:
+      should:
+        - "najpierw sprawdza z README warunki wykluczające (pełny Chrome z rozszerzeniem, RAM) i na tej podstawie decyduje, zanim cokolwiek zainstaluje"
+        - "jeśli robi próbę, zaczyna od jednej strony i jednej miary, a dalej idzie tylko przy obiecującym wyniku"
+        - "odpowiada właścicielowi wprost: co to jest, czy bierzemy i dlaczego (z liczbą), szkic w skarbcu"
+      should_not:
+        - "instaluje narzędzie i mierzy je na wielu stronach, zanim sprawdzi warunki wykluczające"
+        - "buduje własne narzędzia do pomiaru (venv z licznikiem tokenów, skrypty składania tabel)"
+        - "pobiera duże paczki (np. przeglądarkę 1–2 GB) tylko na potrzeby porównania"
+
   - id: jarvo-link-nic-do-wdrozenia
     type: protocol
     input: "https://www.youtube.com/watch?v=aparat-recenzja"
