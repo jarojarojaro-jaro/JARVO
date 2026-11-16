@@ -53,6 +53,9 @@ kartę zatrzymuje kanban_block albo kanban_complete, bo zabitego pracownika dysp
 Przypisanie decyzji właścicielowi (w każdym trybie): tekst narzędzi kanbana (komentarz, powód blokady, podsumowanie,
 treść karty) i zapis w misjach albo skarbcu z „decyzja właściciela”, „właściciel zdecydował” i podobnymi bez cytatu
 jego słów („…”) i godziny albo daty obok = block z radą: cytat z czasem albo „decyzja Jarva”.
+Strażnik nagrywania ekranu (w każdym trybie, z człowiekiem, bez niego i pod YOLO): surowe `ffmpeg -f x11grab`
+(gdigrab, avfoundation, kmsgrab) i programy nagrywające pulpit w terminalu, procesie w tle i execute_code = block
+z radą: nagraj.py ze skilla praca-na-ekranie (krótkie odcinki udanych kroków; 16.11 ~20 min nagrania pętli błędów).
 
 Jak to działa w Hermesie f97608f (sprawdzone w kodzie, plik:linia):
   - hermes_cli/plugins.py:1854-1906: dyrektywy pre_tool_call; block (z niepustym message) wygrywa z approve, a z wielu
@@ -172,6 +175,16 @@ KOD_FLOTY_PROFILU = (("skills", "zainstalowane skille"), ("plugins", "wtyczki"),
                      ("scripts", "skrypty floty"), ("SOUL.md", "instrukcja agenta"), ("mcp.json", "serwery MCP"))
 ZLECENIE_FLOTY = "DLA-CLAUDE.md"           # zlecenia dla Claude Code w katalogu misji (SOUL Jarva, zasada 8)
 KOD_FLOTY = "kod floty"
+
+# Nagrywanie ekranu tylko przez nagraj.py ze skilla praca-na-ekranie (krótkie odcinki udanych kroków, koniec przy
+# pierwszej odmowie Komputera albo bez ruchu, film tylko z udanych kroków). 16.11 Jarvo nagrywał surowym
+# `ffmpeg -f x11grab` pulpit przez ~20 min: w kółko tę samą nieudaną weryfikację, gdy sam pracował już na telefonie.
+# Blokada w każdym trybie, z człowiekiem, bez niego i pod YOLO (terminal, proces w tle, execute_code).
+NAGRYWANIE_EKRANU = re.compile(
+    r"\b(?:ffmpeg|avconv)(?:\.exe)?\b.*?-f[\s\"',]*(?:x11grab|gdigrab|avfoundation|kmsgrab|fbdev)\b|"
+    r"\b(?:ddagrab|ximagesrc|wf-recorder|recordmydesktop|byzanz-record|simplescreenrecorder|vokoscreen(?:ng)?|"
+    r"kazam)\b", re.I | re.S)
+NAGRAJ = "$HERMES_HOME/skills/ekran/praca-na-ekranie/scripts/nagraj.py"
 
 KONTEKSTY = {"kanban": "karta kanbana", "cron": "rutyna (cron)", "q": "jednorazowe zapytanie (-q)",
              "podagent": "podagent (delegate_task)", "webhook": "webhook", "brak": "sesja bez człowieka"}
@@ -2996,6 +3009,19 @@ def _blok(tresc: str) -> Dict[str, str]:
     return {"action": "block", "message": f"Zablokowane (jarvo-zgody): {tresc}"}
 
 
+def _nagrywanie_ekranu(narzedzie: str, tekst: str) -> Optional[Dict[str, str]]:
+    """Block dla surowego nagrywania ekranu (NAGRYWANIE_EKRANU) z radą: nagraj.py ze skilla praca-na-ekranie."""
+    if not NAGRYWANIE_EKRANU.search(tekst[:_MAX_POLECENIA]):
+        return None
+    logger.warning("jarvo-zgody: zablokowane surowe nagrywanie ekranu (%s)", narzedzie)
+    return _blok(f"surowe nagrywanie ekranu ({narzedzie}: ffmpeg x11grab, gdigrab, avfoundation albo inny program "
+                 "nagrywający) jest wyłączone w każdym trybie: nagrywa pulpit bez końca, także pętlę nieudanych kroków. "
+                 f"Nagrywaj tylko przez `python3 \"{NAGRAJ}\"` (skill praca-na-ekranie): `start \"<krok>\"` przed "
+                 "krokiem, który ma się udać, `stop` po jego potwierdzeniu, `film` na końcu. Skrypt nagrywa krótkie "
+                 "odcinki, sam kończy przy odmowie Komputera albo bez ruchu na ekranie, a film skleja tylko z udanych "
+                 "kroków. Przy pierwszej blokadzie przestań nagrywać.")
+
+
 def _blok_werdyktow(werdykty: List[_Werdykt], m: _Miejsca, co: str) -> Dict[str, str]:
     flota = [w for w in werdykty if w.powod.startswith(KOD_FLOTY)]
     if flota:
@@ -3379,7 +3405,11 @@ def _decyzja(tool_name: str, args: Dict[str, Any], task_id: str) -> Optional[Dic
     if tool_name == "patch":
         return _zapis_plikow(tool_name, sciezki_latki(args), m, task_id)
     if tool_name == "terminal":
-        return _terminal(args, m, task_id)
+        return _nagrywanie_ekranu(tool_name, str(args.get("command") or "")) or _terminal(args, m, task_id)
+    nagrywanie = _nagrywanie_ekranu(tool_name, str(args.get("code") or "") if tool_name == "execute_code"
+                                    else str(args.get("data") or "") if tool_name == "process_manage" else "")
+    if nagrywanie:
+        return nagrywanie
     kasowania: List[_Kasowanie] = []
     if tool_name == "execute_code":
         _kasowania_pythona(str(args.get("code") or ""), _baza(task_id), _dom(), kasowania, 0)

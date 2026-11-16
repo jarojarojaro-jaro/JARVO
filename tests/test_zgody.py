@@ -1093,6 +1093,47 @@ def test_execute_code_i_proces_w_tle_z_kasowaniem(sr, monkeypatch, tryb):
     assert w is None or "masowe kasowanie" not in w["message"]
 
 
+NAGRYWANIE = [
+    "ffmpeg -y -video_size 1920x1080 -framerate 25 -f x11grab -i :0.0 /tmp/proces.mp4",      # 16.11 z terminala
+    "nohup nice -n 15 /usr/bin/ffmpeg -f 'x11grab' -i \"$DISPLAY\" -t 1200 out/nagranie.mkv &",
+    "ffmpeg.exe -f gdigrab -framerate 30 -i desktop out.mp4", "ffmpeg -f avfoundation -i 1:none out.mov",
+    "ffmpeg -loglevel error \\\n  -f x11grab -i :1 a.mp4", "wf-recorder -f film.mp4", "recordmydesktop -o a.ogv",
+    "gst-launch-1.0 ximagesrc ! videoconvert ! x264enc ! mp4mux ! filesink location=a.mp4",
+]
+
+
+@pytest.mark.parametrize("tryb", TRYBY_PRACY + ["auto"])
+@pytest.mark.parametrize("polecenie", NAGRYWANIE, ids=[n[:40] for n in NAGRYWANIE])
+def test_surowe_nagrywanie_ekranu_zablokowane_z_rada_nagraj(sr, monkeypatch, tryb, polecenie):
+    """16.11: `ffmpeg -f x11grab` z terminala nagrywał pulpit ~20 min (pętla nieudanej weryfikacji). Każdy tryb,
+    z człowiekiem, bez niego i pod YOLO: block z radą nagraj.py ze skilla praca-na-ekranie."""
+    if tryb == "auto":
+        ustaw_tryb(monkeypatch, "auto")
+    else:
+        tryb_pracy(sr, monkeypatch, tryb)
+    w = hak("terminal", command=polecenie)
+    assert akcja(w) == "block" and "surowe nagrywanie ekranu" in w["message"], (polecenie, w)
+    assert "praca-na-ekranie/scripts/nagraj.py" in w["message"] and "`film`" in w["message"]
+
+
+def test_nagrywanie_ekranu_w_kodzie_i_procesie_w_tle(sr, monkeypatch):
+    ustaw_tryb(monkeypatch, "auto")
+    kod = "import subprocess\nsubprocess.Popen(['ffmpeg', '-f', 'x11grab', '-i', ':0', 'a.mp4'])\n"
+    assert "surowe nagrywanie" in hak("execute_code", code=kod)["message"]
+    w = hak("process_manage", action="write", session_id="proc_1", data="ffmpeg -f x11grab -i :0 a.mp4\n")
+    assert akcja(w) == "block" and "nagraj.py" in w["message"]
+
+
+@pytest.mark.parametrize("polecenie", [
+    "ffmpeg -i out/nagranie/01.mp4 -c:v libx264 film.mp4", "ffmpeg -f concat -safe 0 -i lista.txt -c copy film.mp4",
+    "python3 \"$HERMES_HOME/skills/ekran/praca-na-ekranie/scripts/nagraj.py\" start \"Rejestracja: e-mail\"",
+    "grep -rn x11grab docs/"])
+def test_montaz_i_nagraj_py_bez_blokady_nagrywania(sr, monkeypatch, polecenie):
+    ustaw_tryb(monkeypatch, "auto")
+    w = hak("terminal", command=polecenie)
+    assert w is None or "surowe nagrywanie" not in w["message"], w
+
+
 @pytest.mark.parametrize("tryb", TRYBY_PRACY)
 def test_write_file_i_patch_nie_oprozniaja_chronionych_plikow(sr, monkeypatch, tryb):
     drzewo(sr)

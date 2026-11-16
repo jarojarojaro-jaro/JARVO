@@ -112,6 +112,25 @@ def cisza_tablicy(**kwargs) -> None:
         logger.warning("jarvo-wiedza: cisza tablicy niedostępna: %s", e)
 
 
+def blokada_przed_tura(**kwargs) -> Optional[Dict[str, Any]]:
+    """Hak `pre_llm_call`: budzenie o karcie z `needs_input` przypomina, że trzeba napisać do właściciela."""
+    try:
+        return _modul("jarvo_cisza_tablicy", "cisza_tablicy.py").przed_tura(**kwargs)
+    except Exception as e:
+        logger.warning("jarvo-wiedza: przypomnienie o blokadzie niedostępne: %s", e)
+        return None
+
+
+def blokada_bez_ciszy(**kwargs) -> Optional[str]:
+    """Hak `transform_llm_output`: blokada `needs_input` nigdy nie kończy się `[SILENT]` (cisza_tablicy.py)."""
+    try:
+        return _modul("jarvo_cisza_tablicy", "cisza_tablicy.py").po_odpowiedzi(**kwargs)
+    except Exception as e:
+        logger.warning("jarvo-wiedza: straż ciszy przy blokadzie niedostępna: %s", e)
+        return None
+
+
+
 def _narzedzia_jarva() -> List[Dict[str, Any]]:
     """Schematy narzędzi Jarva (`schemat`, `pobierz_link`); awaria jednego modułu (brak pliku, błąd w kodzie) zabiera
     tylko jego narzędzie, nie narzędzia skarbca ani drugie."""
@@ -1398,6 +1417,11 @@ def register(ctx) -> None:
         ctx.register_hook("post_tool_call", cisza_tablicy)
     except Exception as e:
         logger.debug("jarvo-wiedza: cisza tablicy nie zarejestrowana: %s", e)
+    for hak, funkcja in (("pre_llm_call", blokada_przed_tura), ("transform_llm_output", blokada_bez_ciszy)):
+        try:
+            ctx.register_hook(hak, funkcja)
+        except Exception as e:
+            logger.debug("jarvo-wiedza: %s nie zarejestrowany: %s", hak, e)
     try:
         ctx.register_auxiliary_task(ZADANIE_AUX, display_name="Skarbiec wiedzy", description="wyciągi z rozmów i kompilacja skarbca (główny model)")
     except Exception as e:

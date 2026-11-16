@@ -695,6 +695,40 @@ def test_paczka_staje_na_kroku_platnosci_a_dalszych_nie_wykonuje(przegl, wejscie
     assert [x["decyzja"] for x in wpisy if x["narzedzie"] == "click"] == ["tak", "tak", "czlowiek"]
 
 
+def test_okienko_jestem_czlowiekiem_raz_na_strone_potem_telefon_i_wlasciciel(przegl, wejscie):
+    """16.11 Jarvo klikał to samo pole Turnstile „Potwierdź, że jesteś człowiekiem” godzinę i nie dał znać
+    właścicielowi. Jedno kliknięcie na stronę (bez karty: w sesji); drugie i każde po nieudanej weryfikacji na stronie
+    (nowa sesja) to odmowa `weryfikacja_czlowieka` z drogą Komputer → telefon floty → właściciel (kanban_block)."""
+    st, _, _ = przegl
+    nr = otworz(st, "https://sklep.jarvo.test/weryfikacja.html")
+    krok = {"click": {"text": "Potwierdź, że jesteś człowiekiem", "role": "checkbox"}}
+    zaznaczone = "document.getElementById('czlowiek').checked"
+    k = Mcp(wejscie)
+    try:
+        w = k.narzedzie("run_steps", {"window_id": nr, "steps": [krok]})
+        assert not w["isError"] and js(st, nr, zaznaczone) is True, w
+        w = k.narzedzie("run_steps", {"window_id": nr, "steps": [krok]})
+    finally:
+        k.zamknij()
+    sc = w["structuredContent"]
+    assert w["isError"] and (sc["code"], sc["rule"], sc["next_step"]) == (
+        "zablokowane", "weryfikacja_czlowieka", "choose_another_way"), sc
+    tekst = sc["steps"][0]["message"]
+    assert "już było" in tekst and "jarvo.test" in tekst
+    assert tekst.index("telefonie floty") < tekst.index("kanban_block") and "needs_input" in tekst
+    assert js(st, nr, zaznaczone) is True                                  # drugie kliknięcie nie poszło
+    k = Mcp(wejscie)                                                       # nowa sesja: strona po nieudanej weryfikacji
+    try:
+        w = k.narzedzie("run_steps", {"window_id": nr, "steps": [{"click": {"text": "Pokaż błąd"}}, krok]})
+    finally:
+        k.zamknij()
+    sc = w["structuredContent"]
+    assert (sc["failed_step"], sc["rule"]) == (1, "weryfikacja_czlowieka"), sc
+    assert "nieudaną weryfikację" in sc["steps"][1]["message"]
+    assert [x["decyzja"] for x in wejscie.dziennik.ostatnie if x.get("cel", "").startswith("check box")] == [
+        "tak", "odmowa", "odmowa"]
+
+
 def test_cel_napisem_niejednoznaczny_albo_bez_dopasowania_to_odmowa_bez_dzialania(przegl, wejscie):
     """Napis pasujący do kilku elementów (dwa przyciski z „Zapłać”) albo do żadnego: odmowa kroku z kandydatami
     i numerami z migawki, nic nie kliknięte, kolejne kroki nie idą; numer z odmowy działa w następnej paczce."""

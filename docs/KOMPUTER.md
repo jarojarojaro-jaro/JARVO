@@ -19,7 +19,12 @@ odtwarzamy własnym kodem na Hermesie i otwartym sterowniku `cua-driver` (MIT).
 | **Ręce**: Twój komputer na czas, który sam ustawisz, tylko w aplikacjach, które wskażesz | Windows, macOS, Linux (X11 albo XWayland), instalacja natywna | działa w kodzie (K6, §9): `jarvo komputer rece on/off/status`, zgoda, bramka, profil rąk `jarvo-ekran`; próba na żywo z prawdziwym sterownikiem przed nami |
 
 Co agent robi sam: loguje się, zakłada konta, klika „Continue with Google/GitHub/Apple/Microsoft” i zgody OAuth,
-wpisuje hasła i kody (2FA, SMS, weryfikacja), próbuje CAPTCHA i wysyła formularze logowania i rejestracji.
+wpisuje hasła i kody (2FA, SMS, weryfikacja), raz próbuje CAPTCHA i wysyła formularze logowania i rejestracji.
+Okienko „jestem człowiekiem” (Turnstile, reCAPTCHA, hCaptcha) Komputer natywnie przepuszcza raz na stronę w karcie;
+drugą próbę i każdą po nieudanej weryfikacji odrzuca (`weryfikacja_czlowieka`) z drogą: ten sam krok na telefonie
+floty, a gdy i tam nie przejdzie, `kanban_block` z `needs_input` i jednym zdaniem dla Ciebie. Na film z pracy agent
+nagrywa ekran tylko skryptem `nagraj.py` skilla `praca-na-ekranie` (odcinki do 75 s, tylko udane kroki; surowe
+`ffmpeg -f x11grab` z terminala blokuje wtyczka jarvo-zgody).
 
 Czego agent nigdy nie zrobi sam:
 - nie zapłaci, nie kupi, nie zasubskrybuje, nie doda karty, nie wyśle wiadomości ani formularza (poza logowaniem
@@ -258,6 +263,7 @@ wejścia (użytkownik `pulpit`, wznawiany przez `start.sh` po awarii, uruchamian
 | Enter albo Ctrl+Enter w polu wieloliniowym poza formularzem i Ctrl+Enter w polu poza formularzem (czat, komentarz, edytor: tam to zwykle wysyłka) | bez zgody `wysylka` robi właściciel (`wysylka_bez_formularza`) |
 | pisanie (natywnie także znak po znaku), wklejanie i Enter w polu karty, CVV, daty ważności, BLIK | bez zgody `platnosc` robi właściciel (`pole_wrazliwe`) |
 | pisanie i Enter w polu hasła, PIN, kodu SMS, 2FA, jednorazowego, weryfikacyjnego; CAPTCHA | przechodzi |
+| natywnie: klik, Enter albo spacja w okienku „jestem człowiekiem” (napis elementu albo ramka challenges.cloudflare.com, google.com/recaptcha, hcaptcha.com) drugi raz na tej samej stronie w karcie (bez karty: w sesji) albo gdy strona pokazuje nieudaną weryfikację („Weryfikacja negatywna”, „We couldn't verify you're human”) | zablokowane (`weryfikacja_czlowieka`; ten sam krok na telefonie floty, potem `kanban_block` `needs_input` dla właściciela) |
 | numer karty w dowolnym tekście | bez zgody `platnosc` robi właściciel (`karta`) |
 | klucz, token albo klucz prywatny w tekście; adres `javascript:`, `data:`, `file:`, `chrome:`, `devtools:`, `view-source:` | zablokowane |
 | pisanie, gdy nie wiadomo, gdzie trafi tekst (brak fokusu albo pole z fokusem, którego AT-SPI nie potwierdza na żywo); klik w element spoza migawek tej sesji; klik w punkt, gdy kliknięcie dostałoby inne okno albo okienko podręczne (lista, menu, podpowiedź), gdy punkt leży poza oknem, na pulpicie albo w oknie innego programu, gdy AT-SPI nie odpowiada albo dwie odpowiedzi z rzędu się różnią; element i punkt naraz | zablokowane (`brak_fokusu`, `nieznany_cel`, `cel`) |
@@ -396,8 +402,9 @@ próbach zmiana drogi albo oddanie ekranu.
 **Skille** (`profiles/jarvo/skills/ekran/`): `praca-na-ekranie` (pętla, tryby patrzenia, werdykty, odmowy), `formularze`
 (pole po polu, listy przez `set_value`, sprawdzenie wartości, formularze wrażliwe zostawia), `dane-z-ekranu`
 (tabela z drzewa albo obrazu do CSV z adresem i godziną, tylko potrzebne kolumny), `przejscie-strony` (ścieżka klienta
-z tabelą kroków i zrzutem problemu, kończy przed płatnością), `oddaj-ekran` (krok właściciela: CAPTCHA po jednej
-próbie, płatność bez zgody w karcie, prośba w jednym zdaniu). Hasło zostaje w menedżerze haseł przeglądarki.
+z tabelą kroków i zrzutem problemu, kończy przed płatnością), `oddaj-ekran` (krok właściciela: okienko „jestem
+człowiekiem” po Komputerze i telefonie, płatność bez zgody w karcie, prośba w jednym zdaniu). Hasło zostaje
+w menedżerze haseł przeglądarki. Nagranie pracy: `praca-na-ekranie/scripts/nagraj.py` (`start`, `stop`, `film`).
 
 **Evals i red team:** scenariusze `jarvo-ekran-*` w `evals/jarvo/scenarios.yaml` (droga bez ekranu, pętla, 3 wartości ze strony
 z banerem w najwyżej 10 wywołaniach, formularz, tabela, ścieżka sklepu, logowanie, `wymaga_czlowieka`, pauza,
@@ -458,7 +465,8 @@ dotąd; czytanie skarbca i orzeczeń działa bez zmian.
   zadziałać zawsze (płatność, wysyłka, publikacja, usunięcie konta, sekrety), sprawdza kod w Komputerze przy każdym
   wywołaniu.
 - **Decyzja właściciela (13.11.2026): flota robi to, co zleca właściciel, jeśli to legalne.** Logowanie,
-  rejestracja, OAuth, hasła, kody i CAPTCHA agent robi sam. Płatność, wysyłka, publikacja i usunięcie konta wymagają
+  rejestracja, OAuth, hasła i kody agent robi sam, CAPTCHA raz (potem telefon floty, potem właściciel). Płatność,
+  wysyłka, publikacja i usunięcie konta wymagają
   „tak” właściciela, a jego polecenie wpisane przez Jarva w kartę (`ZGODA WŁAŚCICIELA`, §6) jest tym „tak”. Zgodę
   czyta wejście z `kanban.db` po numerze karty od bramki: strona, czat ani argumenty modelu jej nie dadzą.
 - **Ryzyko resztkowe: formularz logowania rozpoznany po stronie.** „Wyślij” bez zgody przechodzi w formularzu

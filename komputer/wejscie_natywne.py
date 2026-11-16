@@ -167,6 +167,33 @@ class KontekstCDP(wejscie.KontekstSesji):
         super().__init__(ekran)
         self._wej = wej
         self.karta: tuple[str, str] | None = None     # (numer karty, tablica) od bramki (KARTA), pierwsza wygrywa
+        self.sesja = 0                                # numer sesji (klucz prób weryfikacji bez karty)
+        self.proba_weryfikacji: str | None = None     # strona dozwolonej próby okienka „jestem człowiekiem”
+
+    @property
+    def klucz_weryfikacji(self) -> tuple:
+        """Próby okienka „jestem człowiekiem” liczy się na kartę (wszystkie jej sesje), bez karty na sesję."""
+        return ("karta", *self.karta) if self.karta else ("sesja", self.sesja)
+
+    def weryfikacja(self, args: dict) -> tuple[str, int, bool]:
+        """(strona karty, w którą celuje działanie, liczba prób okienka „jestem człowiekiem” na niej w tej karcie,
+        czy strona pokazuje nieudaną weryfikację: napisy ostatniej migawki tego okna albo tekst ramek na żywo)."""
+        cel = self.element_celu(args)
+        nr = cel[0]["okno"][1] if cel else self._nr_okna(args)
+        s = self.sterownik
+        okno = s.okno(nr) if s is not None and nr is not None else None
+        adres = zasady_natywne.strona(okno.url) if okno is not None else ""
+        nieudana = False
+        migawki = [m for m in self.migawki.values() if m["okno"][1] == nr]
+        if migawki:
+            ostatnia = max(migawki, key=lambda m: m["czas"])
+            nieudana = any(zasady_natywne.nieudana_weryfikacja(str(e.get("label") or ""))
+                           for e in ostatnia["elementy"].values())
+        if not nieudana and okno is not None:
+            nieudana = s.jest_wzorzec(nr, zasady_natywne.WERYFIKACJA_NIEUDANA)
+        if nieudana:
+            self._wej.zapisz_weryfikacje(self.klucz_weryfikacji, adres)   # zostaje, choć napis zniknie
+        return adres, self._wej.proby_weryfikacji(self.klucz_weryfikacji, adres), nieudana
 
     def zgody(self) -> frozenset:
         """Zgoda właściciela z karty tej sesji (zasady.Kontekst.zgody); bez karty: brak zgód."""
@@ -238,6 +265,7 @@ class SesjaNatywna(wejscie.Sesja):
     def __init__(self, strumien, wej: "WejscieNatywne") -> None:
         super().__init__(strumien, wej)
         self.ctx = KontekstCDP(wej.ekran, wej)
+        self.ctx.sesja = self.nr
         self._kolejka: queue.Queue = queue.Queue()
         self._pracownik: threading.Thread | None = None
         self._konfig: dict = {"capture_scope": "window", "capture_mode": "som", "max_image_dimension": None}
@@ -324,6 +352,7 @@ class SesjaNatywna(wejscie.Sesja):
         return threading.current_thread() is self._pracownik
 
     def _ocen(self, nazwa: str, args) -> zasady.Werdykt:
+        self.ctx.proba_weryfikacji = None
         if nazwa == "run_steps":
             return self._ocen_paczke(args)
         # zasady patrzą na stronę po poprzednim działaniu, a nie przed nim (np. klik w pole hasła jeszcze w kolejce);
@@ -339,6 +368,14 @@ class SesjaNatywna(wejscie.Sesja):
         if w is not None:
             return w
         return super()._ocen(nazwa, args)
+
+    def _zapisz(self, nazwa: str, args, w: zasady.Werdykt) -> None:
+        """Wpis w dzienniku z ostatecznym werdyktem (po świeżym elemencie); dozwolona próba okienka „jestem
+        człowiekiem” liczy się dopiero tu, więc odmowa `element_zmieniony` albo `zajete` nie zjada jedynej próby."""
+        adres, self.ctx.proba_weryfikacji = self.ctx.proba_weryfikacji, None
+        if adres is not None and w.wolno:
+            self.wejscie.zapisz_weryfikacje(self.ctx.klucz_weryfikacji, adres)
+        super()._zapisz(nazwa, args, w)
 
     def _ocen_paczke(self, args: dict) -> zasady.Werdykt:
         """Sama paczka: przy pauzie nie idzie wcale, przy ekranie innej sesji też nie (`zajete`, a po utracie ekranu
@@ -403,6 +440,20 @@ class WejscieNatywne:
         self.polecenie_uslugi = polecenie_uslugi or (lambda _co, _p: {"ok": False, "blad": "brak usługi"})
         self.kanban = Path(kanban) if kanban is not None else None   # `<dane>` z kanban.db (None: bez zgód z kart)
         self._zgody: dict[tuple[str, str], tuple[float, frozenset]] = {}
+        self._weryfikacje: dict[tuple, dict[str, int]] = {}   # karta albo sesja -> strona -> próby „jestem człowiekiem”
+
+    def proby_weryfikacji(self, klucz: tuple, strona: str) -> int:
+        with self._lock:
+            return self._weryfikacje.get(klucz, {}).get(strona, 0)
+
+    def zapisz_weryfikacje(self, klucz: tuple, strona: str) -> None:
+        """Próba okienka „jestem człowiekiem” (albo nieudana weryfikacja) na stronie, na kartę albo sesję; pamięć
+        usługi Komputera (do restartu), najwyżej 256 kart i sesji."""
+        with self._lock:
+            if klucz not in self._weryfikacje and len(self._weryfikacje) >= 256:
+                self._weryfikacje.pop(next(iter(self._weryfikacje)))
+            strony = self._weryfikacje.setdefault(klucz, {})
+            strony[strona] = strony.get(strona, 0) + 1
 
     def zgody_karty(self, karta: tuple[str, str]) -> frozenset:
         """Kategorie zgody właściciela z treści karty (numer, tablica) w `<kanban>`, czytane z kanban.db tylko do

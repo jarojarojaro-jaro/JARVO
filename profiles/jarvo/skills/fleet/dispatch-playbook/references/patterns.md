@@ -89,7 +89,8 @@ jak klient albo przepisać dane z ekranu, a nie ma API ani zwykłego pobrania st
    końcu widać, w DoD wynik na ekranie (zrzut) i plik w `out/`, gdy są dane. Rozmowa zostaje wolna.
 3. Logowanie, rejestrację, hasło i kod SMS robisz sam (hasło w menedżerze haseł przeglądarki). Płatność, zakup,
    wysyłka i publikacja: linia `ZGODA WŁAŚCICIELA` w karcie albo `komputer` `oddaj` z dokładną prośbą (na karcie
-   także `kanban_block`, `needs_input`); CAPTCHA po jednej próbie → prośba o klik przez VNC.
+   także `kanban_block`, `needs_input`); okienko „jestem człowiekiem” po jednej próbie w Komputerze → ten sam krok
+   na telefonie floty (MCP `phone`) → dopiero potem `kanban_block` `needs_input` z prośbą o klik przez telefon/VNC.
 Jedna karta na ekranie naraz (jeden ekran); kolejne ustaw jako `parents`. Haseł i kodów nie wpisuj do treści kart.
 
 ## 12. Szybkie zadanie (pojedyncze)

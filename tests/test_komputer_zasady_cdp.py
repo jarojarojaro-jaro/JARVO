@@ -4,6 +4,9 @@ z wrażliwym tekstem, wybór pliku i znak po znaku w polu karty. Czyste funkcje 
 systemie."""
 from __future__ import annotations
 
+import json
+import re
+import socket
 import sys
 
 import pytest
@@ -11,7 +14,7 @@ import pytest
 from conftest import REPO
 
 sys.path.insert(0, str(REPO))
-from komputer import sterownik_cdp, zasady_natywne  # noqa: E402
+from komputer import sterownik_cdp, wejscie_natywne, zasady_natywne  # noqa: E402
 
 zasady = zasady_natywne.zasady
 
@@ -213,6 +216,139 @@ def test_wybor_pliku_robi_czlowiek():
 def test_captcha_agent_probuje_sam(cel):
     assert zasady_natywne.ocen("click", KLIK, Ctx(cel=cel)) is None
     assert zasady.ocen("click", KLIK, Ctx(cel=cel)).wolno
+    pierwsza = CtxProby(cel=cel)
+    assert zasady_natywne.ocen("click", KLIK, pierwsza) is None and pierwsza.proba_weryfikacji == "dataannotation.tech"
+
+
+class CtxProby(Ctx):
+    """Kontekst z pamięcią prób okienka „jestem człowiekiem” (jak KontekstCDP.weryfikacja)."""
+
+    def __init__(self, proby=0, nieudana=False, **kw):
+        super().__init__(**kw)
+        self.proby, self.nieudana, self.proba_weryfikacji = proby, nieudana, None
+
+    def weryfikacja(self, args):
+        return "dataannotation.tech", self.proby, self.nieudana
+
+
+TURNSTILE = el("checkbox", "Potwierdź, że jesteś człowiekiem")
+
+
+@pytest.mark.parametrize("cel", [
+    TURNSTILE, el("checkbox", "Verify you are human"), el("checkbox", "I’m not a robot"),
+    el("checkbox", "hCaptcha checkbox. Select in order to trigger the challenge"),
+    el("checkbox", "", adres_ramki="https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/b/turnstile/if/ov2"),
+    el("button", "Weryfikuj", adres_ramki="https://www.google.com/recaptcha/api2/bframe"),
+])
+def test_okienko_jestem_czlowiekiem_rozpoznane(cel):
+    assert zasady_natywne.weryfikacja_czlowieka(cel)
+
+
+@pytest.mark.parametrize("cel", [el("checkbox", "Akceptuję regulamin sklepu"), el("button", "Continue with Google"),
+                                 el("checkbox", "", adres_ramki="https://app.dataannotation.tech/signup")])
+def test_zwykle_pola_to_nie_weryfikacja(cel):
+    assert not zasady_natywne.weryfikacja_czlowieka(cel)
+    assert zasady_natywne.ocen("click", KLIK, CtxProby(proby=3, cel=cel)) is None
+
+
+@pytest.mark.parametrize("nazwa, args, kw", [
+    ("click", KLIK, {"cel": TURNSTILE}), ("double_click", KLIK, {"cel": TURNSTILE}),
+    ("press_key", {**PISZ, "key": "space"}, {"fokus": TURNSTILE}),
+    ("press_key", {**PISZ, "key": "Return"}, {"fokus": TURNSTILE})])
+def test_druga_proba_weryfikacji_odmowa_z_droga_telefon_potem_wlasciciel(nazwa, args, kw):
+    """16.11: cztery kliknięcia tego samego pola Turnstile na DataAnnotation w ~godzinę. Druga próba: odmowa, a jej
+    treść prowadzi Komputer → telefon floty (MCP `phone`, to samo konto) → właściciel (kanban_block needs_input)."""
+    w = zasady_natywne.ocen(nazwa, args, CtxProby(proby=1, **kw))
+    assert (w.decyzja, w.kod, w.dane) == (zasady.ODMOWA, "weryfikacja_czlowieka", {"strona": "dataannotation.tech"})
+    tekst = zasady.wynik_odmowy(w)["content"][0]["text"]
+    assert "już było" in tekst and "nie klikaj go ponownie" in tekst and "user-agenta" in tekst
+    telefon, wlasciciel = tekst.index("telefonie floty: MCP `phone`"), tekst.index("`kanban_block` z `kind: needs_input`")
+    assert telefon < wlasciciel and "to samo konto" in tekst
+    assert zasady.wynik_odmowy(w)["structuredContent"]["next_step"] == "choose_another_way"
+
+
+def test_po_nieudanej_weryfikacji_nawet_pierwsza_proba_to_odmowa():
+    w = zasady_natywne.ocen("click", KLIK, CtxProby(nieudana=True, cel=TURNSTILE))
+    assert w.kod == "weryfikacja_czlowieka" and "nieudaną weryfikację" in w.powod
+    assert zasady_natywne.ocen("right_click", KLIK, CtxProby(proby=1, cel=TURNSTILE)) is None
+
+
+@pytest.mark.parametrize("tekst", ["Weryfikacja negatywna", "We couldn't verify you're human",
+                                   "We couldn’t verify you’re human", "Verification failed. Try again",
+                                   "Weryfikacja nie powiodła się"])
+def test_tekst_nieudanej_weryfikacji(tekst):
+    assert zasady_natywne.nieudana_weryfikacja(tekst)
+
+
+def test_wzorzec_nieudanej_weryfikacji_bez_skladni_tylko_pythona():
+    """Ten sam wzorzec idzie do JavaScriptu (Sterownik.jest_wzorzec): bez (?P<…>), (?i), \\A, \\Z i lookbehind."""
+    assert not re.search(r"\(\?[P<i]|\\[AZ]", zasady_natywne.WERYFIKACJA_NIEUDANA)
+
+
+@pytest.mark.parametrize("adres, oczekiwana", [
+    ("https://app.dataannotation.tech/signup?x=1", "dataannotation.tech"), ("https://www.outlier.ai/", "outlier.ai"),
+    ("https://konto.sklep.co.uk/a", "sklep.co.uk"), ("about:blank", ""), ("", "")])
+def test_strona_proby(adres, oczekiwana):
+    assert zasady_natywne.strona(adres) == oczekiwana
+
+
+class _Okno:
+    def __init__(self, url):
+        self.url = url
+
+
+class _Sterownik:
+    """Atrapa sterownika CDP: karta 1 z adresem i (opcjonalnie) tekstem nieudanej weryfikacji na stronie."""
+
+    def __init__(self, url="https://app.dataannotation.tech/signup", nieudana=False):
+        self.okna, self.nieudana = {1: _Okno(url)}, nieudana
+
+    def okno(self, nr):
+        return self.okna.get(nr)
+
+    def aktywne_okno(self):
+        return 1
+
+    def jest_wzorzec(self, nr, wzorzec):
+        return self.nieudana
+
+
+def _sesja(wej, karta=None):
+    a, b = socket.socketpair()
+    s = wejscie_natywne.SesjaNatywna(b, wej)
+    if karta:
+        s._karta({"karta": karta, "tablica": "default"})
+    return s, a
+
+
+def test_proba_liczona_na_karte_dopiero_po_ostatecznym_werdykcie(tmp_path):
+    """Próba liczy się po wszystkich zasadach (odmowa `element_zmieniony` jej nie zjada) i na kartę: druga sesja
+    tej samej karty (16.11: sesje 9 i 11) nie dostaje drugiego kliknięcia; inna karta i sesja bez karty tak."""
+    wej = wejscie_natywne.WejscieNatywne(tmp_path, "token-testowy")
+    wej.sterownik = _Sterownik()
+    s1, _a1 = _sesja(wej, "t_87d11e3a")
+    args = {"window_id": 1}
+    assert s1.ctx.weryfikacja(args) == ("dataannotation.tech", 0, False)
+    s1.ctx.proba_weryfikacji = "dataannotation.tech"
+    s1._zapisz("click", args, zasady.Werdykt(zasady.ODMOWA, "element_zmieniony", "strona zmieniła się"))
+    assert s1.ctx.weryfikacja(args)[1] == 0 and s1.ctx.proba_weryfikacji is None
+    s1.ctx.proba_weryfikacji = "dataannotation.tech"
+    s1._zapisz("click", args, zasady.Werdykt(zasady.TAK, cel="check box „Potwierdź, że jesteś człowiekiem”"))
+    s2, _a2 = _sesja(wej, "t_87d11e3a")
+    assert s2.ctx.weryfikacja(args)[1] == 1
+    assert _sesja(wej, "t_00000001")[0].ctx.weryfikacja(args)[1] == 0
+    assert _sesja(wej)[0].ctx.weryfikacja(args)[1] == 0
+    wpis = [json.loads(x) for x in (tmp_path / "dziennik.jsonl").read_text(encoding="utf-8").splitlines()][-1]
+    assert (wpis["narzedzie"], wpis["decyzja"]) == ("click", "tak")
+
+
+def test_nieudana_weryfikacja_zostaje_w_pamieci_karty(tmp_path):
+    wej = wejscie_natywne.WejscieNatywne(tmp_path, "token-testowy")
+    wej.sterownik = _Sterownik(nieudana=True)
+    s, _a = _sesja(wej, "t_87d11e3a")
+    assert s.ctx.weryfikacja({"window_id": 1}) == ("dataannotation.tech", 1, True)
+    wej.sterownik.nieudana = False                                  # napis zniknął, strona dalej odrzuca
+    assert s.ctx.weryfikacja({"window_id": 1})[1:] == (1, False)
 
 
 def test_pauza_i_odczyt_zostaja_dla_rdzenia():

@@ -3,8 +3,8 @@ przeglądarka na pulpicie właściciela wymaga ponad kontener.
 
 Rdzeń (płatność, zakup, wysyłka, publikacja i usunięcie konta tylko ze zgodą właściciela w karcie, karty, sekrety,
 adresy, skróty narzędzi deweloperskich, accesskey, okno nieaktywne, pauza) ocenia zasady.ocen na opisie elementu ze
-sterownika CDP (role w słowniku zasad: sterownik_cdp.ROLE i rola_zasad). Logowanie, rejestrację, hasła, kody i CAPTCHA
-agent robi sam. Ten moduł dokłada zasady, które ocenia się PRZED rdzeniem:
+sterownika CDP (role w słowniku zasad: sterownik_cdp.ROLE i rola_zasad). Logowanie, rejestrację, hasła i kody agent
+robi sam, okienko „jestem człowiekiem” raz (niżej). Ten moduł dokłada zasady, które ocenia się PRZED rdzeniem:
   schowek            Ctrl/Cmd+V, Shift+Insert, Ctrl+Shift+V (wklejanie ze schowka właściciela: mógł tam skopiować
                      hasło) oraz Ctrl/Cmd+C, Ctrl/Cmd+X, Ctrl+Insert (agent nie zmienia schowka właściciela): odmowa
   skrot_przegladarki skróty, które w oknie przeglądarki otwierają pasek adresu, nową kartę lub okno, plik z dysku,
@@ -16,6 +16,13 @@ agent robi sam. Ten moduł dokłada zasady, które ocenia się PRZED rdzeniem:
   pole_wrazliwe      pojedynczy znak przez press_key (także z Shift) w polu karty, CVV albo BLIK bez zgody `platnosc`:
                      to też pisanie (rdzeń sprawdza pole tylko przy type_text); pole, którego nie da się
                      sprawdzić: odmowa `nieznany_cel`
+  weryfikacja_czlowieka  klik, Enter albo spacja w okienku „jestem człowiekiem” (Cloudflare Turnstile, reCAPTCHA,
+                     hCaptcha: napis elementu albo ramka serwisu weryfikacji): jedno kliknięcie na stronę (domenę)
+                     w karcie (bez karty: w sesji); drugie albo każde po nieudanej weryfikacji na stronie: odmowa
+                     (16.11 Jarvo klikał to samo pole Turnstile godzinę i nie dał znać właścicielowi). Odmowa wskazuje
+                     drogę: ten sam krok na telefonie floty (MCP `phone`, to samo konto), a gdy i tam nie przejdzie,
+                     koniec pracy karty na ekranie: `kanban_block` z `kind: needs_input` i jednym zdaniem dla
+                     właściciela. Bez ponawiania w Komputerze, innej przeglądarki, user-agenta ani obchodzenia.
 """
 from __future__ import annotations
 
@@ -23,6 +30,7 @@ import re
 import sys
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlsplit
 
 _INFRA = Path(__file__).resolve().parent.parent / "infra" / "komputer"
 if str(_INFRA) not in sys.path:
@@ -51,6 +59,79 @@ OKNO_WRAZLIWE = re.compile(
     r"wy[sś][lł]|prze[sś][lł]|opublik|publik|udost[eę]pni|usu[nń]\w*\s+(?:\w+\s+)?kont|zamkn\w*\s+(?:\w+\s+)?kont|"
     r"\bpay|\bbuy|purchase|\border|checkout|subscri|sign ?in|log ?in|register|\bsend|submit|publish|\bshare|"
     r"delete\s+(?:\w+\s+)?account|close\s+(?:\w+\s+)?account", re.I)
+
+# Okienko „jestem człowiekiem” (zasada weryfikacja_czlowieka): napis elementu albo adres ramki, w której leży
+WERYFIKACJA = re.compile(
+    r"\b(?:re|h)?captcha\b|turnstile|nie jestem robotem|jestem cz[lł]owiekiem|"
+    r"(?:potwierd[zź]|zweryfikuj),? [zż]e jeste[sś] cz[lł]owiekiem|i.?m not a robot|i am not a robot|"
+    r"(?:verify|confirm) (?:that )?you(?: a|.)re (?:a )?human|human verification|are you (?:a )?(?:human|robot)",
+    re.I)
+RAMKA_WERYFIKACJI = re.compile(
+    r"^https?://(?:[^/]*\.)?(?:challenges\.cloudflare\.com|hcaptcha\.com|recaptcha\.net|captcha-delivery\.com|"
+    r"arkoselabs\.com|funcaptcha\.com)(?:[:/]|$)|^https?://(?:www\.)?google\.com/recaptcha/", re.I)
+# Strona po nieudanej weryfikacji. Składnia wspólna Pythona i JavaScriptu: sterownik sprawdza nią tekst ramek strony
+# (Sterownik.jest_wzorzec), wejście napisy ostatniej migawki sesji.
+WERYFIKACJA_NIEUDANA = (
+    r"weryfikacja (?:negatywna|nieudana|nie powiod[lł]a si[eę])|nie uda[lł]o si[eę] (?:zweryfikowa|potwierdzi)|"
+    r"nie mo[zż]emy (?:zweryfikowa|potwierdzi)|(?:could ?n.?t|could not|unable to|failed to) verify|"
+    r"verification (?:failed|unsuccessful|expired)|sorry, you have been blocked")
+_NIEUDANA = re.compile(WERYFIKACJA_NIEUDANA, re.I)
+_DRUGI_POZIOM = frozenset({"co", "com", "org", "net", "gov", "edu", "ac"})
+
+
+def strona(adres: str) -> str:
+    """Strona (domena) adresu karty do liczenia prób weryfikacji: app.dataannotation.tech i
+    www.dataannotation.tech to ta sama strona; „example.co.uk” bierze trzy człony."""
+    try:
+        host = (urlsplit(str(adres or "")).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return ""
+    czlony = host.split(".")
+    if len(czlony) > 2 and len(czlony[-1]) == 2 and czlony[-2] in _DRUGI_POZIOM:
+        return ".".join(czlony[-3:])
+    return ".".join(czlony[-2:])
+
+
+def weryfikacja_czlowieka(el: Optional[dict]) -> bool:
+    """Element okienka „jestem człowiekiem”: jego napis, ramka serwisu weryfikacji (Turnstile, reCAPTCHA, hCaptcha,
+    DataDome, Arkose) albo przodek-ramka lub dokument z takim napisem. Każde działanie w takiej ramce to próba (także
+    obrazki po pierwszym kliknięciu)."""
+    if not el:
+        return False
+    ramki = [p for p in el.get("sciezka_przodkow") or el.get("przodkowie") or []
+             if isinstance(p, dict) and p.get("rola") in ("internal frame", "document web")]
+    return bool(WERYFIKACJA.search(zasady._etykieta(el))
+                or RAMKA_WERYFIKACJI.search(str(el.get("adres_ramki") or ""))
+                or any(WERYFIKACJA.search(zasady._napis(str(p.get("nazwa") or ""))) for p in ramki))
+
+
+def nieudana_weryfikacja(tekst: str) -> bool:
+    return bool(_NIEUDANA.search(zasady._napis(str(tekst or ""))))
+
+
+def _weryfikacja(el: Optional[dict], args: dict, ctx) -> Optional[zasady.Werdykt]:
+    """Jedno kliknięcie okienka „jestem człowiekiem” na stronę w karcie. Kontekst z pamięcią prób (KontekstCDP:
+    `weryfikacja(args)` → (strona, próby, nieudana)) dostaje w `proba_weryfikacji` stronę dozwolonej próby; wejście
+    liczy ją dopiero, gdy działanie przeszło wszystkie zasady (SesjaNatywna._zapisz)."""
+    sprawdz = getattr(ctx, "weryfikacja", None)
+    if sprawdz is None or not weryfikacja_czlowieka(el):
+        return None
+    adres, proby, nieudana = sprawdz(args)
+    if not proby and not nieudana:
+        ctx.proba_weryfikacji = adres
+        return None
+    nazwa = adres or "tej stronie"
+    przyczyna = ("strona pokazuje nieudaną weryfikację" if nieudana
+                 else "jedno kliknięcie na tej stronie w tej karcie już było i nie przeszło")
+    return zasady.Werdykt(
+        zasady.ODMOWA, "weryfikacja_czlowieka",
+        f"okienko „jestem człowiekiem” na {nazwa}: {przyczyna}. Drugiej próby w Komputerze nie ma: nie klikaj go "
+        "ponownie, nie zmieniaj przeglądarki ani user-agenta i nie obchodź sprawdzenia. Ten sam krok dokończ teraz "
+        "na telefonie floty: MCP `phone` (`third` albo `first`), Chrome na telefonie, to samo konto i ten sam adres. "
+        "Telefon też nie przejdzie → zakończ pracę karty na ekranie: `kanban_block` z `kind: needs_input` i jednym "
+        f"zdaniem dla właściciela, np. „{nazwa}: sprawdzenie „jestem człowiekiem” nie przepuszcza Komputera ani "
+        "telefonu, kliknij je raz na telefonie albo przez VNC”; w rozmowie bez karty to samo zdanie "
+        "właścicielowi", zasady.opis(el), {"strona": adres} if adres else {})
 
 
 def _skrot(args: dict, nazwa: str) -> tuple:
@@ -99,7 +180,9 @@ def ocen(nazwa: str, args: Optional[dict], ctx) -> Optional[zasady.Werdykt]:
     if nazwa in ("click", "double_click", "drag", "right_click"):
         el = ctx.cel("click", args) if celowane else None
         if el and not el.get("nieznany"):
-            return _okno_js(el) or (_plik(el) if nazwa != "right_click" else None)
+            if nazwa == "right_click":
+                return _okno_js(el)
+            return _okno_js(el) or _plik(el) or _weryfikacja(el, args, ctx)
         return None
     if nazwa in ("press_key", "hotkey"):
         skrot = _skrot(args, nazwa)
@@ -123,7 +206,7 @@ def ocen(nazwa: str, args: Optional[dict], ctx) -> Optional[zasady.Werdykt]:
                 zly = _okno_js(el)
                 if zly:
                     return zly
-            return _plik(el)
+            return _plik(el) or _weryfikacja(el, args, ctx)
         return None
     if nazwa == "type_text":
         el = ctx.cel(nazwa, args) if celowane else ctx.fokus(args)

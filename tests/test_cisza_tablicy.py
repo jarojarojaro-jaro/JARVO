@@ -66,3 +66,52 @@ def test_inne_narzedzia_i_nieudane_tworzenie_bez_zmian(baza):
     ct.po_narzedziu("kanban_create", {}, json.dumps({"ok": True, "task_id": "t_1", "subscribed": False}))
     ct.po_narzedziu("kanban_create", {}, "nie json")
     assert tryby(baza) == przed
+
+
+def budzenie(karta="t_87d11e3a", status="blocked; needs attention", tytul="Pilot ankiet: DataAnnotation"):
+    return (f"[kanban] Task {karta} {status}.\nTitle: {tytul}\nAssignee: @jarvo\nBoard: default\n\n"
+            "Check the result or decide the next step.\n\nThis is an automatic task-status notification, ...")
+
+
+def zablokuj(plik, karta, payload):
+    with sqlite3.connect(plik) as c:
+        c.execute("CREATE TABLE IF NOT EXISTS task_events (id INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT, "
+                  "run_id INTEGER, kind TEXT, payload TEXT, created_at INTEGER)")
+        c.execute("INSERT INTO task_events (task_id, kind, payload, created_at) VALUES (?, 'blocked', ?, 1)",
+                  (karta, json.dumps(payload)))
+
+
+POWOD = "DataAnnotation: Cloudflare nie przepuszcza Komputera ani telefonu, kliknij raz na telefonie albo przez VNC"
+
+
+def test_budzenie_o_blokadzie_rozpoznane():
+    assert ct.blokada_z_budzenia(budzenie()) == ("t_87d11e3a", "Pilot ankiet: DataAnnotation", "default")
+    assert ct.blokada_z_budzenia(budzenie(status="completed, blocked; needs attention"))[0] == "t_87d11e3a"
+    assert ct.blokada_z_budzenia(budzenie(status="completed")) is None
+    assert ct.blokada_z_budzenia("Zablokowane? [kanban] Task t_1 blocked; needs attention.") is None
+
+
+@pytest.mark.parametrize("odpowiedz", ["[SILENT]", " [SILENT]\n", "[SILENT] karta czeka", "Zapisane.\n[SILENT]"])
+def test_blokada_needs_input_nigdy_nie_konczy_sie_cisza(baza, odpowiedz):
+    """17.11: „przez godzinę klikał w kółko i nie dał mi znać”. Budzenie o karcie z needs_input: przypomnienie
+    w turze, a odpowiedź-cisza zamieniona na zdanie dla właściciela (Hermes na Telegramie milczy: tryb `wake`)."""
+    zablokuj(baza, "t_87d11e3a", {"kind": "needs_input", "reason": POWOD})
+    kontekst = ct.przed_tura(session_id="s1", turn_id="u7", user_message=budzenie())
+    assert "nigdy nie kończy się [SILENT]" in kontekst["context"] and POWOD in kontekst["context"]
+    assert ct.po_odpowiedzi(response_text=odpowiedz, session_id="s1", turn_id="u7") == \
+        f"Zadanie „Pilot ankiet: DataAnnotation” czeka na Ciebie: {POWOD}"
+    assert ct.po_odpowiedzi(response_text="[SILENT]", session_id="s1", turn_id="u7") is None    # raz na turę
+
+
+def test_odpowiedz_jarva_i_inne_blokady_bez_zmian(baza):
+    zablokuj(baza, "t_87d11e3a", {"kind": "needs_input", "reason": POWOD})
+    ct.przed_tura(session_id="s1", turn_id="u1", user_message=budzenie())
+    assert ct.po_odpowiedzi(response_text="Cloudflare nie przepuszcza: kliknij raz na telefonie.", session_id="s1",
+                            turn_id="u1") is None
+    ct.przed_tura(session_id="s1", turn_id="u2", user_message=budzenie())
+    assert ct.po_odpowiedzi(response_text="[SILENT]", session_id="s1", turn_id="u3") is None    # inna tura
+    assert ct.po_odpowiedzi(response_text="[SILENT]", session_id="s2", turn_id="u2") is None    # inna sesja
+    zablokuj(baza, "t_2", {"kind": "capability", "reason": "to praca Weba"})
+    assert ct.przed_tura(session_id="s3", turn_id="u4", user_message=budzenie(karta="t_2")) is None
+    assert ct.po_odpowiedzi(response_text="[SILENT]", session_id="s3", turn_id="u4") is None
+    assert ct.przed_tura(session_id="s4", turn_id="u5", user_message="Zrób raport") is None

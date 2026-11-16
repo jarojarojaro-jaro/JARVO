@@ -1,7 +1,7 @@
 ---
 name: oddaj-ekran
 description: "Krok właściciela przez VNC: płatność, CAPTCHA po próbie"
-version: 1.3.0
+version: 1.4.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,21 +11,26 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-11-14"
+    reviewed: "2026-11-17"
 ---
 
 # Oddaj ekran właścicielowi
 
 Kroki właściciela: płatność, zakup, zamówienie, wysłanie wiadomości do ludzi, publikacja i usunięcie konta bez linii
-`ZGODA WŁAŚCICIELA` w karcie (w rozmowie: bez polecenia właściciela na tę akcję); CAPTCHA, która nie przeszła po
-Twojej próbie; wybór pliku z jego dysku. Logowanie, rejestrację, hasło i kod SMS robisz sam (Ty, Jarvo).
+`ZGODA WŁAŚCICIELA` w karcie (w rozmowie: bez polecenia właściciela na tę akcję); okienko „jestem człowiekiem”, które
+nie przeszło ani w Komputerze, ani na telefonie floty; wybór pliku z jego dysku. Logowanie, rejestrację, hasło i kod
+SMS robisz sam (Ty, Jarvo).
 Przygotowujesz wszystko do kroku właściciela i prosisz go dokładnie o ten jeden krok. Właściciel robi go przez VNC
 na pulpicie serwera, gdzie okno Komputera Jarva jest widoczne.
 
 ## Kiedy
 - Wejście Komputera odmówiło z `code: wymaga_czlowieka` (`next_step: ask_owner`).
 - Widzisz na ekranie krok z listy wyżej, zanim w niego klikniesz (nie czekaj na odmowę).
-- Serwis odmówił automatowi po Twojej próbie (CAPTCHA nie przeszła, „potwierdź, że nie jesteś robotem”, blokada).
+- Serwis odmówił automatowi po Twojej próbie (CAPTCHA nie przeszła, „We couldn't verify you're human”, blokada).
+  Okienko „jestem człowiekiem” (odmowa `weryfikacja_czlowieka`): najpierw ten sam krok na telefonie floty (MCP
+  `phone`, `third` albo `first`, Chrome, to samo konto); dopiero gdy i tam nie przejdzie, krok właściciela, a na
+  karcie od razu `kanban_block` z `kind: needs_input` i jednym zdaniem („DataAnnotation: Cloudflare nie przepuszcza
+  Komputera ani telefonu, kliknij raz na telefonie albo przez VNC”). Nie klikasz okienka drugi raz w Komputerze.
 - Przeglądarka Jarva (Komputer natywnie) dokłada kroki właściciela: wybór pliku z jego dysku (`wybor_pliku`)
   i OK w oknie potwierdzenia płatności, zakupu albo wysyłki bez zgody w karcie (`okno_wrazliwe`; Anuluj klikasz
   sam). Prośba jak zawsze: gdzie i co kliknąć albo który plik wybrać (nazwa, nie zawartość).

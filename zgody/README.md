@@ -139,3 +139,13 @@ Przechodzi: `decyzja właściciela (16.11 23:15): „tak, zaznacz NDA”`, linia
 „decyzja Jarva: …”, prośba o decyzję, pytanie i przeczenie („potrzebna decyzja właściciela”, „czekam na decyzję
 właściciela”, „czy właściciel zatwierdził”, „bez zgody właściciela”). Rada w blokadzie: cytat z czasem albo „decyzja
 Jarva: …”, a gdy potrzebne jest „tak” właściciela, pytanie (na karcie `kanban_block(kind="needs_input")`).
+
+## Strażnik nagrywania ekranu
+
+Surowe nagrywanie ekranu (`ffmpeg`/`avconv` z `-f x11grab`, `gdigrab`, `avfoundation`, `kmsgrab`, `fbdev`, a także
+`ddagrab`, `ximagesrc`, `wf-recorder`, `recordmydesktop`, `byzanz-record`, `simplescreenrecorder`, `vokoscreen`, `kazam`)
+w terminalu, procesie w tle i `execute_code` to `block` w każdym trybie, z człowiekiem, bez niego i pod YOLO.
+Komunikat kieruje do `nagraj.py` ze skilla `praca-na-ekranie` (`start "<krok>"`, `stop`, `film`): krótkie odcinki
+udanych kroków, koniec nagrywania przy pierwszej odmowie Komputera albo bez ruchu na ekranie. Powód: 16.11 Jarvo
+nagrywał pulpit surowym `ffmpeg -f x11grab` przez ~20 min, w kółko tę samą nieudaną weryfikację, choć sam pracował już
+na telefonie. Blokada trafia do logu (`jarvo-zgody: zablokowane surowe nagrywanie ekranu (…)`).

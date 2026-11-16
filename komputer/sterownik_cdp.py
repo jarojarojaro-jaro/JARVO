@@ -202,7 +202,8 @@ JS_OPIS = """function(){
   return {tag: t, typ: (a('type') || (t === 'input' ? 'text' : '')).toLowerCase(), nazwa: a('name'),
     autocomplete: a('autocomplete'), placeholder: a('placeholder'), edytowalny: !!e.isContentEditable,
     wieloliniowy: t === 'textarea' || (!!e.isContentEditable && t !== 'input'), plik: t === 'input' && a('type').toLowerCase() === 'file',
-    formularz: !!f, wartosc: ('value' in e && t !== 'button') ? String(e.value).slice(0, 200) : null};
+    formularz: !!f, wartosc: ('value' in e && t !== 'button') ? String(e.value).slice(0, 200) : null,
+    adres: String((e.ownerDocument && e.ownerDocument.URL) || '').split(/[?#]/)[0].slice(0, 300)};
 }"""
 JS_FORMULARZ = "function(){ return this.form || (this.closest && this.closest('form')) || null; }"
 # Pola formularza i jego nazwa (zasady.formularz_logowania: wysyłka formularza logowania i rejestracji bez zgody)
@@ -265,6 +266,11 @@ JS_JEST_TEKST = """function(t){
   const n = s => String(s || '').toLowerCase().replace(/\\s+/g, ' ').trim();
   const b = document.body;
   return b ? n(b.innerText).includes(n(t)) : false;
+}"""
+# Wzorzec (składnia wspólna Pythona i JS, bez wielkości liter) w tekście ramki: Sterownik.jest_wzorzec
+JS_JEST_WZORZEC = """function(w){
+  const b = document.body;
+  return b ? new RegExp(w, 'i').test(String(b.innerText || '').replace(/\\s+/g, ' ')) : false;
 }"""
 
 
@@ -1507,7 +1513,7 @@ class Sterownik:
                                                ("autocomplete", dom.get("autocomplete")),
                                                ("placeholder-text", dom.get("placeholder"))) if v},
                 "zrodlo": "cdp", "przodkowie": przodkowie[:5], "plik": bool(dom.get("plik")),
-                "sciezka_przodkow": przodkowie}
+                "sciezka_przodkow": przodkowie, "adres_ramki": str(dom.get("adres") or "")}
             stany = []
             if dom.get("edytowalny") or el["rola"] in ("entry", "password text"):
                 stany.append("editable")
@@ -2636,9 +2642,10 @@ class Sterownik:
         url, wzor = url.lower(), wzor.lower()
         return fnmatch.fnmatchcase(url, wzor) if "*" in wzor else wzor in url
 
-    def _jest_tekst(self, okno: Okno, tekst: str) -> bool | None:
+    def _jest_tekst(self, okno: Okno, tekst: str, js: str = JS_JEST_TEKST) -> bool | None:
         """Czy tekst jest na stronie karty (każda ramka, także z innego procesu; tylko to, co strona rysuje) albo
-        w otwartym oknie JavaScript; None, gdy żadnej ramki nie dało się odczytać (strona się ładuje)."""
+        w otwartym oknie JavaScript; None, gdy żadnej ramki nie dało się odczytać (strona się ładuje). `js`:
+        JS_JEST_WZORZEC sprawdza wyrażenie zamiast tekstu (wtedy okno JavaScript pomija wołający: jest_wzorzec)."""
         if okno.dialog:
             return " ".join(tekst.lower().split()) in " ".join(str(okno.dialog.get("wiadomosc") or "").lower().split())
         try:
@@ -2650,7 +2657,7 @@ class Sterownik:
             try:
                 ctx = self._swiat(okno, r["sesja"], r["ramka"])
                 w = self.b.wyslij("Runtime.callFunctionOn", {
-                    "functionDeclaration": JS_JEST_TEKST, "executionContextId": ctx, "arguments": [{"value": tekst}],
+                    "functionDeclaration": js, "executionContextId": ctx, "arguments": [{"value": tekst}],
                     "returnByValue": True}, r["sesja"], czas=2)
             except (cdp.BladCDP, KeyError):
                 okno.swiaty.pop((r["sesja"], r["ramka"]), None)    # świat zniknął z nawigacją: następnym razem nowy
@@ -2661,6 +2668,12 @@ class Sterownik:
             if (w.get("result") or {}).get("value") is True:
                 return True
         return False if odczytane else None
+
+    def jest_wzorzec(self, nr, wzorzec: str) -> bool:
+        """Czy tekst strony karty `nr` (każda ramka) pasuje do wyrażenia `wzorzec` (zasady: nieudana weryfikacja
+        „jestem człowiekiem”); karta nieczytelna albo pod oknem JavaScript: False."""
+        okno = self.okno(nr)
+        return bool(okno is not None and not okno.dialog and self._jest_tekst(okno, wzorzec, JS_JEST_WZORZEC))
 
     def _czekaj(self, okno: Okno, tekst: str, znika: bool, adres: str, limit: float) -> tuple[bool, float, str]:
         """Warunek wait_for sprawdzany w sterowniku co CO_ILE_WARUNEK s, najwyżej `limit` s: (spełniony, ile s,

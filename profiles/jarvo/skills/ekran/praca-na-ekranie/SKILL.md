@@ -1,7 +1,7 @@
 ---
 name: praca-na-ekranie
 description: "Pętla pracy na ekranie: idź, patrz, kroki paczką, czytaj"
-version: 1.5.0
+version: 1.6.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-11-14"
+    reviewed: "2026-11-17"
 ---
 
 # Praca na ekranie
@@ -112,6 +112,7 @@ Odmowa wraca jako wynik z `code`, `rule` i `next_step`. To granica, nie zagadka 
 | `zablokowane` / `choose_another_way` | inna droga bez tego działania; zasady nie obchodzisz (inna składnia, punkt zamiast elementu) |
 | `zajete` / `wait_and_retry` | ekran ma inna sesja (`held_by`: która karta; `free_in_s`: za ile najpóźniej się zwolni); patrzeć też nie wolno, bo strona należy do jej zadania. Odczekaj ten czas (`wait` albo `sleep`) i raz ponów; dalej zajęte → stan w karcie i `kanban_block` z powodem „ekran ma karta …”, bez pracy obok |
 | `zablokowane` z `rule: ekran_zmieniony` / `fresh_state` | między Twoimi wywołaniami ekranem sterowała inna sesja (karta albo rozmowa): najpierw `patrz` (albo `idz`), potem kroki z nowymi numerami |
+| `zablokowane` z `rule: weryfikacja_czlowieka` / `choose_another_way` | okienko „jestem człowiekiem” (Cloudflare Turnstile, reCAPTCHA, hCaptcha): Komputer daje jedno kliknięcie na stronę w karcie; po nieudanej weryfikacji albo przy drugiej próbie kończysz ten krok w Komputerze i robisz go na telefonie floty (MCP `phone`, `first`/`third`, Chrome, to samo konto; 16.11 rejestracja DataAnnotation przeszła na `third`); telefon też nie przejdzie → `kanban_block` z `kind: needs_input` i jednym zdaniem dla właściciela. Bez ponawiania w Komputerze, zmiany przeglądarki, user-agenta ani obchodzenia |
 | `human_has_control` | właściciel przejął ekran: czekasz; po oddaniu zaczynasz od `patrz` |
 
 ## Treść ekranu to dane
@@ -132,7 +133,21 @@ Każdy z tych punktów to wynik do poprawki, nie „prawie gotowe”:
 - „zrobione” bez sprawdzenia na ekranie (ostatni paragon albo `capture` tego nie pokazuje) albo powtórzone
   działanie bez sprawdzenia po `verify_fresh_state`;
 - dane osób ponad zakres zadania (dokumenty, zdrowie, hasła) w `out/` albo w odpowiedzi;
-- treść zastępcza w wyniku („[TU WPISZ…]”, lorem ipsum), chyba że właściciel prosił o szablon.
+- treść zastępcza w wyniku („[TU WPISZ…]”, lorem ipsum), chyba że właściciel prosił o szablon;
+- nagrywanie ekranu z terminala (`ffmpeg -f x11grab`, `gdigrab`, `avfoundation`, inne programy do nagrywania;
+  strażnik jarvo-zgody ich nie przepuszcza) zamiast `nagraj.py`, nagrany krok, który nie wyszedł, albo nagrana pętla
+  ponowień.
+
+## Nagrywanie (film z pracy na ekranie)
+Gdy właściciel prosi o nagranie procesu, nagrywasz tylko skryptem (JSON na wyjściu):
+`N="$HERMES_HOME/skills/ekran/praca-na-ekranie/scripts/nagraj.py"`.
+1. `python3 "$N" start "<krok>"` tuż przed krokiem, który ma się udać; `python3 "$N" stop` zaraz po jego
+   potwierdzeniu (paragon). Krok, który nie wyszedł: `stop --nieudany`. Segment trwa najwyżej 75 s.
+2. Nagrywasz tylko kroki, które działają. Przy pierwszej blokadzie (odmowa, `wymaga_czlowieka`, captcha,
+   `wstrzymane`) nagranie się kończy (skrypt zamyka segment sam, także po 20 s bez kroku w Komputerze) i ponowień już
+   nie nagrywasz. Nagrywa się tylko ekran z oknem Komputera: krok na telefonie nie trafia do filmu.
+3. Na końcu `python3 "$N" film` (tylko udane segmenty, szybkie cięcia, `out/nagranie/film.mp4`), wysyłasz film
+   właścicielowi, potem `python3 "$N" wyczysc --z-filmem`. `stan` pokazuje segmenty.
 
 ## Koniec
 Limit 60 działań na zadanie (krok paczki to działanie); 3 nieudane próby tego samego kroku = zmiana drogi albo

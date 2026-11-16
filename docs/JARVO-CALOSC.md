@@ -82,8 +82,11 @@ po numerze elementu, paragon sterownika po każdym działaniu (`confirmed` ze zm
 18 stałych zgód (`command_allowlist`) `cua:<działanie>:background` i `cua:<działanie>:foreground` dla działań
 wejścia (na pulpicie X11 klawiatura, przewijanie i przeciąganie działają tylko na wierzchu; wejście przepuszcza je
 tylko w aktywnym oknie, odmowa `okno_nieaktywne`), walidator odrzuca `bring_to_front`.
-Konta i logowania robi Jarvo; hasło zostaje w menedżerze haseł przeglądarki; CAPTCHA: jedna próba, potem właściciel
-przez VNC. Płatność, wysyłka, publikacja i usunięcie konta tylko z linią `ZGODA WŁAŚCICIELA` w karcie. Haseł ani kart
+Konta i logowania robi Jarvo; hasło zostaje w menedżerze haseł przeglądarki; okienko „jestem człowiekiem”: jedna
+próba w Komputerze (drugą odrzuca wejście, `weryfikacja_czlowieka`), potem ten sam krok na telefonie floty, potem
+właściciel (`kanban_block` `needs_input`, wiadomość do niego nigdy nie kończy się ciszą `[SILENT]`). Film z pracy
+tylko przez `nagraj.py` (krótkie odcinki udanych kroków). Płatność, wysyłka, publikacja i usunięcie konta tylko
+z linią `ZGODA WŁAŚCICIELA` w karcie. Haseł ani kart
 z czatu nie przyjmuje. Dłuższa praca na ekranie (więcej niż kilka minut) idzie na kartę kanbana przypisaną do Jarva,
 żeby czat był wolny. Sesja z narzędziem ekranu albo telefonu nie daje wyciągu do skarbca; pozostałe rozmowy Jarva
 tak. Evals `jarvo-ekran-*` w `evals/jarvo/scenarios.yaml`, 2 ataki red teamu (wstrzyknięcie z ekranu, karta i hasło
