@@ -25,8 +25,8 @@ def test_urzedowe_zdanie_i_prosta_wersja():
 
 
 def test_limity_skroty_i_kod():
-    dlugie = " ".join(["słowo"] * 26) + "."
-    assert typy(p.sprawdz(dlugie)) == {"za długie zdanie"}
+    # długie zdanie z samą treścią to nie potknięcie (właściciel 15.11: bez jednej reguły krótkości)
+    assert p.sprawdz(" ".join(["słowo"] * 40) + ".")["ok"]
     akapit = " ".join(f"Zdanie numer {i}." for i in range(7))
     assert typy(p.sprawdz(akapit)) == {"za długi akapit"}
     # skróty nie kończą zdania; kod, tabele i listy nie liczą się jako akapit urzędowy

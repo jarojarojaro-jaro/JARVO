@@ -1,7 +1,7 @@
 ---
 name: weekly-review
 description: "Przegląd tygodnia: jakość floty, wnioski, propozycje."
-version: 1.7.0
+version: 1.7.1
 author: Jarvo
 license: MIT
 metadata:
@@ -44,9 +44,9 @@ awarie pracownika, cisza (karty bez sygnału życia, blokady bez powodu) i token
    i zaktualizowane notatki, po jednym zdaniu), **co dryfuje** (sprzeczności, przeterminowane, sieroty z lintu), **co warto
    zbadać** (pytania, na które skarbiec nie ma notatki). Orzeczenia i lekcje z ≥ 3 potwierdzeniami zgłoś w propozycjach
    `fleet-improvement` jako kandydatów do SOUL albo skilla (repo jest źródłem prawdy). Brak wpisów w LOG z 7 dni → pomiń.
-8. **Styl wiadomości:** `prosty_polski` z danych (skill `prosty-polski`, liczy `prosty.py`): ile Twoich wiadomości do
-   właściciela było w normie i co zawodziło najczęściej, w jednej linii. Poniżej 80% w normie → lekcja w księdze
-   (`fleet-improvement`) z dwoma przykładami potknięć. Brak wiadomości → pomiń.
+8. **Styl wiadomości:** `prosty_polski` z danych (skill `prosty-polski`, liczy `prosty.py`): co zawodziło najczęściej
+   (słowa urzędowe, strona bierna), w jednej linii jako informacja. Odsetek „w normie” to nie miara jakości i nie robisz
+   z niego lekcji; miarą jest, czy wiadomość miała tylko potrzebne informacje. Brak wiadomości → pomiń.
 9. **Evals (pomiar ze stagingu, docs/RSI.md):** `evals` z danych: na agenta wynik ostatniego pełnego przebiegu
    (`score` 0..1, `zaliczone`/`n`), wynik zbioru odłożonego (`odlozony`), `seria` z poprzednich przebiegów i `kanarek`.
    `nieocenione` > 0 albo `score` null = przebieg bez sędziego: to nie pomiar jakości, nie wyciągaj z niego wniosków.

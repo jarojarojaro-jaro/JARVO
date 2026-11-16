@@ -1,7 +1,7 @@
 ---
 name: daily-brief
 description: "Poranny brief: co w toku, co gotowe, jakie decyzje."
-version: 1.3.0
+version: 1.3.1
 author: Jarvo
 license: MIT
 metadata:
@@ -49,6 +49,6 @@ Odpowiedz np. „1 ok, 2 nie”.
   albo jest starszy niż 2 dni.
 - Liczby tylko, gdy coś znaczą („3 posty gotowe”, nie „2 karty w statusie review”).
 - Bez żargonu tablicy. Bez powtarzania wczorajszego briefu, jeśli nic się nie zmieniło.
-- Prosty polski (skill `prosty-polski`): zdanie do 20 słów, strona czynna, zwykłe słowa, ostrzeżenie: najpierw co zrobić.
+- Prosty polski (skill `prosty-polski`): tylko potrzebne informacje, bez waty (długości zdań nie liczysz), strona czynna, zwykłe słowa, ostrzeżenie: najpierw co zrobić.
 - Jeśli dane pokazują problem (zablokowane > 1 dnia, awarie), zacznij od niego.
 - Skrypt zgłosił błąd → jedna linia: „Nie mogę odczytać tablicy: <błąd>. Sprawdź serwer.”

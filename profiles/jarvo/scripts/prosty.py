@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Prosty polski bez modelu (skill `prosty-polski`, wzór ASD-STE100 „w 80%”): limity zdań i akapitów, słowa urzędowe,
-strona bierna i łańcuchy rzeczowników w tekście do właściciela.
+"""Prosty polski bez modelu (skill `prosty-polski`, wzór ASD-STE100 „w 80%”): długość akapitów, słowa urzędowe,
+strona bierna i łańcuchy rzeczowników w tekście do właściciela. Długości zdań nie liczymy: właściciel 15.11 („ma być
+same potrzebne info, nie robimy jednej reguły krótkości”), kryterium to treść, nie liczba słów.
 
     python3 prosty.py plik.md [...]            # albo --tekst "…", albo - (stdin)
     python3 prosty.py --tydzien                # wiadomości Jarva do właściciela z 7 dni (state.db), jak w przeglądzie tygodnia
@@ -21,7 +22,7 @@ import time
 from collections import Counter
 from pathlib import Path
 
-ZDANIE_MAX, AKAPIT_MAX, LANCUCH_MAX = 25, 6, 2
+AKAPIT_MAX, LANCUCH_MAX = 6, 2
 SLOWNIK_MD = Path(__file__).resolve().parent.parent / "skills" / "fleet" / "prosty-polski" / "references" / "slownik.md"
 # skróty z kropką, które nie kończą zdania
 SKROTY = re.compile(r"\b(np|m\.in|tj|itd|itp|ok|godz|zł|tzw|wg|ul|nr|ds|r|s|min|tys|mln|mld|pkt|str|ang|por|dot|jw|ww)\.", re.I)
@@ -93,10 +94,6 @@ def sprawdz(tekst: str, slow: list | None = None) -> dict:
         if len(zd) > AKAPIT_MAX:
             uwagi.append({"typ": "za długi akapit", "opis": f"{len(zd)} zdań (maks. {AKAPIT_MAX})", "gdzie": zd[0][:60]})
         for z in zd:
-            slowa = SLOWO.findall(z)
-            if len(slowa) > ZDANIE_MAX:
-                uwagi.append({"typ": "za długie zdanie", "opis": f"{len(slowa)} słów (maks. {ZDANIE_MAX}, polecenie 20)",
-                              "gdzie": z[:60]})
             for m in BIERNA.finditer(z):
                 uwagi.append({"typ": "strona bierna", "opis": f"„{m.group(0)}”: napisz, kto to zrobił", "gdzie": z[:60]})
             ciag = []

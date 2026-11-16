@@ -1,7 +1,7 @@
 ---
 name: audyt-strony
 description: "Audyt strony: Lighthouse, a11y, SEO, linki, obrazy, mobile."
-version: 1.7.0
+version: 1.8.0
 author: Jarvo
 license: MIT
 metadata:
@@ -52,7 +52,13 @@ Wynik: raport priorytetów, który da się od razu zamienić na karty poprawek.
    - **P2**: średni (obrazy bez AVIF/WebP, brak schema, drobne a11y, skrypt firmy trzeciej > 100 KB albo > 100 ms
      wątku bez decyzji: usunąć, odłożyć po załadowaniu strony (analityka, czat) albo zostawić z powodem),
    - **P3**: kosmetyka.
-4. **Weryfikacja przed raportem:** każdy problem potwierdź sam na co najmniej jednym przykładzie (otwórz adres
+4. **Weryfikacja przed raportem:**
+   0. **Licznik zapytań do żywej strony:** przed pierwszym żądaniem załóż `out/zapytania-zywe.md` z limitem z karty
+      (domyślnie 5 na stronę) i po każdym żądaniu HTTP dopisz wiersz: numer, adres, kod. Liczysz żądania, nie polecenia:
+      każdy adres w jednym `curl` i każde przekierowanie to osobne żądanie (15.11: aiwarsztat 6 i aiwdomu 8 zamiast 5,
+      bo jedno polecenie wysyłało 2–3 żądania). Licznik na limicie = stop; dalsze adresy w „Niesprawdzone: limit
+      zapytań”. Limit chroni wspólny hosting 12 domen przed blokadą adresu (429). Automaty z kroku 1 liczą się osobno.
+   Każdy problem potwierdź sam na co najmniej jednym przykładzie (otwórz adres
    w przeglądarce albo `curl -sI`, obejrzyj zrzut, znajdź linię w kodzie strony). Wynik automatu to poszlaka: 429
    („za dużo żądań”), 403 od ochrony przed botami i przekroczony czas to „niesprawdzone”, nie zepsute linki.
    Czego nie potwierdzisz, nie wpisuj jako problemu; opisz to w sekcji „Niesprawdzone” z powodem.
@@ -64,6 +70,7 @@ Wynik: raport priorytetów, który da się od razu zamienić na karty poprawek.
 - [ ] lista naruszeń axe pogrupowana (krytyczne/poważne),
 - [ ] martwe linki z trwałym kodem (albo „brak”); niesprawdzone (429, czas) osobno, z powodem,
 - [ ] każdy problem ma dowód, sposób potwierdzenia (sam otworzyłem / curl / zrzut) i konkretną poprawkę,
+- [ ] `out/zapytania-zywe.md`: każde żądanie do żywej strony z numerem, najwyżej limit z karty (domyślnie 5),
 - [ ] priorytety P0–P3 i top 3 na górze,
 - [ ] aplikacja z backendem: sekcja „Wydajność backendu” z 11 punktami (✓ z dowodem, ✗ z poprawką, n/d z powodem).
 

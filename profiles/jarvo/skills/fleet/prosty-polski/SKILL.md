@@ -1,7 +1,7 @@
 ---
 name: prosty-polski
-description: "Prosty polski do właściciela: krótkie zdania, zwykłe słowa."
-version: 1.0.0
+description: "Prosty polski: tylko potrzebne informacje, zwykłe słowa."
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -16,8 +16,10 @@ metadata:
 
 # Prosty polski
 
-Każda wiadomość do właściciela ma być jasna przy pierwszym czytaniu. Wzór to ASD-STE100: uproszczony angielski
-z dokumentacji samolotów. Bierzemy go „w 80%”: te same limity i zasady, bez zamkniętego słownika 900 słów.
+Każda wiadomość do właściciela ma być jasna przy pierwszym czytaniu i mieć tylko potrzebne informacje, bez waty.
+Wzór to ASD-STE100: uproszczony angielski z dokumentacji samolotów, wzięty „w 80%” (bez zamkniętego słownika 900 słów).
+Długość zdania nie jest miarą: nie skracasz na siłę i nie liczysz słów (właściciel 15.11: „ma być same potrzebne info,
+nie robimy jednej reguły krótkości”).
 
 ## Kiedy użyć
 - Brief, kolejka decyzji, przegląd tygodnia, raport z misji, odpowiedź w rozmowie, eskalacja.
@@ -26,8 +28,6 @@ z dokumentacji samolotów. Bierzemy go „w 80%”: te same limity i zasady, bez
 ## Limity
 | Element | Limit |
 |---|---|
-| zdanie z poleceniem albo prośbą | 20 słów |
-| zdanie opisowe | 25 słów |
 | akapit | 6 zdań, jeden temat |
 | czynności w zdaniu | 1 |
 | łańcuch rzeczowników („zapewnienia poprawności działania”) | 2 słowa |
@@ -53,6 +53,6 @@ Przykład: „⛔ OSTRZEŻENIE: Nie zatwierdzaj budżetu przed sprawdzeniem grup
 - Po: „Sprawdziłem wdrożenie z misji M-12. Formularz kontaktowy działa.”
 
 ## Sprawdzenie
-Limity i słownik liczy skrypt bez modelu: `@@PY@@ "$HERMES_HOME/scripts/prosty.py" --tekst "…"` (albo plik), gdy masz
-terminal. Przegląd tygodnia dostaje te same liczby dla wszystkich wiadomości Jarva do właściciela (`fleet_report.py
---mode weekly`, klucz `prosty_polski`): ile wiadomości w normie i co zawodzi najczęściej.
+Akapity, słownik, stronę bierną i łańcuchy liczy skrypt bez modelu: `@@PY@@ "$HERMES_HOME/scripts/prosty.py" --tekst "…"`
+(albo plik), gdy masz terminal. Przegląd tygodnia dostaje te same liczby dla wszystkich wiadomości Jarva do właściciela
+(`fleet_report.py --mode weekly`, klucz `prosty_polski`) jako informację, nie jako ocenę.
