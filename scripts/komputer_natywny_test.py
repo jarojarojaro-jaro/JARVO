@@ -344,15 +344,16 @@ def przebieg(root: str) -> int:
             f"zablokowane przed {przed}, po {po}")
     k.narzedzie("bring_to_front", {"pid": pid, "window_id": wid})
 
-    # druga sesja (druga karta Jarva): patrzy, ale ekranem steruje ta, która działała ostatnio
+    # druga sesja (druga karta Jarva): ekran ma ta, która działała ostatnio, także do patrzenia (75e4c361)
     k2 = Klient()
     inicjuj(k2, "komputer-natywny-test-2")
-    el2 = po_nazwie((k2.narzedzie("get_window_state", {"pid": pid, "window_id": wid}).get(
-        "structuredContent") or {}).get("elements") or [])
-    w = k2.narzedzie("click", {"pid": pid, "window_id": wid,
-                               "element_token": (el2.get("Dodaj do koszyka") or {}).get("element_token")})
-    sprawdz(zasada(w) == "zajete" and (w.get("structuredContent") or {}).get("next_step") == "wait_and_retry",
-            "druga sesja: patrzy, ale klik dostaje „zajęte” (jedna sesja naraz)", tekst(w))
+    patrz2 = k2.narzedzie("get_window_state", {"pid": pid, "window_id": wid})
+    w = k2.narzedzie("click", {"pid": pid, "window_id": wid, "element_token": (el.get("Dodaj do koszyka") or {}).get(
+        "element_token")})
+    sprawdz(all(zasada(x) == "zajete" and (x.get("structuredContent") or {}).get("next_step") == "wait_and_retry"
+                and (x.get("structuredContent") or {}).get("held_by") for x in (patrz2, w)),
+            "druga sesja: patrzenie i klik dostają „zajęte” z `held_by` (jedna sesja naraz)",
+            f"{tekst(patrz2)} | {tekst(w)}")
     k2.zamknij()
 
     formularz(k, pid)
