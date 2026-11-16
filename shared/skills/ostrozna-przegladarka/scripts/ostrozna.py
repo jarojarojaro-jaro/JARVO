@@ -11,7 +11,7 @@
 Tylko po blokadzie zwykłej drogi (extract.py, strona.py, browser_* z Lightpandą albo Chromium): 403/429,
 „Just a moment…”, „Human Verification”, captcha. Nigdy domyślnie. Camoufox to Firefox z podmienionym odciskiem
 przeglądarki (MPL-2.0): w obrazie `/opt/jarvo/camoufox`, natywnie paczka z manifestu instalacji (JARVO_CAMOUFOX,
-pobierana przy pierwszym użyciu, ok. 0,5 GB); RAM ok. 800 MB na czas jednej strony. Odcisk przeglądarki udaje system,
+pobierana przy pierwszym użyciu, ok. 1,3 GB); RAM ok. 800 MB na czas jednej strony. Odcisk przeglądarki udaje system,
 na którym działa (Windows, macOS, Linux), bo strona widzi fonty tego systemu.
 
 Zasady pilnowane w kodzie, nie tylko w skillu:
@@ -328,6 +328,10 @@ def opcje_camoufox(zrzut: bool, dom: Path | None = None) -> dict:
         "block_webrtc": True,
         "block_images": not zrzut,
         "exclude_addons": [DefaultAddons.UBO],  # bez pobierania dodatków z sieci przy starcie
+        # Camoufox 159 zostawia aktualizacje wtyczek GMP: każdy start (świeży profil) pyta aus5.mozilla.org (wersja
+        # przeglądarki i jądra systemu) i pobiera OpenH264 (ciscobinary.openh264.org) i Widevine (Google). Jak do 152:
+        # bez tego ruchu (OpenH264 służy WebRTC, które i tak blokujemy; Widevine to DRM, którego nie potrzebujemy)
+        "firefox_user_prefs": {"media.gmp-manager.updateEnabled": False},
         "i_know_what_im_doing": True,
     }
 
@@ -418,10 +422,11 @@ def czytaj(url: str, tryb: str = "markdown", zrzut: str | None = None, czekaj_s:
         return wynik
 
 
-# pliki paczki, bez których Camoufox nie ruszy albo da zły odcisk: na Linuksie także fonty i fontconfig z paczki
-PLIKI_PACZKI = {"linux": ("fontconfig/linux/fonts.conf", "fonts/linux", "properties.json"),
+# pliki paczki, bez których Camoufox nie ruszy albo da zły odcisk: na Linuksie także fontconfig i fonty z paczki
+# (od 158 w grupach fonts/{L,LM,LMW,LW}: litery = systemy, które je czytają; fonts/groups.json, L = tylko Linux)
+PLIKI_PACZKI = {"linux": ("fontconfig/linux/fonts.conf", "fonts/groups.json", "fonts/L", "properties.json"),
                 "windows": ("application.ini", "properties.json"), "macos": ("application.ini", "properties.json")}
-BRAK_PACZKI = ("Camoufox nie jest zainstalowany na tym komputerze (dodatek pobierany przy pierwszym użyciu, ok. 0,5 GB, "
+BRAK_PACZKI = ("Camoufox nie jest zainstalowany na tym komputerze (dodatek pobierany przy pierwszym użyciu, ok. 1,3 GB, "
                "z sumą z manifestu instalacji): poproś właściciela o jego instalację; do tego czasu odmowa strony "
                "zostaje blokadą")
 

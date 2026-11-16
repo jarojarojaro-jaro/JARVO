@@ -62,6 +62,19 @@ def test_jedno_zlecenie_z_nowymi_wersjami_i_bez_powtorek(tmp_path):
     assert len([l for l in zlecenia.read_text(encoding="utf-8").splitlines() if l.startswith("- [ ] ")]) == 1
 
 
+def test_ffmpeg_tylko_ostatni_build_zakonczonego_miesiaca():
+    """Buildy dzienne FFmpeg-Builds znikają po 14 kolejnych (zostaje tylko ostatni build miesiąca): zgłaszamy ostatni
+    build miesiąca, po którym jest już następny, nigdy build z miesiąca, który trwa (16.11 rutyna zgłosiła 2026-11-15)."""
+    pin = {"nazwa": "ffmpeg", "pin": "9.0.2", "rodzaj": "github", "owner": "FFmpeg-Builds", "repo": "FFmpeg-Builds",
+           "tag": "autobuild-2026-09-30-13-08", "plik": "vendor/natywne.yaml"}
+    listopad = ["autobuild-2026-11-15-12-40", "autobuild-2026-11-02-12-51"]
+    siec = _siec({"FFmpeg-Builds/FFmpeg-Builds": [*listopad, "autobuild-2026-10-30-12-00", "autobuild-2026-10-31-12-59",
+                                                  "autobuild-2026-09-30-13-08"]})
+    assert nw.najnowsza(pin, siec, {})[0] == "autobuild-2026-10-31-12-59"
+    siec = _siec({"FFmpeg-Builds/FFmpeg-Builds": [*listopad, "autobuild-2026-10-31-12-59"]})
+    assert nw.najnowsza({**pin, "tag": "autobuild-2026-10-31-12-59"}, siec, {}) is None
+
+
 def test_blad_jednego_zrodla_nie_zatrzymuje_reszty(tmp_path):
     repo = _repo(tmp_path / "r")
     stan, zlecenia = tmp_path / "stan.json", tmp_path / "DLA-CLAUDE.md"

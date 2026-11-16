@@ -102,9 +102,14 @@ def najnowsza(p: dict, pobierz: Pobierz, cache: dict) -> tuple[str, str] | None:
         beta = bool(re.search(r"(?i)alpha|beta|rc", p["tag"]))
         tagi = [r for r in cache[klucz] if isinstance(r, dict) and not r.get("draft") and (beta or not r.get("prerelease"))
                 and przedrostek(r.get("tag_name", "")) == pref and wersja(r.get("tag_name", ""))]
+        if pref == "autobuild-" and tagi:
+            # FFmpeg-Builds trzyma 14 ostatnich buildów dziennych, a 2 lata tylko ostatni build miesiąca: build z miesiąca,
+            # który trwa, zniknie (pin by się zepsuł). Liczy się ostatni build miesiąca, po którym jest już następny.
+            biezacy = max(wersja(r["tag_name"]) for r in tagi)
+            tagi = [r for r in tagi if wersja(r["tag_name"]) < biezacy]
         if not tagi:
             return None
-        top = max(tagi, key=lambda r: wersja(r["tag_name"]))
+        top = max(tagi, key=lambda r: (wersja(r["tag_name"]), tuple(int(x) for x in re.findall(r"\d+", r["tag_name"]))))
         if wersja(top["tag_name"]) > wersja(p["tag"]):
             return top["tag_name"], top.get("html_url") or f"https://github.com/{klucz}/releases/tag/{top['tag_name']}"
         return None

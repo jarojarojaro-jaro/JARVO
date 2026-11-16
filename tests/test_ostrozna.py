@@ -294,16 +294,18 @@ def test_cli_zrzut_i_limit(cli, monkeypatch, capsys):
 
 
 def test_opcje_bez_proxy_i_dodatkow(tmp_path, monkeypatch):
-    (tmp_path / "application.ini").write_text("[App]\nVendor=Camoufox\nVersion=152.0.4-beta.30\n", encoding="utf-8")
+    (tmp_path / "application.ini").write_text("[App]\nVendor=Camoufox\nVersion=159.0-beta.42\n", encoding="utf-8")
     monkeypatch.setattr(O, "EXE", str(tmp_path / "camoufox-bin"))
     fake = types.ModuleType("camoufox")
     fake.DefaultAddons = types.SimpleNamespace(UBO="ubo")
     monkeypatch.setitem(sys.modules, "camoufox", fake)
     o = O.opcje_camoufox(zrzut=False)
-    assert o["headless"] is True and o["os"] == O.SYSTEM and o["ff_version"] == 152
+    assert o["headless"] is True and o["os"] == O.SYSTEM and o["ff_version"] == 159
     assert o["exclude_addons"] == ["ubo"] and o["block_images"] is True and o["humanize"] is False
     assert not {"proxy", "user_data_dir", "persistent_context", "addons", "geoip_db"} & set(o) and o["geoip"] is False
     assert O.opcje_camoufox(zrzut=True)["block_images"] is False
+    # bez pobierania wtyczek GMP (OpenH264, Widevine) i pytania aus5.mozilla.org przy każdym starcie (Camoufox 159)
+    assert o["firefox_user_prefs"] == {"media.gmp-manager.updateEnabled": False}
 
 
 def test_przegladarka_bez_kluczy_agenta(tmp_path, monkeypatch):
@@ -381,8 +383,10 @@ def test_sprawdz(tmp_path, monkeypatch, capsys):
     (tmp_path / "camoufox-bin").chmod(0o755)
     (tmp_path / "fontconfig" / "linux").mkdir(parents=True)
     (tmp_path / "fontconfig" / "linux" / "fonts.conf").write_text("<fontconfig/>", encoding="utf-8")
-    (tmp_path / "fonts" / "linux").mkdir(parents=True)
+    (tmp_path / "fonts" / "L").mkdir(parents=True)          # od 158 fonty w grupach (L = tylko Linux)
     (tmp_path / "properties.json").write_text("[]", encoding="utf-8")
+    assert O.sprawdz() == 1 and "groups.json" in capsys.readouterr().err
+    (tmp_path / "fonts" / "groups.json").write_text('{"readBy": {"lin": ["L"]}}', encoding="utf-8")
     assert O.sprawdz() == 0
 
 

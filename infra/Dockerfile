@@ -118,7 +118,7 @@ RUN set -e; cd /opt/jarvo/node && \
 ENV HYPERFRAMES_BROWSER_PATH=/usr/local/bin/chromium \
     HYPERFRAMES_NO_TELEMETRY=1 \
     HYPERFRAMES_NO_UPDATE_CHECK=1
-# Jedna kopia HyperFrames: ta z locka w /opt/jarvo/node (wyżej; wersja przejrzana, ta sama co skille z
+# Jedna kopia HyperFrames: ta z locka w /opt/jarvo/node (wyżej; wersja przejrzana, 0.9.56, z poleceniami skilli z
 # vendor/skills.lock.yaml, tag v0.9.52). Skille HyperFrames wołają `npx hyperframes`, a npx szuka programu
 # w node_modules/.bin katalogu projektu i w globalnym bin npm, nie w PATH: bez wpisu tam ściągałby najnowszą wersję
 # przy pierwszym użyciu (a bez sieci healthcheck padał). Dlatego globalny bin dostaje dowiązania do tej kopii zamiast
@@ -249,23 +249,29 @@ ENV INDRA_OCR_MODEL_DIR=/opt/jarvo/models/indra-ocr
 
 # --- Camoufox (MPL-2.0): Firefox z podmienionym odciskiem przeglądarki, zapasowa przeglądarka Łowcy i Sherlocka
 #     (`ostrozna.py`, wspólny skill `ostrozna-przegladarka`) tylko po odmowie zwykłej przeglądarki. Binarka z wydania
-#     daijro/camoufox przypięta wersją i sumą SHA-256 dla amd64 i arm64 (przejrzana). Z paczki (1,3 GB) zostaje
-#     ~0,35 GB: bez fontów macOS i Windows (~0,9 GB fontów Apple i Microsoft, których nie redystrybuujemy), więc
-#     przeglądarka udaje tylko Linuksa (fonty Linuksa z paczki: Noto, Arimo, Tinos, Cousine; OFL i Apache-2.0).
+#     daijro/camoufox przypięta wersją i sumą SHA-256 dla amd64 i arm64 (przejrzana). Od 158 paczka (1,3 GB, 2,6 GB po
+#     rozpakowaniu) trzyma fonty wszystkich systemów raz, w grupach fonts/<litery systemów> (fonts/groups.json, readBy).
+#     Zostaje ~0,75 GB (0,39 GB w warstwie gzip; było 0,35 GB): program i fonty z grup, które czyta Linux (readBy.lin:
+#     L, LM, LMW, LW; 0,35 GB), więc przeglądarka udaje tylko Linuksa; bez grup macOS i Windows (M, MW, W: 1,24 GB,
+#     m.in. fonty Apple i Microsoftu), bez fontów Adobe i Microsoftu z grup Linuksa (Kozuka Mincho/Gothic Pr6N, Myriad
+#     Pro, Cascadia: ich licencje nie pozwalają nam ich rozpowszechniać) i bez Iosevki (0,54 GB, OFL, poza listą fontów
+#     biblioteki camoufox 0.5.6). Zostają m.in.
+#     Noto, DejaVu, Liberation, Ubuntu, URW, Arimo, Tinos, Cousine, STIX Two Math (OFL, Apache-2.0, GPL z wyjątkiem
+#     fontów, Ubuntu Font Licence), Twemoji Mozilla (CC-BY-4.0). Asercja pilnuje, że wycięte wzorce pasują do paczki.
 #     Na końcu start bez sieci: strona z data: i navigator.webdriver = false.
-ARG CAMOUFOX_VERSION=152.0.4-beta.30
-ARG CAMOUFOX_SHA256_AMD64=5720d45b894ce1770543de024c6f10d514b38be560fa2dc3226b3d8586caf672
-ARG CAMOUFOX_SHA256_ARM64=60447260af8bebdb0ec3f2aa72f687b879e5598367303de2e3fdbc7a5be8c124
+ARG CAMOUFOX_VERSION=159.0-beta.42
+ARG CAMOUFOX_SHA256_AMD64=a79ad1ef1a4575e3e0d2c1c66b13ad79ebcad15a898a7c070075e6dd849533d4
+ARG CAMOUFOX_SHA256_ARM64=7c7e81870bbd29ff3d765c0e0c29b8dad8cd695cd27ea145ca4d0dbf3def2b2b
 RUN set -e; case "$(uname -m)" in x86_64) a=x86_64; s="$CAMOUFOX_SHA256_AMD64";; aarch64) a=arm64; s="$CAMOUFOX_SHA256_ARM64";; \
       *) echo "Camoufox: brak wydania dla $(uname -m)" >&2; exit 1;; esac; \
     d=/opt/jarvo/camoufox; t="$(mktemp -d)"; \
     curl -fsSL --retry 3 -o "$t/camoufox.zip" \
       "https://github.com/daijro/camoufox/releases/download/v${CAMOUFOX_VERSION}/camoufox-${CAMOUFOX_VERSION}-lin.${a}.zip" && \
     echo "$s  $t/camoufox.zip" | sha256sum -c - && \
-    python3 -I -c "import os, sys, zipfile; z = zipfile.ZipFile(sys.argv[1]); pomin = ('fonts/macos/', 'fonts/windows/', 'fontconfig/macos/', 'fontconfig/windows/'); [os.chmod(z.extract(i, sys.argv[2]), ((i.external_attr >> 16) & 0o755) | 0o444) for i in z.infolist() if not i.is_dir() and not i.filename.startswith(pomin)]" "$t/camoufox.zip" "$d" && \
+    python3 -I -c "import json, os, re, sys, zipfile; z = zipfile.ZipFile(sys.argv[1]); lin = set(json.loads(z.read('fonts/groups.json'))['readBy']['lin']); bez = re.compile(r'__(KozMinPr6N|KozGoPr6N|MyriadPro|Cascadia|Iosevka)'); g = lambda n: n.split('/')[1] if n.startswith('fonts/') and n.count('/') > 1 else None; pomin = lambda n: (n.startswith('fontconfig/') and not n.startswith('fontconfig/linux/')) or (g(n) is not None and (g(n) not in lin or bez.search(n) is not None)); wyciete = {m.group(1) for i in z.infolist() if g(i.filename) in lin and (m := bez.search(i.filename))}; assert wyciete == {'KozMinPr6N', 'KozGoPr6N', 'MyriadPro', 'Cascadia', 'Iosevka'}, wyciete; [os.chmod(z.extract(i, sys.argv[2]), ((i.external_attr >> 16) & 0o755) | 0o444) for i in z.infolist() if not i.is_dir() and not pomin(i.filename)]" "$t/camoufox.zip" "$d" && \
     printf '%s\n' "Camoufox ${CAMOUFOX_VERSION} (MPL-2.0), kod źródłowy: https://github.com/daijro/camoufox (tag v${CAMOUFOX_VERSION})." \
-      "Binarka bez zmian; Jarvo pomija tylko fonty macOS i Windows z paczki. Licencje Firefoksa: about:license." > "$d/JARVO-ZRODLO.txt" && \
-    HOME="$t" /opt/jarvo/venv/bin/python -c "from camoufox.sync_api import Camoufox; from camoufox import DefaultAddons; c = Camoufox(executable_path='$d/camoufox-bin', ff_version=${CAMOUFOX_VERSION%%.*}, headless=True, os='linux', geoip=False, exclude_addons=[DefaultAddons.UBO], i_know_what_im_doing=True); b = c.__enter__(); p = b.new_page(); p.goto('data:text/html,<title>ok</title>'); assert p.title() == 'ok' and p.evaluate('navigator.webdriver') is False; c.__exit__(None, None, None); print('Camoufox OK')" && \
+      "Binarka bez zmian; Jarvo pomija fonty grup macOS i Windows, fonty Adobe i Microsoftu oraz Iosevkę z paczki. Licencje Firefoksa: about:license." > "$d/JARVO-ZRODLO.txt" && \
+    HOME="$t" /opt/jarvo/venv/bin/python -c "from camoufox.sync_api import Camoufox; from camoufox import DefaultAddons; c = Camoufox(executable_path='$d/camoufox-bin', ff_version=${CAMOUFOX_VERSION%%.*}, headless=True, os='linux', geoip=False, exclude_addons=[DefaultAddons.UBO], firefox_user_prefs={'media.gmp-manager.updateEnabled': False}, i_know_what_im_doing=True); b = c.__enter__(); p = b.new_page(); p.goto('data:text/html,<title>ok</title>'); assert p.title() == 'ok' and p.evaluate('navigator.webdriver') is False; c.__exit__(None, None, None); print('Camoufox OK')" && \
     rm -rf "$t"
 
 # --- skrypty floty w obrazie (jarvo-stt: rozpoznawanie mowy Parakeet dla Hermesa i napisów; jarvo-tts: lektor;

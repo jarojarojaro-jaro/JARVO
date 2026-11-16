@@ -70,9 +70,9 @@
    }
   },
   "camoufox": {
-   "wersja": "152.0.4-beta.30",
+   "wersja": "159.0-beta.42",
    "kiedy": "przy-uzyciu",
-   "licencja": "MPL-2.0 (Camoufox, Firefox) + fonty z paczki (OFL-1.1, Apache-2.0, CC-BY-4.0, Apple, Microsoft) + DLL Microsoftu",
+   "licencja": "MPL-2.0 (Camoufox, Firefox) + fonty z paczki (OFL-1.1, Apache-2.0, CC-BY-4.0, GPL z wyjątkiem fontów, Adobe, Apple, Microsoft) + DLL Microsoftu",
    "zrodlo": "camoufox",
    "pliki": {
     "windows-x64": {
@@ -80,45 +80,55 @@
       "JARVO_CAMOUFOX": "{katalog}/camoufox.exe"
      },
      "format": "zip",
-     "rozmiar": 493141328,
-     "sha256": "ea52a02fb1cfb1813ef6a326bea03fb2b650c9774143d953a94a27bfc8f10072",
-     "url": "https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-win.x86_64.zip"
+     "rozmiar": 1328541285,
+     "sha256": "abd9b989654877e0baf3af480b75789d3aec059618d8606ae2b4975f0561fdf7",
+     "url": "https://github.com/daijro/camoufox/releases/download/v159.0-beta.42/camoufox-159.0-beta.42-win.x86_64.zip"
     },
     "windows-arm64": {
      "env": {
       "JARVO_CAMOUFOX": "{katalog}/camoufox.exe"
      },
      "format": "zip",
-     "rozmiar": 493141328,
-     "sha256": "ea52a02fb1cfb1813ef6a326bea03fb2b650c9774143d953a94a27bfc8f10072",
-     "url": "https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-win.x86_64.zip"
+     "rozmiar": 1328541285,
+     "sha256": "abd9b989654877e0baf3af480b75789d3aec059618d8606ae2b4975f0561fdf7",
+     "url": "https://github.com/daijro/camoufox/releases/download/v159.0-beta.42/camoufox-159.0-beta.42-win.x86_64.zip"
     },
     "macos-arm64": {
      "env": {
       "JARVO_CAMOUFOX": "{katalog}/Camoufox.app/Contents/MacOS/camoufox"
      },
      "format": "zip",
-     "rozmiar": 312665777,
-     "sha256": "3b43e766574f286a6a63296cf58b660b7a3120952086c869b4df4c9a71604bc3",
-     "url": "https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-mac.arm64.zip"
+     "rozmiar": 1304134993,
+     "sha256": "5b0e908086497e435ec2e4363c5a03141b85020114d35876f475f0be805f93bc",
+     "url": "https://github.com/daijro/camoufox/releases/download/v159.0-beta.42/camoufox-159.0-beta.42-mac.arm64.zip"
     },
     "linux-x64": {
      "env": {
       "JARVO_CAMOUFOX": "{katalog}/camoufox-bin"
      },
      "format": "zip",
-     "rozmiar": 663467670,
-     "sha256": "5720d45b894ce1770543de024c6f10d514b38be560fa2dc3226b3d8586caf672",
-     "url": "https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-lin.x86_64.zip"
+     "rozmiar": 1313639575,
+     "sha256": "a79ad1ef1a4575e3e0d2c1c66b13ad79ebcad15a898a7c070075e6dd849533d4",
+     "url": "https://github.com/daijro/camoufox/releases/download/v159.0-beta.42/camoufox-159.0-beta.42-lin.x86_64.zip",
+     "usun": [
+      "fonts/M",
+      "fonts/MW",
+      "fonts/W"
+     ]
     },
     "linux-arm64": {
      "env": {
       "JARVO_CAMOUFOX": "{katalog}/camoufox-bin"
      },
      "format": "zip",
-     "rozmiar": 653870625,
-     "sha256": "60447260af8bebdb0ec3f2aa72f687b879e5598367303de2e3fdbc7a5be8c124",
-     "url": "https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.30/camoufox-152.0.4-beta.30-lin.arm64.zip"
+     "rozmiar": 1306142907,
+     "sha256": "7c7e81870bbd29ff3d765c0e0c29b8dad8cd695cd27ea145ca4d0dbf3def2b2b",
+     "url": "https://github.com/daijro/camoufox/releases/download/v159.0-beta.42/camoufox-159.0-beta.42-lin.arm64.zip",
+     "usun": [
+      "fonts/M",
+      "fonts/MW",
+      "fonts/W"
+     ]
     }
    }
   },

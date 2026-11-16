@@ -1,7 +1,7 @@
 ---
 name: ostrozna-przegladarka
 description: "Odmowa zwykłej przeglądarki → jedna próba Camoufoxem."
-version: 1.1.0
+version: 1.1.1
 author: "Jarvo (przeglądarka: Camoufox, MPL-2.0)"
 license: MIT
 metadata:
@@ -9,7 +9,7 @@ metadata:
     tags: [browser, blocked-page, 403, captcha, camoufox, fallback]
   jarvo:
     autonomy: A1
-    reviewed: "2026-10-25"
+    reviewed: "2026-11-16"
 ---
 
 # Ostrożna przeglądarka (Camoufox)
@@ -46,7 +46,7 @@ Kody: 0 strona przeczytana, 1 błąd (sieć, 404, brak Camoufoxa na tym komputer
 - **3:** koniec. Zapisz w `risks` „<domena>: odmowa także w Camoufoxie (<powód>)” i zgłoś blokadę jednym zdaniem.
   Bez drugiej próby, innego adresu tej samej strony, archiwum na siłę ani innego narzędzia.
 - **4:** limit domeny albo przeglądarka zajęta. Nie omijasz go: odłóż stronę albo zgłoś.
-- **1 z „Camoufox nie jest zainstalowany”:** przeglądarka to dodatek pobierany przy pierwszym użyciu (ok. 0,5 GB).
+- **1 z „Camoufox nie jest zainstalowany”:** przeglądarka to dodatek pobierany przy pierwszym użyciu (ok. 1,3 GB).
   Nie instalujesz jej sam: zgłoś to właścicielowi jednym zdaniem, a strona zostaje blokadą do czasu instalacji.
 
 ## Granice (pilnuje ich skrypt)

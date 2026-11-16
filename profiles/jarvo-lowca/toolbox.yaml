@@ -48,8 +48,8 @@ tools:
   - name: camoufox
     source: https://github.com/daijro/camoufox
     license: MPL-2.0 (przeglądarka, niezmodyfikowana binarka), MIT (biblioteka camoufox)
-    version: "152.0.4-beta.30 (biblioteka 0.5.6)"
-    install: {method: binary, spec: "obraz: infra/Dockerfile, wydanie v152.0.4-beta.30, SHA-256 amd64 i arm64; natywnie: vendor/natywne.yaml (camoufox, przy pierwszym użyciu: Windows, macOS, Linux; JARVO_CAMOUFOX); camoufox==0.5.6 + playwright==1.62.0 w venvie narzędzi"}
+    version: "159.0-beta.42 (biblioteka 0.5.6)"
+    install: {method: binary, spec: "obraz: infra/Dockerfile, wydanie v159.0-beta.42, SHA-256 amd64 i arm64, fonty grup Linuksa; natywnie: vendor/natywne.yaml (camoufox, przy pierwszym użyciu: Windows, macOS, Linux bez fontów macOS i Windows; JARVO_CAMOUFOX); camoufox==0.5.6 + playwright==1.62.0 w venvie narzędzi"}
     integration: skill-script
     used_by_skills: [ostrozna-przegladarka, kontakt-firmy, sygnaly, rozpoznanie-zrodla]
     healthcheck: "python3 @@REPO_DIR@@/shared/skills/ostrozna-przegladarka/scripts/ostrozna.py --sprawdz"

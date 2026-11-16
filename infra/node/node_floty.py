@@ -21,8 +21,8 @@ Wpis dla `<stan>/narzedzia.json` (jarvo/srodowisko.py składa z niego środowisk
   bin  node_modules/.bin w PATH: `hyperframes`, `lighthouse`, `svgo`… (na Windows pliki .cmd, w Git Bash skrypty sh),
   env  NODE_PATH (playwright-core i three dla skryptów floty, serwery MCP z Node, build.py), HYPERFRAMES_NO_TELEMETRY
        i HYPERFRAMES_NO_UPDATE_CHECK (jak ENV w obrazie: bez PostHoga i bez pytania npm o nowszą wersję; przy
-       NO_UPDATE_CHECK hyperframes 0.9.52 nie instaluje też nowszej wersji w tle ani nie sprawdza skilli), do tego
-       HYPERFRAMES_NO_AUTO_INSTALL (0.9.52 wyłącza autoaktualizację każdym z nich); na Windows i macOS
+       NO_UPDATE_CHECK hyperframes 0.9.56 nie instaluje też nowszej wersji w tle ani nie sprawdza skilli), do tego
+       HYPERFRAMES_NO_AUTO_INSTALL (0.9.56 wyłącza autoaktualizację każdym z nich); na Windows i macOS
        HYPERFRAMES_RENDER_DETACHED (strażnik przodków renderu bez sprawdzania tożsamości procesów myli odzyskane
        PID-y i przerywa render; na Linuksie i w obrazie sprawdza czas startu, więc zostaje); HYPERFRAMES_FFMPEG_PATH
        i HYPERFRAMES_FFPROBE_PATH na programy z katalogów `bin_ffmpeg` (ffmpeg z manifestu; na macOS ffmpeg i ffprobe
@@ -158,7 +158,7 @@ def wpis(katalog: Path, suma: str, bin_ffmpeg: Iterable[Path] = (), cache: Path 
     env = {"NODE_PATH": str(nm), "HYPERFRAMES_NO_TELEMETRY": "1", "HYPERFRAMES_NO_UPDATE_CHECK": "1",
            "HYPERFRAMES_NO_AUTO_INSTALL": "1", "npm_config_prefix": str(Path(katalog) / PREFIX)}
     if WINDOWS or sys.platform == "darwin":
-        # strażnik renderu HyperFrames (0.8.78, bez zmian w 0.9.52) poza Linuksem sprawdza tylko, czy PID-y przodków
+        # strażnik renderu HyperFrames (0.8.78, bez zmian do 0.9.56) poza Linuksem sprawdza tylko, czy PID-y przodków
         # żyją: łańcuch rodziców z migawki procesów sięga przez martwy proces (np. ten, który uruchomił nadzorcę)
         # do obcego procesu o odzyskanym PID-zie, a jego koniec przerywa render („render_cancelled_parent_exited”,
         # próba na Windows 11)

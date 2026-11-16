@@ -86,8 +86,8 @@ zrodla:
   hyperframes:
     repo: https://github.com/heygen-com/hyperframes
     status: uzywane
-    przejrzane: ad3a2389ee82b87eaee4bbf9a046c6a4273a6661
-    notatka: "HyperFrames 0.9.52 (tag v0.9.52 = ten commit; paczka npm hyperframes 0.9.52 w infra/node z atestacją SLSA z publish.yml na tym commicie, skille z tego samego commitu). Aktualizacja 0.8.78 → 0.9.52 2026-11-15 (przegląd w docs/SOURCES.md): licencja bez zmian, bez skryptów instalacyjnych, flagi Jarva bez zmian, telemetria i autoaktualizacja wyłączone tymi samymi zmiennymi, GSAP z paczki (render bez jsdelivr, npm i GitHuba, sprawdzone strace); 8 skilli workflow (product-launch-video, faceless-explainer, motion-graphics, embedded-captions, general-video, hyperframes-core/-animation/-creative) upstream wycofał do references skilla hyperframes, we flocie 4 skille."
+    przejrzane: 79990aed9a9e9059d03b17c1e2c659f0e4f3fc9c
+    notatka: "HyperFrames 0.9.56 (tag v0.9.56 = ten commit; paczka npm hyperframes 0.9.56 w infra/node z atestacją SLSA z publish.yml na tym commicie). Skille zostają na v0.9.52 (ad3a238, skills.lock.yaml): skille v0.9.56 wołają CLI przez scripts/plugin-cli.mjs, który bez manifestu wtyczki robi npx --yes hyperframes@>=0.9.34 i pobiera najnowszą paczkę z npm mimo przypiętej kopii; polecenia i flagi CLI 0.9.56 identyczne jak 0.9.52 (--help 50 poleceń). Aktualizacja 0.9.52 → 0.9.56 2026-11-16 (103 commity, poprawki bezpieczeństwa; licencja, zależności i brak skryptów instalacyjnych bez zmian; zmienne Jarva działają jak dotąd). Aktualizacja 0.8.78 → 0.9.52 2026-11-15 (przegląd w docs/SOURCES.md): telemetria i autoaktualizacja wyłączone tymi samymi zmiennymi, GSAP z paczki (render bez jsdelivr, npm i GitHuba, sprawdzone strace); 8 skilli workflow upstream wycofał do references skilla hyperframes, we flocie 4 skille."
   huashu-art-motion:
     repo: https://github.com/alchaincyf/huashu-art-motion
     status: uzywane
@@ -227,8 +227,8 @@ zrodla:
   camoufox:
     repo: https://github.com/daijro/camoufox
     status: uzywane
-    przejrzane: 5d06ec1629ac7843508f1e683f83e404fde8db76
-    notatka: "Camoufox 152.0.4-beta.30 (MPL-2.0, tag v152.0.4-beta.30 = ten commit, workflow Build and Release z tagu): w obrazie lin.x86_64 i lin.arm64 (sumy w infra/Dockerfile = digesty GitHuba = własne liczenie 2026-10-24). Natywnie (przegląd 2026-10-24), przy pierwszym użyciu: win.x86_64 (ea52a02f…, 937 MB po rozpakowaniu) i mac.arm64 (3b43e766…, zip bez dowiązań); Windows arm64 = x86_64 w emulacji. Polityki i camoufox.cfg wyłączają aktualizacje, telemetrię, Normandy, Safe Browsing i zdalne ustawienia (w 25 s bezczynności tylko gniazda 127.0.0.1). Windows: camoufox.exe i xul.dll bez Authenticode, w paczce podpisane DLL runtime VC++ i Windows App SDK Microsoftu; macOS: pakiet bez _CodeSignature, Mach-O ad-hoc, bez notaryzacji. Paczka Windows ma płasko fonty macOS (355 plików, 596 MB) i Linuksa, paczka macOS fonty Windows (144, 337 MB); w obrazie fonty macOS i Windows pomijamy, natywnie decyduje właściciel"
+    przejrzane: 340cf16170eaca627711b9dbdd541dbe516b895f
+    notatka: "Camoufox 159.0-beta.42 (MPL-2.0, tag v159.0-beta.42 = ten commit, workflow Release; wydanie oznaczone jako pre-release): w obrazie lin.x86_64 i lin.arm64 (sumy w infra/Dockerfile = digesty GitHuba; lin.x86_64 = własne liczenie 2026-11-16). Od 158 fonty wszystkich systemów raz, w grupach fonts/{L,LM,LMW,LW,M,MW,W} (fonts/groups.json, readBy): zip 1,30–1,33 GB, 2,6 GB po rozpakowaniu. Obraz bierze grupy Linuksa bez Kozuka/Myriad Pro (Adobe), Cascadia (licencja Microsoftu) i Iosevki (0,75 GB); natywnie na Linuksie manifest usuwa grupy M, MW, W (1,33 GB na dysku). Natywnie, przy pierwszym użyciu: win.x86_64 (abd9b989…) i mac.arm64 (5b0e9080…, zip bez dowiązań), płaski fonts/ ze wszystkimi fontami; Windows arm64 = x86_64 w emulacji. 159 nie ma distribution/policies.json i ma mniej wyłączeń w camoufox.cfg: aktualizacje wtyczek GMP (aus5.mozilla.org, OpenH264, Widevine) włączone, ostrozna.py i obraz wyłączają je media.gmp-manager.updateEnabled = false (potem w 30 s bezczynności bez gniazd TCP/UDP). Windows: camoufox.exe i xul.dll bez Authenticode; macOS: pakiet bez _CodeSignature. Czy pomijać fonty innych systemów na Windows i macOS, decyduje właściciel"
   cua:
     repo: https://github.com/trycua/cua
     status: uzywane

@@ -330,7 +330,10 @@ def test_camoufox_pinned_and_lean():
     code = "\n".join(line for line in docker.splitlines() if not line.lstrip().startswith("#"))
     wersja = re.search(r"CAMOUFOX_VERSION=([\w.-]+)", code).group(1)
     assert re.search(r"CAMOUFOX_SHA256_AMD64=[0-9a-f]{64}", code) and re.search(r"CAMOUFOX_SHA256_ARM64=[0-9a-f]{64}", code)
-    assert "sha256sum -c" in code and "fonts/macos/" in code and "fonts/windows/" in code
+    # fonty tylko z grup, które czyta Linux (fonts/groups.json, readBy), bez fontów Adobe i Microsoftu z tych grup
+    assert "sha256sum -c" in code and "['readBy']['lin']" in code and "fontconfig/linux/" in code
+    assert all(f in code for f in ("KozMinPr6N", "KozGoPr6N", "MyriadPro", "Cascadia"))
+    assert "'media.gmp-manager.updateEnabled': False" in code     # start bez pobierania wtyczek GMP
     assert "libgtk-3-0t64" in code and "dbus-x11" in code and "dbus-user-session" not in code
     tools = (REPO / "infra" / "python" / "requirements-tools.txt").read_text(encoding="utf-8")
     assert re.search(r"^camoufox==[\d.]+$", tools, re.M) and re.search(r"^playwright==1\.(\d+)\.\d+$", tools, re.M)
