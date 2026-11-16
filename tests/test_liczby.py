@@ -37,7 +37,7 @@ def kanban(path):
         ("t_run", "Cisza", "jarvo-wideo", "running", NOW - D, None),
     ])
     ev = [("t_web", "review_requested", {"implementer": "jarvo-web"}, NOW - 15 * D),
-          ("t_web", "changes_requested", {}, NOW - 14 * D),
+          ("t_web", "changes_requested", {"reason": "Runda 1: brak  zrzutu 375 px"}, NOW - 14 * D),
           ("t_web", "review_requested", {"implementer": "jarvo-web"}, NOW - 2 * D),
           ("t_sh", "review_requested", {"implementer": "jarvo-sherlock"}, NOW - D),
           ("t_blk", "blocked", {"kind": "needs_input", "reason": ""}, NOW - D),
@@ -91,6 +91,10 @@ def test_eskalacje_awarie_cisza_tokeny(tmp_path):
     assert w["tokeny_na_karte"] == {"jarvo-web": {"karty": 1, "bez_cache": 400, "cache": 2000}}
     assert any("na kartę jarvo-web: 400 bez cache + 2000 z cache (kart 1" in ln for ln in liczby.opis(w))
     assert any("za 1. razem: 1/3 (33%)" in ln for ln in liczby.opis(w))
+
+    # znane braki (16.11): powód odesłania przypisany wykonawcy z recenzji, spacje sklejone; dla karty bez recenzji nic
+    assert w["braki"] == {"jarvo-web": ["Runda 1: brak zrzutu 375 px"]}
+    assert any("znane braki jarvo-web" in ln and "brak zrzutu 375 px" in ln for ln in liczby.opis(w))
 
 
 def test_hq_liczy_tak_samo_jak_przeglad_tygodnia(tmp_path):

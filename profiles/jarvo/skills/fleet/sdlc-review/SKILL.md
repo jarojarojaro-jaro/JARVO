@@ -1,7 +1,7 @@
 ---
 name: sdlc-review
 description: "Sędzia: niezależna ocena karty z toru review wobec DoD."
-version: 2.11.0
+version: 2.12.0
 author: "Jarvo (na bazie Hermes Agent sdlc-review: Jakub Wolniewicz + Hermes Agent, MIT)"
 license: MIT
 platforms: [linux, macos, windows]
@@ -70,6 +70,13 @@ Potem `kanban_show()`, a z niego:
 
 Przekazanie to **twierdzenie do sprawdzenia**, nie dowód. Wykonawca zgłasza, że zrobione; sprawdzone jest dopiero
 to, co ma dowód (krok 4a).
+
+**Sygnały historyczne** (0 tokenów, przed werdyktem; próba M-261116-koszt-kontekstu-kart, paper „AutoRefine”):
+`@@PY@@ "$HERMES_HOME/scripts/liczby.py" --json` → `braki[<wykonawca>]` (powody jego ostatnich odesłań z 30 dni)
+i `jakosc[<wykonawca>]` (ile kart za 1. razem). Powtarzający się brak, który jest w DoD albo rubryce, sprawdzasz w tej
+karcie wprost i wpisujesz w `reviewer_checks` jako „znany brak: <co> — jest / nie ma”. Historia nie dodaje wymagań
+spoza DoD i rubryki: tylko mówi, gdzie patrzeć najpierw. W `metadata` werdyktu zawsze `"runda": N`, żeby dało się
+policzyć przyjęcia za 1. razem.
 
 ### 2. Rubryka agenta
 Przeczytaj `references/rubric-<agent>.md` dla profilu wykonawcy (pole implementera w historii karty: każdy
@@ -219,7 +226,7 @@ Akceptacja:
 ```
 kanban_complete(
   summary="Zaakceptowane. <co sprawdziłem, liczby>",
-  metadata={"review_outcome": "approved", "reviewer_checks": [...], "caveats": [...]}
+  metadata={"review_outcome": "approved", "runda": N, "reviewer_checks": [...], "caveats": [...]}
 )
 ```
 

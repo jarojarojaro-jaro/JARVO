@@ -1,7 +1,7 @@
 ---
 name: dispatch-playbook
 description: "Rozdawanie pracy: karty z kontraktem, zależności, misje."
-version: 1.5.0
+version: 1.6.0
 author: Jarvo
 license: MIT
 metadata:
@@ -34,8 +34,9 @@ Używaj, gdy intake zdecydował: **zlecenie jednego agenta** albo **misja**.
 Szablon: `references/card-template.md`. Minimum:
 ```
 CEL: <co ma powstać, 1–2 zdania>
-KONTEKST: <dla kogo, po co, decyzje już podjęte, marka, ton, ograniczenia>
-WEJŚCIA: <pliki/URL; brand kit: @@KNOWLEDGE_DIR@@/brands/<marka>/; wyniki rodziców: ich katalogi out/;
+KONTEKST: <najwyżej 5 punktów: dla kogo i po co, decyzje już podjęte, ograniczenia, czego NIE robić, znane braki
+          wykonawcy (1–3 z `liczby.py --json` → `braki[<agent>]`)>
+WEJŚCIA: <pliki/URL; brand kit: @@KNOWLEDGE_DIR@@/brands/<marka>/; wyniki rodziców: ścieżka do ich out/, nie treść;
          zdjęcia i pliki od użytkownika: pełne ścieżki @@INBOX_DIR@@/… (z linii 📎 w rozmowie)>
 DoD:
 - <mierzalny warunek 1>
@@ -44,6 +45,10 @@ WYJŚCIA: <pliki w out/ (nazwy, formaty)>
 GRANICE: autonomia A1 (bez publikacji/wdrożeń); budżet <czas>; nie ruszać <…>
 ZGODA WŁAŚCICIELA: <konto|platnosc|wysylka|publikacja|usuniecie_konta|wszystko> — „<cytat polecenia>” (<RRRR-MM-DD>)
 ```
+Karta to kontrakt, nie streszczenie rozmowy: historia rozmowy i warianty, które rozważałeś, idą do `MISSION.md`
+(wykonawca czyta kartę w każdej turze, więc każde zbędne zdanie płaci wielokrotnie; próba M-261116-koszt-kontekstu-kart,
+paper „Agency”: czytanie kontekstu do 73% kosztu). Znane braki wykonawcy wpisujesz, żeby nie powtórzył ich w rundzie 1
+(2/11 kart za 1. razem w tygodniu do 16.11); bierzesz je z `@@PY@@ "$HERMES_HOME/scripts/liczby.py" --json` (klucz `braki`).
 Linia `ZGODA WŁAŚCICIELA`, gdy właściciel kazał założyć konto (`konto`), zapłacić, wysłać, opublikować albo usunąć
 konto: cytujesz jego słowa. Czyta ją kod (Komputer Jarva, bramka telefonu), nie model; bez niej taki klik na karcie
 oddajesz właścicielowi (`oddaj-ekran`). W Komputerze logowanie i rejestracja przechodzą i bez niej, na telefonie zgoda na regulamin
@@ -115,3 +120,5 @@ Nie relacjonuj każdego zdarzenia. Mów tylko wtedy, gdy to zmienia coś dla uż
 - Dwie równoległe karty wymyślające tę samą rzecz → zdecyduj wcześniej.
 - Karta dla nieistniejącego agenta → dispatcher jej nie wykona. Tylko nazwy z rosteru.
 - `scratch` workspace dla wyników misji → pliki znikną po akceptacji. Używaj `dir` w katalogu misji.
+- KONTEKST przepisany z rozmowy (historia, warianty, cudze wyniki wklejone treścią) → podwójny koszt w każdej turze
+  wykonawcy. Najwyżej 5 punktów, wyniki rodziców ścieżką.

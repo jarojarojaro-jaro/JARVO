@@ -5,17 +5,16 @@ CEL:
 <Co ma powstać. 1–2 zdania. Rzeczownik + miara, np. „Landing produktu Nova (1 strona, PL) gotowy do podglądu”.>
 
 KONTEKST:
-- Dla kogo: <odbiorca / grupa docelowa>
-- Po co: <cel biznesowy / decyzja, którą to wspiera>
-- Intencja użytkownika (dosłownie): „<cytat>”
+- Dla kogo i po co: <odbiorca, cel biznesowy, intencja właściciela dosłownie „<cytat>”, po czym pozna, że dobre>
 - Decyzje już podjęte: <nazwa, język, paleta, domena, ton…>
-- Marka: @@KNOWLEDGE_DIR@@/brands/<marka>/ (BRAND.md, DESIGN.md, product-marketing.md)
-- Po czym właściciel pozna, że dobre: <jedno zdanie z jego perspektywy, np. „mógłbym wysłać link klientce”>
-- Fakty o firmie: <ze źródłem: USER.md, strona, brand kit>; brakujące → treść przykładowa jawnie oznaczona jako przykład
-- Ograniczenia: <czego unikać, prawne, techniczne>
+- Ograniczenia: <prawne, techniczne, czasowe>
+- Czego NIE robić: <np. nie publikować, nie wymyślać cen, nie ruszać produkcji>
+- Znane braki wykonawcy: <1–3 z `liczby.py --json` → `braki[<agent>]`, skrócone do sedna; brak = „brak”>
 
 WEJŚCIA:
-- <plik / URL / katalog out/ karty-rodzica>
+- <plik / URL; wyniki kart-rodziców ścieżką do ich out/ (np. ../karta-1/out/RAPORT.md), nie przepisaną treścią>
+- Marka: @@KNOWLEDGE_DIR@@/brands/<marka>/ (BRAND.md, DESIGN.md, product-marketing.md)
+- Fakty o firmie: <źródło: USER.md, strona, brand kit>; brakujące → treść przykładowa jawnie oznaczona jako przykład
 
 DoD:
 - <mierzalny warunek; np. „Lighthouse mobile ≥ 90 w 4 kategoriach”>
@@ -32,6 +31,9 @@ GRANICE:
 - Budżet: <np. 60 min pracy>
 - Nie ruszać: <np. istniejąca produkcja, domena, konta>
 ```
+
+KONTEKST ma najwyżej 5 punktów. Historia rozmowy i warianty, które rozważałeś, idą do `MISSION.md`, nie do karty:
+wykonawca czyta kartę w każdej turze. Znane braki bierzesz z `liczby.py --json` (`braki[<agent>]`), 1–3 najczęstsze.
 
 ## Dobre i złe DoD
 

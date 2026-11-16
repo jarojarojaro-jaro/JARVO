@@ -82,6 +82,25 @@ def zdarzenia_jakosci(conn: sqlite3.Connection, ids: list[str]) -> dict[str, lis
     return out
 
 
+BRAKI_DNI, BRAKI_ILE = 30, 5
+
+
+def braki(conn: sqlite3.Connection, teraz: float) -> dict[str, list[str]]:
+    """Znane braki wykonawców: powody ostatnich odesłań do poprawek (`changes_requested.reason`, 30 dni, do 5 na agenta,
+    od najnowszego). Wykonawca = implementer z poprzedzającego `review_requested` tej karty. Czyta je Jarvo przy pisaniu
+    karty (punkt KONTEKSTU „znane braki”) i sędzia przed werdyktem (16.11, zlecenie Jarva: tylko 2/11 kart za 1. razem)."""
+    out: dict[str, list[str]] = {}
+    kto: dict[str, str] = {}
+    for r in conn.execute("SELECT task_id, kind, payload FROM task_events WHERE kind IN ('review_requested', "
+                          "'changes_requested') AND created_at >= ? ORDER BY created_at, id", (teraz - BRAKI_DNI * DZIEN,)):
+        p = _payload(dict(r))
+        if r["kind"] == "review_requested" and p.get("implementer"):
+            kto[r["task_id"]] = p["implementer"]
+        elif r["kind"] == "changes_requested" and kto.get(r["task_id"]) and str(p.get("reason") or "").strip():
+            out.setdefault(kto[r["task_id"]], []).append(" ".join(str(p["reason"]).split())[:240])
+    return {a: list(reversed(v))[:BRAKI_ILE] for a, v in out.items()}
+
+
 def _tokeny(dane: Path, od: float) -> dict[str, dict]:
     out = {}
     bazy = sorted((dane / "profiles").glob("*/state.db")) + [dane / "state.db"]
@@ -147,6 +166,7 @@ def policz(dane: Path, teraz: float, dni: int = 7) -> dict:
             karty = [dict(r) for r in conn.execute(
                 "SELECT id, assignee FROM tasks WHERE status IN ('done', 'archived') AND completed_at >= ?", (od,))]
             wynik["jakosc"] = jakosc(karty, zdarzenia_jakosci(conn, [k["id"] for k in karty]))
+            wynik["braki"] = braki(conn, teraz)
             przebiegi = [(r["task_id"], r["profile"], r["started_at"]) for r in conn.execute(
                 "SELECT task_id, profile, started_at FROM task_runs WHERE started_at >= ? AND profile IS NOT NULL", (od,))]
             esk = {"needs_input": 0, "capability": 0, "inne": 0, "gave_up": 0}
@@ -230,6 +250,8 @@ def opis(w: dict) -> list[str]:
              f"- za 1. razem: {z['przyjete']}/{z['zrobione']}" + (f" ({z['procent']}%)" if z["procent"] is not None else "")]
     for a, s in sorted(w["jakosc"].items()):
         linie.append(f"  {a}: {s['first_pass']}/{s['done']}, rund poprawek {s['changes_requested']}")
+    for a, b in sorted((w.get("braki") or {}).items()):
+        linie.append(f"- znane braki {a} (ostatnie odesłania, {BRAKI_DNI} dni): " + " | ".join(x[:120] for x in b[:3]))
     e = w["eskalacje"]
     if e:
         linie.append(f"- eskalacje: pytania {e['needs_input']}, poza zakresem {e['capability']}, inne {e['inne']}, "
