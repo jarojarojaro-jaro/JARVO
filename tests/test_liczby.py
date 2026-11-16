@@ -67,7 +67,8 @@ def dane(tmp_path):
     kanban(tmp_path / "kanban.db")
     (tmp_path / "profiles" / "jarvo-web").mkdir(parents=True)
     sesje(tmp_path / "profiles" / "jarvo-web" / "state.db",
-          [("a", NOW - D, 1000, 200, 5000, 0, 50), ("stara", NOW - 30 * D, 9, 9, 9, 9, 9)])
+          [("a", NOW - D, 1000, 200, 5000, 0, 50), ("stara", NOW - 30 * D, 9, 9, 9, 9, 9),
+           ("karta", NOW - 2 * D + 5, 300, 100, 2000, 0, 0)])        # pracownik t_web: start 5 s po przebiegu
     return tmp_path
 
 
@@ -84,9 +85,11 @@ def test_eskalacje_awarie_cisza_tokeny(tmp_path):
     assert w["eskalacje"] == {"needs_input": 1, "capability": 1, "inne": 0, "gave_up": 1}
     assert w["awarie"] == {"crashed": 1}
     assert w["cisza"] == {"bez_sygnalu": ["t_run"], "blokady_bez_powodu": ["t_blk"]}
-    assert w["tokeny"]["jarvo-web"] == {"sesje": 1, "wejscie": 1000, "wyjscie": 200, "cache_odczyt": 5000,
+    assert w["tokeny"]["jarvo-web"] == {"sesje": 2, "wejscie": 1300, "wyjscie": 300, "cache_odczyt": 7000,
                                         "cache_zapis": 0, "rozumowanie": 50}
-    assert w["tokeny_na_karte"] == {"jarvo-web": 6250}
+    # 16.11: na kartę tylko sesje pracowników kart (przebieg z task_runs), cache osobno; rozmowa „a” się nie liczy
+    assert w["tokeny_na_karte"] == {"jarvo-web": {"karty": 1, "bez_cache": 400, "cache": 2000}}
+    assert any("na kartę jarvo-web: 400 bez cache + 2000 z cache (kart 1" in ln for ln in liczby.opis(w))
     assert any("za 1. razem: 1/3 (33%)" in ln for ln in liczby.opis(w))
 
 

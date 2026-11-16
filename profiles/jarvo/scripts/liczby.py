@@ -6,7 +6,8 @@
 Jedna definicja dla przeglądu tygodnia (fleet_report.py) i Jarvo HQ (hqbuild kopiuje ten plik do pluginu):
 karta przyjęta za 1. razem = zakończona, oddana do recenzji i bez żadnego `changes_requested`; liczy się
 wykonawcy (payload.implementer z recenzji), nie temu, kto ją akurat trzyma. Tokeny to suma sesji profilu
-w oknie; złotówek tu nie liczymy (zależą od dostawcy i cennika, a na planie ChatGPT to zużycie limitu).
+w oknie; „na kartę” liczy tylko sesje pracowników kart (start w oknie startu przebiegu z `task_runs`), bez cache
+osobno i cache osobno. Złotówek tu nie liczymy (zależą od dostawcy i cennika, a na planie ChatGPT to zużycie limitu).
 Ostatnia linia wyjścia to JSON.
 """
 
@@ -101,15 +102,53 @@ def _tokeny(dane: Path, od: float) -> dict[str, dict]:
     return out
 
 
+START_PRACOWNIKA_S = 120        # sesja pracownika karty startuje tuż po starcie przebiegu (spawn procesu Hermesa)
+
+
+def _tokeny_kart(dane: Path, przebiegi: list[tuple[str, str, float]]) -> dict[str, dict]:
+    """Tokeny sesji, które pracowały nad kartami: sesja profilu, która ruszyła do START_PRACOWNIKA_S po starcie przebiegu
+    (`task_runs`: zadanie, profil, start). 16.11: dawna miara dzieliła wszystkie sesje profilu (u Jarva głównie rozmowy
+    z właścicielem i rutyny, 266 mln tokenów z cache) przez 2 karty i dawała „139 mln na kartę”; na takiej mierze
+    eksperyment „krótszy KONTEKST w kartach” nic by nie wykazał. Wynik: {profil: {karty, bez_cache, cache}} na kartę."""
+    okna: dict[str, list[tuple[float, str]]] = {}
+    for zadanie, profil, start in przebiegi:
+        okna.setdefault(profil, []).append((float(start), zadanie))
+    out = {}
+    for profil, starty in okna.items():
+        conn = _ro(dane / "profiles" / profil / "state.db")
+        if conn is None:
+            continue
+        try:
+            sesje = conn.execute("SELECT started_at, input_tokens, output_tokens, cache_read_tokens FROM sessions "
+                                 "WHERE started_at >= ?", (min(s for s, _ in starty) - 1,)).fetchall()
+        except sqlite3.Error:
+            continue
+        finally:
+            conn.close()
+        karty, bez_cache, cache = set(), 0, 0
+        for s in sesje:
+            zadanie = next((z for start, z in starty if start - 1 <= s[0] <= start + START_PRACOWNIKA_S), None)
+            if zadanie:
+                karty.add(zadanie)
+                bez_cache += int(s[1] or 0) + int(s[2] or 0)
+                cache += int(s[3] or 0)
+        if karty:
+            out[profil] = {"karty": len(karty), "bez_cache": round(bez_cache / len(karty)), "cache": round(cache / len(karty))}
+    return out
+
+
 def policz(dane: Path, teraz: float, dni: int = 7) -> dict:
     od = teraz - dni * DZIEN
     wynik: dict = {"okno_dni": dni, "jakosc": {}, "eskalacje": {}, "awarie": {}, "cisza": {}, "tokeny": {}}
+    przebiegi: list[tuple[str, str, float]] = []
     conn = _ro(dane / "kanban.db")
     if conn is not None:
         try:
             karty = [dict(r) for r in conn.execute(
                 "SELECT id, assignee FROM tasks WHERE status IN ('done', 'archived') AND completed_at >= ?", (od,))]
             wynik["jakosc"] = jakosc(karty, zdarzenia_jakosci(conn, [k["id"] for k in karty]))
+            przebiegi = [(r["task_id"], r["profile"], r["started_at"]) for r in conn.execute(
+                "SELECT task_id, profile, started_at FROM task_runs WHERE started_at >= ? AND profile IS NOT NULL", (od,))]
             esk = {"needs_input": 0, "capability": 0, "inne": 0, "gave_up": 0}
             for r in conn.execute("SELECT kind, payload FROM task_events WHERE created_at >= ? AND kind IN "
                                   "('blocked', 'gave_up')", (od,)):
@@ -144,8 +183,7 @@ def policz(dane: Path, teraz: float, dni: int = 7) -> dict:
     przyjete = sum(s["first_pass"] for s in wynik["jakosc"].values())
     wynik["za_1_razem"] = {"przyjete": przyjete, "zrobione": zrobione,
                            "procent": round(100 * przyjete / zrobione) if zrobione else None}
-    wynik["tokeny_na_karte"] = {a: round(sum(v for k, v in t.items() if k != "sesje") / wynik["jakosc"][a]["done"])
-                                for a, t in wynik["tokeny"].items() if wynik["jakosc"].get(a, {}).get("done")}
+    wynik["tokeny_na_karte"] = _tokeny_kart(dane, przebiegi)
     return wynik
 
 
@@ -203,7 +241,10 @@ def opis(w: dict) -> list[str]:
                      f"{len(c['blokady_bez_powodu'])}")
     for a, t in sorted(w["tokeny"].items()):
         linie.append(f"- tokeny {a}: wejście {t['wejscie']}, cache {t['cache_odczyt']}, wyjście {t['wyjscie']}, "
-                     f"sesje {t['sesje']}" + (f", na kartę {w['tokeny_na_karte'][a]}" if a in w["tokeny_na_karte"] else ""))
+                     f"sesje {t['sesje']} (wszystkie sesje profilu, także rozmowy i rutyny)")
+    for a, k in sorted(w["tokeny_na_karte"].items()):
+        linie.append(f"- na kartę {a}: {k['bez_cache']} bez cache + {k['cache']} z cache (kart {k['karty']}, "
+                     "tylko sesje pracowników kart)")
     if w.get("blad"):
         linie.append(f"- uwaga: tablica odczytana częściowo ({w['blad']})")
     return linie
