@@ -227,6 +227,15 @@ Przejęte z kontraktu firstmate i dostosowane do nas:
   wtyczka `jarvo-sesje` w hoście i w każdym profilu (`sesje/plugin/__init__.py`, hak `pre_gateway_dispatch` od startu
   bramy, także gdy Jarvo jest w trakcie tury) tylko wiadomości od dozwolonych osób; awaria haka oddaje wiadomość Jarvowi.
   Format pliku: `{"gpu": {"nazwa": "Kernel", "skrzynka": "/ścieżka/skrzynki", "czat": "-100…", "watek": "11"}}`.
+  **Sesja omp jako rozmówca panelu** (wpis z blokiem `panel`, `zaplecze: "omp"`): sesję prowadzi tylko
+  `jarvo sesja <klucz> skrzynka` (tura `omp --session-dir <sesje> --resume <sesja> <omp_arg…> -p --mode json`)
+  albo `jarvo sesja <klucz> terminal`; oba biorą blokadę `<skrzynka>/sesja.lock` i pytają omp o dzierżawę
+  (`omp session lease --json`), więc sesja nigdy się nie odgałęzia. Zajęta sesja = wiadomości czekają, po 2 min jedno
+  powiadomienie, po wyjściu z terminala skrzynka rusza sama. Panel pisze do `nowe/` (`zrodlo: "panel"`, `klucz`), czyta
+  `stan.json`, `tura/<tura>.jsonl` (tekst, nazwa i intencja narzędzia; nigdy wyniki ani argumenty) i plik sesji.
+  Wzór: `{"inz": {"nazwa": "Inżynier", "skrzynka": "~/inz/skrzynka", "czat": "-100…", "watek": "12",
+  "panel": {"zaplecze": "omp", "sesje": "~/inz/sesje", "sesja": "<id>", "cwd": "~/…", "omp_arg": [],
+  "kolejnosc": 0, "potwierdzenia": true, "zamykaj_bezczynna_min": 0}}}` (kontrakt: `hq/plugin/omp_sesje.py`).
 - **Prosty polski** (skill `prosty-polski`, wzór: ASD-STE100 z dokumentacji lotniczej „w 80%”): zdanie do 20–25 słów,
   akapit do 6 zdań, jedna czynność w zdaniu, strona czynna, zwykłe słowa zamiast urzędowych (słownik w skillu),
   ostrzeżenie: najpierw co zrobić, potem ryzyko (⛔ strata pieniędzy, danych, konta; ⚠ gorszy wynik). Te same limity liczy

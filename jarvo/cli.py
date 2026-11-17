@@ -29,6 +29,8 @@ JARVO_ROOT) ustawia korzeń jak JARVO_ROOT: zadanie Harmonogramu nie przekazuje 
                        odinstalowanie (N11, c4; jarvo/odinstalowanie.py): stop, autostart off, cofnięcie dziennika
                        zmian hosta, usunięcie programu, logów i cache; dane tylko z --all po pytaniu; skan śladów
   migruj               w budowie (etap E12), kod 2
+  sesja <klucz> [stan|terminal|skrzynka]
+                       sesja omp z wpisu sesje.json (jarvo/sesje_omp.py): stan, terminal z blokadą, tura skrzynki
 
 Panel liczy się tylko NASZ: /api/status z hermes_home = <dane> tej instalacji (instalator.stan_panelu). Port 9119
 może trzymać stara flota z WSL albo prywatny Hermes właściciela; wtedy polecenie mówi, kto trzyma port.
@@ -71,7 +73,7 @@ PORTY = (("panel", None), ("API bramy", None), ("podgląd HQ", 9120), ("ekran te
 NASZE_PORTY = {"panel", "API bramy"}         # bez działającego serwisu muszą być wolne
 CZAS_STOPU = instalator.CZAS_STOPU
 W_BUDOWIE: dict[str, tuple[str, str]] = {}     # polecenie → (etap, opis): podpowiedź dla planowanych poleceń
-Z_RESZTA = ("chat", "serwis", "komputer", "migruj")   # argumenty idą dalej (Hermes, nadzorca, Komputer, migracja)
+Z_RESZTA = ("chat", "serwis", "komputer", "migruj", "sesja")   # argumenty idą dalej (Hermes, nadzorca, Komputer, …)
 BOOTSTRAP = "https://raw.githubusercontent.com/jarojarojaro-jaro/JARVO/main/jarvo/bootstrap"
 RADA_INSTALACJI = ("Zainstaluj Jarvo jednym poleceniem: "
                    + (f"irm {BOOTSTRAP}/install.ps1 | iex (PowerShell)" if WINDOWS else
@@ -184,6 +186,8 @@ def _parser() -> argparse.ArgumentParser:
     android.dodaj_polecenia(sub)
     from . import telefon                   # telefon przez PHONEUSE (serwer MCP phone): jarvo telefon status|on|off|przydziel
     telefon.dodaj_polecenia(sub)
+    from . import sesje_omp                 # sesje omp z sesje.json (centrum 1d): jarvo sesja <klucz> stan|terminal|skrzynka
+    sesje_omp.dodaj_polecenia(sub)
 
     s = sub.add_parser("komputer", add_help=False, help="Komputer Jarva: przeglądarka Jarva (on, off, status, …) "
                        "i ręce na Twoim ekranie (komputer rece on|off|status)",
