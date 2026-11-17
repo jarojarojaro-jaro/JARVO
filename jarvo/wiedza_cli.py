@@ -17,19 +17,24 @@ K02, K03, K07, K08, H06, H11, decyzja I36).
         `hermes -p jarvo cron resume|pause` (H06). Po instalacji są wstrzymane; włącza je udana próbna wiadomość
         na Telegram (`jarvo telegram test`, I36), a `jarvo rutyny off` wyłącza je na stałe, aż `jarvo rutyny on`
   jarvo telegram ustaw [--wlasciciel ID] [--grupa ID] [--token-ze-stdin] [--bez-wdrozenia] [--bez-sprawdzenia]
-        token bota i lista dozwolonych do `<dane>/.env` (wartości nigdy na ekran ani do logu), trasy z pliku Jarva
-        `<dane>/jarvo/konfig/jarvo.env` (TELEGRAM_OWNER_ID: DM → Jarvo i cel rutyn, TELEGRAM_HQ_CHAT_ID); potem
-        wdrożenie floty (jarvo/flota.py: trasy w configu bramy, rutyny na Telegram) i restart bramy przez nadzorcę.
+        token bota, lista dozwolonych i kanał domowy bramy (TELEGRAM_HOME_CHANNEL = dom Jarva) do `<dane>/.env`
+        (wartości nigdy na ekran ani do logu), trasy z pliku Jarva `<dane>/jarvo/konfig/jarvo.env` (TELEGRAM_OWNER_ID:
+        DM → Jarvo, TELEGRAM_HQ_CHAT_ID); potem wdrożenie floty (jarvo/flota.py: trasy w configu bramy, rutyny do domu
+        Jarva) i restart bramy przez nadzorcę.
         ID właściciela: --wlasciciel albo z pierwszej wiadomości do bota (getUpdates, gdy nikt inny bota nie czyta)
   jarvo telegram test [--bez-rutyn] | status [--json] [--sprawdz] | wyslij [--czat ID] [--watek ID]
-        próbna wiadomość do właściciela (udana włącza rutyny, I36) / co jest ustawione (bez wartości) i konflikt 409
-        w logach bramy (dwie bramy na jednym tokenie, H11) / tekst z wejścia do właściciela albo do wątku grupy, długi
-        w kilku wiadomościach (odpowiedzi sesji zewnętrznych ze skrzynki „<dopisek>”, sesje/plugin/__init__.py)
-  jarvo telegram tematy [--grupa ID] [--bez-wdrozenia]
+        próbna wiadomość do domu Jarva (udana włącza rutyny, I36) / układ grupy i tematów, dom Jarva, co jest ustawione
+        (bez wartości) i konflikt 409 w logach bramy (dwie bramy na jednym tokenie, H11) / tekst z wejścia do domu
+        Jarva albo do wątku grupy, długi w kilku wiadomościach (odpowiedzi sesji zewnętrznych ze skrzynki „<dopisek>”,
+        sesje/plugin/__init__.py). Dom Jarva (17.11): temat General „JARVO” grupy Jarvo HQ, bez grupy DM właściciela;
+        DM to wejście zapasowe (Jarvo odpowiada tam na Twoje wiadomości, sam nic tam nie wysyła)
+  jarvo telegram tematy [--grupa ID] [--bez-wdrozenia] [--usun-zbedne]
         grupa „Jarvo HQ” z tematami: grupa z --grupa albo z wiadomości właściciela (wtyczka jarvo-sesje zapisuje ją
         w state/telegram-grupy.json), wątek na każdego aktywnego agenta z telegram_topic (Jarvo: General) i na sesję
-        zewnętrzną z sesje.json (Kernel); brakujące zakłada createForumTopic, potem TELEGRAM_HQ_CHAT_ID
-        i TELEGRAM_TOPIC_* do jarvo.env, czat i wątek sesji do sesje.json i wdrożenie tras jak w `ustaw`
+        zewnętrzną z sesje.json (Kernel); brakujące zakłada createForumTopic, nazwy tematów wielkimi literami
+        (General → „JARVO” przez editGeneralForumTopic, JARODEV, KERNEL; powtórka niczego nie zmienia), potem
+        TELEGRAM_HQ_CHAT_ID i TELEGRAM_TOPIC_* do jarvo.env, czat i wątek sesji do sesje.json, kanał domowy bramy na
+        grupę (dom Jarva) i wdrożenie tras jak w `ustaw`
 
 Integracja z jarvo/cli.py: `dodaj_polecenia(sub)` dopisuje te trzy polecenia do parsera, `sprawdzenia(u, ot)` daje
 wyniki dla `jarvo doctor` (format cli._wynik: nazwa, stan ok|uwaga|blad, opis, rada). Moduł działa też sam:
@@ -739,6 +744,12 @@ def sprawdz_telegram(u: Uklad, ot=None, teraz: float | None = None) -> list[dict
             ostatni = _json(stan_skarbca(u) / "telegram.json").get("test_ok")
             wyniki.append(_wynik("Telegram", "ok", opis + "; trasa DM → Jarvo" + (f"; próbna wiadomość {_kiedy(ostatni)}"
                                                                                if ostatni else "")))
+        dom = dom_jarva(k)
+        if dom and (k["dom"] != dom or k["dom_watek"]):
+            wyniki.append(_wynik("Telegram: dom Jarva", "uwaga",
+                                 "kanał domowy bramy (TELEGRAM_HOME_CHANNEL) to nie " + opis_domu(dom),
+                                 "Powiadomienia bramy i rutyny z `deliver: telegram` idą gdzie indziej: jarvo telegram "
+                                 + ("tematy" if k["grupa"] else "ustaw") + " (samo zrestartuje bramę)."))
     konf = konflikt_409(u, teraz)
     if konf:
         wyniki.append(_wynik("Telegram: jedna brama na token", "blad",
@@ -945,7 +956,34 @@ def konfiguracja_telegrama(u: Uklad) -> dict:
             "wszyscy": (env.get("TELEGRAM_ALLOW_ALL_USERS") or "").strip().lower() in ("1", "true", "yes"),
             "wlasciciel": (trasy.get("TELEGRAM_OWNER_ID") or "").strip(),
             "grupa": (trasy.get("TELEGRAM_HQ_CHAT_ID") or "").strip(),
-            "dom": (env.get("TELEGRAM_HOME_CHANNEL") or "").strip()}
+            "dom": (env.get("TELEGRAM_HOME_CHANNEL") or "").strip(),
+            "dom_watek": (env.get("TELEGRAM_HOME_CHANNEL_THREAD_ID") or "").strip()}
+
+
+def dom_jarva(k: dict) -> str:
+    """Dom Jarva: czat wszystkiego, co Jarvo wysyła sam (rutyny, karty kanbana, próbna wiadomość, `wyslij` bez --czat;
+    decyzja 17.11): grupa Jarvo HQ, czyli jej temat General „JARVO” (wiadomość bez wątku), a bez grupy DM właściciela.
+    DM zostaje wejściem zapasowym: Jarvo odpowiada tam na Twoje wiadomości, ale sam do niego nie pisze."""
+    return k["grupa"] or k["wlasciciel"] or (k["dozwoleni"][0] if k["dozwoleni"] else "")
+
+
+def zmiany_domu(dom: str) -> dict[str, str | None]:
+    """Kanał domowy bramy w `<dane>/.env` (Hermes: TELEGRAM_HOME_CHANNEL, cel `deliver: telegram`, powiadomień bramy
+    i kart; wątek pusty = General, bo sendMessage z message_thread_id=1 Telegram odrzuca)."""
+    return {"TELEGRAM_HOME_CHANNEL": dom, "TELEGRAM_HOME_CHANNEL_THREAD_ID": None} if dom else {}
+
+
+def opis_domu(dom: str) -> str:
+    return (f"grupa Jarvo HQ {dom}, temat General „{NAZWA_OGOLNEGO}”" if dom.startswith("-")
+            else f"DM {dom} (bez grupy: jarvo telegram tematy)" if dom else "brak")
+
+
+def rutyny_do_domu(u: Uklad, dom: str) -> bool:
+    """Czy rutyny Jarva dostarczają do jego domu (`deliver` ustawia build przy wdrożeniu floty, HOME_DELIVER);
+    bez zainstalowanych rutyn nie ma czego wdrażać."""
+    rutyny = stan_rutyn(u)
+    return not rutyny["zainstalowane"] or all(str(r.get("deliver")) == f"telegram:{dom}"
+                                              for r in rutyny["lista"] if r.get("jest"))
 
 
 def _token(u: Uklad) -> str:
@@ -1127,9 +1165,9 @@ def polecenie_telegram_ustaw(u: Uklad, a, _reszta, ot, *, pytaj: Callable = inpu
         return 2
     env_bramy = czytaj_env(u.dane / ".env")
     dozwoleni = [x.strip() for x in (env_bramy.get("TELEGRAM_ALLOWED_USERS") or "").split(",") if x.strip()]
-    zmiany = {"TELEGRAM_BOT_TOKEN": token, "TELEGRAM_ALLOWED_USERS": ",".join(dict.fromkeys([*dozwoleni, wlasciciel]))}
-    if not (env_bramy.get("TELEGRAM_HOME_CHANNEL") or "").strip():
-        zmiany["TELEGRAM_HOME_CHANNEL"] = wlasciciel
+    dom = dom_jarva({**k, "grupa": a.grupa or k["grupa"], "wlasciciel": wlasciciel})
+    zmiany = {"TELEGRAM_BOT_TOKEN": token, "TELEGRAM_ALLOWED_USERS": ",".join(dict.fromkeys([*dozwoleni, wlasciciel])),
+              **zmiany_domu(dom)}
     zmienione = zapisz_env(u.dane / ".env", zmiany)
     if (konfig(u) / "host.env").is_file():        # źródło sekretów przy wdrożeniu (merge_env): to samo, żeby nie cofnęło
         zapisz_env(konfig(u) / "host.env", zmiany)
@@ -1138,9 +1176,8 @@ def polecenie_telegram_ustaw(u: Uklad, a, _reszta, ot, *, pytaj: Callable = inpu
     print(f"Zapisane w {u.dane / '.env'} (wartości nie pokazuję): {', '.join(zmienione) or 'bez zmian'}.")
     print(f"Trasy w {konfig(u) / 'jarvo.env'}: DM → Jarvo (ID {wlasciciel})"
           + (f", grupa Jarvo HQ {a.grupa}" if a.grupa else "") + ("" if zmienione_trasy else " (bez zmian)") + ".")
-    rutyny = stan_rutyn(u)
-    rutyny_do_mnie = all(str(r.get("deliver")) == f"telegram:{wlasciciel}" for r in rutyny["lista"] if r.get("jest"))
-    wdrozenie = bool(zmienione_trasy) or (rutyny["zainstalowane"] and not rutyny_do_mnie)
+    print("Dom Jarva (rutyny, karty, próbna wiadomość): " + opis_domu(dom) + ".")
+    wdrozenie = bool(zmienione_trasy) or not rutyny_do_domu(u, dom)
     if not (zmienione or wdrozenie):
         print("Nic się nie zmieniło: wdrożenie i restart bramy niepotrzebne.")
     elif wdroz_trasy(u, ot, zmienione_bramy=bool(zmienione), wdrozenie=wdrozenie, bez_wdrozenia=a.bez_wdrozenia,
@@ -1179,6 +1216,8 @@ def wdroz_trasy(u: Uklad, ot, *, zmienione_bramy: bool, wdrozenie: bool, bez_wdr
 
 PLIK_GRUP = "telegram-grupy.json"          # w stanie Jarva; pisze go wtyczka jarvo-sesje (zapamietaj_grupe)
 WATEK_OGOLNY = "1"                         # temat General forum: trasa całej grupy (Jarvo), bez TELEGRAM_TOPIC_*
+# nazwy tematów w grupie: krótka nazwa wielkimi literami (17.11: JARVO w General, JARODEV, KERNEL)
+NAZWA_OGOLNEGO = "JARVO"
 ID_GRUPY_RE = re.compile(r"^-\d{3,20}$")
 ID_WATKU_RE = re.compile(r"^\d{1,12}$")
 
@@ -1234,21 +1273,47 @@ def nowy_numer_grupy(token: str, grupa: str) -> str:
     return ""
 
 
+def tytul_tematu(nazwa: str) -> str:
+    """Nazwa tematu w Telegramie (do 128 znaków): krótka nazwa agenta albo sesji wielkimi literami."""
+    return str(nazwa).strip().upper()[:128]
+
+
 def tematy_do_zalozenia(u: Uklad, sesje: dict) -> list[dict]:
     """Wątki grupy: aktywni agenci floty z `telegram_topic` (zbudowana flota, <build>/wiedza/fleet.json; „general” =
-    temat General, bez zakładania) i sesje zewnętrzne ze skrzynką z sesje.json (Kernel)."""
+    temat General, bez zakładania) i sesje zewnętrzne ze skrzynką z sesje.json (Kernel). `tytul` = nazwa tematu."""
     wynik = []
     for a in _json(u.build / "wiedza" / "fleet.json").get("agents") or []:
         temat = str((a or {}).get("telegram_topic") or "").strip() if isinstance(a, dict) else ""
         if temat and temat != "general" and a.get("name"):
-            wynik.append({"klucz": temat.upper(), "nazwa": str(a.get("short") or a.get("title") or a["name"]),
-                          "temat": temat, "sesja": None})
+            nazwa = str(a.get("short") or a.get("title") or a["name"])
+            wynik.append({"klucz": temat.upper(), "nazwa": nazwa, "tytul": tytul_tematu(nazwa), "temat": temat,
+                          "sesja": None, "profil": str(a["name"])})
     for dopisek, w in sesje.items():
         if isinstance(w, dict) and w.get("skrzynka"):
             nazwa = str(w.get("nazwa") or dopisek)
-            wynik.append({"klucz": _klucz_tematu(nazwa) or _klucz_tematu(dopisek), "nazwa": nazwa, "temat": dopisek,
-                          "sesja": dopisek})
+            wynik.append({"klucz": _klucz_tematu(nazwa) or _klucz_tematu(dopisek), "nazwa": nazwa,
+                          "tytul": tytul_tematu(nazwa), "temat": dopisek, "sesja": dopisek, "profil": None})
     return wynik
+
+
+def _bez_zmian(e: BladTelegrama) -> bool:
+    """Nazwa tematu już taka sama (MTProto TOPIC_NOT_MODIFIED w opisie Bot API): zmiana nazwy jest powtarzalna."""
+    return "not_modified" in str(e).lower() or "not modified" in str(e).lower()
+
+
+def nazwij_temat(token: str, grupa: str, watek: str, tytul: str) -> str:
+    """Nazwa tematu: General przez editGeneralForumTopic, inne przez editForumTopic. "zmieniona" / "bez zmian";
+    BladTelegrama (np. brak prawa „Zarządzanie tematami”) idzie dalej."""
+    try:
+        if watek == WATEK_OGOLNY:
+            api_telegrama(token, "editGeneralForumTopic", {"chat_id": grupa, "name": tytul})
+        else:
+            api_telegrama(token, "editForumTopic", {"chat_id": grupa, "message_thread_id": int(watek), "name": tytul})
+    except BladTelegrama as e:
+        if _bez_zmian(e):
+            return "bez zmian"
+        raise
+    return "zmieniona"
 
 
 def _zly_watek(e: BladTelegrama) -> bool:
@@ -1298,7 +1363,7 @@ def polecenie_telegram_tematy(u: Uklad, a, _reszta, ot) -> int:
     ta_sama = (env.get("TELEGRAM_HQ_CHAT_ID") or "").strip() == grupa
     nagrane = (grupy_telegrama(u).get(grupa) or {}).get("watki") or {}
     zmiany_env = {"TELEGRAM_HQ_CHAT_ID": grupa}
-    wiersze, blad_tg = [], None
+    wiersze, blad_tg, bledy_nazw = [], None, []
     for t in tematy:
         znane = []
         w = sesje.get(t["sesja"]) if t["sesja"] else None
@@ -1324,20 +1389,31 @@ def polecenie_telegram_tematy(u: Uklad, a, _reszta, ot) -> int:
                 watek, skad = kandydat, "był" + skad
                 break
             if watek is None:
-                nowy = api_telegrama(token, "createForumTopic", {"chat_id": grupa, "name": t["nazwa"][:128]}) or {}
+                nowy = api_telegrama(token, "createForumTopic", {"chat_id": grupa, "name": t["tytul"]}) or {}
                 watek, skad = str(nowy.get("message_thread_id") or ""), "nowy"
                 if not ID_WATKU_RE.match(watek):
                     raise BladTelegrama(0, "Telegram nie podał numeru nowego wątku")
         except BladTelegrama as e:
             blad_tg = (t, e)
             break
+        if skad.startswith("był"):
+            try:
+                if nazwij_temat(token, grupa, watek, t["tytul"]) == "zmieniona":
+                    skad += f", nazwa „{t['tytul']}”"
+            except BladTelegrama as e:
+                bledy_nazw.append((t["tytul"], e))
         t["watek"] = watek
         zmiany_env[f"TELEGRAM_TOPIC_{t['klucz']}"] = watek
         if isinstance(w, dict):
             w.update(czat=grupa, watek=watek)
-        wiersze.append(f"  {t['nazwa']}: wątek {watek} ({skad})" + (", wiadomości w nim idą do skrzynki bez dopisku"
+        wiersze.append(f"  {t['tytul']}: wątek {watek} ({skad})" + (", wiadomości w nim idą do skrzynki bez dopisku"
                                                                      if t["sesja"] else ""))
-    print("  Jarvo: temat General (cała grupa poza wątkami agentów)")
+    try:
+        ogolny = nazwij_temat(token, grupa, WATEK_OGOLNY, NAZWA_OGOLNEGO)
+    except BladTelegrama as e:
+        ogolny = "nazwy nie zmieniłem"
+        bledy_nazw.append((NAZWA_OGOLNEGO, e))
+    print(f"  {NAZWA_OGOLNEGO}: temat General ({ogolny}): Jarvo, jego dom (rutyny, karty, powiadomienia bramy)")
     for wiersz in wiersze:
         print(wiersz)
     # wątki, których już nie ma mieć nikt (16.11: specjaliści pracują przez Jarva, bez własnych wątków): trasa z
@@ -1359,15 +1435,25 @@ def polecenie_telegram_tematy(u: Uklad, a, _reszta, ot) -> int:
     if json.dumps(_json(plik_sesji), sort_keys=True) != json.dumps(sesje, sort_keys=True):
         przenosne.zapisz_atomowo(plik_sesji, json.dumps(sesje, ensure_ascii=False, indent=1) + "\n")
     print(f"Trasy w {konfig(u) / 'jarvo.env'}: " + (", ".join(zmienione) if zmienione else "bez zmian") + ".")
+    # dom Jarva = ta grupa (General): kanał domowy bramy w <dane>/.env (i host.env, źródle przy wdrożeniu)
+    zmienione_bramy = zapisz_env(u.dane / ".env", zmiany_domu(grupa))
+    if (konfig(u) / "host.env").is_file():
+        zapisz_env(konfig(u) / "host.env", zmiany_domu(grupa))
+    print(f"Dom Jarva: {opis_domu(grupa)}" + (" (kanał domowy bramy ustawiony)" if zmienione_bramy else "") + ".")
+    for tytul, e in bledy_nazw:
+        print(f"UWAGA: nazwy tematu „{tytul}” nie zmieniłem: {e}. {rada_telegrama(e, grupa=True)}", file=sys.stderr)
     if blad_tg:
         t, e = blad_tg
-        print(f"BŁĄD: temat „{t['nazwa']}”: {e}. {rada_telegrama(e, grupa=True)} Zapisałem gotowe wątki; po poprawce "
+        print(f"BŁĄD: temat „{t['tytul']}”: {e}. {rada_telegrama(e, grupa=True)} Zapisałem gotowe wątki; po poprawce "
               "uruchom jarvo telegram tematy jeszcze raz.", file=sys.stderr)
         return 1
-    if not zmienione:
+    wdrozenie = bool(zmienione) or not rutyny_do_domu(u, grupa)
+    if not (wdrozenie or zmienione_bramy):
         print("Wątki bez zmian: wdrożenie niepotrzebne.")
-        return 0
-    return wdroz_trasy(u, ot, zmienione_bramy=False, wdrozenie=True, bez_wdrozenia=a.bez_wdrozenia, token=token)
+        return 1 if bledy_nazw else 0
+    wynik = wdroz_trasy(u, ot, zmienione_bramy=bool(zmienione_bramy), wdrozenie=wdrozenie,
+                        bez_wdrozenia=a.bez_wdrozenia, token=token)
+    return wynik or (1 if bledy_nazw else 0)
 
 
 
@@ -1376,7 +1462,7 @@ def polecenie_telegram_test(u: Uklad, a, _reszta, ot, *, uruchom: Callable | Non
         return _brak_instalacji(u)
     token = _token(u)
     k = konfiguracja_telegrama(u)
-    cel = k["wlasciciel"] or (k["dozwoleni"][0] if k["dozwoleni"] else "")
+    cel = dom_jarva(k)                     # grupa Jarvo HQ (General, bez wątku), bez grupy DM właściciela
     if not token or not cel:
         print("Telegram nie jest ustawiony (token i ID właściciela): jarvo telegram ustaw.", file=sys.stderr)
         return 1
@@ -1385,10 +1471,11 @@ def polecenie_telegram_test(u: Uklad, a, _reszta, ot, *, uruchom: Callable | Non
         api_telegrama(token, "sendMessage", {"chat_id": cel, "text": "Jarvo: próbna wiadomość z Twojego komputera. "
                                                                      "Jeśli ją widzisz, Telegram działa."})
     except BladTelegrama as e:
-        print(f"BŁĄD: nie wysłałem próbnej wiadomości ({e}). {rada_telegrama(e)}", file=sys.stderr)
+        print(f"BŁĄD: nie wysłałem próbnej wiadomości ({e}). {rada_telegrama(e, grupa=cel.startswith('-'))}",
+              file=sys.stderr)
         return 1
     bot = f"@{ja.get('username')}" if ja.get("username") else "bot"
-    print(f"Próbna wiadomość wysłana przez {bot} do ID {cel}: sprawdź Telegram.")
+    print(f"Próbna wiadomość wysłana przez {bot} do domu Jarva: {opis_domu(cel)}. Sprawdź Telegram.")
     with contextlib.suppress(OSError):
         przenosne.zapisz_atomowo(stan_skarbca(u) / "telegram.json",
                                  json.dumps({"test_ok": time.time(), "bot": bot, "do": cel}, ensure_ascii=False) + "\n")
@@ -1443,10 +1530,10 @@ def kawalki_wiadomosci(tekst: str, limit: int = LIMIT_WIADOMOSCI) -> list[str]:
 
 
 def polecenie_telegram_wyslij(u: Uklad, a, _reszta, _ot) -> int:
-    """Tekst z wejścia do właściciela (zwykły tekst, długi w kilku wiadomościach): odpowiedzi sesji zewnętrznych
-    (skrzynka `<dopisek>` z sesje/plugin/__init__.py) i skrypty na serwerze. `--watek` (z `--czat` albo grupą
-    Jarvo HQ z jarvo.env) pisze do wątku grupy, np. odpowiedź Kernela na wiadomość z jego wątku. Token nigdy nie
-    trafia na ekran."""
+    """Tekst z wejścia do domu Jarva (zwykły tekst, długi w kilku wiadomościach): temat General grupy Jarvo HQ, bez
+    grupy DM właściciela (dom_jarva); skrypty na serwerze i odpowiedzi sesji zewnętrznych (skrzynka `<dopisek>`
+    z sesje/plugin/__init__.py). `--watek` (z `--czat` albo grupą Jarvo HQ z jarvo.env) pisze do wątku grupy, np.
+    odpowiedź Kernela w jego wątku; `--czat <ID właściciela>` do DM. Token nigdy nie trafia na ekran."""
     if not _zainstalowane(u):
         return _brak_instalacji(u)
     czat = (getattr(a, "czat", None) or "").strip()
@@ -1456,7 +1543,7 @@ def polecenie_telegram_wyslij(u: Uklad, a, _reszta, _ot) -> int:
         return 2
     token = _token(u)
     k = konfiguracja_telegrama(u)
-    cel = czat or (k["grupa"] if watek else k["wlasciciel"] or (k["dozwoleni"][0] if k["dozwoleni"] else ""))
+    cel = czat or (k["grupa"] if watek else dom_jarva(k))
     if watek and not cel:
         print("Wątek bez grupy: podaj --czat -100… albo ustaw grupę (jarvo telegram tematy).", file=sys.stderr)
         return 1
@@ -1522,9 +1609,27 @@ def konflikt_409(u: Uklad, teraz: float | None = None, okno_s: float = OKNO_409_
     return znaleziony
 
 
+def uklad_grupy(u: Uklad, k: dict) -> list[dict]:
+    """Tematy grupy Jarvo HQ z ustawień (bez sieci): General = Jarvo, potem wątki agentów (TELEGRAM_TOPIC_* w jarvo.env)
+    i sesji zewnętrznych (sesje.json). {"tytul", "watek" ("1" = General, "" = brak), "kto"}."""
+    if not k["grupa"]:
+        return []
+    env, sesje = czytaj_env(konfig(u) / "jarvo.env"), _json(konfig(u) / "sesje.json")
+    wynik = [{"tytul": NAZWA_OGOLNEGO, "watek": WATEK_OGOLNY, "kto": "Jarvo (dom: rutyny, karty, powiadomienia)"}]
+    for t in tematy_do_zalozenia(u, sesje):
+        w = sesje.get(t["sesja"]) if t["sesja"] else None
+        watek = (str(w.get("watek") or "") if isinstance(w, dict) and str(w.get("czat") or "") == k["grupa"]
+                 else (env.get(f"TELEGRAM_TOPIC_{t['klucz']}") or "").strip())
+        wynik.append({"tytul": t["tytul"], "watek": watek,
+                      "kto": f"sesja {t['nazwa']} (skrzynka)" if t["sesja"] else f"agent {t['profil']}"})
+    return wynik
+
+
 def polecenie_telegram_status(u: Uklad, a, _reszta, ot) -> int:
     k = konfiguracja_telegrama(u)
-    wynik = {**k, "test": _json(stan_skarbca(u) / "telegram.json"), "konflikt_409": konflikt_409(u),
+    dom = dom_jarva(k)
+    wynik = {**k, "dom_jarva": dom, "tematy": uklad_grupy(u, k), "test": _json(stan_skarbca(u) / "telegram.json"),
+             "konflikt_409": konflikt_409(u),
              "rutyny": [{x: r.get(x) for x in ("id", "wlaczona", "deliver")} for r in stan_rutyn(u)["lista"]]}
     if getattr(a, "sprawdz", False) and k["token"]:
         try:
@@ -1538,7 +1643,20 @@ def polecenie_telegram_status(u: Uklad, a, _reszta, ot) -> int:
     print(f"Bot: {'ustawiony' if k['token'] else 'brak'}" + (f" ({wynik['bot']})" if wynik.get("bot") else "")
           + (f"; sprawdzenie: {wynik['bot_blad']}" if wynik.get("bot_blad") else ""))
     print(f"Dozwolone osoby: {len(k['dozwoleni'])}" + ("; wszyscy (TELEGRAM_ALLOW_ALL_USERS)" if k["wszyscy"] else ""))
-    print(f"Trasa DM → Jarvo: {k['wlasciciel'] or 'brak (TELEGRAM_OWNER_ID)'}; grupa Jarvo HQ: {k['grupa'] or 'brak'}")
+    print(f"Dom Jarva: {opis_domu(dom)}")
+    if k["grupa"]:
+        print(f"Grupa Jarvo HQ {k['grupa']}, tematy (kogo wybierasz tematem):")
+        for t in wynik["tematy"]:
+            gdzie = "General" if t["watek"] == WATEK_OGOLNY else f"wątek {t['watek']}" if t["watek"] else \
+                "brak wątku (jarvo telegram tematy)"
+            print(f"  {t['tytul']} ({gdzie}): {t['kto']}")
+    print(f"DM {k['wlasciciel'] or '(brak TELEGRAM_OWNER_ID)'}: "
+          + ("wejście zapasowe do Jarva (odpowiedź w DM; sam do DM nie pisze), „… gpu” → Kernel"
+             if k["grupa"] else "rozmowa z Jarvem i jego dom"))
+    if k["token"] and dom and (k["dom"] != dom or k["dom_watek"]):
+        print(f"UWAGA: kanał domowy bramy (TELEGRAM_HOME_CHANNEL w {u.dane / '.env'}) to nie dom Jarva: "
+              "powiadomienia bramy i `deliver: telegram` idą gdzie indziej. Popraw: jarvo telegram "
+              + ("tematy." if k["grupa"] else "ustaw."))
     test = wynik["test"]
     print(f"Ostatnia próbna wiadomość: {_kiedy(test.get('test_ok') or 0)}")
     for linia in opis_rutyn(u):
@@ -1596,14 +1714,15 @@ def dodaj_polecenia(sub) -> None:
     k.add_argument("--bez-wdrozenia", action="store_true", help="tylko zapis ustawień (trasy przy następnym wdrożeniu)")
     k.add_argument("--bez-sprawdzenia", action="store_true", help="bez getMe (bez sieci; token sprawdzi test)")
     k.set_defaults(funkcja=polecenie_telegram_ustaw)
-    k = t.add_parser("test", help="próbna wiadomość do Ciebie; udana włącza rutyny")
+    k = t.add_parser("test", help="próbna wiadomość do domu Jarva (temat JARVO grupy, bez grupy DM); udana włącza rutyny")
     k.add_argument("--bez-rutyn", action="store_true", help="nie włączaj rutyn po udanej wiadomości")
     k.set_defaults(funkcja=polecenie_telegram_test)
-    k = t.add_parser("wyslij", help="tekst z wejścia do Ciebie albo do wątku grupy (długi: kilka wiadomości)")
-    k.add_argument("--czat", metavar="ID", help="czat zamiast Twojego DM (grupa: -100…)")
+    k = t.add_parser("wyslij", help="tekst z wejścia do domu Jarva albo do wątku grupy (długi: kilka wiadomości)")
+    k.add_argument("--czat", metavar="ID", help="czat zamiast domu Jarva (Twoje ID: DM; grupa: -100…)")
     k.add_argument("--watek", metavar="ID", help="wątek grupy (bez --czat: grupa Jarvo HQ z jarvo.env)")
     k.set_defaults(funkcja=polecenie_telegram_wyslij)
-    k = t.add_parser("tematy", help="wątki grupy Jarvo HQ: Jarvo (General), agenci biznesowi, Kernel; trasy i wdrożenie floty")
+    k = t.add_parser("tematy", help="tematy grupy Jarvo HQ: JARVO (General, dom Jarva), agenci biznesowi, KERNEL; "
+                     "nazwy, trasy, kanał domowy bramy i wdrożenie floty")
     k.add_argument("--grupa", metavar="ID", help="ID supergrupy Jarvo HQ (-100…); bez niego: grupa, w której pisałeś")
     k.add_argument("--bez-wdrozenia", action="store_true", help="tylko zapis wątków (trasy przy następnym wdrożeniu)")
     k.add_argument("--usun-zbedne", action="store_true",

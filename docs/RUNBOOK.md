@@ -88,9 +88,22 @@ Zainstaluj Tailscale też na laptopie i telefonie. Od teraz łącz się przez `s
 3. **Twoje ID:** napisz do [@userinfobot](https://t.me/userinfobot) → liczba `Id` = `TELEGRAM_OWNER_ID`.
 4. **Supergrupa:** nowa grupa „Jarvo HQ” → Ustawienia → **Tematy (Topics): włącz**. Dodaj bota
    (**po** zmianie prywatności; jeśli był dodany wcześniej: usuń i dodaj ponownie) i nadaj mu admina.
-5. **Tematy:** wątek „General” należy do Jarva; własny wątek ma tylko agent biznesowy z nakładki (np. `Sklep`) i sesja
-   zewnętrzna (Kernel). Specjaliści (Sherlock, Web, Studio, Wideograf, Ads, Łowca, Aplikacje, Ręka) wątków nie mają:
-   pracują przez Jarva (decyzja 16.11). Wątki zakłada `jarvo telegram tematy`.
+5. **Tematy:** temat General nazywa się „JARVO” i należy do Jarva; własny wątek ma tylko agent biznesowy z nakładki
+   (np. `JARODEV`) i sesja zewnętrzna (`KERNEL`). Specjaliści (Sherlock, Web, Studio, Wideograf, Ads, Łowca, Aplikacje,
+   Ręka) wątków nie mają: pracują przez Jarva (decyzja 16.11). Wątki zakłada i nazywa (krótka nazwa wielkimi literami,
+   General przez `editGeneralForumTopic`; powtórka niczego nie zmienia) `jarvo telegram tematy`; bot potrzebuje prawa
+   „Zarządzanie tematami”. Adresata wybierasz tematem.
+   **Dom Jarva (decyzja 17.11):** wszystko, co Jarvo wysyła sam, idzie do tematu JARVO: rutyny (patrol, brief, przegląd
+   tygodnia, świeżość wiedzy, nowe wersje; `deliver` = `HOME_DELIVER` z `scripts/build.py`), wyniki kart i blokady
+   `needs_input` (wtyczka `jarvo-wiedza`, `cisza_tablicy.py`, przenosi subskrypcję karty z DM do tematu JARVO),
+   powiadomienia bramy (`TELEGRAM_HOME_CHANNEL` w `<dane>/.env` = grupa, bez wątku; ustawia `jarvo telegram tematy`
+   i `ustaw`), `jarvo telegram test` i `jarvo telegram wyslij` bez `--czat`. DM z botem zostaje wejściem zapasowym:
+   Jarvo odpowiada tam na Twoje wiadomości, ale sam nic do DM nie wysyła; „… gpu” z DM idzie do Kernela, a jego odpowiedź
+   przychodzi w temacie KERNEL. Bez grupy domem Jarva jest DM. Układ pokazuje `jarvo telegram status`.
+   **Sprawdzenie po wdrożeniu:** `jarvo telegram tematy` (nazwy, trasy, kanał domowy, wdrożenie i restart bramy), potem
+   `jarvo telegram status`, `jarvo telegram test --bez-rutyn` (wiadomość w JARVO) i po jednej wiadomości właściciela:
+   w JARVO (odpowiada Jarvo w JARVO), w JARODEV (odpowiada Jarodev), w KERNEL (potwierdzenie „📥 Kernel”, odpowiedź
+   w KERNEL) i w DM (odpowiedź Jarva w DM; „… gpu” z DM: odpowiedź w KERNEL).
 6. **ID grupy i wątków** (zanim uruchomisz flotę, bo gateway przejmie odbieranie wiadomości):
    napisz po jednej wiadomości w każdym temacie, potem:
    ```bash

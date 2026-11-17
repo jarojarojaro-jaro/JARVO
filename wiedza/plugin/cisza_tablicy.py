@@ -15,11 +15,19 @@ skończyć się ciszą: 16.11 i 17.11 Jarvo stał na okienku „jestem człowiek
 attention” (szablon Hermesa, locales/en.yaml `gateway.kanban.wake`) i czyta z kanban.db ostatnią blokadę karty;
 przy `needs_input` dokłada do tury przypomnienie, że trzeba napisać do właściciela. Hak `transform_llm_output`
 zamienia odpowiedź-ciszę (`[SILENT]`) w tej turze na jedno zdanie dla właściciela z tytułem karty i powodem blokady.
+
+Dom Jarva (decyzja 17.11): wszystko, co Jarvo mówi sam, idzie do tematu General „JARVO” grupy Jarvo HQ, a DM jest
+tylko wejściem zapasowym. Karta założona z rozmowy w DM subskrybowała DM, więc budzenie, wynik karty i zdanie
+o `needs_input` szły do DM. Ten sam hak `post_tool_call` przenosi subskrypcje telegramowe karty z czatu prywatnego
+(ID bez „-”) do domu Jarva, gdy kanał domowy bramy (TELEGRAM_HOME_CHANNEL, ustawia `jarvo telegram tematy`) to
+grupa: Hermes budzi wtedy sesję Jarva z tematu General (klucz sesji jak wiadomość z General: typ „group”, wątek
+„1”), a jego odpowiedź trafia do tego tematu. Bez grupy (dom = DM) nic nie przenosi.
 """
 from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import threading
 from typing import Any, Optional
@@ -28,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 # platformy, na których surowy komunikat Hermesa trafiłby do właściciela obok wiadomości Jarva
 BEZ_SUROWYCH = ("telegram",)
+WATEK_OGOLNY = "1"                 # temat General forum (plugins/platforms/telegram/adapter.py _GENERAL_TOPIC_THREAD_ID)
 # budzenie Jarva po zmianie karty (hermes locales/en.yaml gateway.kanban.wake.message; statusy łączy „, ”)
 BUDZENIE = re.compile(r"^\[kanban\] Task (\S+) (.+?)\.\nTitle: (.*)\nAssignee: @(\S+)\nBoard: (\S+)")
 STATUS_BLOKADY = "blocked; needs attention"
@@ -56,9 +65,32 @@ def ucisz(conn, task_id: str) -> int:
     return cur.rowcount or 0
 
 
+def dom_jarva() -> Optional[tuple[str, str]]:
+    """(grupa, wątek) domu Jarva z kanału domowego bramy: grupa (ID „-…”) → jej temat General („1”), chyba że
+    TELEGRAM_HOME_CHANNEL_THREAD_ID wskazuje inny; DM albo brak → None (subskrypcje zostają, gdzie są)."""
+    czat = (os.environ.get("TELEGRAM_HOME_CHANNEL") or "").strip()
+    if not czat.startswith("-"):
+        return None
+    return czat, (os.environ.get("TELEGRAM_HOME_CHANNEL_THREAD_ID") or "").strip() or WATEK_OGOLNY
+
+
+def do_domu(conn, task_id: str, dom: tuple[str, str]) -> int:
+    """Subskrypcje telegramowe karty `task_id` z czatu prywatnego → dom Jarva (`dom` = grupa, wątek). Gdy dom już
+    subskrybuje kartę (klucz task, platforma, czat, wątek), wiersz z DM po prostu wypada. Zwraca liczbę przeniesionych."""
+    czat, watek = dom
+    gdzie = "task_id = ? AND lower(platform) = 'telegram' AND chat_id NOT LIKE '-%'"
+    cur = conn.execute(
+        "UPDATE OR IGNORE kanban_notify_subs SET chat_id = ?, thread_id = ?, chat_type = 'group', "
+        f"delivery_metadata = NULL WHERE {gdzie}", (czat, watek, task_id))
+    przeniesione = cur.rowcount or 0
+    conn.execute(f"DELETE FROM kanban_notify_subs WHERE {gdzie}", (task_id,))
+    conn.commit()
+    return przeniesione
+
+
 def po_narzedziu(function_name: str = "", function_args: Any = None, result: Any = None, **_kw: Any) -> None:
-    """Hak `post_tool_call`: po `kanban_create` z subskrypcją czatu Hermes milczy, a mówi Jarvo. Błąd = log, nigdy
-    wyjątek (narzędzie już się wykonało)."""
+    """Hak `post_tool_call`: po `kanban_create` z subskrypcją czatu Hermes milczy, a mówi Jarvo, w swoim domu (karta
+    z DM: subskrypcja do tematu General grupy). Błąd = log, nigdy wyjątek (narzędzie już się wykonało)."""
     if function_name != "kanban_create":
         return
     wynik = _wynik(result)
@@ -66,12 +98,15 @@ def po_narzedziu(function_name: str = "", function_args: Any = None, result: Any
     if not (wynik.get("ok") and wynik.get("subscribed") and isinstance(task_id, str)):
         return
     board = function_args.get("board") if isinstance(function_args, dict) else None
+    dom = dom_jarva()
     try:
         from hermes_cli import kanban_db_connect as kbc
         with kbc.connect_closing(board=board) as conn:
             ucisz(conn, task_id)
+            if dom:
+                do_domu(conn, task_id, dom)
     except Exception as exc:  # noqa: BLE001 - powiadomienia nie mogą psuć zakładania kart
-        logger.warning("cisza tablicy: nie przełączyłem subskrypcji %s na wake: %r", task_id, exc)
+        logger.warning("cisza tablicy: nie przełączyłem subskrypcji %s (wake, dom Jarva): %r", task_id, exc)
 
 
 def blokada_z_budzenia(tekst: Any) -> Optional[tuple[str, str, str]]:

@@ -1,6 +1,7 @@
 """Grupa „Jarvo HQ” z tematami (14.11): `jarvo telegram tematy` (grupa z wiadomości właściciela, zakładanie
-brakujących wątków createForumTopic, ponowne użycie znanych, TELEGRAM_* do jarvo.env, wątek Kernela do sesje.json,
-wdrożenie tras), rady po polsku przy błędach Telegrama i `jarvo telegram wyslij --watek` (atrapa Bot API)."""
+brakujących wątków createForumTopic, ponowne użycie znanych, nazwy JARVO/JARODEV/KERNEL, TELEGRAM_* do jarvo.env,
+wątek Kernela do sesje.json, kanał domowy bramy, wdrożenie tras), dom Jarva w temacie General (17.11), rady po polsku
+przy błędach Telegrama i `jarvo telegram wyslij --watek` (atrapa Bot API)."""
 from __future__ import annotations
 
 import argparse
@@ -28,7 +29,8 @@ FLOTA = {"orchestrator": "jarvo", "agents": [
 
 
 class BotAPI:
-    """Atrapa api_telegrama: zapisuje wołania, zakłada tematy od numeru 101, `bledy` = metoda → BladTelegrama."""
+    """Atrapa api_telegrama: zapisuje wołania, zakłada tematy od numeru 101, `bledy` = metoda → BladTelegrama, `nazwy`
+    = wątek → nazwa tematu (General „1”); zmiana na tę samą nazwę jak Telegram: TOPIC_NOT_MODIFIED."""
 
     def __init__(self):
         self.wolania: list[tuple[str, dict]] = []
@@ -36,6 +38,7 @@ class BotAPI:
         self.usuniete: set[int] = set()
         self.forum, self.status = True, "administrator"
         self.nastepny = 101
+        self.nazwy: dict[int, str] = {1: "General"}
 
     def __call__(self, token, metoda, dane=None, **_kw):
         assert token == TOKEN
@@ -55,7 +58,14 @@ class BotAPI:
             return True
         if metoda == "createForumTopic":
             self.nastepny += 1
+            self.nazwy[self.nastepny - 1] = dane["name"]
             return {"message_thread_id": self.nastepny - 1, "name": dane["name"]}
+        if metoda in ("editForumTopic", "editGeneralForumTopic"):
+            watek = dane.get("message_thread_id", 1)
+            if self.nazwy.get(watek) == dane["name"]:
+                raise wc.BladTelegrama(400, "Bad Request: TOPIC_NOT_MODIFIED")
+            self.nazwy[watek] = dane["name"]
+            return True
         if metoda == "sendMessage":
             return {"message_id": 1}
         if metoda == "deleteForumTopic":
@@ -122,26 +132,42 @@ def test_tematy_zaklada_brakujace_i_zapisuje_trasy(inst, capsys):
     _grupy(u, {"-4001": {"nazwa": "stara grupa", "forum": False, "watki": {}},
                GRUPA: {"nazwa": "Jarvo HQ", "forum": True, "watki": {"1": {"nazwa": "General"},
                                                                     "55": {"nazwa": "🔎 Sherlock"}}}})
+    api.nazwy[55] = "🔎 Sherlock"
+    wc.zapisz_env(wc.konfig(u) / "host.env", {"TELEGRAM_HOME_CHANNEL": "123456789"})   # źródło przy wdrożeniu
+    wc.zapisz_env(u.dane / ".env", {"TELEGRAM_HOME_CHANNEL": "123456789", "TELEGRAM_HOME_CHANNEL_THREAD_ID": "9"})
     assert wc.polecenie_telegram_tematy(u, _a(), [], ot) == 0
     zalozone = api.metody("createForumTopic")
-    assert [d["name"] for d in zalozone] == ["Sklep", "Kernel"] and all(d["chat_id"] == GRUPA for d in zalozone)
+    assert [d["name"] for d in zalozone] == ["SKLEP", "KERNEL"] and all(d["chat_id"] == GRUPA for d in zalozone)
+    # nazwy jednolite: General → JARVO, istniejący wątek przemianowany
+    assert api.metody("editGeneralForumTopic") == [{"chat_id": GRUPA, "name": "JARVO"}]
+    assert api.metody("editForumTopic") == [{"chat_id": GRUPA, "message_thread_id": 55, "name": "SHERLOCK"}]
+    assert api.nazwy == {1: "JARVO", 55: "SHERLOCK", 101: "SKLEP", 102: "KERNEL"}
     env = wc.czytaj_env(wc.konfig(u) / "jarvo.env")
     assert env["TELEGRAM_HQ_CHAT_ID"] == GRUPA and env["TELEGRAM_TOPIC_SHERLOCK"] == "55"
     assert env["TELEGRAM_TOPIC_SKLEP"] == "101" and env["TELEGRAM_TOPIC_KERNEL"] == "102"
     assert env["TELEGRAM_OWNER_ID"] == "123456789"                             # reszta pliku zostaje
+    # dom Jarva: kanał domowy bramy = grupa (General, bez wątku), także w host.env, żeby wdrożenie nie cofnęło
+    for plik in (u.dane / ".env", wc.konfig(u) / "host.env"):
+        brama = wc.czytaj_env(plik)
+        assert brama["TELEGRAM_HOME_CHANNEL"] == GRUPA and "TELEGRAM_HOME_CHANNEL_THREAD_ID" not in brama
+    assert wc.czytaj_env(u.dane / ".env")["TELEGRAM_BOT_TOKEN"] == TOKEN
     sesje = json.loads((wc.konfig(u) / "sesje.json").read_text(encoding="utf-8"))
     assert sesje["gpu"]["czat"] == GRUPA and sesje["gpu"]["watek"] == "102"
     assert sesje["dev"] == {"nazwa": "Sklep", "profil": "jarvo-sklep"}
     assert flota.wywolania == 1
     out = capsys.readouterr().out
-    assert "Sherlock: wątek 55 (był)" in out and "Sklep: wątek 101 (nowy)" in out and "Kernel: wątek 102 (nowy)" in out
+    assert "SHERLOCK: wątek 55 (był, nazwa „SHERLOCK”)" in out and "SKLEP: wątek 101 (nowy)" in out
+    assert "KERNEL: wątek 102 (nowy)" in out and "JARVO: temat General (zmieniona)" in out
+    assert f"Dom Jarva: grupa Jarvo HQ {GRUPA}, temat General „JARVO”" in out
     assert "Flota wdrożona" in out and TOKEN not in out
-    # drugi raz: wszystko znane (jarvo.env, sesje.json), nic nowego, bez wdrożenia
+    # drugi raz: wszystko znane (jarvo.env, sesje.json, nazwy, kanał domowy), nic nowego, bez wdrożenia
     api.wolania.clear()
     assert wc.polecenie_telegram_tematy(u, _a(), [], ot) == 0
     assert not api.metody("createForumTopic") and flota.wywolania == 1
     assert {d["message_thread_id"] for d in api.metody("sendChatAction")} == {55, 101, 102}
-    assert "Wątki bez zmian" in capsys.readouterr().out
+    assert api.nazwy == {1: "JARVO", 55: "SHERLOCK", 101: "SKLEP", 102: "KERNEL"}
+    out = capsys.readouterr().out
+    assert "Wątki bez zmian" in out and "JARVO: temat General (bez zmian)" in out and "nazwa „" not in out
 
 
 def test_tematy_zaklada_od_nowa_usuniety_watek(inst, capsys):
@@ -150,7 +176,7 @@ def test_tematy_zaklada_od_nowa_usuniety_watek(inst, capsys):
                                                "TELEGRAM_TOPIC_SKLEP": "56", "TELEGRAM_TOPIC_KERNEL": "57"})
     api.usuniete = {56}
     assert wc.polecenie_telegram_tematy(u, _a(bez_wdrozenia=True), [], ot) == 0
-    assert [d["name"] for d in api.metody("createForumTopic")] == ["Sklep"]
+    assert [d["name"] for d in api.metody("createForumTopic")] == ["SKLEP"]
     env = wc.czytaj_env(wc.konfig(u) / "jarvo.env")
     assert env["TELEGRAM_TOPIC_SKLEP"] == "101" and env["TELEGRAM_TOPIC_KERNEL"] == "57"
     assert flota.wywolania == 0 and "wejdą przy następnym wdrożeniu" in capsys.readouterr().out
@@ -176,7 +202,7 @@ def test_tematy_bledy_telegrama_z_rada(inst, capsys, blad, rada):
     api.bledy["createForumTopic"] = blad
     assert wc.polecenie_telegram_tematy(u, _a(grupa=GRUPA), [], ot) == 1
     err = capsys.readouterr().err
-    assert rada in err and "„Sherlock”" in err and flota.wywolania == 0
+    assert rada in err and "„SHERLOCK”" in err and flota.wywolania == 0
     # grupa i wątki znane do błędu już zapisane: następny przebieg ich nie zakłada drugi raz
     assert wc.czytaj_env(wc.konfig(u) / "jarvo.env")["TELEGRAM_HQ_CHAT_ID"] == GRUPA
 
@@ -251,16 +277,66 @@ def test_wyslij_do_watku_grupy(inst, monkeypatch):
     assert wc.polecenie_telegram_wyslij(u, _a(czat=GRUPA, watek="102"), [], ot) == 0
     assert api.metody("sendMessage") == [{"chat_id": GRUPA, "disable_web_page_preview": True,
                                           "message_thread_id": 102, "text": "⚡ Kernel\n\nodpowiedź"}]
-    # bez --czat: grupa Jarvo HQ z jarvo.env; General (1) bez message_thread_id; bez niczego: DM właściciela
+    # bez --czat i bez grupy: DM właściciela (dom Jarva bez grupy)
+    monkeypatch.setattr(sys, "stdin", io.StringIO("tekst"))
+    assert wc.polecenie_telegram_wyslij(u, _a(), [], ot) == 0
+    # z grupą Jarvo HQ w jarvo.env: --watek do jej wątku, General (1) bez message_thread_id, bez niczego dom Jarva
+    # (General, bez wątku), --czat <ID właściciela> nadal do DM
     wc.zapisz_env(wc.konfig(u) / "jarvo.env", {"TELEGRAM_HQ_CHAT_ID": GRUPA})
-    for argumenty in ({"watek": "7"}, {"watek": "1"}, {}):
+    for argumenty in ({"watek": "7"}, {"watek": "1"}, {}, {"czat": "123456789"}):
         monkeypatch.setattr(sys, "stdin", io.StringIO("tekst"))
         assert wc.polecenie_telegram_wyslij(u, _a(**argumenty), [], ot) == 0
     wyslane = api.metody("sendMessage")[1:]
-    assert [(d["chat_id"], d.get("message_thread_id")) for d in wyslane] == [(GRUPA, 7), (GRUPA, None),
-                                                                            ("123456789", None)]
+    assert [(d["chat_id"], d.get("message_thread_id")) for d in wyslane] == [
+        ("123456789", None), (GRUPA, 7), (GRUPA, None), (GRUPA, None), ("123456789", None)]
     monkeypatch.setattr(sys, "stdin", io.StringIO("tekst"))
     assert wc.polecenie_telegram_wyslij(u, _a(watek="abc"), [], ot) == 2
+
+
+def test_proba_idzie_do_domu_jarva(inst, capsys):
+    """17.11: próbna wiadomość (jak każda, którą Jarvo wysyła sam) do tematu General grupy, bez message_thread_id;
+    bez grupy do DM właściciela."""
+    u, ot, api, _f = inst
+    assert wc.polecenie_telegram_test(u, argparse.Namespace(bez_rutyn=True), [], ot) == 0
+    wc.zapisz_env(wc.konfig(u) / "jarvo.env", {"TELEGRAM_HQ_CHAT_ID": GRUPA})
+    assert wc.polecenie_telegram_test(u, argparse.Namespace(bez_rutyn=True), [], ot) == 0
+    assert [(d["chat_id"], "message_thread_id" in d) for d in api.metody("sendMessage")] == [
+        ("123456789", False), (GRUPA, False)]
+    assert f"do domu Jarva: grupa Jarvo HQ {GRUPA}, temat General „JARVO”" in capsys.readouterr().out
+    assert json.loads((wc.stan_skarbca(u) / "telegram.json").read_text(encoding="utf-8"))["do"] == GRUPA
+
+
+def test_tematy_bez_prawa_do_nazw_zapisuje_trasy_i_ostrzega(inst, capsys):
+    """Brak prawa „Zarządzanie tematami” przy zmianie nazwy General nie blokuje tras ani domu Jarva: kod 1 i rada."""
+    u, ot, api, _f = inst
+    api.bledy["editGeneralForumTopic"] = wc.BladTelegrama(400, "Bad Request: not enough rights to manage topics")
+    assert wc.polecenie_telegram_tematy(u, _a(grupa=GRUPA, bez_wdrozenia=True), [], ot) == 1
+    err = capsys.readouterr().err
+    assert "nazwy tematu „JARVO” nie zmieniłem" in err and "Zarządzanie tematami" in err
+    assert wc.czytaj_env(wc.konfig(u) / "jarvo.env")["TELEGRAM_TOPIC_KERNEL"] == "103"
+    assert wc.czytaj_env(u.dane / ".env")["TELEGRAM_HOME_CHANNEL"] == GRUPA
+
+
+def test_status_pokazuje_uklad_grupy(inst, capsys):
+    """`jarvo telegram status`: dom Jarva, tematy (kogo wybierasz tematem), DM jako wejście zapasowe, ostrzeżenie,
+    gdy kanał domowy bramy wskazuje gdzie indziej."""
+    u, ot, api, _f = inst
+    assert wc.polecenie_telegram_tematy(u, _a(grupa=GRUPA, bez_wdrozenia=True), [], ot) == 0
+    capsys.readouterr()
+    assert wc.polecenie_telegram_status(u, argparse.Namespace(json=False, sprawdz=False), [], ot) == 0
+    out = capsys.readouterr().out
+    assert f"Dom Jarva: grupa Jarvo HQ {GRUPA}, temat General „JARVO”" in out
+    assert "JARVO (General): Jarvo (dom" in out and "SHERLOCK (wątek 101): agent jarvo-sherlock" in out
+    assert "KERNEL (wątek 103): sesja Kernel (skrzynka)" in out
+    assert "DM 123456789: wejście zapasowe do Jarva" in out and "UWAGA: kanał domowy" not in out
+    wc.zapisz_env(u.dane / ".env", {"TELEGRAM_HOME_CHANNEL": "123456789"})
+    assert wc.polecenie_telegram_status(u, argparse.Namespace(json=True, sprawdz=False), [], ot) == 0
+    stan = json.loads(capsys.readouterr().out)
+    assert stan["dom_jarva"] == GRUPA and stan["dom"] == "123456789"
+    assert [t["tytul"] for t in stan["tematy"]] == ["JARVO", "SHERLOCK", "SKLEP", "KERNEL"]
+    assert wc.polecenie_telegram_status(u, argparse.Namespace(json=False, sprawdz=False), [], ot) == 0
+    assert "UWAGA: kanał domowy bramy" in capsys.readouterr().out
+    assert any(w["nazwa"] == "Telegram: dom Jarva" and w["stan"] == "uwaga" for w in wc.sprawdz_telegram(u))
 
 
 def test_parser_zna_tematy_i_watek():

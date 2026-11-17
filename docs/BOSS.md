@@ -162,9 +162,12 @@ zdarzenie `completed`:
 Rutyny instalują się **wstrzymane**. Włączasz je po sprawdzeniu, że Telegram działa:
 `scripts/install-fleet.sh --resume-cron` (albo `hermes -p jarvo cron resume <id>`).
 
-Rutyny Jarva idą do Ciebie na DM (`@@OWNER_DELIVER@@`), a rutyny agentów biznesowych do ich wątku w grupie Jarvo HQ
-(`@@AGENT_DELIVER@@` w `cron/jobs.yaml` profilu: `telegram:<TELEGRAM_HQ_CHAT_ID>:<TELEGRAM_TOPIC_<temat>>`, temat `general` = sama
-grupa); bez grupy albo tematu w `.env` też na DM. Specjaliści wątków nie mają: ich wyniki przekazuje Jarvo (16.11).
+Rutyny Jarva idą do jego domu, tematu General „JARVO” grupy Jarvo HQ (`@@HOME_DELIVER@@`: `telegram:<TELEGRAM_HQ_CHAT_ID>`,
+bez grupy DM właściciela; decyzja 17.11), a rutyny agentów biznesowych do ich wątku w grupie (`@@AGENT_DELIVER@@` w
+`cron/jobs.yaml` profilu: `telegram:<TELEGRAM_HQ_CHAT_ID>:<TELEGRAM_TOPIC_<temat>>`, temat `general` = sama grupa); bez
+tematu w `.env` do domu Jarva. Specjaliści wątków nie mają: ich wyniki przekazuje Jarvo (16.11). Do domu Jarva idą też
+wyniki kart i blokady `needs_input` (karta założona z DM budzi Jarva w temacie JARVO, `cisza_tablicy.py`) i
+powiadomienia bramy (`TELEGRAM_HOME_CHANNEL`). DM jest wejściem zapasowym: Jarvo odpowiada tam, ale sam do DM nie pisze.
 
 ---
 
@@ -218,9 +221,12 @@ Przejęte z kontraktu firstmate i dostosowane do nas:
   potem `/new` czyści rozmowę.
   **Sesje zewnętrzne (dopisek, np. „gpu”):** wiadomość zakończona słowem z `<dane>/jarvo/konfig/sesje.json` nie idzie
   do Jarva, tylko do skrzynki innej sesji agenta (u nas: sesja Kernel o silniku inferencji, omp na serwerze). Bot
-  potwierdza „📥 Kernel: przyjąłem”, a odpowiedź sesji przychodzi z jej procesu (`jarvo telegram wyslij`). Przechwytuje
+  potwierdza „📥 Kernel: przyjąłem”, a odpowiedź sesji przychodzi z jej procesu (`jarvo telegram wyslij` na `chat_id`
+  i `watek` z pliku). Sesja z wątkiem w grupie (`czat` i `watek`, zapisuje je `jarvo telegram tematy`) odpowiada zawsze
+  w swoim temacie, także na „… gpu” z DM (wtedy potwierdzenie w DM dodaje „Odpowiedź w temacie KERNEL.”). Przechwytuje
   wtyczka `jarvo-sesje` w hoście i w każdym profilu (`sesje/plugin/__init__.py`, hak `pre_gateway_dispatch` od startu
-  bramy, także gdy Jarvo jest w trakcie tury) tylko wiadomości od dozwolonych osób; awaria haka oddaje wiadomość Jarvowi. Format pliku: `{"gpu": {"nazwa": "Kernel", "skrzynka": "/ścieżka/skrzynki"}}`.
+  bramy, także gdy Jarvo jest w trakcie tury) tylko wiadomości od dozwolonych osób; awaria haka oddaje wiadomość Jarvowi.
+  Format pliku: `{"gpu": {"nazwa": "Kernel", "skrzynka": "/ścieżka/skrzynki", "czat": "-100…", "watek": "11"}}`.
 - **Prosty polski** (skill `prosty-polski`, wzór: ASD-STE100 z dokumentacji lotniczej „w 80%”): zdanie do 20–25 słów,
   akapit do 6 zdań, jedna czynność w zdaniu, strona czynna, zwykłe słowa zamiast urzędowych (słownik w skillu),
   ostrzeżenie: najpierw co zrobić, potem ryzyko (⛔ strata pieniędzy, danych, konta; ⚠ gorszy wynik). Te same limity liczy

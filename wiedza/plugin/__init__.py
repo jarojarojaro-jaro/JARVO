@@ -112,7 +112,8 @@ def _linki():
 # Hermesowi moduł zamiast funkcji. Do 18.11 tak było z `cisza_tablicy` i `ksiega_bledow`: oba haki rzucały
 # „'module' object is not callable” (Hermes loguje to raz, potem DEBUG). Pilnuje tego test_haki_po_ladowaniu_jak_hermes.
 def cisza_po_narzedziu(**kwargs) -> None:
-    """Hak `post_tool_call`: karta założona z Telegrama budzi Jarva bez surowego komunikatu Hermesa (cisza_tablicy.py)."""
+    """Hak `post_tool_call`: karta założona z Telegrama budzi Jarva bez surowego komunikatu Hermesa, a karta z DM
+    budzi go w jego domu, temacie General grupy Jarvo HQ (cisza_tablicy.py)."""
     try:
         _modul("jarvo_cisza_tablicy", "cisza_tablicy.py").po_narzedziu(**kwargs)
     except Exception as e:

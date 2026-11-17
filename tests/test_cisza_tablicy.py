@@ -21,12 +21,17 @@ spec.loader.exec_module(ct)
 @pytest.fixture
 def baza(tmp_path, monkeypatch):
     plik = tmp_path / "kanban.db"
-    with sqlite3.connect(plik) as c:
-        c.execute("CREATE TABLE kanban_notify_subs (task_id TEXT, platform TEXT, chat_id TEXT, delivery_mode TEXT)")
-        c.executemany("INSERT INTO kanban_notify_subs VALUES (?, ?, ?, ?)", [
-            ("t_1", "telegram", "100", "notify+wake"),
-            ("t_1", "api_server", "hq", "notify+wake"),       # czat HQ: wybudzenie to dostarczenie, bez zmian
-            ("t_2", "telegram", "100", "notify+wake"),        # inna karta
+    monkeypatch.delenv("TELEGRAM_HOME_CHANNEL", raising=False)
+    monkeypatch.delenv("TELEGRAM_HOME_CHANNEL_THREAD_ID", raising=False)
+    with sqlite3.connect(plik) as c:            # kolumny jak hermes_cli/kanban_db.py (kanban_notify_subs)
+        c.execute("CREATE TABLE kanban_notify_subs (task_id TEXT NOT NULL, platform TEXT NOT NULL, chat_id TEXT NOT NULL, "
+                  "thread_id TEXT NOT NULL DEFAULT '', user_id TEXT, chat_type TEXT, delivery_mode TEXT NOT NULL "
+                  "DEFAULT 'notify', delivery_metadata TEXT, PRIMARY KEY (task_id, platform, chat_id, thread_id))")
+        c.executemany("INSERT INTO kanban_notify_subs (task_id, platform, chat_id, user_id, chat_type, delivery_mode, "
+                      "delivery_metadata) VALUES (?, ?, ?, ?, ?, ?, ?)", [
+            ("t_1", "telegram", "100", "100", "dm", "notify+wake", '{"chat_type": "dm"}'),
+            ("t_1", "api_server", "hq", None, None, "notify+wake", None),   # czat HQ: wybudzenie to dostarczenie
+            ("t_2", "telegram", "100", "100", "dm", "notify+wake", None),   # inna karta
         ])
 
     @contextlib.contextmanager
@@ -66,6 +71,45 @@ def test_inne_narzedzia_i_nieudane_tworzenie_bez_zmian(baza):
     ct.po_narzedziu("kanban_create", {}, json.dumps({"ok": True, "task_id": "t_1", "subscribed": False}))
     ct.po_narzedziu("kanban_create", {}, "nie json")
     assert tryby(baza) == przed
+
+
+def subskrypcje(plik):
+    with sqlite3.connect(plik) as c:
+        return sorted(c.execute("SELECT task_id, platform, chat_id, thread_id, chat_type, delivery_mode, "
+                                "delivery_metadata FROM kanban_notify_subs"))
+
+
+def test_karta_z_dm_budzi_jarva_w_jego_domu(baza, monkeypatch):
+    """17.11: dom Jarva to temat General grupy Jarvo HQ; karta założona z rozmowy w DM budzi Jarva w sesji General
+    (klucz jak wiadomość z General: „group”, wątek „1”), więc wynik i needs_input trafiają tam, nie do DM."""
+    monkeypatch.setenv("TELEGRAM_HOME_CHANNEL", "-1004309644955")
+    ct.po_narzedziu("kanban_create", {"title": "x"}, json.dumps({"ok": True, "task_id": "t_1", "subscribed": True}))
+    assert subskrypcje(baza) == [
+        ("t_1", "api_server", "hq", "", None, "notify+wake", None),
+        ("t_1", "telegram", "-1004309644955", "1", "group", "wake", None),
+        ("t_2", "telegram", "100", "", "dm", "notify+wake", None)]
+
+
+def test_dom_juz_subskrybuje_a_dm_wypada(baza, monkeypatch):
+    """Karta już ma subskrypcję domu (np. dziedziczoną z rodzica): wiersz z DM po prostu znika, bez błędu klucza."""
+    monkeypatch.setenv("TELEGRAM_HOME_CHANNEL", "-1004309644955")
+    with sqlite3.connect(baza) as c:
+        c.execute("INSERT INTO kanban_notify_subs (task_id, platform, chat_id, thread_id, chat_type, delivery_mode) "
+                  "VALUES ('t_1', 'telegram', '-1004309644955', '1', 'group', 'wake')")
+    ct.po_narzedziu("kanban_create", {}, json.dumps({"ok": True, "task_id": "t_1", "subscribed": True}))
+    assert [w[:4] for w in subskrypcje(baza) if w[0] == "t_1"] == [
+        ("t_1", "api_server", "hq", ""), ("t_1", "telegram", "-1004309644955", "1")]
+
+
+def test_dom_w_dm_albo_brak_nie_przenosi(baza, monkeypatch):
+    """Bez grupy dom Jarva to DM: subskrypcje zostają tam, gdzie były (tylko cisza tablicy)."""
+    monkeypatch.setenv("TELEGRAM_HOME_CHANNEL", "100")
+    assert ct.dom_jarva() is None
+    ct.po_narzedziu("kanban_create", {}, json.dumps({"ok": True, "task_id": "t_1", "subscribed": True}))
+    assert ("t_1", "telegram", "100", "", "dm", "wake", '{"chat_type": "dm"}') in subskrypcje(baza)
+    monkeypatch.setenv("TELEGRAM_HOME_CHANNEL", "-1004309644955")
+    monkeypatch.setenv("TELEGRAM_HOME_CHANNEL_THREAD_ID", "5")
+    assert ct.dom_jarva() == ("-1004309644955", "5")
 
 
 def budzenie(karta="t_87d11e3a", status="blocked; needs attention", tytul="Pilot ankiet: DataAnnotation"):

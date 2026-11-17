@@ -185,15 +185,15 @@ class Nadzorca:
 
 
 class Flota:
-    """Atrapa jarvo/flota.py: wdrożenie zapisuje trasę właściciela w rutynach (jak build z OWNER_DELIVER)."""
+    """Atrapa jarvo/flota.py: wdrożenie zapisuje dom Jarva w rutynach (jak build z HOME_DELIVER: grupa, bez niej DM)."""
 
     def __init__(self, u):
         self.u, self.wywolania, self.potwierdzone = u, 0, []
 
     def zainstaluj_flote(self, u, env, log=print):
         self.wywolania += 1
-        wlasciciel = wc.czytaj_env(wc.konfig(u) / "jarvo.env")["TELEGRAM_OWNER_ID"]
-        _jobs(u, deliver=f"telegram:{wlasciciel}")
+        trasy = wc.czytaj_env(wc.konfig(u) / "jarvo.env")
+        _jobs(u, deliver=f"telegram:{trasy.get('TELEGRAM_HQ_CHAT_ID') or trasy['TELEGRAM_OWNER_ID']}")
         return {"restart_bramy": True, "restart_panelu": True, "odcisk_panelu": "0123456789abcdef"}
 
     def uslugi_do_restartu(self, wynik):
@@ -292,7 +292,7 @@ def test_ustaw_bez_terminala_token_z_wejscia(inst, api, monkeypatch, capsys):
     assert TOKEN not in wyj.out + wyj.err and "@jarvo_proba_bot" in wyj.out and "jarvo telegram test" in wyj.out
     env = wc.czytaj_env(u.dane / ".env")
     assert env["TELEGRAM_BOT_TOKEN"] == TOKEN and env["TELEGRAM_ALLOWED_USERS"] == "123456789"
-    assert env["TELEGRAM_HOME_CHANNEL"] == "123456789"
+    assert env["TELEGRAM_HOME_CHANNEL"] == "123456789"                  # bez grupy dom Jarva to DM
     assert wc.czytaj_env(wc.konfig(u) / "jarvo.env") == {"TELEGRAM_OWNER_ID": "123456789"}
     assert flota.wywolania == 0 and nadzorca.restarty == []
     if os.name != "nt":
@@ -341,8 +341,9 @@ def test_ustaw_konflikt_409_przy_wykrywaniu(inst, api, capsys):
 
 
 def test_ustaw_wdraza_flote_i_restartuje_uslugi(inst, api, monkeypatch, capsys):
-    """Z flotą: wdrożenie (trasa w configu bramy, rutyny do właściciela), restart usług przez działającego nadzorcę
-    i potwierdzenie odcisku panelu; źródłowe host.env (merge_env przy wdrożeniu) dostaje te same wartości."""
+    """Z flotą: wdrożenie (trasa w configu bramy, rutyny do domu Jarva: z grupą jej temat General), restart usług przez
+    działającego nadzorcę i potwierdzenie odcisku panelu; źródłowe host.env (merge_env przy wdrożeniu) dostaje te same
+    wartości, także kanał domowy bramy (grupa)."""
     u, ot, nadzorca, flota = inst
     nadzorca.dziala = True
     (wc.profil(u) / "distribution.yaml").write_text("name: jarvo\n", encoding="utf-8")
@@ -355,7 +356,9 @@ def test_ustaw_wdraza_flote_i_restartuje_uslugi(inst, api, monkeypatch, capsys):
     assert flota.wywolania == 1 and nadzorca.restarty == ["brama", "panel"] and flota.potwierdzone == ["0123456789abcdef"]
     assert wc.czytaj_env(wc.konfig(u) / "host.env")["TELEGRAM_BOT_TOKEN"] == TOKEN
     assert wc.czytaj_env(wc.konfig(u) / "jarvo.env")["TELEGRAM_HQ_CHAT_ID"] == "-1001234567890"
-    assert all(r["deliver"] == "telegram:123456789" for r in wc.stan_rutyn(u)["lista"])
+    for plik in (u.dane / ".env", wc.konfig(u) / "host.env"):
+        assert wc.czytaj_env(plik)["TELEGRAM_HOME_CHANNEL"] == "-1001234567890"
+    assert all(r["deliver"] == "telegram:-1001234567890" for r in wc.stan_rutyn(u)["lista"])
     assert "Flota wdrożona; restart: brama, panel" in capsys.readouterr().out
     monkeypatch.setattr(sys, "stdin", io.StringIO(TOKEN + "\n"))                     # nic nowego: bez wdrożenia
     assert wc.polecenie_telegram_ustaw(u, _a(token_ze_stdin=True, wlasciciel="123456789"), [], ot, interaktywnie=False) == 0

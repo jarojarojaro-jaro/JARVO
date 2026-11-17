@@ -20,8 +20,10 @@ wtyczka tylko w hoście, wiadomość poszła do Jarva). Konfiguracja (bez sekret
      "sklep": {"nazwa": "Sklep", "profil": "jarvo-sklep"}}
 
 Plik w skrzynce: `nowe/<RRRRMMDD-HHMMSS>-<id wiadomości>.json` z polami dopisek, nazwa, tekst (bez dopisku),
-odpowiedz_na (cytowana wiadomość), media (kopie zdjęć i plików obok JSON-a), czas, chat_id, message_id, watek
-(wątek grupy, z którego przyszła; pusty w DM: sesja odpowiada wtedy właścicielowi w DM).
+odpowiedz_na (cytowana wiadomość), media (kopie zdjęć i plików obok JSON-a), czas, chat_id, message_id, watek: gdzie
+sesja odpowiada. Sesja z wątkiem w grupie (`czat` i `watek` w sesje.json) odpowiada zawsze w swoim wątku, także na
+„… gpu” z DM (17.11: DM tylko wejściem zapasowym, odpowiedź Kernela w temacie KERNEL; skąd przyszło: zrodlo_chat_id
+i zrodlo_watek). Bez wątku: tam, skąd przyszła (pusty watek w DM = odpowiedź do DM).
 
 Grupa „Jarvo HQ” z tematami (14.11): wątek na agenta. Wpis skrzynki z `czat` i `watek` (zapisuje je
 `jarvo telegram tematy`) łapie każdą wiadomość właściciela w tym wątku, bez dopisku. Wpis z `profil` zamiast
@@ -135,16 +137,19 @@ def _watek_grupy(zrodlo: Any) -> str:
     return str(getattr(zrodlo, "thread_id", "") or "")
 
 
-def zapisz(skrzynka: Path, dopisek: str, nazwa: str, tekst: str, event: Any) -> Path:
-    """Wiadomość jako JSON w `nowe/` (zapis przez plik tymczasowy, więc proces sesji nie przeczyta połowy)."""
+def zapisz(skrzynka: Path, dopisek: str, cel: dict, tekst: str, event: Any) -> Path:
+    """Wiadomość jako JSON w `nowe/` (zapis przez plik tymczasowy, więc proces sesji nie przeczyta połowy). chat_id
+    i watek = gdzie sesja odpowiada: jej wątek w grupie, gdy go ma, inaczej czat i wątek wiadomości."""
     nowe = skrzynka / "nowe"
     nowe.mkdir(parents=True, exist_ok=True)
     zrodlo = getattr(event, "source", None)
     rdzen, mid = _rdzen(event)
-    wpis = {"dopisek": dopisek, "nazwa": nazwa, "tekst": tekst,
+    czat, watek = str(getattr(zrodlo, "chat_id", "") or ""), _watek_grupy(zrodlo)
+    wpis = {"dopisek": dopisek, "nazwa": cel["nazwa"], "tekst": tekst,
             "odpowiedz_na": getattr(event, "reply_to_text", None) or "",
             "media": _kopiuj_media(event, nowe, rdzen), "czas": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "chat_id": str(getattr(zrodlo, "chat_id", "") or ""), "message_id": mid, "watek": _watek_grupy(zrodlo)}
+            "chat_id": cel.get("czat") or czat, "message_id": mid, "watek": cel.get("watek") or watek,
+            "zrodlo_chat_id": czat, "zrodlo_watek": watek}
     tymczasowy = nowe / f".{rdzen}.json.tmp"
     tymczasowy.write_text(json.dumps(wpis, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     plik = nowe / f"{rdzen}.json"
@@ -359,10 +364,12 @@ async def przechwyc(event: Any = None, gateway: Any = None, **_kw) -> Optional[d
                 potwierdzenie = f"📥 {cel['nazwa']}: przyjąłem, karta {ident}."
             else:
                 skrzynka = Path(os.path.expanduser(cel["skrzynka"]))
-                zapisz(skrzynka, dopisek, cel["nazwa"], tekst, event)
+                zapisz(skrzynka, dopisek, cel, tekst, event)
                 w_kolejce = len(list((skrzynka / "nowe").glob("*.json")))
                 potwierdzenie = (f"📥 {cel['nazwa']}: przyjąłem, analizuję"
-                                 + (f" (w kolejce: {w_kolejce})" if w_kolejce > 1 else "") + ".")
+                                 + (f" (w kolejce: {w_kolejce})" if w_kolejce > 1 else "") + "."
+                                 + (f" Odpowiedź w temacie {cel['nazwa'].upper()}."
+                                    if cel.get("watek") and not _watek_grupy(zrodlo) else ""))
         except Exception:
             _PRZYJETE.pop(klucz, None)        # ponowienie ma szansę; tę wiadomość dostaje Jarvo
             raise

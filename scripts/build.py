@@ -517,7 +517,9 @@ def base_tokens(fleet: fl.Fleet, agent: fl.Agent, runtime_build_dir: str, env: d
     """Tokeny @@…@@ profilu. Bez `uklad`: kontener z buildem pod `runtime_build_dir` (dawne wywołanie)."""
     shared = fleet.raw.get("shared", {})
     owner = env.get("TELEGRAM_OWNER_ID", "").strip()
-    owner_deliver = f"telegram:{owner}" if owner else "local"
+    # dom Jarva (17.11): wątek orkiestratora w grupie Jarvo HQ (temat General = sama grupa), bez grupy DM właściciela,
+    # bez niego lokalnie; ten sam cel ustawia `jarvo telegram ustaw/tematy` jako TELEGRAM_HOME_CHANNEL bramy
+    home_deliver = cel_watku(fleet.agent(fleet.orchestrator), env) or (f"telegram:{owner}" if owner else "local")
     u = uklad or Uklad(build=runtime_build_dir)
     return {
         "PROVIDER": fleet.provider,
@@ -533,10 +535,10 @@ def base_tokens(fleet: fl.Fleet, agent: fl.Agent, runtime_build_dir: str, env: d
         "AGENT": agent.name,
         "REVIEWER": fleet.reviewer,
         "ORCHESTRATOR": fleet.orchestrator,
-        # cel dostarczania rutyn: DM właściciela (trasa DM → jarvo), albo lokalnie gdy brak
-        "OWNER_DELIVER": owner_deliver,
-        # rutyny agentów (nie Jarva): ich wątek w grupie Jarvo HQ, a bez grupy albo tematu w .env jak OWNER_DELIVER
-        "AGENT_DELIVER": cel_watku(agent, env) or owner_deliver,
+        # cel dostarczania rutyn Jarva: jego dom (temat General grupy Jarvo HQ, bez grupy DM właściciela)
+        "HOME_DELIVER": home_deliver,
+        # rutyny agentów (nie Jarva): ich wątek w grupie Jarvo HQ, a bez grupy albo tematu jak HOME_DELIVER
+        "AGENT_DELIVER": cel_watku(agent, env) or home_deliver,
     }
 
 

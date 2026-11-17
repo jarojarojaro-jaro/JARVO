@@ -220,10 +220,16 @@ def test_wiadomosc_w_watku_kernela_idzie_do_skrzynki_bez_dopisku(tmp_path, monke
     assert brama.wyslane == [(GRUPA, "📥 Kernel: przyjąłem, analizuję.", "12")]
     # inny wątek tej grupy bez dopisku: zwykła droga (Jarvo / agent wątku)
     assert asyncio.run(s.przechwyc(event=w_grupie("a to dla Jarva", watek="1", mid="71"), gateway=brama)) is None
-    # DM z dopiskiem „gpu” jak dotąd: skrzynka, bez wątku (Kernel odpowie w DM)
+    # DM z dopiskiem „gpu” (17.11: DM tylko wejściem zapasowym): skrzynka, odpowiedź Kernela w jego wątku, nie w DM;
+    # potwierdzenie w DM mówi, gdzie szukać odpowiedzi
     assert asyncio.run(s.przechwyc(event=zdarzenie("link gpu", mid="72"), gateway=brama))["action"] == "skip"
-    dm = [json.loads(p.read_text(encoding="utf-8")) for p in (skrzynka / "nowe").glob("*.json")]
-    assert {w["watek"] for w in dm} == {"12", ""}
+    wpisy = {w["message_id"]: w for w in (json.loads(p.read_text(encoding="utf-8"))
+                                          for p in (skrzynka / "nowe").glob("*.json"))}
+    assert (wpisy["72"]["chat_id"], wpisy["72"]["watek"]) == (GRUPA, "12")
+    assert (wpisy["72"]["zrodlo_chat_id"], wpisy["72"]["zrodlo_watek"]) == ("777", "")
+    assert (wpisy["70"]["zrodlo_chat_id"], wpisy["70"]["zrodlo_watek"]) == (GRUPA, "12")
+    assert brama.wyslane[-1] == ("777", "📥 Kernel: przyjąłem, analizuję (w kolejce: 2). Odpowiedź w temacie KERNEL.",
+                                 None)
 
 
 def test_dopisek_dev_zaklada_karte_dla_profilu(tmp_path, monkeypatch):
