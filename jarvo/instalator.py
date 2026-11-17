@@ -285,7 +285,11 @@ def zapytaj_http(url: str, czas: float = 2.0) -> tuple[int, Any] | None:
         with otwieracz.open(zadanie, timeout=czas) as odp:
             kod, dane = odp.status, odp.read(1 << 20)
     except urllib.error.HTTPError as e:
-        kod, dane = e.code, b""
+        # treść odpowiedzi z błędem też się liczy: bramka panelu w sieci mówi o sobie w 401 (17.11 doctor jej nie widział)
+        try:
+            kod, dane = e.code, e.read(1 << 20)
+        except (OSError, http.client.HTTPException):
+            kod, dane = e.code, b""
     except http.client.HTTPException as e:
         return None if isinstance(e, ConnectionError) else (0, None)   # RemoteDisconnected = jeszcze nie słucha
     except (urllib.error.URLError, OSError, ValueError):

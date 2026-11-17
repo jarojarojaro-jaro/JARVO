@@ -526,3 +526,33 @@ def test_prawdziwy_hermes_loopback_bez_hasla_a_siec_z_kluczem(tmp_path):
     assert w["siec_bez_sesji"] == 401 and w["siec_strona_bez_sesji"] == 302 and w["logowanie_formularz"] is True
     assert w["logowanie"] == [200, "/jarvo"] and w["drugi_raz"] == 401
     assert w["strona"] == [200, True] and w["api_z_tokenem"] == 200
+
+
+def test_proba_czyta_tresc_401_z_prawdziwego_http(tmp_path):
+    """17.11 na żywo: zapytaj_http gubił treść odpowiedzi 401, więc doctor pisał „nie od bramki”, choć bramka działała."""
+    import http.server
+    import json as _json
+    import threading
+
+    from jarvo import instalator
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            b = _json.dumps({"error": "unauthenticated", "jarvo": "panel-siec"}).encode()
+            self.send_response(401)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(b)))
+            self.end_headers()
+            self.wfile.write(b)
+
+        def log_message(self, *a):
+            pass
+
+    s = http.server.HTTPServer(("127.0.0.1", 0), H)
+    t = threading.Thread(target=s.serve_forever, daemon=True)
+    t.start()
+    try:
+        kod, tresc = instalator.zapytaj_http(f"http://127.0.0.1:{s.server_port}/api/status", 3.0)
+    finally:
+        s.shutdown()
+    assert kod == 401 and tresc["jarvo"] == "panel-siec"
