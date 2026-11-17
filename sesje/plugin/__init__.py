@@ -29,7 +29,9 @@ Grupa „Jarvo HQ” z tematami (14.11): wątek na agenta. Wpis skrzynki z `czat
 `jarvo telegram tematy`) łapie każdą wiadomość właściciela w tym wątku, bez dopisku. Wpis z `profil` zamiast
 `skrzynka` to agent floty: „… sklep” zakłada kartę kanbana przypisaną do tego profilu (API kanbana Hermesa, jak
 narzędzie kanban_create; recenzenta wybiera pracownik przy kanban_request_review według floty), bot odpowiada
-„📥 Sklep: przyjąłem, karta <id>”. Każda wiadomość właściciela w grupie zapisuje też grupę i wątek (nazwa tematu
+„📥 Sklep: przyjąłem, karta <id>”. Wpis z `profil`, `czat` i `watek` (temat agenta, np. JARODEV) to rozmowa: wiadomość
+w tym temacie hak przepuszcza do bramy profilu (D6 z 17.11), a kartę zakłada tylko dopisek spoza tematu. Każda
+wiadomość właściciela w grupie zapisuje też grupę i wątek (nazwa tematu
 z `reply_to_message.forum_topic_created`) w `<dane>/jarvo/state/telegram-grupy.json`: stąd `jarvo telegram tematy`
 bierze ID grupy i istniejące tematy. Samo „start” w grupie tylko to zapisuje i potwierdza (nie budzi Jarva), a gdy
 grupa nie ma jeszcze wątków agentów, dopisuje jedno zlecenie dla Claude Code w `missions/DLA-CLAUDE.md`
@@ -91,7 +93,10 @@ def konfiguracja(dane: Optional[Path] = None) -> dict[str, dict]:
                 cel.update(czat=str(wpis["czat"]), watek=str(wpis["watek"]))
             wynik[klucz] = cel
         elif _PROFIL.fullmatch(str(wpis.get("profil") or "")):
-            wynik[klucz] = {"nazwa": nazwa, "profil": str(wpis["profil"])}
+            cel = {"nazwa": nazwa, "profil": str(wpis["profil"])}
+            if wpis.get("czat") and wpis.get("watek"):     # temat agenta w grupie = rozmowa z jego bramą (D6)
+                cel.update(czat=str(wpis["czat"]), watek=str(wpis["watek"]))
+            wynik[klucz] = cel
     return wynik
 
 
@@ -346,6 +351,9 @@ async def przechwyc(event: Any = None, gateway: Any = None, **_kw) -> Optional[d
                 await _odpowiedz(gateway, zrodlo, f"✅ Jarvo HQ: zapisałem ten wątek{f' „{temat}”' if temat else ''}. "
                                  "Wątki agentów zakłada operator, Ty nic nie uruchamiasz.")
             return {"action": "skip", "reason": "start w grupie Jarvo HQ (zapis wątku)"}
+        if z_watku and z_watku[1].get("profil"):
+            # temat agenta floty (np. JARODEV) to rozmowa: wiadomość idzie dalej do bramy jego profilu, bez karty
+            return None
         if z_watku:
             dopisek, cel = z_watku
             wlasny = rozpoznaj(event.text, {dopisek: cel})

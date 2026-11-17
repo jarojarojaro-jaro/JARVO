@@ -255,6 +255,22 @@ def test_dopisek_dev_zaklada_karte_dla_profilu(tmp_path, monkeypatch):
     assert brama.wyslane == [("777", "📥 Sklep: przyjąłem, karta t_abc123.")]
 
 
+def test_temat_profilu_to_rozmowa_z_brama(tmp_path, monkeypatch):
+    """D6 (17.11): temat JARODEV = rozmowa z bramą profilu jarvo-jarodev; hak nic nie robi (bez karty, bez
+    potwierdzenia), a dopisek „… dev” spoza tematu dalej zakłada kartę."""
+    s = load()
+    konfig_sesji(tmp_path, monkeypatch, {"dev": {"nazwa": "Jarodev", "profil": "jarvo-jarodev", "czat": GRUPA, "watek": "15"}})
+    assert s.konfiguracja()["dev"] == {"nazwa": "Jarodev", "profil": "jarvo-jarodev", "czat": GRUPA, "watek": "15"}
+    karty = []
+    monkeypatch.setattr(s, "zaloz_karte", lambda *a: karty.append(a) or "t_1")
+    brama = BramaGrupy()
+    assert asyncio.run(s.przechwyc(event=w_grupie("popraw testy panelu", watek="15", mid="90"), gateway=brama)) is None
+    assert asyncio.run(s.przechwyc(event=w_grupie("a to z dopiskiem dev", watek="15", mid="91"), gateway=brama)) is None
+    assert karty == [] and brama.wyslane == []
+    assert asyncio.run(s.przechwyc(event=zdarzenie("zrób to dev", mid="92"), gateway=brama))["action"] == "skip"
+    assert len(karty) == 1
+
+
 def test_karta_przez_api_kanbana_hermesa(monkeypatch):
     """zaloz_karte woła hermes_cli.kanban_db.create_task jak narzędzie kanban_create (atrapa modułów Hermesa)."""
     import sys
