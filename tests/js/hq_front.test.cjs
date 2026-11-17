@@ -106,6 +106,7 @@ test("Trasa.parsuj", () => {
   eq(Trasa.parsuj("#/o/zly"), { widok: "start" });
   eq(Trasa.parsuj("#/mozg"), { widok: "mozg" });
   eq(Trasa.parsuj("#/mozg/x"), { widok: "start" });
+  eq(Trasa.parsuj("#/?u=wyglad"), { widok: "start" });                               // dawny ?u= nie otwiera szuflady
   eq(Trasa.parsuj("#/?n=edytor&p=a/b.mp4"), { widok: "start", n: "edytor", p: "a/b.mp4" });
   eq(Trasa.parsuj("#/?n=zlo"), { widok: "start" });
   eq(Trasa.parsuj("#/r/%E0%A4%A"), { widok: "start" });                             // zły zapis % nie wywraca
@@ -120,6 +121,7 @@ test("Trasa.zbuduj: w obie strony", () => {
   assert.strictEqual(Trasa.zbuduj({ widok: "start" }), "#/");
   assert.strictEqual(Trasa.zbuduj({ widok: "rozmowca", rozmowca: "f:hermes" }), "#/o/f:hermes");
   assert.strictEqual(Trasa.zbuduj({ widok: "ustawienia", sekcja: "konto" }), "#/ustawienia/konto");
+  assert.strictEqual(Trasa.zbuduj({ widok: "ustawienia", sekcja: "wyglad" }), "#/ustawienia/wyglad");
 });
 
 // ------------------------------------------------------------------------------------------------ skróty

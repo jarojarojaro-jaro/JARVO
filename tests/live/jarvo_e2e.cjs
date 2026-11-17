@@ -514,8 +514,8 @@ async function etap1(browser) {
   });
 
   await krok("9", "Stara Baza z ustawień działa: panel agenta, cele konwertera, podgląd pliku", async () => {
-    await page.goto(BASE + "/jarvo#/?u=stara-baza");
-    await page.click("[data-region=szuflada] .j-btn-mocny", { timeout: 20000 });
+    await page.goto(BASE + "/jarvo#/ustawienia/stara-baza");
+    await page.click("[data-region=ustawienia] .j-btn-mocny", { timeout: 20000 });
     await page.waitForSelector(".j-stara .thq-room", { timeout: 20000 });
     const pokoj = page.locator(".thq-room").first();
     await pokoj.click();
@@ -1541,12 +1541,12 @@ async function etap3(browser) {
       musi(linie[0] === "model", `bez modelu nie ma linii „Połącz model”: ${linie}`);
       musi(!(await korzen(() => !!document.querySelector(".j-podp"))), "bez modelu widać startery");
       await page.click('.j-gotowosc[data-gotowosc="model"] .j-got-b');
-      const f = await (await page.waitForSelector("[data-region=szuflada] iframe.j-osadzona", { timeout: 5000 })).contentFrame();
+      const f = await (await page.waitForSelector("[data-region=ustawienia] iframe.j-osadzona", { timeout: 5000 })).contentFrame();
       await f.waitForSelector("#app-sidebar", { state: "attached", timeout: 15000 });
       out.polacz_model = await f.evaluate(() => location.pathname);
       musi(out.polacz_model === cel, `„Połącz model” otworzył ${out.polacz_model}, a nie ${cel} (${got.model.sposob})`);
-      await page.click("[data-region=szuflada] .j-sz-x");
-      await page.waitForSelector("[data-region=szuflada]", { state: "detached", timeout: 5000 });
+      await page.keyboard.press("Escape");
+      await page.waitForSelector("[data-region=ustawienia]", { state: "detached", timeout: 5000 });
     }
     if (!got.profil_wlasciciela && got.model.polaczony) {
       // linia „Poznajmy się” otwiera pierwsze spotkanie (37-poznajmy.js), „Pomiń” wraca na start
@@ -2163,18 +2163,18 @@ async function etap3(browser) {
 
   await krok("5", "szuflada: Połączenia (Klucze, Modele w ramce bez menu Hermesa), Wygląd, Konto (język PL/EN także dla stron Hermesa, wylogowanie, klasyczny panel), System › Aktualizacja, Stara Baza na cały ekran; Esc oddaje fokus", async () => {
     const zebatka = ".j-stopka .j-btn[aria-label]";
-    const szuflada = "[data-region=szuflada]";
+    const szuflada = "[data-region=ustawienia]";
     const sekcja = async (id) => {
       await page.click(`${szuflada} [data-sekcja="${id}"]`);
       await page.waitForSelector(`${szuflada} [data-sekcja="${id}"][aria-current=true]`, { timeout: 3000 });
     };
     await page.click(zebatka);
     await page.waitForSelector(szuflada, { timeout: 5000 });
-    musi(await korzen(() => document.querySelector("[data-region=szuflada]").contains(document.activeElement)), "fokus poza szufladą");
-    const sekcje = await korzen(() => [...document.querySelectorAll("[data-region=szuflada] [data-sekcja]")].map((e) => e.dataset.sekcja));
+    musi(await korzen(() => document.querySelector("[data-region=ustawienia]").contains(document.activeElement)), "fokus poza szufladą");
+    const sekcje = await korzen(() => [...document.querySelectorAll("[data-region=ustawienia] [data-sekcja]")].map((e) => e.dataset.sekcja));
     // Połączenia: Klucze i Modele jako strony Hermesa w ramce, bez jego menu
     const ramki = {};
-    await sekcja("polaczenia");
+    await sekcja("model");
     for (const [i, adres] of [[0, "/env"], [1, "/models"]]) {
       await page.locator(`${szuflada} .j-karta .j-wiersz`).nth(i).locator(".j-btn").click();
       const f = await (await page.waitForSelector(`${szuflada} iframe.j-osadzona`, { timeout: 5000 })).contentFrame();
@@ -2194,39 +2194,39 @@ async function etap3(browser) {
     await wybor(0, 0); const system = await motyw();
     musi(jasny === "jasny" && ciemny === "ciemny" && system === "ciemny", `motywy: ${jasny}, ${ciemny}, ${system}`);
     // Konto: język EN (aplikacja i strony Hermesa przez hermes-locale) i z powrotem, wylogowanie, klasyczny panel, wersja, skróty
-    await sekcja("konto");
+    await sekcja("system");
     await wybor(0, 1);
     await page.waitForFunction(() => document.querySelector("[data-jarvo-korzen]").getAttribute("lang") === "en", null, { timeout: 15000 });
     await page.waitForSelector(szuflada, { timeout: 15000 });
-    const poAngielsku = await korzen(() => document.querySelector("[data-region=szuflada] .j-sz-gora h2").textContent);
+    const poAngielsku = await korzen(() => document.querySelector("[data-region=ustawienia] .j-sz-gora h2").textContent);
     const klasyczna = pilnuj(await ctx.newPage());
     await klasyczna.goto(BASE + "/sessions");
     await klasyczna.waitForSelector("#app-sidebar", { state: "attached", timeout: 15000 });
     await klasyczna.waitForFunction(() => /Sessions/.test(document.getElementById("app-sidebar").textContent), null, { timeout: 10000 }).catch(() => {});
     const hermesEn = await klasyczna.evaluate(() => ({ locale: localStorage.getItem("hermes-locale"), sesje: /Sessions/.test(document.getElementById("app-sidebar").textContent) }));
     await klasyczna.close();
-    if (!(await page.$(`${szuflada} [data-sekcja="konto"][aria-current=true]`))) await sekcja("konto");
+    if (!(await page.$(`${szuflada} [data-sekcja="system"][aria-current=true]`))) await sekcja("system");
     await wybor(0, 0);
     await page.waitForFunction(() => document.querySelector("[data-jarvo-korzen]").getAttribute("lang") === "pl", null, { timeout: 15000 });
     await page.waitForSelector(szuflada, { timeout: 15000 });
     const locPl = await korzen(() => localStorage.getItem("hermes-locale"));
     musi(poAngielsku === "Settings", `tytuł szuflady po angielsku: ${poAngielsku}`);
     musi(hermesEn.locale === "en" && hermesEn.sesje && locPl === "pl", `strony Hermesa: ${JSON.stringify(hermesEn)}, po powrocie ${locPl}`);
-    if (!(await page.$(`${szuflada} [data-sekcja="konto"][aria-current=true]`))) await sekcja("konto");
+    if (!(await page.$(`${szuflada} [data-sekcja="system"][aria-current=true]`))) await sekcja("system");
     const konto = await korzen(() => ({ skroty: document.querySelectorAll(".j-skrot").length,
-      klasyczny: (document.querySelector('[data-region=szuflada] [data-akcja="klasyczny"]') || {}).href || "",
-      wyloguj: !!document.querySelector('[data-region=szuflada] [data-akcja="wyloguj"]'),
-      wersja: ((document.querySelector("[data-region=szuflada] .j-sz-kod") || {}).textContent || "").trim(),
-      wersja_pelna: ((document.querySelector("[data-region=szuflada] .j-sz-kod") || {}).title || "").trim(),
-      skroty_zwiniete: !!document.querySelector("[data-region=szuflada] details.j-sz-det:not([open]) .j-skrot") }));
+      klasyczny: (document.querySelector('[data-region=ustawienia] [data-akcja="klasyczny"]') || {}).href || "",
+      wyloguj: !!document.querySelector('[data-region=ustawienia] [data-akcja="wyloguj"]'),
+      wersja: ((document.querySelector("[data-region=ustawienia] .j-sz-kod") || {}).textContent || "").trim(),
+      wersja_pelna: ((document.querySelector("[data-region=ustawienia] .j-sz-kod") || {}).title || "").trim(),
+      skroty_zwiniete: !!document.querySelector("[data-region=ustawienia] details.j-sz-det:not([open]) .j-skrot") }));
     // skróty schowane pod „Pokaż skróty…”, wersja skrócona do 10 znaków (pełna w podpowiedzi)
     musi(konto.skroty >= 8 && konto.skroty_zwiniete && /\/sessions$/.test(konto.klasyczny) && konto.wyloguj && /^[0-9a-f]{10}$/.test(konto.wersja)
       && konto.wersja_pelna.startsWith(konto.wersja), `konto: ${JSON.stringify(konto)}`);
     // System › Aktualizacja: stan pomocnika (w piaskownicy bez pomocnika: „nie działa”)
     await sekcja("system");
     await page.waitForSelector(`${szuflada} .j-akt[data-stan] .j-akt-stan`, { timeout: 5000 });
-    const aktualizacja = await korzen(() => ({ stan: document.querySelector("[data-region=szuflada] .j-akt").dataset.stan,
-      tekst: document.querySelector("[data-region=szuflada] .j-akt-stan").textContent.trim().slice(0, 80) }));
+    const aktualizacja = await korzen(() => ({ stan: document.querySelector("[data-region=ustawienia] .j-akt").dataset.stan,
+      tekst: document.querySelector("[data-region=ustawienia] .j-akt-stan").textContent.trim().slice(0, 80) }));
     // Stara Baza: cała, na cały ekran nad aplikacją, z powrotem do Jarva
     await sekcja("stara-baza");
     await page.click(`${szuflada} .j-btn-mocny`);
@@ -2242,7 +2242,7 @@ async function etap3(browser) {
     await page.keyboard.press("Escape");
     await page.waitForSelector(szuflada, { state: "detached", timeout: 5000 });
     const fokus = await korzen(() => document.activeElement && document.activeElement.closest(".j-stopka") && document.activeElement.getAttribute("aria-label"));
-    musi(JSON.stringify(sekcje) === JSON.stringify(["polaczenia", "zespol", "wyglad", "konto", "system", "stara-baza"]), `sekcje: ${sekcje}`);
+    musi(JSON.stringify(sekcje) === JSON.stringify(["rozmowcy", "model", "telegram", "powiadomienia", "dostep", "wyglad", "jezyk", "zespol", "system", "stara-baza"]), `sekcje: ${sekcje}`);
     musi(!!fokus, `fokus po Esc: ${fokus}`);
     return { sekcje, ramki, motywy: [jasny, ciemny, system], jezyk: { aplikacja: poAngielsku, hermes: hermesEn.locale }, konto,
              aktualizacja, stara_baza: `${stara.w}×${stara.h}`, fokus_po_esc: fokus };
@@ -2251,9 +2251,9 @@ async function etap3(browser) {
   await krok("6", "klawiatura: Ctrl+, i Esc, Ctrl+Shift+S zwija pasek, / do pola wiadomości, F6 między regionami, Ctrl+Shift+O start", async () => {
     await korzen(() => document.activeElement && document.activeElement.blur());
     await page.keyboard.press("Control+Comma");
-    await page.waitForSelector("[data-region=szuflada]", { timeout: 3000 });
+    await page.waitForSelector("[data-region=ustawienia]", { timeout: 3000 });
     await page.keyboard.press("Escape");
-    await page.waitForSelector("[data-region=szuflada]", { state: "detached", timeout: 3000 });
+    await page.waitForSelector("[data-region=ustawienia]", { state: "detached", timeout: 3000 });
     await page.keyboard.press("Control+Shift+KeyS");
     await page.waitForSelector(".j-uklad.is-zwiniety", { timeout: 3000 });
     await page.keyboard.press("Control+Shift+KeyS");
@@ -2292,12 +2292,12 @@ async function etap3(browser) {
     const przed = await page.waitForFunction(() => !!document.activeElement && document.activeElement.hasAttribute("data-kompozytor"),
       null, { timeout: 3000 }).then(() => true, () => false);
     await page.keyboard.press("Control+Comma");
-    await page.waitForSelector("[data-region=szuflada]", { timeout: 3000 });
-    const wSzufladzie = await korzen(() => document.querySelector("[data-region=szuflada]").contains(document.activeElement));
+    await page.waitForSelector("[data-region=ustawienia]", { timeout: 3000 });
+    const wSzufladzie = await korzen(() => document.querySelector("[data-region=ustawienia]").contains(document.activeElement));
     await page.keyboard.press("Tab");
-    const tab = await korzen(() => document.querySelector("[data-region=szuflada]").contains(document.activeElement));
+    const tab = await korzen(() => document.querySelector("[data-region=ustawienia]").contains(document.activeElement));
     await page.keyboard.press("Escape");
-    await page.waitForSelector("[data-region=szuflada]", { state: "detached", timeout: 3000 });
+    await page.waitForSelector("[data-region=ustawienia]", { state: "detached", timeout: 3000 });
     const fokus = await korzen(() => !!document.activeElement && document.activeElement.hasAttribute("data-kompozytor"));
     const zap = zapytaniaZ(z);
     musi(wPolu, "„/” nie przeniósł do pola wiadomości na starcie");
@@ -2324,19 +2324,19 @@ async function etap3(browser) {
       await page.click(".j-gora [aria-haspopup=menu]");
       await page.locator(".j-menu [role=menuitem]", { hasText: "Ustawienia" }).click();
     } else await page.click(".j-gora-ust");
-    const widok = () => page.getAttribute("[data-region=szuflada]", "data-widok");
-    await page.waitForSelector("[data-region=szuflada]", { timeout: 3000 });
+    const widok = () => page.getAttribute("[data-region=ustawienia]", "data-widok");
+    await page.waitForSelector("[data-region=ustawienia]", { timeout: 3000 });
     const w1 = await widok();
-    const cel = await korzen(() => Math.round(document.querySelector("[data-region=szuflada] .j-sz-p").getBoundingClientRect().height));
-    await page.locator("[data-region=szuflada] .j-sz-p").nth(1).click();
+    const cel = await korzen(() => Math.round(document.querySelector("[data-region=ustawienia] .j-sz-p").getBoundingClientRect().height));
+    await page.locator("[data-region=ustawienia] .j-sz-p").nth(1).click();
     const w2 = await widok();
-    await page.click("[data-region=szuflada] .j-sz-wroc");
+    await page.click("[data-region=ustawienia] .j-sz-wroc");
     const w3 = await widok();
     const poziomo = await korzen(() => document.documentElement.scrollWidth > innerWidth);
     // figurki w wątku zostają małe także na telefonie (awatar bez pozycji oddawał figurkę całemu dymkowi)
     const figurka = await korzen(() => Math.max(0, ...[...document.querySelectorAll(".j-os .j-awatar-f")].map((f) => Math.round(f.getBoundingClientRect().width))));
-    await page.click("[data-region=szuflada] .j-sz-gora .j-btn");
-    await page.waitForSelector("[data-region=szuflada]", { state: "detached", timeout: 3000 });
+    await page.click("[data-region=ustawienia] .j-sz-gora .j-btn");
+    await page.waitForSelector("[data-region=ustawienia]", { state: "detached", timeout: 3000 });
     await page.setViewportSize({ width: 1280, height: 800 });
     musi(ukryty === "hidden" && wysuniety === "visible", `pasek: ${ukryty} → ${wysuniety}`);
     musi(w1 === "lista" && w2 === "sekcja" && w3 === "lista", `szuflada: ${w1} → ${w2} → ${w3}`);
@@ -2434,8 +2434,8 @@ async function etap3(browser) {
       await strumieniuje();
       await spij(1500);                                  // praca.json silnika (przy każdej zmianie)
       await page.click('[data-odznaka="aktualizacja"]');
-      await page.waitForSelector('[data-region=szuflada] .j-akt [data-akcja="aktualizuj"]', { timeout: 5000 });
-      await page.click('[data-region=szuflada] .j-akt [data-akcja="aktualizuj"]');
+      await page.waitForSelector('[data-region=ustawienia] .j-akt [data-akcja="aktualizuj"]', { timeout: 5000 });
+      await page.click('[data-region=ustawienia] .j-akt [data-akcja="aktualizuj"]');
       await page.waitForSelector(".j-okno-akt", { timeout: 5000 });
       out.okno = await korzen(() => ({ n: document.querySelector(".j-okno-akt [data-praca]").dataset.praca,
         tekst: document.querySelector(".j-okno-akt [data-praca]").textContent.trim(),
@@ -2465,7 +2465,7 @@ async function etap3(browser) {
       out.prosba_po_ms = tProsba ? tProsba - tKoniec : null;
       musi(tProsba && out.prosba_po_ms >= 27000 && tresc === "update", `update-request po ${out.prosba_po_ms} ms od końca pracy (${tresc})`);
       await page.keyboard.press("Escape");
-      await page.waitForSelector("[data-region=szuflada]", { state: "detached", timeout: 5000 }).catch(() => {});
+      await page.waitForSelector("[data-region=ustawienia]", { state: "detached", timeout: 5000 }).catch(() => {});
       // nowa wersja: karta ze szkicem zostaje (pasek „Odśwież”), druga bezczynna i schowana odświeża się sama
       druga = pilnuj(await ctx.newPage());
       await druga.goto(BASE + "/jarvo");
@@ -2510,9 +2510,9 @@ async function etap3(browser) {
     await b.goto(BASE + `/jarvo#/r/${wid}`);
     await b.waitForSelector(`.j-wiersz-w[data-watek="${wid}"][aria-current=page]`, { timeout: 15000 });
     await page.keyboard.press("Control+Comma");
-    await page.waitForSelector("[data-region=szuflada]", { timeout: 5000 });
-    await page.click('[data-region=szuflada] [data-sekcja="konto"]');
-    await page.click('[data-region=szuflada] [data-akcja="wyloguj"]');
+    await page.waitForSelector("[data-region=ustawienia]", { timeout: 5000 });
+    await page.click('[data-region=ustawienia] [data-sekcja="system"]');
+    await page.click('[data-region=ustawienia] [data-akcja="wyloguj"]');
     await page.waitForURL((u) => u.pathname === "/login", { timeout: 15000 });
     await b.waitForURL((u) => u.pathname === "/login", { timeout: 15000 });
     const a = new URL(page.url()), u = new URL(b.url());

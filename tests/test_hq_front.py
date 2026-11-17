@@ -45,7 +45,7 @@ def test_nazwy_globalne_jednoznaczne():
             assert n not in gdzie, f"{n}: {f.name} i {gdzie[n]}"
             gdzie[n] = f.name
     for n in ("AppJarvo", "StaraBaza", "sklep", "Trasa", "T", "Skroty", "Motyw", "Strumien", "Czas", "Os", "akcje",
-              "Ikona", "Pasek", "Szuflada", "BladApi"):
+              "Ikona", "Pasek", "Ustawienia", "BladApi"):
         assert n in gdzie, n
 
 
@@ -82,8 +82,9 @@ def test_teksty_pl_en():
               "grupa.przypiete", "grupa.dzis", "grupa.wczoraj", "grupa.tydzien", "grupa.wczesniej",
               "motyw.system", "motyw.jasny", "motyw.ciemny"):
         assert k in klucze, k
-    sekcje = re.findall(r"\{ id: \"([a-z-]+)\", ikona:", _tekst("61-szuflada.js"))
-    assert sekcje and all(f"szuflada.{s}" in klucze for s in sekcje), sekcje
+    sekcje = re.findall(r"\{ id: \"([a-z-]+)\", ikona:", _tekst("62-ustawienia.js"))
+    assert sekcje and all(f"ust.{s}" in klucze and f"ust.{s}_opis" in klucze for s in sekcje), sekcje
+    assert set(validate.USTAWIENIA_MINIMUM) <= set(sekcje)
 
 
 def test_szablony_z_agentem_bez_odmiany():
@@ -175,7 +176,7 @@ def test_klasy_aplikacji_maja_style():
     bez_stylu = {"j-btn-zwykly", "j-awatar-z", "j-grupa"}
     braki = sorted(uzyte - zdefiniowane - bez_stylu)
     assert not braki, braki
-    assert {"j-uklad", "j-pasek", "j-glowna", "j-szuflada", "j-arkusz", "j-sr"} <= uzyte
+    assert {"j-uklad", "j-pasek", "j-glowna", "j-ust", "j-sr"} <= uzyte
 
 
 def test_przewijane_pola_bez_kontekstu_nakladania():
@@ -384,4 +385,4 @@ def test_pliki_bez_logowania_bez_adresu_file():
     strumien = _tekst("11-strumien.js")
     assert "zTokenem() ? new ZrodloFetch(url) : new EventSource(url)" in strumien
     assert "headers: authHeaders() })).status" in strumien
-    assert 'bezLogowania()\n        ? html`<${Wiersz} ikona="logout" tytul=${T("szuflada.bez_logowania")}' in _tekst("61-szuflada.js")
+    assert 'bezLogowania()\n        ? html`<${Wiersz} ikona="logout" tytul=${T("szuflada.bez_logowania")}' in _tekst("62-ustawienia.js")

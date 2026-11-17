@@ -2038,3 +2038,54 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-zdrowie-kropka { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--j-tekst-3); }
 .j-zdrowie-kropka.is-ok { background: var(--j-ok); }
 .j-zdrowie-kropka.is-przerwany { background: var(--j-uwaga); }
+
+/* === Ustawienia (UiUstawienia) === */
+/* palety Fosforu (branding/fosfor/palettes.yaml): jeden kolor --j-fosfor liczy resztę --j-*; „jarvo” = tokeny domyślne */
+.jarvo-app[data-paleta="fosfor"] { --j-fosfor: #89cff0; }
+.jarvo-app[data-paleta="fosfor-bursztyn"] { --j-fosfor: #ffb000; }
+.jarvo-app[data-paleta="fosfor-zielen"] { --j-fosfor: #41ff7a; }
+.jarvo-app[data-paleta="fosfor-biel"] { --j-fosfor: #eef3ff; }
+.jarvo-app[data-paleta^="fosfor"] {
+  color-scheme: dark; --j-font-ui: var(--j-font-mono);
+  --j-tlo: #07090a; --j-tlo-pasek: #050607; --j-tlo-karta: color-mix(in srgb, var(--j-fosfor) 5%, #07090a);
+  --j-tlo-2: color-mix(in srgb, var(--j-fosfor) 9%, #07090a); --j-tlo-3: color-mix(in srgb, var(--j-fosfor) 16%, #07090a);
+  --j-tlo-pop: color-mix(in srgb, var(--j-fosfor) 7%, #07090a);
+  --j-tlo-hover: color-mix(in srgb, var(--j-fosfor) 8%, transparent); --j-tlo-aktywne: color-mix(in srgb, var(--j-fosfor) 14%, transparent);
+  --j-linia: color-mix(in srgb, var(--j-fosfor) 14%, transparent); --j-linia-2: color-mix(in srgb, var(--j-fosfor) 24%, transparent);
+  --j-linia-mocna: color-mix(in srgb, var(--j-fosfor) 45%, transparent); --j-krawedz: color-mix(in srgb, var(--j-fosfor) 55%, #07090a);
+  --j-tekst: var(--j-fosfor); --j-tekst-2: color-mix(in srgb, var(--j-fosfor) 78%, #07090a); --j-tekst-3: color-mix(in srgb, var(--j-fosfor) 62%, #07090a);
+  --j-papier: var(--j-tlo-2); --j-papier-linia: var(--j-linia); --j-papier-tekst: var(--j-fosfor);
+  --j-akcent: var(--j-fosfor); --j-akcent-hover: color-mix(in srgb, var(--j-fosfor) 85%, #fff); --j-akcent-na: #07090a; --j-fokus: var(--j-fosfor);
+  --j-mocny: var(--j-fosfor); --j-mocny-na: #07090a;
+}
+/* @@pakiet ustawienia */
+.j-ust { display: grid; grid-template-columns: 220px minmax(0, 1fr); height: 100%; min-height: 0; }
+.j-ust .j-sz-tresc { max-width: 760px; }
+.j-ust.is-szeroka .j-sz-tresc { max-width: none; }
+.j-ust-sw { position: relative; width: 40px; height: 24px; border-radius: 12px; --j-r: 12px; background: var(--j-tlo-3); border: 1px solid var(--j-linia-2); flex: none; }
+.j-ust-sw > span { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--j-tekst-2); transition: transform .15s var(--j-ease); }
+.j-ust-sw[aria-checked="true"] { background: var(--j-akcent); border-color: var(--j-akcent); }
+.j-ust-sw[aria-checked="true"] > span { transform: translateX(16px); background: var(--j-akcent-na); }
+.j-ust-sw:disabled { opacity: .5; }
+.j-ust-kafle { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 18px; }
+.j-ust-kafel { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--j-linia-2); border-radius: 12px; background: var(--j-tlo-karta); }
+.j-ust-kafel-t { display: grid; color: inherit; text-decoration: none; }
+.j-ust-kafel-t b { font-size: 15px; font-weight: 600; }
+.j-ust-kafel-t small, .j-ust-kafel-tg { font-size: 12.5px; color: var(--j-tekst-3); }
+.j-ust-kafel.is-czeka { border-color: var(--j-uwaga-linia); }
+.j-ust-kafel-l { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13.5px; }
+.j-ust-palety button { display: inline-flex; align-items: center; gap: 8px; }
+.j-ust-palety button[aria-checked="true"], .j-wybor button[aria-pressed="true"] { border-color: var(--j-akcent); }
+.j-ust-probka { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--j-linia-mocna); }
+.j-ust .j-polecenie { margin-top: 8px; }
+@container app (max-width: 1023px) {
+  .j-ust, .j-ust.is-szeroka { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+  .j-ust[data-widok="lista"] .j-sz-glowna, .j-ust[data-widok="sekcja"] .j-sz-nav { display: none; }
+  .j-ust-kafle { grid-template-columns: minmax(0, 1fr); }
+  .j-ust-sw { width: 48px; height: 28px; border-radius: 14px; }
+  .j-ust-sw > span { width: 20px; height: 20px; }
+  .j-ust-sw[aria-checked="true"] > span { transform: translateX(20px); }
+}
+@media (prefers-reduced-motion: reduce) { .j-ust-sw > span { transition: none; } }
+/* @@pakiet rdzen */
+/* === koniec Ustawień === */
