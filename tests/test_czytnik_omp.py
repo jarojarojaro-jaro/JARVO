@@ -85,3 +85,24 @@ def test_nieznany_format(tmp_path):
     assert cz.os_sesji(q)["blad"] == "nieznany format"
     assert cz.os_sesji(tmp_path / "brak.jsonl")["blad"] == "brak pliku sesji"
     assert cz.os_sesji(None)["blad"] == "brak pliku sesji"
+
+
+def test_partia_panel_i_telegram_z_kluczami(tmp_path):
+    """Partia skrzynki: blok panelu niesie klucz (= id przebiegu), blok z Telegrama zostaje osobno (scalanie pokaże
+    go jako dymek 📱, a wiadomość panelu pokazuje jej wpis)."""
+    p = tmp_path / "2026_s2.jsonl"
+    zapisz(p, [
+        {"type": "session", "version": 3, "id": "s2", "timestamp": "t", "cwd": "/tmp"},
+        msg("u1", None, "user", [{"type": "text", "text":
+            "Wstęp.\n\n[Panel · op · 2026-11-17 12:00:00 · #p_abc123 · wiadomość 1/2]\nz panelu\n\n---\n\n"
+            "[Telegram · op · 2026-11-17 12:00:01 · wiadomość 2/2]\nz telefonu"}]),
+        msg("a1", "u1", "assistant", [{"type": "text", "text": "ok"}]),
+    ])
+    u, a = cz.os_sesji(p)["wpisy"]
+    assert u["klucze"] == ["p_abc123"] and u["tekst"] == "z panelu\n\nz telefonu"
+    assert u["bloki"] == [{"zrodlo": "panel", "tekst": "z panelu"}, {"zrodlo": "telegram", "tekst": "z telefonu"}]
+    sc = load_script("hq/plugin/scalanie.py", "jarvo_test_czytnik_omp_scalanie")
+    poz = sc.pozycje_omp({"klucz": "s:op"}, cz.os_sesji(p))
+    assert [(x["rodzaj"], x.get("zrodlo"), x["tekst"]) for x in poz] == [("wlasciciel", "telegram", "z telefonu"),
+                                                                           ("agent", None, "ok")]
+    assert poz[1]["przebieg_id"] == "p_abc123" and poz[1]["przebiegi"] == ["p_abc123"]

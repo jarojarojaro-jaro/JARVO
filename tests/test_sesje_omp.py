@@ -79,7 +79,7 @@ def test_tura_z_panelu(w, at):
     assert [z["typ"] for z in zdarzenia] == ["narzedzie", "delta", "delta", "koniec"]
     assert zdarzenia[0] == {"typ": "narzedzie", "nazwa": "bash", "intencja": "Sprawdzam GPU"}
     assert zdarzenia[-1]["ok"] is True and "SEKRET" not in plik.read_text()
-    assert tg.wyslane == [("🖥 Kernel\n\nGotowe, zrobione.", "-1001", "7")]
+    assert tg.wyslane == [("🖥 sprawdź GPU", "-1001", "7"), ("Kernel\n\nGotowe, zrobione.", "-1001", "7")]
     assert om.czytaj_stan(w)["tura"] is None and om.stan(w)["stan"] == "wolny"
 
 
