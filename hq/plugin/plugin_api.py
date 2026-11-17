@@ -2213,6 +2213,8 @@ MOZG = {"home": HOME, "flota": lambda: json.loads(FLEET_FILE.read_text(encoding=
 trasy_aplikacji.dolacz(router, m=roz, trasy=trasy_rozmow, silnik=_silnik, agenci=AGENCI, gotowosc=GOTOWOSC,
                        nawyki=NAWYKI, stan_aktualizacji=_update_state, hello=_hello, decyzje=_decyzje, glos=GLOS,
                        mozg=MOZG, dostep=lambda: siec.dostep(siec.Sciezki(core.JARVO_DIR)), log=_log_hq)
+# Mózg aplikacji (#/mozg): skarbiec Jarva i grafy z konfig/mozg.json instalacji (mozg_zrodla.py)
+_load("jarvo_hq_mozg_zrodla", "mozg_zrodla.py").dolacz(router, konfig=core.JARVO_DIR / "konfig" / "mozg.json", log=_log_hq)
 
 
 async def _zdrowie_rozmow() -> dict:

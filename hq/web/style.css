@@ -2089,3 +2089,44 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 @media (prefers-reduced-motion: reduce) { .j-ust-sw > span { transition: none; } }
 /* @@pakiet rdzen */
 /* === koniec Ustawień === */
+
+/* @@pakiet mozg */
+/* Mózg (#/mozg, hq/web/src/63-mozg.js): lista Notatek, graf na canvasie, karta notatki; telefon: graf na cały ekran,
+   lista pod przyciskiem „Notatki”, karta arkuszem od dołu */
+.j-mozg { position: relative; display: grid; grid-template-columns: minmax(220px, 280px) 1fr; grid-template-rows: auto 1fr; height: 100%; min-height: 0; background: var(--j-tlo); color: var(--j-tekst); }
+.j-mozg-gora { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid var(--j-linia); }
+.j-mozg-gora h1 { font: 600 1rem var(--j-font-mono); margin: 0 6px 0 0; letter-spacing: .04em; }
+.j-mozg-zrodla { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--j-linia-2); border-radius: var(--j-promien-2); }
+.j-mozg-zrodla button { min-height: 32px; padding: 0 10px; border: 0; border-radius: var(--j-promien-1); background: none; color: var(--j-tekst-2); font: inherit; cursor: pointer; }
+.j-mozg-zrodla button[aria-pressed="true"] { background: var(--j-tlo-aktywne); color: var(--j-tekst); }
+.j-mozg-meta { color: var(--j-tekst-3); font: .8rem var(--j-font-mono); margin: 0 0 0 auto; }
+.j-mozg-lista .j-mozg-meta { margin: 0; padding: 6px 14px; }
+.j-mozg-3d { color: var(--j-akcent); font-size: .85rem; }
+.j-mozg-lista { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--j-linia); }
+.j-mozg-lista input { margin: 10px; min-height: 36px; padding: 0 10px; border: 1px solid var(--j-linia-2); border-radius: var(--j-promien-1); background: var(--j-tlo-2); color: inherit; font: inherit; }
+.j-mozg-lista ul { list-style: none; margin: 0; padding: 0 6px 10px; overflow: auto; flex: 1; }
+.j-mozg-lista li { min-height: 36px; padding: 8px 10px; border-radius: var(--j-promien-1); cursor: pointer; font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.j-mozg-lista li.is-hub { font-weight: 600; }
+.j-mozg-lista li[aria-selected="true"] { background: var(--j-tlo-aktywne); outline: 1px solid var(--j-krawedz); }
+.j-mozg-plotno { position: relative; min-height: 0; min-width: 0; }
+.j-mozg-plotno canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+.j-mozg-stan { position: absolute; inset: 0; display: grid; place-items: center; color: var(--j-tekst-3); padding: 20px; text-align: center; }
+.j-mozg-lista-btn { min-width: 44px; min-height: 44px; border: 1px solid var(--j-linia-2); border-radius: var(--j-promien-1); background: var(--j-tlo-karta); color: var(--j-tekst); font: inherit; cursor: pointer; }
+.j-mozg-lista-btn { display: none; padding: 0 12px; }
+.j-mozg-karta { position: absolute; top: 58px; right: 12px; bottom: 12px; z-index: 2; width: min(420px, calc(100% - 24px)); overflow: auto; padding: 16px 18px; background: var(--j-tlo-karta); border: 1px solid var(--j-linia-2); border-radius: var(--j-promien-3); box-shadow: 0 12px 40px rgba(0, 0, 0, .35); }
+.j-mozg-karta:focus { outline: none; }
+.j-mozg-karta h2 { font-size: 1.05rem; margin: 0 36px 10px 0; }
+.j-mozg-karta h3 { font-size: .9rem; }
+.j-mozg-karta ul { padding-left: 18px; }
+.j-mozg-x { position: absolute; top: 6px; right: 6px; min-width: 44px; min-height: 44px; border: 0; background: none; color: var(--j-tekst-2); font-size: 1.2rem; cursor: pointer; }
+@container app (max-width: 700px) {
+  .j-mozg { grid-template-columns: 1fr; }
+  .j-mozg-lista-btn { display: inline-block; margin-left: auto; }
+  .j-mozg-meta { display: none; }
+  .j-mozg-lista, .j-mozg-plotno { grid-area: 2 / 1; }
+  .j-mozg-lista { display: none; z-index: 2; background: var(--j-tlo); border: 0; }
+  .j-mozg.is-lista .j-mozg-lista { display: flex; }
+  .j-mozg-lista .j-mozg-meta { display: block; }
+  .j-mozg-karta { top: auto; right: 0; bottom: 0; left: 0; width: auto; max-height: 70%; border-radius: var(--j-promien-3) var(--j-promien-3) 0 0; }
+}
+/* @@pakiet rdzen */

@@ -177,7 +177,9 @@ def test_odczyty_hq_bez_skutkow(monkeypatch):
         # karty pracy (karty.py): kanban.db i state.db pracowników tylko do odczytu (mode=ro)
         "/karty", "/karty/{tid}",
         # start aplikacji (trasy_aplikacji.py): USER.md, config i .env profilu Jarva tylko po nazwach, nawyki.db mode=ro
-        "/app", "/podpowiedzi"}
+        "/app", "/podpowiedzi",
+        # Mózg (mozg_zrodla.py): konfig/mozg.json i pliki grafów tylko do odczytu (wynik w pamięci procesu)
+        "/mozg/zrodla", "/mozg/{klucz}"}
     zapis = {t.path for t in _trasy(api.router) if "POST" in t.methods}
     assert "/anim/info" in zapis
 

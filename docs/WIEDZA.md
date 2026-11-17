@@ -422,12 +422,13 @@ ma obie części: `plugin.yaml` + `__init__.py` (dostawca pamięci, narzędzia, 
 `plugin_api.py`, logika `panel.py`, pakiet `dist/`).
 
 Co widać:
-- **Graf** (canvas, własny układ sił ~150 linii, bez bibliotek), z wyglądu jak graf Obsidiana: kropka = notatka podpisana
+- **Graf** (canvas, własny układ sił, bez bibliotek; wspólny `shared/web/graf.js`, ten sam co Mózg aplikacji HQ, docs/HQ.md), z wyglądu jak graf Obsidiana: kropka = notatka podpisana
   nazwą pliku, linia = link, kolor = folder, huby `_hub-…` na biało, większe, z promieniami do swoich notatek; sieroty na
   czerwono, `status: sprzeczna` z obwódką; filtr po folderze i agencie, suwak czasu (co doszło w tym tygodniu), klik otwiera
-  notatkę, podwójny klik centruje (na tle: wraca do całości), przeciąganie przestawia węzeł, najechanie podświetla sąsiadów.
-  Cienki folder widać od razu (jak radzi wzorzec). Wydajność: układ sił liczony w małych krokach na klatkę (budżet ~12 ms),
-  powyżej 800 węzłów odpychanie przez drzewo czwórkowe (Barnes-Hut), etykiety notatek dopiero po przybliżeniu (huby zawsze).
+  notatkę, przeciąganie przesuwa widok, kółko i dwa palce przybliżają; na start widok obejmuje cały graf.
+  Cienki folder widać od razu (jak radzi wzorzec). Wydajność: układ sił liczony w małych krokach na klatkę (budżet ~10 ms),
+  odpychanie przez drzewo czwórkowe (Barnes-Hut), etykiety notatek dopiero po przybliżeniu (huby zawsze), uspokojony graf
+  nie rysuje kolejnych klatek.
 - **Drzewo i notatka:** foldery jak w Obsidianie (hub folderu pod ręką), notatka renderowana z Markdown bez `innerHTML`
   (linki `[[…]]` klikalne, frontmatter jako właściwości, bloki generowane oznaczone), źródła (klikalne, gdy leżą w skarbcu),
   linki w obie strony (z zaznaczeniem list automatycznych i martwych), historia z git, „Zgłoś uwagę” (szkic do skrzynki

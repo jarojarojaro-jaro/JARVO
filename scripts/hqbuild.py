@@ -46,11 +46,19 @@ PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "ochrona.py", "e
                 # sesje omp jako rozmówcy (centrum 1d): skrzynka, stan, ogon tury; oś z pliku sesji bez wyników narzędzi
                 "omp_sesje.py", "czytnik_omp.py",
                 # rozmówcy panelu (centrum 1b): sesja tematu Telegrama, lustro panel → temat, stałe wątki i stan
-                "tematy.py", "lustro.py", "rozmowcy.py")
+                "tematy.py", "lustro.py", "rozmowcy.py",
+                # źródła Mózgu (docs/HQ.md „Mózg”): skarbiec Jarva i grafy z konfig/mozg.json
+                "mozg_zrodla.py")
+# wspólny graf wiedzy (canvas, układ sił): zakładka Wiedza i Mózg aplikacji HQ
+GRAF_WSPOLNY = fl.REPO_ROOT / "shared" / "web" / "graf.js"
 
 
-def bundle_js(src_dir: Path | None = None, naglowek: str = "Jarvo HQ: plugin dashboardu Hermesa. Plik generowany przez scripts/hqbuild.py z hq/web/src/.") -> str:
-    """Jedno IIFE z htm i plikami src/*.js (w kolejności nazw); ten sam pakowacz służy zakładce „Wiedza” (wiedza/web/src)."""
+def bundle_js(src_dir: Path | None = None, naglowek: str = "Jarvo HQ: plugin dashboardu Hermesa. Plik generowany przez scripts/hqbuild.py z hq/web/src/.",
+              wspolne: tuple[Path, ...] | None = None) -> str:
+    """Jedno IIFE z htm, plikami `wspolne` (np. shared/web/graf.js) i src/*.js (w kolejności nazw); ten sam pakowacz
+    służy zakładce „Wiedza” (wiedza/web/src). Bez `src_dir` = aplikacja HQ, która dostaje wspólny graf."""
+    if wspolne is None:
+        wspolne = () if src_dir else (GRAF_WSPOLNY,)
     src_dir = src_dir or HQ / "web" / "src"
     htm = (HQ / "web" / "vendor" / "htm.umd.js").read_text(encoding="utf-8").strip()
     parts = [
@@ -62,7 +70,7 @@ def bundle_js(src_dir: Path | None = None, naglowek: str = "Jarvo HQ: plugin das
         "return module.exports; })();",
         '"use strict";',
     ]
-    for src in sorted(src_dir.glob("*.js")):
+    for src in [*wspolne, *sorted(src_dir.glob("*.js"))]:
         parts.append(f"\n// ---- {src.name}\n" + src.read_text(encoding="utf-8"))
     parts.append("})();")
     return "\n".join(parts) + "\n"

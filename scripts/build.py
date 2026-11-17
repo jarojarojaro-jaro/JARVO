@@ -784,8 +784,10 @@ def build_wiedza_plugin(out: Path, recenzent: str | None = None) -> Path:
     import hqbuild
     dash = out / "dashboard"
     (dash / "dist").mkdir(parents=True, exist_ok=True)
+    # graf rysuje wspólny shared/web/graf.js (ten sam kod co Mózg aplikacji HQ)
     zapisz(dash / "dist" / "index.js", hqbuild.bundle_js(fl.REPO_ROOT / "wiedza" / "web" / "src",
-                                                          "Jarvo Wiedza: zakładka dashboardu Hermesa. Plik generowany przez scripts/build.py z wiedza/web/src/."))
+                                                          "Jarvo Wiedza: zakładka dashboardu Hermesa. Plik generowany przez scripts/build.py z wiedza/web/src/.",
+                                                          wspolne=(hqbuild.GRAF_WSPOLNY,)))
     shutil.copy2(fl.REPO_ROOT / "wiedza" / "web" / "style.css", dash / "dist" / "style.css")
     shutil.copy2(fl.REPO_ROOT / "hq" / "web" / "vendor" / "LICENSE-htm", dash / "dist" / "LICENSE-htm")
     # ochrona zapisu (CSRF): ten sam plik co w jarvo-hq, żeby obie wtyczki miały jedne reguły (tests/test_csrf.py)
