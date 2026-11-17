@@ -1330,6 +1330,33 @@ innych kanałów etap 6.
   specyfikacji dla etapów 3–6 to 190 KB gzip JS: przekroczony o ok. 72 KB, bo w pakiecie jest jeszcze cała Stara Baza; podział na pakiet aplikacji i Starą Bazę ładowaną na żądanie
   (etap 7) albo usuwanie komentarzy w `hqbuild.py` to zejdą.
 
+### Mózg (`#/mozg`)
+
+Graf wiedzy w aplikacji, w etapie 1 centrum dowodzenia (pakiet `mozg` ładowany dopiero po wejściu w widok):
+
+- **Kod.** `hq/web/src/63-mozg.js` (widok `MozgWidok`, lista „Notatki”, karta notatki) i wspólny graf
+  `shared/web/graf.js` (canvas, własny układ sił z drzewem czwórkowym Barnes-Hut, bez bibliotek). Ten sam `graf.js`
+  rysuje graf zakładki Wiedza (`scripts/build.py` dołącza go przez `bundle_js(..., wspolne=...)`). Style w
+  `hq/web/style.css` w bloku `/* @@pakiet mozg */`. Budżet: kod pakietu ≤ 6 KB gzip po minifikacji buildu.
+- **Źródła** (`hq/plugin/mozg_zrodla.py`): `GET /mozg/zrodla` zawsze zaczyna od skarbca Jarva (graf i notatki
+  z tras `jarvo-wiedza`: `/graph`, `/note`), dalej źródła z `<dane>/jarvo/konfig/mozg.json` instalacji:
+  `{"nazwa", "nazwa_en"?, "graf": "<plik json>", "notatka_url"?: "https://…/{id}.html", "widok_3d"?}` (jeden obiekt,
+  lista albo `{"zrodla": [...]}`). `GET /mozg/<klucz>` oddaje graf pliku w kształcie skarbca `{wezly, linki}`;
+  plik może mieć też kształt `{nodes, links}` (`source/target`, `stopien`). Ścieżka pliku nie wychodzi do
+  przeglądarki, adresy tylko http(s), plik do 16 MB, wynik w pamięci do zmiany mtime, odczyt tylko z karty panelu.
+  Bez `widok_3d` link „Widok 3D ↗” prowadzi na stronę główną serwisu z `notatka_url`.
+- **Widok.** Domyślnie skarbiec Jarva, przełącznik źródeł nad grafem (gdy jest więcej niż jedno). Lista „Notatki”:
+  szukanie bez ogonków, strzałki, Enter otwiera (combobox z `aria-activedescendant`), więc Mózg działa bez myszy
+  i z czytnikiem ekranu. Klik w węzeł albo wybór z listy otwiera kartę i centruje węzeł; Esc zamyka kartę.
+  Karta: notatka skarbca w Markdown (`TrescMd`, bez `innerHTML`), dla źródła z pliku opis i link „Otwórz notatkę ↗”;
+  pod spodem „Powiązane” (sąsiedzi w grafie).
+- **Kolory z motywu:** foldery dostają kolejno `--j-krawedz`, `--j-akcent`, `--j-tekst-3` w trzech jasnościach,
+  huby `--j-tekst`, sieroty obwódkę `--j-akcent`, zaznaczony `--j-fokus`; motyw czytany co 120 klatek.
+- **Wydajność:** układ liczony w budżecie 10 ms na klatkę, linki jedną ścieżką na styl, węzły poza ekranem
+  pominięte, etykiety tylko po przybliżeniu; uspokojony graf nie rysuje kolejnych klatek. Test w node: 1200 węzłów,
+  najdłuższa klatka < 40 ms na atrapie canvasa, graf zasypia (`tests/test_mozg_zrodla.py`).
+- **Telefon (≤ 700 px kontenera):** graf na cały ekran, lista pod przyciskiem „Notatki”, karta arkuszem od dołu,
+  dwa palce przybliżają i przesuwają.
 ## 2g. Panel w sieci (Tailscale)
 
 Instalacja natywna: panel słucha na `127.0.0.1:<port>` (domyślnie 9119) bez hasła. Żeby właściciel używał go
