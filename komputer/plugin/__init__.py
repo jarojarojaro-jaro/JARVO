@@ -51,6 +51,7 @@ NAZWA = "jarvo-komputer"
 STER = os.path.join(os.path.dirname(os.environ.get("JARVO_KOMPUTER_GNIAZDO", "/opt/jarvo/komputer/cua.sock")),
                     "ster.sock")
 GRUPA_ENV = "JARVO_KOMPUTER_GRUPA"        # grupa ekranu procesu (komputer/jarvo_cua.py, infra/komputer/wejscie.py)
+KARTA_EKRANU_ENV = "JARVO_KOMPUTER_KARTA" # karta kanbana procesu dla klucza ekranu (przeżywa scrub Hermesa)
 BEZCZYNNOSC = 300.0                       # s bez wywołania: rozmowa z wejściem się kończy (sesja i ekran wolne)
 CZASY = {"patrz": 60.0, "idz": 60.0, "czekaj": 45.0, "kroki": 150.0}   # s na odpowiedź wejścia
 DOMYSLNIE_ELEMENTOW = 150
@@ -220,11 +221,19 @@ def grupa_ekranu() -> str:
     """Klucz grupy ekranu tego procesu Hermesa, ustawiany raz w jego otoczeniu: dziedziczą go bramki, które Hermes
     uruchamia dla computer_use, więc ich sesje i sesje tej wtyczki dzielą ekran (wejście: GRUPA). Klucz z PID tego
     procesu: klucz odziedziczony po rodzicu (pracownik karty kanbana dostaje otoczenie bramy Hermesa, w której ta
-    wtyczka też działa) zastępuje nowy, inaczej wszystkie karty i rozmowy bramy byłyby dla wejścia jedną sesją."""
+    wtyczka też działa) zastępuje nowy, inaczej wszystkie karty i rozmowy bramy byłyby dla wejścia jedną sesją.
+    Obok klucza karta tego procesu (KARTA_EKRANU_ENV z HERMES_KANBAN_TASK): Hermes zdejmuje HERMES_KANBAN_* z otoczenia
+    bramki computer_use (scrub_kanban_env, 17.11), a bramka podaje kartę wejściu razem z kluczem, więc computer_use
+    i `komputer` jednej karty mają ten sam klucz ekranu."""
     przedrostek = f"p{os.getpid()}-"
     klucz = os.environ.get(GRUPA_ENV, "")
     if not klucz.startswith(przedrostek):
         klucz = os.environ[GRUPA_ENV] = przedrostek + secrets.token_hex(16)
+        karta = os.environ.get("HERMES_KANBAN_TASK", "").strip()
+        if karta:
+            os.environ[KARTA_EKRANU_ENV] = karta
+        else:
+            os.environ.pop(KARTA_EKRANU_ENV, None)         # karta rodzica nie jest kartą tego procesu
     return klucz
 
 

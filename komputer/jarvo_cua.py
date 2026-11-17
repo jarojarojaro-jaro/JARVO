@@ -23,11 +23,13 @@ potok nazwany z DACL właściciela na Windows, gniazdo 0600 na macOS i Linuksie)
 z `<stan>/komputer/usluga.json`. Manifest podaje wtedy jako polecenie MCP Pythona z tą bramką, bo Windows nie
 uruchomi pliku .py wprost.
 Przed rozmową bramka wysyła wejściu powiadomienie `notifications/jarvo/grupa` z kluczem z JARVO_KOMPUTER_GRUPA
-(ustawia go wtyczka jarvo-komputer w procesie Hermesa) i kartą kanbana pracownika (HERMES_KANBAN_TASK): computer_use
-i narzędzie `komputer` jednego procesu agenta dzielą wtedy ekran (wejście nie odmawia im sobie nawzajem `zajete`),
-sesje różnych kart nie dzielą go nigdy, a odmowa `zajete` mówi, która karta ma ekran. Natywnie jeszcze wcześniej, jako
-pierwszą wiadomość, `notifications/jarvo/karta` z kartą i tablicą (HERMES_KANBAN_TASK, HERMES_KANBAN_BOARD; ustawia
-je dispatcher Hermesa): wejście czyta z tej karty zgodę właściciela (komputer/zgoda_karty.py, docs/KOMPUTER.md §6).
+i kartą procesu z JARVO_KOMPUTER_KARTA (oba ustawia wtyczka jarvo-komputer w procesie Hermesa; bez wtyczki karta
+z HERMES_KANBAN_TASK): computer_use i narzędzie `komputer` jednego procesu agenta dzielą wtedy ekran (wejście nie
+odmawia im sobie nawzajem `zajete`), sesje różnych kart nie dzielą go nigdy, a odmowa `zajete` mówi, która karta ma
+ekran. Hermes zdejmuje HERMES_KANBAN_* z otoczenia bramki computer_use (scrub_kanban_env), więc karta do klucza
+ekranu idzie zmienną wtyczki. Natywnie jeszcze wcześniej, jako pierwszą wiadomość, `notifications/jarvo/karta`
+z kartą i tablicą (HERMES_KANBAN_TASK, HERMES_KANBAN_BOARD; ustawia je dispatcher Hermesa): wejście czyta z tej karty
+zgodę właściciela (komputer/zgoda_karty.py, docs/KOMPUTER.md §6).
 """
 
 from __future__ import annotations
@@ -51,6 +53,7 @@ KOD_ODMOWY = 64                        # EX_USAGE: czasownik zablokowany przez b
 KOD_BRAK_KOMPUTERA = 69                # EX_UNAVAILABLE
 PO_KONCU_WEJSCIA = 2.0                 # s: ostatnie odpowiedzi po zamknięciu stdin przez Hermesa (potok bez półzamknięcia)
 GRUPA_ENV = "JARVO_KOMPUTER_GRUPA"     # grupa ekranu procesu agenta (infra/komputer/wejscie.py: GRUPA)
+KARTA_EKRANU_ENV = "JARVO_KOMPUTER_KARTA"   # karta procesu agenta do klucza ekranu (wtyczka jarvo-komputer)
 KARTA_ENV, TABLICA_ENV = "HERMES_KANBAN_TASK", "HERMES_KANBAN_BOARD"   # karta pracownika kanbana (Hermes)
 
 POMOC = """cua-driver (bramka Jarvo)
@@ -141,13 +144,15 @@ def komputer_dostepny() -> bool:
 
 
 def powiadomienie_grupy() -> bytes:
-    """Wiersz MCP z grupą ekranu procesu agenta i kartą kanbana pracownika dla wejścia (pusty bez poprawnego klucza
-    w JARVO_KOMPUTER_GRUPA; karta tylko przy poprawnym numerze)."""
+    """Wiersz MCP z grupą ekranu procesu agenta i jego kartą kanbana dla wejścia (pusty bez poprawnego klucza
+    w JARVO_KOMPUTER_GRUPA; karta tylko przy poprawnym numerze). Karta z JARVO_KOMPUTER_KARTA, bo tę zmienną Hermes
+    zostawia bramce computer_use, a HERMES_KANBAN_TASK zdejmuje (17.11: computer_use karty t_8a8a79ab dostawał
+    `zajete` od jej własnego narzędzia `komputer`)."""
     grupa = os.environ.get(GRUPA_ENV, "")
     if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", grupa):
         return b""
     params = {"grupa": grupa}
-    karta = os.environ.get(KARTA_ENV, "").strip()
+    karta = (os.environ.get(KARTA_EKRANU_ENV) or os.environ.get(KARTA_ENV) or "").strip()
     if re.fullmatch(r"[A-Za-z0-9_-]{1,64}", karta):
         params["karta"] = karta
     return (json.dumps({"jsonrpc": "2.0", "method": "notifications/jarvo/grupa", "params": params}) + "\n").encode()

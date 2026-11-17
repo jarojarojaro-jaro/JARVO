@@ -696,12 +696,14 @@ class Sesja:
         self._wewn_n = 0
         self._wewn_lock = threading.Lock()
         self.grupa: str | None = None                 # grupa ekranu (GRUPA) od bramki, pierwsza wygrywa
-        self.karta: str | None = None                 # karta kanbana pracownika od bramki (GRUPA, natywnie KARTA)
+        self.karta: str | None = None                 # karta procesu agenta, tylko z GRUPA (razem z kluczem grupy)
 
     @property
     def klucz_ekranu(self):
-        """Kto ma ekran: grupa ekranu sesji z jej kartą kanbana (dwie karty nigdy nie dzielą ekranu, nawet gdy ich
-        pracownicy odziedziczyli ten sam klucz grupy) albo sama sesja."""
+        """Kto ma ekran: grupa ekranu sesji z kartą jej procesu (dwie karty nigdy nie dzielą ekranu, nawet gdy ich
+        pracownicy odziedziczyli ten sam klucz grupy) albo sama sesja. Karta tylko z GRUPA: computer_use i `komputer`
+        jednej karty wysyłają ją tak samo (JARVO_KOMPUTER_KARTA od wtyczki), a natywne KARTA (zgoda właściciela)
+        dostaje tylko bramka z HERMES_KANBAN_TASK, którego Hermes bramce computer_use nie daje."""
         return ("grupa", self.grupa, self.karta) if self.grupa else self.nr
 
     @property

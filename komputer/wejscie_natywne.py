@@ -294,9 +294,14 @@ class SesjaNatywna(wejscie.Sesja):
         karta, tablica = params.get("karta"), params.get("tablica") or "default"
         if isinstance(karta, str) and zgoda_karty.KARTA.match(karta) \
                 and isinstance(tablica, str) and zgoda_karty.TABLICA.match(tablica):
-            self.ctx.karta = (karta, tablica)
-            self.karta = karta                        # kto ma ekran (odmowa `zajete`) i klucz ekranu z grupą
+            self.ctx.karta = (karta, tablica)         # zgoda właściciela; klucz ekranu bierze kartę tylko z GRUPA
             log(f"sesja {self.nr}: karta {karta} (tablica {tablica})")
+
+    @property
+    def opis_ekranu(self) -> str:
+        if not self.karta and self.ctx.karta:         # bramka bez klucza grupy (bez wtyczki), ale z kartą
+            return f"karta {self.ctx.karta[0]}"
+        return super().opis_ekranu
 
     def do_sterownika(self, wiadomosc: dict) -> None:
         if self._pracownik is None:

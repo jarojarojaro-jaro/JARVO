@@ -169,7 +169,7 @@ def env_natywny(root: Path) -> dict:
 class Klient:
     def __init__(self, root: Path, grupa: str | None = None, karta: str | None = None, tablica: str | None = None):
         env = env_natywny(root)
-        for k in ("JARVO_KOMPUTER_GRUPA", "HERMES_KANBAN_TASK", "HERMES_KANBAN_BOARD"):
+        for k in ("JARVO_KOMPUTER_GRUPA", "JARVO_KOMPUTER_KARTA", "HERMES_KANBAN_TASK", "HERMES_KANBAN_BOARD"):
             env.pop(k, None)
         if grupa:
             env["JARVO_KOMPUTER_GRUPA"] = grupa            # grupa ekranu procesu Hermesa (wtyczka jarvo-komputer)
@@ -694,70 +694,133 @@ def test_dwie_karty_z_kluczem_bramy_nie_dziela_ekranu(usluga):
 
 
 _PRACOWNIK = """
-import importlib.util, json, os, sys
+import importlib.util, itertools, json, os, subprocess, sys
 s = importlib.util.spec_from_file_location("jarvo_komputer_pracownik", sys.argv[1])
 m = importlib.util.module_from_spec(s)
 s.loader.exec_module(m)
-m.register(type("Ctx", (), {"register_tool": lambda self, **kw: None})())
+m.register(type("Ctx", (), {"register_tool": lambda self, **kw: None})())   # Hermes ładuje wtyczki na starcie
+cu, n = None, itertools.count(1)
 for linia in sys.stdin:
-    odp = m.obsluz(json.loads(linia), session_id="rozmowa")
+    polecenie = json.loads(linia)
+    if "cu" not in polecenie:                                   # narzędzie `komputer`
+        odp = m.obsluz(polecenie, session_id="rozmowa")
+    else:                                                       # computer_use Hermesa
+        if cu is None:   # bramka przy pierwszym computer_use; otoczenie jak cua_driver_child_env + scrub_kanban_env
+            env = {k: v for k, v in os.environ.items() if k not in (
+                "HERMES_KANBAN_TASK", "HERMES_KANBAN_RUN_ID", "HERMES_KANBAN_CLAIM_LOCK",
+                "HERMES_KANBAN_GOAL_MODE", "HERMES_KANBAN_GOAL_MAX_TURNS")}
+            env.update(HERMES_DELEGATED_CHILD_CONTEXT=os.environ.get("HERMES_HOME", "/tmp"),
+                       CUA_DRIVER_RS_TELEMETRY_ENABLED="0")
+            cu = subprocess.Popen(m._wywolanie_bramki(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=env)
+        ident = next(n)
+        cu.stdin.write((json.dumps({"jsonrpc": "2.0", "id": ident, "method": "tools/call", "params": {
+            "name": polecenie["cu"], "arguments": polecenie.get("args") or {}}}) + "\\n").encode())
+        cu.stdin.flush()
+        while (msg := json.loads(cu.stdout.readline())).get("id") != ident:
+            pass
+        odp = msg.get("result") or {}
     print(json.dumps({"grupa": os.environ["JARVO_KOMPUTER_GRUPA"], "odp": odp}), flush=True)
+if cu is not None:
+    cu.stdin.close()
+    cu.wait(20)
 """
 
 
-def test_karty_w_osobnych_pracownikach_nie_steruja_ekranem_naraz(usluga, tmp_path, monkeypatch):
+@pytest.fixture
+def pracownicy(usluga, tmp_path, monkeypatch):
+    """Brama Hermesa z wtyczką (klucz grupy ekranu w jej otoczeniu) i fabryka pracowników kart: proces z kopią tego
+    otoczenia i kartą (jak _default_spawn), wtyczka ładowana na starcie, computer_use przez bramkę na żądanie."""
+    monkeypatch.delenv("JARVO_KOMPUTER_GNIAZDO", raising=False)
+    monkeypatch.setenv("JARVO_ROOT", str(usluga.root))
+    monkeypatch.setenv("JARVO_KOMPUTER_GRUPA", "do-zastapienia-przez-brame")
+    monkeypatch.setenv("JARVO_KOMPUTER_KARTA", "do-usuniecia-przez-brame")
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)         # brama nie pracuje nad kartą
+    monkeypatch.setenv("HERMES_CUA_DRIVER_CMD", str(jk.nakladka_bramki(_uklad(tmp_path), REPO, Path(sys.executable))))
+    brama = _wtyczka().grupa_ekranu()                              # brama Hermesa: wtyczka przy ładowaniu
+    assert "JARVO_KOMPUTER_KARTA" not in os.environ                 # brama nie ma karty
+    procesy: list[subprocess.Popen] = []
+
+    def pracownik(karta: str) -> subprocess.Popen:
+        env = {**os.environ, "HERMES_KANBAN_TASK": karta, "HERMES_KANBAN_BOARD": "default"}   # jak _default_spawn
+        p = subprocess.Popen([sys.executable, "-I", "-c", _PRACOWNIK, str(REPO / "komputer" / "plugin" /
+                                                                          "__init__.py")],
+                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+                             text=True, encoding="utf-8")
+        procesy.append(p)
+        return p
+
+    pracownik.brama = brama
+    yield pracownik
+    for p in procesy:
+        if p.stdin and not p.stdin.closed:
+            p.stdin.close()
+        try:
+            p.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            p.kill()
+
+
+def _do_pracownika(p: subprocess.Popen, polecenie: dict) -> dict:
+    p.stdin.write(json.dumps(polecenie) + "\n")
+    p.stdin.flush()
+    linia = p.stdout.readline()
+    assert linia, p.stderr.read()[:400]
+    return json.loads(linia)
+
+
+def test_karty_w_osobnych_pracownikach_nie_steruja_ekranem_naraz(usluga, pracownicy):
     """Incydent 16.11 od początku do końca: brama Hermesa ładuje wtyczkę (klucz grupy ekranu w jej otoczeniu),
     dispatcher kanbana daje pracownikom kart kopię tego otoczenia, każdy pracownik ma wtyczkę i bramkę. Pracownik
     karty B dostaje przy `idz`, `kroki`, `patrz` i `czekaj` odmowę z kartą A i czasem do zwolnienia, a przeglądarka
     nic od niego nie dostaje; po końcu pracownika A ekran jest wolny."""
-    monkeypatch.delenv("JARVO_KOMPUTER_GNIAZDO", raising=False)
-    monkeypatch.setenv("JARVO_ROOT", str(usluga.root))
-    monkeypatch.setenv("JARVO_KOMPUTER_GRUPA", "do-zastapienia-przez-brame")
-    monkeypatch.setenv("HERMES_CUA_DRIVER_CMD", str(jk.nakladka_bramki(_uklad(tmp_path), REPO, Path(sys.executable))))
-    brama = _wtyczka().grupa_ekranu()                              # brama Hermesa: wtyczka przy ładowaniu
+    a, b = pracownicy("t_87d11e3a"), pracownicy("t_8a2f5f5e")
+    odp_a = _do_pracownika(a, {"akcja": "idz", "adres": "https://accounts.google.com/signup"})
+    assert odp_a["odp"].startswith("ok: okno"), odp_a
+    przed = len(usluga.sterownik.wywolania)
+    for args in ({"akcja": "idz", "adres": "https://gotranscript.com/register"},
+                 {"akcja": "kroki", "kroki": [{"type_text": {"name": "E-mail", "text": "jarvo@example.com"}}]},
+                 {"akcja": "patrz"}, {"akcja": "czekaj", "tekst": "Utwórz konto"}):
+        odp_b = _do_pracownika(b, args)
+        tekst = odp_b["odp"]
+        assert tekst.startswith("BŁĄD zablokowane: Komputer Jarva: ekran ma teraz inna sesja Jarva "
+                                "(karta t_87d11e3a"), (args, tekst)
+        assert "zwolni się najpóźniej za" in tekst and "Dalej: odczekaj" in tekst, tekst
+    assert len(usluga.sterownik.wywolania) == przed
+    assert len({pracownicy.brama, odp_a["grupa"], odp_b["grupa"]}) == 3      # każdy proces ma własny klucz grupy
+    assert "„Dodaj do koszyka”" in _do_pracownika(a, {"akcja": "patrz"})["odp"]
+    a.stdin.close()
+    a.wait(timeout=30)                                            # koniec pracownika A kończy jego rozmowę
+    _czekaj_na_sesje(usluga, 1)
+    assert _do_pracownika(b, {"akcja": "idz", "adres": "https://gotranscript.com/register"})["odp"].startswith(
+        "ok: okno")
 
-    def pracownik(karta: str) -> subprocess.Popen:
-        env = {**os.environ, "HERMES_KANBAN_TASK": karta, "HERMES_KANBAN_BOARD": "default"}   # jak _default_spawn
-        return subprocess.Popen([sys.executable, "-I", "-c", _PRACOWNIK, str(REPO / "komputer" / "plugin" /
-                                                                             "__init__.py")],
-                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
-                                text=True, encoding="utf-8")
 
-    def wtyczka(p: subprocess.Popen, args: dict) -> dict:
-        p.stdin.write(json.dumps(args) + "\n")
-        p.stdin.flush()
-        linia = p.stdout.readline()
-        assert linia, p.stderr.read()[:400]
-        return json.loads(linia)
-
-    a, b = pracownik("t_87d11e3a"), pracownik("t_8a2f5f5e")
-    try:
-        odp_a = wtyczka(a, {"akcja": "idz", "adres": "https://accounts.google.com/signup"})
-        assert odp_a["odp"].startswith("ok: okno"), odp_a
-        przed = len(usluga.sterownik.wywolania)
-        for args in ({"akcja": "idz", "adres": "https://gotranscript.com/register"},
-                     {"akcja": "kroki", "kroki": [{"type_text": {"name": "E-mail", "text": "jarvo@example.com"}}]},
-                     {"akcja": "patrz"}, {"akcja": "czekaj", "tekst": "Utwórz konto"}):
-            odp_b = wtyczka(b, args)
-            tekst = odp_b["odp"]
-            assert tekst.startswith("BŁĄD zablokowane: Komputer Jarva: ekran ma teraz inna sesja Jarva "
-                                    "(karta t_87d11e3a"), (args, tekst)
-            assert "zwolni się najpóźniej za" in tekst and "Dalej: odczekaj" in tekst, tekst
-        assert len(usluga.sterownik.wywolania) == przed
-        assert len({brama, odp_a["grupa"], odp_b["grupa"]}) == 3      # każdy proces ma własny klucz grupy
-        assert "„Dodaj do koszyka”" in wtyczka(a, {"akcja": "patrz"})["odp"]
-        a.stdin.close()
-        a.wait(timeout=30)                                            # koniec pracownika A kończy jego rozmowę
-        _czekaj_na_sesje(usluga, 1)
-        assert wtyczka(b, {"akcja": "idz", "adres": "https://gotranscript.com/register"})["odp"].startswith("ok: okno")
-    finally:
-        for p in (a, b):
-            if p.stdin and not p.stdin.closed:
-                p.stdin.close()
-            try:
-                p.wait(timeout=30)
-            except subprocess.TimeoutExpired:
-                p.kill()
+def test_computer_use_i_komputer_jednej_karty_dziela_ekran(usluga, pracownicy):
+    """17.11 00:25 karta t_8a8a79ab (jeden pracownik): `komputer` idz przeszło, a computer_use tej samej karty
+    9 s później dostał `zajete` „ekran ma inna sesja (karta t_8a8a79ab)” już na list_windows. Hermes buduje otoczenie
+    bramki computer_use bez HERMES_KANBAN_* (scrub_kanban_env), więc ta sesja nie miała karty i jej klucz ekranu był
+    inny niż sesji wtyczki. Kolejność jak na żywo: wtyczka przy starcie pracownika, idz, potem pierwsze computer_use
+    (start_session, set_config, kursor, list_windows, zrzut). Inna karta dalej nie dostaje ekranu, także gdy ma go
+    computer_use, a odmowa nazywa kartę."""
+    a, b = pracownicy("t_8a8a79ab"), pracownicy("t_8a2f5f5e")
+    assert _do_pracownika(a, {"akcja": "idz", "adres": "https://www.oneforma.com/"})["odp"].startswith("ok: okno")
+    for nazwa, args in (("start_session", {}), ("set_config", {"capture_mode": "som"}),
+                        ("set_agent_cursor_enabled", {"enabled": True}), ("list_windows", {}),
+                        ("get_window_state", OKNO)):
+        w = _do_pracownika(a, {"cu": nazwa, "args": args})["odp"]
+        assert not w.get("isError"), (nazwa, w)
+    assert "„Dodaj do koszyka”" in _do_pracownika(a, {"akcja": "patrz"})["odp"]   # i z powrotem do wtyczki
+    w = _do_pracownika(b, {"cu": "list_windows"})["odp"]
+    sc = w["structuredContent"]
+    assert sc["rule"] == "zajete" and sc["held_by"] == "karta t_8a8a79ab", sc
+    assert not _do_pracownika(a, {"cu": "get_window_state", "args": OKNO})["odp"].get("isError")
+    tekst = _do_pracownika(b, {"akcja": "patrz"})["odp"]              # ekran ma computer_use karty A
+    assert tekst.startswith("BŁĄD zablokowane: Komputer Jarva: ekran ma teraz inna sesja Jarva (karta t_8a8a79ab"), \
+        tekst
+    zajete = [w for w in usluga.wejscie.dziennik.ostatnie if w.get("zasada") == "zajete"]
+    assert len(zajete) == 2 and {w["przez"] for w in zajete} == {"karta t_8a8a79ab"}
+    karty = {s.nr: s.karta for s in list(usluga.wejscie.sesje)}
+    assert sorted(karty.values()) == ["t_8a2f5f5e"] * 2 + ["t_8a8a79ab"] * 2, karty   # wtyczka i computer_use
 
 
 def test_ekran_po_ciszy_przechodzi_a_karta_wraca_od_patrzenia(usluga, monkeypatch):
@@ -811,17 +874,22 @@ def test_oddanie_ekranu_wlascicielowi_trzyma_ekran_karty(usluga, monkeypatch):
 
 def test_pracownik_karty_ma_wlasny_klucz_grupy_ekranu(monkeypatch):
     """Wtyczka trzyma klucz grupy ekranu w otoczeniu procesu, a proces potomny (pracownik karty z otoczeniem bramy
-    Hermesa) dziedziczy go razem z resztą otoczenia: tam wtyczka bierze własny klucz z PID procesu."""
+    Hermesa) dziedziczy go razem z resztą otoczenia: tam wtyczka bierze własny klucz z PID procesu, a obok kartę
+    procesu (JARVO_KOMPUTER_KARTA), którą Hermes zostawia bramce computer_use."""
     monkeypatch.setenv("JARVO_KOMPUTER_GRUPA", "g" * 32)
+    monkeypatch.setenv("JARVO_KOMPUTER_KARTA", "t_cudza")
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
     brama = _wtyczka().grupa_ekranu()
     assert brama.startswith(f"p{os.getpid()}-") and _wtyczka().grupa_ekranu() == brama
+    assert "JARVO_KOMPUTER_KARTA" not in os.environ                 # brama bez karty nie niesie cudzej
     kod = ("import importlib.util, os, sys; s = importlib.util.spec_from_file_location('w', sys.argv[1]); "
-           "m = importlib.util.module_from_spec(s); s.loader.exec_module(m); print(os.getpid(), m.grupa_ekranu())")
-    pid, pracownik = subprocess.run([sys.executable, "-I", "-c", kod, str(REPO / "komputer" / "plugin" /
-                                                                         "__init__.py")],
-                                    capture_output=True, text=True, env=dict(os.environ), timeout=30,
-                                    check=True).stdout.split()
-    assert pracownik != brama and pracownik.startswith(f"p{pid}-")
+           "m = importlib.util.module_from_spec(s); s.loader.exec_module(m); "
+           "print(os.getpid(), m.grupa_ekranu(), os.environ['JARVO_KOMPUTER_KARTA'])")
+    pid, pracownik, karta = subprocess.run([sys.executable, "-I", "-c", kod, str(REPO / "komputer" / "plugin" /
+                                                                                "__init__.py")],
+                                           capture_output=True, text=True, timeout=30, check=True,
+                                           env={**os.environ, "HERMES_KANBAN_TASK": "t_8a8a79ab"}).stdout.split()
+    assert pracownik != brama and pracownik.startswith(f"p{pid}-") and karta == "t_8a8a79ab"
     assert wejscie_natywne.wejscie.WZOR_GRUPY.match(pracownik) and os.environ["JARVO_KOMPUTER_GRUPA"] == brama
 
 

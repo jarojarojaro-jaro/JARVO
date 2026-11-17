@@ -246,9 +246,12 @@ wejścia (użytkownik `pulpit`, wznawiany przez `start.sh` po awarii, uruchamian
   obie miały ten sam klucz grupy ekranu (niżej), a patrzenie nie zajmowało ekranu.
   Wyjątek to **grupa ekranu**: wtyczka `jarvo-komputer` ustawia w procesie Hermesa losowy klucz
   `JARVO_KOMPUTER_GRUPA` z PID tego procesu (`p<pid>-…`), który dziedziczą bramki `computer_use` tego procesu, a bramka
-  podaje go wejściu powiadomieniem `notifications/jarvo/grupa` przed rozmową, razem z kartą pracownika
-  (`HERMES_KANBAN_TASK`). Sesje z tym samym kluczem i tą samą kartą (narzędzie `komputer` i `computer_use` jednej
-  sesji Jarva) liczą się jak jedna, więc zrzut przez `computer_use` po krokach wtyczki nie czeka 120 s. Pracownik
+  podaje go wejściu powiadomieniem `notifications/jarvo/grupa` przed rozmową, razem z kartą procesu
+  (`JARVO_KOMPUTER_KARTA`, którą wtyczka ustawia obok klucza z `HERMES_KANBAN_TASK`; Hermes zdejmuje
+  `HERMES_KANBAN_*` z otoczenia bramki `computer_use`, a tę zmienną zostawia). Sesje z tym samym kluczem i tą samą
+  kartą (narzędzie `komputer` i `computer_use` jednej sesji Jarva) liczą się jak jedna, więc zrzut przez
+  `computer_use` po krokach wtyczki nie czeka 120 s (17.11 karta t_8a8a79ab: `computer_use` bez karty dostawał
+  `zajete` od własnego `komputer`). Pracownik
   karty kanbana dostaje od dispatchera kopię otoczenia bramy Hermesa, a w nim klucz bramy: wtyczka zastępuje klucz
   z cudzym PID własnym, a wejście i tak nie łączy sesji różnych kart. To nie jest granica bezpieczeństwa: każde
   działanie i tak oceniają twarde zasady. Dwie rozmowy w jednym procesie bramy Hermesa dzielą ekran.
