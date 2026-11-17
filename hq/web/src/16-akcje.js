@@ -30,7 +30,19 @@ const akcje = {
   ustawAgentow(lista) {
     const agenci = {};
     (lista || []).forEach((a, i) => { agenci[a.name] = { barwa: i % 10, ...a }; });
-    sklep.ustaw({ agenci, kolejnosc: (lista || []).map((a) => a.name) });
+    sklep.ustaw((s) => ({ ...s, agenci: Os.agenciRozmowcow(agenci, s.rozmowcy), kolejnosc: (lista || []).map((a) => a.name) }));
+  },
+  // rozmówcy lewej kolumny (GET /app, PATCH); stan i liczniki potem już tylko ze strumienia (15-os.js)
+  ustawRozmowcow(lista) {
+    sklep.ustaw((s) => ({ ...s, rozmowcy: lista || [], agenci: Os.agenciRozmowcow(s.agenci, lista || []) }));
+  },
+  async zmienRozmowce(klucz, zmiana) {
+    try {
+      const r = await api.rozmowcy.zmien(klucz, zmiana);
+      if (r && r.rozmowca) sklep.ustaw((s) => ({ ...s, rozmowcy: s.rozmowcy.map((x) => (x.klucz === klucz ? r.rozmowca : x)) }));
+    } catch (e) {
+      Komunikaty.pokaz(e.tekst ? e.tekst() : String(e), { rodzaj: "blad" });
+    }
   },
 
   // pierwsza sesja (docs/HQ.md „Pierwsze spotkanie”): serwer zakłada ją raz na instalację; tu jedno żądanie naraz,
@@ -59,9 +71,11 @@ const akcje = {
       const a = await api.aplikacja();
       akcje._appProba = 0;
       if (a.katalog_danych) Sciezki.ustaw(a.katalog_danych);      // ścieżki floty w tekście (07-sciezki.js)
+      akcje.ustawRozmowcow(a.rozmowcy);
       akcje.ustawAgentow(a.agenci);
       sklep.ustaw({ wlasciciel: a.wlasciciel || null, gotowosc: a.gotowosc || null, aktualizacja: a.aktualizacja || null,
-        decyzje: { liczba: a.decyzje || 0 }, funkcje: a.funkcje || {}, wersja: a.wersja || null, blad_aplikacji: false });
+        decyzje: { liczba: a.decyzje || 0 }, funkcje: a.funkcje || {}, wersja: a.wersja || null, blad_aplikacji: false,
+        dostep: a.dostep || null });
     } catch (e) {
       if (e.status === 401) return;
       if (e.status !== 404) {

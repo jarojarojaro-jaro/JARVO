@@ -318,6 +318,11 @@ Object.assign(liveApi, {
     kopiuj: (profil, id) => zadanie("POST", `/sesje/${kodujUrl(profil)}/${kodujUrl(id)}/kopiuj`, {}),
   },
   efekty: { lista: (p) => zadanie("GET", `/efekty${zapytanieUrl(p)}`) },
+  // rozmówcy (centrum §1): lista ze stanem i PATCH lustra albo kolejności (jedyna trasa zapisu Ustawień)
+  rozmowcy: {
+    lista: () => zadanie("GET", "/rozmowcy"),
+    zmien: (klucz, zmiana) => zadanie("PATCH", `/rozmowcy/${kodujUrl(klucz)}`, zmiana),   // {lustro?, kolejnosc?}
+  },
   aplikacja: () => zadanie("GET", "/app"),
   agenci: () => zadanie("GET", "/agenci"),
   flotaAgenci: () => zadanie("GET", "/fleet"),

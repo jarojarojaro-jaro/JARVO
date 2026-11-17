@@ -53,21 +53,29 @@ function AkcjeWiadomosci({ tekst, agent, watek, koordynator }) {
 const OBRAZ_DATA = /^data:image\/(png|jpeg|gif|webp);base64,/;
 
 // ------------------------------------------------------------------------------------------------- właściciel
-function WiadomoscWlasciciela({ x, k }) {
+// odznaka źródła w rozmowie z rozmówcą (centrum §2.1): 📱 Telegram, ⌨ terminal, 🖥 panel (wpis i wiadomość w drodze)
+const ZRODLA = { telegram: "📱", terminal: "⌨", panel: "🖥" };
+function Zrodlo({ zrodlo, ts }) {
+  const z = ZRODLA[zrodlo] ? zrodlo : "panel";
+  return html`<span class="j-zrodlo" data-zrodlo=${z}><span aria-hidden="true">${ZRODLA[z]} </span>${T(`zrodlo.${z}`)}${ts ? ` · ${Czas.godzina(ts)}` : ""}</span>`;
+}
+
+function WiadomoscWlasciciela({ x, k, rozmowca }) {
   const o = x.oczekuje, w = x.wpis || {};
   const adresaci = (o ? o.adresaci : w.adresaci) || [];
-  const bezposrednio = o ? adresaci.length > 0 : x.tryb === "bezposrednio";
+  const bezposrednio = !rozmowca && (o ? adresaci.length > 0 : x.tryb === "bezposrednio");
   // zapisany wpis: załączniki z /upload (path, name, size, kind) i obrazy z wiadomości (path); bez powtórek ścieżek
   const pliki = o ? o.pliki || [] : [...new Map((x.pliki || [])
     .concat((w.zalaczniki || []).filter((z) => z && z.path).map((z) => ({ ...fileFromPath(z.path), ...z })))
     .concat((w.obrazy || []).filter((b) => b && b.path).map((b) => ({ ...fileFromPath(b.path), size: b.size })))
     .map((p) => [p.path, p])).values()];
   const obrazy = o ? (o.obrazy || []).filter((b) => OBRAZ_DATA.test(b.dane || "")) : [];
-  return html`<article class="j-msg j-msg-ja" data-wpis=${o ? undefined : x.id}>
+  return html`<article class="j-msg j-msg-ja" data-wpis=${o ? undefined : x.id} data-zrodlo=${rozmowca ? x.zrodlo || "panel" : undefined}>
     <h3 class="j-sr">${T("os.ty")}, ${Czas.godzina(x.ts)}</h3>
     ${bezposrednio && adresaci.length > 0 && html`<p class="j-msg-tag"><${Ikona} n="turn" r=${14}/>
       <span>${T("msg.bezposrednio")} · ${adresaci.map(nazwaAgenta).join(", ")}</span></p>`}
-    ${x.tekst && html`<div class=${cx("j-babel", o && o.stan === "blad" && "is-blad")} title=${czasPelny(x.ts)}>${x.tekst}</div>`}
+    ${x.tekst && html`<div class=${cx("j-babel", o && o.stan === "blad" && "is-blad")} title=${czasPelny(x.ts)}>
+      ${rozmowca && html`<${Zrodlo} zrodlo=${x.zrodlo} ts=${x.ts}/>`}${x.tekst}</div>`}
     ${(obrazy.length > 0 || pliki.length > 0) && html`<div class="j-msg-pliki">
       ${obrazy.map((b, i) => html`<img key=${i} class="j-zal-obraz" src=${b.dane} alt=${b.nazwa || ""}/>`)}
       ${pliki.map((p) => html`<${KartaPliku} key=${p.path} plik=${p} kompakt=${true}/>`)}</div>`}
@@ -93,18 +101,52 @@ function StanWysylki({ o, k }) {
 }
 
 // ------------------------------------------------------------------------------------------------- agent
-function WiadomoscAgenta({ x, ctx, ostatniaPrzebiegu }) {
+// „[[czeka-na-tak]]” (centrum §6): rozmówca z potwierdzeniami kończy plan tym znacznikiem. Znacznik nie trafia do
+// widoku; pod ostatnią taką odpowiedzią bez odpowiedzi właściciela stoją „Tak, wykonaj” i „Nie” (zwykła wiadomość
+// „tak”/„nie”, wykonanie przychodzi w następnej turze), a po odpowiedzi jedna spokojna linia z nią.
+const ZNACZNIK_TAK = "[[czeka-na-tak]]";
+const bezZnacznika = (t) => (t && t.includes(ZNACZNIK_TAK) ? t.split(ZNACZNIK_TAK).join("").trim() : t);
+const czekaNaTak = (x) => !!(x && (x.czeka_na_tak || String(x.tekst || "").includes(ZNACZNIK_TAK)
+  || (x.przebieg && String(x.przebieg.tekst || "").includes(ZNACZNIK_TAK))));
+
+function TakNie({ tak, ctx }) {
+  const [wysyla, setWysyla] = useState(false);
+  if (tak !== "czeka") {
+    return html`<p class="j-tak-po" data-tak-po=""><${Ikona} n="check" r=${14}/><span>${T("tak.odpowiedziano", { tekst: tak })}</span></p>`;
+  }
+  const odpowiedz = async (tekst) => {
+    setWysyla(true);
+    try { await akcje.wyslij({ watek: ctx.watek, tekst, koordynator: ctx.koordynator }); } finally { setWysyla(false); }
+  };
+  return html`<div class="j-tak" role="group" aria-label=${T("tak.etykieta")}>
+    <p class="j-tak-t">${T("tak.tytul")}</p>
+    <div class="j-tak-b">
+      <${Przycisk} rodzaj="mocny" ikona="check" disabled=${wysyla} data-tak="tak" onClick=${() => odpowiedz("tak")}>${T("tak.tak")}</${Przycisk}>
+      <${Przycisk} disabled=${wysyla} data-tak="nie" onClick=${() => odpowiedz("nie")}>${T("tak.nie")}</${Przycisk}>
+    </div></div>`;
+}
+
+// lustro do Telegrama nie doszło (lustro.py: 3 próby): znacznik pod odpowiedzią
+function LustroNie({ pid }) {
+  const nie = useSklep((s) => !!(s.przebiegi[pid] && s.przebiegi[pid].lustro_nie));
+  return nie ? html`<p class="j-msg-meta is-lustro" role="note"><span aria-hidden="true">📱</span><span>${T("lustro.nie_doszlo")}</span></p>` : null;
+}
+
+function WiadomoscAgenta({ x, ctx, ostatniaPrzebiegu, tak }) {
   const pomin = useMemo(() => new Set((x.pliki || []).map((p) => p.path)), [x.pliki]);
-  const bezposrednio = x.tryb === "bezposrednio" && x.agent !== ctx.koordynator;
+  const bezposrednio = x.tryb === "bezposrednio" && x.agent !== ctx.koordynator && !ctx.rozmowca;
+  const tekst = bezZnacznika(x.tekst);
   return html`<article class="j-msg j-msg-ag" data-pozycja=${x.id} data-agent=${x.agent}>
     <h3 class="j-sr">${nazwaAgenta(x.agent)}, ${Czas.godzina(x.ts)}</h3>
     <${NaglowekAgenta} agent=${x.agent} ts=${x.ts} bezposrednio=${bezposrednio}/>
     ${x.kroki && x.kroki.length > 0 && html`<${Kroki} kroki=${x.kroki} szczegoly=${ctx.szczegoly}/>`}
-    <${TrescMd} tekst=${x.tekst} pomin=${pomin} klasa="j-msg-t"/>
+    <${TrescMd} tekst=${tekst} pomin=${pomin} klasa="j-msg-t"/>
     ${x.pliki && x.pliki.length > 0 && html`<div class="j-pliki">${x.pliki.map((p) => html`<${KartaPliku} key=${p.path} plik=${p}/>`)}</div>`}
+    ${tak && html`<${TakNie} tak=${tak} ctx=${ctx}/>`}
     ${ostatniaPrzebiegu && x.przebieg_id && html`<${ZgodaPoKoncu} pid=${x.przebieg_id} ctx=${ctx}/>`}
+    ${ostatniaPrzebiegu && x.przebieg_id && ctx.rozmowca && html`<${LustroNie} pid=${x.przebieg_id}/>`}
     ${x.zatrzymany && html`<${MetaPrzebiegu} p=${x.zatrzymany}/>`}
-    <${AkcjeWiadomosci} tekst=${x.tekst} agent=${x.agent} watek=${ctx.watek} koordynator=${ctx.koordynator}/>
+    <${AkcjeWiadomosci} tekst=${tekst} agent=${ctx.rozmowca ? null : x.agent} watek=${ctx.watek} koordynator=${ctx.koordynator}/>
   </article>`;
 }
 
@@ -232,7 +274,7 @@ function BladPrzebiegu({ p }) {
     <p class="j-blad-t"><${Ikona} n="alert" r=${16}/><span>${tekst}</span></p>
     <${SzczegolyBledu} tekst=${b.szczegoly}/>
     <div class="j-blad-b">
-      ${kl.sekcja && html`<${Przycisk} maly onClick=${() => Trasa.idz({ u: kl.sekcja, pod: kl.pod }, { scal: true })}>
+      ${kl.sekcja && html`<${Przycisk} maly onClick=${() => Trasa.idz({ widok: "ustawienia", sekcja: kl.sekcja, pod: kl.pod })}>
         ${T(kl.pod === "klucze" ? "blad.otworz_klucze" : "blad.otworz_modele")}</${Przycisk}>`}
       <${Przycisk} maly rodzaj="mocny" ikona="repeat" onClick=${() => akcje.ponow(p.id)}>${T("przebieg.ponow")}</${Przycisk}>
     </div></div>`;
@@ -272,7 +314,7 @@ function ZywyDymek({ p, ctx }) {
     <h3 class="j-sr">${nazwaAgenta(p.agent)}, ${Czas.godzina(od)}</h3>
     <${NaglowekAgenta} agent=${p.agent} ts=${od} bezposrednio=${bezposrednio}/>
     ${p.kroki && p.kroki.length > 0 && html`<${Kroki} kroki=${p.kroki} szczegoly=${ctx.szczegoly} zywe=${trwa}/>`}
-    ${p.tekst ? html`<${TrescMd} tekst=${p.tekst} zywy=${trwa} klasa="j-msg-t"/>`
+    ${p.tekst ? html`<${TrescMd} tekst=${bezZnacznika(p.tekst)} zywy=${trwa} klasa="j-msg-t"/>`
       : trwa && !zgoda && p.stan !== "kolejka" ? html`<${Pisze}/>` : null}
     ${zgoda && html`<${Zgoda} key=${z.request_id} p=${p}/>`}
     ${wygasla && html`<${ZgodaWygasla} p=${p} z=${wygasla} ctx=${ctx}/>`}
@@ -318,10 +360,10 @@ function BladTury({ x }) {
 
 // jedna pozycja osi (widok z Os.widok): rodzaj → komponent. React.memo: długa rozmowa nie renderuje się cała przy
 // każdym zdarzeniu strumienia, tylko pozycje, których dane się zmieniły (Os.widok zachowuje obiekty bez zmian)
-const ElementOsi = React.memo(function ElementOsiW({ x, ctx, ostatniaPrzebiegu }) {
+const ElementOsi = React.memo(function ElementOsiW({ x, ctx, ostatniaPrzebiegu, tak }) {
   switch (x.rodzaj) {
-    case "wlasciciel": return html`<${WiadomoscWlasciciela} x=${x} k=${ctx.k}/>`;
-    case "agent": return html`<${WiadomoscAgenta} x=${x} ctx=${ctx} ostatniaPrzebiegu=${ostatniaPrzebiegu}/>`;
+    case "wlasciciel": return html`<${WiadomoscWlasciciela} x=${x} k=${ctx.k} rozmowca=${ctx.rozmowca}/>`;
+    case "agent": return html`<${WiadomoscAgenta} x=${x} ctx=${ctx} ostatniaPrzebiegu=${ostatniaPrzebiegu} tak=${tak}/>`;
     case "zywy": return html`<${ZywyDymek} p=${x.przebieg} ctx=${ctx}/>`;
     case "kroki": return html`<div class="j-msg-kroki"><${Kroki} kroki=${x.kroki || []} szczegoly=${ctx.szczegoly}/></div>`;
     case "obca": return html`<${WiadomoscObca} x=${x}/>`;

@@ -1,13 +1,15 @@
 // Trasy w aplikacji (docs/HQ.md „Aplikacja”): ścieżka dashboardu to dokładnie /jarvo, więc widok niesie hash.
 //   #/                     start          #/nowa/<agent>             nowa rozmowa, pierwsza wiadomość do agenta
+//   #/o/<rozmówca>         stała rozmowa z rozmówcą (klucz f:<profil> albo s:<wpis>, centrum §4)
 //   #/r/<watek>            wątek          #/r/<watek>/m/<pozycja>    wątek przewinięty do pozycji
 //   #/s/<profil>/<sesja>   obca sesja (tylko odczyt)
-//   …?u=<sekcja>[/<pod>]   szuflada ustawień      …?n=<narzędzie>&p=<ścieżka>   narzędzie na pełny ekran
+//   #/mozg                 Mózg Jarva (pakiet „mozg” na żądanie)
+//   #/ustawienia[/<sekcja>[/<pod>]]   strona Ustawień      …?n=<narzędzie>&p=<ścieżka>   narzędzie na pełny ekran
 // parsuj/zbuduj są czyste (testy node); reszta dotyka location i sessionStorage.
 
 const Trasa = (() => {
   const WATEK = /^w_[0-9a-f]{21}$/, PROFIL = /^[a-z0-9-]{1,64}$/, SESJA = /^[A-Za-z0-9_.:-]{1,128}$/;
-  const POZYCJA = /^[A-Za-z0-9_:.-]{1,200}$/, SEKCJA = /^[a-z0-9-]{1,32}$/;
+  const POZYCJA = /^[A-Za-z0-9_:.-]{1,200}$/, SEKCJA = /^[a-z0-9-]{1,32}$/, ROZMOWCA = /^[fs]:[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
   const NARZEDZIA = ["edytor", "animacja", "konwerter", "wiedza"];
   const KLUCZ_PO_LOGOWANIU = "jarvo.po_logowaniu";
   const dekoduj = (s) => { try { return decodeURIComponent(s); } catch (_) { return ""; } };
@@ -20,12 +22,16 @@ const Trasa = (() => {
     let t = { widok: "start" };
     const [a, b, c, d] = cz;
     if (a === "nowa" && PROFIL.test(b || "")) t = { widok: "nowa", agent: b };
+    else if (a === "o" && ROZMOWCA.test(b || "")) t = { widok: "rozmowca", rozmowca: b };
     else if (a === "r" && WATEK.test(b || "")) {
       t = { widok: "watek", watek: b };
       if (c === "m" && POZYCJA.test(d || "")) t.pozycja = d;
     } else if (a === "s" && PROFIL.test(b || "") && SESJA.test(c || "")) t = { widok: "sesja", profil: b, sesja: c };
-    const [s, pod] = (q.get("u") || "").split("/");
-    if (SEKCJA.test(s || "")) { t.u = s; if (SEKCJA.test(pod || "")) t.pod = pod; }
+    else if (a === "mozg" && !b) t = { widok: "mozg" };
+    else if (a === "ustawienia") {
+      t = { widok: "ustawienia" };
+      if (SEKCJA.test(b || "")) { t.sekcja = b; if (SEKCJA.test(c || "")) t.pod = c; }
+    }
     const n = q.get("n");
     if (NARZEDZIA.includes(n)) { t.n = n; if (q.get("p")) t.p = q.get("p"); }
     return t;
@@ -36,10 +42,12 @@ const Trasa = (() => {
     const e = encodeURIComponent;
     let s = "#/";
     if (t.widok === "nowa" && t.agent) s += `nowa/${e(t.agent)}`;
+    else if (t.widok === "rozmowca" && t.rozmowca) s += `o/${e(t.rozmowca).replace(/%3A/g, ":")}`;
     else if (t.widok === "watek" && t.watek) s += `r/${e(t.watek)}` + (t.pozycja ? `/m/${e(t.pozycja)}` : "");
     else if (t.widok === "sesja" && t.profil && t.sesja) s += `s/${e(t.profil)}/${e(t.sesja)}`;
+    else if (t.widok === "mozg") s += "mozg";
+    else if (t.widok === "ustawienia") s += "ustawienia" + (t.sekcja ? `/${e(t.sekcja)}${t.pod ? "/" + e(t.pod) : ""}` : "");
     const q = [];
-    if (t.u) q.push(`u=${e(t.u)}${t.pod ? "/" + e(t.pod) : ""}`);
     if (t.n) { q.push(`n=${e(t.n)}`); if (t.p) q.push(`p=${e(t.p)}`); }
     return q.length ? `${s}?${q.join("&")}` : s;
   }
@@ -67,7 +75,7 @@ const Trasa = (() => {
   function zapamietaj() {
     try { sessionStorage.setItem(KLUCZ_PO_LOGOWANIU, location.hash || ""); } catch (_) { /* tryb prywatny */ }
   }
-  // Hermes przy wczytaniu strony dopisuje ?profile= i gubi hash, więc link prosto do wątku albo szuflady
+  // Hermes przy wczytaniu strony dopisuje ?profile= i gubi hash, więc link prosto do wątku albo Ustawień
   // (/jarvo#/r/…) otwierałby start. Pierwszy widok dokumentu bierze hash z adresu wczytania (Navigation Timing),
   // tylko gdy dokument wczytano na /jarvo; kolejne wejścia na /jarvo w tym samym dokumencie już nie.
   let startDokumentu = true;

@@ -52,6 +52,8 @@ function useMedia(q) {
 
 // pasek boczny wysuwany (poniżej 1024 px, jak w style.css)
 const useWaskiEkran = () => useMedia("(max-width: 1023.98px)");
+// telefon (< 640 px, centrum §2.2): lista rozmówców jako pierwszy ekran, rozmowa z „←” i paskiem rozmówców na dole
+const useTelefon = () => useMedia("(max-width: 639.98px)");
 
 // ruch: „gładko” tylko, gdy system nie prosi o ograniczenie animacji
 const Ruch = { zachowanie: () => (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth") };

@@ -1,8 +1,8 @@
-// Aplikacja Jarvo (wersja 2, docs/HQ.md „Aplikacja”): jeden czat na pierwszym planie, rozmowy po lewej, ustawienia
-// w szufladzie z prawej, ekran startu w 38-start.js. Korzeń ma data-jarvo-korzen i leży nad całym dashboardem
-// (position: fixed); na <html> stawia data-jarvo-app (powłoka Hermesa znika, reszta strony dostaje inert) i po
-// pierwszym widoku data-jarvo-gotowe (zasłona startowa znika). Widoki z trasy (03-trasa.js): start, nowa, wątek,
-// sesja; szuflada z ?u=.
+// Aplikacja Jarvo (wersja 2, docs/HQ.md „Aplikacja”): jeden czat na pierwszym planie, rozmówcy i rozmowy po lewej,
+// Ustawienia jako strona (62-ustawienia.js), ekran startu w 38-start.js. Korzeń ma data-jarvo-korzen i leży nad całym
+// dashboardem (position: fixed); na <html> stawia data-jarvo-app (powłoka Hermesa znika, reszta strony dostaje inert)
+// i po pierwszym widoku data-jarvo-gotowe (zasłona startowa znika). Widoki z trasy (03-trasa.js): start, nowa,
+// rozmówca, wątek, sesja, Mózg (pakiet na żądanie), Ustawienia (pakiet na żądanie).
 
 // ---- paski stanu nad wszystkim (spec §13.12): „Łączę ponownie…” (strumień przerwany od 5 s; pisać można dalej),
 // aktualizacja w toku (neutralnie, bez czerwieni), awaria silnika, nieudane wczytanie aplikacji z ponowieniem,
@@ -129,16 +129,19 @@ function Gora({ trasa }) {
   const wWatku = trasa.widok === "watek";
   const tytul = wWatku ? (watek && watek.tytul) || T("watek.bez_tytulu") : "";
   // nagłówek h1 tylko w wątku (na starcie jest h1 powitania); tabIndex -1: tu wraca fokus po zmianie nazwy
-  return html`<header class=${cx("j-gora", wWatku && "is-watek")}>
-    <${Przycisk} rodzaj="cichy" ikona="menu" etykieta=${T("pasek.pokaz")} klasa="j-menu-btn" aria-expanded=${String(!!otwarty)}
-      aria-controls="jarvo-pasek" onClick=${() => sklep.zmien("pasek", (p) => ({ ...p, otwarty: true, zwiniety: false }))}/>
+  const telefon = useTelefon();
+  return html`<header class=${cx("j-gora", (wWatku || trasa.rozmowca) && "is-watek", trasa.rozmowca && "is-rozmowca")}>
+    ${!(trasa.rozmowca && telefon) && html`<${Przycisk} rodzaj="cichy" ikona="menu" etykieta=${T("pasek.pokaz")} klasa="j-menu-btn"
+      aria-expanded=${String(!!otwarty)} aria-controls="jarvo-pasek"
+      onClick=${() => sklep.zmien("pasek", (p) => ({ ...p, otwarty: true, zwiniety: false }))}/>`}
+    ${trasa.rozmowca && html`<${NaglowekRozmowcy} klucz=${trasa.rozmowca} wstecz=${telefon}/>`}
     ${wWatku && watek && edycja ? html`<${EdycjaTytulu} watek=${watek} onKoniec=${() => setEdycja(false)} klasa="j-gora-pole" fokusPo=".j-gora-t"/>`
       : tytul ? html`<h1 class="j-gora-t" tabIndex="-1" onDoubleClick=${() => watek && !watek.usuniety_at && setEdycja(true)}>${tytul}</h1>` : null}
     ${wWatku && watek && watek.usuniety_at && html`<span class="j-tag">${T("watek.w_koszu_tag")}</span>`}
     <span class="j-rozpych"></span>
     ${wWatku && watek && html`<${MenuWatku} watek=${watek} onZmienNazwe=${() => setEdycja(true)}/>`}
-    <${Przycisk} rodzaj="cichy" ikona="gear" etykieta=${T("pasek.ustawienia")} klasa="j-gora-ust"
-      onClick=${() => Trasa.idz({ u: "ustawienia", pod: undefined }, { scal: true })}/>
+    ${trasa.widok !== "ustawienia" && html`<${Przycisk} rodzaj="cichy" ikona="gear" etykieta=${T("pasek.ustawienia")} klasa="j-gora-ust"
+      onClick=${() => Trasa.idz({ widok: "ustawienia" })}/>`}
   </header>`;
 }
 
@@ -167,8 +170,14 @@ function useSkrotyAplikacji() {
       Skroty.dodaj({ komb: "Mod+Shift+O", opis: "skroty.nowa", akcja: () => Trasa.idz({ widok: "start" }) }),
       Skroty.dodaj({ komb: "Mod+Shift+S", opis: "skroty.pasek", akcja: () => sklep.zmien("pasek", (p) => (window.innerWidth < 1024
         ? { ...p, otwarty: !p.otwarty } : { ...p, zwiniety: !p.zwiniety })) }),
-      Skroty.dodaj({ komb: "Mod+,", opis: "skroty.ustawienia", akcja: () => Trasa.idz({ u: "ustawienia", pod: undefined }, { scal: true }) }),
-      Skroty.dodaj({ komb: "Mod+/", opis: "skroty.pomoc", akcja: () => Trasa.idz({ u: "konto", pod: undefined }, { scal: true }) }),
+      Skroty.dodaj({ komb: "Mod+,", opis: "skroty.ustawienia", akcja: () => Trasa.idz({ widok: "ustawienia" }) }),
+      Skroty.dodaj({ komb: "Mod+/", opis: "skroty.pomoc", akcja: () => Trasa.idz({ widok: "ustawienia", sekcja: "system" }) }),
+      // rozmówcy w stałej kolejności (centrum D7) i Mózg; działają też przy pisaniu
+      ...[1, 2, 3, 4].map((n) => Skroty.dodaj({ komb: `Mod+${n}`, opis: `skroty.rozmowca_${n}`, wPolu: true, akcja: () => {
+        const r = sklep.stan().rozmowcy[n - 1];
+        if (r) { Fokus.odloz("kompozytor"); Trasa.idz({ widok: "rozmowca", rozmowca: r.klucz }); }
+      } })),
+      Skroty.dodaj({ komb: "Mod+M", opis: "skroty.mozg", akcja: () => Trasa.idz({ widok: "mozg" }) }),
       Skroty.dodaj({ komb: "Alt+ArrowUp", opis: "skroty.poprzedni", akcja: () => doWatku(-1) }),
       Skroty.dodaj({ komb: "Alt+ArrowDown", opis: "skroty.nastepny", akcja: () => doWatku(1) }),
       Skroty.dodaj({ komb: "F6", opis: "skroty.region", wPolu: true, akcja: () => przejdzRegion(false) }),
@@ -195,6 +204,26 @@ function AppJarvo() {
   return jezyk === "laduje" ? null : html`<${AplikacjaJarvo}/>`;
 }
 
+// rozmowa z rozmówcą (#/o/<klucz>): jego stały wątek; przed GET /app spinner, nieznany klucz = komunikat
+function WidokRozmowcy({ klucz }) {
+  const r = useSklep((s) => s.rozmowcy.find((x) => x.klucz === klucz) || null);
+  const wczytane = useSklep((s) => s.gotowosc !== null || s.wersja !== null);
+  if (!r) {
+    return wczytane ? html`<${Pusto} ikona="alert" tytul=${T("rozm.brak")}><a class="j-link" href="#/">${T("watek.do_startu")}</a></${Pusto}>`
+      : html`<p class="j-pasek-pusto"><${Spinner}/></p>`;
+  }
+  return html`<${Watek} key=${r.watek_id} id=${r.watek_id} rozmowca=${r.klucz}/>`;
+}
+
+// Mózg Jarva (#/mozg): pakiet „mozg” (63-mozg.js, MozgWidok) dopiero po wejściu w widok
+function WidokMozgu() {
+  const st = usePakiet("mozg");
+  const Mozg = st === "ok" ? Zasoby.wez("MozgWidok") : null;
+  if (Mozg) return html`<${Mozg}/>`;
+  if (st === "laduje") return html`<p class="j-pasek-pusto"><${Spinner}/></p>`;
+  return html`<${Pusto} ikona="spark" tytul=${T(st === "blad" ? "blad.ogolny" : "rozm.mozg_brak")}/>`;
+}
+
 function AplikacjaJarvo() {
   const trasa = useTrasa();
   const motyw = useMotyw(useSklep((s) => s.ustawienia.motyw));
@@ -207,6 +236,9 @@ function AplikacjaJarvo() {
   useSkrotyAplikacji();
   useNowaWersja();
   useStanAktualizacji();
+  usePowiadomieniaRozmowcow();
+  const telefon = useTelefon();
+  const saRozmowcy = useSklep((s) => s.rozmowcy.length > 0);
 
   React.useLayoutEffect(() => {
     const d = document.documentElement;
@@ -250,29 +282,43 @@ function AplikacjaJarvo() {
     }
   }, [polaczony]);
 
-  // przejście w inne miejsce zamyka wysunięty pasek (telefon); ostatni wątek zostaje w pamięci przeglądarki
+  // przejście w inne miejsce zamyka wysunięty pasek (telefon); ostatni wątek i rozmówca zostają w pamięci przeglądarki
   useEffect(() => {
     sklep.zmien("pasek", { otwarty: false });
     if (trasa.watek) Pamiec.daj("jarvo.ostatni_watek", trasa.watek);
-  }, [trasa.widok, trasa.watek]);
+    if (trasa.rozmowca) Pamiec.daj("jarvo.ostatni_rozmowca", trasa.rozmowca);
+  }, [trasa.widok, trasa.watek, trasa.rozmowca]);
 
-  // gotowość (karta na starcie): świeża po zamknięciu szuflady (model mógł zostać połączony) i co 10 s, dopóki brama
+  // pierwsze wejście bez adresu (#/) na komputerze: ostatni rozmówca, domyślnie pierwszy (centrum §3.3); telefon
+  // zaczyna od listy rozmówców, a „Nowa rozmowa” (#/) dalej otwiera ekran startu
+  const startowy = useRef(!location.hash || location.hash === "#/" || location.hash === "#");
+  useEffect(() => {
+    if (!saRozmowcy || !startowy.current) return;
+    startowy.current = false;
+    if (telefon || Trasa.biezaca().widok !== "start") return;
+    const lista = sklep.stan().rozmowcy, ost = Pamiec.wez("jarvo.ostatni_rozmowca", null);
+    const r = lista.find((x) => x.klucz === ost) || lista[0];
+    Trasa.idz({ widok: "rozmowca", rozmowca: r.klucz }, { zastap: true });
+  }, [saRozmowcy]);
+
+  // gotowość (karta na starcie): świeża po wyjściu z Ustawień (model mógł zostać połączony) i co 10 s, dopóki brama
   // nie odpowiada
   const brama = useSklep((s) => (s.gotowosc && s.gotowosc.brama) || null);
-  const bylaSzuflada = useRef(false);
+  const wUstawieniach = trasa.widok === "ustawienia";
+  const bylyUstawienia = useRef(false);
   useEffect(() => {
-    if (bylaSzuflada.current && !trasa.u) akcje.wczytajAplikacje();
-    bylaSzuflada.current = !!trasa.u;
-  }, [trasa.u]);
+    if (bylyUstawienia.current && !wUstawieniach) akcje.wczytajAplikacje();
+    bylyUstawienia.current = wUstawieniach;
+  }, [wUstawieniach]);
   useEffect(() => {
     if (!brama || brama === "ok") return undefined;
     const t = setInterval(() => akcje.wczytajAplikacje(), 10000);
     return () => clearInterval(t);
   }, [brama]);
 
-  // pod warstwą (szuflada, Stara Baza) układ jest nieaktywny: Tab i czytnik zostają w warstwie. Efekt układu, bo
-  // zamykana warstwa oddaje fokus w swoim sprzątaniu (efekt zwykły), a do elementu z inert fokus nie wróci.
-  const warstwa = !!trasa.u || staraBaza;
+  // pod warstwą (Stara Baza) układ jest nieaktywny: Tab i czytnik zostają w warstwie. Efekt układu, bo zamykana
+  // warstwa oddaje fokus w swoim sprzątaniu (efekt zwykły), a do elementu z inert fokus nie wróci.
+  const warstwa = staraBaza;
   React.useLayoutEffect(() => { Bezwladnosc.warstwa(warstwa); }, [warstwa]);
   // wysunięty pasek na telefonie jest warstwą: treść obok nieaktywna, Esc zamyka, fokus wraca do przycisku menu
   const pasekWarstwa = useWaskiEkran() && pasek.otwarty;
@@ -286,30 +332,35 @@ function AplikacjaJarvo() {
   }, []);
 
   // pierwsze spotkanie na całym ekranie: same pytania, bez paska rozmów i górnej belki
-  if (trasa.widok !== "watek" && trasa.widok !== "sesja" && (poznanie === "trwa" || poznanie === "mozg" || poznanieOtwarte(got))) {
+  if (!["watek", "sesja", "ustawienia", "rozmowca"].includes(trasa.widok) && (poznanie === "trwa" || poznanie === "mozg" || poznanieOtwarte(got))) {
     return html`<div class="jarvo-app" data-jarvo-korzen="" data-motyw=${motyw} lang=${isPL() ? "pl" : "en"} ref=${korzen}>
       <main class="j-poz-ekran" data-region="glowna" tabIndex="-1" aria-label=${T("poz.etykieta")}>
         <${Leniwy} pakiet="poznajmy" nazwa="Poznajmy" key=${poznanie === "mozg" ? "mozg" : "poz"} poczatek=${poznanie === "mozg" ? "mozg" : "witaj"}
           koniec=${() => sklep.ustaw({ poznanie: null })}/>
       </main>
-      ${trasa.u && html`<${Leniwy} pakiet="ustawienia" nazwa="Szuflada" trasa=${trasa}/>`}
       <${Pasy}/>
       <${Toasty}/>
     </div>`;
   }
-  const widok = trasa.widok === "watek" ? html`<${Watek} key=${trasa.watek} id=${trasa.watek}/>`
-    : trasa.widok === "sesja" ? html`<${Pusto} ikona="msg" tytul=${T("sesja.wkrotce")}/>`
-      : html`<${EkranStartu} key=${trasa.agent || "start"} agent=${trasa.widok === "nowa" ? trasa.agent : null}/>`;
+  const zastepczy = html`<p class="j-pasek-pusto"><${Spinner}/></p>`;
+  let widok;
+  if (trasa.widok === "watek") widok = html`<${Watek} key=${trasa.watek} id=${trasa.watek}/>`;
+  else if (trasa.widok === "rozmowca") widok = html`<${WidokRozmowcy} klucz=${trasa.rozmowca}/>`;
+  else if (trasa.widok === "sesja") widok = html`<${Pusto} ikona="msg" tytul=${T("sesja.wkrotce")}/>`;
+  else if (trasa.widok === "mozg") widok = html`<${WidokMozgu}/>`;
+  else if (trasa.widok === "ustawienia") widok = html`<${Leniwy} pakiet="ustawienia" nazwa="Ustawienia" trasa=${trasa} zastepczy=${zastepczy}/>`;
+  else if (trasa.widok === "start" && telefon && saRozmowcy) widok = html`<${EkranRozmowcow}/>`;
+  else widok = html`<${EkranStartu} key=${trasa.agent || "start"} agent=${trasa.widok === "nowa" ? trasa.agent : null}/>`;
   return html`<div class="jarvo-app" data-jarvo-korzen="" data-motyw=${motyw} lang=${isPL() ? "pl" : "en"} ref=${korzen}>
     <div class=${cx("j-uklad", pasek.zwiniety && "is-zwiniety", pasek.otwarty && "is-wysuniety")} ref=${uklad}>
       <${Pasek} trasa=${trasa} warstwa=${pasekWarstwa}/>
       <div class="j-zaslona-paska" onClick=${() => sklep.zmien("pasek", { otwarty: false })}></div>
-      <main class="j-glowna" data-region="glowna" tabIndex="-1" aria-label=${T("glowna.etykieta")}>
+      <main class=${cx("j-glowna", `is-${trasa.widok}`)} data-region="glowna" tabIndex="-1" aria-label=${T("glowna.etykieta")}>
         <${Gora} trasa=${trasa}/>
         ${widok}
+        ${telefon && trasa.widok === "rozmowca" && html`<${DokRozmowcow} trasa=${trasa}/>`}
       </main>
     </div>
-    ${trasa.u && html`<${Leniwy} pakiet="ustawienia" nazwa="Szuflada" trasa=${trasa}/>`}
     ${staraBaza && html`<${OknoStarejBazy}/>`}
     <${PodgladPliku}/>
     <${OknoPytania}/>

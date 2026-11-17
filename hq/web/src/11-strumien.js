@@ -97,7 +97,9 @@ const Strumien = (() => {
   const ZDARZENIA = ["hello", "reset", "kursor", "watek.zmiana", "watek.usuniety", "watek.wpis", "watek.os", "przebieg.stan",
     "przebieg.delta", "przebieg.komentarz", "przebieg.mysl", "przebieg.narzedzie", "przebieg.podagent", "przebieg.zgoda",
     "przebieg.koniec", "przebieg.nadzor", "karta.zmiana", "decyzje.zmiana", "flota.stan", "lista.zmiana", "sesja.os",
-    "misje.zmiana", "aktualizacja", "agenci.zmiana", "efekty.zmiana"];
+    "misje.zmiana", "aktualizacja", "agenci.zmiana", "efekty.zmiana",
+    // centrum: stan rozmówcy co 2 s bez odpytywania (pracuje, czeka, terminal, kolejka…), lista i lustro do Telegrama
+    "rozmowca.stan", "rozmowcy.lista", "przebieg.lustro"];
   const CISZA_MS = 30000, PRZERWA_MS = 5000, PONOW_S = [1, 2, 4, 8, 15];
   // karta, która zniknęła bez „zegnaj” (zamrożona, zabita), wypada z sumy: karty co 20 s powtarzają „sub”,
   // a wpis starszy niż 60 s nie liczy się do subskrypcji lidera

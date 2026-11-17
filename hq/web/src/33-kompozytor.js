@@ -110,13 +110,16 @@ function PasekNaZywo({ przebiegi, watek }) {
   const zatrzymaj = async () => { setStop(true); try { await akcje.zatrzymaj(watek); } finally { setStop(false); } };
   return html`<div class="j-zywo" role="group" aria-label=${T("zywo.etykieta")}>
     <${Awatar} agent=${sklep.stan().agenci[p.agent] || { name: p.agent }} r=${20}/>
-    <span class="j-zywo-t"><b>${nazwaAgenta(p.agent)}</b> ${T(`przebieg.${p.stan}`)}${przebiegi.length > 1 ? ` · ${T("zywo.i_inni", { n: przebiegi.length - 1 })}` : ""}</span>
+    <span class="j-zywo-t"><b>${nazwaAgenta(p.agent)}</b> ${stanPracy(p)}${przebiegi.length > 1 ? ` · ${T("zywo.i_inni", { n: przebiegi.length - 1 })}` : ""}</span>
     ${od ? html`<span class="j-zywo-c" aria-hidden="true">${Czas.trwanie(teraz - od)}</span>` : null}
     <span class="j-rozpych"></span>
     <${Przycisk} maly rodzaj="cichy" ikona="stop" disabled=${zatrzymuje} onClick=${zatrzymaj} podpowiedz=${T("zywo.esc")}>
       ${T(zatrzymuje ? "zywo.zatrzymuje" : "zywo.zatrzymaj")}</${Przycisk}>
   </div>`;
 }
+// wiadomość do sesji omp czeka w skrzynce (przyjęta, powód terminal albo kolejka): „w terminalu” zamiast „Przyjęte”
+const stanPracy = (p) => (p.stan === "przyjety" && (p.powod === "terminal" || p.powod === "kolejka")
+  ? T(p.powod === "terminal" ? "zywo.terminal" : "zywo.kolejka") : T(`przebieg.${p.stan}`));
 
 // ------------------------------------------------------------------------------------------------- kompozytor
 function Kompozytor({ watek = null, panel = 0, koordynator = "jarvo", start = false }) {

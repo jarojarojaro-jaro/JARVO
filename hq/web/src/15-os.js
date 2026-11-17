@@ -149,9 +149,33 @@ const Os = (() => {
     return { ...przebiegi, [p.id]: n };
   }
 
+  // ------------------------------------------------------------------------------------------- rozmówcy
+  // Rozmówcy omp nie są agentami floty: do mapy agentów trafiają pod kluczem (`s:<wpis>`), żeby nazwa, figurka
+  // i żywy dymek przebiegu (agent = klucz) wyglądały jak u agentów Hermesa. Kolejność floty bez zmian.
+  function agenciRozmowcow(agenci, rozmowcy) {
+    const out = {};
+    for (const [k, a] of Object.entries(agenci || {})) if (!a._rozmowca) out[k] = a;
+    for (const r of rozmowcy || []) {
+      if (r.zaplecze !== "omp" || out[r.klucz]) continue;
+      out[r.klucz] = { name: r.klucz, handle: "", nazwa: r.nazwa, nazwa_en: r.nazwa_en, opis: r.opis, pokoj: r.pokoj || "",
+        rodzaj: "rozmowca", stan: "aktywny", _rozmowca: true };
+    }
+    return out;
+  }
+  const rozmowcaWatku = (rozmowcy, wid) => (rozmowcy || []).find((r) => r.watek_id === wid) || null;
+  function rozmowcyZmiana(rozmowcy, klucz, zmiana) {
+    let jest = false;
+    const out = (rozmowcy || []).map((r) => { if (r.klucz !== klucz) return r; jest = true; return { ...r, ...zmiana }; });
+    return jest ? out : rozmowcy;
+  }
+
   // ------------------------------------------------------------------------------------------- zdarzenie → stan
   function zastosujZdarzenie(s, typ, d, kursor) {
     if (!d) return s;
+    if (typ === "przebieg.lustro") {             // lustro do Telegrama nie doszło: znacznik pod odpowiedzią
+      const p = s.przebiegi[d.przebieg_id];
+      return p ? { ...s, przebiegi: { ...s.przebiegi, [p.id]: { ...p, lustro_nie: d.stan === "nie_doszlo" } } } : s;
+    }
     if (typ.startsWith("przebieg.")) {
       const przebiegi = przebieg(s.przebiegi, typ, d, kursor);
       return przebiegi === s.przebiegi ? s : { ...s, przebiegi };
@@ -161,12 +185,28 @@ const Os = (() => {
         const w = d.watek;
         if (!w || !w.id) return s;
         const watki = s.watki[w.id] ? { ...s.watki, [w.id]: { ...s.watki[w.id], ...w } } : s.watki;
+        const r = rozmowcaWatku(s.rozmowcy, w.id);
+        if (r) {                                   // wątek rozmówcy: licznik i podgląd w lewej kolumnie, nie w liście
+          const zm = {};
+          for (const k of ["nieprzeczytane", "podglad", "aktywnosc_at"]) if (k in w) zm[k] = w[k];
+          return { ...s, watki, rozmowcy: rozmowcyZmiana(s.rozmowcy, r.klucz, zm) };
+        }
         return { ...s, lista: listaZmiana(s.lista, w), watki };
       }
       case "watek.usuniety": return { ...s, lista: listaUsun(s.lista, d.id) };
       case "watek.wpis": {
         const os = s.os[d.watek_id];
         return os && d.wpis ? { ...s, os: { ...s.os, [d.watek_id]: osWpis(os, d.wpis) } } : s;
+      }
+      case "rozmowca.stan": {
+        const zm = {};
+        for (const k of ["stan", "stan_od", "czeka", "powod", "terminal_od"]) if (k in d) zm[k] = d[k];
+        const rozmowcy = rozmowcyZmiana(s.rozmowcy, d.klucz, zm);
+        return rozmowcy === s.rozmowcy ? s : { ...s, rozmowcy };
+      }
+      case "rozmowcy.lista": {
+        const rozmowcy = d.rozmowcy || [];
+        return { ...s, rozmowcy, agenci: agenciRozmowcow(s.agenci, rozmowcy) };
       }
       case "hello": return { ...s, wersja: d.wersja || s.wersja, silnik: d.silnik || s.silnik };
       case "aktualizacja": return { ...s, aktualizacja: d };
@@ -323,15 +363,15 @@ const Os = (() => {
   // błąd przebiegu → co pokazać: brak klucza i model prowadzą do Połączeń, reszta do „Ponów”
   function klasaBledu(blad) {
     const kod = (blad && blad.kod) || "";
-    if (kod === "klucz") return { rodzaj: "klucz", sekcja: "polaczenia", pod: "klucze", ponow: false };
-    if (kod === "model") return { rodzaj: "model", sekcja: "polaczenia", pod: "modele", ponow: true };
+    if (kod === "klucz") return { rodzaj: "klucz", sekcja: "model", pod: "klucze", ponow: false };
+    if (kod === "model") return { rodzaj: "model", sekcja: "model", pod: "modele", ponow: true };
     if (kod === "brama_niedostepna" || kod === "limit_bramy") return { rodzaj: "brama", ponow: true };
     return { rodzaj: "inny", ponow: true };
   }
 
   return { KONCOWE, PONOWIALNE, DO_ZATRZYMANIA, porownaj, FILTRY, listaStrona, listaZmiana, listaUsun, osStrona, osWpis,
     zWpisu, zMigawki, przebieg, dodajPrzebiegi, scalPrzebieg, zastosujZdarzenie, widok, kartyWatku, noweOdTad, ryzyko,
-    wyboryZgody, krokiPodsumowanie, doZatrzymania, klasaBledu };
+    wyboryZgody, krokiPodsumowanie, doZatrzymania, klasaBledu, agenciRozmowcow, rozmowcaWatku };
 })();
 
 // ------------------------------------------------------------------------------------------------- kompozytor

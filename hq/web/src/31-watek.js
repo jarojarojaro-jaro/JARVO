@@ -22,7 +22,7 @@ function useOgloszenia() {
   return [tekst, oglos];
 }
 
-function Watek({ id, panel = 0 }) {
+function Watek({ id, panel = 0, rozmowca = null }) {
   const watek = useSklep((s) => s.watki[id] || (s.lista.wg_klucza[`w:${id}`] || {}).watek || null);
   const os = useSklep((s) => s.os[id]);
   const przebiegi = useSklep((s) => Object.values(s.przebiegi).filter((p) => p.watek_id === id), plytko);
@@ -80,6 +80,18 @@ function Watek({ id, panel = 0 }) {
   const ostatnie = useMemo(() => {
     const m = {};
     for (const x of pozycje) if (x.rodzaj === "agent" && x.przebieg_id) m[x.przebieg_id] = x.id;
+    return m;
+  }, [pozycje]);
+  // „[[czeka-na-tak]]”: ostatnia odpowiedź z planem bez odpowiedzi właściciela = przyciski Tak/Nie; odpowiedziana =
+  // linia z odpowiedzią (pierwszy dymek właściciela po niej)
+  const tak = useMemo(() => {
+    const m = {};
+    let pyta = null;
+    for (const x of pozycje) {
+      if (x.rodzaj === "agent" || x.rodzaj === "zywy") pyta = czekaNaTak(x) && x.rodzaj === "agent" ? x.id : null;
+      else if (x.rodzaj === "wlasciciel" && pyta) { m[pyta] = String(x.tekst || "").slice(0, 40); pyta = null; }
+    }
+    if (pyta) m[pyta] = "czeka";
     return m;
   }, [pozycje]);
   stanOsi.current = os;
@@ -167,7 +179,7 @@ function Watek({ id, panel = 0 }) {
   }
   // ctx stały między renderami (ElementOsi jest memo): nowy tylko przy zmianie wątku, ustawień albo języka
   const pl = isPL();
-  const ctx = useMemo(() => ({ watek: id, k: id, koordynator, szczegoly, panel, pl }), [id, koordynator, szczegoly, panel, pl]);
+  const ctx = useMemo(() => ({ watek: id, k: id, koordynator, szczegoly, panel, pl, rozmowca }), [id, koordynator, szczegoly, panel, pl, rozmowca]);
   const wKoszu = !!(watek && watek.usuniety_at);
   return html`<div class=${cx("j-watek", nad && "is-nad")} onDragOver=${(e) => { if (zPlikami(e)) { e.preventDefault(); setNad(true); } }}
       onDragLeave=${(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setNad(false); }} onDrop=${upusc}>
@@ -180,18 +192,42 @@ function Watek({ id, panel = 0 }) {
         ${os && !pozycje.length && html`<p class="j-os-pusto">${T("watek.pusty")}</p>`}
         ${pozycje.map((x) => html`<${React.Fragment} key=${x.id}>
           ${granica && granica === x.id && html`<div class="j-nowe" role="separator"><span>${T("watek.nowe_od_tad")}</span></div>`}
-          <${ElementOsi} x=${x} ctx=${ctx} ostatniaPrzebiegu=${ostatnie[x.przebieg_id] === x.id}/></${React.Fragment}>`)}
+          <${ElementOsi} x=${x} ctx=${ctx} ostatniaPrzebiegu=${ostatnie[x.przebieg_id] === x.id} tak=${tak[x.id]}/></${React.Fragment}>`)}
       </div>
     </div>
     ${pokazDol && html`<button type="button" class="j-dodolu" onClick=${() => naDol(true)} aria-label=${T("watek.na_dol")}>
       <${Ikona} n="down" r=${18}/></button>`}
     <p class="j-sr" aria-live="polite" aria-atomic="true">${ogloszenie}</p>
     <div class="j-dok">
+      ${rozmowca && html`<${BanerRozmowcy} klucz=${rozmowca}/>`}
       ${wKoszu ? html`<div class="j-kosz-uwaga"><${Ikona} n="trash" r=${16}/><span>${T("watek.w_koszu_opis")}</span>
           <${Przycisk} maly onClick=${() => akcje.przywroc(id)}>${T("watek.przywroc")}</${Przycisk}></div>`
         : html`<${Kompozytor} key=${id} watek=${id} panel=${panel} koordynator=${koordynator}/>`}
     </div>
   </div>`;
+}
+
+// pasek nad kompozytorem w rozmowie z rozmówcą: sesja w terminalu, kolejka w skrzynce albo rozmówca niedostępny
+// (centrum §6: „nigdy ciche czekanie”; po 2 min jedno powiadomienie przeglądarki z 30-pasek.js)
+function BanerRozmowcy({ klucz }) {
+  const r = useSklep((s) => s.rozmowcy.find((x) => x.klucz === klucz));
+  if (!r || !["terminal", "kolejka", "offline"].includes(r.stan)) return null;
+  const tekst = r.stan === "offline" ? T("rozm.baner_offline", { powod: r.powod || T("rozm.offline") })
+    : T(r.stan === "terminal" ? "rozm.baner_terminal" : "rozm.baner_kolejka", { n: r.czeka || 0 });
+  return html`<div class=${cx("j-baner-rozm", `is-${r.stan}`)} role="status">
+    <b>${linijkaStanu(r, { podglad: false })}</b><span>${tekst}</span></div>`;
+}
+
+// nagłówek rozmowy z rozmówcą: figurka ze stanem, nazwa, opis i stan, „jedna historia” (panel, Telegram, terminal)
+function NaglowekRozmowcy({ klucz, wstecz }) {
+  const r = useSklep((s) => s.rozmowcy.find((x) => x.klucz === klucz));
+  if (!r) return null;
+  const opis = (!isPL() && r.opis_en) || r.opis;
+  return html`${wstecz && html`<a class="j-wstecz" href="#/" aria-label=${T("rozm.wroc")}><${Ikona} n="back" r=${20}/></a>`}
+    <${AwatarRozmowcy} r=${r} rozmiar=${32}/>
+    <div class="j-gora-rozm"><h1 class="j-gora-t" tabIndex="-1">${nazwaRozmowcy(r)}</h1>
+      <p class="j-gora-opis">${[opis, linijkaStanu(r, { podglad: false })].filter(Boolean).join(" · ")}</p></div>
+    <span class="j-wspolna" title=${T("rozm.wspolna_opis")}>${r.temat ? "📱 " : ""}${r.zaplecze === "omp" ? "⌨ " : ""}🖥<span class="j-wspolna-t"> ${T("rozm.wspolna")}</span></span>`;
 }
 
 // ------------------------------------------------------------------------------------------------- nagłówek wątku
@@ -223,7 +259,7 @@ function MenuWatku({ watek, onZmienNazwe }) {
   // wąski ekran: koło zębate z nagłówka wątku jest tutaj (mniej ikon w nagłówku telefonu)
   if (window.innerWidth < 1024) {
     pozycje.push({ oddzielnik: true }, { id: "ustawienia", ikona: "gear", tekst: T("pasek.ustawienia"),
-      akcja: () => Trasa.idz({ u: "ustawienia", pod: undefined }, { scal: true }) });
+      akcja: () => Trasa.idz({ widok: "ustawienia" }) });
   }
   pozycje.splice(watek.usuniety_at ? 0 : 2, 0,
     { id: "szczegoly", ikona: "spark", tekst: T(szczegoly ? "watek.prosty" : "watek.szczegoly"),

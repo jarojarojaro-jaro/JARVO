@@ -32,13 +32,17 @@ function utworzSklep(poczatek) {
   return sklep;
 }
 
-const USTAWIENIA_DOMYSLNE = { motyw: "system", szczegoly: false, gestosc: "wygodna", dzwiek: false, powiadomienia: false,
+// powiadomienia przeglądarki domyślnie włączone (centrum D9): „czeka na Ciebie” i koniec długiej pracy rozmówcy
+const USTAWIENIA_DOMYSLNE = { motyw: "system", szczegoly: false, gestosc: "wygodna", dzwiek: false, powiadomienia: true,
   zapytano_o_powiadomienia: false };
 
 function stanPoczatkowy() {
   return {
     gotowe: false, wersja: null, silnik: null,
     agenci: {}, kolejnosc: [], wlasciciel: null, gotowosc: null,
+    rozmowcy: [],      // rozmówcy lewej kolumny (GET /app, rozmowcy.lista, rozmowca.stan) w stałej kolejności
+    inne_otwarte: !!Pamiec.wez("jarvo.inne_rozmowy", false),   // „Inne rozmowy” rozwinięte (przy rozmówcach)
+    dostep: null,      // panel w sieci (GET /app, Ustawienia › Dostęp)
     // lista wątków (docelowo jednolita lista §10.8): klucz „w:<id>” → {typ: "watek", watek}
     lista: { porzadek: [], wg_klucza: {}, filtr: "rozmowy", q: "", dalej: null, laduje: false, blad: null, wczytana: false },
     adresaci: {},      // "<panel>:<wątek|nowa>" → agent na jedną wiadomość (wybór w kompozytorze)
@@ -72,6 +76,7 @@ const sklep = utworzSklep(stanPoczatkowy());
     if (s.ustawienia !== byl.ustawienia) Pamiec.daj("jarvo.ustawienia.v1", s.ustawienia);
     if (s.podzial !== byl.podzial) Pamiec.daj("jarvo.podzial.v1", s.podzial);
     if (s.pasek.zwiniety !== byl.pasek.zwiniety) Pamiec.daj("jarvo.pasek_zwiniety", s.pasek.zwiniety || null);
+    if (s.inne_otwarte !== byl.inne_otwarte) Pamiec.daj("jarvo.inne_rozmowy", s.inne_otwarte || null);
     if (s.szkice !== byl.szkice) {
       clearTimeout(czasSzkicow);
       czasSzkicow = setTimeout(() => Pamiec.daj("jarvo.szkice.v1", sklep.stan().szkice), 500);

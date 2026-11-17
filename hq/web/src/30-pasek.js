@@ -108,25 +108,160 @@ function OdznakaAktualizacji({ otworz }) {
     <${Podpowiedz} tekst=${opis}/></button>`;
 }
 
+// ------------------------------------------------------------------------------------------------- rozmówcy
+// Sekcja ROZMÓWCY (centrum §1, §2.1): stała kolejność z konfiguracji, wiersz = figurka z kropką stanu, nazwa, skrót
+// ⌘1–⌘4 albo licznik nieprzeczytanych i linia „znak + słowo stanu · podgląd” (kropka i słowo: czytnik ekranu,
+// daltonizm). Lista to role=listbox: strzałki, Home/End, Enter; jeden wiersz w kolejności Tab (aktywny albo pierwszy).
+const ZNAKI_STANU = { pracuje: "●", czeka: "◐", wolny: "○", terminal: "⌨", kolejka: "◷", offline: "⊘" };
+const nazwaRozmowcy = (r) => (r ? (!isPL() && r.nazwa_en) || r.nazwa || r.klucz : "");
+const agentRozmowcy = (r) => (r.zaplecze === "omp" ? r.klucz : r.cel);
+const stanRozmowcy = (r) => (ZNAKI_STANU[r && r.stan] ? r.stan : "offline");
+function slowoStanu(r) {
+  const st = stanRozmowcy(r);
+  return st === "kolejka" ? T("rozm.kolejka", { n: Math.max(1, r.czeka || 0) }) : T(`rozm.${st}`);
+}
+function linijkaStanu(r, { podglad = true } = {}) {
+  const st = stanRozmowcy(r);
+  const cz = [`${ZNAKI_STANU[st]} ${slowoStanu(r)}`];
+  if (st === "terminal" && r.czeka > 0) cz.push(T("rozm.czeka_n", { n: r.czeka }));
+  if (st === "offline" && r.powod) cz.push(r.powod);
+  else if (podglad && r.podglad) cz.push(r.podglad);
+  return cz.join(" · ");
+}
+
+function AwatarRozmowcy({ r, rozmiar = 34 }) {
+  const a = useSklep((s) => s.agenci[agentRozmowcy(r)]);
+  return html`<span class="j-rozm-av"><${Awatar} agent=${a || { name: agentRozmowcy(r) }} r=${rozmiar}/>
+    <i class=${`j-rk is-${stanRozmowcy(r)}`} aria-hidden="true"></i></span>`;
+}
+
+const otworzRozmowce = (r, fokus = true) => {
+  if (fokus) Fokus.odloz("kompozytor");
+  Trasa.idz({ widok: "rozmowca", rozmowca: r.klucz });
+};
+
+function ListaRozmowcow({ trasa, duza = false }) {
+  const rozmowcy = useSklep((s) => s.rozmowcy);
+  const ref = useRef(null);
+  if (!rozmowcy.length) return null;
+  const aktywny = rozmowcy.findIndex((r) => r.klucz === trasa.rozmowca);
+  const wTabie = aktywny < 0 ? 0 : aktywny;
+  const klawisz = (e) => {
+    const el = [...ref.current.querySelectorAll('[role="option"]')];
+    const i = el.indexOf(document.activeElement);
+    let j = null;
+    if (e.key === "ArrowDown") j = Math.min(el.length - 1, i + 1);
+    else if (e.key === "ArrowUp") j = Math.max(0, i - 1);
+    else if (e.key === "Home") j = 0;
+    else if (e.key === "End") j = el.length - 1;
+    else if ((e.key === "Enter" || e.key === " ") && i >= 0) { e.preventDefault(); otworzRozmowce(rozmowcy[i]); return; }
+    if (j == null) return;
+    e.preventDefault();
+    el[j].focus();
+  };
+  return html`<ul class=${cx("j-rozmowcy", duza && "is-duza")} role="listbox" aria-label=${T("rozm.sekcja")} ref=${ref} onKeyDown=${klawisz}>
+    ${rozmowcy.map((r, i) => {
+      const st = stanRozmowcy(r), n = r.nieprzeczytane || 0;
+      const opis = [nazwaRozmowcy(r), slowoStanu(r), n > 0 ? T("watek.nieprzeczytane", { n }) : ""].filter(Boolean).join(", ");
+      return html`<li key=${r.klucz} role="option" class=${cx("j-rozm", i === aktywny && "is-aktywny", `is-${st}`)}
+          aria-selected=${String(i === aktywny)} tabIndex=${i === wTabie ? "0" : "-1"} aria-label=${opis}
+          data-rozmowca=${r.klucz} onClick=${() => otworzRozmowce(r)}>
+        <${AwatarRozmowcy} r=${r} rozmiar=${duza ? 40 : 34}/>
+        <span class="j-rozm-n">${nazwaRozmowcy(r)}</span>
+        ${n > 0 ? html`<span class="j-rozm-licz" aria-hidden="true">${n > 99 ? "99+" : n}</span>`
+          : i < 4 && !duza ? html`<kbd class="j-rozm-skrot" aria-hidden="true">${Skroty.opis(`Mod+${i + 1}`)}</kbd>` : html`<span></span>`}
+        <span class="j-rozm-st" aria-hidden="true">${linijkaStanu(r)}</span>
+      </li>`;
+    })}
+  </ul>`;
+}
+
+// Mózg i Ustawienia pod rozmówcami (⌘M, ⌘,)
+function NawigacjaCentrum({ trasa }) {
+  const poz = [["mozg", "◇", T("rozm.mozg"), "Mod+M"], ["ustawienia", "⚙", T("pasek.ustawienia"), "Mod+,"]];
+  return html`<ul class="j-nawig">${poz.map(([w, znak, tekst, komb]) => html`<li key=${w}>
+    <a href=${Trasa.zbuduj({ widok: w })} aria-current=${trasa.widok === w ? "page" : undefined} class=${cx(trasa.widok === w && "is-aktywny")}>
+      <span aria-hidden="true">${znak}</span><span class="j-nawig-t">${tekst}</span>
+      <kbd class="j-rozm-skrot" aria-hidden="true">${Skroty.opis(komb)}</kbd></a></li>`)}</ul>`;
+}
+
+// Ekran 1 telefonu (centrum §2.2): duże wiersze rozmówców, pod nimi Mózg, Ustawienia i Inne rozmowy
+function EkranRozmowcow() {
+  const ile = useSklep((s) => s.lista.porzadek.length);
+  const stan = useSklep((s) => s.strumien.stan);
+  const trasa = useTrasa();
+  return html`<section class="j-ekran-rozm" aria-labelledby="j-ekran-rozm-t">
+    <h1 class="j-sr" id="j-ekran-rozm-t">${T("rozm.sekcja")}</h1>
+    <p class="j-ekran-rozm-st"><span class=${cx("j-zdrowie-kropka", `is-${stan}`)}></span>${T(`polaczenie.${stan}`)}</p>
+    <${ListaRozmowcow} trasa=${trasa} duza=${true}/>
+    <ul class="j-nawig is-duza">
+      <li><a href="#/mozg"><span aria-hidden="true">◇</span><span class="j-nawig-t">${T("rozm.mozg")}</span></a></li>
+      <li><a href="#/ustawienia"><span aria-hidden="true">⚙</span><span class="j-nawig-t">${T("pasek.ustawienia")}</span></a></li>
+      <li><button type="button" onClick=${() => sklep.ustaw((s) => ({ ...s, inne_otwarte: true, pasek: { ...s.pasek, otwarty: true } }))}>
+        <span class="j-nawig-t is-cichy">${T("rozm.inne")} ▸</span><small>${ile || ""}</small></button></li>
+    </ul>
+  </section>`;
+}
+
+// pasek 4 rozmówców na dole rozmowy (telefon): figurka z kropką stanu i nazwa
+function DokRozmowcow({ trasa }) {
+  const rozmowcy = useSklep((s) => s.rozmowcy);
+  if (!rozmowcy.length) return null;
+  return html`<nav class="j-dok-rozm" aria-label=${T("rozm.sekcja")}>${rozmowcy.slice(0, 5).map((r) => html`<a key=${r.klucz}
+      href=${Trasa.zbuduj({ widok: "rozmowca", rozmowca: r.klucz })} aria-current=${trasa.rozmowca === r.klucz ? "page" : undefined}
+      aria-label=${`${nazwaRozmowcy(r)}, ${slowoStanu(r)}`} class=${cx(trasa.rozmowca === r.klucz && "is-aktywny")}>
+    <${AwatarRozmowcy} r=${r} rozmiar=${28}/><span>${nazwaRozmowcy(r)}</span>
+    ${r.nieprzeczytane > 0 && html`<b class="j-rozm-licz" aria-hidden="true">${r.nieprzeczytane}</b>`}</a>`)}</nav>`;
+}
+
+// Powiadomienia przeglądarki (centrum D9): „czeka na Ciebie” od razu, kolejka po 2 min (serwer: `powiadom`) i koniec
+// pracy dłuższej niż 2 min. Tylko karta lidera strumienia (jedno powiadomienie na przeglądarkę), tylko gdy właściciel
+// nie patrzy na tę rozmowę; klik otwiera rozmówcę.
+function usePowiadomieniaRozmowcow() {
+  useEffect(() => Strumien.naZdarzenie("rozmowca.stan", (d) => {
+    const s = sklep.stan();
+    // poprzedni stan z poprzedniego zdarzenia (sklep ma już nowy: reduktor działa przed hakami)
+    const byl = STANY_POWIADOMIEN[d.klucz] || null;
+    STANY_POWIADOMIEN[d.klucz] = { stan: d.stan, od: d.stan_od };
+    const poprzedni = byl && byl.stan, od = byl && byl.od;
+    const r = s.rozmowcy.find((x) => x.klucz === d.klucz);
+    if (!r || !s.ustawienia.powiadomienia || !window.Notification || Notification.permission !== "granted" || !Strumien.jestLiderem()) return;
+    const patrzy = document.visibilityState === "visible" && Trasa.biezaca().rozmowca === d.klucz;
+    let tekst = null;
+    if (d.stan === "czeka" && poprzedni !== "czeka") tekst = T("rozm.powiadom_czeka");
+    else if (d.powiadom) tekst = T("rozm.powiadom_kolejka", { n: Math.max(1, d.czeka || 0) });
+    else if (poprzedni === "pracuje" && d.stan === "wolny" && od && Date.now() / 1000 - od > 120) tekst = T("rozm.powiadom_koniec");
+    if (!tekst || patrzy) return;
+    try {
+      const n = new Notification(`${nazwaRozmowcy(r)} · Jarvo`, { body: tekst, tag: `jarvo-${d.klucz}` });
+      n.onclick = () => { window.focus(); otworzRozmowce(r, false); n.close(); };
+    } catch (_) { /* przeglądarka bez powiadomień w tym kontekście */ }
+  }), []);
+}
+const STANY_POWIADOMIEN = {};
+
 function StopkaPaska() {
   const wlasciciel = useSklep((s) => s.wlasciciel);
   const stan = useSklep((s) => s.strumien.stan);
   const imie = wlasciciel && wlasciciel.imie;
-  const otworz = (u) => Trasa.idz({ u, pod: undefined }, { scal: true });
+  const otworz = (sekcja) => Trasa.idz({ widok: "ustawienia", sekcja });
   // bez imienia z USER.md: ikona osoby zamiast litery „T” od „Ty”
   return html`<div class="j-stopka">
-    <button type="button" class="j-ja" onClick=${() => otworz("konto")}>
+    <button type="button" class="j-ja" onClick=${() => otworz("jezyk")}>
       <span class="j-ja-av" aria-hidden="true">${imie ? imie.slice(0, 1).toUpperCase() : html`<${Ikona} n="user" r=${14}/>`}</span>
       <span class="j-ja-n">${imie || T("pasek.ty")}</span></button>
     <${OdznakaAktualizacji} otworz=${otworz}/>
     <button type="button" class=${cx("j-zdrowie", "j-ma-tip", `is-${stan}`)} data-stan=${stan} aria-label=${T(`polaczenie.${stan}`)}
       onClick=${() => otworz("system")}><i></i><${Podpowiedz} tekst=${T(`polaczenie.${stan}`)}/></button>
-    <${Przycisk} rodzaj="cichy" ikona="gear" etykieta=${T("pasek.ustawienia")} onClick=${() => otworz("ustawienia")}/>
+    <${Przycisk} rodzaj="cichy" ikona="gear" etykieta=${T("pasek.ustawienia")} onClick=${() => otworz(undefined)}/>
   </div>`;
 }
 
 function Pasek({ trasa, warstwa = false }) {
   const lista = useSklep((s) => s.lista);
+  const saRozmowcy = useSklep((s) => s.rozmowcy.length > 0);
+  const inneOtwarte = useSklep((s) => s.inne_otwarte);
+  const inne = !saRozmowcy || inneOtwarte || lista.filtr !== "rozmowy" || !!lista.q;
   const nav = useRef(null);
   const [wiecej, setWiecej] = useState(null);       // kotwica menu „⋯” obok Szukaj (Archiwum, Kosz)
   useWarstwa(warstwa, () => sklep.zmien("pasek", { otwarty: false }), nav);
@@ -175,7 +310,16 @@ function Pasek({ trasa, warstwa = false }) {
       <${Przycisk} rodzaj="cichy" ikona="x" etykieta=${T("ui.zamknij")} klasa="j-zamknij-pasek"
         onClick=${() => sklep.zmien("pasek", { otwarty: false })}/>
     </div>
-    <a class="j-nowa" href="#/" data-fokus="" onClick=${() => Fokus.odloz("kompozytor")}><${Ikona} n="compose"/><span>${T("pasek.nowa")}</span></a>
+    ${saRozmowcy && html`<div class="j-pasek-rozm">
+      <h2 class="j-sekcja" id="j-sekcja-rozm">${T("rozm.sekcja_t")}</h2>
+      <${ListaRozmowcow} trasa=${trasa}/>
+      <${NawigacjaCentrum} trasa=${trasa}/>
+      <button type="button" class="j-inne" aria-expanded=${String(inne)} aria-controls="j-inne-l"
+        onClick=${() => sklep.ustaw((s) => ({ ...s, inne_otwarte: !inne }))}>
+        <span>${T("rozm.inne")}</span><span aria-hidden="true">${inne ? "▾" : "▸"}</span>
+        ${!inne && lista.porzadek.length > 0 && html`<small>${lista.porzadek.length}</small>`}</button></div>`}
+    ${inne && html`<div class=${cx("j-inne-l", saRozmowcy && "is-pod-rozm")} id="j-inne-l">
+    <a class="j-nowa" href="#/" data-fokus=${saRozmowcy ? undefined : ""} onClick=${() => Fokus.odloz("kompozytor")}><${Ikona} n="compose"/><span>${T("pasek.nowa")}</span></a>
     <div class="j-szukaj-w">
       <label class="j-szukaj"><${Ikona} n="search" r=${16}/>
         <input type="search" data-szukaj placeholder=${T("pasek.szukaj")} aria-label=${T("pasek.szukaj")} value=${lista.q}
@@ -198,6 +342,7 @@ function Pasek({ trasa, warstwa = false }) {
       ${lista.dalej && html`<button type="button" class="j-link j-wiecej" disabled=${lista.laduje}
         onClick=${() => akcje.wczytajListe({ dopisz: true })}>${T("pasek.wiecej")}</button>`}
     </div>
+    </div>`}
     <${StopkaPaska}/>
     ${menu && html`<${Menu} kotwica=${menu.kotwica} etykieta=${menu.w.tytul || T("watek.bez_tytulu")} onZamknij=${() => setMenu(null)}
       pozycje=${pozycjeMenuWatku(menu.w, { onZmienNazwe: () => setEdycja(menu.w.id) })}/>`}
