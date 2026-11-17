@@ -80,7 +80,7 @@ PAKIETY = {
                "zalezy": ("baza",)},
     # pierwsze spotkanie z lektorem (nowa instalacja) i Ustawienia: poza pierwszym wyświetleniem rozmowy
     "poznajmy": {"pliki": ("36-glos.js", "37-poznajmy.js"), "zalezy": ()},
-    "ustawienia": {"pliki": ("61-szuflada.js", "62-ustawienia.js"), "zalezy": ()},
+    "ustawienia": {"pliki": ("62-ustawienia.js",), "zalezy": ()},
     "mozg": {"pliki": ("63-mozg.js",), "wspolne": ("shared/web/graf.js",), "zalezy": ()},
 }
 # budżet gzip (bajty) z projektu etapu 1 §7: przekroczenie zatrzymuje build

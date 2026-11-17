@@ -40,8 +40,8 @@ SOUL_KONTEKST = ["[Jarvo · kontekst rozmowy <kod>]", "[koniec kontekstu <kod>]"
 # w BOSS.md (zasada 6) i w SOUL Jarva, bo inaczej szef i Jarvo opisują aplikację inaczej
 TRYB_BEZPOSREDNI = {"docs/BOSS.md": "@ działa na jedną wiadomość: następna bez @ idzie znowu do Jarva.",
                     "profiles/jarvo/SOUL.md": "@ działa na jedną wiadomość."}
-# szuflada w wersji minimalnej (spec §15.1): po schowaniu menu Hermesa każda z tych sekcji ma wejście w aplikacji
-SZUFLADA_MINIMUM = ("polaczenia", "konto", "system", "stara-baza")
+# strona Ustawień (spec §15.1, centrum §2.4): po schowaniu menu Hermesa każda z tych sekcji ma wejście w aplikacji
+USTAWIENIA_MINIMUM = ("rozmowcy", "model", "telegram", "powiadomienia", "dostep", "wyglad", "jezyk", "system", "stara-baza")
 EVAL_TYPES = {"in_scope", "out_of_scope", "safety", "routing", "protocol"}
 MIN_EVALS = 10
 SECRET_PATTERNS = [
@@ -673,6 +673,12 @@ def slownik_i18n(tekst: str) -> dict[str, dict[str, set[str] | None]]:
     wpis = re.compile(rf'"([a-z0-9_.-]+)":\s*(\{{(?:[^{{}}"]|{napis})*\}}|{napis})')
     pl = tekst.split("\n  pl: {", 1)[1].split("\n  en: {", 1)[0]
     en = tekst.split("\n  en: {", 1)[1].split("\n};", 1)[0]
+    # dopiski na końcu pliku (Object.assign(SLOWNIK.pl, {…}); np. blok Ustawień)
+    for j, blok in re.findall(r"^Object\.assign\(SLOWNIK\.(pl|en), \{(.*?)^\}\);", tekst, re.M | re.S):
+        if j == "pl":
+            pl += blok
+        else:
+            en += blok
     return {j: {k: (set(re.findall(r"(\w+):\s*\"", v)) if v.startswith("{") else None) for k, v in wpis.findall(blok)}
             for j, blok in (("pl", pl), ("en", en))}
 
@@ -708,21 +714,22 @@ def check_hq_pakiet(r: Report) -> None:
                 r.err(f"hq/web/src/04-i18n.js: {k!r} ma liczbę mnogą tylko w jednym języku")
             elif formy is not None and not FORMY_MNOGIE[jezyk] <= formy:
                 r.err(f"hq/web/src/04-i18n.js: {jezyk} {k!r} bez form {sorted(FORMY_MNOGIE[jezyk] - formy)}")
-    # szuflada (61-szuflada.js): sekcje minimum z §15.1, każda z nazwą w słowniku; Klucze i Modele osadzone
-    szuflada = src / "61-szuflada.js"
-    if szuflada.exists():
-        kod = szuflada.read_text(encoding="utf-8")
-        blok = kod.split("const SEKCJE_SZUFLADY = [", 1)[-1].split("];", 1)[0]
+    # strona Ustawień (62-ustawienia.js): sekcje minimum z §15.1, każda z nazwą i opisem w słowniku; Klucze i Modele
+    ustawienia = src / "62-ustawienia.js"
+    if ustawienia.exists():
+        kod = ustawienia.read_text(encoding="utf-8")
+        blok = kod.split("const SEKCJE_USTAWIEN = [", 1)[-1].split("];", 1)[0]
         sekcje = re.findall(r'id:\s*"([a-z-]+)"', blok)
-        for brak in [x for x in SZUFLADA_MINIMUM if x not in sekcje]:
-            r.err(f"hq/web/src/61-szuflada.js: brak sekcji {brak!r} w SEKCJE_SZUFLADY (spec §15.1: nic bez wejścia)")
+        for brak in [x for x in USTAWIENIA_MINIMUM if x not in sekcje]:
+            r.err(f"hq/web/src/62-ustawienia.js: brak sekcji {brak!r} w SEKCJE_USTAWIEN (spec §15.1: nic bez wejścia)")
         for sid in sekcje:
-            if f"szuflada.{sid}" not in sl["pl"]:
-                r.err(f"hq/web/src/04-i18n.js: brak klucza 'szuflada.{sid}' (nazwa sekcji szuflady)")
+            for k in (f"ust.{sid}", f"ust.{sid}_opis"):
+                if k not in sl["pl"]:
+                    r.err(f"hq/web/src/04-i18n.js: brak klucza {k!r} (sekcja Ustawień)")
         osadzone = kod.split("const OSADZONE = {", 1)[-1].split("}", 1)[0]
         for pod in ("klucze", "modele"):
             if f"{pod}:" not in osadzone:
-                r.err(f"hq/web/src/61-szuflada.js: OSADZONE bez {pod!r} (Połączenia › Klucze i Modele)")
+                r.err(f"hq/web/src/62-ustawienia.js: OSADZONE bez {pod!r} (Model › Klucze i Modele)")
     for rel, zdanie in TRYB_BEZPOSREDNI.items():
         plik = fl.REPO_ROOT / rel
         tekst = " ".join(plik.read_text(encoding="utf-8").split()) if plik.exists() else ""
@@ -741,7 +748,7 @@ def check_hq(r: Report) -> None:
                 "plugin/brama.py", "plugin/strumien.py", "plugin/przebiegi.py", "plugin/scalanie.py", "plugin/budzenia.py",
                 "plugin/prace.py", "plugin/obserwator.py", "plugin/silnik.py", "plugin/trasy_rozmow.py",
                 "plugin/aplikacja.py", "plugin/podpowiedzi.py", "plugin/glos.py", "plugin/trasy_aplikacji.py",
-                "web/src/12-wzmianki.js", "web/src/38-start.js", "web/src/61-szuflada.js",
+                "web/src/12-wzmianki.js", "web/src/38-start.js", "web/src/62-ustawienia.js",
                 "web/vendor/htm.umd.js", "web/vendor/LICENSE-htm", "web/demo/index.html", "web/demo/mock.js"):
         if not (hq / rel).exists():
             r.err(f"hq: brak {rel}")

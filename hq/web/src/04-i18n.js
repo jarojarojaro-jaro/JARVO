@@ -463,3 +463,56 @@ const T = (() => {
   T.wymus = null;           // testy: "pl" albo "en" bez dashboardu
   return T;
 })();
+
+/* === Ustawienia (UiUstawienia) === */
+Object.assign(SLOWNIK.pl, {
+  "ust.rozmowcy": "Rozmówcy", "ust.rozmowcy_opis": "Stałe rozmowy z lewej kolumny. Każdy rozmówca ma swój temat w Telegramie; lustro wysyła tam też to, co piszesz w panelu.",
+  "ust.model": "Model", "ust.model_opis": "Klucze dostawców i modele, na których pracują agenci.",
+  "ust.telegram": "Telegram", "ust.telegram_opis": "Tematy rozmówców w grupie Jarvo. Odpowiedź w temacie trafia do tej samej rozmowy co w panelu.",
+  "ust.powiadomienia": "Powiadomienia", "ust.powiadomienia_opis": "Gdy rozmówca czeka na Ciebie albo kończy długą pracę.",
+  "ust.dostep": "Dostęp", "ust.dostep_opis": "Panel w sieci prywatnej (Tailscale): adres i stan nasłuchu.",
+  "ust.wyglad": "Wygląd", "ust.wyglad_opis": "Motyw i paleta kolorów panelu na tym urządzeniu.",
+  "ust.jezyk": "Język", "ust.jezyk_opis": "Język panelu i klasycznych stron.",
+  "ust.zespol": "Zespół", "ust.zespol_opis": "Kto co robi i jak pisać do agenta wprost.",
+  "ust.system": "System", "ust.system_opis": "Aktualizacja, konto, klasyczny panel, wersja i skróty.",
+  "ust.stara-baza": "Stara Baza", "ust.stara-baza_opis": "Dawny widok bazy z pokojami agentów, na cały ekran.",
+  "ust.zaplecze_omp": "terminal (omp)", "ust.zaplecze_hermes": "Hermes",
+  "ust.temat_jest": "temat w Telegramie ✓", "ust.temat_brak": "bez tematu w Telegramie",
+  "ust.lustro": "Lustro", "ust.lustro_dla": "Lustro do Telegrama: {nazwa}",
+  "ust.lustro_opis": "Lustro wł.: wiadomości z panelu i odpowiedzi pojawiają się też w temacie Telegrama. Telegram zawsze trafia do panelu.",
+  "ust.lustro_wl": "lustro wł.", "ust.lustro_wyl": "lustro wył.", "ust.lustro_zmien": "Zmień lustro",
+  "ust.powiadomienia_przegladarki": "Powiadomienia przeglądarki",
+  "ust.zgoda_default": "Przeglądarka zapyta o zgodę po włączeniu.", "ust.zgoda_granted": "Zgoda przeglądarki jest.",
+  "ust.zgoda_denied": "Przeglądarka blokuje powiadomienia. Zezwól w ustawieniach strony.", "ust.zgoda_brak": "Ta przeglądarka nie ma powiadomień.",
+  "ust.dzwiek": "Dźwięk", "ust.dzwiek_opis": "Krótki sygnał, gdy przychodzi odpowiedź.",
+  "ust.dostep_ok": "Panel w sieci działa", "ust.dostep_wyl": "Panel w sieci wyłączony", "ust.dostep_blad": "Panel w sieci: błąd",
+  "ust.dostep_czeka": "Panel w sieci uruchamia się", "ust.dostep_brak": "Brak danych o dostępie",
+  "ust.dostep_klucz": "Klucz jednorazowy do logowania z telefonu wydasz poleceniem:",
+  "ust.paleta": "Paleta", "ust.paleta_opis": "Fosfor to monochromatyczny terminal z 1982 roku: jeden kolor na ciemnym tle.",
+});
+Object.assign(SLOWNIK.en, {
+  "ust.rozmowcy": "Partners", "ust.rozmowcy_opis": "Standing conversations from the left column. Each partner has a Telegram topic; the mirror also sends what you type in the panel there.",
+  "ust.model": "Model", "ust.model_opis": "Provider keys and the models the agents work on.",
+  "ust.telegram": "Telegram", "ust.telegram_opis": "Partner topics in the Jarvo group. A reply in a topic lands in the same conversation as in the panel.",
+  "ust.powiadomienia": "Notifications", "ust.powiadomienia_opis": "When a partner is waiting for you or finishes long work.",
+  "ust.dostep": "Access", "ust.dostep_opis": "Panel on your private network (Tailscale): address and listener state.",
+  "ust.wyglad": "Appearance", "ust.wyglad_opis": "Theme and colour palette of the panel on this device.",
+  "ust.jezyk": "Language", "ust.jezyk_opis": "Language of the panel and the classic pages.",
+  "ust.zespol": "Team", "ust.zespol_opis": "Who does what and how to write to an agent directly.",
+  "ust.system": "System", "ust.system_opis": "Update, account, classic panel, version and shortcuts.",
+  "ust.stara-baza": "Old Base", "ust.stara-baza_opis": "The former base view with agent rooms, full screen.",
+  "ust.zaplecze_omp": "terminal (omp)", "ust.zaplecze_hermes": "Hermes",
+  "ust.temat_jest": "Telegram topic ✓", "ust.temat_brak": "no Telegram topic",
+  "ust.lustro": "Mirror", "ust.lustro_dla": "Mirror to Telegram: {nazwa}",
+  "ust.lustro_opis": "Mirror on: panel messages and replies also appear in the Telegram topic. Telegram always reaches the panel.",
+  "ust.lustro_wl": "mirror on", "ust.lustro_wyl": "mirror off", "ust.lustro_zmien": "Change mirror",
+  "ust.powiadomienia_przegladarki": "Browser notifications",
+  "ust.zgoda_default": "The browser will ask for permission when you turn this on.", "ust.zgoda_granted": "The browser allows notifications.",
+  "ust.zgoda_denied": "The browser blocks notifications. Allow them in the site settings.", "ust.zgoda_brak": "This browser has no notifications.",
+  "ust.dzwiek": "Sound", "ust.dzwiek_opis": "A short chime when a reply arrives.",
+  "ust.dostep_ok": "Panel on the network is up", "ust.dostep_wyl": "Panel on the network is off", "ust.dostep_blad": "Panel on the network: error",
+  "ust.dostep_czeka": "Panel on the network is starting", "ust.dostep_brak": "No access data",
+  "ust.dostep_klucz": "Issue a one-time key for signing in from a phone with:",
+  "ust.paleta": "Palette", "ust.paleta_opis": "Phosphor is a monochrome 1982 terminal: one colour on a dark background.",
+});
+/* === koniec Ustawień === */
