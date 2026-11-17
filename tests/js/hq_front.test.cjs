@@ -98,9 +98,14 @@ test("Trasa.parsuj", () => {
   eq(Trasa.parsuj("#/nowa/jarvo-web"), { widok: "nowa", agent: "jarvo-web" });
   eq(Trasa.parsuj("#/nowa/Zly!"), { widok: "start" });
   eq(Trasa.parsuj("#/s/jarvo/20261021_abc"), { widok: "sesja", profil: "jarvo", sesja: "20261021_abc" });
-  eq(Trasa.parsuj("#/?u=polaczenia/klucze"), { widok: "start", u: "polaczenia", pod: "klucze" });
-  eq(Trasa.parsuj(`#/r/${W}?u=wyglad`), { widok: "watek", watek: W, u: "wyglad" });
-  eq(Trasa.parsuj("#/?u=../x"), { widok: "start" });
+  eq(Trasa.parsuj("#/ustawienia/model/klucze"), { widok: "ustawienia", sekcja: "model", pod: "klucze" });
+  eq(Trasa.parsuj("#/ustawienia"), { widok: "ustawienia" });
+  eq(Trasa.parsuj("#/ustawienia/../x"), { widok: "ustawienia" });
+  eq(Trasa.parsuj("#/?u=polaczenia"), { widok: "start" });                         // stare ?u= już nie istnieje
+  eq(Trasa.parsuj("#/o/f:hermes"), { widok: "rozmowca", rozmowca: "f:hermes" });
+  eq(Trasa.parsuj("#/o/zly"), { widok: "start" });
+  eq(Trasa.parsuj("#/mozg"), { widok: "mozg" });
+  eq(Trasa.parsuj("#/mozg/x"), { widok: "start" });
   eq(Trasa.parsuj("#/?n=edytor&p=a/b.mp4"), { widok: "start", n: "edytor", p: "a/b.mp4" });
   eq(Trasa.parsuj("#/?n=zlo"), { widok: "start" });
   eq(Trasa.parsuj("#/r/%E0%A4%A"), { widok: "start" });                             // zły zapis % nie wywraca
@@ -108,11 +113,13 @@ test("Trasa.parsuj", () => {
 test("Trasa.zbuduj: w obie strony", () => {
   for (const t of [{ widok: "start" }, { widok: "watek", watek: W }, { widok: "watek", watek: W, pozycja: "x_1" },
     { widok: "nowa", agent: "jarvo-web" }, { widok: "sesja", profil: "jarvo", sesja: "s1" },
-    { widok: "start", u: "polaczenia", pod: "modele" }, { widok: "watek", watek: W, n: "konwerter", p: "a b.png" }]) {
+    { widok: "ustawienia", sekcja: "model", pod: "modele" }, { widok: "rozmowca", rozmowca: "s:omp-1" }, { widok: "mozg" },
+    { widok: "watek", watek: W, n: "konwerter", p: "a b.png" }]) {
     eq(Trasa.parsuj(Trasa.zbuduj(t)), t);
   }
   assert.strictEqual(Trasa.zbuduj({ widok: "start" }), "#/");
-  assert.strictEqual(Trasa.zbuduj({ widok: "watek", watek: W, u: "konto" }), `#/r/${W}?u=konto`);
+  assert.strictEqual(Trasa.zbuduj({ widok: "rozmowca", rozmowca: "f:hermes" }), "#/o/f:hermes");
+  assert.strictEqual(Trasa.zbuduj({ widok: "ustawienia", sekcja: "konto" }), "#/ustawienia/konto");
 });
 
 // ------------------------------------------------------------------------------------------------ skróty
@@ -183,8 +190,8 @@ test("plytko", () => {
   assert.ok(!plytko(null, {}));
 });
 test("stanPoczatkowy: kształt sklepu", () => {
-  eq(Object.keys(stanPoczatkowy()).sort(), ["adresaci", "agenci", "aktualizacja", "blad_aplikacji", "decyzje", "funkcje", "gotowe",
-    "gotowosc", "karty", "kolejnosc", "lista", "os", "pasek", "podglad", "podpowiedzi", "podzial", "poznanie", "przebiegi", "pytanie", "silnik",
+  eq(Object.keys(stanPoczatkowy()).sort(), ["adresaci", "agenci", "aktualizacja", "blad_aplikacji", "decyzje", "dostep", "funkcje", "gotowe",
+    "gotowosc", "inne_otwarte", "karty", "kolejnosc", "lista", "os", "pasek", "podglad", "podpowiedzi", "podzial", "poznanie", "przebiegi", "pytanie", "rozmowcy", "silnik",
     "stara_baza", "strumien", "szkice", "toasty", "ustawienia", "watki", "wersja", "wlasciciel", "wysylane"]);
   eq(stanPoczatkowy().lista.filtr, "rozmowy");
   eq(stanPoczatkowy().ustawienia.motyw, "system");
@@ -369,7 +376,7 @@ test("Os.widok: żywy dymek za wpisem, schowane pozycje w toku, koniec po odpowi
   eq(Os.widok(zOdp, [stop, { id: "p9", wpis_id: "m1", stan: "gotowe", tekst: "x", ponowienie_z: "p1" }]).some((x) => x.zatrzymany), false);
 });
 test("Os.klasaBledu", () => {
-  eq(Os.klasaBledu({ kod: "klucz" }), { rodzaj: "klucz", sekcja: "polaczenia", pod: "klucze", ponow: false });
+  eq(Os.klasaBledu({ kod: "klucz" }), { rodzaj: "klucz", sekcja: "model", pod: "klucze", ponow: false });
   eq(Os.klasaBledu({ kod: "model" }).pod, "modele");
   eq(Os.klasaBledu({ kod: "limit_bramy" }).rodzaj, "brama");
   eq(Os.klasaBledu(null), { rodzaj: "inny", ponow: true });

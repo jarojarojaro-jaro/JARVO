@@ -227,6 +227,7 @@ function WidokMozgu() {
 function AplikacjaJarvo() {
   const trasa = useTrasa();
   const motyw = useMotyw(useSklep((s) => s.ustawienia.motyw));
+  const paleta = useSklep((s) => s.ustawienia.paleta) || "jarvo";
   const pasek = useSklep((s) => s.pasek, plytko);
   const staraBaza = useSklep((s) => s.stara_baza);
   const got = useSklep((s) => s.gotowosc);
@@ -333,7 +334,7 @@ function AplikacjaJarvo() {
 
   // pierwsze spotkanie na całym ekranie: same pytania, bez paska rozmów i górnej belki
   if (!["watek", "sesja", "ustawienia", "rozmowca"].includes(trasa.widok) && (poznanie === "trwa" || poznanie === "mozg" || poznanieOtwarte(got))) {
-    return html`<div class="jarvo-app" data-jarvo-korzen="" data-motyw=${motyw} lang=${isPL() ? "pl" : "en"} ref=${korzen}>
+    return html`<div class="jarvo-app" data-jarvo-korzen="" data-motyw=${motyw} data-paleta=${paleta} lang=${isPL() ? "pl" : "en"} ref=${korzen}>
       <main class="j-poz-ekran" data-region="glowna" tabIndex="-1" aria-label=${T("poz.etykieta")}>
         <${Leniwy} pakiet="poznajmy" nazwa="Poznajmy" key=${poznanie === "mozg" ? "mozg" : "poz"} poczatek=${poznanie === "mozg" ? "mozg" : "witaj"}
           koniec=${() => sklep.ustaw({ poznanie: null })}/>
@@ -351,7 +352,7 @@ function AplikacjaJarvo() {
   else if (trasa.widok === "ustawienia") widok = html`<${Leniwy} pakiet="ustawienia" nazwa="Ustawienia" trasa=${trasa} zastepczy=${zastepczy}/>`;
   else if (trasa.widok === "start" && telefon && saRozmowcy) widok = html`<${EkranRozmowcow}/>`;
   else widok = html`<${EkranStartu} key=${trasa.agent || "start"} agent=${trasa.widok === "nowa" ? trasa.agent : null}/>`;
-  return html`<div class="jarvo-app" data-jarvo-korzen="" data-motyw=${motyw} lang=${isPL() ? "pl" : "en"} ref=${korzen}>
+  return html`<div class="jarvo-app" data-jarvo-korzen="" data-motyw=${motyw} data-paleta=${paleta} lang=${isPL() ? "pl" : "en"} ref=${korzen}>
     <div class=${cx("j-uklad", pasek.zwiniety && "is-zwiniety", pasek.otwarty && "is-wysuniety")} ref=${uklad}>
       <${Pasek} trasa=${trasa} warstwa=${pasekWarstwa}/>
       <div class="j-zaslona-paska" onClick=${() => sklep.zmien("pasek", { otwarty: false })}></div>

@@ -1986,3 +1986,55 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 @media (prefers-reduced-motion: reduce) {
   .jarvo-app *, .jarvo-app *::before, .jarvo-app *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
 }
+/* rozmówcy (centrum §2): szyna, kropki stanu, nawigacja, dok telefonu, baner, Tak/Nie, odznaki źródła */
+.jarvo-app { --j-terminal: #89CFF0; }
+.j-rozmowcy { list-style: none; margin: 0; padding: 0 8px; }
+.j-rozm { display: grid; grid-template-columns: 34px 1fr auto; gap: 2px 10px; align-items: center; padding: 8px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
+.j-rozm:hover { background: var(--j-tlo-hover); }
+.j-rozm.is-aktywny { background: var(--j-tekst); color: var(--j-tlo); }
+.j-rozm.is-aktywny .j-rozm-st, .j-rozm.is-aktywny .j-rozm-skrot { color: inherit; opacity: .75; border-color: currentColor; }
+.j-rozm:focus-visible, .j-nawig a:focus-visible, .j-dok-rozm a:focus-visible { outline: 2px solid var(--j-akcent); outline-offset: 1px; }
+.j-rozm-av { grid-row: span 2; position: relative; display: grid; place-items: center; }
+.j-rozm-n { font-family: var(--j-font-mono); font-size: 16px; letter-spacing: .03em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.j-rozm-st { grid-column: 2 / 4; font-size: 11.5px; color: var(--j-tekst-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.j-rozm-licz { min-width: 20px; height: 20px; border-radius: 10px; background: var(--j-akcent); color: var(--j-akcent-na); font-size: 11px; font-weight: 600; display: grid; place-items: center; padding: 0 6px; }
+.j-rozm-skrot { font: 10px var(--j-font-mono); color: var(--j-tekst-3); border: 1px solid var(--j-linia); border-radius: 3px; padding: 0 4px; }
+.j-rozmowcy.is-duza .j-rozm { min-height: 60px; grid-template-columns: 40px 1fr auto; }
+.j-rk { position: absolute; right: -4px; bottom: -4px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--j-tlo-2); background: var(--j-tekst-3); }
+.j-rk.is-pracuje { background: var(--j-akcent); animation: j-rk-puls 1.4s ease-in-out infinite; }
+.j-rk.is-czeka { background: var(--j-uwaga); }
+.j-rk.is-wolny { background: var(--j-tlo-2); box-shadow: inset 0 0 0 2px var(--j-tekst-3); }
+.j-rk.is-terminal { background: var(--j-terminal); }
+.j-rk.is-kolejka { background: var(--j-terminal); opacity: .7; }
+.j-rk.is-offline { background: var(--j-linia-mocna); }
+@keyframes j-rk-puls { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--j-akcent) 25%, transparent); } }
+.j-nawig, .j-inne { list-style: none; margin: 6px 8px 0; padding: 8px 0 0; border-top: 1px solid var(--j-linia); }
+.j-nawig a, .j-nawig button, .j-inne a { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; border-radius: 6px; color: var(--j-tekst); text-decoration: none; background: none; border: 0; font: inherit; cursor: pointer; }
+.j-nawig a:hover, .j-nawig button:hover, .j-inne a:hover { background: var(--j-tlo-hover); }
+.j-nawig-t, .j-inne-l { flex: 1; text-align: left; }
+.j-nawig small, .j-nawig kbd { color: var(--j-tekst-3); font-size: 11px; }
+.j-ekran-rozm { display: flex; flex-direction: column; min-height: 100%; padding-bottom: 8px; }
+.j-ekran-rozm-t { margin: 0; padding: 10px 16px 6px; font: 15px var(--j-font-mono); letter-spacing: .12em; color: var(--j-tekst-3); }
+.j-ekran-rozm-st { font-size: 11px; color: var(--j-tekst-3); }
+.j-dok-rozm { display: flex; justify-content: space-around; border-top: 1px solid var(--j-linia); padding: 6px 0 calc(10px + env(safe-area-inset-bottom)); background: var(--j-tlo-2); }
+.j-dok-rozm a { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 56px; min-height: 44px; font-size: 10px; color: var(--j-tekst-3); text-decoration: none; }
+.j-dok-rozm a[aria-current="page"] { color: var(--j-tekst); }
+.j-dok-rozm .j-rozm-licz { position: absolute; top: -2px; right: 8px; }
+.j-baner-rozm { margin: 8px 10px 0; border: 1px solid var(--j-terminal); border-radius: 8px; padding: 8px 10px; font-size: 12px; background: color-mix(in srgb, var(--j-terminal) 7%, transparent); }
+.j-baner-rozm b { color: var(--j-terminal); font-weight: 600; }
+.j-tak { margin: 8px 0 0; padding: 10px 12px; border: 1px solid var(--j-uwaga-linia, var(--j-uwaga)); border-radius: 8px; background: var(--j-tlo-karta); }
+.j-tak-t { margin: 0 0 8px; font-weight: 600; }
+.j-tak-b { display: flex; gap: 8px; flex-wrap: wrap; }
+.j-tak-po { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; font-size: 12px; color: var(--j-tekst-3); }
+.j-zrodlo { display: block; margin-bottom: 2px; font-size: 10.5px; color: var(--j-tekst-3); }
+.j-zrodlo[data-zrodlo="terminal"] { color: var(--j-terminal); }
+.j-wspolna { font-size: 11px; color: var(--j-tekst-3); white-space: nowrap; }
+@media (max-width: 640px) { .j-wspolna-t { display: none; } }
+.j-pasek-rozm { padding-bottom: 4px; }
+.j-sekcja, .j-sekcja-rozm { margin: 0; padding: 10px 16px 6px; font: 400 13px var(--j-font-mono); letter-spacing: .12em; color: var(--j-tekst-3); }
+.j-gora-rozm { min-width: 0; }
+.j-gora-opis { margin: 0; font-size: 11.5px; color: var(--j-tekst-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.j-wstecz { display: grid; place-items: center; min-width: 44px; min-height: 44px; color: var(--j-tekst); }
+.j-zdrowie-kropka { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--j-tekst-3); }
+.j-zdrowie-kropka.is-ok { background: var(--j-ok); }
+.j-zdrowie-kropka.is-przerwany { background: var(--j-uwaga); }
