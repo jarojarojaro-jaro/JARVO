@@ -144,9 +144,15 @@ def dolacz(router, *, m, trasy, silnik: Callable[[], Any], agenci, gotowosc, naw
                 obrazy_wprost = bool(s._obrazy_wprost())
             except Exception:
                 pass
+        rozmowcy = []
+        if s is not None and getattr(s, "rozmowcy", None) is not None:
+            try:                                       # lewa kolumna od pierwszego wyświetlenia (centrum §7)
+                rozmowcy = await asyncio.to_thread(s.rozmowcy.lista)
+            except Exception as exc:
+                log(f"jarvo-hq: GET /app rozmówcy: {type(exc).__name__}")
         return {
             "wersja": hello().get("wersja", ""), "silnik": hello().get("silnik", "awaria"),
-            "agenci": lista, "wlasciciel": wlasciciel, "gotowosc": got,
+            "agenci": lista, "rozmowcy": rozmowcy, "wlasciciel": wlasciciel, "gotowosc": got,
             "ustawienia": {"limit_przebiegow": getattr(s, "limit", None), "upload_max": UPLOAD_MAX,
                            "zalaczniki_max": trasy.ZALACZNIKI_MAKS, "obrazy_max": trasy.OBRAZY_MAKS,
                            "obrazy_body_max": trasy.OBRAZY_BAJTY},

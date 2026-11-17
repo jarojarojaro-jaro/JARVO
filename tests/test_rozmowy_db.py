@@ -69,9 +69,9 @@ def test_migracja_1_ma_pelny_schemat(db):
     indeksy = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type = 'index'")}
     assert {"watki_lista", "sesje_watek", "wpisy_czas", "przebiegi_aktywne", "przebiegi_watek", "przebiegi_sha",
             "przebiegi_lancuch", "przebiegi_nadzor", "karty_watek"} <= indeksy
-    assert c.execute("PRAGMA user_version").fetchone()[0] == 1
+    assert c.execute("PRAGMA user_version").fetchone()[0] == len(rz.MIGRACJE)
     assert c.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
-    assert [r[0] for r in c.execute("SELECT wersja FROM migracje")] == [1]
+    assert [r[0] for r in c.execute("SELECT wersja FROM migracje")] == list(range(1, len(rz.MIGRACJE) + 1))
     c.close()
     _tylko_wlasciciel(db.sciezka)
     assert db.meta("utworzono") is not None
@@ -85,7 +85,7 @@ def test_pragmy_polaczenia(db):
 
 
 def test_migracja_powtorna_nic_nie_robi_i_nowsza_wersja_odmawia(db, tmp_path):
-    assert db.migruj() == 1
+    assert db.migruj() == len(rz.MIGRACJE)
     assert not list(db.sciezka.parent.glob("*.bak-v*"))
     db._conn.execute("PRAGMA user_version = 7")
     with pytest.raises(RuntimeError, match="nowszą"):
@@ -398,7 +398,69 @@ def test_sprzataj(db, zegar):
 
 def test_zdrowie(db):
     z = db.zdrowie()
-    assert z == {"db_ok": True, "wersja": 1, "watki": 0, "przebiegi_aktywne": 0, "kolejka": 0, "sesje_nieprzypiete": 0}
+    assert z == {"db_ok": True, "wersja": len(rz.MIGRACJE), "watki": 0, "przebiegi_aktywne": 0, "kolejka": 0,
+                 "sesje_nieprzypiete": 0}
+
+
+# ------------------------------------------------------------------------------------------- rozmówcy (migracja 2)
+
+def test_migracja_1_do_2_zachowuje_dane(tmp_path, zegar, monkeypatch):
+    """Baza wersji 1 z wątkiem i przebiegiem → wersja 2: kopia .bak-v1, kolumny rozmówców, dane zostają."""
+    monkeypatch.setattr(rz, "MIGRACJE", (rz.MIGRACJA_1,))
+    d = rz.Rozmowy(tmp_path / "r.db", zegar=zegar)
+    assert d.migruj() == 1
+    w = d.utworz_watek(tytul="Stara rozmowa")
+    e = d.dodaj_wpis(w["id"], rodzaj="wlasciciel", tekst="hej")
+    p = d.dodaj_przebieg(watek_id=w["id"], wpis_id=e["id"], agent="jarvo")
+    monkeypatch.setattr(rz, "MIGRACJE", (rz.MIGRACJA_1, rz.MIGRACJA_2))
+    assert d.migruj() == 2
+    assert (tmp_path / "r.db.bak-v1").is_file()
+    c = d._conn
+    assert {"rozmowca", "zaplecze"} <= _kolumny(c, "watki")
+    assert {"zaplecze", "lustro_at", "lustro"} <= _kolumny(c, "przebiegi")
+    assert d.watek(w["id"])["tytul"] == "Stara rozmowa" and d.watek(w["id"])["zaplecze"] == "hermes"
+    assert d.przebieg(p["id"])["zaplecze"] == "hermes" and d.przebieg(p["id"])["lustro_at"] is None
+
+
+ROZMOWCY = [
+    {"klucz": "s:op", "zrodlo": "sesje", "zaplecze": "omp", "wpis": "op", "nazwa": "Operator", "kolejnosc": 0},
+    {"klucz": "f:jarvo", "zrodlo": "flota", "zaplecze": "hermes", "profil": "jarvo", "nazwa": "Jarvo", "kolejnosc": 1,
+     "czat": "-1001", "watek_tg": "1"},
+    {"klucz": "s:gpu", "zrodlo": "sesje", "zaplecze": "omp", "wpis": "gpu", "nazwa": "Kernel", "kolejnosc": 2},
+    {"klucz": "f:jarvo-jarodev", "zrodlo": "flota", "zaplecze": "hermes", "profil": "jarvo-jarodev", "nazwa": "Jarodev",
+     "kolejnosc": 11},
+]
+
+
+def test_rozmowcy_watki_idempotentnie_i_archiwum(db):
+    wynik = db.zsynchronizuj_rozmowcow(ROZMOWCY)
+    assert sorted(wynik["nowe"]) == sorted(r["klucz"] for r in ROZMOWCY) and wynik["usuniete"] == []
+    lista = db.rozmowcy()
+    assert [r["klucz"] for r in lista] == ["s:op", "f:jarvo", "s:gpu", "f:jarvo-jarodev"]       # D7: stała kolejność
+    wid = {r["klucz"]: r["watek_id"] for r in lista}
+    assert db.watek(wid["f:jarvo"])["koordynator"] == "jarvo" and db.watek(wid["s:op"])["zaplecze"] == "omp"
+    assert db.rozmowca_watku(wid["s:gpu"])["cel"] == "gpu"
+    # drugi raz: te same wątki; wątki rozmówców nie stoją w zwykłej liście (mają swoją sekcję)
+    assert db.zsynchronizuj_rozmowcow(ROZMOWCY)["nowe"] == []
+    assert {r["watek_id"] for r in db.rozmowcy()} == set(wid.values())
+    assert db.lista()[0] == []
+    # wpis zniknął z konfiguracji: wątek do Archiwum z linią systemu, historia zostaje; powrót = ten sam wątek
+    wynik = db.zsynchronizuj_rozmowcow(ROZMOWCY[:3])
+    assert wynik["usuniete"] == ["f:jarvo-jarodev"]
+    assert [w["id"] for w in db.lista(filtr="archiwum")[0]] == [wid["f:jarvo-jarodev"]]
+    assert db.wpisy(wid["f:jarvo-jarodev"])[-1]["tekst"] == "Rozmówca usunięty z konfiguracji"
+    assert [r["klucz"] for r in db.rozmowcy()] == ["s:op", "f:jarvo", "s:gpu"]
+    db.zsynchronizuj_rozmowcow(ROZMOWCY)
+    assert db.rozmowca("f:jarvo-jarodev")["watek_id"] == wid["f:jarvo-jarodev"]
+    assert db.watek(wid["f:jarvo-jarodev"])["archiwum"] is False
+
+
+def test_rozmowca_lustro_kolejnosc_stan(db, zegar):
+    db.zsynchronizuj_rozmowcow(ROZMOWCY)
+    r = db.zmien_rozmowce("f:jarvo", lustro=False, kolejnosc=50)
+    assert r["lustro"] is False and [x["klucz"] for x in db.rozmowcy()][-1] == "f:jarvo"
+    od = db.zmien_rozmowce("s:op", stan="terminal")["stan_od"]
+    assert db.zmien_rozmowce("s:op", stan="terminal")["stan_od"] == od        # ten sam stan: czas od bez zmian
 
 
 # ------------------------------------------------------------------------------------------- import Bazy

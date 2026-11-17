@@ -163,7 +163,7 @@ class Silnik:
         self.start_at = time.time()
         self.loop: asyncio.AbstractEventLoop | None = None
         self.watek: threading.Thread | None = None
-        self.db = self.brama = self.rejestr = self.obserwator = self.czytnik = None
+        self.db = self.brama = self.rejestr = self.obserwator = self.czytnik = self.rozmowcy = self.lustro = None
         self._gotowy = threading.Event()
         self._koniec: asyncio.Event | None = None
         self.czytnik = moduly.czytnik.Czytnik(self.home / "profiles", agenci.nazwy, log=self.log)
@@ -229,7 +229,19 @@ class Silnik:
             blad_bramy=m.brama.BladBramy, utajnij=m.ochrona.utajnij, etykieta=m.hq_core.tool_label, limit=self.limit,
             log=self.log, czas_zgody=self._czas_zgody, aktualizacja=self._aktualizacja, brama_mloda=self._brama_mloda,
             obrazy_wprost=self._obrazy_wprost, plik=self.plik, **kw)
+        # centrum (krok 1b/1d): rozmówcy (stałe wątki, sesja tematu, stan), lustro do Telegrama, zaplecze omp
+        omp = getattr(m, "omp_sesje", None)
+        self.rejestr.omp, self.rejestr.omp_dane = omp, self.home
+        self.lustro = m.lustro.Lustro(self.db, self.home, self.hub, log=self.log)
+        self.rejestr.po_koncu = self.lustro.po_koncu
+        self.rozmowcy = m.rozmowcy.Serwis(db=self.db, agenci=self.agenci, hub=self.hub, dane=self.home,
+                                          tematy=m.tematy, omp=omp, czytnik=self.czytnik, log=self.log)
+        try:
+            self.rozmowcy.synchronizuj()
+        except Exception as exc:                    # zła konfiguracja nie zatrzymuje silnika; pętla spróbuje znowu
+            self.log(f"jarvo-hq: rozmówcy: {type(exc).__name__}")
         await self.rejestr.uruchom()
+        petla_rozmowcow = asyncio.get_running_loop().create_task(self._petla_rozmowcow())
         if self.z_obserwatorem:
             self.obserwator = m.obserwator.Obserwator(
                 db=self.db, czytnik=self.czytnik, rejestr=self.rejestr, hub=self.hub, agenci=self.agenci,
@@ -246,7 +258,7 @@ class Silnik:
             await self._koniec.wait()
         finally:
             # obserwator i jego porządki (przypinanie, sprzątanie) kończą się przed pętlami rejestru i klientem HTTP
-            zadania = [t for t in (obs, getattr(self.obserwator, "_porzadki", None)) if t is not None]
+            zadania = [t for t in (obs, petla_rozmowcow, getattr(self.obserwator, "_porzadki", None)) if t is not None]
             for t in zadania:
                 t.cancel()
             await asyncio.gather(*zadania, return_exceptions=True)
@@ -258,6 +270,18 @@ class Silnik:
         exc = kontekst.get("exception")
         self.log(f"jarvo-hq: pętla silnika: {type(exc).__name__ if exc else 'błąd'}"
                  f"{' (' + str(kontekst.get('message'))[:80] + ')' if not exc and kontekst.get('message') else ''}")
+
+    async def _petla_rozmowcow(self) -> None:
+        """Co 2 s: stan rozmówców (`rozmowca.stan`), sesje tematów, zaległe lustro do Telegrama (wątek tła)."""
+        while True:
+            for zadanie in (self.rozmowcy.stany, self.lustro.runda):
+                try:
+                    await asyncio.to_thread(zadanie)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    self.log(f"jarvo-hq: rozmówcy: {type(exc).__name__}")
+            await asyncio.sleep(2.0)
 
     def zamknij(self, czekaj: float = 5.0) -> None:
         """Koniec wątku (testy); w dashboardzie wątek kończy się z procesem."""

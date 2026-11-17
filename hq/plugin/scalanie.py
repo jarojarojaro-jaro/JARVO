@@ -124,7 +124,7 @@ def _wpisy(wpisy: list[dict], plik: Callable[[str], dict | None] | None) -> list
 
 def _czlonek(agent: str, rola: str, linia: list[dict], przebiegi: list[dict], wpisy_id: Mapping[str, dict], *,
              import_: bool, budzenia, etykieta: Callable, utajnij: Callable[[str], str] | None,
-             plik: Callable[[str], dict | None] | None, czytnik) -> tuple[list[dict], dict]:
+             plik: Callable[[str], dict | None] | None, czytnik, zrodlo_obcej: str | None = None) -> tuple[list[dict], dict]:
     """Pozycje jednego członka (cały rodowód) i informacje do kursora: `koniec` (liczba wierszy), `od_ponownie`
     (indeks pierwszego wiersza, który trzeba wysłać jeszcze raz: tura w toku albo otwarta grupa kroków),
     `skompaktowane` (pokolenie kompresji)."""
@@ -228,8 +228,9 @@ def _czlonek(agent: str, rola: str, linia: list[dict], przebiegi: list[dict], wp
                 elif m.get("podsumowanie"):
                     out.append(_pozycja(id=klucz, rodzaj="kompresja", **wspolne(m, idx),
                                         tekst="Streszczenie wcześniejszej rozmowy"))
-                elif import_:
-                    out.append(_pozycja(id=klucz, rodzaj="wlasciciel", **wspolne(m, idx), tekst=tresc, wpis=None))
+                elif import_ or zrodlo_obcej:   # wątek rozmówcy: wiadomość z tematu Telegrama to dymek właściciela 📱
+                    out.append(_pozycja(id=klucz, rodzaj="wlasciciel", **wspolne(m, idx), tekst=tresc, wpis=None,
+                                        zrodlo=zrodlo_obcej))
                 else:
                     out.append(_pozycja(id=klucz, rodzaj="obca", **wspolne(m, idx), tekst=tresc))
                 continue
@@ -324,8 +325,46 @@ def _pliki(tekst: str, plik: Callable[[str], dict | None] | None) -> list[dict]:
     return out
 
 
+def _czas(v: Any) -> float:
+    """Czas wpisu sesji omp (ISO 8601 albo liczba sekund / milisekund) → sekundy epoki."""
+    if isinstance(v, (int, float)):
+        return float(v) / (1000.0 if v > 1e11 else 1.0)
+    try:
+        from datetime import datetime
+        return datetime.fromisoformat(str(v).replace("Z", "+00:00")).timestamp()
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def pozycje_omp(r: Mapping, os_: Mapping) -> list[dict]:
+    """Oś sesji omp (czytnik_omp.os_sesji) jako pozycje osi: wiadomości spoza panelu = dymek właściciela ze źródłem
+    (📱 telegram, ⌨ terminal; z panelu pokazuje je wpis), asystent = `agent`, narzędzia = `kroki` z samą nazwą
+    i intencją (wyników i argumentów czytnik nie ma), kompresja = `kompresja`."""
+    out, agent = [], r["klucz"]
+    for i, e in enumerate(os_.get("wpisy") or []):
+        wsp = {"id": f"o:{agent}:{e.get('id')}", "ts": _czas(e.get("czas")), "agent": agent, "rola": "rozmowa", "_i": i}
+        typ = e.get("typ")
+        if typ == "uzytkownik":
+            if e.get("zrodlo") == "panel":
+                continue
+            out.append(_pozycja(rodzaj="wlasciciel", tekst=str(e.get("tekst") or ""), wpis=None,
+                                zrodlo=str(e.get("zrodlo") or "terminal"), **{**wsp, "agent": None}))
+        elif typ == "asystent":
+            out.append(_pozycja(rodzaj="agent", tekst=str(e.get("tekst") or ""), czeka_na_tak=bool(e.get("czeka_na_tak")),
+                                **wsp))
+        elif typ == "kroki":
+            out.append(_pozycja(rodzaj="kroki", kroki=[
+                {"ts": wsp["ts"], "narzedzie": str(k.get("nazwa") or "?"), "verb": str(k.get("nazwa") or "?"),
+                 "verb_en": str(k.get("nazwa") or "?"), "detail": str(k.get("intencja") or "")[:140], "czas_ms": None,
+                 "blad": False, "podglad": ""} for k in e.get("kroki") or []], **wsp))
+        elif typ == "streszczenie":
+            out.append(_pozycja(rodzaj="kompresja", tekst="Streszczenie wcześniejszej rozmowy", **wsp))
+    return out
+
+
 def zrodla(db, czytnik, wid: str, *, budzenia=None, etykieta: Callable | None = None,
-           utajnij: Callable[[str], str] | None = None, plik: Callable[[str], dict | None] | None = None) -> dict:
+           utajnij: Callable[[str], str] | None = None, plik: Callable[[str], dict | None] | None = None,
+           omp_os: Callable[[Mapping], Mapping] | None = None) -> dict:
     """{"zrodla": {klucz: [pozycje]}, "info": {klucz: {...}}, "g": pokolenie}. Klucze: `w` i `<agent>:<rola>`."""
     watek = db.watek(wid) or {}
     wpisy = db.wpisy(wid, limit=10_000)
@@ -339,6 +378,16 @@ def zrodla(db, czytnik, wid: str, *, budzenia=None, etykieta: Callable | None = 
     info = {"w": {"koniec": len(wpisy), "od_ponownie": None, "skompaktowane": 0}}
     g = 0
     bledy: list[dict] = []
+    if watek.get("zaplecze") == "omp":          # rozmówca omp: oś z pliku sesji (czytnik_omp), bez członków Hermesa
+        r = db.rozmowca_watku(wid)
+        os_ = omp_os(r) if (r and omp_os) else {"blad": "brak czytnika"}
+        if os_.get("blad"):
+            bledy.append({"agent": (r or {}).get("klucz") or "omp", "blad": str(os_["blad"])})
+        else:
+            out["omp"] = pozycje_omp(r, os_)
+            info["omp"] = {"koniec": len(out["omp"]), "od_ponownie": None, "skompaktowane": 0,
+                           "pelny": bool(os_.get("pelny"))}
+        return {"zrodla": out, "info": info, "g": 0, "bledy": bledy}
     for c in db.czlonkowie(wid):
         sesje = [s["sesja_id"] for s in db.sesje_watku(wid, agent=c["agent"], rola=c["rola"])]
         if not sesje:
@@ -353,7 +402,8 @@ def zrodla(db, czytnik, wid: str, *, budzenia=None, etykieta: Callable | None = 
         klucz = f"{c['agent']}:{c['rola']}"
         pozycje, inf = _czlonek(c["agent"], c["rola"], linia, przebiegi, wpisy_id,
                                 import_=watek.get("rodzaj") == "import", budzenia=budzenia,
-                                etykieta=etykieta or _etykieta_domyslna, utajnij=utajnij, plik=plik, czytnik=czytnik)
+                                etykieta=etykieta or _etykieta_domyslna, utajnij=utajnij, plik=plik, czytnik=czytnik,
+                                zrodlo_obcej="telegram" if watek.get("rozmowca") else None)
         out[klucz] = pozycje
         info[klucz] = inf
         g += inf["skompaktowane"]

@@ -80,6 +80,35 @@ def testowi(dane: object, zajete: set[str]) -> list[dict]:
     return out
 
 
+def rozmowcy_floty(lista: list[dict]) -> list[dict]:
+    """Rozmówcy z floty i nakładki (centrum §1): agent z niepustym `telegram_topic`. Koordynator (temat General)
+    stoi na miejscu 1, pozostali od 10 w kolejności floty; wpisy sesji mają własne `panel.kolejnosc`."""
+    out = []
+    for i, a in enumerate(x for x in lista if x.get("temat_tg") and not x.get("test")):
+        out.append({"klucz": f"f:{a['name']}", "zrodlo": "flota", "zaplecze": "hermes", "profil": a["name"],
+                    "nazwa": a["nazwa"], "nazwa_en": a.get("nazwa_en") or a["nazwa"],
+                    "opis": a.get("rola") or a.get("opis") or "", "opis_en": a.get("rola_en") or a.get("opis_en") or "",
+                    "temat": a["temat_tg"], "pokoj": a.get("pokoj") or "",
+                    "kolejnosc": 1 if a["temat_tg"] == "general" else 10 + i, "potwierdzenia": False, "blad": ""})
+    return out
+
+
+def rozmowcy_sesji(wpisy: list[dict]) -> list[dict]:
+    """Rozmówcy z sesje.json (`panel.zaplecze = omp`, omp_sesje.rozmowcy): klucz `s:<wpis>`."""
+    out = []
+    for w in wpisy:
+        klucz = str(w.get("klucz") or "")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", klucz):
+            continue
+        out.append({"klucz": f"s:{klucz}", "zrodlo": "sesje", "zaplecze": "omp", "wpis": klucz,
+                    "nazwa": str(w.get("nazwa") or klucz), "nazwa_en": str(w.get("nazwa_en") or w.get("nazwa") or klucz),
+                    "opis": str(w.get("opis") or ""), "opis_en": str(w.get("opis_en") or w.get("opis") or ""),
+                    "czat": str(w.get("czat") or ""), "watek_tg": str(w.get("watek") or ""), "pokoj": "",
+                    "kolejnosc": int(w.get("kolejnosc") if w.get("kolejnosc") is not None else 99),
+                    "potwierdzenia": bool(w.get("potwierdzenia")), "blad": str(w.get("blad") or "")})
+    return out
+
+
 class Agenci:
     """Lista agentów z pamięcią po mtime obu plików. `e2e` domyślnie z env `JARVO_E2E`."""
 
@@ -136,3 +165,8 @@ class Agenci:
             return True
         a = self.agent(nazwa)
         return bool(a and a["test"] and self.e2e())
+
+    def rozmowcy(self, wpisy_sesji: list[dict] | None = None) -> list[dict]:
+        """Rozmówcy panelu: flota z tematem Telegrama i wpisy sesji omp, posortowani po `kolejnosc` (D7)."""
+        lista = rozmowcy_floty(self.lista()) + rozmowcy_sesji(wpisy_sesji or [])
+        return sorted(lista, key=lambda r: (r["kolejnosc"], r["klucz"]))

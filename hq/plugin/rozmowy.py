@@ -215,7 +215,36 @@ CREATE TABLE meta (klucz TEXT PRIMARY KEY, wartosc TEXT NOT NULL);
 CREATE TABLE migracje (wersja INTEGER PRIMARY KEY, at REAL NOT NULL);
 """
 
-MIGRACJE: tuple[str, ...] = (MIGRACJA_1,)     # migracja n = MIGRACJE[n - 1]; nowe tylko dopisujemy na końcu
+# Migracja 2 (centrum, krok 1b): rozmówcy. Wątek rozmówcy to zwykły wątek z `rozmowca = <klucz>` (unikalny; CHECK
+# na `rodzaj` zostaje bez zmian, bo SQLite nie zmienia CHECK bez przebudowy tabeli). `zaplecze` wątku i przebiegu:
+# hermes albo omp. `lustro_at`: kopia do tematu Telegrama poszła (jedna na przebieg).
+MIGRACJA_2 = """
+ALTER TABLE watki ADD COLUMN rozmowca TEXT;
+ALTER TABLE watki ADD COLUMN zaplecze TEXT NOT NULL DEFAULT 'hermes' CHECK (zaplecze IN ('hermes','omp'));
+CREATE UNIQUE INDEX watki_rozmowca ON watki (rozmowca) WHERE rozmowca IS NOT NULL;
+ALTER TABLE przebiegi ADD COLUMN zaplecze TEXT NOT NULL DEFAULT 'hermes' CHECK (zaplecze IN ('hermes','omp'));
+ALTER TABLE przebiegi ADD COLUMN lustro_at REAL;
+ALTER TABLE przebiegi ADD COLUMN lustro TEXT;
+CREATE TABLE rozmowcy (
+  klucz          TEXT PRIMARY KEY,
+  zrodlo         TEXT NOT NULL CHECK (zrodlo IN ('flota','nakladka','sesje')),
+  nazwa          TEXT NOT NULL,
+  nazwa_en       TEXT NOT NULL DEFAULT '',
+  zaplecze       TEXT NOT NULL CHECK (zaplecze IN ('hermes','omp')),
+  cel            TEXT NOT NULL,
+  czat           TEXT,
+  watek_tg       TEXT,
+  stan           TEXT NOT NULL DEFAULT 'wolny',
+  stan_od        REAL,
+  lustro         INTEGER NOT NULL DEFAULT 1,
+  kolejnosc      INTEGER NOT NULL DEFAULT 0,
+  kolejnosc_wlasna INTEGER,
+  watek_id       TEXT REFERENCES watki(id) ON DELETE SET NULL,
+  usuniety_at    REAL
+);
+"""
+
+MIGRACJE: tuple[str, ...] = (MIGRACJA_1, MIGRACJA_2)     # migracja n = MIGRACJE[n - 1]; nowe tylko dopisujemy na końcu
 
 # kolumny JSON i logiczne każdej tabeli (dekodowane przy odczycie, kodowane przy zapisie)
 JSON_POLA = {
@@ -230,13 +259,15 @@ BOOL_POLA = {
     "przebiegi": ("nadzorowany", "odlaczony", "stop_lokalny"),
     "przekazy": ("spoznione",),
     "sesje": ("przypieta",),
+    "rozmowcy": ("lustro",),
 }
 POLA_PRZEBIEGU = frozenset({
     "watek_id", "wpis_id", "agent", "rola", "zrodlo", "lancuch_id", "lancuch_zrodlo", "hop", "przekaz_z",
     "nadzorowany", "nadzor_stan", "nadzor_przez", "nadzor_zgoda", "nadzor_zgoda_przez", "nadzor_dla", "sesja_id",
     "run_id", "stan", "powod", "odlaczony", "stop_lokalny", "dopisany_do", "user_msg_id", "cialo_sha", "kroki",
     "proby", "nastepna_proba_at", "wyslany_at", "przyjety_at", "zakonczony_at", "ostatnie_zdarzenie_at",
-    "ostatnie_zdarzenie", "zgoda", "blad", "uzycie", "payload", "payload_sha", "autor", "ponowienie_z",
+    "ostatnie_zdarzenie", "zgoda", "blad", "uzycie", "payload", "payload_sha", "autor", "ponowienie_z", "zaplecze",
+    "lustro_at", "lustro",
 })
 POLA_PRZEKAZU = frozenset({"klucz", "watek_id", "akcja", "od_agenta", "do_agenta", "tresc", "pliki", "stan", "powod",
                            "rola", "lancuch_id", "przebieg_id", "z_przebiegu", "spoznione", "at"})
@@ -499,9 +530,9 @@ class Rozmowy:
             if filtr == "archiwum":
                 warunki.append("w.archiwum = 1")
             elif filtr == "przypiete":
-                warunki.append("w.przypiety = 1 AND w.archiwum = 0")
-            else:
-                warunki.append("w.archiwum = 0")
+                warunki.append("w.przypiety = 1 AND w.archiwum = 0 AND w.rozmowca IS NULL")
+            else:                                  # wątki rozmówców mają swoją sekcję (GET /rozmowcy)
+                warunki.append("w.archiwum = 0 AND w.rozmowca IS NULL")
         if q.strip():
             warunki.append("(w.tytul_szukaj LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM wpisy e WHERE e.watek_id = w.id "
                            "AND e.rodzaj = 'wlasciciel' AND e.szukaj LIKE ? ESCAPE '\\'))")
@@ -588,6 +619,91 @@ class Rozmowy:
                 arg.append(status)
             c.execute(f"UPDATE watki SET {', '.join(sql)} WHERE id = ?", (*arg, wid))
         return self.watek(wid)
+
+    # ------------------------------------------------------------------------------------------- rozmówcy
+    def rozmowcy(self, *, z_usunietymi: bool = False) -> list[dict]:
+        """Rozmówcy w kolejności (własna z PATCH, inaczej z konfiguracji), bez usuniętych z konfiguracji."""
+        sql = "SELECT * FROM rozmowcy" + ("" if z_usunietymi else " WHERE usuniety_at IS NULL")
+        with self._odczyt() as c:
+            out = [_wiersz("rozmowcy", r) for r in c.execute(sql)]
+        return sorted(out, key=lambda r: (r["kolejnosc_wlasna"] if r["kolejnosc_wlasna"] is not None else r["kolejnosc"],
+                                          r["klucz"]))
+
+    def rozmowca(self, klucz: str) -> dict | None:
+        with self._odczyt() as c:
+            return _wiersz("rozmowcy", c.execute("SELECT * FROM rozmowcy WHERE klucz = ?", (klucz,)).fetchone())
+
+    def rozmowca_watku(self, wid: str) -> dict | None:
+        with self._odczyt() as c:
+            return _wiersz("rozmowcy", c.execute("SELECT r.* FROM rozmowcy r JOIN watki w ON w.rozmowca = r.klucz "
+                                                 "WHERE w.id = ?", (wid,)).fetchone())
+
+    def zsynchronizuj_rozmowcow(self, lista: Iterable[Mapping]) -> dict:
+        """Rozmówcy z konfiguracji (agenci.rozmowcy) → tabela `rozmowcy` i ich stałe wątki (idempotentnie). Wpis,
+        który zniknął z konfiguracji: wątek do Archiwum z linią systemu, historia zostaje; powrót wpisu = powrót
+        wątku. Zwraca {"nowe": [klucze], "usuniete": [klucze]}."""
+        teraz = self.zegar()
+        obecne = {str(r["klucz"]): dict(r) for r in lista}
+        nowe, usuniete = [], []
+        with self._tx() as c:
+            stare = {r["klucz"]: _wiersz("rozmowcy", r) for r in c.execute("SELECT * FROM rozmowcy")}
+            for klucz, r in obecne.items():
+                zaplecze = "omp" if r.get("zaplecze") == "omp" else "hermes"
+                cel = str(r.get("profil") or r.get("wpis") or klucz)
+                byl = stare.get(klucz)
+                wid = (byl or {}).get("watek_id")
+                if wid is None or c.execute("SELECT 1 FROM watki WHERE id = ?", (wid,)).fetchone() is None:
+                    row = c.execute("SELECT id FROM watki WHERE rozmowca = ?", (klucz,)).fetchone()
+                    if row is not None:
+                        wid = row["id"]
+                    else:
+                        wid = nowe_id("w", teraz)
+                        tytul = str(r.get("nazwa") or klucz)[:TYTUL_MAX]
+                        c.execute("INSERT INTO watki (id, tytul, tytul_zrodlo, tytul_szukaj, koordynator, utworzony_at, "
+                                  "aktywnosc_at, przeczytane_at, rozmowca, zaplecze) VALUES (?, ?, 'import', ?, ?, ?, ?, ?, ?, ?)",
+                                  (wid, tytul, zloz(tytul), cel if zaplecze == "hermes" else klucz, teraz, teraz, teraz,
+                                   klucz, zaplecze))
+                        nowe.append(klucz)
+                c.execute("UPDATE watki SET archiwum = 0, usuniety_at = NULL, zaplecze = ?, tytul = ?, tytul_szukaj = ? "
+                          "WHERE id = ?", (zaplecze, str(r.get("nazwa") or klucz)[:TYTUL_MAX], zloz(str(r.get("nazwa") or klucz)), wid))
+                pola = (str(r.get("zrodlo") or "flota"), str(r.get("nazwa") or klucz), str(r.get("nazwa_en") or ""),
+                        zaplecze, cel, r.get("czat") or None, r.get("watek_tg") or None, int(r.get("kolejnosc") or 0), wid)
+                if byl is None:
+                    c.execute("INSERT INTO rozmowcy (zrodlo, nazwa, nazwa_en, zaplecze, cel, czat, watek_tg, kolejnosc, "
+                              "watek_id, klucz, stan_od) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (*pola, klucz, teraz))
+                else:
+                    c.execute("UPDATE rozmowcy SET zrodlo = ?, nazwa = ?, nazwa_en = ?, zaplecze = ?, cel = ?, czat = ?, "
+                              "watek_tg = ?, kolejnosc = ?, watek_id = ?, usuniety_at = NULL WHERE klucz = ?", (*pola, klucz))
+            for klucz, byl in stare.items():
+                if klucz in obecne or byl.get("usuniety_at"):
+                    continue
+                c.execute("UPDATE rozmowcy SET usuniety_at = ? WHERE klucz = ?", (teraz, klucz))
+                if byl.get("watek_id"):
+                    c.execute("UPDATE watki SET archiwum = 1 WHERE id = ?", (byl["watek_id"],))
+                usuniete.append((klucz, byl.get("watek_id")))
+        for klucz, wid in usuniete:
+            if wid:
+                self.dodaj_wpis(wid, rodzaj="system", tekst="Rozmówca usunięty z konfiguracji",
+                                dane={"typ": "rozmowca_usuniety"}, klucz=f"usuniety:{klucz}:{int(teraz)}")
+        return {"nowe": nowe, "usuniete": [k for k, _w in usuniete]}
+
+    def zmien_rozmowce(self, klucz: str, *, lustro: bool | None = None, kolejnosc: int | None = None,
+                       stan: str | None = None) -> dict | None:
+        sql, arg = [], []
+        if lustro is not None:
+            sql.append("lustro = ?")
+            arg.append(int(bool(lustro)))
+        if kolejnosc is not None:
+            sql.append("kolejnosc_wlasna = ?")
+            arg.append(int(kolejnosc))
+        if stan is not None:
+            sql.append("stan_od = CASE WHEN stan = ? THEN stan_od ELSE ? END")
+            sql.append("stan = ?")
+            arg += [stan, self.zegar(), stan]
+        if sql:
+            with self._tx() as c:
+                c.execute(f"UPDATE rozmowcy SET {', '.join(sql)} WHERE klucz = ?", (*arg, klucz))
+        return self.rozmowca(klucz)
 
     # ------------------------------------------------------------------------------------------- członkowie i sesje
     def czlonek(self, wid: str, agent: str, rola: str = "rozmowa") -> dict | None:

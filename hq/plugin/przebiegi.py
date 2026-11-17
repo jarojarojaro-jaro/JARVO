@@ -113,6 +113,7 @@ ZGUBIONY_404_S = 60.0
 ZGUBIONY_S = 600.0
 ODPYTANIE_S = 2.0
 DELTA_S = 0.05
+OMP_ODSTEP_S = 0.5      # stan i ogon tury sesji omp (tylko w trakcie przebiegu)
 TEKST_MAKS = 256 * 1024
 MYSL_MAKS = 2048
 PODGLAD_MAKS = 500
@@ -264,6 +265,12 @@ class Rejestr:
         self._dlugo: set[str] = set()
         self._budzik: asyncio.Event | None = None
         self._dziala = False
+        # centrum (krok 1b/1d): koniec przebiegu dla lustra (silnik: Lustro.po_koncu) i zaplecze omp (omp_sesje.py
+        # wtyczki z katalogiem danych; wpis z `rozmowcy.cel`). Bez nich przebiegi omp kończą się błędem „niedostępny”.
+        self.po_koncu: Callable[[dict, str, str], Any] | None = None
+        self.omp = None
+        self.omp_dane: Path | None = None
+        self._omp_sledzone: dict[str, asyncio.Task] = {}
 
     # =========================================================================================== pomocnicze
     def _nazwy(self) -> dict[str, str]:
@@ -418,6 +425,12 @@ class Rejestr:
                 continue
             if p["stan"] == "kolejka":
                 continue
+            if p.get("zaplecze") == "omp":
+                if p["stan"] == "wysylanie":            # proces padł w trakcie zapisu do skrzynki: ten sam klucz
+                    self._zadanie(self._wyslij_omp(p["id"]))
+                else:
+                    self._sledz_omp(p["id"])
+                continue
             if p["stan"] == "wysylanie" and not p.get("run_id"):
                 self.log(f"jarvo-hq: przebieg {p['id']}: wysyłka po restarcie (ten sam klucz)")
                 self._zadanie(self._wyslij(p["id"]))
@@ -464,7 +477,7 @@ class Rejestr:
         """Jedna runda dyspozytora: które przebiegi z kolejki mogą iść teraz."""
         teraz = self.zegar()
         aktywne = self.db.przebiegi_aktywne()
-        w_limicie = sum(1 for p in aktywne if p["stan"] in STANY_W_LIMICIE)
+        w_limicie = sum(1 for p in aktywne if p["stan"] in STANY_W_LIMICIE and p.get("zaplecze") != "omp")
         zajete = {(p["watek_id"], p["agent"], p.get("rola") or "rozmowa") for p in aktywne if p["stan"] in STANY_W_LIMICIE}
         widziane: set[tuple] = set()
         w_koszu: dict[str, bool] = {}
@@ -485,6 +498,12 @@ class Rejestr:
                 continue
             widziane.add(k)
             if p.get("nastepna_proba_at") and float(p["nastepna_proba_at"]) > teraz:
+                continue
+            if p.get("zaplecze") == "omp":              # skrzynka sesji: bez bramy i bez limitu, jeden naraz na wpis
+                biezacy = self._przejdz(p, "wysylanie", proby=int(p.get("proby") or 0) + 1, nastepna_proba_at=None)
+                if biezacy["stan"] == "wysylanie":
+                    zajete.add(k)
+                    self._zadanie(self._wyslij_omp(p["id"]))
                 continue
             rodowod = self._rodowod(p)
             if rodowod:
@@ -516,9 +535,10 @@ class Rejestr:
         if tekst is not None:
             payload.update(tekst=tekst, wprost=False, obrazy=[])
             pola["payload_sha"] = self.kontekst.payload_sha(tekst, 0)
+        zaplecze = (self.db.watek(watek_id) or {}).get("zaplecze") or "hermes"
         p = self.db.dodaj_przebieg(watek_id=watek_id, wpis_id=wpis_id, agent=agent, rola=rola, zrodlo=zrodlo,
                                    lancuch_id=lancuch_id, autor=autor, payload=payload, nadzorowany=nadzorowany,
-                                   ponowienie_z=ponowienie_z, hop=hop, **pola)
+                                   ponowienie_z=ponowienie_z, hop=hop, zaplecze=zaplecze, **pola)
         self.log(f"jarvo-hq: przebieg {p['id']} {agent} —→kolejka(start)")
         self._nadaj_stan(p)
         self._status_watku(watek_id)
@@ -566,22 +586,24 @@ class Rejestr:
         nazwy = self._nazwy()
         blok = ""
         kod = self.kontekst.kod()
-        try:
-            pozycje = await self._w_tle(lambda: self.scalanie.pozycje_kontekstu(
-                self.db, self.czytnik, wid, budzenia=self.budzenia, etykieta=self.etykieta))
-            koord = None
-            if agent == watek.get("koordynator") and rola == "rozmowa":
-                w_toku = sorted({q["agent"] for q in self.db.przebiegi_watku(wid, aktywne=True)
-                                 if q["agent"] != agent and q["stan"] in STANY_W_LIMICIE})
-                koord = {"ostatnia": self.scalanie.ostatnia_praca(pozycje, agent), "w_toku": w_toku, "do_sprawdzenia": []}
-            # blok w wątku roboczym: wpisy są czyszczone (sekrety, podróbki znaczników) w całości, zanim zostaną
-            # przycięte, a długie odpowiedzi agentów nie mogą wstrzymać pętli silnika (strumienie, inne przebiegi)
-            blok = await self._w_tle(lambda: self.kontekst.blok(
-                pozycje, agent=agent, tytul=watek.get("tytul") or "", kod_bloku=kod, rola=rola,
-                widzial_at=float(czl.get("widzial_at") or 0), wpis_id=p.get("wpis_id"), nazwy=nazwy, teraz=teraz,
-                utajnij=self.utajnij, koordynator=koord))
-        except Exception as exc:  # oś czasu nieczytelna (schemat Hermesa): wysyłamy bez bloku, dziennik mówi czemu
-            self.log(f"jarvo-hq: przebieg {p['id']}: blok kontekstu pominięty ({type(exc).__name__})")
+        if not watek.get("rozmowca"):               # wątek rozmówcy: jeden agent, blok kontekstu nic nie dodaje
+            try:
+                pozycje = await self._w_tle(lambda: self.scalanie.pozycje_kontekstu(
+                    self.db, self.czytnik, wid, budzenia=self.budzenia, etykieta=self.etykieta))
+                koord = None
+                if agent == watek.get("koordynator") and rola == "rozmowa":
+                    w_toku = sorted({q["agent"] for q in self.db.przebiegi_watku(wid, aktywne=True)
+                                     if q["agent"] != agent and q["stan"] in STANY_W_LIMICIE})
+                    koord = {"ostatnia": self.scalanie.ostatnia_praca(pozycje, agent), "w_toku": w_toku,
+                             "do_sprawdzenia": []}
+                # blok w wątku roboczym: wpisy są czyszczone (sekrety, podróbki znaczników) w całości, zanim zostaną
+                # przycięte, a długie odpowiedzi agentów nie mogą wstrzymać pętli silnika (strumienie, inne przebiegi)
+                blok = await self._w_tle(lambda: self.kontekst.blok(
+                    pozycje, agent=agent, tytul=watek.get("tytul") or "", kod_bloku=kod, rola=rola,
+                    widzial_at=float(czl.get("widzial_at") or 0), wpis_id=p.get("wpis_id"), nazwy=nazwy, teraz=teraz,
+                    utajnij=self.utajnij, koordynator=koord))
+            except Exception as exc:  # oś czasu nieczytelna (schemat Hermesa): wysyłamy bez bloku, dziennik mówi czemu
+                self.log(f"jarvo-hq: przebieg {p['id']}: blok kontekstu pominięty ({type(exc).__name__})")
         tekst = self.kontekst.tekst_przebiegu(blok_kontekstu=blok, prosba=payload.get("prosba") or "", kod_bloku=kod,
                                               zlecenie=p.get("zrodlo") == "przekaz", utajnij=self.utajnij)
         wprost = bool(payload.get("obrazy")) and bool(self.obrazy_wprost())
@@ -612,6 +634,8 @@ class Rejestr:
             return czl.get("sesja_tip") or czl["sesja_id"]
         sid = f"jarvo_{wid}_{'nadzor' if rola == 'nadzor' else agent}"
         watek = self.db.watek(wid) or {}
+        if watek.get("rozmowca") and rola == "rozmowa":
+            sid = f"jarvo_r_{agent}"                 # temat bez sesji bramy: stała sesja panelu (centrum D5)
         nazwa = self._nazwy().get(agent, agent)
         tytul = " ".join(str(watek.get("tytul") or "Rozmowa").split())[:60]
         await self.brama.utworz_sesje(agent, sid, f"Jarvo · {tytul} · {nazwa}{' · nadzór' if rola == 'nadzor' else ''}")
@@ -628,6 +652,120 @@ class Rejestr:
             return False
         self.db.ustaw_przypieta(agent, sid, True)
         return True
+
+    # =========================================================================================== zaplecze omp
+    # Przebieg rozmówcy omp (centrum §3.2): wiadomość idzie do skrzynki sesji (omp_sesje.wyslij, klucz = id
+    # przebiegu), turę prowadzi proces skrzynki. Stany: przyjety(kolejka | terminal) → pracuje → gotowe | blad;
+    # ogon pliku tury co 0,5 s daje te same `przebieg.delta` i `przebieg.narzedzie` co brama Hermesa.
+    def _wpis_omp(self, p: Mapping):
+        if self.omp is None or self.omp_dane is None:
+            return None
+        r = self.db.rozmowca_watku(p["watek_id"])
+        if not r or r.get("zaplecze") != "omp":
+            return None
+        return self.omp.wpisy(self.omp_dane).get(r["cel"])
+
+    def _omp_niedostepny(self, p: Mapping | None, w) -> None:
+        powod = getattr(w, "blad", "") if w is not None else ""
+        self._koniec(p, "blad", blad={"kod": "niedostepny", "komunikat": "Rozmówca jest niedostępny"
+                                      + (f" ({powod})" if powod else "") + "."})
+
+    async def _wyslij_omp(self, pid: str) -> None:
+        p = self.db.przebieg(pid)
+        if not p or p["stan"] != "wysylanie":
+            return
+        try:
+            w = await self._w_tle(self._wpis_omp, p)
+            if w is None or getattr(w, "blad", ""):
+                self._omp_niedostepny(p, w)
+                return
+            payload = p.get("payload") or {}
+            r = self.db.rozmowca_watku(p["watek_id"]) or {}
+            tekst = payload.get("tekst") or payload.get("prosba") or ""
+            media = [str(o["path"]) for o in payload.get("obrazy") or [] if o.get("path")]
+            await self._w_tle(lambda: self.omp.wyslij(w, tekst, pid, media, lustro=bool(r.get("lustro", True))))
+        except Exception as exc:
+            self.log(f"jarvo-hq: przebieg {pid}: skrzynka sesji {type(exc).__name__}")
+            self._koniec(self.db.przebieg(pid), "blad", blad={"kod": "wewnetrzny",
+                                                              "komunikat": "Nie udało się położyć wiadomości w skrzynce sesji."})
+            return
+        teraz = self.zegar()
+        self._przejdz(self.db.przebieg(pid) or p, "przyjety", powod="kolejka", wyslany_at=p.get("wyslany_at") or teraz,
+                      przyjety_at=teraz)
+        self._sledz_omp(pid)
+
+    def _sledz_omp(self, pid: str) -> None:
+        t = self._omp_sledzone.get(pid)
+        if t is None or t.done():
+            self._omp_sledzone[pid] = self._zadanie(self._omp_petla(pid))
+
+    def _omp_zdarzenie(self, pid: str, e: Mapping) -> None:
+        teraz = self.zegar()
+        if e.get("typ") == "delta" and e.get("tekst"):
+            self._zdarzenie(pid, {"event": "message.delta", "delta": str(e["tekst"]), "timestamp": teraz})
+        elif e.get("typ") == "narzedzie":
+            self._zdarzenie(pid, {"event": "tool.started", "tool": str(e.get("nazwa") or "?"),
+                                  "preview": str(e.get("intencja") or ""), "timestamp": teraz})
+
+    async def _omp_petla(self, pid: str) -> None:
+        tura, od, brak = None, 0, 0
+        dz = self.dziennik(pid)
+        try:
+            while self._dziala:
+                p = self.db.przebieg(pid)
+                if p is None or p["stan"] in STANY_KONCOWE:
+                    return
+                w = await self._w_tle(self._wpis_omp, p)
+                if w is None:
+                    self._omp_niedostepny(p, w)
+                    return
+                st = await self._w_tle(self.omp.przebieg, w, pid)
+                s = st.get("stan")
+                if st.get("tura") and st["tura"] != tura:
+                    tura, od = st["tura"], 0
+                if tura and s in ("pracuje", "gotowe", "blad"):
+                    zdarzenia, od = await self._w_tle(self.omp.ogon, w, tura, od)
+                    for e in zdarzenia:
+                        self._omp_zdarzenie(pid, e)
+                    p = self.db.przebieg(pid) or p
+                if s == "kolejka":
+                    powod = "terminal" if st.get("terminal") else "kolejka"
+                    if p["stan"] == "przyjety" and p.get("powod") != powod:
+                        self._zmien(p, powod=powod)
+                elif s == "pracuje":
+                    if p["stan"] in ("przyjety", "czeka_na_ture"):
+                        self._przejdz(p, "pracuje")
+                elif s == "gotowe":
+                    if not dz.tekst and st.get("odpowiedz"):
+                        dz.dopisz(str(st["odpowiedz"]))
+                    self._koniec(p, "gotowe")
+                    return
+                elif s == "blad":
+                    if p["stan"] == "zatrzymywanie":
+                        self._koniec(p, "zatrzymane")
+                    else:
+                        self._koniec(p, "blad", blad={"kod": "omp", "komunikat": str(st.get("blad") or "Tura się nie udała.")[:300]})
+                    return
+                else:                                   # brak: plik jeszcze nie widoczny albo usunięty ze skrzynki
+                    brak += 1
+                    if brak > 20:
+                        self._koniec(p, "zgubione")
+                        return
+                self._zapisz_goraca(self.db.przebieg(pid) or p)
+                await asyncio.sleep(OMP_ODSTEP_S)
+        finally:
+            self._omp_sledzone.pop(pid, None)
+
+    async def _stop_omp(self, p: dict) -> dict:
+        if p["stan"] not in ("przyjety", "pracuje", "czeka_na_ture"):
+            raise Blad(409, "nieaktywny", "Ta praca już się nie toczy.", "This run is not active.")
+        if p["stan"] != "pracuje":
+            raise Blad(409, "w_skrzynce", "Wiadomość czeka w skrzynce sesji; zatrzymać można trwającą turę.",
+                       "The message is waiting in the session inbox; only a running turn can be stopped.")
+        w = await self._w_tle(self._wpis_omp, p)
+        if w is None or not await self._w_tle(self.omp.zatrzymaj, w):
+            raise Blad(409, "nieaktywny", "Nie udało się zatrzymać tury sesji.", "Could not stop the session turn.")
+        return self._przejdz(p, "zatrzymywanie", stop_lokalny=True)
 
     async def _wyslij(self, pid: str) -> None:
         p = self.db.przebieg(pid)
@@ -960,6 +1098,8 @@ class Rejestr:
     # =========================================================================================== stop, dopisz
     async def stop(self, pid: str) -> dict:
         p = self._wez(pid)
+        if p.get("zaplecze") == "omp" and p["stan"] != "zatrzymywanie":
+            return await self._stop_omp(p)
         if p["stan"] == "zatrzymywanie":
             if p.get("stop_lokalny") and pid not in self._stop_proby:
                 return p                                # stop doszedł do bramy: czekamy na koniec tury
@@ -1266,6 +1406,11 @@ class Rejestr:
         p = self._przejdz(p, stan, **pola)
         if p["stan"] != stan:
             return
+        if self.po_koncu is not None:
+            try:
+                self.po_koncu(p, stan, dz.tekst if dz is not None else "")
+            except Exception as exc:                     # lustro to dodatek: koniec przebiegu idzie dalej
+                self.log(f"jarvo-hq: przebieg {pid}: lustro {type(exc).__name__}")
         if dz is not None:
             dz.koniec_at = self.zegar()
         for t in (self._odpytywane.pop(pid, None),):
@@ -1377,7 +1522,7 @@ class Rejestr:
         for p in self.db.przebiegi_aktywne():
             pid = p["id"]
             p = self.db.przebieg(pid)               # lista sprzed sond tej pętli: każdy wiersz czytany na nowo
-            if p is None or p["stan"] in STANY_KONCOWE or p["stan"] == "kolejka":
+            if p is None or p["stan"] in STANY_KONCOWE or p["stan"] == "kolejka" or p.get("zaplecze") == "omp":
                 continue
             if p["stan"] == "dopisany":             # cel skończył się: rozstrzygnięcie z jego końca albo z osi czasu
                 if pid not in self._w_locie:

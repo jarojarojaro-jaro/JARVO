@@ -44,6 +44,7 @@ import functools
 import hashlib
 import os
 import time
+import re
 import unicodedata
 from collections import deque
 from pathlib import Path
@@ -99,6 +100,14 @@ class ZmianaWatkuBody(_Model):
     przypiety: bool | None = None
     archiwum: bool | None = None
     praca: Literal["zatrzymaj", "zostaw"] | None = None
+
+
+ROZMOWCA_RE = re.compile(r"^[fs]:[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+
+
+class ZmianaRozmowcyBody(_Model):
+    lustro: bool | None = None
+    kolejnosc: int | None = Field(None, ge=0, le=999)
 
 
 class PrzeczytaneBody(_Model):
@@ -480,13 +489,16 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
                             "This conversation's agent is no longer available.")
         return adresaci, wynik.tresc, ostrzezenia
 
-    def przygotuj_wysylke(body: WyslijBody, koordynator: str) -> dict:
+    def przygotuj_wysylke(body: WyslijBody, koordynator: str, adresat: str | None = None) -> dict:
         """Wszystko, co da się sprawdzić bez zapisu: obrazy, załączniki, adresaci, pusta treść (tempo sprawdza
         trasa przed czytaniem treści). Blokujące (dekodowanie do 7 MB obrazów, stat plików): trasa woła przez
-        `asyncio.to_thread`."""
+        `asyncio.to_thread`. `adresat` = wątek rozmówcy: jedna stała rozmowa, bez wzmianek innych agentów."""
         obrazy = obrazy_z(body)
         zalaczniki = zalaczniki_z(body)
-        adresaci, tresc, ostrzezenia = adresaci_z(body, koordynator)
+        if adresat:
+            adresaci, tresc, ostrzezenia = [adresat], body.tekst.strip(), []
+        else:
+            adresaci, tresc, ostrzezenia = adresaci_z(body, koordynator)
         if not tresc and not obrazy and not zalaczniki:
             raise BladTrasy(409, "pusta_tresc", "Nie ma czego wysłać.", "There is nothing to send.")
         ostrzezenia = [o for o in ostrzezenia if o != "pusta_tresc"]
@@ -568,8 +580,9 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
                     s_ = db.dodaj_wpis(wid, rodzaj="system", tekst=f"Dołącza: {n.get(a, a)}",
                                        dane={"typ": "dolaczyl", "agent": a})
                     hub.nadaj("watek.wpis", {"watek_id": wid, "wpis": s_}, watek_id=wid)
-        for a in adresaci:
-            db.zapewnij_czlonka(wid, a)
+        if watek.get("zaplecze") != "omp":      # sesja omp nie ma członków Hermesa (oś z pliku sesji)
+            for a in adresaci:
+                db.zapewnij_czlonka(wid, a)
         nowe: list[dict] = []
         if dopisany is not None:
             nowe.append(db.zmien_przebieg(dopisany["id"], wpis_id=w["id"]))
@@ -729,6 +742,9 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
             if body.przypiety is not None:
                 pola["przypiety"] = int(body.przypiety)
             if body.archiwum is not None:
+                if body.archiwum and (sil.db.watek(wid) or {}).get("rozmowca"):
+                    raise BladTrasy(409, "rozmowca", "Rozmowy z rozmówcą nie da się zarchiwizować.",
+                                    "A partner conversation cannot be archived.")
                 if body.archiwum:
                     await porzadek_pracy(sil, wid, body.praca)
                 pola["archiwum"] = int(body.archiwum)
@@ -744,7 +760,9 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
     @obsluga
     async def usun_rozmowe(wid: str, trwale: int = 0, praca: str = ""):
         sil = s()
-        await watek_lub_404(sil, wid)
+        w = await watek_lub_404(sil, wid)
+        if w.get("rozmowca"):
+            raise BladTrasy(409, "rozmowca", "Rozmowy z rozmówcą nie da się usunąć.", "A partner conversation cannot be deleted.")
         if praca not in ("", "zatrzymaj", "zostaw"):
             raise BladTrasy(422, "zle_dane", "Nieznany wybór pracy.", "Unknown work choice.")
 
@@ -800,7 +818,8 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
         try:
             return await asyncio.to_thread(
                 m.scalanie.os_watku, sil.db, sil.czytnik, wid, przed=przed or None, po=po or None, limit=limit,
-                budzenia=m.budzenia, etykieta=core.tool_label, utajnij=ochrona.utajnij, plik=plik)
+                budzenia=m.budzenia, etykieta=core.tool_label, utajnij=ochrona.utajnij, plik=plik,
+                omp_os=lambda r: omp_os(sil, r))
         except ValueError:
             raise BladTrasy(422, "zly_kursor", "Zły kursor osi czasu.", "Bad timeline cursor.") from None
 
@@ -817,7 +836,7 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
             for _ in range(EKSPORT_STRON):
                 o = m.scalanie.os_watku(sil.db, sil.czytnik, w["id"], przed=przed, limit=m.scalanie.LIMIT_MAKS,
                                         budzenia=m.budzenia, etykieta=core.tool_label, utajnij=ochrona.utajnij,
-                                        plik=plik)
+                                        plik=plik, omp_os=lambda r: omp_os(sil, r))
                 strony.append(o["pozycje"])
                 przed = o.get("przed")
                 if not przed or o.get("pelny"):
@@ -838,6 +857,53 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
         tylko_ta_strona(request)
         return {"agenci": await asyncio.to_thread(agenci.lista)}
 
+    # ------------------------------------------------------------------------------------------- rozmówcy
+    def omp_os(sil, r: dict) -> dict:
+        """Oś sesji omp rozmówcy (czytnik_omp.os_sesji, tylko odczyt, bez wyników narzędzi)."""
+        omp, czyt = getattr(m, "omp_sesje", None), getattr(m, "czytnik_omp", None)
+        if omp is None or czyt is None:
+            return {"blad": "brak czytnika"}
+        w = omp.wpisy(sil.home).get(r["cel"])
+        if w is None or w.blad:
+            return {"blad": (w.blad if w is not None else "brak wpisu")}
+        plik_ = omp.plik_sesji(w)
+        return czyt.os_sesji(plik_) if plik_ else {"blad": "brak pliku sesji"}
+
+    def adresat_rozmowcy(sil, w: dict) -> str | None:
+        if not w.get("rozmowca"):
+            return None
+        r = sil.db.rozmowca(w["rozmowca"])
+        if r is None or r.get("usuniety_at"):
+            raise BladTrasy(409, "rozmowca", "Tego rozmówcy nie ma już w konfiguracji.", "This partner is no longer configured.")
+        return r["cel"] if r["zaplecze"] == "hermes" else r["klucz"]
+
+    @trasa("GET", "/rozmowcy")
+    @obsluga
+    async def lista_rozmowcow(request: Request):
+        """Rozmówcy panelu (centrum §1): kolejność, stan, nieprzeczytane, lustro, wątek."""
+        tylko_ta_strona(request)
+        sil = s()
+        return {"rozmowcy": await asyncio.to_thread(sil.rozmowcy.lista)}
+
+    @trasa("PATCH", "/rozmowcy/{klucz}")
+    @obsluga
+    async def zmien_rozmowce(klucz: str, request: Request):
+        """Lustro wł./wył. i kolejność rozmówcy (jedyna nowa trasa zapisu Ustawień)."""
+        sil = s()
+        if not ROZMOWCA_RE.fullmatch(klucz):
+            raise BladTrasy(404, "brak", "Nie ma takiego rozmówcy.", "No such partner.")
+        body = await czytaj_cialo(request, ZmianaRozmowcyBody)
+
+        async def _r():
+            if sil.db.rozmowca(klucz) is None:
+                raise BladTrasy(404, "brak", "Nie ma takiego rozmówcy.", "No such partner.")
+            sil.db.zmien_rozmowce(klucz, lustro=body.lustro, kolejnosc=body.kolejnosc)
+            lista = sil.rozmowcy.lista()
+            hub.nadaj("rozmowcy.lista", {"rozmowcy": lista})
+            return {"rozmowca": next((r for r in lista if r["klucz"] == klucz), None)}
+
+        return await sil.wykonaj(_r())
+
     @trasa("POST", "/rozmowy/{wid}/wiadomosci", status_code=202)
     @obsluga
     async def wiadomosc(wid: str, request: Request):
@@ -850,7 +916,8 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
             jest = await asyncio.to_thread(powtorka, sil, wid, body.klucz)
             if jest is not None:                    # powtórzone żądanie: zapisana odpowiedź, bez walidacji i tempa
                 return JSONResponse(jest, status_code=202)
-            prz = await asyncio.to_thread(przygotuj_wysylke, body, w.get("koordynator") or "jarvo")
+            adresat = await asyncio.to_thread(adresat_rozmowcy, sil, w)
+            prz = await asyncio.to_thread(przygotuj_wysylke, body, w.get("koordynator") or "jarvo", adresat)
             wynik = await sil.wykonaj(wyslij_na_silniku(sil, wid, body, prz))
             nowy = bool(wynik.pop("_nowy", False))
             return JSONResponse(wynik, status_code=202)

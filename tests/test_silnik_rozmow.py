@@ -26,7 +26,8 @@ M = SimpleNamespace(**{n: load_script(f"hq/plugin/{p}.py", f"jarvo_test_sr_{n}")
     ("hq_core", "hq_core"), ("ochrona", "ochrona"), ("agenci", "agenci"), ("rozmowy", "rozmowy"),
     ("czytnik", "czytnik"), ("kontekst", "kontekst"), ("wzmianki", "wzmianki"), ("budzenia", "budzenia"),
     ("scalanie", "scalanie"), ("brama", "brama"), ("strumien", "strumien"), ("przebiegi", "przebiegi"),
-    ("prace", "prace"), ("karty", "karty"), ("obserwator", "obserwator"), ("silnik", "silnik"))})
+    ("prace", "prace"), ("karty", "karty"), ("obserwator", "obserwator"), ("tematy", "tematy"), ("lustro", "lustro"),
+    ("omp_sesje", "omp_sesje"), ("rozmowcy", "rozmowcy"), ("silnik", "silnik"))})
 trasy = load_script("hq/plugin/trasy_rozmow.py", "jarvo_test_sr_trasy")
 P = "/api/plugins/jarvo-hq"
 PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")

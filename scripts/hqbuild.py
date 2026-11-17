@@ -44,7 +44,9 @@ PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "ochrona.py", "e
                 # panel w sieci Tailscale: drugi nasłuch z logowaniem kluczem jednorazowym (docs/HQ.md „Panel w sieci”)
                 "siec.py",
                 # sesje omp jako rozmówcy (centrum 1d): skrzynka, stan, ogon tury; oś z pliku sesji bez wyników narzędzi
-                "omp_sesje.py", "czytnik_omp.py")
+                "omp_sesje.py", "czytnik_omp.py",
+                # rozmówcy panelu (centrum 1b): sesja tematu Telegrama, lustro panel → temat, stałe wątki i stan
+                "tematy.py", "lustro.py", "rozmowcy.py")
 
 
 def bundle_js(src_dir: Path | None = None, naglowek: str = "Jarvo HQ: plugin dashboardu Hermesa. Plik generowany przez scripts/hqbuild.py z hq/web/src/.") -> str:
