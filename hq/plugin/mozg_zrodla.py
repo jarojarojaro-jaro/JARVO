@@ -14,18 +14,12 @@
 Testy: tests/test_mozg_zrodla.py.
 """
 
-from __future__ import annotations
-
 import asyncio
 import json
 import re
 from pathlib import Path
 from typing import Callable
 
-try:  # trasy tylko we wtyczce; funkcje czyste działają i bez FastAPI (testy)
-    from fastapi import Request
-except ImportError:  # pragma: no cover
-    Request = None
 
 
 GRAF_MAKS = 16 * 1024 * 1024
@@ -149,6 +143,10 @@ class Zrodla:
 
 
 def dolacz(router, *, konfig: Path, log: Callable[[str], None] | None = None) -> Zrodla:
+    # import tutaj (bez `from __future__ import annotations`): adnotacja trasy to klasa z FastAPI w chwili
+    # rejestracji, a funkcje czyste działają i bez FastAPI
+    from fastapi import Request
+
     log = log or (lambda _m: None)
     zrodla = Zrodla(konfig)
 
