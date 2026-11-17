@@ -14,6 +14,7 @@ import gzip
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -259,10 +260,42 @@ def test_websocket_z_sesja_jak_z_petli_zwrotnej(sc):
     assert dict(scope["headers"])[b"origin"] == b"http://127.0.0.1:9119"
 
 
-def test_strona_logowania_dostaje_skrypt_klucza(sc):
-    status, h, tresc = wolaj(bramka(sc), "/login", zapytanie=b"next=%2Fjarvo")
-    assert status == 200 and b"klucz=" in tresc and tresc.endswith(b"</body></html>")
+@pytest.fixture
+def strona(tmp_path, monkeypatch):
+    """logowanie.html jak w buildzie wtyczki (scripts/hqbuild.py), obok „wtyczki” w tmp."""
+    sys.path.insert(0, str(REPO / "scripts"))
+    import hqbuild
+    plik = tmp_path / hqbuild.LOGOWANIE_SIECI
+    plik.write_bytes(hqbuild.strona_logowania_sieci())
+    monkeypatch.setattr(s, "STRONA_LOGOWANIA", plik)
+    return plik.read_bytes()
+
+
+def test_strona_logowania_jarva_bez_hermesa(sc, strona):
+    """GET /login podaje bramka: strona Jarva (wygląd jarvo.pl), bez wołania Hermesa i bez innych plików."""
+    app = Aplikacja()
+    status, h, tresc = wolaj(bramka(sc, app), "/login", zapytanie=b"next=%2Fjarvo")
+    assert status == 200 and tresc == strona and app.wolania == []
+    assert naglowek(h, b"content-type") == [b"text/html; charset=utf-8"] and naglowek(h, b"cache-control") == [b"no-store"]
     assert naglowek(h, b"content-length") == [str(len(tresc)).encode()]
+    tekst = tresc.decode("utf-8")
+    assert 'data-provider="jarvo"' in tekst and "/auth/password-login" in tekst and "klucz=" in tekst
+    assert "Klucz jednorazowy" in tekst and "jarvo panel klucz" in tekst and 'lang="pl"' in tekst
+    for obce in ("Hermes Agent", "Nous", "Public bind", "Auth required", "Choose a sign-in", "@@"):
+        assert obce not in tekst, obce
+    assert tekst.count("data:font/woff2;base64,") == 4 and 'aria-label="JARVO"' in tekst     # kroje i logo w pliku
+    zasoby = set(re.findall(r'(?:src|href)="([^"]*)"', tekst)) | set(re.findall(r"url\((?!data:)([^)]*)\)", tekst))
+    assert zasoby == {"/favicon.svg"}                    # jedyny inny plik: publiczna ikona z dista
+    status, h, spakowane = wolaj(bramka(sc), "/login", naglowki=[("accept-encoding", "gzip")])
+    assert naglowek(h, b"content-encoding") == [b"gzip"] and gzip.decompress(spakowane) == strona
+    assert wolaj(bramka(sc, app), "/auth/password-login", metoda="POST")[0] == 200 and len(app.wolania) == 1
+
+
+def test_bez_pliku_strona_logowania_hermesa(sc, tmp_path, monkeypatch):
+    monkeypatch.setattr(s, "STRONA_LOGOWANIA", tmp_path / "brak.html")
+    app = Aplikacja()
+    status, _, tresc = wolaj(bramka(sc, app), "/login")
+    assert status == 200 and tresc == LOGOWANIE and [w["path"] for w in app.wolania] == ["/login"]
 
 
 def test_bez_sesji_zadna_strona_spa_z_tokenem(sc):

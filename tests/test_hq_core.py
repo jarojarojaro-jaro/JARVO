@@ -296,7 +296,7 @@ def test_hq_plugin_build(tmp_path):
 
     dash = hqbuild.build_plugin(tmp_path / "jarvo-hq")
     for rel in ("manifest.json", "plugin_api.py", "hq_core.py", "ochrona.py", "animacja.py", "pomiar.py", "konwertuj.py", "fleet.json",
-                "dist/index.js", "dist/LICENSE-htm", "dist/fonts/fosfor.css"):
+                "logowanie.html", "dist/index.js", "dist/LICENSE-htm", "dist/fonts/fosfor.css"):
         assert (dash / rel).exists(), rel
     assert not (dash / "dist" / "style.css").exists()        # style tylko na /jarvo, przez loader (zasoby/app-<h>.css)
     # figura floty: iso.py ze szablonem, licencją iso-glow i krojem OFL (bez przykładów)

@@ -10,9 +10,9 @@ pętli zdarzeń serwer uvicorn na `<adres Tailscale>:<port panelu>`, który prze
 
   1. Host: dokładnie adres z ustawień albo nazwa MagicDNS (z portem albo bez), inaczej 400 jak strażnik Hosta
      Hermesa (DNS rebinding, GHSA-ppp5-vxwm-4cf7). Origin, gdy jest, wskazuje ten sam serwer, inaczej 403.
-  2. Bez sesji przechodzą tylko strona logowania Hermesa (`/login`, `/auth/password-login`, `/auth/logout`)
-     i statyczne zasoby (strona HTML z nich = 404: brakujący plik w /fonts/ Hermes odsyła jako index.html SPA
-     z tokenem sesji loopbacku); reszta: `/api/…` = 401 JSON, strona = 302 na `/login?next=…`, WebSocket = odmowa
+  2. Bez sesji przechodzą tylko logowanie (`/login`, `/auth/password-login`, `/auth/logout`) i statyczne zasoby
+     (strona HTML z nich = 404: brakujący plik w /fonts/ Hermes odsyła jako index.html SPA z tokenem sesji
+     loopbacku); reszta: `/api/…` = 401 JSON, strona = 302 na `/login?next=…`, WebSocket = odmowa
      przed przyjęciem. Sesja to ciasteczka Hermesa (`hermes_session_at`, `hermes_session_rt`), wydane przez trasę
      `/auth/password-login` Hermesa i dostawcę `jarvo` (rejestr dostawców Hermesa, `register_global_provider`),
      podpisane HMAC sekretem z `<dane>/jarvo/konfig/panel-siec.sekret`. Dostęp 12 h, odświeżenie 30 dni
@@ -27,8 +27,11 @@ pętli zdarzeń serwer uvicorn na `<adres Tailscale>:<port panelu>`, który prze
 Logowanie: `jarvo panel klucz` wydaje klucz JRV-XXXX-XXXX-XXXX (alfabet Crockforda, 60 bitów) z ważnością
 (domyślnie 1 h); na dysku zostaje tylko skrót SHA-256 z czasem wygaśnięcia w `<dane>/jarvo/wejscie` (katalog 700,
 pliki 600, jak dawny infra/bin/jarvo-klucz). Pierwsze użycie przenosi plik skrótu atomowo, więc klucz działa raz,
-także przy dwóch równoczesnych próbach. Link `http://<adres>:<port>/login#klucz=…`: klucz jest w części po #, nie
-idzie do serwera z adresem; skrypt dopisany do strony logowania wpisuje go w formularz Hermesa i wysyła.
+także przy dwóch równoczesnych próbach. Stronę `GET /login` podaje sama bramka: `logowanie.html` z buildu wtyczki
+(scripts/hqbuild.py z branding/panel-siec/logowanie.html, wygląd jarvo.pl, jeden plik bez innych zasobów); wysyła
+klucz do `/auth/password-login` Hermesa (dostawca `jarvo`). Bez tego pliku idzie strona logowania Hermesa (każda
+nazwa użytkownika, hasło = klucz). Link `http://<adres>:<port>/login#klucz=…`: klucz jest w części po #, nie idzie
+do serwera z adresem; skrypt strony wpisuje go i wysyła.
 `jarvo panel siec wyloguj` zmienia sekret: każda sesja traci ważność od razu (sekret czytamy przy zmianie pliku).
 
 Włączenie: `<dane>/jarvo/konfig/panel-siec.json` (`jarvo panel siec on|off`): {"wlaczony", "adres", "nazwa"}.
@@ -97,31 +100,9 @@ NAGLOWKI_POSREDNIKA = frozenset({b"x-forwarded-for", b"x-forwarded-host", b"x-fo
 ODMOWA_HOSTA = {"detail": "Invalid Host header. Dashboard requests must use the bound hostname or the configured "
                           "public hostname."}
 
-# dopisek do strony logowania Hermesa: pole użytkownika ukryte (dostawca go nie potrzebuje), hasło = klucz, a klucz
-# z części adresu po # wpisany i wysłany od razu (formularz obsługuje skrypt Hermesa: fetch /auth/password-login)
-SKRYPT_LOGOWANIA = """<script>
-(function () {
-  var f = document.querySelector('form.provider-form[data-provider="jarvo"]');
-  if (!f) return;
-  var u = f.querySelector('input[name=username]'), p = f.querySelector('input[name=password]');
-  var t = f.querySelector('.form-title'), b = f.querySelector('button[type=submit]');
-  if (t) t.textContent = 'Jarvo: wejście kluczem';
-  if (b) b.textContent = 'Wejdź';
-  if (u) { u.value = 'jarvo'; var lu = u.closest('label'); if (lu) lu.style.display = 'none'; }
-  if (!p) return;
-  var lp = p.closest('label') && p.closest('label').querySelector('.field-label');
-  if (lp) lp.textContent = 'Klucz jednorazowy (od operatora: jarvo panel klucz)';
-  p.setAttribute('autocomplete', 'one-time-code');
-  p.setAttribute('placeholder', 'JRV-XXXX-XXXX-XXXX');
-  var m = /(?:^#|&)klucz=([A-Za-z0-9-]{10,40})(?:&|$)/.exec(location.hash || '');
-  if (location.hash) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
-  if (!m) return;
-  p.value = m[1].toUpperCase();
-  if (f.requestSubmit) f.requestSubmit(); else if (b) b.click();
-})();
-</script>"""
-
 _log = logging.getLogger("jarvo.hq.siec")
+# strona logowania Jarva obok tego pliku we wtyczce (scripts/hqbuild.py LOGOWANIE_SIECI)
+STRONA_LOGOWANIA = Path(__file__).with_name("logowanie.html")
 
 
 # ---------------------------------------------------------------------------------------------- ścieżki i pliki
@@ -465,6 +446,15 @@ def publiczna(sciezka: str) -> bool:
     return sciezka in PUBLICZNE or sciezka.startswith(PUBLICZNE_PRZEDROSTKI)
 
 
+def strona_logowania() -> bytes | None:
+    """Strona logowania Jarva (plik obok wtyczki) albo None, gdy jej nie ma: wtedy idzie strona Hermesa."""
+    try:
+        return STRONA_LOGOWANIA.read_bytes()
+    except OSError:
+        _log.warning("panel w sieci: brak %s, strona logowania Hermesa", STRONA_LOGOWANIA.name)
+        return None
+
+
 def bezpieczny_next(sciezka: str, zapytanie: str) -> str:
     """Cel po zalogowaniu (jak is_safe_next_path Hermesa): ścieżka strony, nie /api i nie trasy logowania."""
     if not sciezka.startswith("/") or sciezka.startswith("//") or sciezka == "/api" or sciezka.startswith("/api/"):
@@ -581,7 +571,10 @@ class Bramka:
         wyslij = self._gzip(scope, send)
         if publiczna(sciezka):
             if sciezka == "/login" and scope.get("method") == "GET":
-                wyslij = self._z_dopiskiem(wyslij)
+                strona = strona_logowania()
+                if strona is not None:
+                    await self._odpowiedz(wyslij, 200, strona, b"text/html; charset=utf-8")
+                    return
             elif sciezka not in TRASY_LOGOWANIA:
                 wyslij = self._bez_strony(wyslij)
             await self.app(self._jak_lokalne(scope, klient_lokalny=False), receive, wyslij)
@@ -670,31 +663,6 @@ class Bramka:
             if wiadomosc.get("type") == "http.response.start":
                 wiadomosc = {**wiadomosc, "headers": [*(wiadomosc.get("headers") or ()), *ustaw_ciastka(sesja)]}
             await send(wiadomosc)
-        return wyslij
-
-    @staticmethod
-    def _z_dopiskiem(send):
-        """Strona logowania Hermesa (HTML, cała w jednej odpowiedzi) z SKRYPT_LOGOWANIA przed </body>."""
-        start: dict = {}
-        czesci: list[bytes] = []
-
-        async def wyslij(wiadomosc: dict) -> None:
-            if wiadomosc.get("type") == "http.response.start":
-                start.update(wiadomosc)
-                return
-            if wiadomosc.get("type") != "http.response.body" or not start:
-                await send(wiadomosc)
-                return
-            czesci.append(wiadomosc.get("body") or b"")
-            if wiadomosc.get("more_body"):
-                return
-            tresc = b"".join(czesci)
-            naglowki = [(k, v) for k, v in start.get("headers") or () if k != b"content-length"]
-            if start.get("status") == 200 and b"</body>" in tresc:
-                i = tresc.rfind(b"</body>")
-                tresc = tresc[:i] + SKRYPT_LOGOWANIA.encode() + tresc[i:]
-            await send({**start, "headers": [*naglowki, (b"content-length", str(len(tresc)).encode())]})
-            await send({"type": "http.response.body", "body": tresc})
         return wyslij
 
 

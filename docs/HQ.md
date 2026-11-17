@@ -1396,11 +1396,17 @@ jarvo panel siec off       # koniec nasłuchu w sieci; 127.0.0.1 bez zmian
   i Origin `127.0.0.1:<port>`, bez `X-Forwarded-*` i `Forwarded` od klienta; WebSocket z adresem klienta 127.0.0.1.
   Dalej działa zwykła ochrona loopbacku (token sesji z index.html, ochrona zapisu HQ, limity), więc zakładka Jarvo,
   czat (SSE, WebSocket), Wiedza i reszta panelu działają w sieci tak samo jak lokalnie.
-- **Logowanie.** Dostawca `jarvo` w rejestrze logowania Hermesa (formularz `/login` Hermesa, POST
-  `/auth/password-login`, limit 10 prób na minutę z adresu): hasłem jest klucz jednorazowy. Na dysku tylko skrót
-  SHA-256 klucza z czasem wygaśnięcia (`<dane>/jarvo/wejscie`, katalog 700, pliki 600); pierwsze użycie przenosi plik
-  atomowo, więc klucz działa raz. Link `http://<adres>:<port>/login?next=%2Fjarvo#klucz=…`: klucz w części po #
-  nie idzie do serwera z adresem; skrypt dopisany do strony logowania wpisuje go i wysyła. Sesja to ciasteczka
+- **Logowanie.** Dostawca `jarvo` w rejestrze logowania Hermesa (POST `/auth/password-login`, limit 10 prób na minutę
+  z adresu): hasłem jest klucz jednorazowy. Na dysku tylko skrót SHA-256 klucza z czasem wygaśnięcia
+  (`<dane>/jarvo/wejscie`, katalog 700, pliki 600); pierwsze użycie przenosi plik atomowo, więc klucz działa raz.
+  Stronę `GET /login` podaje bramka, nie Hermes: wygląd jarvo.pl (logo, kolory, DM Sans i JetBrains Mono z `site/`),
+  teksty po polsku (po angielsku, gdy w panelu wybrano inny język), jedno pole „Klucz jednorazowy” i podpowiedź, skąd
+  go wziąć. Źródło `branding/panel-siec/logowanie.html`; build wtyczki (`scripts/hqbuild.py`) wstawia logo i kroje
+  jako data: URL i zapisuje `logowanie.html` obok `siec.py`, więc bez sesji nie trzeba żadnych innych plików. Strona
+  logowania obrazu (branding/logowanie, `patch_dashboard.py`) łata Pythona Hermesa tylko w kontenerze; natywnie łatka
+  `--web` zostawia Hermesa bez zmian, stąd osobna strona panelu w sieci. Link
+  `http://<adres>:<port>/login?next=%2Fjarvo#klucz=…`: klucz w części po # nie idzie do serwera z adresem; strona
+  wpisuje go i wchodzi sama. Sesja to ciasteczka
   Hermesa (`hermes_session_at` 12 h, `hermes_session_rt` 30 dni, odnawiane przy każdym odświeżeniu), podpisane HMAC
   sekretem `<dane>/jarvo/konfig/panel-siec.sekret` (32 bajty, tylko właściciel, nigdy na ekranie ani w logach).
 - **Szybkość.** Sprawdzenie sesji to jeden HMAC i `stat` pliku sekretu (treść czytana tylko po zmianie pliku), bez

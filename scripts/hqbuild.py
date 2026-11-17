@@ -7,8 +7,9 @@
 Plugin: <out>/dashboard/{manifest.json, plugin_api.py, hq_core.py, przenosne.py, sciezki.py, ochrona.py, edytor.py,
 animacja.py, rozmowy.py, czytnik.py, wzmianki.py, kontekst.py, agenci.py, brama.py, strumien.py, przebiegi.py, scalanie.py,
 budzenia.py, prace.py, obserwator.py, silnik.py, trasy_rozmow.py, aplikacja.py, podpowiedzi.py, glos.py, mozg.py,
-trasy_aplikacji.py, pomiar.py, liczby.py, _sciezki.py, konwertuj.py, izometria/, fleet.json, dzwieki/, dist/index.js, dist/zasoby/,
-dist/fonts/}. Pakiet, loader i pliki demo mają końce linii „\\n” także na Windows (te same bajty na każdym systemie).
+trasy_aplikacji.py, pomiar.py, liczby.py, _sciezki.py, konwertuj.py, izometria/, fleet.json, logowanie.html, dzwieki/,
+dist/index.js, dist/zasoby/, dist/fonts/}. Pakiet, loader i pliki demo mają końce linii „\\n” także na Windows (te same
+bajty na każdym systemie).
 Pakiet aplikacji to sklejone hq/web/src/*.js (w kolejności nazw) w jednym IIFE, z htm (Apache-2.0) na początku; trafia do
 dist/zasoby/app-<sha256[:12]>.js (z bliźniakiem .gz), style do app-<h>.css, kroje aplikacji do zasoby/kroje/.
 dist/index.js to mały loader (≤ 4 KB, dashboard serwuje go na każdej stronie): rejestruje zakładkę /jarvo i dopiero
@@ -18,6 +19,7 @@ na niej wczytuje pakiet przez trasę /api/plugins/jarvo-hq/zasoby/ (cache na rok
 from __future__ import annotations
 
 import argparse
+import base64
 import gzip
 import hashlib
 import json
@@ -495,6 +497,31 @@ def zapisz_pakiety(zasoby: Path) -> tuple[str, str]:
     return (zasob(zasoby, "app-rdzen", pliki["app-rdzen.js"], "js"), zasob(zasoby, "app-rdzen", pliki["app-rdzen.css"], "css"))
 
 
+# strona logowania panelu w sieci (hq/plugin/siec.py, docs/HQ.md „Panel w sieci”): wygląd jarvo.pl z site/ (logo,
+# DM Sans i JetBrains Mono z tymi samymi @font-face co site/style.css), wszystko w jednym pliku HTML: bramka podaje
+# go bez sesji, a poza /login, /auth/… i plikami Hermesa nic innego nie jest dostępne bez logowania
+LOGOWANIE_SIECI = "logowanie.html"
+
+
+def strona_logowania_sieci() -> bytes:
+    """branding/panel-siec/logowanie.html z logo (site/assets/logo.svg) i krojami jarvo.pl jako data: URL."""
+    site = fl.REPO_ROOT / "site"
+    fonty = []
+    for blok in re.findall(r"@font-face\s*\{[^}]*\}", (site / "style.css").read_text(encoding="utf-8")):
+        plik = re.search(r"url\((['\"]?)(assets/fonts/[\w.-]+\.woff2)\1\)", blok)
+        if not plik:
+            raise SystemExit(f"site/style.css: @font-face bez pliku woff2 z assets/fonts/: {blok[:80]}")
+        dane = base64.b64encode((site / plik.group(2)).read_bytes()).decode("ascii")
+        fonty.append(" ".join(blok.replace(plik.group(0), f"url(data:font/woff2;base64,{dane})").split()))
+    if len(fonty) < 2:
+        raise SystemExit("site/style.css: brak @font-face krojów jarvo.pl (DM Sans, JetBrains Mono)")
+    logo = (site / "assets" / "logo.svg").read_text(encoding="utf-8").strip()
+    szablon = (fl.REPO_ROOT / "branding" / "panel-siec" / "logowanie.html").read_text(encoding="utf-8")
+    if szablon.count("@@FONTY@@") != 1 or szablon.count("@@LOGO@@") != 1:
+        raise SystemExit("branding/panel-siec/logowanie.html: potrzebne dokładnie jedno @@FONTY@@ i jedno @@LOGO@@")
+    return szablon.replace("@@FONTY@@", "\n".join(fonty)).replace("@@LOGO@@", logo).encode("utf-8")
+
+
 def build_plugin(out: Path, fleet: fl.Fleet | None = None) -> Path:
     dash = out / "dashboard"
     if out.exists():
@@ -533,6 +560,7 @@ def build_plugin(out: Path, fleet: fl.Fleet | None = None) -> Path:
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "przyklady", "examples"))
     fl.kopiuj_kroje_izometrii(dash / "izometria" / "scripts")
     fl.write_json(dash / "fleet.json", fleet_json(fleet))
+    (dash / LOGOWANIE_SIECI).write_bytes(strona_logowania_sieci())
     return dash
 
 

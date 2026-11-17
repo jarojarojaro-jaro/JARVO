@@ -1,0 +1,237 @@
+<!doctype html>
+<!-- Jarvo: strona logowania panelu w sieci Tailscale (GET /login za bramką hq/plugin/siec.py, docs/HQ.md „Panel
+     w sieci”). Wygląd jak jarvo.pl (site/: logo, kolory, DM Sans i JetBrains Mono). scripts/hqbuild.py wstawia
+     kroje jako data: URL i logo z site/assets/logo.svg (znaczniki w <style> i w <header>), więc strona nie potrzebuje
+     innych plików. Wejście: POST /auth/password-login Hermesa z dostawcą „jarvo” (hasło = klucz jednorazowy z
+     `jarvo panel klucz`); link z #klucz=… wpisuje klucz i wchodzi sam. Język jak w panelu: localStorage
+     „hermes-locale”, bez wyboru polski. -->
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E121A">
+<meta name="robots" content="noindex">
+<title>Wejście · Jarvo</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+@@FONTY@@
+:root {
+  --bg: #0E121A; --ink: #F2F1E8; --crimson: #D4213D; --lime: #B8FF3D; --steel: #747D90; --muted: #A2AABB;
+  --line: #2B303C; --panel: #0F131B; --pole: #0B0E14;
+  --sans: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); }
+body { font-family: var(--sans); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh; min-height: 100svh; display: flex; }
+:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+::selection { background: var(--lime); color: #10131C; }
+
+.strona { width: 100%; max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column;
+  padding: 28px max(32px, env(safe-area-inset-right)) 28px max(32px, env(safe-area-inset-left)); }
+.nav { flex: none; display: flex; align-items: center; height: 76px; padding: 0 26px; border: 1px solid var(--line); border-radius: 6px; }
+.nav svg { display: block; height: 36px; width: auto; }
+.nav-info { margin-left: auto; display: flex; align-items: center; gap: 12px; font: 500 12px var(--mono); letter-spacing: .26em;
+  text-transform: uppercase; color: var(--muted); }
+
+.glowna { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 470px); gap: 72px; align-items: center; padding: 56px 6px 40px; }
+.kicker { display: flex; align-items: center; gap: 16px; margin: 0; font: 500 13px var(--mono); letter-spacing: .32em; text-transform: uppercase; color: var(--muted); }
+.kropka { width: 12px; height: 12px; flex: none; background: var(--lime);
+  clip-path: polygon(20% 0, 80% 0, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0 80%, 0 20%); }
+h1 { margin: 22px 0 0; font-weight: 900; font-size: clamp(44px, 6.4vw, 86px); line-height: .94; letter-spacing: -.025em; text-transform: uppercase; }
+h1 > span { display: block; }
+.lime { color: var(--lime); } .red { color: var(--crimson); }
+.sub { margin: 24px 0 0; font-size: clamp(20px, 2.3vw, 30px); line-height: 1.3; letter-spacing: -.005em; }
+
+.term { border: 1px solid var(--line); border-radius: 7px; background: var(--panel); box-shadow: 0 30px 90px rgba(0, 0, 0, .45); }
+.term-bar { display: flex; align-items: center; height: 46px; padding: 0 18px; }
+.dots { display: flex; gap: 10px; }
+.dots i { width: 12px; height: 12px; border-radius: 50%; background: #F2564A; }
+.dots i:nth-child(2) { background: #F5B731; } .dots i:nth-child(3) { background: #36C24C; }
+.term-ver { margin-left: auto; font: 13px var(--mono); letter-spacing: .08em; color: #8E96A8; text-transform: uppercase; }
+.term-body { margin: 0 10px 10px; padding: 22px 22px 24px; border: 1px solid var(--line); border-radius: 4px; }
+.t-line { margin: 0 0 22px; min-height: 3em; font: 15px/1.5 var(--mono); }
+.t-who { color: var(--lime); margin-right: 10px; }
+.t-who::after { content: " ›"; color: var(--steel); }
+.kursor { display: inline-block; width: 9px; height: 17px; margin-left: 4px; vertical-align: -3px; background: var(--lime); animation: kursor 1.06s steps(1) infinite; }
+@keyframes kursor { 50% { opacity: 0; } }
+
+form { margin: 0; }
+.etykieta { display: block; margin: 0 0 10px; font: 500 12px var(--mono); letter-spacing: .22em; text-transform: uppercase; color: var(--muted); }
+.pole { display: block; width: 100%; height: 56px; margin: 0; padding: 0 16px; background: var(--pole); color: var(--ink);
+  border: 1.5px solid var(--line); border-radius: 4px; font: 500 18px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+  transition: border-color .15s, box-shadow .15s; }
+.pole::placeholder { color: #4A5160; }
+.pole:focus { outline: none; border-color: var(--lime); box-shadow: 0 0 0 3px rgba(184, 255, 61, .18); }
+.pole[aria-invalid="true"], .pole[aria-invalid="true"]:focus { border-color: var(--crimson); box-shadow: 0 0 0 3px rgba(212, 33, 61, .22); }
+.blad { margin: 12px 0 0; font-size: 15px; line-height: 1.45; color: #FF6B80; }
+.blad[hidden] { display: none; }
+.btn { margin-top: 18px; width: 100%; height: 60px; display: flex; align-items: center; justify-content: center; gap: 20px;
+  background: var(--lime); color: #10131C; border: 0; border-radius: 4px; font: 500 21px var(--sans); cursor: pointer;
+  transition: transform .15s, box-shadow .2s, opacity .2s; }
+.btn:hover { box-shadow: 0 0 0 3px rgba(184, 255, 61, .25), 0 0 34px rgba(184, 255, 61, .35); transform: translateY(-1px); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .65; cursor: progress; transform: none; box-shadow: none; }
+.btn:focus-visible { outline-color: var(--ink); }
+.strzalka { display: inline-block; width: 18px; height: 14px; position: relative; flex: none; }
+.strzalka::before { content: ""; position: absolute; left: 0; right: 2px; top: 6px; height: 2px; background: currentColor; }
+.strzalka::after { content: ""; position: absolute; right: 1px; top: 1.5px; width: 9px; height: 9px; border: solid currentColor;
+  border-width: 2px 2px 0 0; transform: rotate(45deg); }
+.podpowiedz { margin: 20px 4px 0; font-size: 15.5px; line-height: 1.6; color: #B9BFCB; }
+code { font: 500 14px var(--mono); color: var(--ink); background: #161B25; padding: 2px 7px; border-radius: 3px; white-space: nowrap; }
+
+.kroki { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.kroki li { display: grid; grid-template-columns: auto 1fr; align-content: start; gap: 6px 22px; padding: 24px 28px 4px; }
+.kroki li + li { border-left: 1px solid var(--line); }
+.kroki b { grid-row: span 2; font: 400 16px var(--mono); letter-spacing: .12em; color: #8F97A9; }
+.kroki strong { font: 600 15px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+.kroki span { font: 15px/1.55 var(--mono); letter-spacing: .03em; color: #AEB5C4; }
+.kroki li:nth-child(1) strong { color: var(--ink); } .kroki li:nth-child(2) strong { color: var(--lime); } .kroki li:nth-child(3) strong { color: var(--crimson); }
+
+/* telefon i wąskie okna: jedna kolumna, jak jarvo.pl na telefonie */
+@media (max-width: 860px) {
+  .strona { padding: 12px max(16px, env(safe-area-inset-right)) 20px max(16px, env(safe-area-inset-left)); }
+  .nav { height: 52px; padding: 0 12px; }
+  .nav svg { height: 28px; }
+  .nav-info { font-size: 10.5px; letter-spacing: .2em; gap: 8px; }
+  .nav-info .kropka { width: 8px; height: 8px; }
+  .glowna { grid-template-columns: minmax(0, 1fr); gap: 26px; align-items: start; align-content: start; padding: 28px 0 0; }
+  .kicker { font-size: 11px; gap: 10px; }
+  .kicker .kropka { width: 9px; height: 9px; }
+  h1 { margin-top: 14px; font-size: clamp(36px, 11vw, 60px); }
+  .sub { margin-top: 12px; font-size: clamp(18px, 5vw, 24px); }
+  .term-bar { height: 40px; padding: 0 14px; }
+  .dots { gap: 8px; } .dots i { width: 10px; height: 10px; }
+  .term-ver { font-size: 11.5px; }
+  .term-body { margin: 0 8px 8px; padding: 18px 16px 18px; }
+  .t-line { font-size: 14px; margin-bottom: 18px; }
+  .pole { font-size: 17px; letter-spacing: .05em; padding: 0 14px; }
+  .btn { height: 56px; font-size: 19px; }
+  .podpowiedz { font-size: 15px; margin: 18px 2px 0; }
+  .kroki { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="strona">
+  <header class="nav">
+    @@LOGO@@
+    <span class="nav-info"><span class="kropka" aria-hidden="true"></span><span data-t="nav">Panel w sieci</span></span>
+  </header>
+  <main class="glowna">
+    <section>
+      <p class="kicker"><span class="kropka" aria-hidden="true"></span><span data-t="kicker">Wejście do panelu</span></p>
+      <h1><span data-t="h1a">Twój zespół</span><span><span class="lime" data-t="h1b">już</span> <span class="red" data-t="h1c">czeka.</span></span></h1>
+      <p class="sub" data-t="sub">Twoja cyfrowa prawa ręka. Wejdź kluczem jednorazowym.</p>
+    </section>
+    <section aria-labelledby="klucz-tytul">
+      <div class="term">
+        <div class="term-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="term-ver">Jarvo</span></div>
+        <div class="term-body">
+          <p class="t-line" aria-live="polite"><span class="t-who">jarvo</span><span id="dymek" data-t="witaj">Cześć! Wpisz klucz i wchodzimy.</span><span class="kursor" aria-hidden="true"></span></p>
+          <form class="provider-form" data-provider="jarvo" id="wejscie" novalidate>
+            <label class="etykieta" for="klucz" id="klucz-tytul" data-t="etykieta">Klucz jednorazowy</label>
+            <input class="pole" id="klucz" name="password" type="text" inputmode="text" autocomplete="one-time-code"
+                   autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="40"
+                   placeholder="JRV-XXXX-XXXX-XXXX" aria-describedby="blad podpowiedz" required>
+            <p class="blad" id="blad" role="alert" hidden></p>
+            <button class="btn" type="submit"><span data-t="wejdz">Wejdź</span><i class="strzalka" aria-hidden="true"></i></button>
+          </form>
+        </div>
+      </div>
+      <p class="podpowiedz" id="podpowiedz"><span data-t="rada1">Klucz dostaniesz poleceniem</span> <code>jarvo panel klucz</code> <span data-t="rada2">na komputerze, na którym działa Jarvo. Działa raz, przez godzinę.</span></p>
+    </section>
+  </main>
+  <ol class="kroki">
+    <li><b>01</b><strong data-t="k1">Klucz</strong><span data-t="k1o">Jarvo daje Ci klucz albo gotowy link.</span></li>
+    <li><b>02</b><strong data-t="k2">Wejście</strong><span data-t="k2o">Wpisujesz klucz tutaj albo klikasz link.</span></li>
+    <li><b>03</b><strong data-t="k3">Gotowe</strong><span data-t="k3o">To urządzenie zostaje zalogowane.</span></li>
+  </ol>
+</div>
+<script>
+(function () {
+  var EN = {
+    nav: 'Remote panel', kicker: 'Sign in to the panel', h1a: 'Your team', h1b: 'is', h1c: 'waiting.',
+    sub: 'Your digital right hand. Sign in with a one-time key.', witaj: 'Hi! Enter your key and we\u2019re in.',
+    etykieta: 'One-time key', wejdz: 'Sign in', rada1: 'Get a key with the command',
+    rada2: 'on the computer that runs Jarvo. It works once, for one hour.',
+    k1: 'Key', k1o: 'Jarvo gives you a key or a ready link.', k2: 'Sign in', k2o: 'Enter the key here or open the link.',
+    k3: 'Done', k3o: 'This device stays signed in.',
+    mam: 'Got your key. Signing you in\u2026', jest: 'You\u2019re in!', pusty: 'Enter your key.',
+    zly: 'This key doesn\u2019t work: it\u2019s wrong, already used or expired. Ask for a new one.',
+    duzo: 'Too many attempts. Wait a moment and try again.', inny: 'Couldn\u2019t sign in. Try again.',
+    siec: 'Can\u2019t reach Jarvo. Check your connection and try again.', znowu: 'Hmm, that key won\u2019t let me in.'
+  };
+  var PL = {
+    mam: 'Mam Twój klucz. Wchodzimy\u2026', jest: 'Wchodzimy!', pusty: 'Wpisz klucz.',
+    zly: 'Ten klucz nie działa: jest błędny, już użyty albo wygasł. Poproś o nowy.',
+    duzo: 'Za dużo prób. Odczekaj chwilę i spróbuj jeszcze raz.', inny: 'Nie udało się wejść. Spróbuj jeszcze raz.',
+    siec: 'Brak połączenia z Jarvem. Sprawdź sieć i spróbuj jeszcze raz.', znowu: 'Hmm, ten klucz mnie nie wpuści.'
+  };
+  var wybor = null;
+  try { wybor = localStorage.getItem('hermes-locale'); } catch (e) {}
+  var en = !!wybor && !/^pl/i.test(wybor);
+  var T = en ? EN : PL;
+  if (en) {
+    document.documentElement.lang = 'en';
+    document.title = 'Sign in \u00b7 Jarvo';
+    var el = document.querySelectorAll('[data-t]');
+    for (var i = 0; i < el.length; i++) { var k = el[i].getAttribute('data-t'); if (EN[k]) el[i].textContent = EN[k]; }
+  }
+
+  var form = document.getElementById('wejscie');
+  var pole = document.getElementById('klucz');
+  var blad = document.getElementById('blad');
+  var btn = form.querySelector('button[type=submit]');
+  var dymek = document.getElementById('dymek');
+  var nastepny = new URLSearchParams(location.search).get('next') || '';
+
+  // klucz z linku (`jarvo panel klucz`): tylko w części po #, więc nie idzie do serwera z adresem i nie zostaje w historii
+  var m = /(?:^#|&)klucz=([A-Za-z0-9-]{10,40})(?:&|$)/.exec(location.hash || '');
+  if (location.hash) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
+
+  function pokazBlad(tekst) {
+    blad.textContent = tekst; blad.hidden = false;
+    pole.setAttribute('aria-invalid', 'true');
+  }
+
+  function wejdz() {
+    var kod = pole.value.replace(/\s+/g, '').toUpperCase();
+    blad.hidden = true; blad.textContent = ''; pole.removeAttribute('aria-invalid');
+    if (!kod) { pokazBlad(T.pusty); pole.focus(); return; }
+    btn.disabled = true; pole.readOnly = true;
+    fetch('/auth/password-login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+      body: JSON.stringify({ provider: form.getAttribute('data-provider'), username: 'jarvo', password: kod, next: nastepny })
+    }).then(function (r) {
+      if (r.ok) {
+        return r.json().then(function (dane) {
+          dymek.textContent = T.jest;
+          window.location.assign((dane && dane.next) || '/jarvo');
+        });
+      }
+      pokazBlad(r.status === 429 ? T.duzo : (r.status === 401 ? T.zly : T.inny));
+      if (r.status === 401) { dymek.textContent = T.znowu; pole.value = ''; }
+      btn.disabled = false; pole.readOnly = false; pole.focus();
+    }).catch(function () {
+      pokazBlad(T.siec);
+      btn.disabled = false; pole.readOnly = false;
+    });
+  }
+
+  form.addEventListener('submit', function (ev) { ev.preventDefault(); if (!btn.disabled) wejdz(); });
+  pole.addEventListener('input', function () { pole.removeAttribute('aria-invalid'); blad.hidden = true; });
+  if (m) {
+    pole.value = m[1].toUpperCase();
+    dymek.textContent = T.mam;
+    wejdz();
+  } else if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) {
+    pole.focus();
+  }
+})();
+</script>
+</body>
+</html>
