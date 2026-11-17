@@ -2177,6 +2177,10 @@ def _start_silnika():
 
 HUB = _start_silnika()
 trasy_rozmow.dolacz(router, m=roz, silnik=_silnik, hub=HUB, agenci=AGENCI, inbox=core.JARVO_DIR / "inbox", log=_log_hq)
+# panel w sieci Tailscale (siec.py, docs/HQ.md „Panel w sieci”): drugi nasłuch tego dashboardu z logowaniem kluczem
+# jednorazowym, gdy <dane>/jarvo/konfig/panel-siec.json ma wlaczony (jarvo panel siec on); 127.0.0.1 bez zmian
+siec = _load("jarvo_hq_siec", "siec.py")
+siec.zahacz(core.JARVO_DIR, _log_hq)
 # start aplikacji (GET /app, podpowiedzi N0): gotowość bez sekretów (aplikacja.py), nawyki.db (podpowiedzi.py)
 GOTOWOSC = roz.aplikacja.Gotowosc(home=HOME, profil=HOME / "profiles" / "jarvo",
                                   user_md=core.JARVO_DIR / "knowledge" / "user" / "USER.md", api_base=API_BASE)

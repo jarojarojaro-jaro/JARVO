@@ -542,7 +542,8 @@ bezpieczeństwo web, landing jarvo.pl z nagłówkami.
    Hermes z przypięcia, nadzorca `jarvo serwis`, autostart, dziennik zmian hosta, polecenie `jarvo`, instalator
    i bootstrap `jarvo/bootstrap/install.ps1|sh`, wtyczka zgód `zgody/`; CI `natywnie.yml` instaluje poleceniem z README
    na Windows x64 i arm64, macOS arm64 i Linuksie x64 i arm64. Po instalacji: `jarvo` (rozmowa), `jarvo panel`,
-   `jarvo status`, `jarvo doctor`, `jarvo down`/`up`.
+   `jarvo status`, `jarvo doctor`, `jarvo down`/`up`; panel z Maca albo telefonu w sieci Tailscale: `jarvo panel siec on`
+   i `jarvo panel klucz` (klucz jednorazowy, 127.0.0.1 bez hasła; [HQ.md §2g](HQ.md#2g-panel-w-sieci-tailscale)).
 
 **Odrzucone (nie wpinamy):** RedAmon (offensive pentest — za ciężki, ryzyko prawne),
 terminal-browser (ciężka przeglądarka desktopowa, nie dla agentów na VPS),

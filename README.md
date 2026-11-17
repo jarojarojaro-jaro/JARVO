@@ -60,7 +60,9 @@ Krótszy adres po wgraniu strony (`scripts/deploy-site.sh`): `curl -fsSL https:/
 `irm https://jarvo.pl/install.ps1 | iex` (przekierowanie na ten sam bootstrap, `site/.htaccess`).
 
 Potem `jarvo` (rozmowa w terminalu, tryby zgód `--tryb pytaj|projekt|pelny`), `jarvo panel`, `jarvo status`,
-`jarvo doctor`, `jarvo update`, `jarvo down` / `jarvo up`, `jarvo uninstall` (`jarvo help`: wszystkie). Inny dysk:
+`jarvo doctor`, `jarvo update`, `jarvo down` / `jarvo up`, `jarvo uninstall` (`jarvo help`: wszystkie). Panel
+z Maca albo telefonu w sieci Tailscale: `jarvo panel siec on` i `jarvo panel klucz` (logowanie kluczem jednorazowym,
+127.0.0.1 dalej bez hasła; [docs/HQ.md §2g](docs/HQ.md#2g-panel-w-sieci-tailscale)). Inny dysk:
 przed poleceniem `$env:JARVO_ROOT = 'D:\Jarvo'` (Windows) albo `JARVO_ROOT=/sciezka` (macOS, Linux). Stara
 instalacja z Dockerem albo WSL: to samo polecenie ją wykrywa, stawia wersję natywną i przenosi dane (`jarvo migruj`,
 pytanie o zgodę przed każdą zmianą); bez zgody stara flota pracuje dalej. Szczegóły: [docs/INSTALER.md](docs/INSTALER.md),

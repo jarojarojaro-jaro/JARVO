@@ -36,7 +36,8 @@ Krótszy adres po wgraniu strony: `curl -fsSL https://jarvo.pl/install.sh | bash
   `<dane>/jarvo/models/e5-small`) i koło tokenizers w venvie narzędzi (ok. 3 MB). Z nich nadzorca uruchamia usługę
   `wektory` (jeden ciepły model na instalację, ok. 0,5 GB RAM), z której przypomnienia skarbca szukają po znaczeniu
   ([WIEDZA.md](WIEDZA.md) §7); bez niej przypomnienia działają po słowach jak wcześniej.
-- Polecenia: `jarvo` (rozmowa w terminalu, jak `jarvo chat`), `jarvo panel`, `jarvo status`, `jarvo doctor`, `jarvo up`,
+- Polecenia: `jarvo` (rozmowa w terminalu, jak `jarvo chat`), `jarvo panel` (w sieci Tailscale: `jarvo panel siec
+  on|off|status|wyloguj` i `jarvo panel klucz`, [HQ.md §2g](HQ.md#2g-panel-w-sieci-tailscale)), `jarvo status`, `jarvo doctor`, `jarvo up`,
   `jarvo down` (serwis stoi do `jarvo up`), `jarvo logs`, `jarvo autostart on|off|status`, `jarvo chat` (profil `jarvo`,
   `--profil`, `--tryb pytaj|projekt|pelny`), `jarvo wiedza`, `jarvo rutyny`, `jarvo telegram`, `jarvo komputer`
   (Komputer Jarva; `jarvo komputer rece` = ręce na Twoim ekranie, domyślnie wyłączone), `jarvo android`, `jarvo telefon`

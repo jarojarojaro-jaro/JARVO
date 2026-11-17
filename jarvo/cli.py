@@ -11,6 +11,8 @@ JARVO_ROOT) ustawia korzeń jak JARVO_ROOT: zadanie Harmonogramu nie przekazuje 
                        autostart nie podniesie go sam, aż `jarvo up`, `jarvo panel` albo instalacja (N02)
   status [--json]      serwis z kanału nadzorcy (bez niego z <stan>/nadzorca.json), wersje, autostart, porty (N03)
   panel                startuje serwis, gdy nie działa, czeka na panel i otwiera go w przeglądarce (N06)
+  panel siec on|off|status|wyloguj, panel klucz
+                       panel w sieci Tailscale z logowaniem kluczem jednorazowym (jarvo/panel_siec.py, H10, I11)
   chat                 rozmowa w terminalu: `hermes -p <profil> chat` w środowisku Jarva, tryb zgód w JARVO_TRYB_ZGOD
                        (sekcja d; tryb egzekwuje wtyczka zgód z etapu E4)
   logs [usługa] [-f]   logi nadzorcy i usług (<logi>) i Hermesa (<dane>/logs) (N04)
@@ -146,9 +148,14 @@ def _parser() -> argparse.ArgumentParser:
     s.add_argument("--json", action="store_true", help="wynik w JSON (CI, skrypty)")
     s.set_defaults(funkcja=polecenie_status)
 
-    s = sub.add_parser("panel", help="otwiera panel w przeglądarce (startuje serwis, gdy trzeba)")
+    s = sub.add_parser("panel", help="otwiera panel w przeglądarce (startuje serwis, gdy trzeba); panel w sieci "
+                       "Tailscale: panel siec on|off|status|wyloguj, panel klucz",
+                       description="Samo `jarvo panel` otwiera panel na 127.0.0.1 (bez hasła). `jarvo panel siec on` "
+                       "dokłada nasłuch na adresie Tailscale z logowaniem kluczem jednorazowym (`jarvo panel klucz`).")
     s.add_argument("--bez-przegladarki", action="store_true", help="tylko uruchom i wypisz adres")
     s.set_defaults(funkcja=polecenie_panel)
+    from . import panel_siec                # panel w sieci Tailscale (docs/HQ.md „Panel w sieci”)
+    panel_siec.dodaj_polecenia(s)
 
     s = sub.add_parser("chat", help="rozmowa z Jarvem w terminalu (domyślne polecenie)", allow_abbrev=False,
                        description="Rozmowa przez Hermesa w środowisku Jarva. Dodatkowe argumenty idą do "
@@ -652,6 +659,11 @@ def stan_nakladki(u: Uklad) -> dict | None:
     return n if isinstance(n, dict) and n.get("sciezka") else None
 
 
+def _panel_siec():
+    from . import panel_siec                     # panel w sieci Tailscale: opcjonalny (docs/HQ.md „Panel w sieci”)
+    return panel_siec
+
+
 def zbierz_status(u: Uklad, ot: Otoczenie) -> dict:
     biez = srodowisko.biezace(u)
     stan, powod = stan_serwisu(u, ot)
@@ -677,6 +689,7 @@ def zbierz_status(u: Uklad, ot: Otoczenie) -> dict:
         "panel": adres_panelu(ot.env),
         "nakladka": stan_nakladki(u),
         "panel_jarva": panel,
+        "panel_siec": _panel_siec().do_statusu(u, ot),
     }
 
 
@@ -750,6 +763,9 @@ def opis_statusu(r: dict) -> str:
     w.append("  porty:      " + ", ".join(f"{port} {'zajęty' if p['zajety'] else 'wolny'} ({p['nazwa']})"
                                           for port, p in r["porty"].items()))
     w.append(f"  panel:      {r['panel']} ({_opis_panelu(r.get('panel_jarva') or {})})")
+    siec = _panel_siec().opis_do_statusu(r.get("panel_siec"))
+    if siec:
+        w.append(f"  w sieci:    {siec}")
     n = r.get("nakladka")
     w.append("  nakładka:   " + (f"{n.get('sciezka')} {n.get('commit') or '(bez gita)'}" if n else "brak"))
     return "\n".join(w)
@@ -1209,6 +1225,7 @@ def zbierz_diagnoze(u: Uklad, ot: Otoczenie) -> dict:
     wyniki += android.sprawdzenia(u, ot)
     from . import telefon                       # telefon przez PHONEUSE: opcjonalny, wyłączony = „ok” z opisem
     wyniki += telefon.sprawdzenia(u, ot)
+    wyniki += _panel_siec().sprawdzenia(u, ot)   # panel w sieci Tailscale: opcjonalny, wyłączony = „ok” z opisem
     return {"root": str(u.root), "czas": time.strftime("%Y-%m-%dT%H:%M:%S"), "serwis": stan is not None,
             "wyniki": wyniki, "bledy": sum(w["stan"] == "blad" for w in wyniki),
             "uwagi": sum(w["stan"] == "uwaga" for w in wyniki)}

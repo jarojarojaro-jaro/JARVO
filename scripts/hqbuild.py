@@ -40,7 +40,9 @@ PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "ochrona.py", "e
                 "rozmowy.py", "czytnik.py", "wzmianki.py", "kontekst.py", "agenci.py", "brama.py", "strumien.py",
                 "przebiegi.py", "scalanie.py", "budzenia.py", "prace.py", "karty.py", "obserwator.py", "silnik.py",
                 "trasy_rozmow.py",
-                "aplikacja.py", "podpowiedzi.py", "glos.py", "mozg.py", "trasy_aplikacji.py")
+                "aplikacja.py", "podpowiedzi.py", "glos.py", "mozg.py", "trasy_aplikacji.py",
+                # panel w sieci Tailscale: drugi nasłuch z logowaniem kluczem jednorazowym (docs/HQ.md „Panel w sieci”)
+                "siec.py")
 
 
 def bundle_js(src_dir: Path | None = None, naglowek: str = "Jarvo HQ: plugin dashboardu Hermesa. Plik generowany przez scripts/hqbuild.py z hq/web/src/.") -> str:

@@ -1330,6 +1330,55 @@ innych kanałów etap 6.
   specyfikacji dla etapów 3–6 to 190 KB gzip JS: przekroczony o ok. 72 KB, bo w pakiecie jest jeszcze cała Stara Baza; podział na pakiet aplikacji i Starą Bazę ładowaną na żądanie
   (etap 7) albo usuwanie komentarzy w `hqbuild.py` to zejdą.
 
+## 2g. Panel w sieci (Tailscale)
+
+Instalacja natywna: panel słucha na `127.0.0.1:<port>` (domyślnie 9119) bez hasła. Żeby właściciel używał go
+z Maca albo telefonu w swojej sieci Tailscale, operator włącza **tryb sieci** (docs/NATYWNIE.md H10, I11, N06):
+
+```
+jarvo panel siec on        # adres i nazwa MagicDNS z `tailscale status --json`; sekret sesji; bez restartu
+jarvo panel klucz          # klucz JRV-XXXX-XXXX-XXXX (działa raz, 1 h; --waznosc 30m…1d) i link dla właściciela
+jarvo panel siec status    # ustawienia, nasłuch, próba w sieci, ważne klucze, adres Tailscale teraz
+jarvo panel siec wyloguj   # nowy sekret: każde urządzenie wylogowane od razu
+jarvo panel siec off       # koniec nasłuchu w sieci; 127.0.0.1 bez zmian
+```
+
+- **Jak działa.** Bramka logowania Hermesa włącza się dla całego procesu (bind spoza pętli zwrotnej albo
+  `dashboard.public_url`), więc zabrałaby loopbackowi tryb bez hasła, a drugi proces dashboardu miałby drugi silnik
+  rozmów na tych samych bazach. Dlatego wtyczka `jarvo-hq` (`hq/plugin/siec.py`) dokłada w tym samym procesie i na
+  tej samej pętli zdarzeń drugi serwer uvicorn na `<adres Tailscale>:<port>`, a przed aplikacją Hermesa stawia
+  bramkę. Ustawienia czyta co 5 s (`<dane>/jarvo/konfig/panel-siec.json`): włączenie, wyłączenie i nowy adres
+  działają bez restartu panelu; adres jeszcze niedostępny (Tailscale wstaje po panelu) = ponowienie co 5 s. Stan
+  nasłuchu: `<dane>/jarvo/state/panel-siec.json`.
+- **Bramka.** Host tylko adres Tailscale albo nazwa MagicDNS (z portem albo bez), inaczej 400 jak strażnik Hosta
+  Hermesa (DNS rebinding); `127.0.0.1` i `localhost` na adresie sieci też 400. Obcy `Origin` = 403. Bez sesji
+  przechodzą tylko `/login`, `/auth/password-login`, `/auth/logout` i pliki statyczne (strona HTML z SPA, np. dla
+  brakującego pliku w `/fonts/`, zamieniona na 404, bo niesie token sesji loopbacku); `/api/…` = 401, strona = 302 na
+  `/login?next=…`, WebSocket = odmowa przed przyjęciem. Zalogowane żądanie idzie do Hermesa jak lokalne: Host
+  i Origin `127.0.0.1:<port>`, bez `X-Forwarded-*` i `Forwarded` od klienta; WebSocket z adresem klienta 127.0.0.1.
+  Dalej działa zwykła ochrona loopbacku (token sesji z index.html, ochrona zapisu HQ, limity), więc zakładka Jarvo,
+  czat (SSE, WebSocket), Wiedza i reszta panelu działają w sieci tak samo jak lokalnie.
+- **Logowanie.** Dostawca `jarvo` w rejestrze logowania Hermesa (formularz `/login` Hermesa, POST
+  `/auth/password-login`, limit 10 prób na minutę z adresu): hasłem jest klucz jednorazowy. Na dysku tylko skrót
+  SHA-256 klucza z czasem wygaśnięcia (`<dane>/jarvo/wejscie`, katalog 700, pliki 600); pierwsze użycie przenosi plik
+  atomowo, więc klucz działa raz. Link `http://<adres>:<port>/login?next=%2Fjarvo#klucz=…`: klucz w części po #
+  nie idzie do serwera z adresem; skrypt dopisany do strony logowania wpisuje go i wysyła. Sesja to ciasteczka
+  Hermesa (`hermes_session_at` 12 h, `hermes_session_rt` 30 dni, odnawiane przy każdym odświeżeniu), podpisane HMAC
+  sekretem `<dane>/jarvo/konfig/panel-siec.sekret` (32 bajty, tylko właściciel, nigdy na ekranie ani w logach).
+- **Szybkość.** Sprawdzenie sesji to jeden HMAC i `stat` pliku sekretu (treść czytana tylko po zmianie pliku), bez
+  zapytań do Hermesa. Front Hermesa (ok. 2,7 MB JS i CSS) Hermes wysyła bez kompresji, więc bramka kompresuje gzip
+  pełne odpowiedzi tekstowe z `Content-Length` (pliki `/assets/` raz, potem z pamięci; JS 68 KB → 23 KB), a strumienie
+  (SSE, odpowiedzi bez długości) przepuszcza bez buforowania. Pakiet HQ jest już skompresowany (`.gz` z buildu).
+  Pliki z nazwą z hasha mają `Cache-Control: immutable`, więc kolejne wejścia biorą je z pamięci przeglądarki.
+- **Status.** `jarvo status` (wiersz „w sieci”) pokazuje adres i to, czy panel odpowiada w sieci (próba `GET
+  /api/status`: bez sesji 401 od bramki). `jarvo doctor`: wyłączony = ok; włączony, a w sieci nie odpowiada albo
+  Tailscale ma inny adres = uwaga; bez sekretu albo odpowiedź 200 bez logowania = błąd.
+- **Granice.** „▶ Odpal” (podgląd :9120) i ekran telefonu (:9122) słuchają tylko na 127.0.0.1, więc z Maca ich
+  linki nie działają. `on`, `off`, `wyloguj` i `klucz` robi tylko właściciel albo operator w swoim terminalu (proces
+  Jarva dostaje odmowę). Komputer Jarva nie dosięgnie panelu w sieci: jego filtr odrzuca 100.64.0.0/10.
+- Testy: `tests/test_panel_siec.py` (bramka, klucz, sesje, kompresja, polecenia, doctor; z `JARVO_TEST_HERMES_SRC`
+  także próba na prawdziwej aplikacji Hermesa: loopback bez hasła, sieć z kluczem).
+
 ## 3. Bezpieczeństwo
 
 - Wszystkie trasy pluginu są za logowaniem dashboardu (bez sesji: `401 unauthenticated`).
@@ -1344,7 +1393,8 @@ innych kanałów etap 6.
   wtyczek jest przypięta: trasa GET niczego nie zapisuje, dlatego link podglądu animacji wydaje `POST /anim/info`).
   Ochrona obejmuje trasy wtyczek Jarvo, nie własne trasy zapisu Hermesa (`/api/gateway/…`, `/api/cron/…` itd.):
   te chroni tylko logowanie i CORS Hermesa. Szersza ochrona całego dashboardu czeka na decyzję właściciela.
-- Dashboard nasłuchuje tylko na IP Tailscale (`JARVO_BIND_IP`), hasło generuje bootstrap.
+- Dashboard nasłuchuje tylko na IP Tailscale (`JARVO_BIND_IP`), hasło generuje bootstrap. Instalacja natywna:
+  tylko 127.0.0.1 bez hasła, a w sieci Tailscale drugi nasłuch za bramką z kluczem jednorazowym (sekcja 2g).
 - Klucze API profili zostają na serwerze. Backend pluginu czyta je z `.env` profilu przy każdym wywołaniu.
 - Podgląd plików tylko z `/opt/data/jarvo/{workspaces,missions,knowledge,inbox}` (inbox: pliki wysłane w czacie HQ),
   po rozwiązaniu symlinków.
@@ -1476,6 +1526,9 @@ Agenci rozmawiają po polsku niezależnie od języka panelu (SOUL).
 | Objaw | Przyczyna i naprawa |
 |---|---|
 | brak zakładki Jarvo albo Wiedza w menu | plugin nie jest włączony albo dashboard nie wstał po instalacji: `docker exec -u hermes jarvo-hermes sh -c '/command/s6-svc -wd -T 40000 -d /run/service/dashboard; /command/s6-svc -u /run/service/dashboard'` (zatrzymanie z limitem 30 s i start, sekcja 2c) |
+| z Maca: `http://<adres Tailscale>:9119/jarvo` się nie łączy | `jarvo panel siec status` na serwerze: „nie słucha” z powodem (adres niedostępny = Tailscale wyłączony albo nowy adres: `jarvo panel siec on`; bez wersji z trybem sieci: `jarvo update`); Mac musi być w tej samej sieci Tailscale (`tailscale status` na Macu) |
+| z Maca: 400 „Invalid Host header” | adres inny niż w ustawieniach (np. stary IP albo inna nazwa): użyj adresu z `jarvo panel siec status` albo `jarvo panel siec on --nazwa <nazwa>` |
+| z Maca: „Invalid username or password” przy kluczu | klucz zużyty (działa raz), wygasły (1 h) albo po `jarvo panel siec wyloguj`: nowy `jarvo panel klucz` |
 | czat: „Profil … nie ma API_SERVER_KEY” | uruchom deploy ponownie (instalator generuje klucze) |
 | czat: „Gateway odrzucił klucz” | klucz w `.env` profilu zmieniony bez restartu gatewaya: `hermes gateway restart` |
 | czat: „No LLM provider configured” | profil nie ma `OPENROUTER_API_KEY` w `/srv/jarvo/secrets/<agent>.env` |
