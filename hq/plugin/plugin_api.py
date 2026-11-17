@@ -2079,7 +2079,7 @@ async def update_request(request: Request):
 # bliźniak .gz i cache na rok (pliki pluginu dashboard serwuje z no-store). Tylko nazwy z białej listy.
 ZASOBY = _HERE / "dist" / "zasoby"
 # pakiety aplikacji (scripts/hqbuild.py PAKIETY): app-<pakiet>-<skrót>, mozg-<skrót>; narzędzia; kroje
-ZASOB_WZOR = re.compile(r"^(?:(?:app-[a-z]+|narzedzia|mozg)-[0-9a-f]{12}\.(?:js|css)|kroje/[A-Za-z0-9_.-]+\.(?:woff2|ttf))$")
+ZASOB_WZOR = re.compile(r"^(?:(?:app(?:-[a-z]+)?|narzedzia|mozg)-[0-9a-f]{12}\.(?:js|css)|kroje/[A-Za-z0-9_.-]+\.(?:woff2|ttf))$")
 ZASOB_TYPY = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
               ".woff2": "font/woff2", ".ttf": "font/ttf"}
 ZASOB_NAGLOWKI = {"Cache-Control": "private, max-age=31536000, immutable", "Vary": "Accept-Encoding",
