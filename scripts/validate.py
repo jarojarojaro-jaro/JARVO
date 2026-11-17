@@ -795,12 +795,16 @@ def check_hq(r: Report) -> None:
     src = sorted((hq / "web" / "src").glob("*.js"))
     if not src:
         r.err("hq/web/src: brak plików źródłowych")
-    art = (hq / "web" / "src" / "20-art.js")
-    if art.exists():
+    # ROOMS (grafika pokoi) mieszka tam, gdzie silnik pikseli: od podziału pakietu (centrum 1a) w 19-piksele.js
+    art = next((p for p in sorted((hq / "web" / "src").glob("*.js"))
+                if "const ROOMS = {" in p.read_text(encoding="utf-8")), None)
+    if art is None:
+        r.err("hq/web/src: brak `const ROOMS = {` (grafika pokoi)")
+    else:
         block = art.read_text(encoding="utf-8").split("const ROOMS = {", 1)[-1].split("};", 1)[0]
         js_rooms = set(re.findall(r"^\s+(\w+):\s*\{", block, re.M))
         if js_rooms != fl.HQ_ROOMS:
-            r.err(f"hq: pokoje w 20-art.js {sorted(js_rooms)} ≠ fleetlib.HQ_ROOMS {sorted(fl.HQ_ROOMS)}")
+            r.err(f"hq: pokoje w {art.name} {sorted(js_rooms)} ≠ fleetlib.HQ_ROOMS {sorted(fl.HQ_ROOMS)}")
     check_hq_pakiet(r)
 
 
