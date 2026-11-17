@@ -2212,7 +2212,7 @@ MOZG = {"home": HOME, "flota": lambda: json.loads(FLEET_FILE.read_text(encoding=
         "rozdaj": _rozdaj_klucze, "status": roz.aplikacja.status_hermesa}
 trasy_aplikacji.dolacz(router, m=roz, trasy=trasy_rozmow, silnik=_silnik, agenci=AGENCI, gotowosc=GOTOWOSC,
                        nawyki=NAWYKI, stan_aktualizacji=_update_state, hello=_hello, decyzje=_decyzje, glos=GLOS,
-                       mozg=MOZG, log=_log_hq)
+                       mozg=MOZG, dostep=lambda: siec.dostep(siec.Sciezki(core.JARVO_DIR)), log=_log_hq)
 
 
 async def _zdrowie_rozmow() -> dict:

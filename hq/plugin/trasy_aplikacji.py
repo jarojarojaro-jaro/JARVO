@@ -44,15 +44,26 @@ UPLOAD_MAX = 52_428_800
 
 def dolacz(router, *, m, trasy, silnik: Callable[[], Any], agenci, gotowosc, nawyki, stan_aktualizacji: Callable[[], dict],
            hello: Callable[[], dict], decyzje: Callable[[], list] | None = None, glos=None,
-           mozg: dict | None = None, log: Callable[[str], None] | None = None) -> list[str]:
+           mozg: dict | None = None, dostep: Callable[[], dict] | None = None,
+           log: Callable[[str], None] | None = None) -> list[str]:
     """Rejestruje trasy startu. `trasy`: moduł trasy_rozmow (BladTrasy, blad, czytaj_cialo, _Model, ODCZYT_ZRODLA).
     `decyzje`: pytania zespołu ze Starej Bazy (hq_core.build_state → decisions). Języka nie podajemy: wybiera go
     przełącznik dashboardu w przeglądarce (localStorage), serwer go nie zna. `glos`: lektor aplikacji (glos.Glos);
     None = trasy głosu odpowiadają 503 `brak_glosu`. `mozg`: {home, flota (wywołanie → fleet.json), stan, build_json,
-    rozdaj, status} dla tras mózgu; None = 503 `brak_mozgu`."""
+    rozdaj, status} dla tras mózgu; None = 503 `brak_mozgu`. `dostep`: panel w sieci (siec.dostep, Ustawienia ›
+    Dostęp, tylko odczyt); None = brak trybu sieci."""
     log = log or (lambda _m: None)
     decyzje = decyzje or (lambda: [])
     sciezki: list[str] = []
+
+    def _dostep() -> dict | None:
+        if dostep is None:
+            return None
+        try:
+            return dostep()
+        except Exception as exc:                     # zły plik stanu nie psuje startu aplikacji
+            log(f"jarvo-hq: GET /app dostęp: {type(exc).__name__}")
+            return None
 
     class ReakcjaBody(trasy._Model):
         rodzaj: Literal["pokazana", "kliknieta", "odrzucona", "nigdy"]
@@ -160,6 +171,7 @@ def dolacz(router, *, m, trasy, silnik: Callable[[], Any], agenci, gotowosc, naw
                         "telefon": bool(os.environ.get("JARVO_ANDROID_SCREEN_URL")), "agenci_wlasni": False,
                         "e2e": os.environ.get("JARVO_E2E") == "1"},
             "decyzje": len(pytania), "aktualizacja": aktual,
+            "dostep": _dostep(),
             # korzeń danych z „/”: przeglądarka rozpoznaje po nim ścieżki floty w tekście (hq/web/src/07-sciezki.js)
             "katalog_danych": m.hq_core.sciezki.jako_tekst(m.hq_core.HOME),
         }

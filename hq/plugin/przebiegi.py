@@ -323,6 +323,7 @@ class Rejestr:
         out["nadzor_zgoda"] = ({"stan": p["nadzor_zgoda"], "przez": p.get("nadzor_zgoda_przez")}
                                if p.get("nadzor_zgoda") else None)
         out["dlugo"] = p["id"] in self._dlugo
+        out["lustro_nie"] = '"nie_doszlo"' in str(p.get("lustro") or "")     # „nie doszło do Telegrama” (lustro.py)
         if tekst:
             # bez tekstu czekającego na wspólną deltę (≤ 50 ms): ten przyjdzie jako `przebieg.delta` z seq > `seq`
             out["tekst_dotad"] = (dz.tekst[:len(dz.tekst) - len(dz.oczekuje)] if dz.oczekuje else dz.tekst) if dz else ""

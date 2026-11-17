@@ -194,6 +194,14 @@ def stan(sc: Sciezki) -> dict:
     return _json(sc.stan)
 
 
+def dostep(sc: Sciezki) -> dict:
+    """Ustawienia › Dostęp w aplikacji (tylko odczyt): włączenie, adres, nazwa MagicDNS, port i nasłuch. Bez sekretu
+    i kluczy; klucz jednorazowy wydaje `jarvo panel klucz`."""
+    u, s = ustawienia(sc), stan(sc)
+    return {"wlaczony": u["wlaczony"], "adres": u["adres"], "nazwa": u["nazwa"], "port": s.get("port"),
+            "nasluch": bool(s.get("nasluch")), "od": s.get("od"), "blad": s.get("blad")}
+
+
 def _zapisz_stan(sc: Sciezki, **pola: Any) -> None:
     try:
         zapisz_atomowo(sc.stan, json.dumps({**pola, "pid": os.getpid(),
