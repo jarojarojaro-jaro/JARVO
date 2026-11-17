@@ -118,7 +118,9 @@ def prompt(w, partia: list[tuple[Path, dict]]) -> tuple[str, list[str]]:
         zrodlo = str(m.get("zrodlo") or "telegram")
         etykieta = {"telegram": "Telegram", "panel": "Panel"}.get(zrodlo, zrodlo.capitalize())
         tekst = str(m.get("tekst") or "")
-        blok = f"[{etykieta} · {w.klucz} · {m.get('czas')} · wiadomość {i}/{len(partia)}]\n{tekst or '(bez tekstu)'}"
+        # klucz wiadomości panelu (= id przebiegu) w nagłówku: czytnik osi łączy odpowiedź z przebiegiem (bez dubla)
+        znak = f" · #{m['klucz']}" if zrodlo == "panel" and rdzen.KLUCZ_RE.fullmatch(str(m.get("klucz") or "")) else ""
+        blok = f"[{etykieta} · {w.klucz} · {m.get('czas')}{znak} · wiadomość {i}/{len(partia)}]\n{tekst or '(bez tekstu)'}"
         if m.get("odpowiedz_na"):
             blok += f"\n\nOdpowiedź na wiadomość:\n{m['odpowiedz_na']}"
         linki = pobierz_linki(w, tekst + " " + str(m.get("odpowiedz_na") or "")) if zrodlo != "zwiad" else ""
@@ -275,8 +277,14 @@ def skrzynka(w, wyslij=telegram) -> int:
                 rdzen.zapisz_stan(w, ostatni_blad=time.time())
                 continue
             panel = all(m.get("zrodlo") == "panel" for _, m in partia)
-            if not panel or any(m.get("lustro") for _, m in partia):
-                wyslij(f"{'🖥 ' if panel else ''}{w.nazwa}\n\n{tura.odpowiedz}", *gdzie)
+            # lustro panelu (centrum D10): w temacie najpierw „🖥 <prośba>” (jak lustro rozmówców Hermesa), potem
+            # odpowiedź, więc historia w Telegramie jest pełna także dla wiadomości z panelu
+            prosby = [" ".join(str(m.get("tekst") or "").split()) for _, m in partia
+                      if m.get("zrodlo") == "panel" and m.get("lustro")]
+            if any(prosby):
+                wyslij("🖥 " + "\n\n".join(p if len(p) <= 300 else p[:299].rstrip() + "…" for p in prosby if p), *gdzie)
+            if not panel or prosby:
+                wyslij(f"{w.nazwa}\n\n{tura.odpowiedz}", *gdzie)
             for p, m in partia:
                 przenies(p, m, w.zrobione, odpowiedz=tura.odpowiedz, sekundy=sekundy, tura=tura.id)
             log(w, f"tura {tura.id}: ok po {sekundy} s, odpowiedź {len(tura.odpowiedz)} znaków")

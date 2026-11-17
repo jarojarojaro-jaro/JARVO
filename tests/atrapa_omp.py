@@ -3,7 +3,9 @@
 Zachowanie z plików w katalogu `ATRAPA_OMP` (tworzy je `zrob`): `argv.jsonl` (każde wywołanie), `held.json` (lista
 trzymanych sesji dla `session lease`), `tryb` (ok | blad | spi). Tura `-p --mode json` wypisuje zdarzenia jak omp
 18.22: nagłówek sesji, przyrosty tekstu, narzędzie z argumentami i wynikiem (z napisem SEKRET, którego nie wolno
-przepuścić dalej), `message_end`, `agent_end`.
+przepuścić dalej), `message_end`, `agent_end`. Udana tura dopisuje też do pliku sesji `<session-dir>/2026_<sesja>.jsonl`
+(format v3: nagłówek, wiadomość użytkownika z promptem, wywołanie narzędzia, wynik z SEKRET, odpowiedź), jak omp.
+Prompt ze znacznikiem `[plan]` daje odpowiedź z planem i `[[czeka-na-tak]]`.
 """
 from __future__ import annotations
 
@@ -42,8 +44,30 @@ for d in ("Gotowe", ", zrobione."):
     e(type="message_update", assistantMessageEvent={"type": "text_delta", "contentIndex": 0, "delta": d})
     e(type="message_update", assistantMessageEvent={"type": "toolcall_delta", "contentIndex": 1, "delta": "SEKRET"})
 e(type="message_end", message={"role": "toolResult", "content": [{"type": "text", "text": "SEKRET"}]})
-e(type="message_end", message={"role": "assistant", "content": [{"type": "text", "text": "Gotowe, zrobione."}]})
+odp = "Plan: restart bramy. [[czeka-na-tak]]" if "[plan]" in a[a.index("--mode") + 2] else "Gotowe, zrobione."
+e(type="message_end", message={"role": "assistant", "content": [{"type": "text", "text": odp}]})
 e(type="agent_end", messages=[], isTerminal=True)
+if "--session-dir" in a and "--resume" in a:
+    import datetime, uuid
+    sd, sid = Path(a[a.index("--session-dir") + 1]), a[a.index("--resume") + 1]
+    plik, lisc = sd / f"2026_{sid}.jsonl", k / f"lisc_{sid}"
+    rodzic = lisc.read_text() if lisc.exists() else None
+    teraz = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    linie = [] if plik.exists() else [dict(type="session", version=3, id=sid, timestamp=teraz, cwd=os.getcwd())]
+    prompt = a[a.index("--mode") + 2]
+    for rola, tresc in (("user", [{"type": "text", "text": prompt}]),
+                        ("assistant", [{"type": "toolCall", "id": "c1", "name": "bash", "intent": "Sprawdzam GPU",
+                                        "arguments": {"command": "cat SEKRET"}}]),
+                        ("toolResult", [{"type": "text", "text": "SEKRET"}]),
+                        ("assistant", [{"type": "text", "text": odp}])):
+        i = uuid.uuid4().hex[:8]
+        linie.append(dict(type="message", id=i, parentId=rodzic, timestamp=teraz, message=dict(role=rola, content=tresc)))
+        rodzic = i
+    sd.mkdir(parents=True, exist_ok=True)
+    with plik.open("a") as f:
+        for z in linie:
+            f.write(json.dumps(z, ensure_ascii=False) + "\n")
+    lisc.write_text(rodzic)
 '''
 
 

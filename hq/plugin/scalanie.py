@@ -229,8 +229,10 @@ def _czlonek(agent: str, rola: str, linia: list[dict], przebiegi: list[dict], wp
                     out.append(_pozycja(id=klucz, rodzaj="kompresja", **wspolne(m, idx),
                                         tekst="Streszczenie wcześniejszej rozmowy"))
                 elif import_ or zrodlo_obcej:   # wątek rozmówcy: wiadomość z tematu Telegrama to dymek właściciela 📱
-                    out.append(_pozycja(id=klucz, rodzaj="wlasciciel", **wspolne(m, idx), tekst=tresc, wpis=None,
-                                        zrodlo=zrodlo_obcej))
+                    poz = _pozycja(id=klucz, rodzaj="wlasciciel", **wspolne(m, idx), tekst=tresc, wpis=None, zrodlo=zrodlo_obcej)
+                    if zrodlo_obcej:                 # dymek właściciela, nie agenta (jak dymek z wpisu panelu)
+                        poz["agent"] = None
+                    out.append(poz)
                 else:
                     out.append(_pozycja(id=klucz, rodzaj="obca", **wspolne(m, idx), tekst=tresc))
                 continue
@@ -339,17 +341,26 @@ def _czas(v: Any) -> float:
 def pozycje_omp(r: Mapping, os_: Mapping) -> list[dict]:
     """Oś sesji omp (czytnik_omp.os_sesji) jako pozycje osi: wiadomości spoza panelu = dymek właściciela ze źródłem
     (📱 telegram, ⌨ terminal; z panelu pokazuje je wpis), asystent = `agent`, narzędzia = `kroki` z samą nazwą
-    i intencją (wyników i argumentów czytnik nie ma), kompresja = `kompresja`."""
-    out, agent = [], r["klucz"]
+    i intencją (wyników i argumentów czytnik nie ma), kompresja = `kompresja`. Odpowiedź na wiadomości panelu niesie
+    `przebieg_id` (ostatni) i `przebiegi` (wszystkie z partii; klucz wiadomości = id przebiegu), więc żywy dymek
+    przebiegu znika, gdy oś ma już odpowiedź z pliku sesji (bez dubla)."""
+    out, agent, tura = [], r["klucz"], []
     for i, e in enumerate(os_.get("wpisy") or []):
         wsp = {"id": f"o:{agent}:{e.get('id')}", "ts": _czas(e.get("czas")), "agent": agent, "rola": "rozmowa", "_i": i}
         typ = e.get("typ")
         if typ == "uzytkownik":
-            if e.get("zrodlo") == "panel":
-                continue
-            out.append(_pozycja(rodzaj="wlasciciel", tekst=str(e.get("tekst") or ""), wpis=None,
-                                zrodlo=str(e.get("zrodlo") or "terminal"), **{**wsp, "agent": None}))
-        elif typ == "asystent":
+            tura = [str(k) for k in e.get("klucze") or []]
+            bloki = e.get("bloki") or [{"zrodlo": e.get("zrodlo"), "tekst": e.get("tekst")}]
+            for j, b in enumerate(bloki):
+                if b.get("zrodlo") == "panel":         # wiadomość z panelu pokazuje jej wpis (bez dubla)
+                    continue
+                out.append(_pozycja(rodzaj="wlasciciel", tekst=str(b.get("tekst") or ""), wpis=None,
+                                    zrodlo=str(b.get("zrodlo") or "terminal"),
+                                    **{**wsp, "agent": None, "id": wsp["id"] + (f":{j}" if j else "")}))
+            continue
+        if tura:
+            wsp.update(przebieg_id=tura[-1], przebiegi=tura)
+        if typ == "asystent":
             out.append(_pozycja(rodzaj="agent", tekst=str(e.get("tekst") or ""), czeka_na_tak=bool(e.get("czeka_na_tak")),
                                 **wsp))
         elif typ == "kroki":

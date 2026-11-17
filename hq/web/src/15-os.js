@@ -190,8 +190,10 @@ const Os = (() => {
   // przebiegiem dostaje `zatrzymany` (linia „Zatrzymane · Ponów” pod nią, spec §9.1), dopóki nie ma ponowienia;
   // zatrzymany przed pierwszym słowem (żadnej pozycji agenta) zostaje pustym dymkiem z tą linią.
   function widok(pozycje, przebiegiWatku, { szczegoly = false, oczekujace = null } = {}) {
-    const maOdpowiedz = (p) => pozycje.some((x) => x.przebieg_id === p.id && !x.w_toku && x.rodzaj === "agent");
-    const maSlad = (p) => pozycje.some((x) => x.przebieg_id === p.id && x.rodzaj === "agent");
+    // odpowiedź sesji omp na partię wiadomości panelu niesie wszystkie ich przebiegi (`przebiegi`)
+    const jego = (x, p) => x.przebieg_id === p.id || (x.przebiegi && x.przebiegi.includes(p.id));
+    const maOdpowiedz = (p) => pozycje.some((x) => jego(x, p) && !x.w_toku && x.rodzaj === "agent");
+    const maSlad = (p) => pozycje.some((x) => jego(x, p) && x.rodzaj === "agent");
     const lista = przebiegiWatku || [];
     const ponowione = new Set(lista.map((p) => p.ponowienie_z).filter(Boolean));
     const zywe = lista.filter((p) => p.zrodlo !== "nadzor" && p.stan !== "dopisany" && !ponowione.has(p.id)

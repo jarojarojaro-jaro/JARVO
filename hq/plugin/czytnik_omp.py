@@ -26,7 +26,8 @@ from pathlib import Path
 WERSJE = (3,)
 SCHEMAT_WYMAGANY = {"session": ("type", "version", "id"), "wpis": ("type", "id")}
 ZNACZNIK_TAK = "[[czeka-na-tak]]"
-_NAGLOWEK = re.compile(r"^\[(Telegram|Panel|[A-ZŁŚŻŹĆŃÓĘĄ][\w ]{0,20}) · [^\]\n]*wiadomość \d+/\d+\]\n", re.M)
+_NAGLOWEK = re.compile(r"^\[(Telegram|Panel|[A-ZŁŚŻŹĆŃÓĘĄ][\w ]{0,20}) · ([^\]\n]*)wiadomość \d+/\d+\]\n", re.M)
+_KLUCZ = re.compile(r"· #([A-Za-z0-9][A-Za-z0-9_-]{0,63}) · $")
 _PAMIEC: dict[str, dict] = {}
 
 
@@ -36,17 +37,26 @@ def _tekst(tresc) -> str:
     return "".join(c.get("text", "") for c in tresc or [] if isinstance(c, dict) and c.get("type") == "text")
 
 
-def bez_obwiedni(tekst: str) -> tuple[str, str]:
-    """(źródło, tekst bloków) dla wiadomości skrzynki; bez nagłówków = (terminal, tekst)."""
+def bloki_obwiedni(tekst: str) -> list[dict]:
+    """[{zrodlo, tekst, klucz}] wiadomości skrzynki (partia może mieszać panel i Telegram; `klucz` = klucz wiadomości
+    panelu z nagłówka, czyli id przebiegu); bez nagłówków = terminal."""
     naglowki = list(_NAGLOWEK.finditer(tekst))
     if not naglowki:
-        return "terminal", tekst.strip()
+        return [{"zrodlo": "terminal", "tekst": tekst.strip(), "klucz": None}]
     bloki = []
     for i, m in enumerate(naglowki):
         koniec = naglowki[i + 1].start() if i + 1 < len(naglowki) else len(tekst)
-        blok = tekst[m.end():koniec].strip()
-        bloki.append(blok.removesuffix("---").strip())
-    return naglowki[0].group(1).lower(), "\n\n".join(b for b in bloki if b)
+        blok = tekst[m.end():koniec].strip().removesuffix("---").strip()
+        k = _KLUCZ.search(m.group(2))
+        if blok:
+            bloki.append({"zrodlo": m.group(1).lower(), "tekst": blok, "klucz": k.group(1) if k else None})
+    return bloki
+
+
+def bez_obwiedni(tekst: str) -> tuple[str, str]:
+    """(źródło pierwszego bloku, tekst bloków) dla wiadomości skrzynki; bez nagłówków = (terminal, tekst)."""
+    bloki = bloki_obwiedni(tekst)
+    return (bloki[0]["zrodlo"] if bloki else "terminal"), "\n\n".join(b["tekst"] for b in bloki)
 
 
 def _skrot(e: dict) -> dict | None:
@@ -59,8 +69,17 @@ def _skrot(e: dict) -> dict | None:
     m = e.get("message") or {}
     rola = m.get("role")
     if rola == "user":
-        zrodlo, tekst = bez_obwiedni(_tekst(m.get("content")))
-        return {"typ": "uzytkownik", "czas": czas, "zrodlo": zrodlo, "tekst": tekst} if tekst else None
+        bloki = bloki_obwiedni(_tekst(m.get("content")))
+        if not any(b["tekst"] for b in bloki):
+            return None
+        wynik = {"typ": "uzytkownik", "czas": czas, "zrodlo": bloki[0]["zrodlo"],
+                 "tekst": "\n\n".join(b["tekst"] for b in bloki)}
+        klucze = [b["klucz"] for b in bloki if b["klucz"]]
+        if klucze:                                     # wiadomości panelu: odpowiedź należy do ich przebiegów
+            wynik["klucze"] = klucze
+        if len({b["zrodlo"] for b in bloki}) > 1:      # partia z kilku kanałów: panel pokazuje bloki spoza panelu
+            wynik["bloki"] = [{"zrodlo": b["zrodlo"], "tekst": b["tekst"]} for b in bloki]
+        return wynik
     if rola == "assistant":
         kroki = [{"nazwa": str(c.get("name") or ""), "intencja": str(c.get("intent") or "")[:200]}
                  for c in m.get("content") or [] if isinstance(c, dict) and c.get("type") == "toolCall"]
