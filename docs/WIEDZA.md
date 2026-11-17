@@ -248,7 +248,7 @@ operatora, której nie widział). Księga to folder `bledy/` w skarbcu: jedna no
 | nowy błąd | wynik `error` bez notatki: raz na sesję i narzędzie linia „Tego błędu nie ma w księdze… zapisz go: wiedza_zapisz z typ=blad…” |
 | zapis | `wiedza_zapisz` z `typ: blad` wymaga `sygnatury` (poprawne wyrażenia, bez sekretów) i akapitu „Jak poprawnie:”; kompilacja kładzie szkic błędu zawsze w `bledy/` jako `blad` (także gdy model zaproponuje inny folder albo typ, poza agentem marki), scala sygnatury i przy tym samym błędzie dolicza `wystapienia` |
 | licznik | przypomnienie +1 w `state/bledy-licznik.json` raz na sesję i notatkę, pod blokadą międzyprocesową, zapis atomowy (notatki pisze dalej tylko kompilacja); hub `bledy/_hub-bledy` pokazuje przy notatce wystąpienia i przypomnienia, dopisek: sumę |
-| zasiew | `wiedza.py zasiej --bledy wiedza/bledy` (instalator i `jarvo update`): notatki z repo, których skarbiec jeszcze nie dostał (`state/bledy-zasiane.json`); istniejącej nie nadpisuje, usunięta nie wraca |
+| zasiew | `wiedza.py zasiej --bledy wiedza/bledy` (instalator i `jarvo update`): `state/bledy-zasiane.json` trzyma skrót zasianej treści każdej notatki; nowa notatka z repo trafia do skarbca, zasiana i nietknięta od zasiewu dostaje nowszą wersję z repo (np. nowe sygnatury), zmienionej przez kompilację albo człowieka i notatki skarbca o tej samej nazwie sprzed zasiewu nie rusza, usunięta nie wraca |
 | lint | błąd: złe wyrażenie w sygnaturze, `wystapienia` nie liczbą; ostrzeżenie: brak sygnatur, kroku „Jak poprawnie” albo typu `blad` w `bledy/` |
 
 Hermes nie przepuszcza przez `transform_tool_result` wywołań zablokowanych przez strażników `pre_tool_call` (ich odmowa
@@ -256,6 +256,13 @@ ma własną radę), więc sygnatury celują w wyniki narzędzi: odmowy Komputera
 komunikaty stron, telefonu, kanbana i API. Notatki księgi wracają też zwykłą drogą (przypomnienie przed turą,
 `wiedza_szukaj` z `folder: bledy`). Skill Jarva `fleet-improvement` (1.4.0) opisuje pętlę: dopisek → krok → zapis nowego
 błędu, a przegląd tygodnia bierze notatki z największą liczbą wystąpień na kandydatów do poprawki w kodzie.
+
+**Nazwy funkcji haków ≠ nazwy plików obok wtyczki.** Hermes ładuje katalog dostawcy pamięci jako pakiet: wykonuje każdy
+sąsiedni `*.py` jako podmoduł i po `__init__` przypisuje go pakietowi pod nazwą pliku (`plugins/plugin_loader.py`,
+`load_plugin_module`), więc funkcja `__init__` o nazwie pliku staje się modułem, zanim `register()` odda ją Hermesowi.
+Do 18.11 tak było z hakiem księgi (`ksiega_bledow`) i ciszy tablicy (`cisza_tablicy`): oba rzucały „'module' object is
+not callable” i nie działały (karta t_8a8a79ab: odmowa Komputera bez dopisku, bez `state/bledy-licznik.json`). Dziś
+`przypomnienie_bledu` i `cisza_po_narzedziu`; test ładuje wtyczkę tak jak Hermes i sprawdza, że każdy hak to funkcja.
 
 ---
 

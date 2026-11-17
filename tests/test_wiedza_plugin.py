@@ -1,8 +1,10 @@
 """Wtyczka jarvo-wiedza (wiedza/plugin): dostawca pamięci na stubie interfejsu Hermesa (agent.memory_provider),
 przypomnienia, narzędzia, strażnik orzeczeń, lustro pamięci, wyciągi (model podstawiony), hak kanbana."""
 import importlib.util
+import inspect
 import json
 import os
+import shutil
 import sqlite3
 import sys
 import time
@@ -785,14 +787,14 @@ def test_ksiega_bledow_hak_i_szkic_bledu(srodowisko, monkeypatch):
         def register_auxiliary_task(self, *a, **k): pass
 
     pl.register(Ctx())
-    assert haki["transform_tool_result"] is pl.ksiega_bledow
+    assert haki["transform_tool_result"] is pl.przypomnienie_bledu
     assert w.zasiej_bledy(sk, REPO / "wiedza" / "bledy") >= 12
     odmowa = json.dumps({"error": "Google: This browser or app may not be secure."})
-    nowy = pl.ksiega_bledow(tool_name="komputer", result=odmowa, status="error", session_id="sesja-k")
+    nowy = pl.przypomnienie_bledu(tool_name="komputer", result=odmowa, status="error", session_id="sesja-k")
     assert nowy.startswith(odmowa) and "To już było: Google nie loguje w przeglądarce Komputera" in nowy
     assert "telefonie floty" in nowy
-    assert pl.ksiega_bledow(tool_name="komputer", result='{"ok": true}', status="ok", session_id="sesja-k") is None
-    assert pl.ksiega_bledow(tool_name="komputer", result={"error": "x"}, status="error") is None      # nie tekst: bez zmian
+    assert pl.przypomnienie_bledu(tool_name="komputer", result='{"ok": true}', status="ok", session_id="sesja-k") is None
+    assert pl.przypomnienie_bledu(tool_name="komputer", result={"error": "x"}, status="error") is None   # nie tekst: bez zmian
     assert "księga błędów" in p.system_prompt_block() and "typ=blad" in p.system_prompt_block()
     schemat = next(t for t in p.get_tool_schemas() if t["name"] == "wiedza_zapisz")
     assert "blad" in schemat["parameters"]["properties"]["typ"]["enum"] and "sygnatury" in schemat["parameters"]["properties"]
@@ -803,3 +805,76 @@ def test_ksiega_bledow_hak_i_szkic_bledu(srodowisko, monkeypatch):
     assert w.podziel(sk.plik(z["szkic"]).read_text(encoding="utf-8"))[0]["sygnatury"] == ["EINTEGRITY"]
     zle = json.loads(p.handle_tool_call("wiedza_zapisz", {"typ": "blad", "tytul": "x", "tresc": "Objaw: y.", "zrodlo": "z"}))
     assert "sygnatury" in zle["error"]
+
+
+def _jak_hermes(katalog: Path, nazwa: str):
+    """Wtyczka załadowana tak jak dostawcę pamięci ładuje Hermes (plugins/plugin_loader.py, load_plugin_module):
+    każdy sąsiedni `*.py` jako podmoduł `<pakiet>.<plik>`, potem `__init__`, potem podmoduły przypisane pakietowi pod
+    nazwą pliku (to przypisanie nadpisuje funkcję `__init__` o tej samej nazwie)."""
+    spec = importlib.util.spec_from_file_location(nazwa, katalog / "__init__.py", submodule_search_locations=[str(katalog)])
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[nazwa] = mod
+    podmoduly = []
+    for plik in sorted(katalog.glob("*.py")):
+        if plik.name == "__init__.py":
+            continue
+        s = importlib.util.spec_from_file_location(f"{nazwa}.{plik.stem}", plik)
+        sub = importlib.util.module_from_spec(s)
+        sys.modules[s.name] = sub
+        s.loader.exec_module(sub)
+        podmoduly.append((plik.stem, sub))
+    spec.loader.exec_module(mod)
+    for stem, sub in podmoduly:
+        setattr(mod, stem, sub)
+    return mod
+
+
+def test_haki_po_ladowaniu_jak_hermes_i_odmowa_komputera_u_pracownika_karty(tmp_path, monkeypatch):
+    """18.11, karta t_8a8a79ab po wdrożeniu księgi błędów: odmowa Komputera „ekran ma teraz inna sesja Jarva” i Google
+    na Komputerze bez żadnego „[księga błędów]”, bez state/bledy-licznik.json. Hermes ładuje katalog wtyczki jako
+    pakiet i przypisuje mu sąsiednie pliki pod ich nazwami, więc funkcje `cisza_tablicy` i `ksiega_bledow` z `__init__`
+    zamieniały się w moduły `cisza_tablicy.py` i `ksiega_bledow.py`: `register()` oddawał moduły, a oba haki rzucały
+    „'module' object is not callable”. Test ładuje wtyczkę jak Hermes (z wiedza.py obok, jak po buildzie), rejestruje
+    haki i puszcza przez hak wynik odmowy Komputera w procesie pracownika karty."""
+    wtyczka = tmp_path / "plugins" / "jarvo-wiedza"
+    shutil.copytree(REPO / "wiedza" / "plugin", wtyczka, ignore=shutil.ignore_patterns("__pycache__", "dashboard"))
+    for plik in ("wiedza.py", "kompilacja.py"):
+        shutil.copy2(REPO / "wiedza" / plik, wtyczka / plik)
+    for m in [m for m in sys.modules if m.startswith("jarvo_") and m != "jarvo_wiedza_plugin"]:
+        monkeypatch.delitem(sys.modules, m)                  # moduły pomocnicze z kopii wtyczki, nie z repo
+    mod = _jak_hermes(wtyczka, "_hermes_user_memory.jarvo_wiedza_test")
+    haki = {}
+
+    class Ctx:
+        def register_memory_provider(self, provider): pass
+        def register_hook(self, nazwa, f): haki[nazwa] = f
+        def register_auxiliary_task(self, *a, **k): pass
+
+    mod.register(Ctx())
+    assert haki and all(inspect.isfunction(f) for f in haki.values()), {k: type(f) for k, f in haki.items()}
+    # pracownik karty Jarva: HERMES_HOME profilu, numer karty w otoczeniu, skarbiec z zasiewem księgi
+    monkeypatch.setenv("WIEDZA_DZIS", "2026-11-18")
+    monkeypatch.delenv("JARVO_KNOWLEDGE_DIR", raising=False)
+    monkeypatch.delenv("JARVO_STATE_DIR", raising=False)
+    root = tmp_path / "dane"
+    (root / "profiles" / "jarvo").mkdir(parents=True)
+    monkeypatch.setenv("HERMES_HOME", str(root / "profiles" / "jarvo"))
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "t_8a8a79ab")
+    sk = w.Skarbiec(root / "jarvo" / "knowledge", root / "jarvo" / "state")
+    w.zasiej(sk, None, None, None, None, REPO / "wiedza" / "bledy")
+    # odmowa wejścia Komputera (infra/komputer/zasady.wynik_odmowy, kod `zajete`) tak, jak oddaje ją computer_use
+    # Hermesa: spłaszczona do message, z kodem decyzji „zablokowane”, bez nazwy zasady
+    zajete = json.dumps({"ok": False, "action": "list_windows", "code": "zablokowane", "message":
+                         "Komputer Jarva: ekran ma teraz inna sesja Jarva (karta t_8a8a79ab, ostatnie wywołanie 9 s temu); "
+                         "zwolni się najpóźniej za 111 s albo wcześniej, gdy tamta sesja skończy."}, ensure_ascii=False)
+    hak = haki["transform_tool_result"]
+    nowy = hak(tool_name="computer_use", args={}, result=zajete, status="ok", task_id="t_8a8a79ab", session_id="sesja-karty",
+               tool_call_id="c1", turn_id="", api_request_id="", duration_ms=3)
+    assert nowy and nowy.startswith(zajete) and "To już było: Ekran Komputera zajęty przez inną kartę" in nowy
+    # Google na ekranie Komputera (odczyt strony narzędziem `komputer`, zwykły wynik)
+    google = json.dumps({"okno": 1, "tekst": "Logowanie – Konta Google\nTa przeglądarka lub aplikacja może nie być bezpieczna"})
+    nowy = hak(tool_name="komputer", args={}, result=google, status="ok", task_id="t_8a8a79ab", session_id="sesja-karty")
+    assert nowy and "Google nie loguje w przeglądarce Komputera" in nowy
+    licznik = w.licznik_bledow(sk.stan)
+    assert licznik["bledy/ekran komputera zajęty przez inną kartę"]["przypomnien"] == 1
+    assert licznik["bledy/google nie loguje w przeglądarce komputera, konta google na telefonie"]["przypomnien"] == 1

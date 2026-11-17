@@ -7,7 +7,7 @@ status: aktualna
 zrodlo: "misja M-261116-pilot-ankiety, karty t_87d11e3a i t_8a2f5f5e 16.11 22:23–22:57; komputer.log, dziennik wejścia"
 agent: jarvo
 narzedzia: [komputer, computer_use]
-sygnatury: ["/\\bzajete\\b/", ekran_zmieniony]
+sygnatury: ["/\\bzajete\\b/", ekran_zmieniony, ekran ma teraz inna sesja Jarva, ekranem sterowała inna sesja Jarva]
 wystapienia: 1
 ---
 # Ekran Komputera zajęty przez inną kartę

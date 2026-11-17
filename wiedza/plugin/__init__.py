@@ -106,7 +106,12 @@ def _linki():
     return _modul("jarvo_linki", "linki.py")
 
 
-def cisza_tablicy(**kwargs) -> None:
+# Nazwy funkcji haków nie mogą być nazwami plików obok wtyczki: Hermes ładuje katalog wtyczki jako pakiet, wykonuje
+# każdy sąsiedni `*.py` jako podmoduł i po `__init__` przypisuje go pakietowi pod tą nazwą
+# (plugins/plugin_loader.py: load_plugin_module, `setattr(mod, sub_name, sub_mod)`), więc `register()` oddałby
+# Hermesowi moduł zamiast funkcji. Do 18.11 tak było z `cisza_tablicy` i `ksiega_bledow`: oba haki rzucały
+# „'module' object is not callable” (Hermes loguje to raz, potem DEBUG). Pilnuje tego test_haki_po_ladowaniu_jak_hermes.
+def cisza_po_narzedziu(**kwargs) -> None:
     """Hak `post_tool_call`: karta założona z Telegrama budzi Jarva bez surowego komunikatu Hermesa (cisza_tablicy.py)."""
     try:
         _modul("jarvo_cisza_tablicy", "cisza_tablicy.py").po_narzedziu(**kwargs)
@@ -131,8 +136,9 @@ def blokada_bez_ciszy(**kwargs) -> Optional[str]:
         logger.warning("jarvo-wiedza: straż ciszy przy blokadzie niedostępna: %s", e)
         return None
 
-def ksiega_bledow(tool_name: str = "", result: Any = None, status: str = "", session_id: str = "", task_id: str = "",
-                  **_kw: Any) -> Optional[str]:
+
+def przypomnienie_bledu(tool_name: str = "", result: Any = None, status: str = "", session_id: str = "", task_id: str = "",
+                        **_kw: Any) -> Optional[str]:
     """Hak `transform_tool_result`: wynik z dopiskiem z księgi błędów (ksiega_bledow.py) albo None (wynik bez zmian,
     także przy własnym błędzie haka: przypomnienie nigdy nie psuje wyniku narzędzia)."""
     if not isinstance(result, str) or not tool_name:
@@ -1438,7 +1444,7 @@ def register(ctx) -> None:
     except Exception as e:
         logger.debug("jarvo-wiedza: strażnik narzędzi nie zarejestrowany: %s", e)
     try:
-        ctx.register_hook("post_tool_call", cisza_tablicy)
+        ctx.register_hook("post_tool_call", cisza_po_narzedziu)
     except Exception as e:
         logger.debug("jarvo-wiedza: cisza tablicy nie zarejestrowana: %s", e)
     for hak, funkcja in (("pre_llm_call", blokada_przed_tura), ("transform_llm_output", blokada_bez_ciszy)):
@@ -1447,7 +1453,7 @@ def register(ctx) -> None:
         except Exception as e:
             logger.debug("jarvo-wiedza: %s nie zarejestrowany: %s", hak, e)
     try:
-        ctx.register_hook("transform_tool_result", ksiega_bledow)
+        ctx.register_hook("transform_tool_result", przypomnienie_bledu)
     except Exception as e:
         logger.debug("jarvo-wiedza: księga błędów nie zarejestrowana: %s", e)
     try:

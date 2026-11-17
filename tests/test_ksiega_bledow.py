@@ -4,6 +4,7 @@ import contextlib
 import importlib.util
 import json
 import os
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -22,6 +23,7 @@ _spec.loader.exec_module(kb)
 ZASIEW = REPO / "wiedza" / "bledy"
 TURNSTILE = "bledy/cloudflare nie przepuszcza komputera, krok na telefonie floty"
 GOOGLE = "bledy/google nie loguje w przeglądarce komputera, konta google na telefonie"
+EKRAN = "bledy/ekran komputera zajęty przez inną kartę"
 FLEET = {"orchestrator": "jarvo", "agents": [
     {"name": "jarvo-web", "short": "Web", "title": "Web Senior Dev", "emoji": "🌐", "kind": "specialist", "description": "Strony i SEO.",
      "room": "devlab", "label": "Pracownia", "telegram_topic": "web", "autonomy_max": "A1", "skills": [], "scripts": []}]}
@@ -66,6 +68,31 @@ def test_zasiew_ksiegi_jest_idempotentny_i_nie_nadpisuje(sk):
     # świeży stan (nowa instalacja na starym skarbcu): istniejącej notatki nie nadpisuje
     (sk.stan / w.ZASIANE_BLEDY).unlink()
     assert w.zasiej_bledy(sk, ZASIEW) == 1 and "wystapienia: 7" in zmieniona.read_text(encoding="utf-8")
+
+
+def test_zasiew_wymienia_nietknieta_notatke_na_nowsza_wersje(sk, tmp_path):
+    """18.11 notatka o zajętym ekranie dostała sygnatury z tekstu odmowy Komputera; skarbiec zasiany 17.11 (state
+    z samą listą) ma dostać nową wersję, ale notatki zmienionej przez kompilację zasiew nie rusza."""
+    repo = tmp_path / "repo-bledy"
+    shutil.copytree(ZASIEW, repo)
+    stan = sk.stan / w.ZASIANE_BLEDY
+    stan.write_text(json.dumps(sorted(json.loads(stan.read_text(encoding="utf-8")))), encoding="utf-8")   # format 17.11
+    ekran, google = (repo / f"{r.split('/', 1)[1]}.md" for r in (EKRAN, GOOGLE))
+    ekran.write_text(ekran.read_text(encoding="utf-8").replace("ekran_zmieniony,", "ekran_zmieniony, nowa sygnatura,"),
+                     encoding="utf-8")
+    google.write_text(google.read_text(encoding="utf-8").replace("wystapienia: 1", "wystapienia: 1\nkarta: t_9"),
+                      encoding="utf-8")
+    zmieniona = sk.plik(GOOGLE)                         # kompilacja dopisała przypadek: inna data i źródło
+    zmieniona.write_text(zmieniona.read_text(encoding="utf-8").replace("zmieniono: 2026-11-17", "zmieniono: 2026-11-18"),
+                         encoding="utf-8")
+    assert w.zasiej_bledy(sk, repo) == 1
+    assert "nowa sygnatura" in sk.plik(EKRAN).read_text(encoding="utf-8")
+    assert "karta: t_9" not in zmieniona.read_text(encoding="utf-8")
+    zapis = json.loads(stan.read_text(encoding="utf-8"))
+    assert isinstance(zapis, dict) and len(zapis[EKRAN]) == 64
+    assert w.zasiej_bledy(sk, repo) == 0                # drugi raz bez zmian
+    ekran.write_text(ekran.read_text(encoding="utf-8").replace("nowa sygnatura", "trzecia sygnatura"), encoding="utf-8")
+    assert w.zasiej_bledy(sk, repo) == 1 and "trzecia sygnatura" in sk.plik(EKRAN).read_text(encoding="utf-8")
 
 
 def test_lint_przyjmuje_ksiege_i_lapie_zle_sygnatury(sk):

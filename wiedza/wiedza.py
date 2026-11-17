@@ -1452,31 +1452,57 @@ def lint_bledu(n: Notatka) -> tuple[list[str], list[str]]:
     return bledy, ostrz
 
 
+def _nietknieta_ze_starego_zasiewu(obecna: str, nowa: str) -> bool:
+    """Notatka zasiana przed zapisem skrótów (state z samą listą): nietknięta, gdy kompilacja jej nie zmieniała
+    (`zmieniono` równe `utworzono`) i ma to samo źródło i wystąpienia co wersja z repo (kompilacja dopisuje źródło
+    i liczy wystąpienia)."""
+    fm, _ = podziel(obecna)
+    fm_nowa, _ = podziel(nowa)
+    return (bool(fm.get("utworzono")) and fm.get("zmieniono") == fm.get("utworzono")
+            and fm.get("zrodlo") == fm_nowa.get("zrodlo") and fm.get("wystapienia") == fm_nowa.get("wystapienia"))
+
+
 def zasiej_bledy(sk: Skarbiec, katalog: Path | None) -> int:
-    """Notatki księgi błędów z repo (`wiedza/bledy/*.md`) do `bledy/`: tylko te, których skarbiec jeszcze nie dostał
-    (state/bledy-zasiane.json), i nigdy w miejsce istniejącej notatki; usunięta przez kompilację albo człowieka nie
-    wraca przy następnym wdrożeniu. Zwraca liczbę nowych notatek."""
+    """Notatki księgi błędów z repo (`wiedza/bledy/*.md`) do `bledy/`. state/bledy-zasiane.json pamięta skrót
+    zasianej treści każdej notatki: nową notatkę z repo kładzie; notatkę, którą skarbiec już miał przed zasiewem,
+    zostawia na zawsze (skrót pusty); zasianą, a nietkniętą od zasiewu (ten sam skrót) wymienia na nowszą wersję
+    z repo (np. nowe sygnatury); zmienioną przez kompilację albo człowieka zostawia; usunięta nie wraca.
+    Zwraca liczbę nowych i wymienionych notatek."""
     if not katalog or not katalog.is_dir():
         return 0
     plik = sk.stan / ZASIANE_BLEDY
     try:
-        zasiane = set(json.loads(plik.read_text(encoding="utf-8")))
-    except (OSError, ValueError, TypeError):
-        zasiane = set()
-    nowe = 0
+        dane = json.loads(plik.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        dane = {}
+    zasiane: dict = dict.fromkeys(dane) if isinstance(dane, list) else dane if isinstance(dane, dict) else {}
+    skrot = lambda t: hashlib.sha256(t.encode("utf-8")).hexdigest()
+    zmienione = 0
     for p in sorted(katalog.glob("*.md")):
         rel = f"{KSIEGA}/{unicodedata.normalize('NFC', p.stem)}"
-        if rel in zasiane:
-            continue
-        if not sk.istnieje(rel):
-            sk.zapisz_plik(rel, p.read_text(encoding="utf-8"))
-            nowe += 1
-        zasiane.add(rel)
+        nowa = p.read_text(encoding="utf-8")
+        if rel not in zasiane:
+            if sk.istnieje(rel):
+                zasiane[rel] = ""                      # notatka skarbca o tej nazwie: nie nasza, nie ruszamy
+                continue
+        else:
+            zapisany = zasiane[rel]
+            if zapisany == "" or zapisany == skrot(nowa) or not sk.istnieje(rel):
+                continue
+            obecna = sk.plik(rel).read_text(encoding="utf-8")
+            if obecna == nowa:                         # stary zasiew tej samej wersji: tylko skrót do stanu
+                zasiane[rel] = skrot(nowa)
+                continue
+            if not (skrot(obecna) == zapisany if zapisany else _nietknieta_ze_starego_zasiewu(obecna, nowa)):
+                continue                               # zmieniona po zasiewie (kompilacja, człowiek): zostaje
+        sk.zapisz_plik(rel, nowa)
+        zasiane[rel] = skrot(nowa)
+        zmienione += 1
     sk.stan.mkdir(parents=True, exist_ok=True)
-    tresc = json.dumps(sorted(zasiane), ensure_ascii=False, indent=1) + "\n"
+    tresc = json.dumps(dict(sorted(zasiane.items())), ensure_ascii=False, indent=1) + "\n"
     if not plik.is_file() or plik.read_text(encoding="utf-8") != tresc:
         plik.write_text(tresc, encoding="utf-8", newline="\n")
-    return nowe
+    return zmienione
 
 
 # ------------------------------------------------------------------------------------------------ INDEX.md i listy hubów
@@ -1833,7 +1859,7 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
                                          newline="\n")
     sk.dopisz_log("zasiew", f"huby: {raport['huby']} folderów, {raport['agenci']} agentów; skille: {raport['skille']} zmienionych; "
                             f"docs repo: {raport['docs']} plików; pliki profili: {raport['repo']} zmienionych; "
-                            f"księga błędów: {raport['bledy']} nowych")
+                            f"księga błędów: {raport['bledy']} nowych albo wymienionych")
     raport["git"] = sk.git_init() and sk.punkt_zapisu("zasiew skarbca")
     return raport
 
@@ -2192,7 +2218,7 @@ def main(argv: list[str] | None = None) -> int:
         ix.odswiez()
         sk.punkt_zapisu("zasiew skarbca: indeks")
         print(f"✓ zasiew: {r['huby']} hubów folderów, {r['agenci']} hubów agentów, {r['skille']} skilli zmienionych, {r['docs']} docs, "
-              f"księga błędów {r['bledy']} nowych, indeks {n} notatek, git: {'tak' if r['git'] else 'nie'}")
+              f"księga błędów {r['bledy']} nowych albo wymienionych, indeks {n} notatek, git: {'tak' if r['git'] else 'nie'}")
         print(opis_wektorow(ix.odswiez_wektory(KlientWektorow(sk.stan, WEKTORY_CZAS_ZAPISU_S))))
         ix.zamknij()
         return 0
