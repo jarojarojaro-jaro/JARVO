@@ -2078,7 +2078,8 @@ async def update_request(request: Request):
 # Loader dist/index.js (scripts/hqbuild.py) wczytuje pakiet aplikacji dopiero na /jarvo, stąd: nazwy z hashem treści,
 # bliźniak .gz i cache na rok (pliki pluginu dashboard serwuje z no-store). Tylko nazwy z białej listy.
 ZASOBY = _HERE / "dist" / "zasoby"
-ZASOB_WZOR = re.compile(r"^(?:(?:app|narzedzia)-[0-9a-f]{12}\.(?:js|css)|kroje/[A-Za-z0-9_.-]+\.(?:woff2|ttf))$")
+# pakiety aplikacji (scripts/hqbuild.py PAKIETY): app-<pakiet>-<skrót>, mozg-<skrót>; narzędzia; kroje
+ZASOB_WZOR = re.compile(r"^(?:(?:app-[a-z]+|narzedzia|mozg)-[0-9a-f]{12}\.(?:js|css)|kroje/[A-Za-z0-9_.-]+\.(?:woff2|ttf))$")
 ZASOB_TYPY = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
               ".woff2": "font/woff2", ".ttf": "font/ttf"}
 ZASOB_NAGLOWKI = {"Cache-Control": "private, max-age=31536000, immutable", "Vary": "Accept-Encoding",
@@ -2131,8 +2132,8 @@ def _log_hq(linia: str) -> None:
 
 def _wersja_paczki() -> str:
     """Wersja do `hello` strumienia: skrót paczki aplikacji (zmienia się po każdej aktualizacji)."""
-    for p in sorted(ZASOBY.glob("app-*.js")):
-        return p.stem.split("-", 1)[1]
+    for p in sorted(ZASOBY.glob("app-rdzen-*.js")):
+        return p.stem.rsplit("-", 1)[1]
     try:
         return json.loads((_HERE / "manifest.json").read_text(encoding="utf-8")).get("version", "")
     except (OSError, ValueError):

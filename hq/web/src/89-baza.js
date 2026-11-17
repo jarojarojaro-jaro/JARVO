@@ -2,13 +2,11 @@
 // aplikacja otwiera ją z szuflady (Ustawienia › Stara Baza) na cały ekran, demo (hq/web/demo) pokazuje tylko ją.
 // Usuwana w etapie 7 razem z 20-art.js, 30-building.js i 60-hud.js (docs/HQ.md „Aplikacja”).
 
-const useHostI18n = (SDK && SDK.useI18n) || (() => null);
-
 // naStart="decyzje": otwarta z „Czeka na Ciebie” w aplikacji, od razu na decyzjach w Centrali
 function StaraBaza({ wlasnyNaglowek = false, naStart = null }) {
   // język dashboardu: zmiana w przełączniku przerysowuje całe HQ
   const i18n = useHostI18n();
-  HQ_LANG = (i18n && i18n.locale) || null;
+  ustawJezyk((i18n && i18n.locale) || null);
   const [state, error] = usePoll(() => api.state(), 3000, []);
   const [fleet, setFleet] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -91,3 +89,5 @@ function StaraBaza({ wlasnyNaglowek = false, naStart = null }) {
     ${animating && html`<${AnimStudio} key=${animating} path=${animating} onClose=${() => setAnimating(null)}/>`}
   </div></${AnimCtx.Provider}></${EditCtx.Provider}></${FileCtx.Provider}>`;
 }
+
+Zasoby.daj({ StaraBaza });

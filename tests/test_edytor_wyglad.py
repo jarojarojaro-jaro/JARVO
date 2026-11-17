@@ -35,7 +35,7 @@ def test_kroj_edytora_w_pluginie_i_demo(tmp_path):
     from posixpath import normpath
     from urllib.parse import urljoin
     baza = "http://x/api/plugins/jarvo-hq/zasoby/"
-    app_css = next((dist / "zasoby").glob("app-*.css")).read_text(encoding="utf-8")
+    app_css = "".join(p.read_text(encoding="utf-8") for p in (dist / "zasoby").glob("app-*.css"))   # rdzeń i pakiety
     adresy = [u for u in re.findall(r'url\(["\']?([^)"\']+)', app_css) if not u.startswith(("http", "data:"))]
     assert "kroje/Inter-latin.woff2" in adresy and any(u.endswith("fonts/kroje/kroje.css") for u in adresy)
     for u in adresy:

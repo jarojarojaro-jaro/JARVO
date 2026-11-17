@@ -153,7 +153,7 @@ def test_plugin_ma_modul_animacji_i_pomiaru(tmp_path):
     import hqbuild
     dash = hqbuild.build_plugin(tmp_path / "jarvo-hq")
     assert (dash / "animacja.py").is_file() and (dash / "pomiar.py").is_file()
-    app = sorted((dash / "dist" / "zasoby").glob("app-*.js"))          # pakiet aplikacji (dist/index.js to loader)
+    app = sorted((dash / "dist" / "zasoby").glob("app-edytor-*.js"))   # pakiet edytora (na żądanie, dist/index.js to loader)
     assert len(app) == 1
     js = app[0].read_text(encoding="utf-8")
-    assert "// ---- 47-animacja.js" in js and "AnimCtx.Provider" in js
+    assert "function AnimStudio(" in js

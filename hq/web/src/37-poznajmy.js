@@ -9,7 +9,6 @@
 
 const POZNANIE_KROKI = ["witaj", "imie", "firma", "linki", "cele", "mozg"];
 const POZNANIE_CELE = ["klienci", "rolki", "strona", "reklamy", "papiery"];
-const POZNANIE_POMINIETE = "jarvo.poznanie.pominiete.v1";
 
 // czyste pomocniki (testy: tests/js/hq_front.test.cjs)
 const Poznanie = {
@@ -84,8 +83,6 @@ const Poznanie = {
     return k;
   },
 };
-
-const poznanieOtwarte = (got) => !!got && !got.profil_wlasciciela && !Pamiec.wez(POZNANIE_POMINIETE, false);
 
 // kwestie Jarva na każdy krok (to samo idzie na ekran i do lektora)
 function kwestiePoznania(krok, d, n) {
@@ -424,3 +421,5 @@ function Poznajmy({ koniec, poczatek = "witaj" }) {
     </div>`}
   </div>`;
 }
+
+Zasoby.daj({ Poznajmy });

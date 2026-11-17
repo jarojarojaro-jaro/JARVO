@@ -66,6 +66,250 @@ def bundle_js(src_dir: Path | None = None, naglowek: str = "Jarvo HQ: plugin das
     return "\n".join(parts) + "\n"
 
 
+# ------------------------------------------------------------------ podział pakietu (docs/HQ.md §2f „Pakiety”)
+# Plugin dostaje rdzeń (app-rdzen-<h>.js: powłoka, rozmówcy, wątek, kompozytor, Markdown, strumień, API, i18n PL)
+# i pakiety na żądanie, które 00-base.js wczytuje przez Zasoby.wczytaj(nazwa). Pliki pakietów to wzorce nazw w
+# hq/web/src; `wspolne` to pliki spoza src dołączane na początek (graf wspólny z wtyczką Wiedzy). `zalezy`: pakiety
+# wczytywane razem (Stara Baza otwiera edytor, edytor używa okien Bazy). Demo i testy biorą pełny pakiet (bundle_js).
+PAKIETY = {
+    "baza": {"pliki": ("20-art.js", "30-building.js", "40-panel.js", "50-chat.js", "56-flota.js", "60-hud.js",
+                       "89-baza.js"), "zalezy": ("edytor",)},
+    "edytor": {"pliki": ("43-*.js", "44-*.js", "45-*.js", "46-*.js", "47-*.js", "48-*.js", "49-*.js", "55-*.js"),
+               "zalezy": ("baza",)},
+    # pierwsze spotkanie z lektorem (nowa instalacja) i Ustawienia: poza pierwszym wyświetleniem rozmowy
+    "poznajmy": {"pliki": ("36-glos.js", "37-poznajmy.js"), "zalezy": ()},
+    "ustawienia": {"pliki": ("61-szuflada.js", "62-ustawienia.js"), "zalezy": ()},
+    "mozg": {"pliki": ("63-mozg.js",), "wspolne": ("shared/web/graf.js",), "zalezy": ()},
+}
+# budżet gzip (bajty) z projektu etapu 1 §7: przekroczenie zatrzymuje build
+BUDZET_GZIP = {"app-rdzen.js": 95 * 1024, "app-rdzen.css": 18 * 1024, "mozg.js": 6 * 1024}
+ZNACZNIK_PAKIETOW = '"@@PAKIETY@@"'
+ZNACZNIK_CSS = re.compile(r"^/\* @@pakiet (\w+) \*/$", re.M)
+DEKLARACJA = re.compile(r"^(?:async\s+)?(?:function\*?\s+([A-Za-z_$][\w$]*)|class\s+([A-Za-z_$][\w$]*)"
+                        r"|(?:const|let|var)\s+(\{[^}]*\}|[A-Za-z_$][\w$]*[^\n]*))",
+                        re.M)
+# słowa, po których „/” zaczyna wyrażenie regularne, a nie dzielenie
+PRZED_REGEXEM = {"return", "typeof", "case", "do", "else", "in", "of", "new", "delete", "void", "throw", "yield", "await"}
+
+
+def pakiet_pliku(nazwa: str) -> str:
+    """Pakiet pliku z hq/web/src: nazwa z PAKIETY albo „rdzen”."""
+    import fnmatch
+    for pakiet, opis in PAKIETY.items():
+        if any(fnmatch.fnmatchcase(nazwa, w) for w in opis["pliki"]):
+            return pakiet
+    return "rdzen"
+
+
+def nazwy_globalne(kod: str) -> list[str]:
+    """Nazwy zadeklarowane na najwyższym poziomie pliku (deklaracje od pierwszej kolumny, jak w hq/web/src)."""
+    out: list[str] = []
+    for m in DEKLARACJA.finditer(kod):
+        if m.group(1) or m.group(2):
+            out.append(m.group(1) or m.group(2))
+            continue
+        g = m.group(3)
+        if g.startswith("{"):        # const { a, b: c } = …
+            out += [n.split(":")[-1].strip() for n in g.strip("{} ").split(",") if n.strip()]
+        else:                        # const a = 1, b = 2 (przecinki poza nawiasami i łańcuchami)
+            out.append(re.match(r"[A-Za-z_$][\w$]*", g).group(0))
+            linia, glebokosc = re.sub(r"\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|`[^`]*`", '""', g), 0
+            for i, c in enumerate(linia):
+                glebokosc += (c in "([{") - (c in ")]}")
+                if c == "," and glebokosc == 0:
+                    m2 = re.match(r",\s*([A-Za-z_$][\w$]*)\s*=", linia[i:])
+                    if m2:
+                        out.append(m2.group(1))
+    return list(dict.fromkeys(out))
+
+
+def uzyte(kod: str, nazwy) -> list[str]:
+    """Które z nazw występują w kodzie jako identyfikatory (nie jako pole po kropce)."""
+    slowa = set(re.findall(r"(?<![\w$.])[A-Za-z_$][\w$]*", kod))
+    return [n for n in nazwy if n in slowa]
+
+
+def zwiez_js(kod: str) -> str:
+    """Bez komentarzy, wcięć i pustych linii; łańcuchy, wyrażenia regularne i szablony bez zmian, poza szablonami
+    html`…`, w których htm i tak usuwa białe znaki z nową linią (wcięcia po nowej linii znikają). Nowe linie zostają
+    (automatyczne średniki), więc wynik zachowuje się jak źródło; test_hq_zasoby.py sprawdza go w node."""
+    out: list[str] = []
+    stos: list[str] = []          # "{" klamra kodu, "$" wyrażenie w szablonie, "`"/"h" szablon (h = html`…`)
+    i, n = 0, len(kod)
+    ostatni = ""                  # ostatni znaczący fragment kodu (rozpoznanie regexu)
+
+    def nowa_linia():
+        while out and out[-1] in (" ", "\t"):
+            out.pop()
+        if out and out[-1] != "\n":
+            out.append("\n")
+
+    while i < n:
+        c = kod[i]
+        if stos and stos[-1] in "`h":                      # tekst szablonu
+            if c == "\\":
+                out.append(kod[i:i + 2]); i += 2; continue
+            if c == "`":
+                stos.pop(); out.append(c); i += 1; ostatni = "`"; continue
+            if c == "$" and kod.startswith("${", i):
+                stos.append("$"); out.append("${"); i += 2; ostatni = "{"; continue
+            if c == "\n" and stos[-1] == "h":
+                out.append(c); i += 1
+                while i < n and kod[i] in " \t":
+                    i += 1
+                continue
+            out.append(c); i += 1; continue
+        if c in "'\"":
+            j = i + 1
+            while j < n and kod[j] != c:
+                j += 2 if kod[j] == "\\" else 1
+            out.append(kod[i:j + 1]); i = j + 1; ostatni = c; continue
+        if c == "`":
+            stos.append("h" if ostatni == "html" else "`"); out.append(c); i += 1; continue
+        if c == "/" and kod.startswith("//", i):
+            j = kod.find("\n", i)
+            i = n if j < 0 else j
+            continue
+        if c == "/" and kod.startswith("/*", i):
+            j = kod.find("*/", i + 2)
+            tresc = kod[i:j + 2]
+            i = j + 2
+            if "\n" in tresc:
+                nowa_linia()
+            elif out and out[-1] not in " \n":
+                out.append(" ")
+            continue
+        if c == "/":
+            regex = not ostatni or ostatni in PRZED_REGEXEM or ostatni in tuple("(,=:[!&|?{};+-*%<>~^\n")
+            if regex:
+                j, klasa = i + 1, False
+                while j < n:
+                    if kod[j] == "\\":
+                        j += 2; continue
+                    if kod[j] == "[":
+                        klasa = True
+                    elif kod[j] == "]":
+                        klasa = False
+                    elif kod[j] == "/" and not klasa:
+                        break
+                    j += 1
+                j += 1
+                while j < n and (kod[j].isalnum()):
+                    j += 1
+                out.append(kod[i:j]); i = j; ostatni = "/r"; continue
+        if c == "\n":
+            nowa_linia(); i += 1
+            while i < n and kod[i] in " \t":
+                i += 1
+            continue
+        if c in " \t":
+            if out and out[-1] not in " \n":
+                out.append(" ")
+            i += 1; continue
+        if c == "{":
+            stos.append("{")
+        elif c == "}" and stos:
+            if stos.pop() == "$":
+                out.append(c); i += 1; ostatni = "}"; continue
+        m = re.compile(r"[A-Za-z_$][\w$]*|\d[\w.]*").match(kod, i)
+        if m:
+            out.append(m.group(0)); i = m.end(); ostatni = m.group(0); continue
+        out.append(c); i += 1; ostatni = c
+    return "".join(out).strip() + "\n"
+
+
+def _htm() -> list[str]:
+    htm = (HQ / "web" / "vendor" / "htm.umd.js").read_text(encoding="utf-8").strip()
+    return ["/* htm 3.1.1 (c) Jason Miller, Apache-2.0: https://github.com/developit/htm */",
+            "var htm = (function () { var module = { exports: {} }; var exports = module.exports;", htm,
+            "return module.exports; })();"]
+
+
+def podziel_i18n(kod: str) -> tuple[str, str]:
+    """04-i18n.js → (rdzeń ze słownikiem angielskim pustym, treść słownika angielskiego). Angielski idzie osobnym
+    pakietem „en”, wczytywanym tylko przy angielskim dashboardzie (polski to język domyślny)."""
+    poczatek = kod.index("\n  en: {\n") + len("\n  en: ")
+    koniec = kod.index("\n  },\n};\n", poczatek) + len("\n  }")
+    return kod[:poczatek] + "{}" + kod[koniec:], kod[poczatek:koniec]
+
+
+def pakiety_js(src_dir: Path | None = None) -> dict[str, str]:
+    """Pakiety pluginu: {"rdzen": kod, "baza": kod, …, "en": kod}. Rdzeń to IIFE jak w bundle_js z placeholderem
+    ZNACZNIK_PAKIETOW (build_plugin wstawia nazwy plików) i na końcu eksportem do window.__JARVO_W__ tych nazw, których
+    używają pakiety. Pakiet to IIFE, które bierze nazwy rdzenia z __JARVO_W__, deklaruje nazwy innych pakietów
+    (uzupełniane, gdy te dojdą: Zasoby.wczytaj ładuje zależności równolegle) i rejestruje swoje przez W.__pakiet."""
+    src_dir = src_dir or HQ / "web" / "src"
+    zrodla: dict[str, list[tuple[str, str]]] = {"rdzen": []}
+    for p in PAKIETY:
+        zrodla[p] = [(w, (fl.REPO_ROOT / w).read_text(encoding="utf-8")) for w in PAKIETY[p].get("wspolne", ())
+                     if (fl.REPO_ROOT / w).exists()]
+    en = ""
+    for src in sorted(src_dir.glob("*.js")):
+        kod = src.read_text(encoding="utf-8")
+        if src.name == "04-i18n.js":
+            kod, en = podziel_i18n(kod)
+        zrodla[pakiet_pliku(src.name)].append((src.name, kod))
+    kody = {p: "\n".join(f"// ---- {nazwa}\n{k}" for nazwa, k in pliki) for p, pliki in zrodla.items()}
+    kody["en"] = f"Object.assign(SLOWNIK.en, {en});\n"
+    globalne = {p: nazwy_globalne(k) for p, k in kody.items()}
+    rdzen_nazwy = globalne["rdzen"]
+    eksport: set[str] = set()
+    out: dict[str, str] = {}
+    for p in [*PAKIETY, "en"]:
+        if p != "en" and not zrodla[p]:
+            continue
+        wlasne = set(globalne[p])
+        z_rdzenia = [x for x in uzyte(kody[p], rdzen_nazwy) if x not in wlasne]
+        obce = sorted({x for q in PAKIETY if q != p for x in uzyte(kody[p], globalne[q]) if x not in wlasne})
+        eksport.update(z_rdzenia)
+        czesci = [f"/* Jarvo HQ: pakiet „{p}” (na żądanie). Plik generowany przez scripts/hqbuild.py. */",
+                  "(function () {", '"use strict";', "var __W = window.__JARVO_W__;"]
+        if z_rdzenia:
+            czesci.append("var { " + ", ".join(z_rdzenia) + " } = __W;")
+        if obce:
+            czesci.append("var " + ", ".join(obce) + ";")
+        czesci.append(kody[p])
+        uzup = "; ".join(f"{x} = __W.{x}" for x in obce)
+        czesci.append(f'__W.__pakiet("{p}", {{ {", ".join(globalne[p])} }}, function () {{ {uzup} }});')
+        czesci.append("})();")
+        out[p] = zwiez_js("\n".join(czesci))
+    rdzen = ["/* Jarvo HQ: rdzeń aplikacji. Plik generowany przez scripts/hqbuild.py z hq/web/src/. */",
+             "(function () {", *_htm(), '"use strict";', kody["rdzen"],
+             "Object.assign(window.__JARVO_W__, { " + ", ".join(x for x in rdzen_nazwy if x in eksport) + " });", "})();"]
+    out["rdzen"] = zwiez_js("\n".join(rdzen))
+    return out
+
+
+def pakiety_css(css: str) -> dict[str, str]:
+    """hq/web/style.css podzielony znacznikami „/* @@pakiet <nazwa> */” (bez znacznika: rdzeń); @import każdego
+    pakietu idzie na jego początek (CSS wymaga go przed regułami)."""
+    czesci: dict[str, list[str]] = {}
+    pakiet, poz = "rdzen", 0
+    for m in ZNACZNIK_CSS.finditer(css):
+        czesci.setdefault(pakiet, []).append(css[poz:m.start()])
+        pakiet, poz = m.group(1), m.end()
+    czesci.setdefault(pakiet, []).append(css[poz:])
+    out = {}
+    for p, kawalki in czesci.items():
+        tekst = "".join(kawalki)
+        importy = re.findall(r"^@import [^;]+;$", tekst, re.M)
+        tekst = re.sub(r"^@import [^;]+;\n?", "", tekst, flags=re.M)
+        out[p] = zwiez_css("\n".join(importy) + "\n" + tekst)
+    return out
+
+
+def zwiez_css(css: str) -> str:
+    """Bez komentarzy i zbędnych białych znaków (łańcuchy w CSS stylów HQ nie mają „/*” ani podwójnych spacji)."""
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    css = re.sub(r"\s+", " ", css)
+    css = re.sub(r" ?([{};]) ?", r"\1", css)
+    return css.replace(";}", "}").strip() + "\n"
+
+
+def gzip_rozmiar(dane: bytes) -> int:
+    return len(gzip.compress(dane, compresslevel=9, mtime=0))
+
+
 def personality(soul: str) -> list[list]:
     """Pierwsza linia sekcji „## Osobowość” z SOUL.md („Szczerość 95%, humor 30%, …”, opcjonalnie po
     „Parametry:”) → [[nazwa, wartość], …]."""
@@ -216,6 +460,31 @@ def loader_js(js: str, css: str) -> str:
     return out
 
 
+def zapisz_pakiety(zasoby: Path) -> tuple[str, str]:
+    """Pakiety JS/CSS w zasobach (nazwy ze skrótu treści) i mapa pakietów na żądanie wstawiona do rdzenia; budżet
+    gzip (BUDZET_GZIP) zatrzymuje build. Zwraca (JS rdzenia, CSS rdzenia) dla loadera."""
+    js = pakiety_js()
+    css = pakiety_css(style_aplikacji((HQ / "web" / "style.css").read_text(encoding="utf-8")))
+    prefiks = lambda p: "mozg" if p == "mozg" else f"app-{p}"
+    mapa: dict[str, dict] = {}
+    for p in [x for x in js if x != "rdzen"] + [x for x in css if x not in js and x != "rdzen"]:
+        wpis = mapa.setdefault(p, {"zalezy": list(PAKIETY.get(p, {}).get("zalezy", ()))})
+        if p in js:
+            wpis["js"] = zasob(zasoby, prefiks(p), js[p].encode("utf-8"), "js")
+        if p in css:
+            wpis["css"] = zasob(zasoby, prefiks(p), css[p].encode("utf-8"), "css")
+    if ZNACZNIK_PAKIETOW not in js["rdzen"]:
+        raise SystemExit(f"hq/web/src/00-base.js: brak znacznika {ZNACZNIK_PAKIETOW} (mapa pakietów na żądanie)")
+    rdzen = js["rdzen"].replace(ZNACZNIK_PAKIETOW, json.dumps(mapa, ensure_ascii=False, separators=(",", ":")), 1)
+    pliki = {"app-rdzen.js": rdzen.encode("utf-8"), "app-rdzen.css": css["rdzen"].encode("utf-8")}
+    if "mozg" in js:
+        pliki["mozg.js"] = js["mozg"].encode("utf-8")
+    for nazwa, dane in pliki.items():
+        if gzip_rozmiar(dane) > BUDZET_GZIP[nazwa]:
+            raise SystemExit(f"{nazwa}: {gzip_rozmiar(dane)} B gzip, budżet {BUDZET_GZIP[nazwa]} B (docs/HQ.md §2f)")
+    return (zasob(zasoby, "app-rdzen", pliki["app-rdzen.js"], "js"), zasob(zasoby, "app-rdzen", pliki["app-rdzen.css"], "css"))
+
+
 def build_plugin(out: Path, fleet: fl.Fleet | None = None) -> Path:
     dash = out / "dashboard"
     if out.exists():
@@ -224,8 +493,7 @@ def build_plugin(out: Path, fleet: fl.Fleet | None = None) -> Path:
     (zasoby / "kroje").mkdir(parents=True)
     for name in PLUGIN_FILES:
         shutil.copy2(HQ / "plugin" / name, dash / name)
-    js = zasob(zasoby, "app", bundle_js().encode("utf-8"), "js")
-    css = zasob(zasoby, "app", style_aplikacji((HQ / "web" / "style.css").read_text(encoding="utf-8")).encode("utf-8"), "css")
+    js, css = zapisz_pakiety(zasoby)
     (dash / "dist" / "index.js").write_text(loader_js(js, css), encoding="utf-8", newline="\n")
     for k in KROJE_APLIKACJI:
         shutil.copy2(HQ / "web" / "fonts" / "kroje" / k, zasoby / "kroje" / k)

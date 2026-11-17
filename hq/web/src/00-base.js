@@ -23,6 +23,73 @@ const isPL = () => {
 };
 const L = (pl, en) => (isPL() ? pl : en);
 const txt = L;   // dla funkcji rysujących wieżę (tam `L` to warstwy sceny)
+// język dashboardu Hermesa (kontekst i18n); pakiet Starej Bazy ustawia go tą funkcją, bo nie widzi `let` rdzenia
+const useHostI18n = (SDK && SDK.useI18n) || (() => null);
+function ustawJezyk(l) { HQ_LANG = l; }
+
+// Pakiety na żądanie (docs/HQ.md §2f): build (scripts/hqbuild.py) wstawia mapę {nazwa: {js, css, zalezy}} w miejsce
+// znacznika; w pełnym pakiecie (demo, testy) mapy nie ma i wszystko jest już wczytane. Pakiet rejestruje swoje nazwy
+// przez W.__pakiet; zależności (Stara Baza ↔ edytor) ładują się równolegle, a nazwy z drugiego pakietu dostają
+// wartość, gdy ten dojdzie. Wejście pakietu (komponent) bierze się przez Zasoby.wez po Zasoby.daj w pliku pakietu.
+const Zasoby = (() => {
+  const P = ((m) => (typeof m === "object" ? m : null))("@@PAKIETY@@");
+  const W = window.__JARVO_W__ = window.__JARVO_W__ || {};
+  const skrypt = document.currentScript;
+  const baza = ((skrypt && skrypt.src) || "").replace(/[^/]*$/, "");
+  const pliki = {}, uzup = [], gotowe = new Set();
+  W.__pakiet = (nazwa, eksport, uzupelnij) => {
+    Object.assign(W, eksport);
+    uzup.push(uzupelnij);
+    uzup.forEach((f) => f());
+    gotowe.add(nazwa);
+  };
+  const plik = (url, css) => pliki[url] || (pliki[url] = new Promise((ok, nie) => {
+    const el = document.createElement(css ? "link" : "script");
+    if (css) { el.rel = "stylesheet"; el.href = url; setTimeout(ok, 3000); } else { el.src = url; el.async = true; }
+    el.onload = ok;
+    el.onerror = () => (css ? ok() : nie(new Error(`nie wczytano ${url}`)));
+    (css ? document.head : document.body).appendChild(el);
+  }).catch((e) => { delete pliki[url]; throw e; }));
+  const zbior = (nazwa) => {
+    const z = new Set(), kolejka = [nazwa];
+    while (kolejka.length) {
+      const n = kolejka.shift();
+      if (z.has(n) || !P[n]) continue;
+      z.add(n);
+      kolejka.push(...(P[n].zalezy || []));
+    }
+    return [...z];
+  };
+  return {
+    gotowy: (nazwa) => !P || !P[nazwa] || zbior(nazwa).every((n) => gotowe.has(n) || !P[n].js),
+    wczytaj(nazwa) {
+      if (!P || !P[nazwa]) return Promise.resolve();
+      return Promise.all(zbior(nazwa).flatMap((n) => [P[n].js && plik(baza + P[n].js), P[n].css && plik(baza + P[n].css, true)]
+        .filter(Boolean))).then(() => undefined);
+    },
+    daj: (nazwy) => Object.assign(W, nazwy),
+    wez: (nazwa) => W[nazwa],
+  };
+})();
+
+// Pakiet na żądanie w komponencie: "ok" | "laduje" | "blad"; null = nic nie trzeba.
+function usePakiet(nazwa) {
+  const [stan, ustaw] = useState(() => (!nazwa || Zasoby.gotowy(nazwa) ? "ok" : "laduje"));
+  useEffect(() => {
+    if (!nazwa || Zasoby.gotowy(nazwa)) { ustaw("ok"); return undefined; }
+    let zywy = true;
+    ustaw("laduje");
+    Zasoby.wczytaj(nazwa).then(() => zywy && ustaw("ok"), () => zywy && ustaw("blad"));
+    return () => { zywy = false; };
+  }, [nazwa]);
+  return stan;
+}
+
+// Komponent z pakietu na żądanie: rysuje `zastepczy`, dopóki pakiet się wczytuje (albo gdy się nie wczytał).
+function Leniwy({ pakiet, nazwa, zastepczy = null, ...p }) {
+  const C = usePakiet(pakiet) === "ok" ? Zasoby.wez(nazwa) : null;
+  return C ? html`<${C} ...${p}/>` : zastepczy;
+}
 
 // Agent w bieżącym języku: po angielsku nazwa pokoju, rola, opis i cechy z fleet.yaml (pole `en`).
 const localAgent = (a) => (!a || isPL() || !a.en ? a : { ...a, ...a.en });

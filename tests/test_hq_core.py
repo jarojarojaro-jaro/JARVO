@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import re
 import stat
 import subprocess
 import sys
@@ -307,17 +308,25 @@ def test_hq_plugin_build(tmp_path):
     manifest = json.loads((dash / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["name"] == "jarvo-hq" and manifest["api"] == "plugin_api.py" and manifest["tab"]["path"] == "/jarvo" and manifest["tab"]["position"] == "before:chat"
     assert manifest["label"] == "Jarvo" and "css" not in manifest
-    # dist/index.js to mały loader; pakiet aplikacji leży w zasoby/app-<hash>.js i wystawia window.__JARVO_APP__
+    # dist/index.js to mały loader; rdzeń leży w zasoby/app-rdzen-<hash>.js i wystawia window.__JARVO_APP__,
+    # pozostałe pakiety (app-<pakiet>-<hash>.js) zna rdzeń z mapy wstawionej przy buildzie
     loader = (dash / "dist" / "index.js").read_text(encoding="utf-8")
     assert len(loader.encode("utf-8")) <= hqbuild.LOADER_MAX and '__HERMES_PLUGINS__.register("jarvo-hq", Jarvo)' in loader
-    app = sorted((dash / "dist" / "zasoby").glob("app-*.js"))
-    assert len(app) == 1 and app[0].name in loader
-    js = app[0].read_text(encoding="utf-8")
+    rdzen = sorted((dash / "dist" / "zasoby").glob("app-rdzen-*.js"))
+    assert len(rdzen) == 1 and rdzen[0].name in loader
+    js = rdzen[0].read_text(encoding="utf-8")
+    pakiety = sorted((dash / "dist" / "zasoby").glob("*.js"))
+    for p in pakiety:
+        if p != rdzen[0]:
+            assert f'"{p.name}"' in js, p.name
+    calosc = "".join(p.read_text(encoding="utf-8") for p in pakiety)
     for src in sorted((Path(hqbuild.HQ) / "web" / "src").glob("*.js")):
-        assert f"// ---- {src.name}" in js
-    assert "window.__JARVO_APP__ = { App: AppJarvo, StaraBaza, wersja: 2 }" in js and "__HERMES_PLUGINS__.register(" not in js
+        nazwy = hqbuild.nazwy_globalne(src.read_text(encoding="utf-8"))
+        assert not nazwy or re.search(rf"\b(function|const|let|class) {re.escape(nazwy[0])}\b", calosc), src.name
+    assert 'window.__JARVO_APP__ = { App: AppJarvo, get StaraBaza() { return Zasoby.wez("StaraBaza"); }, wersja: 2 }' in js
+    assert "__HERMES_PLUGINS__.register(" not in js and "@@PAKIETY@@" not in js
     if shutil.which("node"):
-        for f in (dash / "dist" / "index.js", app[0]):
+        for f in (dash / "dist" / "index.js", *pakiety):
             assert subprocess.run(["node", "--check", str(f)], capture_output=True).returncode == 0, f
     fleet = json.loads((dash / "fleet.json").read_text(encoding="utf-8"))
     names = [a["name"] for a in fleet["agents"]]

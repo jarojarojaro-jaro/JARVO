@@ -3,7 +3,6 @@
 // i prośba do Wideografa. Strona działa na serwerze podglądu :9120 w piaskownicy (inne pochodzenie), więc rozmawiamy
 // z nią przez postMessage: mostek /_jarvo/most.js wstrzykuje serwer tylko w tym trybie (hq/plugin/animacja.py).
 
-const AnimCtx = React.createContext(null);
 const AN_EASE = [["łagodne wyjście", "ease out", [0.16, 1, 0.3, 1]], ["wejście i wyjście", "in-out", [0.65, 0, 0.35, 1]],
   ["sprężyste", "springy", [0.34, 1.56, 0.64, 1]], ["liniowe", "linear", [0, 0, 1, 1]]];
 

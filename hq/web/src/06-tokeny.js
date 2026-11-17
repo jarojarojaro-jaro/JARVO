@@ -37,6 +37,19 @@ function useWidokTelefonu(ref) {
   }, []);
 }
 
+function useMedia(q) {
+  const get = () => typeof window !== "undefined" && window.matchMedia && window.matchMedia(q).matches;
+  const [m, setM] = useState(get);
+  useEffect(() => {
+    if (!window.matchMedia) return undefined;
+    const mq = window.matchMedia(q);
+    const on = () => setM(mq.matches);
+    mq.addEventListener ? mq.addEventListener("change", on) : mq.addListener(on);
+    return () => (mq.removeEventListener ? mq.removeEventListener("change", on) : mq.removeListener(on));
+  }, [q]);
+  return m;
+}
+
 // pasek boczny wysuwany (poniżej 1024 px, jak w style.css)
 const useWaskiEkran = () => useMedia("(max-width: 1023.98px)");
 

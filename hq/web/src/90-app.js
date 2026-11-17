@@ -93,6 +93,8 @@ function useStanAktualizacji() {
 function OknoStarejBazy() {
   const ref = useRef(null);
   const naStart = useSklep((s) => (s.stara_baza === "decyzje" ? "decyzje" : null));
+  const pakiet = usePakiet("baza");
+  const StaraBaza = pakiet === "ok" ? Zasoby.wez("StaraBaza") : null;
   // wyjście: fokus do kompozytora (przycisk, który ją otworzył, był w zamkniętej już szufladzie)
   const zamknij = () => { Fokus.odloz("kompozytor"); sklep.ustaw({ stara_baza: false }); };
   useEffect(() => {
@@ -113,7 +115,9 @@ function OknoStarejBazy() {
   return html`<div class="j-stara" role="dialog" aria-modal="true" aria-label=${T("szuflada.stara-baza")} ref=${ref} tabIndex="-1">
     <div class="j-stara-g"><${Przycisk} maly ikona="back" onClick=${zamknij}>${T("stara.wroc")}</${Przycisk}>
       <span>${T("szuflada.stara-baza")}</span></div>
-    <div class="j-stara-t"><${StaraBaza} wlasnyNaglowek=${true} naStart=${naStart}/></div>
+    <div class="j-stara-t">${StaraBaza
+      ? html`<${StaraBaza} wlasnyNaglowek=${true} naStart=${naStart}/>`
+      : html`<p class="j-stara-laduje" role="status">${pakiet === "blad" ? T("blad.ogolny") : T("stara.laduje")}</p>`}</div>
   </div>`;
 }
 
@@ -178,9 +182,20 @@ function useSkrotyAplikacji() {
   }, []);
 }
 
+// pierwsze spotkanie (37-poznajmy.js, pakiet „poznajmy”): otwarte, dopóki właściciel nie ma profilu i go nie pominął
+const POZNANIE_POMINIETE = "jarvo.poznanie.pominiete.v1";
+const poznanieOtwarte = (got) => !!got && !got.profil_wlasciciela && !Pamiec.wez(POZNANIE_POMINIETE, false);
+
+// Angielski słownik to osobny pakiet „en” (polski jest w rdzeniu): przy angielskim dashboardzie aplikacja czeka na
+// niego pod zasłoną startową, żeby nie mignąć polskimi tekstami.
 function AppJarvo() {
   const i18n = useHostI18n();
   HQ_LANG = (i18n && i18n.locale) || null;
+  const jezyk = usePakiet(isPL() ? null : "en");
+  return jezyk === "laduje" ? null : html`<${AplikacjaJarvo}/>`;
+}
+
+function AplikacjaJarvo() {
   const trasa = useTrasa();
   const motyw = useMotyw(useSklep((s) => s.ustawienia.motyw));
   const pasek = useSklep((s) => s.pasek, plytko);
@@ -274,10 +289,10 @@ function AppJarvo() {
   if (trasa.widok !== "watek" && trasa.widok !== "sesja" && (poznanie === "trwa" || poznanie === "mozg" || poznanieOtwarte(got))) {
     return html`<div class="jarvo-app" data-jarvo-korzen="" data-motyw=${motyw} lang=${isPL() ? "pl" : "en"} ref=${korzen}>
       <main class="j-poz-ekran" data-region="glowna" tabIndex="-1" aria-label=${T("poz.etykieta")}>
-        <${Poznajmy} key=${poznanie === "mozg" ? "mozg" : "poz"} poczatek=${poznanie === "mozg" ? "mozg" : "witaj"}
+        <${Leniwy} pakiet="poznajmy" nazwa="Poznajmy" key=${poznanie === "mozg" ? "mozg" : "poz"} poczatek=${poznanie === "mozg" ? "mozg" : "witaj"}
           koniec=${() => sklep.ustaw({ poznanie: null })}/>
       </main>
-      ${trasa.u && html`<${Szuflada} trasa=${trasa}/>`}
+      ${trasa.u && html`<${Leniwy} pakiet="ustawienia" nazwa="Szuflada" trasa=${trasa}/>`}
       <${Pasy}/>
       <${Toasty}/>
     </div>`;
@@ -294,7 +309,7 @@ function AppJarvo() {
         ${widok}
       </main>
     </div>
-    ${trasa.u && html`<${Szuflada} trasa=${trasa}/>`}
+    ${trasa.u && html`<${Leniwy} pakiet="ustawienia" nazwa="Szuflada" trasa=${trasa}/>`}
     ${staraBaza && html`<${OknoStarejBazy}/>`}
     <${PodgladPliku}/>
     <${OknoPytania}/>
@@ -305,4 +320,4 @@ function AppJarvo() {
 
 // Zakładkę /jarvo rejestruje loader (dist/index.js ze scripts/hqbuild.py): wczytuje ten pakiet dopiero na /jarvo
 // i owija App w osłonę błędów. Wersja 2: aplikacja sama chowa powłokę Hermesa i zdejmuje zasłonę startową.
-window.__JARVO_APP__ = { App: AppJarvo, StaraBaza, wersja: 2 };
+window.__JARVO_APP__ = { App: AppJarvo, get StaraBaza() { return Zasoby.wez("StaraBaza"); }, wersja: 2 };

@@ -266,7 +266,97 @@ def test_loader_bez_pustego_pola(hqbuild, tmp_path):
 
 def test_pakiet_rejestruje_aplikacje_nie_zakladke(hqbuild):
     js = hqbuild.bundle_js()
-    assert "window.__JARVO_APP__ = { App: AppJarvo, StaraBaza, wersja: 2 };" in js
+    assert 'window.__JARVO_APP__ = { App: AppJarvo, get StaraBaza() { return Zasoby.wez("StaraBaza"); }, wersja: 2 };' in js
     assert not re.search(r"__HERMES_PLUGINS__\.register\(", js)
     manifest = json.loads((REPO / "hq" / "plugin" / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["entry"] == "dist/index.js" and "css" not in manifest
+
+
+# --------------------------------------------------------------- podział pakietu i budżet (docs/HQ.md §2f)
+
+def test_podzial_pakietow_i_budzet(hqbuild, tmp_path):
+    dash = hqbuild.build_plugin(tmp_path / "jarvo-hq")
+    zasoby = dash / "dist" / "zasoby"
+    rdzen_js = next(zasoby.glob("app-rdzen-*.js"))
+    rdzen_css = next(zasoby.glob("app-rdzen-*.css"))
+    assert len(gzip.decompress((zasoby / (rdzen_js.name + ".gz")).read_bytes())) == rdzen_js.stat().st_size
+    assert hqbuild.gzip_rozmiar(rdzen_js.read_bytes()) <= hqbuild.BUDZET_GZIP["app-rdzen.js"]
+    assert hqbuild.gzip_rozmiar(rdzen_css.read_bytes()) <= hqbuild.BUDZET_GZIP["app-rdzen.css"]
+    for mozg in zasoby.glob("mozg-*.js"):
+        assert hqbuild.gzip_rozmiar(mozg.read_bytes()) <= hqbuild.BUDZET_GZIP["mozg.js"]
+    kod = rdzen_js.read_text(encoding="utf-8")
+    # rdzeń bez Starej Bazy, edytora, pierwszego spotkania i angielskiego słownika; ma mapę pakietów
+    for nazwa in ("function StaraBaza(", "function VideoEditor(", "function Poznajmy(", '"Back to Jarvo"'):
+        assert nazwa not in kod
+    mapa = json.loads(re.search(r'\(\(m\) => \(typeof m === "object" \? m : null\)\)\((\{.*?\}\})\)', kod).group(1))
+    assert set(mapa) >= {"baza", "edytor", "poznajmy", "ustawienia", "en"}
+    assert mapa["baza"]["zalezy"] == ["edytor"] and mapa["baza"]["css"].startswith("app-baza-")
+    for wpis in mapa.values():
+        for plik in (wpis.get("js"), wpis.get("css")):
+            assert not plik or ((zasoby / plik).is_file() and hqbuild_wzor(plik)), plik
+    # pierwsza strona nie ciągnie Google Fonts ani biblioteki krojów edytora
+    css = rdzen_css.read_text(encoding="utf-8")
+    assert "@import" not in css and "fonts.googleapis.com" not in css
+
+
+def hqbuild_wzor(nazwa):
+    return re.match(r"^(?:(?:app-[a-z]+|narzedzia|mozg)-[0-9a-f]{12}\.(?:js|css))$", nazwa)
+
+
+def test_budzet_zatrzymuje_build(hqbuild, tmp_path, monkeypatch):
+    monkeypatch.setitem(hqbuild.BUDZET_GZIP, "app-rdzen.js", 1000)
+    with pytest.raises(SystemExit, match="budżet"):
+        hqbuild.build_plugin(tmp_path / "jarvo-hq")
+
+
+def test_pakiet_pliku(hqbuild):
+    assert hqbuild.pakiet_pliku("89-baza.js") == "baza" and hqbuild.pakiet_pliku("45-edytor.js") == "edytor"
+    assert hqbuild.pakiet_pliku("37-poznajmy.js") == "poznajmy" and hqbuild.pakiet_pliku("30-pasek.js") == "rdzen"
+    assert hqbuild.pakiet_pliku("95-update.js") == "rdzen"           # pozycja aktualizacji w menu dashboardu
+    assert hqbuild.nazwy_globalne("const a = 1, b = 2;\nfunction c() {}\nconst { d, e: f } = x;\nclass G {}\n  const h = 1;\n") \
+        == ["a", "b", "c", "d", "f", "G"]
+
+
+def test_trasa_przyjmuje_pakiety(trasa):
+    api, *_ = trasa
+    for nazwa in ("app-baza-0123456789ab.js", "app-rdzen-0123456789ab.css", "mozg-0123456789ab.js"):
+        assert api.ZASOB_WZOR.match(nazwa)
+    for nazwa in ("app-Baza-0123456789ab.js", "app--0123456789ab.js", "mozg-0123456789ab.map"):
+        assert not api.ZASOB_WZOR.match(nazwa)
+
+
+ZWIEZ_PROBA = r"""
+// komentarz
+const a = 10 / 2 / 5, re = /\/\*nie komentarz*\//g;   /* blok */
+const s = "a // b", t = 'c /* d */';
+const html = (s, ...v) => s.raw.join("|") + v.join(",");
+const u = `linia 1
+    wcięcie zostaje ${a > 0 ? `w ${"środku"}` : "x"}`;
+const h = html`<div>
+    ${a}
+  </div>`;
+function f(x) { return /x+/.test(x) ? x.length : 0; }
+const obj = { b: { c: 1 } };
+const g = a
+++a2;
+var a2 = 1;
+module.exports = { a, re: re.source, s, t, u, h, f: f("xx"), obj: JSON.stringify(obj) };
+"""
+
+
+def test_zwiez_js_zachowuje_dzialanie(hqbuild, tmp_path):
+    if not NODE:
+        pytest.skip("brak node")
+    wyniki = []
+    for nazwa, kod in (("a.js", ZWIEZ_PROBA), ("b.js", hqbuild.zwiez_js(ZWIEZ_PROBA))):
+        (tmp_path / nazwa).write_text(kod, encoding="utf-8")
+        r = subprocess.run([NODE, "-e", f"console.log(JSON.stringify(require({str(tmp_path / nazwa)!r})))"],
+                           capture_output=True, text=True, timeout=60)
+        assert r.returncode == 0, r.stderr
+        wyniki.append(json.loads(r.stdout))
+    a, b = wyniki
+    assert a["h"] != b["h"] and a["h"].replace("\n    ", "\n").replace("\n  ", "\n") == b["h"]   # tylko wcięcia w html``
+    del a["h"], b["h"]
+    assert a == b
+    zw = hqbuild.zwiez_js(ZWIEZ_PROBA)
+    assert "komentarz\n" not in zw and "/* blok */" not in zw and "    wcięcie zostaje" in zw

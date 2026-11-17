@@ -221,7 +221,7 @@ def test_pakiet_sklejony_ma_poprawna_skladnie(tmp_path):
     plik.write_text(hqbuild.bundle_js(), encoding="utf-8")
     r = subprocess.run([NODE, "--check", str(plik)], capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
-    assert "window.__JARVO_APP__ = { App: AppJarvo, StaraBaza, wersja: 2 };" in plik.read_text(encoding="utf-8")
+    assert 'window.__JARVO_APP__ = { App: AppJarvo, get StaraBaza() { return Zasoby.wez("StaraBaza"); }, wersja: 2 };' in plik.read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------- panel bez logowania (docs/NATYWNIE.md W11, I11)

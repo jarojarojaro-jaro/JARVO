@@ -223,3 +223,5 @@ function Szuflada({ trasa }) {
     </div>
   </${Arkusz}>`;
 }
+
+Zasoby.daj({ Szuflada });

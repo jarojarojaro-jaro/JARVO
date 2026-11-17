@@ -1325,10 +1325,21 @@ innych kanałów etap 6.
   `ciemny-390.jpg` (JPEG 80, w każdym ekran startu obok wątku z odpowiedzią atrapy, motyw „Jak w systemie”). Jedyny
   pomijany błąd strony to komunikat Chromium „ViewTransition opt-in disabled”: dashboard Hermesa włącza przejścia
   widoku między dokumentami, a strona `/login` nie, więc każde przejście na logowanie (także z `/sessions`) go zgłasza.
-- **Rozmiar.** Pakiet 3c po poprawkach przeglądu: JS ok. 826 KB (262 KB gzip, +8 KB gzip względem 3c: figurki,
-  linia gotowości, Zespół, fokus), CSS ok. 157 KB (31,9 KB gzip, +1 KB), loader 3,9 KB (limit 4 KB). Budżet
-  specyfikacji dla etapów 3–6 to 190 KB gzip JS: przekroczony o ok. 72 KB, bo w pakiecie jest jeszcze cała Stara Baza; podział na pakiet aplikacji i Starą Bazę ładowaną na żądanie
-  (etap 7) albo usuwanie komentarzy w `hqbuild.py` to zejdą.
+- **Rozmiar i pakiety (centrum, krok 1a).** Build dzieli aplikację na pakiety (`scripts/hqbuild.py` `PAKIETY`):
+  rdzeń `app-rdzen-<h>.js` (powłoka, pasek, wątek, kompozytor, Markdown, strumień, API, i18n PL, figurki, okna
+  plików) i na żądanie `app-baza` (Stara Baza), `app-edytor` (edytor filmów, animacja, konwerter; ładowane razem
+  z Bazą), `app-poznajmy` (pierwsze spotkanie z lektorem), `app-ustawienia`, `app-en` (angielski słownik, tylko przy
+  angielskim dashboardzie) i `mozg-<h>.js`. CSS dzielą znaczniki `/* @@pakiet <nazwa> */` w `style.css`; Google
+  Fonts i biblioteka krojów edytora (`@import`) idą z pakietem Bazy i edytora, nie z pierwszym wejściem. Rdzeń zna
+  pakiety z mapy, którą build wstawia w miejsce `"@@PAKIETY@@"` (`00-base.js` `Zasoby.wczytaj`, `usePakiet`,
+  `Leniwy`); pakiet to IIFE, które bierze nazwy rdzenia z `window.__JARVO_W__` i rejestruje swoje (`W.__pakiet`),
+  a nazwy drugiego pakietu (Baza ↔ edytor) dostaje, gdy ten dojdzie. Wejście pakietu wystawia `Zasoby.daj({…})`, więc
+  ten sam kod działa w pełnym pakiecie demo i testów (`bundle_js`). Build usuwa komentarze i wcięcia (`zwiez_js`;
+  w szablonach `html` także wcięcia po nowej linii, które htm i tak pomija) i pilnuje budżetu gzip
+  (`BUDZET_GZIP`: rdzeń JS ≤ 95 KB, CSS ≤ 18 KB, Mózg ≤ 6 KB; przekroczenie zatrzymuje build). 17.11: rdzeń JS
+  ok. 278 KB (86,6 KB gzip), CSS 80 KB (16,1 KB gzip); wcześniej jeden pakiet 262 KB gzip. Pliki rdzenia nie mogą
+  sięgać do nazw z pakietów inaczej niż przez `Zasoby.wez`, a pakiety nie zmieniają `let` rdzenia (język ustawia
+  `ustawJezyk`).
 
 ## 2g. Panel w sieci (Tailscale)
 

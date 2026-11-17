@@ -2,7 +2,6 @@
 // Bez bibliotek: dwie warstwy (<video> albo <img>) na zmianę, płynne cięcia i przejścia między klipami (49-przejscia.js),
 // napisy rysowane na kanwie tą samą funkcją w podglądzie i przy eksporcie (PNG na napis), więc plik wygląda jak podgląd.
 
-const EditCtx = React.createContext(null);
 const ED_AGENT = "jarvo-wideo";
 const ED_SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4];
 const ED_FORMATS = [
@@ -168,19 +167,6 @@ function edTC(s, fine = true) {
   const m = Math.floor(s / 60), r = s - m * 60;
   return `${String(m).padStart(2, "0")}:${fine ? r.toFixed(2).padStart(5, "0") : String(Math.floor(r)).padStart(2, "0")}`;
 }
-function useMedia(q) {
-  const get = () => typeof window !== "undefined" && window.matchMedia && window.matchMedia(q).matches;
-  const [m, setM] = useState(get);
-  useEffect(() => {
-    if (!window.matchMedia) return undefined;
-    const mq = window.matchMedia(q);
-    const on = () => setM(mq.matches);
-    mq.addEventListener ? mq.addEventListener("change", on) : mq.addListener(on);
-    return () => (mq.removeEventListener ? mq.removeEventListener("change", on) : mq.removeListener(on));
-  }, [q]);
-  return m;
-}
-
 let edSeq = 0;
 const edId = (p) => `${p}${Date.now().toString(36)}${(edSeq++).toString(36)}`;
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
