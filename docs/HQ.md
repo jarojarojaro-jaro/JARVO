@@ -1341,6 +1341,27 @@ innych kanałów etap 6.
   sięgać do nazw z pakietów inaczej niż przez `Zasoby.wez`, a pakiety nie zmieniają `let` rdzenia (język ustawia
   `ustawJezyk`).
 
+### Aktualizacje (`#/aktualizacje`)
+
+Kanał pod rozmówcami (pozycja „↻ Aktualizacje” z licznikiem nieprzeczytanych, na telefonie na ekranie rozmówców):
+archiwum raportów rutyn floty (poranny brief, patrol, przegląd tygodnia, świeżość wiedzy, nowe wersje, rutyny agentów)
+do przeglądania, tylko odczyt. Od najnowszego, pogrupowane po dniu (Dziś, Wczoraj, data) i w dniu po rodzaju raportu;
+filtr rodzaju w adresie (`#/aktualizacje/<id zadania>`); długi raport zwinięty z „Pokaż całość”; „Odpowiedz
+w rozmowie” otwiera rozmówcę profilu rutyny (Jarvo: temat JARVO). Wejście bez filtra oznacza raporty jako przeczytane.
+
+- **Archiwum** (`hq/plugin/raporty.py`, w kodzie „raporty”, bo „aktualizacja” to aktualizacja Jarva): pętla silnika co
+  30 s czyta nowe zapisy `<dane>/profiles/<profil>/cron/output/<zadanie>/*.md` (Hermes trzyma 50 na zadanie) i przepisuje
+  raporty do `<jarvo>/state/raporty.db`. Raport = odpowiedź po `## Response`, wyjście skryptu `no_agent` albo błąd;
+  cisza (`[SILENT]`, `**Status:** silent`, `wakeAgent=false`) nie jest raportem. Treść przez `utajnij`.
+- **Trasy**: `GET /raporty?rodzaj=&przed=&limit=` (tylko z karty panelu), `POST /raporty/przeczytane {do}` (znacznik
+  tylko rośnie). `GET /app` ma `raporty: {nieprzeczytane, przeczytane_do}`; strumień: `raporty.nowe` (nowy raport,
+  otwarty widok wczytuje się na nowo) i `raporty.licznik`.
+- **Pakiet** `raporty` (`hq/web/src/64-raporty.js`, style w bloku „@@pakiet raporty”) ładuje się po wejściu w widok.
+- **Raport w rozmowie**: rutyna z `attach_to_session` wpisuje raport do sesji tematu JARVO jako wiadomość użytkownika
+  `[Cron delivery: <rutyna>]`; oś (`scalanie.py`, rodzaj `rutyna`) pokazuje ją jako wiadomość Jarva ze znacznikiem
+  „↻ <rutyna>”, a podgląd w lewej kolumnie jako „Jarvo · <rutyna>: …”. Telegram: temat UPDATES dostaje kopię
+  (`ROUTINE_DELIVER`, `docs/BOSS.md`).
+
 ### Mózg (`#/mozg`)
 
 Graf wiedzy w aplikacji, w etapie 1 centrum dowodzenia (pakiet `mozg` ładowany dopiero po wejściu w widok):

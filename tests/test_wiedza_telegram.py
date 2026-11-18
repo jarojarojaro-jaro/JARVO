@@ -185,15 +185,20 @@ class Nadzorca:
 
 
 class Flota:
-    """Atrapa jarvo/flota.py: wdrożenie zapisuje dom Jarva w rutynach (jak build z HOME_DELIVER: grupa, bez niej DM)."""
+    """Atrapa jarvo/flota.py: wdrożenie zapisuje w rutynach `deliver` z tokenu ROUTINE_DELIVER prawdziwego buildu (dom
+    Jarva: General grupy jako wątek 1 i kopia w temacie UPDATES, bez grupy DM), więc `rutyny_do_domu` sprawdza się
+    z tym, co naprawdę wdraża build."""
 
     def __init__(self, u):
         self.u, self.wywolania, self.potwierdzone = u, 0, []
 
     def zainstaluj_flote(self, u, env, log=print):
+        import build
+        import fleetlib as fl
         self.wywolania += 1
         trasy = wc.czytaj_env(wc.konfig(u) / "jarvo.env")
-        _jobs(u, deliver=f"telegram:{trasy.get('TELEGRAM_HQ_CHAT_ID') or trasy['TELEGRAM_OWNER_ID']}")
+        flota = fl.load_fleet()
+        _jobs(u, deliver=build.base_tokens(flota, flota.agent(flota.orchestrator), "/b", trasy)["ROUTINE_DELIVER"])
         return {"restart_bramy": True, "restart_panelu": True, "odcisk_panelu": "0123456789abcdef"}
 
     def uslugi_do_restartu(self, wynik):
@@ -358,7 +363,7 @@ def test_ustaw_wdraza_flote_i_restartuje_uslugi(inst, api, monkeypatch, capsys):
     assert wc.czytaj_env(wc.konfig(u) / "jarvo.env")["TELEGRAM_HQ_CHAT_ID"] == "-1001234567890"
     for plik in (u.dane / ".env", wc.konfig(u) / "host.env"):
         assert wc.czytaj_env(plik)["TELEGRAM_HOME_CHANNEL"] == "-1001234567890"
-    assert all(r["deliver"] == "telegram:-1001234567890" for r in wc.stan_rutyn(u)["lista"])
+    assert all(r["deliver"] == "telegram:-1001234567890:1" for r in wc.stan_rutyn(u)["lista"])
     assert "Flota wdrożona; restart: brama, panel" in capsys.readouterr().out
     monkeypatch.setattr(sys, "stdin", io.StringIO(TOKEN + "\n"))                     # nic nowego: bez wdrożenia
     assert wc.polecenie_telegram_ustaw(u, _a(token_ze_stdin=True, wlasciciel="123456789"), [], ot, interaktywnie=False) == 0

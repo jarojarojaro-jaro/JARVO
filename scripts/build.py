@@ -500,16 +500,31 @@ def render_tokens(text: str, tokens: dict[str, str]) -> str:
     return text
 
 
+# temat General forum: Telegram adresuje go jako wątek 1 (Hermes nie wysyła message_thread_id=1, sesja tematu ma wątek "1")
+WATEK_OGOLNY = "1"
+# temat „UPDATES” grupy Jarvo HQ (`jarvo telegram tematy`): archiwum raportów rutyn do przeglądania
+TEMAT_AKTUALIZACJI = "UPDATES"
+
+
 def cel_watku(agent: fl.Agent, env: dict[str, str]) -> str:
     """Wątek agenta w grupie Jarvo HQ jako cel dostarczania crona Hermesa: `telegram:<grupa>:<wątek>`, temat „general”
-    = sama grupa; pusto, gdy brak TELEGRAM_HQ_CHAT_ID albo TELEGRAM_TOPIC_<temat> (te same zmienne co trasy w build_host)."""
+    = `telegram:<grupa>:1`; pusto, gdy brak TELEGRAM_HQ_CHAT_ID albo TELEGRAM_TOPIC_<temat> (te same zmienne co trasy
+    w build_host). General z jawnym wątkiem 1 (18.11): cel bez wątku z `attach_to_session` każe Hermesowi zakładać
+    przy każdym przebiegu nowy temat „Hermes — <rutyna>” (cron/scheduler_delivery.py `_open_continuable_cron_thread`),
+    a z wątkiem 1 wiadomość idzie do General i trafia do sesji tematu JARVO (lustro `mirror_to_session`)."""
     hq, temat = env.get("TELEGRAM_HQ_CHAT_ID", "").strip(), agent.telegram_topic.strip()
     if not hq or not temat:
         return ""
     if temat.lower() == "general":
-        return f"telegram:{hq}"
+        return f"telegram:{hq}:{WATEK_OGOLNY}"
     watek = env.get(f"TELEGRAM_TOPIC_{temat.upper()}", "").strip()
     return f"telegram:{hq}:{watek}" if watek else ""
+
+
+def cel_aktualizacji(env: dict[str, str]) -> str:
+    """Temat UPDATES grupy Jarvo HQ (`telegram:<grupa>:<wątek>`); pusto bez grupy albo tematu."""
+    hq, watek = env.get("TELEGRAM_HQ_CHAT_ID", "").strip(), env.get(f"TELEGRAM_TOPIC_{TEMAT_AKTUALIZACJI}", "").strip()
+    return f"telegram:{hq}:{watek}" if hq and watek else ""
 
 
 def base_tokens(fleet: fl.Fleet, agent: fl.Agent, runtime_build_dir: str, env: dict[str, str],
@@ -517,9 +532,10 @@ def base_tokens(fleet: fl.Fleet, agent: fl.Agent, runtime_build_dir: str, env: d
     """Tokeny @@…@@ profilu. Bez `uklad`: kontener z buildem pod `runtime_build_dir` (dawne wywołanie)."""
     shared = fleet.raw.get("shared", {})
     owner = env.get("TELEGRAM_OWNER_ID", "").strip()
-    # dom Jarva (17.11): wątek orkiestratora w grupie Jarvo HQ (temat General = sama grupa), bez grupy DM właściciela,
-    # bez niego lokalnie; ten sam cel ustawia `jarvo telegram ustaw/tematy` jako TELEGRAM_HOME_CHANNEL bramy
+    # dom Jarva (17.11): wątek orkiestratora w grupie Jarvo HQ (temat General), bez grupy DM właściciela,
+    # bez niego lokalnie; ten sam czat ustawia `jarvo telegram ustaw/tematy` jako TELEGRAM_HOME_CHANNEL bramy
     home_deliver = cel_watku(fleet.agent(fleet.orchestrator), env) or (f"telegram:{owner}" if owner else "local")
+    aktualizacje = cel_aktualizacji(env)
     u = uklad or Uklad(build=runtime_build_dir)
     return {
         "PROVIDER": fleet.provider,
@@ -537,9 +553,18 @@ def base_tokens(fleet: fl.Fleet, agent: fl.Agent, runtime_build_dir: str, env: d
         "ORCHESTRATOR": fleet.orchestrator,
         # cel dostarczania rutyn Jarva: jego dom (temat General grupy Jarvo HQ, bez grupy DM właściciela)
         "HOME_DELIVER": home_deliver,
+        # raporty rutyn Jarva (18.11): dom i kopia w temacie UPDATES (archiwum), gdy grupa ma ten temat
+        "ROUTINE_DELIVER": z_aktualizacjami(home_deliver, aktualizacje),
         # rutyny agentów (nie Jarva): ich wątek w grupie Jarvo HQ, a bez grupy albo tematu jak HOME_DELIVER
         "AGENT_DELIVER": cel_watku(agent, env) or home_deliver,
+        # raporty rutyn agenta: jego wątek i kopia w temacie UPDATES
+        "AGENT_ROUTINE_DELIVER": z_aktualizacjami(cel_watku(agent, env) or home_deliver, aktualizacje),
     }
+
+
+def z_aktualizacjami(cel: str, aktualizacje: str) -> str:
+    """Cel raportu rutyny z kopią w temacie UPDATES (`deliver` Hermesa przyjmuje cele po przecinku)."""
+    return f"{cel},{aktualizacje}" if aktualizacje and cel not in ("local", aktualizacje) else cel
 
 
 # ------------------------------------------------------------------------ vendoring

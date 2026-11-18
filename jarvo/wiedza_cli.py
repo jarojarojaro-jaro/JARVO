@@ -978,12 +978,24 @@ def opis_domu(dom: str) -> str:
             else f"DM {dom} (bez grupy: jarvo telegram tematy)" if dom else "brak")
 
 
+def cel_rutyn(u: Uklad, dom: str) -> str:
+    """`deliver` rutyn Jarva przy domu `dom` (jak ROUTINE_DELIVER w scripts/build.py): grupa = jej General jako wątek 1
+    (cel bez wątku z attach_to_session zakłada co przebieg temat „Hermes — <rutyna>”) i kopia w temacie UPDATES,
+    gdy jarvo.env go ma; DM = sam czat."""
+    if not dom.startswith("-"):
+        return f"telegram:{dom}"
+    env = czytaj_env(konfig(u) / "jarvo.env")
+    aktualizacje = (env.get(f"TELEGRAM_TOPIC_{NAZWA_AKTUALIZACJI}") or "").strip()
+    ta_grupa = (env.get("TELEGRAM_HQ_CHAT_ID") or "").strip() == dom
+    return f"telegram:{dom}:{WATEK_OGOLNY}" + (f",telegram:{dom}:{aktualizacje}" if aktualizacje and ta_grupa else "")
+
+
 def rutyny_do_domu(u: Uklad, dom: str) -> bool:
-    """Czy rutyny Jarva dostarczają do jego domu (`deliver` ustawia build przy wdrożeniu floty, HOME_DELIVER);
+    """Czy rutyny Jarva dostarczają do jego domu (`deliver` ustawia build przy wdrożeniu floty, ROUTINE_DELIVER);
     bez zainstalowanych rutyn nie ma czego wdrażać."""
     rutyny = stan_rutyn(u)
-    return not rutyny["zainstalowane"] or all(str(r.get("deliver")) == f"telegram:{dom}"
-                                              for r in rutyny["lista"] if r.get("jest"))
+    cel = cel_rutyn(u, dom)
+    return not rutyny["zainstalowane"] or all(str(r.get("deliver")) == cel for r in rutyny["lista"] if r.get("jest"))
 
 
 def _token(u: Uklad) -> str:
@@ -1218,6 +1230,8 @@ PLIK_GRUP = "telegram-grupy.json"          # w stanie Jarva; pisze go wtyczka ja
 WATEK_OGOLNY = "1"                         # temat General forum: trasa całej grupy (Jarvo), bez TELEGRAM_TOPIC_*
 # nazwy tematów w grupie: krótka nazwa wielkimi literami (17.11: JARVO w General, JARODEV, KERNEL)
 NAZWA_OGOLNEGO = "JARVO"
+# temat archiwum raportów rutyn (18.11): kopia każdego raportu (build.py ROUTINE_DELIVER), panel: kanał Aktualizacje
+NAZWA_AKTUALIZACJI = "UPDATES"
 ID_GRUPY_RE = re.compile(r"^-\d{3,20}$")
 ID_WATKU_RE = re.compile(r"^\d{1,12}$")
 
@@ -1280,19 +1294,24 @@ def tytul_tematu(nazwa: str) -> str:
 
 def tematy_do_zalozenia(u: Uklad, sesje: dict) -> list[dict]:
     """Wątki grupy: aktywni agenci floty z `telegram_topic` (zbudowana flota, <build>/wiedza/fleet.json; „general” =
-    temat General, bez zakładania) i sesje zewnętrzne ze skrzynką z sesje.json (Kernel). `tytul` = nazwa tematu."""
+    temat General, bez zakładania), sesje zewnętrzne ze skrzynką z sesje.json (Kernel) i temat UPDATES (archiwum
+    raportów rutyn, bez rozmówcy). `tytul` = nazwa tematu, `kto` = opis dla `jarvo telegram status`."""
     wynik = []
     for a in _json(u.build / "wiedza" / "fleet.json").get("agents") or []:
         temat = str((a or {}).get("telegram_topic") or "").strip() if isinstance(a, dict) else ""
         if temat and temat != "general" and a.get("name"):
             nazwa = str(a.get("short") or a.get("title") or a["name"])
             wynik.append({"klucz": temat.upper(), "nazwa": nazwa, "tytul": tytul_tematu(nazwa), "temat": temat,
-                          "sesja": None, "profil": str(a["name"])})
+                          "sesja": None, "profil": str(a["name"]), "kto": f"agent {a['name']}"})
     for dopisek, w in sesje.items():
         if isinstance(w, dict) and w.get("skrzynka"):
             nazwa = str(w.get("nazwa") or dopisek)
             wynik.append({"klucz": _klucz_tematu(nazwa) or _klucz_tematu(dopisek), "nazwa": nazwa,
-                          "tytul": tytul_tematu(nazwa), "temat": dopisek, "sesja": dopisek, "profil": None})
+                          "tytul": tytul_tematu(nazwa), "temat": dopisek, "sesja": dopisek, "profil": None,
+                          "kto": f"sesja {nazwa} (skrzynka)"})
+    wynik.append({"klucz": NAZWA_AKTUALIZACJI, "nazwa": NAZWA_AKTUALIZACJI, "tytul": NAZWA_AKTUALIZACJI,
+                  "temat": NAZWA_AKTUALIZACJI.lower(), "sesja": None, "profil": None,
+                  "kto": "archiwum raportów rutyn (kopia; rozmowa z Jarvem zostaje w JARVO)"})
     return wynik
 
 
@@ -1406,8 +1425,9 @@ def polecenie_telegram_tematy(u: Uklad, a, _reszta, ot) -> int:
         zmiany_env[f"TELEGRAM_TOPIC_{t['klucz']}"] = watek
         if isinstance(w, dict):
             w.update(czat=grupa, watek=watek)
-        wiersze.append(f"  {t['tytul']}: wątek {watek} ({skad})" + (", wiadomości w nim idą do skrzynki bez dopisku"
-                                                                     if t["sesja"] else ""))
+        dopisek = (", wiadomości w nim idą do skrzynki bez dopisku" if t["sesja"]
+                   else ": kopia raportów rutyn (archiwum)" if t["klucz"] == NAZWA_AKTUALIZACJI else "")
+        wiersze.append(f"  {t['tytul']}: wątek {watek} ({skad})" + dopisek)
     try:
         ogolny = nazwij_temat(token, grupa, WATEK_OGOLNY, NAZWA_OGOLNEGO)
     except BladTelegrama as e:
@@ -1610,8 +1630,8 @@ def konflikt_409(u: Uklad, teraz: float | None = None, okno_s: float = OKNO_409_
 
 
 def uklad_grupy(u: Uklad, k: dict) -> list[dict]:
-    """Tematy grupy Jarvo HQ z ustawień (bez sieci): General = Jarvo, potem wątki agentów (TELEGRAM_TOPIC_* w jarvo.env)
-    i sesji zewnętrznych (sesje.json). {"tytul", "watek" ("1" = General, "" = brak), "kto"}."""
+    """Tematy grupy Jarvo HQ z ustawień (bez sieci): General = Jarvo, potem wątki agentów (TELEGRAM_TOPIC_* w jarvo.env),
+    sesji zewnętrznych (sesje.json) i UPDATES. {"tytul", "watek" ("1" = General, "" = brak), "kto"}."""
     if not k["grupa"]:
         return []
     env, sesje = czytaj_env(konfig(u) / "jarvo.env"), _json(konfig(u) / "sesje.json")
@@ -1620,8 +1640,7 @@ def uklad_grupy(u: Uklad, k: dict) -> list[dict]:
         w = sesje.get(t["sesja"]) if t["sesja"] else None
         watek = (str(w.get("watek") or "") if isinstance(w, dict) and str(w.get("czat") or "") == k["grupa"]
                  else (env.get(f"TELEGRAM_TOPIC_{t['klucz']}") or "").strip())
-        wynik.append({"tytul": t["tytul"], "watek": watek,
-                      "kto": f"sesja {t['nazwa']} (skrzynka)" if t["sesja"] else f"agent {t['profil']}"})
+        wynik.append({"tytul": t["tytul"], "watek": watek, "kto": t["kto"]})
     return wynik
 
 

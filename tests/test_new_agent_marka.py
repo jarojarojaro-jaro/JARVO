@@ -86,7 +86,7 @@ def test_szkielet_agenta_biznesowego_w_nakladce(kopia, tmp_path):
     assert "command_allowlist" not in cfg and "computer_use" not in cfg
 
     (job,) = fl.load_yaml(d / "cron" / "jobs.yaml")["jobs"]
-    assert job["id"] == "kwiaty-dzien" and job["paused"] is True and job["deliver"] == "@@AGENT_DELIVER@@"
+    assert job["id"] == "kwiaty-dzien" and job["paused"] is True and job["deliver"] == "@@AGENT_ROUTINE_DELIVER@@"
 
     scen = fl.load_yaml(n / "evals" / "jarvo-kwiaty" / "scenarios.yaml")["scenarios"]
     ids = {s["id"] for s in scen}

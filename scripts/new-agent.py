@@ -195,7 +195,7 @@ jobs:
     reasoning_effort: low
     skills: [{slug}-workflow]
     enabled_toolsets: [kanban, terminal, file, memory, skills]
-    deliver: "@@AGENT_DELIVER@@"     # wątek agenta w grupie Jarvo HQ, bez grupy DM właściciela (build.py)
+    deliver: "@@AGENT_ROUTINE_DELIVER@@"   # wątek agenta w grupie Jarvo HQ (bez grupy DM) i kopia w temacie UPDATES (build.py)
     paused: true
     paused_reason: "włącza właściciel, gdy agent ma źródła i telefon (docs/RUNBOOK.md)"
     prompt: >-

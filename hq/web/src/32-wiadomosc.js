@@ -29,10 +29,12 @@ function useAgent(nazwa) {
 
 const czasPelny = (ts) => (ts ? `${Czas.data(ts)}, ${Czas.godzina(ts)}` : "");
 
-function NaglowekAgenta({ agent, ts, bezposrednio }) {
+// `rutyna`: nazwa rutyny przy raporcie (Poranny brief, Patrol floty) zamiast znacznika „bezpośrednio”
+function NaglowekAgenta({ agent, ts, bezposrednio, rutyna }) {
   const a = useAgent(agent);
   return html`<header class="j-msg-g"><${Awatar} agent=${a} r=${28}/><b class="j-msg-n">${nazwaAgenta(agent)}</b>
     ${bezposrednio && html`<span class="j-tag">${T("msg.bezposrednio")}</span>`}
+    ${rutyna && html`<span class="j-tag is-rutyna" data-rutyna=${rutyna}><span aria-hidden="true">↻ </span>${rutyna}</span>`}
     ${ts ? html`<time title=${czasPelny(ts)}>${Czas.godzina(ts)}</time>` : null}</header>`;
 }
 
@@ -136,9 +138,10 @@ function WiadomoscAgenta({ x, ctx, ostatniaPrzebiegu, tak }) {
   const pomin = useMemo(() => new Set((x.pliki || []).map((p) => p.path)), [x.pliki]);
   const bezposrednio = x.tryb === "bezposrednio" && x.agent !== ctx.koordynator && !ctx.rozmowca;
   const tekst = bezZnacznika(x.tekst);
-  return html`<article class="j-msg j-msg-ag" data-pozycja=${x.id} data-agent=${x.agent}>
-    <h3 class="j-sr">${nazwaAgenta(x.agent)}, ${Czas.godzina(x.ts)}</h3>
-    <${NaglowekAgenta} agent=${x.agent} ts=${x.ts} bezposrednio=${bezposrednio}/>
+  const rutyna = x.rodzaj === "rutyna" ? (x.rutyna && x.rutyna.nazwa) || T("rap.rutyna") : null;
+  return html`<article class=${cx("j-msg", "j-msg-ag", rutyna && "is-rutyna")} data-pozycja=${x.id} data-agent=${x.agent}>
+    <h3 class="j-sr">${nazwaAgenta(x.agent)}${rutyna ? ` · ${rutyna}` : ""}, ${Czas.godzina(x.ts)}</h3>
+    <${NaglowekAgenta} agent=${x.agent} ts=${x.ts} bezposrednio=${bezposrednio} rutyna=${rutyna}/>
     ${x.kroki && x.kroki.length > 0 && html`<${Kroki} kroki=${x.kroki} szczegoly=${ctx.szczegoly}/>`}
     <${TrescMd} tekst=${tekst} pomin=${pomin} klasa="j-msg-t"/>
     ${x.pliki && x.pliki.length > 0 && html`<div class="j-pliki">${x.pliki.map((p) => html`<${KartaPliku} key=${p.path} plik=${p}/>`)}</div>`}
@@ -364,6 +367,7 @@ const ElementOsi = React.memo(function ElementOsiW({ x, ctx, ostatniaPrzebiegu, 
   switch (x.rodzaj) {
     case "wlasciciel": return html`<${WiadomoscWlasciciela} x=${x} k=${ctx.k} rozmowca=${ctx.rozmowca}/>`;
     case "agent": return html`<${WiadomoscAgenta} x=${x} ctx=${ctx} ostatniaPrzebiegu=${ostatniaPrzebiegu} tak=${tak}/>`;
+    case "rutyna": return html`<${WiadomoscAgenta} x=${x} ctx=${ctx}/>`;
     case "zywy": return html`<${ZywyDymek} p=${x.przebieg} ctx=${ctx}/>`;
     case "kroki": return html`<div class="j-msg-kroki"><${Kroki} kroki=${x.kroki || []} szczegoly=${ctx.szczegoly}/></div>`;
     case "obca": return html`<${WiadomoscObca} x=${x}/>`;

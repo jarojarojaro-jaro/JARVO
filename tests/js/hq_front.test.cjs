@@ -11,15 +11,15 @@ const assert = require("assert");
 
 const SRC = path.join(__dirname, "..", "..", "hq", "web", "src");
 const PLIKI = ["02-sklep.js", "03-trasa.js", "04-i18n.js", "05-skroty.js", "06-tokeny.js", "07-sciezki.js", "12-wzmianki.js",
-  "13-markdown.js", "14-czas.js", "15-os.js", "37-poznajmy.js"];
+  "13-markdown.js", "14-czas.js", "15-os.js", "37-poznajmy.js", "64-raporty.js"];
 const PRZED = `const React = {}; const useMemo = (f) => f(); const useRef = (v) => ({ current: v }); const useEffect = () => {};
 let HQ_LANG = null; const isPL = () => T.wymus !== "en"; const Zasoby = { daj() {} };\n`;
-const PO = "\n;({ T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, sklep, USTAWIENIA_DOMYSLNE, Poznanie, kwestiePoznania, Sciezki });";
+const PO = "\n;({ T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, sklep, USTAWIENIA_DOMYSLNE, Poznanie, kwestiePoznania, Sciezki, grupujRaporty });";
 const kod = PRZED + PLIKI.map((f) => `// ---- ${f}\n` + fs.readFileSync(path.join(SRC, f), "utf8")).join("\n") + PO;
 const kontekst = vm.createContext({ Intl, Date, Math, JSON, URLSearchParams, setTimeout, clearTimeout, console, Set, Map,
   encodeURIComponent, decodeURIComponent, Number, String, Object, Array, RegExp });
 const M = vm.runInContext(kod, kontekst, { filename: "hq-front.js" });
-const { T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, Poznanie, kwestiePoznania, Sciezki } = M;
+const { T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, Poznanie, kwestiePoznania, Sciezki, grupujRaporty } = M;
 
 let ile = 0;
 function test(nazwa, f) {
@@ -193,7 +193,7 @@ test("plytko", () => {
 });
 test("stanPoczatkowy: kształt sklepu", () => {
   eq(Object.keys(stanPoczatkowy()).sort(), ["adresaci", "agenci", "aktualizacja", "blad_aplikacji", "decyzje", "dostep", "funkcje", "gotowe",
-    "gotowosc", "inne_otwarte", "karty", "kolejnosc", "lista", "os", "pasek", "podglad", "podpowiedzi", "podzial", "poznanie", "przebiegi", "pytanie", "rozmowcy", "silnik",
+    "gotowosc", "inne_otwarte", "karty", "kolejnosc", "lista", "os", "pasek", "podglad", "podpowiedzi", "podzial", "poznanie", "przebiegi", "pytanie", "raporty", "rozmowcy", "silnik",
     "stara_baza", "strumien", "szkice", "toasty", "ustawienia", "watki", "wersja", "wlasciciel", "wysylane"]);
   eq(stanPoczatkowy().lista.filtr, "rozmowy");
   eq(stanPoczatkowy().ustawienia.motyw, "system");
@@ -675,6 +675,22 @@ test("Poznanie.dostawca: jak mozg.rozpoznaj na serwerze (przedrostek, kształt)"
   eq(Poznanie.dostawca(`sk-${x(20)} ${x(20)}`), null);
   eq(Poznanie.dostawca(`sk-${x(400)}`), null);
   eq(Poznanie.dostawca(""), null);
+});
+
+test("Aktualizacje: trasa, dni i rodzaje raportów, licznik ze strumienia", () => {
+  eq(Trasa.parsuj("#/aktualizacje"), { widok: "aktualizacje" });
+  eq(Trasa.parsuj("#/aktualizacje/jarvo-patrol"), { widok: "aktualizacje", rodzaj: "jarvo-patrol" });
+  eq(Trasa.parsuj("#/aktualizacje/..%2Fx"), { widok: "aktualizacje" });
+  assert.strictEqual(Trasa.zbuduj({ widok: "aktualizacje", rodzaj: "jarvo-daily-brief" }), "#/aktualizacje/jarvo-daily-brief");
+  const r = (id, rodzaj, kiedy) => ({ id, rodzaj, nazwa: rodzaj, ts: ts(kiedy) });
+  const dni = grupujRaporty([r("a", "patrol", "2026-11-18T12:00"), r("b", "brief", "2026-11-18T07:50"),
+    r("c", "patrol", "2026-11-18T07:30"), r("d", "brief", "2026-11-17T07:50")]);
+  eq(dni.map((d) => [d.dzien, d.sekcje.map((s) => [s.rodzaj, s.raporty.map((x) => x.id)])]),
+    [["2026-11-18", [["patrol", ["a", "c"]], ["brief", ["b"]]]], ["2026-11-17", [["brief", ["d"]]]]]);
+  let s = stanPoczatkowy();
+  s = Os.zastosujZdarzenie(s, "raporty.nowe", { nieprzeczytane: 3 });
+  eq(s.raporty, { nieprzeczytane: 3, wersja: 1 });
+  eq(Os.zastosujZdarzenie(s, "raporty.licznik", { nieprzeczytane: 0 }).raporty, { nieprzeczytane: 0, wersja: 1 });
 });
 
 console.log(`ok ${ile}`);

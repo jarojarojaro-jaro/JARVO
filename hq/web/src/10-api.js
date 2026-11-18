@@ -323,6 +323,11 @@ Object.assign(liveApi, {
     lista: () => zadanie("GET", "/rozmowcy"),
     zmien: (klucz, zmiana) => zadanie("PATCH", `/rozmowcy/${kodujUrl(klucz)}`, zmiana),   // {lustro?, kolejnosc?}
   },
+  // Aktualizacje (raporty.py): archiwum raportów rutyn i znacznik przeczytanych
+  raporty: {
+    lista: (p) => zadanie("GET", `/raporty${zapytanieUrl(p)}`),                // {rodzaj, przed, limit}
+    przeczytane: (ts) => zadanie("POST", "/raporty/przeczytane", { do: ts }),
+  },
   aplikacja: () => zadanie("GET", "/app"),
   agenci: () => zadanie("GET", "/agenci"),
   flotaAgenci: () => zadanie("GET", "/fleet"),

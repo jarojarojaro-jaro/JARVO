@@ -198,9 +198,12 @@ class Obserwator:
         if rola == "nadzor":
             return
         b = self.budzenia.parsuj(tresc) if self.budzenia else None
+        r = self.budzenia.rutyna(tresc) if self.budzenia and not b else None
         nazwy = self.agenci.nazwy_wyswietlane()
         if b:
             podglad = f"Karta „{b['tytul']}” · {nazwy.get(b['wykonawca'], b['wykonawca'])} · {b['status_pl']}"
+        elif r:                                      # raport rutyny wpisany przez Hermesa do sesji tematu
+            podglad = f"{nazwy.get(agent, agent)} · {r['nazwa']}: {' '.join(r['tekst'].split())[:120]}"
         else:
             podglad = f"{nazwy.get(agent, agent)}: wiadomość spoza aplikacji"
         otwarty = wid in self.hub.subskrybowane_watki()

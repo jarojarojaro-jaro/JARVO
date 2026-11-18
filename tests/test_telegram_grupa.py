@@ -137,14 +137,15 @@ def test_tematy_zaklada_brakujace_i_zapisuje_trasy(inst, capsys):
     wc.zapisz_env(u.dane / ".env", {"TELEGRAM_HOME_CHANNEL": "123456789", "TELEGRAM_HOME_CHANNEL_THREAD_ID": "9"})
     assert wc.polecenie_telegram_tematy(u, _a(), [], ot) == 0
     zalozone = api.metody("createForumTopic")
-    assert [d["name"] for d in zalozone] == ["SKLEP", "KERNEL"] and all(d["chat_id"] == GRUPA for d in zalozone)
+    assert [d["name"] for d in zalozone] == ["SKLEP", "KERNEL", "UPDATES"] and all(d["chat_id"] == GRUPA for d in zalozone)
     # nazwy jednolite: General → JARVO, istniejący wątek przemianowany
     assert api.metody("editGeneralForumTopic") == [{"chat_id": GRUPA, "name": "JARVO"}]
     assert api.metody("editForumTopic") == [{"chat_id": GRUPA, "message_thread_id": 55, "name": "SHERLOCK"}]
-    assert api.nazwy == {1: "JARVO", 55: "SHERLOCK", 101: "SKLEP", 102: "KERNEL"}
+    assert api.nazwy == {1: "JARVO", 55: "SHERLOCK", 101: "SKLEP", 102: "KERNEL", 103: "UPDATES"}
     env = wc.czytaj_env(wc.konfig(u) / "jarvo.env")
     assert env["TELEGRAM_HQ_CHAT_ID"] == GRUPA and env["TELEGRAM_TOPIC_SHERLOCK"] == "55"
     assert env["TELEGRAM_TOPIC_SKLEP"] == "101" and env["TELEGRAM_TOPIC_KERNEL"] == "102"
+    assert env["TELEGRAM_TOPIC_UPDATES"] == "103"                            # archiwum raportów rutyn (18.11)
     assert env["TELEGRAM_OWNER_ID"] == "123456789"                             # reszta pliku zostaje
     # dom Jarva: kanał domowy bramy = grupa (General, bez wątku), także w host.env, żeby wdrożenie nie cofnęło
     for plik in (u.dane / ".env", wc.konfig(u) / "host.env"):
@@ -158,14 +159,15 @@ def test_tematy_zaklada_brakujace_i_zapisuje_trasy(inst, capsys):
     out = capsys.readouterr().out
     assert "SHERLOCK: wątek 55 (był, nazwa „SHERLOCK”)" in out and "SKLEP: wątek 101 (nowy)" in out
     assert "KERNEL: wątek 102 (nowy)" in out and "JARVO: temat General (zmieniona)" in out
+    assert "UPDATES: wątek 103 (nowy): kopia raportów rutyn (archiwum)" in out
     assert f"Dom Jarva: grupa Jarvo HQ {GRUPA}, temat General „JARVO”" in out
     assert "Flota wdrożona" in out and TOKEN not in out
     # drugi raz: wszystko znane (jarvo.env, sesje.json, nazwy, kanał domowy), nic nowego, bez wdrożenia
     api.wolania.clear()
     assert wc.polecenie_telegram_tematy(u, _a(), [], ot) == 0
     assert not api.metody("createForumTopic") and flota.wywolania == 1
-    assert {d["message_thread_id"] for d in api.metody("sendChatAction")} == {55, 101, 102}
-    assert api.nazwy == {1: "JARVO", 55: "SHERLOCK", 101: "SKLEP", 102: "KERNEL"}
+    assert {d["message_thread_id"] for d in api.metody("sendChatAction")} == {55, 101, 102, 103}
+    assert api.nazwy == {1: "JARVO", 55: "SHERLOCK", 101: "SKLEP", 102: "KERNEL", 103: "UPDATES"}
     out = capsys.readouterr().out
     assert "Wątki bez zmian" in out and "JARVO: temat General (bez zmian)" in out and "nazwa „" not in out
 
@@ -173,7 +175,8 @@ def test_tematy_zaklada_brakujace_i_zapisuje_trasy(inst, capsys):
 def test_tematy_zaklada_od_nowa_usuniety_watek(inst, capsys):
     u, ot, api, flota = inst
     wc.zapisz_env(wc.konfig(u) / "jarvo.env", {"TELEGRAM_HQ_CHAT_ID": GRUPA, "TELEGRAM_TOPIC_SHERLOCK": "55",
-                                               "TELEGRAM_TOPIC_SKLEP": "56", "TELEGRAM_TOPIC_KERNEL": "57"})
+                                               "TELEGRAM_TOPIC_SKLEP": "56", "TELEGRAM_TOPIC_KERNEL": "57",
+                                               "TELEGRAM_TOPIC_UPDATES": "58"})
     api.usuniete = {56}
     assert wc.polecenie_telegram_tematy(u, _a(bez_wdrozenia=True), [], ot) == 0
     assert [d["name"] for d in api.metody("createForumTopic")] == ["SKLEP"]
@@ -328,15 +331,37 @@ def test_status_pokazuje_uklad_grupy(inst, capsys):
     assert f"Dom Jarva: grupa Jarvo HQ {GRUPA}, temat General „JARVO”" in out
     assert "JARVO (General): Jarvo (dom" in out and "SHERLOCK (wątek 101): agent jarvo-sherlock" in out
     assert "KERNEL (wątek 103): sesja Kernel (skrzynka)" in out
+    assert "UPDATES (wątek 104): archiwum raportów rutyn" in out
     assert "DM 123456789: wejście zapasowe do Jarva" in out and "UWAGA: kanał domowy" not in out
     wc.zapisz_env(u.dane / ".env", {"TELEGRAM_HOME_CHANNEL": "123456789"})
     assert wc.polecenie_telegram_status(u, argparse.Namespace(json=True, sprawdz=False), [], ot) == 0
     stan = json.loads(capsys.readouterr().out)
     assert stan["dom_jarva"] == GRUPA and stan["dom"] == "123456789"
-    assert [t["tytul"] for t in stan["tematy"]] == ["JARVO", "SHERLOCK", "SKLEP", "KERNEL"]
+    assert [t["tytul"] for t in stan["tematy"]] == ["JARVO", "SHERLOCK", "SKLEP", "KERNEL", "UPDATES"]
     assert wc.polecenie_telegram_status(u, argparse.Namespace(json=False, sprawdz=False), [], ot) == 0
     assert "UWAGA: kanał domowy bramy" in capsys.readouterr().out
     assert any(w["nazwa"] == "Telegram: dom Jarva" and w["stan"] == "uwaga" for w in wc.sprawdz_telegram(u))
+
+
+def test_cel_rutyn_jak_build_i_stare_rutyny_wdraza(inst):
+    """`deliver` rutyn, którego oczekuje `jarvo telegram tematy/ustaw`, to ROUTINE_DELIVER buildu (18.11: General jako
+    wątek 1, kopia w UPDATES); rutyny ze starym celem (sama grupa: Hermes zakładał temat „Hermes — <rutyna>”) albo
+    bez UPDATES wymagają wdrożenia."""
+    import build
+    import fleetlib as fl
+    u, _ot, _api, _f = inst
+    wc.zapisz_env(wc.konfig(u) / "jarvo.env", {"TELEGRAM_HQ_CHAT_ID": GRUPA, "TELEGRAM_TOPIC_UPDATES": "58"})
+    flota = fl.load_fleet()
+    env = wc.czytaj_env(wc.konfig(u) / "jarvo.env")
+    oczekiwany = build.base_tokens(flota, flota.agent(flota.orchestrator), "/b", env)["ROUTINE_DELIVER"]
+    assert wc.cel_rutyn(u, GRUPA) == oczekiwany == f"telegram:{GRUPA}:1,telegram:{GRUPA}:58"
+    assert wc.cel_rutyn(u, "123456789") == "telegram:123456789"
+    jobs = wc.profil(u) / "cron" / "jobs.json"
+    jobs.parent.mkdir(parents=True, exist_ok=True)
+    for deliver, dobry in ((f"telegram:{GRUPA}", False), (f"telegram:{GRUPA}:1", False), (oczekiwany, True)):
+        jobs.write_text(json.dumps({"jobs": [{"id": "jarvo-patrol", "name": "Patrol floty", "deliver": deliver}]}),
+                        encoding="utf-8")
+        assert wc.rutyny_do_domu(u, GRUPA) is dobry, deliver
 
 
 def test_parser_zna_tematy_i_watek():

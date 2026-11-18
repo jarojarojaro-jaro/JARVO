@@ -176,16 +176,26 @@ function ListaRozmowcow({ trasa, duza = false }) {
   </ul>`;
 }
 
-// Mózg i Ustawienia pod rozmówcami (⌘M, ⌘,)
+// Aktualizacje (raporty rutyn z licznikiem nieprzeczytanych), Mózg i Ustawienia pod rozmówcami (⌘M, ⌘,)
+function PozycjaAktualizacji({ trasa }) {
+  const n = useSklep((s) => s.raporty.nieprzeczytane);
+  const tu = trasa.widok === "aktualizacje";
+  return html`<li><a href=${Trasa.zbuduj({ widok: "aktualizacje" })} aria-current=${tu ? "page" : undefined}
+      class=${cx(tu && "is-aktywny")} data-nawig="aktualizacje"
+      aria-label=${n > 0 ? `${T("rap.tytul")}, ${T("rap.nowe", { n })}` : undefined}>
+    <span aria-hidden="true">↻</span><span class="j-nawig-t">${T("rap.tytul")}</span>
+    ${n > 0 && html`<span class="j-rozm-licz" aria-hidden="true">${n > 99 ? "99+" : n}</span>`}</a></li>`;
+}
+
 function NawigacjaCentrum({ trasa }) {
   const poz = [["mozg", "◇", T("rozm.mozg"), "Mod+M"], ["ustawienia", "⚙", T("pasek.ustawienia"), "Mod+,"]];
-  return html`<ul class="j-nawig">${poz.map(([w, znak, tekst, komb]) => html`<li key=${w}>
+  return html`<ul class="j-nawig"><${PozycjaAktualizacji} trasa=${trasa}/>${poz.map(([w, znak, tekst, komb]) => html`<li key=${w}>
     <a href=${Trasa.zbuduj({ widok: w })} aria-current=${trasa.widok === w ? "page" : undefined} class=${cx(trasa.widok === w && "is-aktywny")}>
       <span aria-hidden="true">${znak}</span><span class="j-nawig-t">${tekst}</span>
       <kbd class="j-rozm-skrot" aria-hidden="true">${Skroty.opis(komb)}</kbd></a></li>`)}</ul>`;
 }
 
-// Ekran 1 telefonu (centrum §2.2): duże wiersze rozmówców, pod nimi Mózg, Ustawienia i Inne rozmowy
+// Ekran 1 telefonu (centrum §2.2): duże wiersze rozmówców, pod nimi Aktualizacje, Mózg, Ustawienia i Inne rozmowy
 function EkranRozmowcow() {
   const ile = useSklep((s) => s.lista.porzadek.length);
   const stan = useSklep((s) => s.strumien.stan);
@@ -195,6 +205,7 @@ function EkranRozmowcow() {
     <p class="j-ekran-rozm-st"><span class=${cx("j-zdrowie-kropka", `is-${stan}`)}></span>${T(`polaczenie.${stan}`)}</p>
     <${ListaRozmowcow} trasa=${trasa} duza=${true}/>
     <ul class="j-nawig is-duza">
+      <${PozycjaAktualizacji} trasa=${trasa}/>
       <li><a href="#/mozg"><span aria-hidden="true">◇</span><span class="j-nawig-t">${T("rozm.mozg")}</span></a></li>
       <li><a href="#/ustawienia"><span aria-hidden="true">⚙</span><span class="j-nawig-t">${T("pasek.ustawienia")}</span></a></li>
       <li><button type="button" onClick=${() => sklep.ustaw((s) => ({ ...s, inne_otwarte: true, pasek: { ...s.pasek, otwarty: true } }))}>

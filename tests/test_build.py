@@ -152,13 +152,36 @@ def test_category_descriptions(built):
 
 
 def test_home_deliver_token():
-    """Rutyny Jarva do jego domu (17.11): temat General grupy Jarvo HQ (sama grupa), bez grupy DM, bez niego lokalnie."""
+    """Rutyny Jarva do jego domu (17.11): temat General grupy Jarvo HQ jako wątek 1 (18.11: cel bez wątku z
+    attach_to_session zakładał co przebieg temat „Hermes — <rutyna>”), bez grupy DM, bez niego lokalnie."""
     fleet = fl.load_fleet()
     jarvo = fleet.agent(fleet.orchestrator)
-    assert build.base_tokens(fleet, jarvo, "/b", ENV)["HOME_DELIVER"] == "telegram:-1002222222222"
+    assert build.base_tokens(fleet, jarvo, "/b", ENV)["HOME_DELIVER"] == "telegram:-1002222222222:1"
     bez_grupy = {k: v for k, v in ENV.items() if k != "TELEGRAM_HQ_CHAT_ID"}
     assert build.base_tokens(fleet, jarvo, "/b", bez_grupy)["HOME_DELIVER"] == "telegram:111111111"
     assert build.base_tokens(fleet, jarvo, "/b", {})["HOME_DELIVER"] == "local"
+
+
+def test_routine_deliver_z_tematem_updates():
+    """Raporty rutyn (18.11): dom Jarva i kopia w temacie UPDATES grupy (archiwum); bez tematu UPDATES sam dom,
+    bez grupy (DM, lokalnie) bez kopii, bo temat jest tylko w grupie."""
+    fleet = fl.load_fleet()
+    jarvo = fleet.agent(fleet.orchestrator)
+    z_updates = {**ENV, "TELEGRAM_TOPIC_UPDATES": "30"}
+    t = build.base_tokens(fleet, jarvo, "/b", z_updates)
+    assert t["ROUTINE_DELIVER"] == "telegram:-1002222222222:1,telegram:-1002222222222:30"
+    assert t["HOME_DELIVER"] == "telegram:-1002222222222:1"
+    assert build.base_tokens(fleet, jarvo, "/b", ENV)["ROUTINE_DELIVER"] == "telegram:-1002222222222:1"
+    bez_grupy = {k: v for k, v in z_updates.items() if k != "TELEGRAM_HQ_CHAT_ID"}
+    assert build.base_tokens(fleet, jarvo, "/b", bez_grupy)["ROUTINE_DELIVER"] == "telegram:111111111"
+    assert build.base_tokens(fleet, jarvo, "/b", {"TELEGRAM_TOPIC_UPDATES": "30"})["ROUTINE_DELIVER"] == "local"
+    web = _z_watkiem(fleet, "jarvo-web", "web").agent("jarvo-web")
+    assert build.base_tokens(fleet, web, "/b", z_updates)["AGENT_ROUTINE_DELIVER"] == \
+        "telegram:-1002222222222:12,telegram:-1002222222222:30"
+    jobs = (fl.REPO_ROOT / "profiles" / "jarvo" / "cron" / "jobs.yaml").read_text(encoding="utf-8")
+    spec = fl.load_yaml(fl.REPO_ROOT / "profiles" / "jarvo" / "cron" / "jobs.yaml")
+    assert "@@HOME_DELIVER@@" not in jobs
+    assert all(j["deliver"] == "@@ROUTINE_DELIVER@@" and j.get("attach_to_session") is True for j in spec["jobs"])
 
 
 def _z_watkiem(fleet, nazwa: str, temat: str):
@@ -170,21 +193,21 @@ def _z_watkiem(fleet, nazwa: str, temat: str):
 
 
 def test_agent_deliver_token_watek_w_grupie_hq():
-    """Rutyny agenta raportują do jego wątku w grupie Jarvo HQ (telegram:<grupa>:<wątek>), temat „general” do samej
-    grupy; bez tematu w .env jak HOME_DELIVER (dom Jarva: General grupy, bez grupy DM właściciela, bez niego lokalnie)."""
+    """Rutyny agenta raportują do jego wątku w grupie Jarvo HQ (telegram:<grupa>:<wątek>), temat „general” do General
+    (wątek 1); bez tematu w .env jak HOME_DELIVER (dom Jarva: General grupy, bez grupy DM właściciela, bez niego lokalnie)."""
     import dataclasses
     fleet = _z_watkiem(fl.load_fleet(), "jarvo-web", "web")
     web = fleet.agent("jarvo-web")
     assert build.base_tokens(fleet, web, "/b", ENV)["AGENT_DELIVER"] == "telegram:-1002222222222:12"
     ogolny = dataclasses.replace(web, telegram_topic="general")
-    assert build.base_tokens(fleet, ogolny, "/b", ENV)["AGENT_DELIVER"] == "telegram:-1002222222222"
+    assert build.base_tokens(fleet, ogolny, "/b", ENV)["AGENT_DELIVER"] == "telegram:-1002222222222:1"
     bez_tematu = {k: v for k, v in ENV.items() if k != "TELEGRAM_TOPIC_WEB"}
-    assert build.base_tokens(fleet, web, "/b", bez_tematu)["AGENT_DELIVER"] == "telegram:-1002222222222"
+    assert build.base_tokens(fleet, web, "/b", bez_tematu)["AGENT_DELIVER"] == "telegram:-1002222222222:1"
     bez_grupy = {k: v for k, v in ENV.items() if k != "TELEGRAM_HQ_CHAT_ID"}
     assert build.base_tokens(fleet, web, "/b", bez_grupy)["AGENT_DELIVER"] == "telegram:111111111"
     assert build.base_tokens(fleet, web, "/b", {})["AGENT_DELIVER"] == "local"
     specjalista = fl.load_fleet().agent("jarvo-sherlock")               # bez wątku: wynik idzie przez Jarva (General)
-    assert build.base_tokens(fl.load_fleet(), specjalista, "/b", ENV)["AGENT_DELIVER"] == "telegram:-1002222222222"
+    assert build.base_tokens(fl.load_fleet(), specjalista, "/b", ENV)["AGENT_DELIVER"] == "telegram:-1002222222222:1"
 
 
 def test_host_routes(tmp_path):

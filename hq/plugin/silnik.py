@@ -141,7 +141,7 @@ class Silnik:
                  agenci, hub, log: Callable[[str], None] | None = None, limit: int | None = None,
                  sciezka_db: Path | str | None = None, stan_aktualizacji: Callable[[], dict] | None = None,
                  obserwator: bool = True, http=None, odstep_odpytania: float | None = None,
-                 plik: Callable[[str], dict | None] | None = None):
+                 plik: Callable[[str], dict | None] | None = None, raporty=None):
         self.m = moduly
         self.home = Path(home)
         self.jarvo_dir = Path(jarvo_dir)
@@ -158,6 +158,7 @@ class Silnik:
         self._http = http
         self.odstep_odpytania = odstep_odpytania
         self.plik = plik
+        self.raporty = raporty            # archiwum raportów rutyn (raporty.Archiwum, kanał Aktualizacje)
         self.stan = "start"
         self.blad: str | None = None
         self.start_at = time.time()
@@ -272,9 +273,10 @@ class Silnik:
                  f"{' (' + str(kontekst.get('message'))[:80] + ')' if not exc and kontekst.get('message') else ''}")
 
     async def _petla_rozmowcow(self) -> None:
-        """Co 2 s: stan rozmówców (`rozmowca.stan`), sesje tematów, zaległe lustro do Telegrama (wątek tła)."""
+        """Co 2 s: stan rozmówców (`rozmowca.stan`), sesje tematów, zaległe lustro do Telegrama, nowe raporty rutyn
+        (archiwum Aktualizacji zbiera co 30 s, nowe idą zdarzeniem `raporty.nowe`), wszystko w wątku tła."""
         while True:
-            for zadanie in (self.rozmowcy.stany, self.lustro.runda):
+            for zadanie in (self.rozmowcy.stany, self.lustro.runda, self._raporty):
                 try:
                     await asyncio.to_thread(zadanie)
                 except asyncio.CancelledError:
@@ -282,6 +284,11 @@ class Silnik:
                 except Exception as exc:
                     self.log(f"jarvo-hq: rozmówcy: {type(exc).__name__}")
             await asyncio.sleep(2.0)
+
+    def _raporty(self) -> None:
+        nowe = self.raporty.runda() if self.raporty is not None else None
+        if nowe:
+            self.hub.nadaj("raporty.nowe", nowe)
 
     def zamknij(self, czekaj: float = 5.0) -> None:
         """Koniec wątku (testy); w dashboardzie wątek kończy się z procesem."""

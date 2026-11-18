@@ -211,6 +211,9 @@ const Os = (() => {
       case "hello": return { ...s, wersja: d.wersja || s.wersja, silnik: d.silnik || s.silnik };
       case "aktualizacja": return { ...s, aktualizacja: d };
       case "decyzje.zmiana": return { ...s, decyzje: { ...s.decyzje, liczba: d.liczba || 0 } };
+      // Aktualizacje: nowy raport podbija `wersja` (otwarty widok wczytuje się na nowo), znacznik z innej karty
+      case "raporty.nowe": return { ...s, raporty: { nieprzeczytane: d.nieprzeczytane || 0, wersja: s.raporty.wersja + 1 } };
+      case "raporty.licznik": return { ...s, raporty: { ...s.raporty, nieprzeczytane: d.nieprzeczytane || 0 } };
       default: return s;
     }
   }
@@ -318,7 +321,7 @@ const Os = (() => {
 
   // „Nowe od tąd”: przed n-tą od końca pozycją od agentów (n = nieprzeczytane przy otwarciu); nie dalej niż do
   // ostatniej wiadomości właściciela (po niej wszystko jest nowe). Kroki się nie liczą. Zwraca id pozycji albo null.
-  const NOWE = new Set(["agent", "blad_tury", "obca", "budzenie", "dostawa", "przekazanie", "koniec"]);
+  const NOWE = new Set(["agent", "rutyna", "blad_tury", "obca", "budzenie", "dostawa", "przekazanie", "koniec"]);
   function noweOdTad(pozycje, n) {
     if (!(n > 0)) return null;
     let id = null, ile = 0;

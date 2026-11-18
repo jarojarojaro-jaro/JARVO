@@ -50,7 +50,9 @@ PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "ochrona.py", "e
                 # rozmówcy panelu (centrum 1b): sesja tematu Telegrama, lustro panel → temat, stałe wątki i stan
                 "tematy.py", "lustro.py", "rozmowcy.py",
                 # źródła Mózgu (docs/HQ.md „Mózg”): skarbiec Jarva i grafy z konfig/mozg.json
-                "mozg_zrodla.py")
+                "mozg_zrodla.py",
+                # kanał Aktualizacje (docs/HQ.md „Aktualizacje”): archiwum raportów rutyn z cron/output profili
+                "raporty.py")
 # wspólny graf wiedzy (canvas, układ sił): zakładka Wiedza i Mózg aplikacji HQ
 GRAF_WSPOLNY = fl.REPO_ROOT / "shared" / "web" / "graf.js"
 
@@ -92,6 +94,8 @@ PAKIETY = {
     "poznajmy": {"pliki": ("36-glos.js", "37-poznajmy.js"), "zalezy": ()},
     "ustawienia": {"pliki": ("62-ustawienia.js",), "zalezy": ()},
     "mozg": {"pliki": ("63-mozg.js",), "wspolne": ("shared/web/graf.js",), "zalezy": ()},
+    # Aktualizacje (#/aktualizacje): archiwum raportów rutyn, poza pierwszym wyświetleniem rozmowy
+    "raporty": {"pliki": ("64-raporty.js",), "zalezy": ()},
 }
 # budżet gzip (bajty) z projektu etapu 1 §7: przekroczenie zatrzymuje build
 BUDZET_GZIP = {"app-rdzen.js": 95 * 1024, "app-rdzen.css": 18 * 1024, "mozg.js": 6 * 1024}

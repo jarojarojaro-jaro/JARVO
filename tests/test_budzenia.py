@@ -30,3 +30,11 @@ def test_statusy_i_nieznany():
 def test_zwykly_tekst_to_nie_budzenie():
     for t in ("[kanban] coś", "Task t_1 completed.", "", None, "  [kanban] Task t_1 completed.\nTitle: x"):
         assert not bz.czy_budzenie(t) and bz.parsuj(t) is None
+
+
+def test_raport_rutyny():
+    """Lustro dostarczenia crona Hermesa w sesji tematu (`[Cron delivery: <nazwa>]\\n<tekst>`)."""
+    assert bz.rutyna("[Cron delivery: Patrol floty]\n✅ Misja zamknięta\n") == {"nazwa": "Patrol floty",
+                                                                               "tekst": "✅ Misja zamknięta"}
+    for t in ("Cron delivery: x", "[kanban] Task t_1 completed.", "", None, " [Cron delivery: x]\ny"):
+        assert bz.rutyna(t) is None

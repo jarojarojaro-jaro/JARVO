@@ -200,9 +200,11 @@ def eksport_md(tytul: str, pozycje: list[dict], nazwy: dict[str, str], *, teraz:
     linie = [f"# {' '.join((tytul or 'Rozmowa').split())}", "", f"Eksport rozmowy z Jarva · {kiedy(teraz)}", ""]
     for p in pozycje:
         rodzaj, tekst = p.get("rodzaj"), (p.get("tekst") or "").strip()
-        if rodzaj in ("wlasciciel", "agent"):
+        if rodzaj in ("wlasciciel", "agent", "rutyna"):
             kto = "Ty" if rodzaj == "wlasciciel" else nazwy.get(p.get("agent") or "", p.get("agent") or "Agent")
             tryb = " · bezpośrednio" if p.get("tryb") == "bezposrednio" else ""
+            if rodzaj == "rutyna":
+                tryb = f" · {(p.get('rutyna') or {}).get('nazwa') or 'rutyna'}"
             linie += ["---", "", f"**{kto}** · {kiedy(p.get('ts'))}{tryb}", ""]
             if tekst:
                 linie += [tekst, ""]

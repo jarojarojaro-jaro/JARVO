@@ -11,7 +11,12 @@ w sesji api_server zaczyna turę w tej sesji wiadomością użytkownika według 
 
 czasem z `Result: {summary}` (przekazanie) albo `Review feedback: {reason}` (ocena). Oś czasu pokazuje taki wiersz
 jako kartę systemową „Karta „…” · Web · zakończona · Jarvo sprawdza”; wzmianek w nim nie szukamy. Nieznany status
-zostaje po angielsku z tonem `info`. Czysty Python; testy: tests/test_budzenia.py.
+zostaje po angielsku z tonem `info`.
+
+Druga obca tura systemu: **raport rutyny** (cron z `attach_to_session`, Hermes `cron/scheduler_delivery.py`
+`_cron_mirror_message`) wpisany do sesji tematu jako wiadomość użytkownika `[Cron delivery: <nazwa rutyny>]\\n<tekst>`.
+`rutyna` rozpoznaje go; oś pokazuje go jako wiadomość agenta z nazwą rutyny (nie dymek właściciela).
+Czysty Python; testy: tests/test_budzenia.py.
 """
 
 from __future__ import annotations
@@ -66,3 +71,14 @@ def parsuj(tekst: str) -> dict | None:
     if u:
         out["uwagi"] = u.group(1).strip()
     return out
+
+
+RUTYNA = re.compile(r"^\[Cron delivery: ([^\]\n]{1,200})\]\n?")
+
+
+def rutyna(tekst: str) -> dict | None:
+    """Raport rutyny w sesji (lustro dostarczenia crona): {nazwa, tekst} albo None."""
+    m = RUTYNA.match(str(tekst or ""))
+    if not m:
+        return None
+    return {"nazwa": m.group(1).strip(), "tekst": str(tekst)[m.end():].strip()}

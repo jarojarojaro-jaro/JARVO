@@ -2118,10 +2118,12 @@ from types import SimpleNamespace  # noqa: E402
 roz = SimpleNamespace(hq_core=core, ochrona=ochrona)
 for _nazwa in ("agenci", "rozmowy", "czytnik", "kontekst", "wzmianki", "budzenia", "scalanie", "brama", "strumien",
                "przebiegi", "prace", "karty", "obserwator", "aplikacja", "podpowiedzi", "glos", "mozg", "tematy",
-               "lustro", "omp_sesje", "czytnik_omp", "rozmowcy", "silnik"):
+               "lustro", "omp_sesje", "czytnik_omp", "rozmowcy", "raporty", "silnik"):
     setattr(roz, _nazwa, _load(f"jarvo_hq_{_nazwa}", f"{_nazwa}.py"))
 trasy_rozmow = _load("jarvo_hq_trasy_rozmow", "trasy_rozmow.py")
 trasy_aplikacji = _load("jarvo_hq_trasy_aplikacji", "trasy_aplikacji.py")
+# kanał Aktualizacje (raporty.py): archiwum raportów rutyn z cron/output profili, zbiera je pętla silnika
+RAPORTY = roz.raporty.Archiwum(HOME, core.JARVO_DIR / "state" / "raporty.db", utajnij=ochrona.utajnij)
 _dziennik_hq = roz.silnik.ustaw_dziennik(HOME / "logs" / "jarvo-hq.log"
                                          if os.environ.get("JARVO_HQ_SILNIK", "1") != "0" else None)
 AGENCI = roz.agenci.Agenci(FLEET_FILE, core.JARVO_DIR / "state" / "agenci.json")
@@ -2169,7 +2171,7 @@ def _start_silnika():
         return hub
     try:
         s = roz.silnik.Silnik(moduly=roz, home=HOME, jarvo_dir=core.JARVO_DIR, api_base=API_BASE, agenci=AGENCI,
-                              hub=hub, log=_log_hq, stan_aktualizacji=_update_state)
+                              hub=hub, log=_log_hq, stan_aktualizacji=_update_state, raporty=RAPORTY)
         roz.silnik.zarejestruj(s).start(czekaj=2.0)
         roz.silnik.zahacz_uvicorn(hub.zamknij_wszystkie)
     except Exception as exc:  # wtyczka działa dalej (stare trasy), /health i hello mówią „awaria”
@@ -2212,9 +2214,12 @@ MOZG = {"home": HOME, "flota": lambda: json.loads(FLEET_FILE.read_text(encoding=
         "rozdaj": _rozdaj_klucze, "status": roz.aplikacja.status_hermesa}
 trasy_aplikacji.dolacz(router, m=roz, trasy=trasy_rozmow, silnik=_silnik, agenci=AGENCI, gotowosc=GOTOWOSC,
                        nawyki=NAWYKI, stan_aktualizacji=_update_state, hello=_hello, decyzje=_decyzje, glos=GLOS,
-                       mozg=MOZG, dostep=lambda: siec.dostep(siec.Sciezki(core.JARVO_DIR)), log=_log_hq)
+                       mozg=MOZG, dostep=lambda: siec.dostep(siec.Sciezki(core.JARVO_DIR)), raporty=RAPORTY.licznik,
+                       log=_log_hq)
 # Mózg aplikacji (#/mozg): skarbiec Jarva i grafy z konfig/mozg.json instalacji (mozg_zrodla.py)
 _load("jarvo_hq_mozg_zrodla", "mozg_zrodla.py").dolacz(router, konfig=core.JARVO_DIR / "konfig" / "mozg.json", log=_log_hq)
+# Aktualizacje (#/aktualizacje): GET /raporty, POST /raporty/przeczytane
+roz.raporty.dolacz(router, archiwum=RAPORTY, hub=HUB, log=_log_hq)
 
 
 async def _zdrowie_rozmow() -> dict:

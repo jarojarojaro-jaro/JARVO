@@ -181,7 +181,9 @@ def test_odczyty_hq_bez_skutkow(monkeypatch):
         # Mózg (mozg_zrodla.py): konfig/mozg.json i pliki grafów tylko do odczytu (wynik w pamięci procesu)
         "/mozg/zrodla", "/mozg/{klucz}",
         # rozmówcy centrum (rozmowcy.py lista): konfiguracja + odczyt rozmowy.db, bez zapisu
-        "/rozmowcy"}
+        "/rozmowcy",
+        # Aktualizacje (raporty.py lista): odczyt archiwum raportów; brak pliku = pusta lista (archiwum zakłada silnik)
+        "/raporty"}
     zapis = {t.path for t in _trasy(api.router) if "POST" in t.methods}
     assert "/anim/info" in zapis
 

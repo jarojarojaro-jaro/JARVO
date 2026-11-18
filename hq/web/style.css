@@ -2130,3 +2130,38 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   .j-mozg-karta { top: auto; right: 0; bottom: 0; left: 0; width: auto; max-height: 70%; border-radius: var(--j-promien-3) var(--j-promien-3) 0 0; }
 }
 /* @@pakiet rdzen */
+/* Aktualizacje w rdzeniu: znacznik rutyny przy raporcie w rozmowie (licznik pozycji pod rozmówcami: .j-rozm-licz) */
+.j-tag.is-rutyna { color: var(--j-tekst-2); }
+/* @@pakiet raporty */
+/* Aktualizacje (#/aktualizacje, hq/web/src/64-raporty.js): nagłówek z filtrem rodzaju, dni, sekcje rodzajów, raporty */
+.j-rap { height: 100%; overflow: auto; }
+.j-rap-g { position: sticky; top: 0; z-index: 1; padding: 18px 24px 12px; background: var(--j-tlo); border-bottom: 1px solid var(--j-linia); }
+.j-rap-g h1, .j-rap-t { margin: 0; font: 600 1.05rem var(--j-font-mono); letter-spacing: .04em; }
+.j-rap-g h1:focus { outline: none; }
+.j-rap-opis { margin: 4px 0 10px; color: var(--j-tekst-3); font-size: 13px; max-width: 72ch; }
+.j-rap-filtr { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.j-rap-f { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 1px solid var(--j-linia-2); border-radius: 16px; color: var(--j-tekst-2); text-decoration: none; white-space: nowrap; font-size: 13px; }
+.j-rap-f:hover { background: var(--j-tlo-hover); }
+.j-rap-f.is-aktywny { background: var(--j-tekst); color: var(--j-tlo); border-color: var(--j-tekst); }
+.j-rap-f small { font: 11px var(--j-font-mono); opacity: .7; }
+.j-rap-f:focus-visible { outline: 2px solid var(--j-akcent); outline-offset: 1px; }
+.j-rap-lista { max-width: 820px; padding: 8px 24px 32px; }
+.j-rap-dzien { margin: 0; }
+.j-rap-dzien-t { margin: 22px 0 8px; font: 600 12px var(--j-font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--j-tekst-3); }
+.j-rap-sekcja { margin: 0 0 14px; }
+.j-rap-sekcja-t { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+.j-rap-sekcja-t small { color: var(--j-tekst-3); font-weight: 400; }
+.j-rap-r { margin: 0 0 8px; padding: 10px 14px 6px; border: 1px solid var(--j-linia); border-radius: 10px; background: var(--j-tlo-karta); }
+.j-rap-r.is-nowy { border-left: 3px solid var(--j-akcent); }
+.j-rap-r.is-blad { border-color: var(--j-uwaga); }
+.j-rap-r-g { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--j-tekst-3); }
+.j-rap-nowy { font: 600 10px var(--j-font-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--j-akcent); }
+.j-rap-r-t { margin-top: 4px; }
+.j-rap-r.is-zwiniety .j-rap-r-t { max-height: 16em; overflow: hidden; mask-image: linear-gradient(#000 70%, transparent); }
+.j-rap-r-s { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+.j-rap-odp { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+@container app (max-width: 700px) {
+  .j-rap-g { padding: 12px 14px 10px; }
+  .j-rap-lista { padding: 4px 12px 24px; }
+}
+/* @@pakiet rdzen */

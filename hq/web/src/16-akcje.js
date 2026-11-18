@@ -44,6 +44,14 @@ const akcje = {
       Komunikaty.pokaz(e.tekst ? e.tekst() : String(e), { rodzaj: "blad" });
     }
   },
+  // Aktualizacje: znacznik przeczytanych do najnowszego obejrzanego raportu (serwer go tylko podnosi i rozsyła licznik
+  // zdarzeniem `raporty.licznik`); błąd zostawia licznik, następne wejście spróbuje znowu
+  async raportyPrzeczytane(ts) {
+    try {
+      const r = await api.raporty.przeczytane(ts);
+      sklep.zmien("raporty", { nieprzeczytane: (r && r.nieprzeczytane) || 0 });
+    } catch (_) { /* bez sieci: licznik zostaje */ }
+  },
 
   // pierwsza sesja (docs/HQ.md „Pierwsze spotkanie”): serwer zakłada ją raz na instalację; tu jedno żądanie naraz,
   // potem start aplikacji odświeżony (gotowosc.pierwsza_sesja) i przejście do wątku. Błąd idzie do wołającego.
@@ -73,9 +81,10 @@ const akcje = {
       if (a.katalog_danych) Sciezki.ustaw(a.katalog_danych);      // ścieżki floty w tekście (07-sciezki.js)
       akcje.ustawRozmowcow(a.rozmowcy);
       akcje.ustawAgentow(a.agenci);
-      sklep.ustaw({ wlasciciel: a.wlasciciel || null, gotowosc: a.gotowosc || null, aktualizacja: a.aktualizacja || null,
-        decyzje: { liczba: a.decyzje || 0 }, funkcje: a.funkcje || {}, wersja: a.wersja || null, blad_aplikacji: false,
-        dostep: a.dostep || null });
+      sklep.ustaw((s) => ({ ...s, wlasciciel: a.wlasciciel || null, gotowosc: a.gotowosc || null,
+        aktualizacja: a.aktualizacja || null, decyzje: { liczba: a.decyzje || 0 }, funkcje: a.funkcje || {},
+        wersja: a.wersja || null, blad_aplikacji: false, dostep: a.dostep || null,
+        raporty: { ...s.raporty, nieprzeczytane: (a.raporty && a.raporty.nieprzeczytane) || 0 } }));
     } catch (e) {
       if (e.status === 401) return;
       if (e.status !== 404) {

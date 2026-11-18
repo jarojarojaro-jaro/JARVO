@@ -205,3 +205,26 @@ def test_cicha_odpowiedz_na_budzenie_bez_pozycji():
     assert agent == ["Web skończył audyt.", "Cytuję znacznik [SILENT] w zdaniu."]
     assert [p["rodzaj"] for p in wynik["pozycje"]] == ["budzenie", "budzenie", "budzenie", "agent", "kroki", "agent"]
     assert sc.bez_ciszy("[SILENT]") == "" and sc.bez_ciszy("Zwykła odpowiedź") == "Zwykła odpowiedź"
+
+
+def test_raport_rutyny_w_sesji_tematu_to_wiadomosc_agenta():
+    """18.11: rutyna z attach_to_session (Hermes `_cron_mirror_message`) wpisuje raport do sesji tematu JARVO jako
+    wiadomość użytkownika „[Cron delivery: <nazwa>]”; w rozmowie z rozmówcą to nie dymek właściciela 📱, tylko
+    wiadomość Jarva z nazwą rutyny, a odpowiedź właściciela z Telegrama zostaje jego dymkiem."""
+    class BazaRozmowcy(Baza):
+        def watek(self, wid):
+            return {"id": wid, "rodzaj": "rozmowa", "rozmowca": "f:jarvo"}
+
+    linia = [{"sesja_id": "s1", "stan": "ok", "wiersze": [
+        wiersz(1, "user", "[Cron delivery: Poranny brief]\n☀️ Brief B-2026-11-18\n1. Telefon dla Jarodeva?"),
+        wiersz(2, "user", "1 ok"),
+        wiersz(3, "assistant", "Przydzielam telefon."),
+    ]}]
+    wynik = sc.os_watku(BazaRozmowcy([], [], {"jarvo": ["s1"]}), Czytnik({"jarvo": linia}), WID, budzenia=bz)
+    poz = wynik["pozycje"]
+    assert [p["rodzaj"] for p in poz] == ["rutyna", "wlasciciel", "agent"]
+    assert poz[0]["agent"] == "jarvo" and poz[0]["rutyna"] == {"nazwa": "Poranny brief"}
+    assert poz[0]["tekst"] == "☀️ Brief B-2026-11-18\n1. Telefon dla Jarodeva?"
+    assert poz[1]["zrodlo"] == "telegram" and poz[1]["agent"] is None
+    assert [k["rodzaj"] for k in sc.pozycje_kontekstu(BazaRozmowcy([], [], {"jarvo": ["s1"]}), Czytnik({"jarvo": linia}),
+                                                      WID, budzenia=bz)] == ["agent"]

@@ -45,6 +45,8 @@ function stanPoczatkowy() {
     dostep: null,      // panel w sieci (GET /app, Ustawienia › Dostęp)
     // lista wątków (docelowo jednolita lista §10.8): klucz „w:<id>” → {typ: "watek", watek}
     lista: { porzadek: [], wg_klucza: {}, filtr: "rozmowy", q: "", dalej: null, laduje: false, blad: null, wczytana: false },
+    // Aktualizacje (64-raporty.js): licznik w lewej kolumnie; `wersja` rośnie z każdym nowym raportem (odświeża widok)
+    raporty: { nieprzeczytane: 0, wersja: 0 },
     adresaci: {},      // "<panel>:<wątek|nowa>" → agent na jedną wiadomość (wybór w kompozytorze)
     os: {},            // wątek → {pozycje, przed, po, pelny, laduje}
     watki: {},         // wątek → Watek (pełny, otwarte wątki)

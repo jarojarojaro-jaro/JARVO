@@ -554,3 +554,22 @@ Object.assign(SLOWNIK.en, {
   "ust.paleta": "Palette", "ust.paleta_opis": "Phosphor is a monochrome 1982 terminal: one colour on a dark background.",
 });
 /* === koniec Ustawień === */
+
+/* === Aktualizacje (raporty rutyn, 64-raporty.js) === */
+Object.assign(SLOWNIK.pl, {
+  "rap.tytul": "Aktualizacje", "rap.rutyna": "Rutyna",
+  "rap.opis": "Raporty rutyn floty: brief, patrol, przegląd tygodnia, nowe wersje. Odpowiadasz na nie w rozmowie z Jarvem; tam też je widzi.",
+  "rap.filtr": "Rodzaj raportu", "rap.wszystkie": "Wszystkie", "rap.nowy": "nowy", "rap.blad": "rutyna się nie udała",
+  "rap.odpowiedz": "Odpowiedz w rozmowie", "rap.calosc": "Pokaż całość", "rap.zwin": "Zwiń", "rap.starsze": "Starsze raporty",
+  "rap.pusto": "Jeszcze nie ma raportów. Pierwszy przyjdzie z najbliższą rutyną.", "rap.pusto_rodzaj": "Brak raportów tego rodzaju.",
+  "rap.nowe": { one: "{n} nowy raport", few: "{n} nowe raporty", many: "{n} nowych raportów", other: "{n} nowego raportu" },
+});
+Object.assign(SLOWNIK.en, {
+  "rap.tytul": "Updates", "rap.rutyna": "Routine",
+  "rap.opis": "Reports from the fleet routines: brief, patrol, weekly review, new versions. Reply to them in the conversation with Jarvo; he sees them there too.",
+  "rap.filtr": "Report type", "rap.wszystkie": "All", "rap.nowy": "new", "rap.blad": "routine failed",
+  "rap.odpowiedz": "Reply in the conversation", "rap.calosc": "Show all", "rap.zwin": "Collapse", "rap.starsze": "Older reports",
+  "rap.pusto": "No reports yet. The first one arrives with the next routine.", "rap.pusto_rodzaj": "No reports of this type.",
+  "rap.nowe": { one: "{n} new report", other: "{n} new reports" },
+});
+/* === koniec Aktualizacji === */

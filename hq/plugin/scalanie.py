@@ -7,7 +7,9 @@ wierszami sesji Hermesa każdego członka (czytnik.py: projekcja Hermesa albo za
 - **Reguły** (najpierw `display_kind`): `hidden` pominięty; `steer` naszego „Dopisz” pominięty (pokazuje go wpis;
   dopasowanie całymi liniami po zdjęciu znacznika Hermesa, `czytnik.dopisek_w_steerze`), obcy = `dopisano` (tekst bez
   znacznika); `async_delegation_complete`/`process_complete` = `dostawa`; `failed_turn` = `blad_tury`; inne
-  rodzaje = `system`; użytkownik: nasz = ukryty, `[kanban] Task …` = `budzenie`, streszczenie kompresji = `kompresja`,
+  rodzaje = `system`; użytkownik: nasz = ukryty, `[kanban] Task …` = `budzenie`, `[Cron delivery: <rutyna>]` = `rutyna`
+  (raport rutyny wpisany przez Hermesa do sesji tematu: wiadomość agenta z nazwą rutyny, `rutyna: {nazwa}`),
+  streszczenie kompresji = `kompresja`,
   reszta = `obca` (w wątku `import` dymek właściciela); asystent z `tool_calls` = grupa `kroki` przed następnym
   tekstem (czas kroku z zapisanych `kroki` przebiegu), `kanban_create` dodatkowo `przekazanie`; asystent z tekstem =
   `agent`, ale bez linii `[SILENT]` (cicha odpowiedź na budzenie: Hermes jej nie dostarcza, my też nie pokazujemy;
@@ -222,9 +224,13 @@ def _czlonek(agent: str, rola: str, linia: list[dict], przebiegi: list[dict], wp
                     continue
                 biezacy = None
                 b = budzenia.parsuj(tresc) if budzenia else None
+                r = budzenia.rutyna(tresc) if budzenia and not b else None
                 if b:
                     out.append(_pozycja(id=f"b:{agent}:{m['klucz']}", rodzaj="budzenie", **wspolne(m, idx),
                                         tekst=tresc, budzenie=b))
+                elif r:                         # raport rutyny w sesji tematu: mówi agent, nie właściciel
+                    out.append(_pozycja(id=klucz, rodzaj="rutyna", **wspolne(m, idx), tekst=r["tekst"],
+                                        rutyna={"nazwa": r["nazwa"]}, pliki=_pliki(r["tekst"], plik)))
                 elif m.get("podsumowanie"):
                     out.append(_pozycja(id=klucz, rodzaj="kompresja", **wspolne(m, idx),
                                         tekst="Streszczenie wcześniejszej rozmowy"))

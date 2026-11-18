@@ -4,9 +4,11 @@
 # (`hermes -p jarvo cron resume <id>`) po sprawdzeniu, że Telegram działa (scripts/install-fleet.sh --resume-cron).
 # Głęboko myśli tylko przegląd tygodnia (wnioski, lekcje). Patrol i brief: płytkie myślenie, bo skrypt już zebrał dane;
 # model zostaje modelem Jarva (przypięty tu nie poszedłby za zmianą modelu w panelu). Świeżość wiedzy bez modelu (no_agent).
-# `attach_to_session: true`: wiadomość rutyny trafia też do historii rozmowy w domu Jarva (temat JARVO grupy Jarvo HQ,
-# bez grupy DM), więc odpowiedź „1 ok, 2 nie” bez cytowania jest zrozumiała (12.11: brief z 5 decyzjami był tylko
-# w sesji crona, czat by go nie znał). Token HOME_DELIVER = dom Jarva (scripts/build.py, decyzja 17.11).
+# `attach_to_session: true` (każda rutyna, także bez modelu): wiadomość rutyny trafia też do historii rozmowy w domu
+# Jarva (temat JARVO grupy Jarvo HQ, bez grupy DM), więc odpowiedź „1 ok, 2 nie” bez cytowania jest zrozumiała (12.11:
+# brief z 5 decyzjami był tylko w sesji crona, czat by go nie znał). Token ROUTINE_DELIVER (scripts/build.py) = dom
+# Jarva (decyzja 17.11; General jako wątek 1, inaczej Hermes zakłada co przebieg temat „Hermes — <rutyna>”) i kopia
+# w temacie UPDATES, archiwum raportów (18.11; panel: kanał „Aktualizacje” czyta cron/output).
 
 jobs:
   - id: jarvo-patrol
@@ -16,7 +18,7 @@ jobs:
     reasoning_effort: low
     skills: [patrol]
     enabled_toolsets: [kanban, file, memory, skills]
-    deliver: "@@HOME_DELIVER@@"
+    deliver: "@@ROUTINE_DELIVER@@"
     attach_to_session: true
     prompt: >-
       Patrol floty. Powyżej masz sygnały z tablicy i dziennika misji. Postępuj według skilla `patrol`.
@@ -30,7 +32,7 @@ jobs:
     reasoning_effort: low
     skills: [daily-brief, decision-queue, kopalnia-pomyslow, prosty-polski]
     enabled_toolsets: [kanban, file, memory, skills]
-    deliver: "@@HOME_DELIVER@@"
+    deliver: "@@ROUTINE_DELIVER@@"
     attach_to_session: true
     prompt: >-
       Przygotuj poranny brief według skilla `daily-brief` na podstawie danych powyżej
@@ -42,7 +44,7 @@ jobs:
     script: review_weekly.py
     skills: [weekly-review, fleet-improvement, prosty-polski]
     enabled_toolsets: [kanban, file, memory, skills, session_search]
-    deliver: "@@HOME_DELIVER@@"
+    deliver: "@@ROUTINE_DELIVER@@"
     attach_to_session: true
     prompt: >-
       Przygotuj przegląd tygodnia według skilla `weekly-review` na podstawie danych powyżej.
@@ -54,7 +56,8 @@ jobs:
     # daty `reviewed:` skilli liczy skrypt (0 tokenów); puste wyjście = cisza
     script: swiezosc.py
     no_agent: true
-    deliver: "@@HOME_DELIVER@@"
+    deliver: "@@ROUTINE_DELIVER@@"
+    attach_to_session: true
 
   - id: jarvo-new-versions
     name: "Nowe wersje"
@@ -63,4 +66,5 @@ jobs:
     # (decyzja właściciela 14.11: „jak wychodzi nowe, to mieć na uwadze i updatować”)
     script: nowe_wersje.py
     no_agent: true
-    deliver: "@@HOME_DELIVER@@"
+    deliver: "@@ROUTINE_DELIVER@@"
+    attach_to_session: true
