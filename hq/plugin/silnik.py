@@ -236,7 +236,8 @@ class Silnik:
         self.lustro = m.lustro.Lustro(self.db, self.home, self.hub, log=self.log)
         self.rejestr.po_koncu = self.lustro.po_koncu
         self.rozmowcy = m.rozmowcy.Serwis(db=self.db, agenci=self.agenci, hub=self.hub, dane=self.home,
-                                          tematy=m.tematy, omp=omp, czytnik=self.czytnik, log=self.log)
+                                          tematy=m.tematy, omp=omp, czytnik=self.czytnik,
+                                          czytnik_omp=getattr(m, "czytnik_omp", None), log=self.log)
         try:
             self.rozmowcy.synchronizuj()
         except Exception as exc:                    # zła konfiguracja nie zatrzymuje silnika; pętla spróbuje znowu
@@ -246,8 +247,8 @@ class Silnik:
         if self.z_obserwatorem:
             self.obserwator = m.obserwator.Obserwator(
                 db=self.db, czytnik=self.czytnik, rejestr=self.rejestr, hub=self.hub, agenci=self.agenci,
-                home=self.home, jarvo_dir=self.jarvo_dir, prace=m.prace, budzenia=m.budzenia, log=self.log,
-                stan_aktualizacji=self.stan_aktualizacji)
+                home=self.home, jarvo_dir=self.jarvo_dir, prace=m.prace, budzenia=m.budzenia, scalanie=m.scalanie,
+                log=self.log, stan_aktualizacji=self.stan_aktualizacji)
             obs = asyncio.get_running_loop().create_task(self.obserwator.petla())
         else:
             obs = None

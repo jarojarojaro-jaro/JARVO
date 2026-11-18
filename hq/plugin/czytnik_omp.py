@@ -1,6 +1,7 @@
 """Oś rozmowy z pliku sesji omp (`*.jsonl`, wersja 3), tylko odczyt (docs/centrum §3.2, krok 1d).
 
     os_sesji(plik, ostatnie=200) -> {"wpisy": [...], "pelny": bool, "sesja": id, "blad": None | "nieznany format"}
+    odpowiedzi(plik) -> int | None   odpowiedzi kończące turę spoza panelu (licznik nieprzeczytanych rozmówcy)
 
 Aktywna gałąź: od ostatniego wpisu (liść) w górę po `parentId`. `pelny` = sesja odgałęziona z innej
 (`parentSession` w nagłówku): jej początek leży w innym pliku. Wpis osi:
@@ -101,7 +102,7 @@ def _czytaj(plik: Path) -> dict:
     klucz = str(plik)
     p = _PAMIEC.get(klucz)
     if not p or p["ino"] != st.st_ino or st.st_size < p["od"]:
-        p = {"ino": st.st_ino, "od": 0, "naglowek": None, "wpisy": {}, "lisc": None, "blad": None}
+        p = {"ino": st.st_ino, "od": 0, "naglowek": None, "wpisy": {}, "lisc": None, "blad": None, "odpowiedzi": 0}
         _PAMIEC[klucz] = p
     if st.st_size == p["od"] or p["blad"]:
         return p
@@ -134,12 +135,38 @@ def _czytaj(plik: Path) -> dict:
             continue
         if "id" not in e or "type" not in e or "parentId" not in e:
             continue
-        p["wpisy"][e["id"]] = (e.get("parentId"), _skrot(e))
+        skrot = _skrot(e)
+        p["wpisy"][e["id"]] = (e.get("parentId"), skrot)
+        if skrot and skrot["typ"] == "asystent" and not skrot["kroki"] and not _z_panelu(p["wpisy"], e.get("parentId")):
+            p["odpowiedzi"] += 1
         p["lisc"] = e["id"]
     p["od"] += koniec
     if p["naglowek"] is None and p["od"] > 0 and p["wpisy"]:
         p["blad"] = "nieznany format"
     return p
+
+
+def _z_panelu(wpisy: dict, i: str | None) -> bool:
+    """Tura zaczęła się wiadomością panelu (najbliższy wpis użytkownika w górę gałęzi niesie klucze przebiegów)."""
+    widziane = set()
+    while i and i not in widziane:
+        widziane.add(i)
+        rodzic, skrot = wpisy.get(i, (None, None))
+        if skrot and skrot["typ"] == "uzytkownik":
+            return bool(skrot.get("klucze"))
+        i = rodzic
+    return False
+
+
+def odpowiedzi(plik: Path | str) -> int | None:
+    """Licznik nieprzeczytanych rozmówcy omp: liczba odpowiedzi kończących turę w pliku (asystent z tekstem, bez
+    wywołań narzędzi), z pominięciem tur z panelu (te liczy koniec przebiegu); None = pliku nie da się czytać.
+    Kroki narzędzi, wyniki i tekst przy wywołaniu narzędzia licznika nie ruszają: jedna tura = jedna wiadomość."""
+    try:
+        p = _czytaj(Path(plik))
+    except OSError:
+        return None
+    return None if p["blad"] else p["odpowiedzi"]
 
 
 def os_sesji(plik: Path | str | None, ostatnie: int = 200) -> dict:

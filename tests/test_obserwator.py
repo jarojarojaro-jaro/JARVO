@@ -84,8 +84,23 @@ def test_sprzatanie_odpina_sesje_usunietych_watkow(swiat):
 
 
 def test_obcy_wiersz_daje_podpowiedz_i_nieprzeczytane(swiat):
+    """Tura z Telegrama z dwudziestoma krokami narzędzi w kilku cyklach obserwatora: oś na żywo po każdym, licznik
+    nieprzeczytanych +1 dopiero za odpowiedź (uwaga właściciela 18.11: „kropka z numerkiem 20, a przyszła jedna”)."""
     wid, sid = _gotowy_watek(swiat)
+    ostatni = swiat.brama.wiersze("test-e2e-a", sid)[-1]["id"]          # nasza tura już przeczytana przez obserwator
+    czekaj(lambda: int((swiat.sil.db.czlonek(wid, "test-e2e-a") or {}).get("odczyt_id") or 0) >= ostatni, 5, "nasza")
     przed = swiat.sil.db.watek(wid)["nieprzeczytane"]
     swiat.brama._wiersz("test-e2e-a", sid, "user", "pytanie z telegramu")
     czekaj(lambda: any(d["watek_id"] == wid for _t, d in swiat.ramki("watek.os")), 5, "watek.os")
-    czekaj(lambda: swiat.sil.db.watek(wid)["nieprzeczytane"] > przed, 5, "nieprzeczytane")
+    for k in range(20):
+        tc = '[{"id": "c%d", "type": "function", "function": {"name": "terminal", "arguments": "{}"}}]' % k
+        swiat.brama._wiersz("test-e2e-a", sid, "assistant", "Sprawdzam…" if k % 5 == 0 else "", tool_calls=tc)
+        swiat.brama._wiersz("test-e2e-a", sid, "tool", "wynik", tool_call_id=f"c{k}")
+        time.sleep(0.15)
+    odczyt = swiat.brama.wiersze("test-e2e-a", sid)[-1]["id"]
+    czekaj(lambda: int((swiat.sil.db.czlonek(wid, "test-e2e-a") or {}).get("odczyt_id") or 0) >= odczyt, 5, "kroki")
+    assert swiat.sil.db.watek(wid)["nieprzeczytane"] == przed
+    swiat.brama._wiersz("test-e2e-a", sid, "assistant", "odpowiedź po krokach")
+    czekaj(lambda: swiat.sil.db.watek(wid)["nieprzeczytane"] == przed + 1, 5, "nieprzeczytane")
+    time.sleep(1.5)
+    assert swiat.sil.db.watek(wid)["nieprzeczytane"] == przed + 1

@@ -384,6 +384,9 @@ class Czytnik:
     def odpowiedz_po(self, profil: str, sesje: Iterable[str], po_id: int) -> bool:
         return bool(self._sonda(profil, odpowiedz_po, list(sesje), po_id, domyslna=False))
 
+    def wiadomosci_po(self, profil: str, sesje: Iterable[str], po_id: int) -> list[tuple[str, str]]:
+        return self._sonda(profil, wiadomosci_po, list(sesje), po_id, domyslna=[])
+
     def stan_sesji(self, profil: str, sesje: Iterable[str]) -> dict:
         return self._sonda(profil, stan_sesji, list(sesje), domyslna={"max_id": 0, "skompaktowane": 0})
 
@@ -482,6 +485,41 @@ def odpowiedz_po(state_db: Path | str, sesje: list[str], po_id: int) -> bool:
     try:
         return conn.execute(f"SELECT 1 FROM messages WHERE session_id IN ({_w(sesje)}) AND id > ? AND role = 'assistant' "
                             f"AND COALESCE(content, '') != '' LIMIT 1", (*sesje, po_id)).fetchone() is not None
+    finally:
+        conn.close()
+
+
+def wiadomosci_po(state_db: Path | str, sesje: list[str], po_id: int) -> list[tuple[str, str]]:
+    """(rola, tekst) nowych wierszy po `po_id`, które mogą być wiadomością dla właściciela (licznik nieprzeczytanych
+    obserwatora): asystent z tekstem bez `tool_calls` (koniec tury albo `failed_turn`) i zwykły wiersz użytkownika
+    (raport rutyny `[Cron delivery: …]` rozpoznaje obserwator). Kroki narzędzi (także tekst przy wywołaniu narzędzia),
+    wyniki narzędzi, wiersze ukryte, `model_only` i rodzaje systemowe odpadają; wiersz, który tylko podmienia pozycję
+    widoczną już do `po_id` (ten sam `display_order` tej sesji), też."""
+    if not sesje:
+        return []
+    conn = _polacz(state_db)
+    try:
+        rows = conn.execute(f"SELECT session_id, role, content, tool_calls, display_kind, display_metadata, display_order "
+                            f"FROM messages WHERE session_id IN ({_w(sesje)}) AND id > ? AND role IN ('assistant', 'user')"
+                            f"{_WIDOCZNE} ORDER BY id", (*sesje, po_id)).fetchall()
+        out, pozycje = [], set()
+        for r in rows:
+            rodzaj = str(r["display_kind"] or "")
+            if r["role"] == "assistant" and (rodzaj not in ("", "failed_turn") or _json(r["tool_calls"], None)):
+                continue
+            if (r["role"] == "user" and rodzaj) or (_meta(r["display_metadata"]) or {}).get("model_only"):
+                continue
+            tekst = _tresc_wiersza(r["content"]).strip()
+            if not tekst:
+                continue
+            if r["display_order"] is not None:
+                poz = (r["session_id"], r["display_order"])
+                if poz in pozycje or conn.execute("SELECT 1 FROM messages WHERE session_id = ? AND display_order = ? "
+                                                  "AND id <= ? LIMIT 1", (*poz, po_id)).fetchone():
+                    continue
+                pozycje.add(poz)
+            out.append((r["role"], tekst))
+        return out
     finally:
         conn.close()
 

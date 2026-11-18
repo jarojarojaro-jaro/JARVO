@@ -27,12 +27,12 @@ TEMAT_S = 10.0
 
 
 class Serwis:
-    def __init__(self, *, db, agenci, hub, dane: Path | str, tematy, omp=None, czytnik=None,
+    def __init__(self, *, db, agenci, hub, dane: Path | str, tematy, omp=None, czytnik=None, czytnik_omp=None,
                  log: Callable[[str], None] | None = None, zegar: Callable[[], float] = time.time):
         self.db, self.agenci, self.hub = db, agenci, hub
         self.dane = Path(dane)
-        self.tematy, self.omp, self.czytnik = tematy, omp, czytnik
-        self._pliki: dict[str, tuple | None | str] = {}
+        self.tematy, self.omp, self.czytnik, self.czytnik_omp = tematy, omp, czytnik, czytnik_omp
+        self._pliki: dict[str, tuple] = {}             # klucz → (sygnatura pliku sesji omp, odpowiedzi w nim)
         self.log = log or (lambda _m: None)
         self.zegar = zegar
         self._lista: list[dict] = []
@@ -183,22 +183,32 @@ class Serwis:
         return zmienione
 
     def _os_omp(self, r: dict, w) -> None:
-        """Plik sesji omp urósł (tura z Telegrama, terminala albo panelu): oś wątku na żywo (`watek.os`) i aktywność
-        wątku (nieprzeczytane, gdy nikt go nie ogląda). Pierwszy odczyt po starcie tylko zapamiętuje rozmiar."""
+        """Plik sesji omp urósł (tura z Telegrama, terminala albo panelu, także każdy krok narzędzia): oś wątku na żywo
+        (`watek.os`). Aktywność i nieprzeczytane tylko o nowe odpowiedzi kończące turę spoza panelu
+        (`czytnik_omp.odpowiedzi`; turę z panelu liczy koniec przebiegu), więc tura z dwudziestoma krokami to jedna
+        wiadomość. Pierwszy odczyt po starcie i nowy plik sesji (inna ścieżka albo i-węzeł) tylko zapamiętują stan."""
         try:
             plik = self.omp.plik_sesji(w)
             s = plik.stat() if plik else None
         except OSError:
             s = None
-        syg = (s.st_mtime_ns, s.st_size) if s else None
-        stara = self._pliki.get(r["klucz"], "start")
-        self._pliki[r["klucz"]] = syg
-        if stara == "start" or syg is None or syg == stara:
+        syg = (str(plik), s.st_ino, s.st_mtime_ns, s.st_size) if s else None
+        stara = self._pliki.get(r["klucz"])
+        if stara is not None and stara[0] == syg:
+            return
+        n = self.czytnik_omp.odpowiedzi(plik) if syg and self.czytnik_omp is not None else None
+        self._pliki[r["klucz"]] = (syg, n)
+        if stara is None or syg is None:
             return
         wid = r["watek_id"]
-        otwarty = wid in self.hub.subskrybowane_watki()
-        w_ = self.db.aktywnosc(wid, at=s.st_mtime_ns / 1e9, nieprzeczytane_plus=0 if otwarty else 1)
         self.hub.nadaj("watek.os", {"watek_id": wid, "agent": r["klucz"]}, watek_id=wid)
+        syg0, n0 = stara
+        ten_sam = syg0 is not None and syg0[:2] == syg[:2]
+        nowe = n - n0 if ten_sam and n is not None and n0 is not None else 0
+        if nowe <= 0:
+            return
+        otwarty = wid in self.hub.subskrybowane_watki()
+        w_ = self.db.aktywnosc(wid, at=s.st_mtime_ns / 1e9, nieprzeczytane_plus=0 if otwarty else nowe)
         if w_:
             self.hub.nadaj("watek.zmiana", {"watek": {k: w_.get(k) for k in ("id", "aktywnosc_at", "nieprzeczytane",
                                                                                "status", "podglad")}})

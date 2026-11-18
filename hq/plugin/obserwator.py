@@ -3,8 +3,10 @@ same `os.stat`, SQL tylko dla ścieżek, które się zmieniły. Etap 2:
 
 - **state.db profili członków** (i `-wal`): (1) przedłużenie rodowodu: sesja potomna, której rodzic skończył się
   kompresją z rotacją, dostaje wiersz `sesje` (`kompresja`) i staje się `sesja_tip`; (2) nowe wiersze sesji członka
-  (`max(id)` > `odczyt_id`) spoza naszej tury = `watek.os` (podpowiedź do pobrania osi), nieprzeczytane i podgląd
-  (budzenie kanbana: „Karta „…” · zakończona”); wiersze naszej tury tego nie robią (pokazuje je żywy dymek);
+  (`max(id)` > `odczyt_id`) spoza naszej tury = `watek.os` (podpowiedź do pobrania osi); nieprzeczytane i podgląd
+  (budzenie kanbana: „Karta „…” · zakończona”) tylko o wiadomości agenta wśród nich (`czytnik.wiadomosci_po`:
+  odpowiedź kończąca turę bez `[SILENT]`, raport rutyny), nigdy o kroki narzędzi; wiersze naszej tury tego nie robią
+  (pokazuje je żywy dymek, a koniec przebiegu sam podbija licznik o jeden);
   (3) kompresja w miejscu (zmiana liczby wierszy skompaktowanych) = `watek.os {pelny: true}` i notka systemu;
   (4) budzik dyspozytora (dzierżawa mogła się zwolnić, nasz wiersz mógł się pojawić).
 - **agenci.json** = `agenci.zmiana`; **update.json** = `aktualizacja`.
@@ -55,10 +57,10 @@ def _syg(p: Path) -> tuple:
 
 class Obserwator:
     def __init__(self, *, db, czytnik, rejestr, hub, agenci, home: Path | str, jarvo_dir: Path | str, prace=None,
-                 budzenia=None, log: Callable[[str], None] | None = None, zegar: Callable[[], float] = time.time,
-                 stan_aktualizacji: Callable[[], dict] | None = None):
+                 budzenia=None, scalanie=None, log: Callable[[str], None] | None = None,
+                 zegar: Callable[[], float] = time.time, stan_aktualizacji: Callable[[], dict] | None = None):
         self.db, self.czytnik, self.rejestr, self.hub, self.agenci = db, czytnik, rejestr, hub, agenci
-        self.prace, self.budzenia = prace, budzenia
+        self.prace, self.budzenia, self.scalanie = prace, budzenia, scalanie
         self.home, self.jarvo_dir = Path(home), Path(jarvo_dir)
         self.log = log or (lambda _m: None)
         self.zegar = zegar
@@ -169,10 +171,12 @@ class Obserwator:
         poprzedni = self._czlonkowie.get(klucz)
         self._czlonkowie[klucz] = st
         czl = self.db.czlonek(wid, agent, rola) or {}
-        if st["max_id"] > int(czl.get("odczyt_id") or 0):
+        odczyt = int(czl.get("odczyt_id") or 0)
+        if st["max_id"] > odczyt:
             tresc, rodzaj = await asyncio.to_thread(self.czytnik.ostatni_uzytkownika, agent, rodowod)
             if not self._nasza_tura(wid, agent, rola, tresc, rodzaj):
-                self._nowe_wiersze(wid, agent, rola, tresc)
+                nowe = await asyncio.to_thread(self.czytnik.wiadomosci_po, agent, rodowod, odczyt)
+                self._nowe_wiersze(wid, agent, rola, tresc, self._wiadomosci(nowe))
             self.db.zmien_czlonka(wid, agent, rola, odczyt_id=st["max_id"])
         if poprzedni is not None and st["skompaktowane"] != poprzedni["skompaktowane"]:
             self.hub.nadaj("watek.os", {"watek_id": wid, "agent": agent, "pelny": True}, watek_id=wid)
@@ -193,9 +197,22 @@ class Obserwator:
         sha = hashlib.sha256(tresc.encode("utf-8", "surrogatepass")).hexdigest()
         return any(p.get("payload_sha") == sha for p in przebiegi)
 
-    def _nowe_wiersze(self, wid: str, agent: str, rola: str, tresc: str) -> None:
+    def _wiadomosci(self, nowe: list[tuple[str, str]]) -> int:
+        """Ile nowych wierszy to wiadomości agenta dla właściciela: odpowiedź kończąca turę (bez samej ciszy
+        `[SILENT]`) albo raport rutyny; kroki narzędzi, wiadomość właściciela z Telegrama i budzenie nie."""
+        n = 0
+        for rola, tekst in nowe:
+            if rola == "assistant":
+                n += bool(self.scalanie.bez_ciszy(tekst) if self.scalanie else tekst)
+            elif self.budzenia and self.budzenia.rutyna(tekst):
+                n += 1
+        return n
+
+    def _nowe_wiersze(self, wid: str, agent: str, rola: str, tresc: str, wiadomosci: int) -> None:
+        """Nowe wiersze spoza naszej tury: zawsze podpowiedź osi (kroki widać na żywo); aktywność, podgląd
+        i nieprzeczytane tylko o `wiadomosci` (tura z dwudziestoma krokami = jedna odpowiedź = 1)."""
         self.hub.nadaj("watek.os", {"watek_id": wid, "agent": agent}, watek_id=wid)
-        if rola == "nadzor":
+        if rola == "nadzor" or wiadomosci <= 0:
             return
         b = self.budzenia.parsuj(tresc) if self.budzenia else None
         r = self.budzenia.rutyna(tresc) if self.budzenia and not b else None
@@ -207,7 +224,7 @@ class Obserwator:
         else:
             podglad = f"{nazwy.get(agent, agent)}: wiadomość spoza aplikacji"
         otwarty = wid in self.hub.subskrybowane_watki()
-        w = self.db.aktywnosc(wid, at=self.zegar(), podglad=podglad, nieprzeczytane_plus=0 if otwarty else 1)
+        w = self.db.aktywnosc(wid, at=self.zegar(), podglad=podglad, nieprzeczytane_plus=0 if otwarty else wiadomosci)
         if w:
             self.hub.nadaj("watek.zmiana", {"watek": {k: w.get(k) for k in (
                 "id", "tytul", "przypiety", "archiwum", "usuniety_at", "rodzaj", "kanal", "czlonkowie", "ostatni_agenci",
