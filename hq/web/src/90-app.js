@@ -164,8 +164,11 @@ function useSkrotyAplikacji() {
       Fokus.odloz("kompozytor");
       Trasa.idz({ widok: "watek", watek: ids[j] });
     };
+    const nowa = () => { Fokus.odloz("kompozytor"); Trasa.idz({ widok: "nowa" }); };
     const usun = [
-      Skroty.dodaj({ komb: "Mod+Shift+O", opis: "skroty.nowa", akcja: () => Trasa.idz({ widok: "start" }) }),
+      // ⌘N/Ctrl+N przejmie tylko okno aplikacji (karta przeglądarki zostawia je sobie), więc ⇧O zostaje obok
+      Skroty.dodaj({ komb: "Mod+N", opis: "skroty.nowa", akcja: nowa }),
+      Skroty.dodaj({ komb: "Mod+Shift+O", opis: "skroty.nowa", akcja: nowa }),
       Skroty.dodaj({ komb: "Mod+Shift+S", opis: "skroty.pasek", akcja: () => sklep.zmien("pasek", (p) => (window.innerWidth < 1024
         ? { ...p, otwarty: !p.otwarty } : { ...p, zwiniety: !p.zwiniety })) }),
       Skroty.dodaj({ komb: "Mod+,", opis: "skroty.ustawienia", akcja: () => Trasa.idz({ widok: "ustawienia" }) }),
@@ -289,7 +292,7 @@ function AplikacjaJarvo() {
   }, [trasa.widok, trasa.watek, trasa.rozmowca]);
 
   // pierwsze wejście bez adresu (#/) na komputerze: ostatni rozmówca, domyślnie pierwszy (centrum §3.3); telefon
-  // zaczyna od listy rozmówców, a „Nowa rozmowa” (#/) dalej otwiera ekran startu
+  // zaczyna od listy rozmówców, a „Nowa rozmowa” (#/nowa, ⌘N) otwiera ekran startu z kompozytorem
   const startowy = useRef(!location.hash || location.hash === "#/" || location.hash === "#");
   useEffect(() => {
     if (!saRozmowcy || !startowy.current) return;

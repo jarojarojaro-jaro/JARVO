@@ -195,12 +195,21 @@ function NawigacjaCentrum({ trasa }) {
       <kbd class="j-rozm-skrot" aria-hidden="true">${Skroty.opis(komb)}</kbd></a></li>`)}</ul>`;
 }
 
+// „+ Nowa rozmowa” na samej górze (nad rozmówcami, ⌘N): otwiera start z kompozytorem i wyborem „Do:” (domyślnie Jarvo)
+function NowaRozmowa({ fokus = false, duza = false }) {
+  return html`<a class=${cx("j-nowa", duza && "is-duza")} href="#/nowa" data-nowa data-fokus=${fokus ? "" : undefined}
+      aria-keyshortcuts="Meta+N Control+N" onClick=${() => Fokus.odloz("kompozytor")}>
+    <span class="j-nowa-plus" aria-hidden="true">+</span><span class="j-nowa-t">${T("pasek.nowa")}</span>
+    ${!duza && html`<kbd class="j-nowa-skrot" aria-hidden="true">${Skroty.opis("Mod+N")}</kbd>`}</a>`;
+}
+
 // Ekran 1 telefonu (centrum §2.2): duże wiersze rozmówców, pod nimi Aktualizacje, Mózg, Ustawienia i Inne rozmowy
 function EkranRozmowcow() {
   const ile = useSklep((s) => s.lista.porzadek.length);
   const trasa = useTrasa();
   return html`<section class="j-ekran-rozm" aria-labelledby="j-ekran-rozm-t">
     <h1 class="j-sr" id="j-ekran-rozm-t">${T("rozm.sekcja")}</h1>
+    <${NowaRozmowa} duza=${true}/>
     <${StanPolaczenia} klasa="j-ekran-rozm-st"/>
     <${ListaRozmowcow} trasa=${trasa} duza=${true}/>
     <ul class="j-nawig is-duza">
@@ -321,6 +330,7 @@ function Pasek({ trasa, warstwa = false }) {
       <${Przycisk} rodzaj="cichy" ikona="x" etykieta=${T("ui.zamknij")} klasa="j-zamknij-pasek"
         onClick=${() => sklep.zmien("pasek", { otwarty: false })}/>
     </div>
+    <${NowaRozmowa} fokus=${!saRozmowcy}/>
     ${saRozmowcy && html`<div class="j-pasek-rozm">
       <h2 class="j-sekcja" id="j-sekcja-rozm">${T("rozm.sekcja_t")}</h2>
       <${ListaRozmowcow} trasa=${trasa}/>
@@ -330,7 +340,6 @@ function Pasek({ trasa, warstwa = false }) {
         <span>${T("rozm.inne")}</span><span aria-hidden="true">${inne ? "▾" : "▸"}</span>
         ${!inne && lista.porzadek.length > 0 && html`<small>${lista.porzadek.length}</small>`}</button></div>`}
     ${inne && html`<div class=${cx("j-inne-l", saRozmowcy && "is-pod-rozm")} id="j-inne-l">
-    <a class="j-nowa" href="#/" data-fokus=${saRozmowcy ? undefined : ""} onClick=${() => Fokus.odloz("kompozytor")}><${Ikona} n="compose"/><span>${T("pasek.nowa")}</span></a>
     <div class="j-szukaj-w">
       <label class="j-szukaj"><${Ikona} n="search" r=${16}/>
         <input type="search" data-szukaj placeholder=${T("pasek.szukaj")} aria-label=${T("pasek.szukaj")} value=${lista.q}

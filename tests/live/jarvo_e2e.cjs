@@ -2268,7 +2268,7 @@ async function etap3(browser) {
       regiony.push(await korzen(() => { const r = document.activeElement && document.activeElement.closest("[data-region]"); return r ? r.getAttribute("data-region") : "brak"; }));
     }
     await page.keyboard.press("Control+Shift+KeyO");
-    await page.waitForFunction(() => location.hash === "#/" || location.hash === "", null, { timeout: 3000 });
+    await page.waitForFunction(() => location.hash === "#/nowa", null, { timeout: 3000 });
     await page.waitForSelector(".j-witaj", { timeout: 3000 });
     musi(pisz && ukosnik === "", `/ nie przeniósł do pola wiadomości (fokus: ${pisz}, pole: ${JSON.stringify(ukosnik)})`);
     musi(JSON.stringify(regiony) === JSON.stringify(["pasek", "glowna", "pasek"]), `F6: ${regiony}`);

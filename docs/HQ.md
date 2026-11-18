@@ -995,7 +995,7 @@ innych kanałów etap 6.
   640 px szuflada zajmuje cały ekran: lista sekcji, potem sekcja z **Wróć**; cele dotyku ≥ 40 px. Pod szufladą
   i Starą Bazą układ dostaje `inert` (Tab i czytnik zostają w warstwie), a zamknięta warstwa oddaje fokus temu,
   co ją otworzyło.
-- **Pasek** (`30-pasek.js`): marka, **Nowa rozmowa**, szukaj (z opóźnieniem 250 ms, nowsze zapytanie wygrywa),
+- **Pasek** (`30-pasek.js`): marka, pod nią **+ Nowa rozmowa** (akcent, ⌘N, `#/nowa`; nad ROZMÓWCAMI, na telefonie na górze ekranu rozmówców; jedyne wejście, przy „Inne rozmowy” go nie ma), szukaj (z opóźnieniem 250 ms, nowsze zapytanie wygrywa),
   lista wątków w grupach Przypięte, Dziś, Wczoraj, Ten tydzień, Wcześniej (`Czas.grupa`, granice dni w strefie
   przeglądarki), wiersz z ikoną źródła, tytułem i znakiem stanu (z tekstem dla czytnika), **Więcej** dla następnej
   strony; nawigacja z pozycją Ustawienia (także bez rozmówców); stopka: stan połączenia słowem (`StanPolaczenia`,
@@ -1009,7 +1009,7 @@ innych kanałów etap 6.
   i kosz wątku z pracą w toku pytają: zatrzymać ją czy pozwolić skończyć (409 `praca_trwa`). Lista dłuższa niż 120
   wierszy rysuje tylko widoczne wiersze (stała wysokość grupy i wiersza mierzonego z pierwszego). Menu (`Menu`
   w `20-ui.js`) przy dolnej krawędzi otwiera się nad przyciskiem.
-- **Ekran startu** (`38-start.js`, `#/` i `#/nowa/<agent>`; makieta V2): robot Jarva (`23-robot.js`, ikona CRT ze strony logowania), powitanie z porą dnia
+- **Ekran startu** (`38-start.js`, `#/`, `#/nowa` i `#/nowa/<agent>`; makieta V2): robot Jarva (`23-robot.js`, ikona CRT ze strony logowania), powitanie z porą dnia
   i imieniem z `USER.md` („Dzień dobry, {imie}”, pod spodem „{firma} · w czym mogę pomóc?”); bez imienia „Cześć,
   jestem Jarvo” i „Prowadzę zespół N agentów”. Kompozytor nowej rozmowy, a pod nim najwyżej 4 rzeczy: **Czeka na
   Ciebie** (zgody w toku i nieudana praca z `rozmowy.db`, klik otwiera wątek; pytania zespołu z kanbana: jedno
@@ -1189,7 +1189,7 @@ innych kanałów etap 6.
   i **Stara Baza** (cała stara Baza na ekranie nad aplikacją, z **Wróć do Jarva**; jej skróty działają, skróty
   aplikacji milkną; zamknięcie oddaje fokus temu, co ją otworzyło). Całość działa z samej klawiatury. Na
   telefonie wybór sekcji przenosi fokus na jej nagłówek, a **Wróć** na przycisk tej sekcji w liście.
-- **Trasa** (`03-trasa.js`, hash): `#/` start, `#/nowa/<agent>`, `#/r/<wątek>[/m/<pozycja>]`, `#/s/<profil>/<sesja>`,
+- **Trasa** (`03-trasa.js`, hash): `#/` start, `#/nowa[/<agent>]` (bez agenta: nowa rozmowa także na telefonie, gdzie `#/` to lista rozmówców), `#/r/<wątek>[/m/<pozycja>]`, `#/s/<profil>/<sesja>`,
   parametry `u` (szuflada) oraz `n`, `p` (narzędzia: edytor, animacja, konwerter, wiedza, w kolejnych częściach).
   Każda część ma swój wzorzec (id wątku `w_` + 21 znaków hex, profil, sesja); reszta to start. Przed przejściem na
   logowanie hash trafia do `sessionStorage` (`jarvo.po_logowaniu`) i wraca po zalogowaniu. Hermes przy wczytaniu
@@ -1256,7 +1256,7 @@ innych kanałów etap 6.
 - **Język** (`04-i18n.js`): `T(klucz, {n, …})` ze słownika PL i EN (325 kluczy w każdym), liczba mnoga po polsku
   (`one`, `few`, `many`, `other`) i angielsku (`one`, `other`), język z Hermesa (`useI18n`), nazwy agentów bez odmiany
   w szablonach. `validate.py` sprawdza, że oba słowniki mają te same klucze i komplet form.
-- **Skróty** (`05-skroty.js`, lista w Konto): Ctrl/⌘+Shift+O nowa rozmowa, Ctrl/⌘+Shift+S pasek, Ctrl/⌘+,
+- **Skróty** (`05-skroty.js`, lista w Konto): Ctrl/⌘+N nowa rozmowa (karta przeglądarki zostawia je sobie, więc działa też Ctrl/⌘+Shift+O), Ctrl/⌘+Shift+S pasek, Ctrl/⌘+,
   ustawienia, Ctrl/⌘+/ skróty, Alt+↑/↓ poprzedni i następny wątek, F6 i Shift+F6 między regionami (pasek, główna,
   szuflada), `/` do pola wiadomości (bez kompozytora na ekranie: szukaj). W polach tekstowych działają tylko skróty
   z Ctrl/⌘ albo Alt i F6.

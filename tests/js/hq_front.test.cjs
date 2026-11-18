@@ -95,6 +95,7 @@ test("Trasa.parsuj", () => {
   eq(Trasa.parsuj(`#/r/${W}`), { widok: "watek", watek: W });
   eq(Trasa.parsuj(`#/r/${W}/m/p_12:3`), { widok: "watek", watek: W, pozycja: "p_12:3" });
   eq(Trasa.parsuj("#/r/w_zle"), { widok: "start" });
+  eq(Trasa.parsuj("#/nowa"), { widok: "nowa" });
   eq(Trasa.parsuj("#/nowa/jarvo-web"), { widok: "nowa", agent: "jarvo-web" });
   eq(Trasa.parsuj("#/nowa/Zly!"), { widok: "start" });
   eq(Trasa.parsuj("#/s/jarvo/20261021_abc"), { widok: "sesja", profil: "jarvo", sesja: "20261021_abc" });

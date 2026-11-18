@@ -1177,9 +1177,13 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-pasek { display: flex; flex-direction: column; min-width: 0; height: 100%; background: var(--j-tlo-pasek); border-right: 1px solid var(--j-linia); padding: 12px 10px 0; overflow: hidden; }
 .j-pasek-g { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 2px 0 6px; flex: none; }
 .j-marka { display: flex; align-items: center; gap: 9px; font-weight: 650; font-size: 16px; letter-spacing: -.01em; flex: 1; min-width: 0; }
-.j-nowa { margin-top: 12px; display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 11px; border-radius: 10px; font-weight: 550; font-size: 14px;
-  background: var(--j-tlo-karta); border: 1px solid var(--j-linia-2); flex: none; }
-.j-nowa:hover { border-color: var(--j-linia-mocna); }
+.j-nowa { margin-top: 12px; display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; border-radius: 10px; font-weight: 600; font-size: 14px;
+  background: var(--j-akcent); color: var(--j-akcent-na); text-decoration: none; border: 1px solid var(--j-akcent); flex: none; }
+.j-nowa:hover { background: var(--j-akcent-hover); border-color: var(--j-akcent-hover); }
+.j-nowa-plus { font-size: 18px; line-height: 1; font-weight: 500; }
+.j-nowa-t { flex: 1; }
+.j-nowa-skrot { font: 11px var(--j-font-mono); opacity: .8; }
+.j-nowa.is-duza { margin: 8px 16px 4px; height: 48px; font-size: 15px; }
 .j-szukaj { margin-top: 6px; display: flex; align-items: center; gap: 9px; height: 36px; padding: 0 11px; border-radius: 10px; color: var(--j-tekst-3); flex: none; cursor: text; }
 .j-szukaj:hover { background: var(--j-tlo-hover); }
 .j-szukaj:focus-within { background: var(--j-tlo-karta); box-shadow: 0 0 0 1px var(--j-krawedz); }

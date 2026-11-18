@@ -1,5 +1,5 @@
 // Trasy w aplikacji (docs/HQ.md „Aplikacja”): ścieżka dashboardu to dokładnie /jarvo, więc widok niesie hash.
-//   #/                     start          #/nowa/<agent>             nowa rozmowa, pierwsza wiadomość do agenta
+//   #/                     start          #/nowa[/<agent>]           nowa rozmowa (bez agenta: „Do:” domyślnie Jarvo)
 //   #/o/<rozmówca>         stała rozmowa z rozmówcą (klucz f:<profil> albo s:<wpis>, centrum §4)
 //   #/r/<watek>            wątek          #/r/<watek>/m/<pozycja>    wątek przewinięty do pozycji
 //   #/s/<profil>/<sesja>   obca sesja (tylko odczyt)
@@ -23,7 +23,8 @@ const Trasa = (() => {
     const q = new URLSearchParams(i < 0 ? "" : h.slice(i + 1));
     let t = { widok: "start" };
     const [a, b, c, d] = cz;
-    if (a === "nowa" && PROFIL.test(b || "")) t = { widok: "nowa", agent: b };
+    if (a === "nowa" && !b) t = { widok: "nowa" };
+    else if (a === "nowa" && PROFIL.test(b || "")) t = { widok: "nowa", agent: b };
     else if (a === "o" && ROZMOWCA.test(b || "")) t = { widok: "rozmowca", rozmowca: b };
     else if (a === "r" && WATEK.test(b || "")) {
       t = { widok: "watek", watek: b };
@@ -46,7 +47,7 @@ const Trasa = (() => {
     t = t || {};
     const e = encodeURIComponent;
     let s = "#/";
-    if (t.widok === "nowa" && t.agent) s += `nowa/${e(t.agent)}`;
+    if (t.widok === "nowa") s += t.agent ? `nowa/${e(t.agent)}` : "nowa";
     else if (t.widok === "rozmowca" && t.rozmowca) s += `o/${e(t.rozmowca).replace(/%3A/g, ":")}`;
     else if (t.widok === "watek" && t.watek) s += `r/${e(t.watek)}` + (t.pozycja ? `/m/${e(t.pozycja)}` : "");
     else if (t.widok === "sesja" && t.profil && t.sesja) s += `s/${e(t.profil)}/${e(t.sesja)}`;
