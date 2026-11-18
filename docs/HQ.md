@@ -22,10 +22,10 @@ Aplikacja (szczegóły: sekcja [2f](#2f-aplikacja-rozmowa-pasek-szuflada)):
 | Element | Skąd dane | Co pokazuje |
 |---|---|---|
 | Ekran startu (`#/`) | `GET /app` (właściciel z `USER.md`, gotowość), `GET /podpowiedzi` | robot Jarva (CRT) i powitanie po imieniu („Dzień dobry, Ania”, pod spodem firma); bez imienia w `USER.md` zamiast startu **pierwsze spotkanie** na całym ekranie (rozmowa bez modelu, głos Jarva, zapis do `USER.md`, mózg na miejscu, potem wątek „Pierwsza sesja”; `POST /app/poznanie`, `POST /app/glos`, `POST /app/klucz`, `POST /app/mozg/chatgpt`, `POST /app/pierwsza-sesja`). Jedno zdanie gotowości z najwyżej jednym przyciskiem, tylko gdy czegoś brakuje: **Podłącz** („Podłącz mózg, a zacznę pierwszą sesję.”; otwiera kartę mózgu pierwszego spotkania), **Poznajmy się** (otwiera pierwsze spotkanie po „Pomiń”), **Zacznij pierwszą sesję** (profil i mózg są, sesji jeszcze nie było; × = „Nie teraz”, `localStorage` `jarvo.pierwsza.odrzucona.v1`); brama, która wstaje, = „Jarvo się uruchamia…” bez czerwonego paska. Pole wiadomości zakłada nową rozmowę; pod nim najwyżej 4 rzeczy: **Czeka na Ciebie** (zgody, pytania zespołu, nieudana praca) i **Na początek** (startery tylko z połączonym modelem; × ukrywa, potem „Nie pokazuj tego więcej”) |
-| Pasek rozmów | `rozmowy.db` (`GET /rozmowy`) + strumień | **Nowa rozmowa**, szukaj, wątki w grupach (Przypięte, Dziś, Wczoraj, …), menu wiersza, Archiwum i Kosz; stopka: właściciel (Konto), kropka połączenia, odznaka **⬆ N** (dostępna aktualizacja), koło zębate (Ustawienia) |
+| Pasek rozmów | `rozmowy.db` (`GET /rozmowy`) + strumień | **Nowa rozmowa**, szukaj, wątki w grupach (Przypięte, Dziś, Wczoraj, …), menu wiersza, Archiwum i Kosz; nawigacja Aktualizacje, Mózg, **Ustawienia** (jedyne wejście do szuflady w pasku); stopka: stan połączenia słowem („● połączono”, bez połączenia „⚠ Łączę ponownie…”), odznaka **⬆ N** (dostępna aktualizacja) |
 | Rozmowa (`#/r/<wątek>`) | oś czasu wątku (`rozmowy.db` + `state.db` agentów) | wiadomości z Markdownem, żywy dymek pracy agenta (tekst na bieżąco, kroki, czas, **Zatrzymaj**), zgody z odliczaniem, karty plików (Podgląd, Pobierz, Kopiuj ścieżkę, Odpal), błąd z **Ponów**, znacznik „bezpośrednio” |
 | Pole wiadomości | wybór adresata, załączniki, szkic | „Do: Jarvo”; `@uchwyt` na początku albo lista **Do:** = tylko ta wiadomość wprost do agenta, potem znów Jarvo; zdjęcia (wklejenie, przeciągnięcie) i pliki; szkic na wątek |
-| Szuflada ustawień (koło zębate, Ctrl/⌘+,) | strony Hermesa w ramce, `GET/POST /update` | **Połączenia** (Klucze, Modele), **Wygląd** (motyw), **Konto** (język PL/EN także dla stron Hermesa, Wyloguj, klasyczny panel, skróty), **System › Aktualizacja** (bezpieczna aktualizacja: przy pracy agentów pytanie „Zaktualizuj, gdy skończą”), **Stara Baza** |
+| Szuflada ustawień (pozycja Ustawienia, Ctrl/⌘+,) | strony Hermesa w ramce, `GET/POST /update` | **Połączenia** (Klucze, Modele), **Wygląd** (motyw), **Konto** (język PL/EN także dla stron Hermesa, Wyloguj, klasyczny panel, skróty), **System › Aktualizacja** (bezpieczna aktualizacja: przy pracy agentów pytanie „Zaktualizuj, gdy skończą”), **Stara Baza** |
 | Paski stanu | strumień, `GET /app`, `GET /update` | „Łączę ponownie…”, aktualizacja w toku, awaria silnika, nieudane wczytanie z **Ponów**, „Nowa wersja Jarva” z **Odśwież**, kilka kart bez zamka |
 
 ### 1.1 Stara Baza
@@ -849,7 +849,10 @@ dashboardu, a każda trasa zapisu przechodzi ochronę CSRF (`ochrona.Trasa`, sek
   `pelny: true`. Członek, którego state.db nie da się przeczytać (zmieniony schemat Hermesa), wypada z osi
   z `niedostepni: [agent]` zamiast błędu całej osi.
 - **Obserwator plików** (`hq/plugin/obserwator.py`, co 1 s, co 0,5 s przy pracy): state.db członków (przedłużenie
-  rodowodu po kompresji z rotacją, nowe wiersze spoza naszej tury = `watek.os`, nieprzeczytane i podgląd, kompresja
+  rodowodu po kompresji z rotacją, nowe wiersze spoza naszej tury = `watek.os`; nieprzeczytane i podgląd tylko
+  o wiadomości agenta wśród nich: odpowiedź kończąca turę bez `tool_calls` i bez samej ciszy `[SILENT]` albo raport
+  rutyny, nigdy kroki narzędzi (`czytnik.wiadomosci_po`); rozmówca omp tak samo z pliku sesji
+  (`czytnik_omp.odpowiedzi`: tekst asystenta bez wywołań narzędzi, tury z panelu liczy koniec przebiegu), kompresja
   w miejscu), `agenci.json`, `update.json`; co minutę przypięcie sesji i `praca.json`, raz na dobę sprzątanie kosza
   (przypinanie i sprzątanie idą osobnym zadaniem, najwyżej jednym naraz: wolna brama nie wstrzymuje patrzenia na
   pliki).
@@ -995,7 +998,9 @@ innych kanałów etap 6.
 - **Pasek** (`30-pasek.js`): marka, **Nowa rozmowa**, szukaj (z opóźnieniem 250 ms, nowsze zapytanie wygrywa),
   lista wątków w grupach Przypięte, Dziś, Wczoraj, Ten tydzień, Wcześniej (`Czas.grupa`, granice dni w strefie
   przeglądarki), wiersz z ikoną źródła, tytułem i znakiem stanu (z tekstem dla czytnika), **Więcej** dla następnej
-  strony; stopka: właściciel (otwiera Konto), kropka połączenia (`polaczenie.*`), koło zębate (Ustawienia).
+  strony; nawigacja z pozycją Ustawienia (także bez rozmówców); stopka: stan połączenia słowem (`StanPolaczenia`,
+  `polaczenie.*`, tylko informacja) i odznaka aktualizacji, bez drugiego wejścia do Ustawień (na telefonie też bez
+  koła zębatego w nagłówku).
   Lista żyje ze strumienia: `watek.zmiana` wstawia, aktualizuje albo usuwa wiersz zależnie od filtra,
   `watek.usuniety` usuwa. Pokazuje tylko wątki aplikacji; wiersz idzie przez `WierszListy` (typ elementu), gotowy na
   jednolitą listę z sesjami innych kanałów (etap 6). Menu wiersza ⋯ (Zmień nazwę w miejscu, Przypnij/Odepnij,

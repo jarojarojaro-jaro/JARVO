@@ -39,7 +39,7 @@ const USTAWIENIA_DOMYSLNE = { motyw: "system", szczegoly: false, gestosc: "wygod
 function stanPoczatkowy() {
   return {
     gotowe: false, wersja: null, silnik: null,
-    agenci: {}, kolejnosc: [], wlasciciel: null, gotowosc: null,
+    agenci: {}, kolejnosc: [], gotowosc: null,
     rozmowcy: [],      // rozmówcy lewej kolumny (GET /app, rozmowcy.lista, rozmowca.stan) w stałej kolejności
     inne_otwarte: !!Pamiec.wez("jarvo.inne_rozmowy", false),   // „Inne rozmowy” rozwinięte (przy rozmówcach)
     dostep: null,      // panel w sieci (GET /app, Ustawienia › Dostęp)

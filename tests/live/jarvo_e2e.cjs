@@ -2162,7 +2162,7 @@ async function etap3(browser) {
   });
 
   await krok("5", "szuflada: Połączenia (Klucze, Modele w ramce bez menu Hermesa), Wygląd, Konto (język PL/EN także dla stron Hermesa, wylogowanie, klasyczny panel), System › Aktualizacja, Stara Baza na cały ekran; Esc oddaje fokus", async () => {
-    const zebatka = ".j-stopka .j-btn[aria-label]";
+    const zebatka = '.j-pasek .j-nawig a[href="#/ustawienia"]';
     const szuflada = "[data-region=ustawienia]";
     const sekcja = async (id) => {
       await page.click(`${szuflada} [data-sekcja="${id}"]`);
@@ -2241,7 +2241,7 @@ async function etap3(browser) {
     await page.waitForSelector(szuflada, { timeout: 5000 });
     await page.keyboard.press("Escape");
     await page.waitForSelector(szuflada, { state: "detached", timeout: 5000 });
-    const fokus = await korzen(() => document.activeElement && document.activeElement.closest(".j-stopka") && document.activeElement.getAttribute("aria-label"));
+    const fokus = await korzen(() => document.activeElement && document.activeElement.closest(".j-nawig") && document.activeElement.textContent.trim());
     musi(JSON.stringify(sekcje) === JSON.stringify(["rozmowcy", "model", "telegram", "powiadomienia", "dostep", "wyglad", "jezyk", "zespol", "system", "stara-baza"]), `sekcje: ${sekcje}`);
     musi(!!fokus, `fokus po Esc: ${fokus}`);
     return { sekcje, ramki, motywy: [jasny, ciemny, system], jezyk: { aplikacja: poAngielsku, hermes: hermesEn.locale }, konto,
@@ -2318,12 +2318,15 @@ async function etap3(browser) {
     const wysuniety = await korzen(() => getComputedStyle(document.querySelector(".j-pasek")).visibility);
     await page.click(".j-zamknij-pasek");
     await page.waitForSelector(".j-uklad:not(.is-wysuniety)", { timeout: 3000 });
-    // w wątku telefon ma Ustawienia w menu ⋯ nagłówka (mniej ikon), na starcie koło zębate
+    // w wątku telefon ma Ustawienia w menu ⋯ nagłówka, poza wątkiem jedną pozycję „Ustawienia” w wysuwanym pasku
     const wWatku = await page.locator(".j-gora.is-watek").count() > 0;
     if (wWatku) {
       await page.click(".j-gora [aria-haspopup=menu]");
       await page.locator(".j-menu [role=menuitem]", { hasText: "Ustawienia" }).click();
-    } else await page.click(".j-gora-ust");
+    } else {
+      await page.click(".j-menu-btn");
+      await page.click('.j-pasek .j-nawig a[href="#/ustawienia"]');
+    }
     const widok = () => page.getAttribute("[data-region=ustawienia]", "data-widok");
     await page.waitForSelector("[data-region=ustawienia]", { timeout: 3000 });
     const w1 = await widok();

@@ -386,3 +386,36 @@ def test_pliki_bez_logowania_bez_adresu_file():
     assert "zTokenem() ? new ZrodloFetch(url) : new EventSource(url)" in strumien
     assert "headers: authHeaders() })).status" in strumien
     assert 'bezLogowania()\n        ? html`<${Wiersz} ikona="logout" tytul=${T("szuflada.bez_logowania")}' in _tekst("62-ustawienia.js")
+
+
+def test_stopka_paska_bez_drugiego_wejscia_do_ustawien():
+    """Uwaga właściciela 18.11 („JARO” z kropką i zębatką obok pozycji Ustawienia to masło maślane): stopka paska
+    nie ma żadnego przycisku, tylko stan połączenia słowem (role=status) i odznakę aktualizacji; Ustawienia są jedną
+    pozycją nawigacji, także bez rozmówców."""
+    t = _tekst("30-pasek.js")
+    stopka = t.split("function StopkaPaska()", 1)[1].split("\nfunction ", 1)[0]
+    stan = t.split("function StanPolaczenia(", 1)[1].split("\nfunction ", 1)[0]
+    assert "<button" not in stopka + stan and "Przycisk" not in stopka + stan and "j-ja" not in stopka
+    assert "<${StanPolaczenia}/>" in stopka and 'role="status"' in stan and 'T("polaczenie.krotko")' in stan
+    assert "${!saRozmowcy && html`<${NawigacjaCentrum} trasa=${trasa}/>`}" in t
+    assert '["ustawienia", "⚙", T("pasek.ustawienia"), "Mod+,"]' in t
+    assert 'ikona="gear"' not in _tekst("90-app.js") and "j-gora-ust" not in _tekst("90-app.js")   # telefon też
+
+
+def test_komponenty_bez_hookow_po_wczesnym_returnie():
+    """Hook po wczesnym `return` zmienia liczbę hooków między renderami (React #300): błąd ładowania wątku
+    (`if (blad) return …` przed `useMemo` w Watek) gasił cały panel. Żaden komponent nie woła hooka po takim returnie."""
+    hook = re.compile(r"^  (?:const [^=]+= |let [^=]+= )?(?:React\.)?use[A-Z]\w*\(")
+    zle = []
+    for plik in sorted(SRC.glob("*.js")):
+        for m in re.finditer(r"^function ([A-Z]\w*)\(.*?\n}\n", plik.read_text(encoding="utf-8"), re.S | re.M):
+            linie = m.group(0).splitlines()
+            wczesny = False
+            for i, linia in enumerate(linie[1:], 1):
+                if not wczesny:
+                    wczesny = bool(re.match(r"^  if \(.*\) return\b", linia) or (re.match(r"^  if \(.*\{$", linia)
+                                   and i + 1 < len(linie) and re.match(r"^    return\b", linie[i + 1])))
+                elif hook.match(linia):
+                    zle.append(f"{plik.name}:{m.group(1)}: {linia.strip()[:60]}")
+                    break
+    assert not zle, zle

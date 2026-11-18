@@ -236,7 +236,7 @@ sudo systemctl start jarvo-updater
 4. **Aplikacja Jarvo:** `http://<ip-tailscale>:9119/jarvo` (zakładka **Jarvo**, pierwsza w menu, nad CHAT; adres `/` prowadzi tam sam; obok **Wiedza** z grafem skarbca: po wdrożeniu
    widać huby 9 agentów), login `jarvo` + `DASHBOARD_PASSWORD`
    z `compose/.env`. To aplikacja czatu: ekran startu (powitanie, jedno zdanie gotowości, gdy brakuje modelu albo profilu
-   właściciela), rozmowy z Jarvem i agentami, ustawienia w szufladzie (koło zębate); budynek floty z pokojami agentów,
+   właściciela), rozmowy z Jarvem i agentami, ustawienia w szufladzie (pozycja **Ustawienia** w pasku); budynek floty z pokojami agentów,
    decyzjami i misjami jest w **Ustawienia › Stara Baza** ([HQ.md](HQ.md)). Na `/jarvo` menu Hermesa jest schowane;
    pozostałe strony dashboardu (sesje, cron, logi, konfiguracja) otwiera **Ustawienia › Konto › Klasyczny panel**.
    Kontrola: `/api/plugins/jarvo-hq/health` po zalogowaniu pokazuje klucze API profili i dostępność gatewaya.

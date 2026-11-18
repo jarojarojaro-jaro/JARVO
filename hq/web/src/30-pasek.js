@@ -1,6 +1,6 @@
 // Pasek boczny (docs/HQ.md „Aplikacja”, makieta V2 · Spokojny): marka, Nowa rozmowa, Szukaj, lista wątków
-// w grupach (Przypięte, Dziś, Wczoraj, Ten tydzień, Wcześniej), Archiwum i Kosz pod „⋯” obok Szukaj, stopka
-// (właściciel, kropka połączenia otwierająca System, ustawienia). Wiersz: ikona źródła, tytuł w jednej linii, znak stanu (● czeka na Ciebie, ◌ pracuje, ⚠ błąd) z tekstem
+// w grupach (Przypięte, Dziś, Wczoraj, Ten tydzień, Wcześniej), Archiwum i Kosz pod „⋯” obok Szukaj, nawigacja
+// (Aktualizacje, Mózg, Ustawienia), stopka (odznaka aktualizacji, stan połączenia słowem). Wiersz: ikona źródła, tytuł w jednej linii, znak stanu (● czeka na Ciebie, ◌ pracuje, ⚠ błąd) z tekstem
 // dla czytnika i menu ⋯ (Zmień nazwę, Przypnij, Archiwizuj, Usuń; w koszu Przywróć i Usuń na zawsze), widoczne po
 // najechaniu, na dotyku zawsze, też długim przytrzymaniem (500 ms) i prawym przyciskiem. Długa lista (> 120 wierszy)
 // rysuje tylko widoczne wiersze. Wiersz idzie przez WierszListy (typ elementu), gotowy na jednolitą listę z sesjami.
@@ -198,11 +198,10 @@ function NawigacjaCentrum({ trasa }) {
 // Ekran 1 telefonu (centrum §2.2): duże wiersze rozmówców, pod nimi Aktualizacje, Mózg, Ustawienia i Inne rozmowy
 function EkranRozmowcow() {
   const ile = useSklep((s) => s.lista.porzadek.length);
-  const stan = useSklep((s) => s.strumien.stan);
   const trasa = useTrasa();
   return html`<section class="j-ekran-rozm" aria-labelledby="j-ekran-rozm-t">
     <h1 class="j-sr" id="j-ekran-rozm-t">${T("rozm.sekcja")}</h1>
-    <p class="j-ekran-rozm-st"><span class=${cx("j-zdrowie-kropka", `is-${stan}`)}></span>${T(`polaczenie.${stan}`)}</p>
+    <${StanPolaczenia} klasa="j-ekran-rozm-st"/>
     <${ListaRozmowcow} trasa=${trasa} duza=${true}/>
     <ul class="j-nawig is-duza">
       <${PozycjaAktualizacji} trasa=${trasa}/>
@@ -251,20 +250,21 @@ function usePowiadomieniaRozmowcow() {
 }
 const STANY_POWIADOMIEN = {};
 
-function StopkaPaska() {
-  const wlasciciel = useSklep((s) => s.wlasciciel);
+// Stan połączenia słowem (stopka paska, ekran rozmówców na telefonie): cichy „● połączono”, a bez połączenia
+// ostrzeżenie (⚠ Łączę ponownie…); tylko informacja, nie przycisk
+function StanPolaczenia({ klasa }) {
   const stan = useSklep((s) => s.strumien.stan);
-  const imie = wlasciciel && wlasciciel.imie;
-  const otworz = (sekcja) => Trasa.idz({ widok: "ustawienia", sekcja });
-  // bez imienia z USER.md: ikona osoby zamiast litery „T” od „Ty”
+  const ok = stan === "ok";
+  return html`<p class=${cx("j-zdrowie", `is-${stan}`, klasa)} data-stan=${stan} role="status">
+    <i aria-hidden="true">${ok ? "" : "⚠"}</i><span>${ok ? T("polaczenie.krotko") : T(`polaczenie.${stan}`)}</span></p>`;
+}
+
+// Stopka paska: bez drugiego wejścia do Ustawień (jest pozycja „Ustawienia” w nawigacji, ⌘,), tylko stan połączenia
+// i odznaka aktualizacji
+function StopkaPaska() {
   return html`<div class="j-stopka">
-    <button type="button" class="j-ja" onClick=${() => otworz("jezyk")}>
-      <span class="j-ja-av" aria-hidden="true">${imie ? imie.slice(0, 1).toUpperCase() : html`<${Ikona} n="user" r=${14}/>`}</span>
-      <span class="j-ja-n">${imie || T("pasek.ty")}</span></button>
-    <${OdznakaAktualizacji} otworz=${otworz}/>
-    <button type="button" class=${cx("j-zdrowie", "j-ma-tip", `is-${stan}`)} data-stan=${stan} aria-label=${T(`polaczenie.${stan}`)}
-      onClick=${() => otworz("system")}><i></i><${Podpowiedz} tekst=${T(`polaczenie.${stan}`)}/></button>
-    <${Przycisk} rodzaj="cichy" ikona="gear" etykieta=${T("pasek.ustawienia")} onClick=${() => otworz(undefined)}/>
+    <${StanPolaczenia}/>
+    <${OdznakaAktualizacji} otworz=${(sekcja) => Trasa.idz({ widok: "ustawienia", sekcja })}/>
   </div>`;
 }
 
@@ -354,6 +354,7 @@ function Pasek({ trasa, warstwa = false }) {
         onClick=${() => akcje.wczytajListe({ dopisz: true })}>${T("pasek.wiecej")}</button>`}
     </div>
     </div>`}
+    ${!saRozmowcy && html`<${NawigacjaCentrum} trasa=${trasa}/>`}
     <${StopkaPaska}/>
     ${menu && html`<${Menu} kotwica=${menu.kotwica} etykieta=${menu.w.tytul || T("watek.bez_tytulu")} onZamknij=${() => setMenu(null)}
       pozycje=${pozycjeMenuWatku(menu.w, { onZmienNazwe: () => setEdycja(menu.w.id) })}/>`}

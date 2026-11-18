@@ -140,8 +140,6 @@ function Gora({ trasa }) {
     ${wWatku && watek && watek.usuniety_at && html`<span class="j-tag">${T("watek.w_koszu_tag")}</span>`}
     <span class="j-rozpych"></span>
     ${wWatku && watek && html`<${MenuWatku} watek=${watek} onZmienNazwe=${() => setEdycja(true)}/>`}
-    ${trasa.widok !== "ustawienia" && html`<${Przycisk} rodzaj="cichy" ikona="gear" etykieta=${T("pasek.ustawienia")} klasa="j-gora-ust"
-      onClick=${() => Trasa.idz({ widok: "ustawienia" })}/>`}
   </header>`;
 }
 

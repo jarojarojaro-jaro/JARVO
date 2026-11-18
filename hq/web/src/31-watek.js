@@ -173,13 +173,14 @@ function Watek({ id, panel = 0, rozmowca = null }) {
     akcje.doKompozytora(id, { pliki: [...e.dataTransfer.files], fokus: true });
   };
 
+  // ctx stały między renderami (ElementOsi jest memo): nowy tylko przy zmianie wątku, ustawień albo języka; liczony
+  // przed wczesnym returnem błędu (inaczej błąd ładowania wątku zmienia liczbę hooków i React gasi cały panel)
+  const pl = isPL();
+  const ctx = useMemo(() => ({ watek: id, k: id, koordynator, szczegoly, panel, pl, rozmowca }), [id, koordynator, szczegoly, panel, pl, rozmowca]);
   if (blad) {
     return html`<${Pusto} ikona="alert" tytul=${blad.status === 404 ? T("watek.brak") : blad.tekst ? blad.tekst() : String(blad)}>
       <a class="j-link" href="#/">${T("watek.do_startu")}</a></${Pusto}>`;
   }
-  // ctx stały między renderami (ElementOsi jest memo): nowy tylko przy zmianie wątku, ustawień albo języka
-  const pl = isPL();
-  const ctx = useMemo(() => ({ watek: id, k: id, koordynator, szczegoly, panel, pl, rozmowca }), [id, koordynator, szczegoly, panel, pl, rozmowca]);
   const wKoszu = !!(watek && watek.usuniety_at);
   return html`<div class=${cx("j-watek", nad && "is-nad")} onDragOver=${(e) => { if (zPlikami(e)) { e.preventDefault(); setNad(true); } }}
       onDragLeave=${(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setNad(false); }} onDrop=${upusc}>

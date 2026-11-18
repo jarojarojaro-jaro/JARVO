@@ -1170,7 +1170,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-glowna { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; background: var(--j-tlo); }
 .j-gora { height: 56px; display: flex; align-items: center; gap: 10px; padding: 0 14px 0 22px; flex: none; }
 .j-gora-t { font: 600 15px/1.3 var(--j-font-ui) !important; letter-spacing: -.005em !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.j-uklad .j-menu-btn, .j-uklad .j-gora-ust, .j-uklad .j-zamknij-pasek, .jarvo-app .j-na-telefonie { display: none; }
+.j-uklad .j-menu-btn, .j-uklad .j-zamknij-pasek, .jarvo-app .j-na-telefonie { display: none; }
 .j-uklad.is-zwiniety .j-menu-btn { display: inline-grid; }
 
 /* ---- pasek boczny */
@@ -1198,23 +1198,17 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-wiersz-st { display: grid; place-items: center; min-width: 16px; }
 .j-pasek-pusto { font-size: 13px; color: var(--j-tekst-3); padding: 14px 10px; line-height: 1.5; display: grid; gap: 8px; justify-items: start; }
 .j-wiecej { margin: 8px 8px 0; }
-.j-stopka { display: flex; align-items: center; gap: 2px; padding: 8px 0 10px; border-top: 1px solid var(--j-linia); flex: none; }
-.j-ja { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 10px 0 6px; border-radius: 10px; --j-r: 10px; flex: 1; min-width: 0; font-size: 14px; font-weight: 550; }
-.j-ja:hover { background: var(--j-tlo-hover); }
-.j-ja-av { width: 28px; height: 28px; border-radius: 8px; background: var(--j-papier); color: var(--j-papier-tekst); display: grid; place-items: center;
-  font-weight: 650; font-size: 13px; flex: none; border: 1px solid var(--j-papier-linia); }
-.j-ja-n { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.j-stopka { display: flex; align-items: center; gap: 8px; min-height: 40px; margin-top: auto; padding: 6px 12px 8px; border-top: 1px solid var(--j-linia); flex: none; }
 .j-odznaka { position: relative; display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 9px; border-radius: 999px; --j-r: 999px; flex: none;
   font-size: 12.5px; font-weight: 600; color: var(--j-uwaga); background: var(--j-uwaga-tlo); border: 1px solid var(--j-uwaga-linia); margin-right: 2px; }
 .j-odznaka.is-zle { color: var(--j-blad); background: var(--j-blad-tlo); border-color: color-mix(in srgb, var(--j-blad) 40%, transparent); }
 .j-odznaka:hover { border-color: var(--j-uwaga); }
-.j-odznaka .j-tip { left: auto; right: -40px; transform: none; }
-.j-zdrowie { position: relative; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; flex: none; }
-.j-zdrowie:hover { background: var(--j-tlo-hover); }
-.j-zdrowie i { width: 8px; height: 8px; border-radius: 50%; background: var(--j-tekst-3); }
-.j-zdrowie.is-ok i { background: var(--j-ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--j-ok) 22%, transparent); }
-.j-zdrowie.is-przerwany i { background: var(--j-uwaga); box-shadow: 0 0 0 3px color-mix(in srgb, var(--j-uwaga) 24%, transparent); }
-.j-zdrowie .j-tip { left: auto; right: -36px; transform: none; }
+.j-odznaka .j-tip { left: auto; right: 0; transform: none; }
+.j-zdrowie { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; margin: 0; font-size: 12px; color: var(--j-tekst-3); }
+.j-zdrowie span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.j-zdrowie i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--j-ok); font-style: normal; }
+.j-zdrowie:not(.is-ok) { color: var(--j-uwaga); font-weight: 600; }
+.j-zdrowie:not(.is-ok) i { width: auto; height: auto; border-radius: 0; background: none; line-height: 1; }
 
 /* ---- prymitywy */
 .j-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 34px; padding: 0 13px; border-radius: 9px; --j-r: 9px;
@@ -1921,9 +1915,8 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
     transition: transform .22s var(--j-ease), visibility 0s .22s; box-shadow: var(--j-cien-2); }
   .j-uklad.is-wysuniety .j-pasek { transform: none; visibility: visible; transition: transform .22s var(--j-ease); }
   .j-uklad.is-wysuniety .j-zaslona-paska { display: block; position: absolute; inset: 0; z-index: 30; background: var(--j-zaslona); }
-  .j-uklad .j-menu-btn, .j-uklad .j-gora-ust, .j-uklad .j-zamknij-pasek { display: inline-grid; }
+  .j-uklad .j-menu-btn, .j-uklad .j-zamknij-pasek { display: inline-grid; }
   .j-uklad .j-zwin { display: none; }
-  .j-uklad .j-gora.is-watek .j-gora-ust { display: none; }   /* w wątku Ustawienia są w menu ⋯ */
   .j-gora { padding-left: 8px; }
 }
 @container app (max-width: 639px) {
@@ -1958,7 +1951,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   .j-got-w .j-btn { height: 40px; }
   .j-podp-x { width: 40px; height: 40px; opacity: 1; }
   .j-odznaka { height: 32px; }
-  .j-btn-cichy.is-ikona, .j-zdrowie { width: 40px; height: 40px; }
+  .j-btn-cichy.is-ikona { width: 40px; height: 40px; }
   .j-wiersz-w { min-height: 44px; }
   .j-szukaj { height: 44px; }
   .j-wiersz-m { width: 40px; height: 40px; }
@@ -2015,7 +2008,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-nawig small, .j-nawig kbd { color: var(--j-tekst-3); font-size: 11px; }
 .j-ekran-rozm { display: flex; flex-direction: column; min-height: 100%; padding-bottom: 8px; }
 .j-ekran-rozm-t { margin: 0; padding: 10px 16px 6px; font: 15px var(--j-font-mono); letter-spacing: .12em; color: var(--j-tekst-3); }
-.j-ekran-rozm-st { font-size: 11px; color: var(--j-tekst-3); }
+.j-ekran-rozm-st { flex: none; padding: 4px 16px; }
 .j-dok-rozm { display: flex; justify-content: space-around; border-top: 1px solid var(--j-linia); padding: 6px 0 calc(10px + env(safe-area-inset-bottom)); background: var(--j-tlo-2); }
 .j-dok-rozm a { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 56px; min-height: 44px; font-size: 10px; color: var(--j-tekst-3); text-decoration: none; }
 .j-dok-rozm a[aria-current="page"] { color: var(--j-tekst); }
@@ -2035,9 +2028,6 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-gora-rozm { min-width: 0; }
 .j-gora-opis { margin: 0; font-size: 11.5px; color: var(--j-tekst-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .j-wstecz { display: grid; place-items: center; min-width: 44px; min-height: 44px; color: var(--j-tekst); }
-.j-zdrowie-kropka { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--j-tekst-3); }
-.j-zdrowie-kropka.is-ok { background: var(--j-ok); }
-.j-zdrowie-kropka.is-przerwany { background: var(--j-uwaga); }
 
 /* === Ustawienia (UiUstawienia) === */
 /* palety Fosforu (branding/fosfor/palettes.yaml): jeden kolor --j-fosfor liczy resztę --j-*; „jarvo” = tokeny domyślne */

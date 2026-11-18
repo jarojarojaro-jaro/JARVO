@@ -81,7 +81,7 @@ const akcje = {
       if (a.katalog_danych) Sciezki.ustaw(a.katalog_danych);      // ścieżki floty w tekście (07-sciezki.js)
       akcje.ustawRozmowcow(a.rozmowcy);
       akcje.ustawAgentow(a.agenci);
-      sklep.ustaw((s) => ({ ...s, wlasciciel: a.wlasciciel || null, gotowosc: a.gotowosc || null,
+      sklep.ustaw((s) => ({ ...s, gotowosc: a.gotowosc || null,
         aktualizacja: a.aktualizacja || null, decyzje: { liczba: a.decyzje || 0 }, funkcje: a.funkcje || {},
         wersja: a.wersja || null, blad_aplikacji: false, dostep: a.dostep || null,
         raporty: { ...s.raporty, nieprzeczytane: (a.raporty && a.raporty.nieprzeczytane) || 0 } }));

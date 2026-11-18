@@ -194,7 +194,7 @@ test("plytko", () => {
 test("stanPoczatkowy: kształt sklepu", () => {
   eq(Object.keys(stanPoczatkowy()).sort(), ["adresaci", "agenci", "aktualizacja", "blad_aplikacji", "decyzje", "dostep", "funkcje", "gotowe",
     "gotowosc", "inne_otwarte", "karty", "kolejnosc", "lista", "os", "pasek", "podglad", "podpowiedzi", "podzial", "poznanie", "przebiegi", "pytanie", "raporty", "rozmowcy", "silnik",
-    "stara_baza", "strumien", "szkice", "toasty", "ustawienia", "watki", "wersja", "wlasciciel", "wysylane"]);
+    "stara_baza", "strumien", "szkice", "toasty", "ustawienia", "watki", "wersja", "wysylane"]);
   eq(stanPoczatkowy().lista.filtr, "rozmowy");
   eq(stanPoczatkowy().ustawienia.motyw, "system");
 });
