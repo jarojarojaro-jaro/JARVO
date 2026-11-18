@@ -423,7 +423,7 @@ def test_komponenty_bez_hookow_po_wczesnym_returnie():
 
 def test_nowa_rozmowa_na_gorze_paska():
     """Uwaga właściciela 18.11 („Nowa rozmowa na samym dole jest nieintuicyjna”): „+ Nowa rozmowa” stoi pod marką,
-    nad ROZMÓWCAMI (⌘N, #/nowa = start z wyborem „Do:”), na telefonie na górze listy rozmówców; na dole przy
+    nad ROZMÓWCAMI (⌘⇧O, #/nowa = start z wyborem „Do:”), na telefonie na górze listy rozmówców; na dole przy
     „Inne rozmowy” drugiego wejścia już nie ma."""
     t = _tekst("30-pasek.js")
     pasek = t.split("function Pasek(", 1)[1]
@@ -432,5 +432,6 @@ def test_nowa_rozmowa_na_gorze_paska():
     ekran = t.split("function EkranRozmowcow(", 1)[1].split("\nfunction ", 1)[0]
     assert ekran.index("<${NowaRozmowa}") < ekran.index("<${ListaRozmowcow}")
     app = _tekst("90-app.js")
-    assert 'Skroty.dodaj({ komb: "Mod+N", opis: "skroty.nowa", akcja: nowa })' in app
+    assert 'Skroty.dodaj({ komb: "Mod+Shift+O", opis: "skroty.nowa", akcja: nowa })' in app
     assert 'Trasa.idz({ widok: "nowa" })' in app
+    assert "Mod+N" not in app + t

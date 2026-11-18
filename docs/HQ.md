@@ -995,7 +995,7 @@ innych kanałów etap 6.
   640 px szuflada zajmuje cały ekran: lista sekcji, potem sekcja z **Wróć**; cele dotyku ≥ 40 px. Pod szufladą
   i Starą Bazą układ dostaje `inert` (Tab i czytnik zostają w warstwie), a zamknięta warstwa oddaje fokus temu,
   co ją otworzyło.
-- **Pasek** (`30-pasek.js`): marka, pod nią **+ Nowa rozmowa** (akcent, ⌘N, `#/nowa`; nad ROZMÓWCAMI, na telefonie na górze ekranu rozmówców; jedyne wejście, przy „Inne rozmowy” go nie ma), szukaj (z opóźnieniem 250 ms, nowsze zapytanie wygrywa),
+- **Pasek** (`30-pasek.js`): marka, pod nią **+ Nowa rozmowa** (akcent, Ctrl/⌘+Shift+O, `#/nowa`; nad ROZMÓWCAMI, na telefonie na górze ekranu rozmówców; jedyne wejście, przy „Inne rozmowy” go nie ma), szukaj (z opóźnieniem 250 ms, nowsze zapytanie wygrywa),
   lista wątków w grupach Przypięte, Dziś, Wczoraj, Ten tydzień, Wcześniej (`Czas.grupa`, granice dni w strefie
   przeglądarki), wiersz z ikoną źródła, tytułem i znakiem stanu (z tekstem dla czytnika), **Więcej** dla następnej
   strony; nawigacja z pozycją Ustawienia (także bez rozmówców); stopka: stan połączenia słowem (`StanPolaczenia`,
@@ -1256,7 +1256,7 @@ innych kanałów etap 6.
 - **Język** (`04-i18n.js`): `T(klucz, {n, …})` ze słownika PL i EN (325 kluczy w każdym), liczba mnoga po polsku
   (`one`, `few`, `many`, `other`) i angielsku (`one`, `other`), język z Hermesa (`useI18n`), nazwy agentów bez odmiany
   w szablonach. `validate.py` sprawdza, że oba słowniki mają te same klucze i komplet form.
-- **Skróty** (`05-skroty.js`, lista w Konto): Ctrl/⌘+N nowa rozmowa (karta przeglądarki zostawia je sobie, więc działa też Ctrl/⌘+Shift+O), Ctrl/⌘+Shift+S pasek, Ctrl/⌘+,
+- **Skróty** (`05-skroty.js`, lista w Konto): Ctrl/⌘+Shift+O nowa rozmowa, Ctrl/⌘+Shift+S pasek, Ctrl/⌘+,
   ustawienia, Ctrl/⌘+/ skróty, Alt+↑/↓ poprzedni i następny wątek, F6 i Shift+F6 między regionami (pasek, główna,
   szuflada), `/` do pola wiadomości (bez kompozytora na ekranie: szukaj). W polach tekstowych działają tylko skróty
   z Ctrl/⌘ albo Alt i F6.

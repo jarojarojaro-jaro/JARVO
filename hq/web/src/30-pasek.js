@@ -195,12 +195,12 @@ function NawigacjaCentrum({ trasa }) {
       <kbd class="j-rozm-skrot" aria-hidden="true">${Skroty.opis(komb)}</kbd></a></li>`)}</ul>`;
 }
 
-// „+ Nowa rozmowa” na samej górze (nad rozmówcami, ⌘N): otwiera start z kompozytorem i wyborem „Do:” (domyślnie Jarvo)
+// „+ Nowa rozmowa” na samej górze (nad rozmówcami, ⌘⇧O): otwiera start z kompozytorem i wyborem „Do:” (domyślnie Jarvo)
 function NowaRozmowa({ fokus = false, duza = false }) {
   return html`<a class=${cx("j-nowa", duza && "is-duza")} href="#/nowa" data-nowa data-fokus=${fokus ? "" : undefined}
-      aria-keyshortcuts="Meta+N Control+N" onClick=${() => Fokus.odloz("kompozytor")}>
+      aria-keyshortcuts="Meta+Shift+O Control+Shift+O" onClick=${() => Fokus.odloz("kompozytor")}>
     <span class="j-nowa-plus" aria-hidden="true">+</span><span class="j-nowa-t">${T("pasek.nowa")}</span>
-    ${!duza && html`<kbd class="j-nowa-skrot" aria-hidden="true">${Skroty.opis("Mod+N")}</kbd>`}</a>`;
+    ${!duza && html`<kbd class="j-nowa-skrot" aria-hidden="true">${Skroty.opis("Mod+Shift+O")}</kbd>`}</a>`;
 }
 
 // Ekran 1 telefonu (centrum §2.2): duże wiersze rozmówców, pod nimi Aktualizacje, Mózg, Ustawienia i Inne rozmowy
