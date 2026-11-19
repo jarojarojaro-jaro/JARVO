@@ -376,16 +376,19 @@ Object.assign(liveApi, {
 const api = window.JARVO_HQ_MOCK || liveApi;
 
 // Obiekt URL dla podglądu pliku (pobierany z autoryzacją, więc działa w każdym trybie logowania).
+// adres bloba pliku floty: null = wczytuję, false = nie da się wczytać (np. plik spoza katalogów floty: 19.11 klatka
+// z `cache/scratch` wisiała w czacie jako pusta karta bez słowa, dlaczego)
 function useBlobUrl(path) {
   const [url, setUrl] = useState(null);
   useEffect(() => {
     if (!path) return undefined;
     let alive = true, made = null;
+    setUrl(null);
     api.fileBlob(path).then((b) => {
       if (!alive) return;
       made = URL.createObjectURL(b);
       setUrl(made);
-    }).catch(() => alive && setUrl(null));
+    }).catch(() => alive && setUrl(false));
     return () => { alive = false; if (made) URL.revokeObjectURL(made); };
   }, [path]);
   return url;

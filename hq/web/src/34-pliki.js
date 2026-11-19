@@ -32,11 +32,9 @@ function ObrazPliku({ sciezka, alt }) {
 
 const IKONA_RODZAJU = { image: "palette", video: "play", audio: "mic", pdf: "book", text: "book", html: "globe", archive: "folder", doc: "book", other: "clip" };
 
-function MiniaturaPliku({ plik }) {
-  const obraz = plik.kind === "image";
-  const src = useObrazPliku(obraz ? plik.path : null);
-  if (obraz && src) return html`<span class="j-plik-mini is-obraz"><img src=${src} alt="" loading="lazy"/></span>`;
-  return html`<span class=${cx("j-plik-mini", `is-${plik.kind}`)}><${Ikona} n=${IKONA_RODZAJU[plik.kind] || "clip"} r=${20}/></span>`;
+function MiniaturaPliku({ plik, src }) {
+  if (plik.kind === "image" && src) return html`<span class="j-plik-mini is-obraz"><img src=${src} alt="" loading="lazy"/></span>`;
+  return html`<span class=${cx("j-plik-mini", `is-${plik.kind}`, src === false && "is-brak")}><${Ikona} n=${src === false ? "x" : IKONA_RODZAJU[plik.kind] || "clip"} r=${20}/></span>`;
 }
 
 // akcje pliku jako lista (menu karty i stopka podglądu); `uwaga` pokazuje wynik (skopiowano, błąd)
@@ -76,14 +74,16 @@ function KartaPliku({ plik, kompakt = false }) {
   const host = useHost();
   const [menu, setMenu] = useState(null);
   const [uwaga, pokazUwage] = useUwaga();
+  const src = useObrazPliku(plik && plik.kind === "image" ? plik.path : null);
   if (!plik || !plik.path) return null;
   const pozycje = akcjePliku(plik, host, pokazUwage);
   const glowna = pozycje.find((x) => x.id === (plik.kind === "html" ? "odpal" : "pobierz"));
-  const opis = [T(`plik.r_${plik.kind || "other"}`), plik.size != null ? bytes(plik.size) : null].filter(Boolean).join(" · ");
-  return html`<div class=${cx("j-plik", kompakt && "is-kompakt", plik.kind === "image" && !kompakt && "is-obraz")} data-plik=${plik.path}>
+  const opis = src === false ? T("plik.nie_wczytano")
+    : [T(`plik.r_${plik.kind || "other"}`), plik.size != null ? bytes(plik.size) : null].filter(Boolean).join(" · ");
+  return html`<div class=${cx("j-plik", kompakt && "is-kompakt", plik.kind === "image" && !kompakt && src !== false && "is-obraz")} data-plik=${plik.path}>
     <button type="button" class="j-plik-otworz" onClick=${() => akcje.podglad(plik)} title=${plik.path}
       aria-label=${T("plik.otworz", { nazwa: plik.name })}>
-      <${MiniaturaPliku} plik=${plik}/>
+      <${MiniaturaPliku} plik=${plik} src=${src}/>
       <span class="j-plik-t"><span class="j-plik-n">${plik.name}</span><span class="j-plik-o">${opis}</span></span>
     </button>
     <span class="j-plik-akcje">
@@ -124,9 +124,9 @@ function OknoPodgladu({ plik }) {
     ${pozycje.map((x, i) => html`<${Przycisk} key=${x.id} rodzaj=${i === 0 ? "mocny" : "zwykly"} maly ikona=${x.ikona} onClick=${x.akcja}>${x.tekst}</${Przycisk}>`)}
     ${uwaga && html`<span class=${cx("j-plik-uwaga", uwaga.zle && "is-zle")} role="status">${uwaga.tekst}</span>`}</div>`;
   let tresc;
-  if (plik.kind === "image") tresc = src ? html`<img class="j-podglad-obraz" src=${src} alt=${plik.name}/>` : html`<${Spinner}/>`;
-  else if (plik.kind === "video") tresc = blob ? html`<video class="j-podglad-obraz" src=${blob} controls playsinline></video>` : html`<${Spinner}/>`;
-  else if (plik.kind === "audio") tresc = blob ? html`<audio class="j-podglad-audio" src=${blob} controls></audio>` : html`<${Spinner}/>`;
+  if (plik.kind === "image") tresc = src ? html`<img class="j-podglad-obraz" src=${src} alt=${plik.name}/>` : src === false ? html`<p class="j-podglad-uwaga">${T("plik.nie_wczytano")}</p>` : html`<${Spinner}/>`;
+  else if (plik.kind === "video") tresc = blob ? html`<video class="j-podglad-obraz" src=${blob} controls playsinline></video>` : blob === false ? html`<p class="j-podglad-uwaga">${T("plik.nie_wczytano")}</p>` : html`<${Spinner}/>`;
+  else if (plik.kind === "audio") tresc = blob ? html`<audio class="j-podglad-audio" src=${blob} controls></audio>` : blob === false ? html`<p class="j-podglad-uwaga">${T("plik.nie_wczytano")}</p>` : html`<${Spinner}/>`;
   else if (plik.kind === "pdf") {
     // /file (to samo pochodzenie co panel) tylko w <iframe sandbox>; link podglądu :9120 to inne pochodzenie z CSP
     // sandbox z serwera, więc ramka bez atrybutu sandbox (z nim Chrome blokuje przeglądarkę PDF w każdej ramce)

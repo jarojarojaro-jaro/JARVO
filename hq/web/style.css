@@ -1796,6 +1796,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-plik-otworz:hover .j-plik-n { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--j-linia-mocna); }
 .j-plik-mini { width: 40px; height: 40px; flex: none; display: grid; place-items: center; border-radius: 9px; background: var(--j-tlo-2); color: var(--j-tekst-2); overflow: hidden; }
 .j-plik-mini img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.j-plik-mini.is-brak { color: var(--j-uwaga); }
 .j-plik-t { display: grid; min-width: 0; }
 .j-plik-n { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .j-plik-o { font-size: 12.5px; color: var(--j-tekst-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

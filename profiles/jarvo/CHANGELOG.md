@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Panel: plik, którego nie da się wczytać (np. spoza katalogów floty), ma na karcie „Nie udało się wczytać pliku.” zamiast pustej karty bez słowa, a podgląd zamiast kręcącego się kółka mówi to samo (19.11 właściciel nie mógł obejrzeć klatki z próbki Translatora: plik leżał w `cache/scratch` agenta).
 - Aktualizacja nie przerywa już odpowiedzi agentów: restart bramy po zmianie floty (`jarvo instaluj`, `jarvo update`, `jarvo telegram tematy`) czeka, aż żaden agent nie odpowiada (najdłużej 30 min). 19.11 przy dodawaniu nowego agenta trzy restarty przerwały odpowiedź Jarva na wiadomość właściciela z Telegrama („Operation interrupted” w panelu; brama wznowiła ją dopiero po starcie).
 - Walidacja: każdy plik YAML profilu (`config.yaml`, `toolbox.yaml`, `cron/jobs.yaml`…) musi się parsować już w `validate.py`, także u agentów nakładki. 19.11 `toolbox.yaml` nowego agenta biznesowego z wartością „REST: /v2/…” bez cudzysłowu przeszedł walidację i wywrócił dopiero build w `jarvo instaluj`.
 - Panel: Aktualizacje mają jeden zestaw strzałek (19.11 właściciel: „dwa sety strzałek, jedne działają, jedne nie… nie mamy miesięcy”). Kalendarz nie ma już strzałek miesiąca, idzie za wybranym dniem; ‹ › dnia w nagłówku nie uciekają spod kursora (data ma stałą szerokość), a ←/→ działają od razu po wejściu w widok.
