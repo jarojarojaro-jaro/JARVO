@@ -30,6 +30,8 @@ GRANICE:
 - Autonomia: A1 (szkice/podglądy; bez publikacji, wdrożeń, wysyłek, wydatków)
 - Budżet: <np. 60 min pracy>
 - Nie ruszać: <np. istniejąca produkcja, domena, konta>
+
+STOP: KONTROLA <nazwa>: NIE — <błąd> w notatce postępu; ta sama kontrola 3× z rzędu → kanban_block z dowodem, bez 4. próby
 ```
 
 KONTEKST ma najwyżej 5 punktów. Historia rozmowy i warianty, które rozważałeś, idą do `MISSION.md`, nie do karty:

@@ -158,3 +158,42 @@ def test_mission_already_reported_or_waiting_does_not_wake_again():
     assert "mission_ready" not in kinds(patrol.analyze(board(raporty=["M-260926-done"]), NOW))
     czeka = INDEX.replace("| M-260926-done | Stara misja | w toku |", "| M-260926-done | Stara misja | czeka na decyzję: rejestracja |")
     assert "mission_ready" not in kinds(patrol.analyze(board(index=czeka), NOW))
+
+
+def _notes(*texts, start=NOW - 20 * MIN):
+    return [{"kind": "heartbeat", "created_at": start + i * 4 * MIN, "payload": {"note": t}} for i, t in enumerate(texts)]
+
+
+def _running_card(minutes, notes):
+    data = board()
+    data["tasks"].append({"id": "t_hh01", "title": "Rejestracja", "status": "running", "assignee": "jarvo",
+                          "started_at": NOW - minutes * MIN, "created_at": NOW - minutes * MIN})
+    data["events"]["t_hh01"] = notes
+    return [a for a in patrol.analyze(data, NOW) if a.get("task_id") == "t_hh01"]
+
+
+def test_same_check_failing_three_rounds_is_check_loop():
+    found = _running_card(26, _notes(
+        "KONTROLA turnstile: NIE — Weryfikacja negatywna",
+        "KONTROLA Turnstile: NIE — Weryfikacja negatywna",
+        "KONTROLA turnstile: NIE — We couldn't verify you're human",
+    ))
+    assert [a["kind"] for a in found] == ["check_loop"]
+    loop = found[0]
+    assert loop["severity"] == "high"
+    assert loop["check"] == "turnstile"
+    assert len(loop["times"]) == 3
+    assert loop["error"] == "We couldn't verify you're human"
+    assert "ostatni błąd: We couldn't verify you're human" in loop["message"]
+
+
+def test_identical_unformatted_notes_count_as_loop():
+    found = _running_card(30, _notes(*["Cloudflare znowu odrzuca"] * 3))
+    assert [a["kind"] for a in found] == ["check_loop"]
+
+
+def test_progress_or_short_run_is_not_check_loop():
+    assert _running_card(30, _notes("KONTROLA build: NIE — błąd", "KONTROLA testy: NIE — błąd",
+                                     "KONTROLA build: NIE — błąd")) == []
+    assert _running_card(30, _notes("KONTROLA build: NIE — x", "KONTROLA build: NIE — x")) == []
+    assert _running_card(4, _notes(*["KONTROLA build: NIE — x"] * 3, start=NOW - 3 * MIN)) == []

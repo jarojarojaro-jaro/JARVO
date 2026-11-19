@@ -1,7 +1,7 @@
 ---
 name: dispatch-playbook
 description: "Rozdawanie pracy: karty z kontraktem, zależności, misje."
-version: 1.7.0
+version: 1.8.0
 author: Jarvo
 license: MIT
 metadata:
@@ -12,7 +12,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-11-14"
+    reviewed: "2026-11-19"
 ---
 
 # Dispatch: jak rozdać pracę
@@ -43,6 +43,7 @@ DoD:
 - <mierzalny warunek 2>
 WYJŚCIA: <pliki w out/ (nazwy, formaty)>
 GRANICE: autonomia A1 (bez publikacji/wdrożeń); budżet <czas>; nie ruszać <…>
+STOP: KONTROLA <nazwa>: NIE — <błąd> w notatce postępu; ta sama kontrola 3× z rzędu → kanban_block z dowodem, bez 4. próby
 ZGODA WŁAŚCICIELA: <konto|platnosc|wysylka|publikacja|usuniecie_konta|wszystko> — „<cytat polecenia>” (<RRRR-MM-DD>)
 ```
 Karta to kontrakt, nie streszczenie rozmowy: historia rozmowy i warianty, które rozważałeś, idą do `MISSION.md`
@@ -53,6 +54,11 @@ Linia `ZGODA WŁAŚCICIELA`, gdy właściciel kazał założyć konto (`konto`),
 konto: cytujesz jego słowa. Czyta ją kod (Komputer Jarva, bramka telefonu), nie model; bez niej taki klik na karcie
 oddajesz właścicielowi (`oddaj-ekran`). W Komputerze logowanie i rejestracja przechodzą i bez niej, na telefonie zgoda na regulamin
 potrzebuje `konto`.
+Linia `STOP` to próg „trzy rundy i stop” (zespół Claude Code o weryfikacji: kontrola, która po trzech rundach dalej
+nie przechodzi, zatrzymuje pracę i woła człowieka; 16.11 karta t_87d11e3a klikała Cloudflare 26 min). Wykonawca każdą
+nieudaną kontrolę zapisuje notatką postępu (`kanban_heartbeat`, note) w formacie `KONTROLA <nazwa>: NIE — <błąd>`.
+Gdy ta sama kontrola nie przejdzie w trzech kolejnych notatkach, nie ponawia jej, tylko `kanban_block` z dowodem:
+nazwa kontroli, trzy godziny notatek, ostatni komunikat błędu. Patrol czyta te notatki i zrobi to samo, gdy wykonawca nie zdąży.
 
 ## Wywołanie `kanban_create`
 

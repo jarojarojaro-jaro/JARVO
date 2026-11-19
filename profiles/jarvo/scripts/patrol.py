@@ -8,6 +8,8 @@ a w ostatniej linii JSON dla schedulera:
 
 Ta sama anomalia nie budzi Jarva częściej niż co JARVO_PATROL_REALERT_HOURS (domyślnie 12 h).
 Brak dziennika misji (`<misje>/INDEX.md`) to też sygnał: bez niego patrol nie widzi misji i dawniej milczał.
+Pętla kontroli (`check_loop`): karta pracuje dłużej niż JARVO_PATROL_CHECK_LOOP_MIN (5 min), a jej trzy ostatnie
+notatki postępu (`heartbeat` z `note`) mówią o tym samym niepowodzeniu kontroli → Jarvo blokuje kartę z dowodem.
 Ścieżki z HERMES_HOME (_sciezki.py), nie z /opt: natywnie cron uruchamia skrypt z HERMES_HOME profilu jarvo.
 
 Tryb testowy: --fixture plik.json (tasks/events/diagnostics/index) zamiast wywołań `hermes`.
@@ -34,6 +36,8 @@ READY_STALE_MIN = int(os.environ.get("JARVO_PATROL_READY_STALE_MIN", "20"))
 REVIEW_STALE_MIN = int(os.environ.get("JARVO_PATROL_REVIEW_STALE_MIN", "60"))
 RUNNING_STALE_MIN = int(os.environ.get("JARVO_PATROL_RUNNING_STALE_MIN", "240"))
 REALERT_HOURS = float(os.environ.get("JARVO_PATROL_REALERT_HOURS", "12"))
+CHECK_LOOP_MIN = int(os.environ.get("JARVO_PATROL_CHECK_LOOP_MIN", "5"))
+CHECK_LOOP_ROUNDS = 3   # „po trzech rundach stop i człowiek” (zespół Claude Code o weryfikacji)
 
 
 # ------------------------------------------------------------------ data access
@@ -119,6 +123,29 @@ def _last_event(events: list, kind: str) -> dict | None:
     return max(matching, key=lambda e: e.get("created_at") or 0) if matching else None
 
 
+# Notatka postępu o nieudanej kontroli wg kontraktu karty: „KONTROLA <nazwa>: NIE — <komunikat błędu>”.
+_KONTROLA = re.compile(r"^KONTROLA\s+(?P<nazwa>[^:]+?)\s*:\s*NIE\b\s*[—–:-]?\s*(?P<blad>.*)$", re.I)
+
+
+def check_loop(events: list) -> dict | None:
+    """Trzy kolejne notatki postępu z tym samym niepowodzeniem kontroli → dowód, inaczej None.
+
+    Kontrolę rozpoznaje po nazwie z formatu kontraktu; notatki bez formatu liczą się, gdy są identyczne."""
+    notes = sorted((e for e in events if e.get("kind") == "heartbeat" and (e.get("payload") or {}).get("note")),
+                   key=lambda e: e.get("created_at") or 0)[-CHECK_LOOP_ROUNDS:]
+    if len(notes) < CHECK_LOOP_ROUNDS:
+        return None
+    keys, check, error = set(), "", ""
+    for e in notes:
+        text = " ".join(str(e["payload"]["note"]).split())
+        m = _KONTROLA.match(text)
+        check, error = (m["nazwa"], m["blad"] or text) if m else (text[:80], text)
+        keys.add(check.lower() if m else text.lower())
+    if len(keys) != 1:
+        return None
+    return {"check": check, "times": [int(e.get("created_at") or 0) for e in notes], "error": error[:300]}
+
+
 def analyze(data: dict, now: float) -> list[dict]:
     """Zwraca listę anomalii: {key, severity, kind, task_id?, mission?, message}."""
     tasks = {t["id"]: t for t in data.get("tasks", [])}
@@ -165,6 +192,13 @@ def analyze(data: dict, now: float) -> list[dict]:
             if age > max(limit, RUNNING_STALE_MIN):
                 add(f"running:{tid}:{int(started)}", "medium", "running_long",
                     f"Pracuje od {int(age)} min (limit {int(limit)}): „{title}” ({who})", task_id=tid)
+            loop = check_loop(evs) if age > CHECK_LOOP_MIN else None
+            if loop:
+                godziny = ", ".join(time.strftime("%H:%M", time.localtime(t)) for t in loop["times"])
+                add(f"check_loop:{tid}:{loop['times'][-1]}", "high", "check_loop",
+                    f"Ta sama kontrola nie przechodzi {CHECK_LOOP_ROUNDS} razy z rzędu: „{title}” ({who}); "
+                    f"kontrola: {loop['check']}; notatki: {godziny}; ostatni błąd: {loop['error']}",
+                    task_id=tid, check=loop["check"], times=loop["times"], error=loop["error"])
 
     for d in data.get("diagnostics", []):
         msg = d.get("message") or d.get("summary") or json.dumps(d, ensure_ascii=False)[:200]
