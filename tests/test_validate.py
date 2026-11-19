@@ -40,6 +40,13 @@ def test_soul_without_protocol_marker(repo_copy):
     assert errors_matching(validate.run(), r"jarvo-web: SOUL.md bez znacznika")
 
 
+def test_profile_yaml_must_parse(repo_copy):
+    toolbox = repo_copy / "profiles/jarvo-web/toolbox.yaml"
+    toolbox.write_text(toolbox.read_text(encoding="utf-8") + "\n  - name: x\n    source: https://x.dev (REST: /v2)\n",
+                       encoding="utf-8")
+    assert errors_matching(validate.run(), r"jarvo-web: toolbox.yaml nie jest poprawnym YAML")
+
+
 def test_hq_chat_platform_must_be_configured(repo_copy):
     import re as _re
     cfg = repo_copy / "profiles/jarvo-web/config.yaml"

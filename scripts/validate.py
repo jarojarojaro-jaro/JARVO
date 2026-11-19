@@ -206,6 +206,13 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
         r.err(f"{a.name}: snajper/orkiestrator musi mieć .no-bundled-skills (izolacja skilli)")
     if a.kind == "generalist" and (d / ".no-bundled-skills").exists():
         r.warn(f"{a.name}: generalista z .no-bundled-skills nie dostanie katalogu Hermesa")
+    # 19.11: toolbox.yaml agenta nakładki z „REST: /v2/…” bez cudzysłowu przeszedł walidację i wywrócił dopiero build
+    # w `jarvo instaluj`; każdy YAML profilu musi się parsować już tutaj.
+    for plik in sorted(d.rglob("*.yaml")):
+        try:
+            fl.load_yaml(plik)
+        except Exception as e:                       # yaml.YAMLError i błędy kodowania: wszystko to zły plik
+            r.err(f"{a.name}: {plik.relative_to(d)} nie jest poprawnym YAML: {str(e).splitlines()[0]}")
 
     soul = (d / "SOUL.md").read_text(encoding="utf-8") if (d / "SOUL.md").exists() else ""
     if fl.PROTOCOL_MARKER not in soul:
