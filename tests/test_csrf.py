@@ -182,8 +182,9 @@ def test_odczyty_hq_bez_skutkow(monkeypatch):
         "/mozg/zrodla", "/mozg/{klucz}",
         # rozmówcy centrum (rozmowcy.py lista): konfiguracja + odczyt rozmowy.db, bez zapisu
         "/rozmowcy",
-        # Aktualizacje (raporty.py lista): odczyt archiwum raportów; brak pliku = pusta lista (archiwum zakłada silnik)
-        "/raporty"}
+        # Aktualizacje (raporty.py lista, kalendarz): odczyt archiwum raportów; brak pliku = pusta lista (archiwum
+        # zakłada silnik)
+        "/raporty", "/raporty/kalendarz"}
     zapis = {t.path for t in _trasy(api.router) if "POST" in t.methods}
     assert "/anim/info" in zapis
 
