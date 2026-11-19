@@ -14,9 +14,11 @@ W kodzie „raporty”, bo „aktualizacja” to już aktualizacja Jarva (odznak
   w lewej kolumnie bez odpytywania, we wszystkich kartach).
 - **Trasy** (router wtyczki, GET tylko z karty panelu: `Sec-Fetch-Site` same-origin/none; POST z ochroną zapisu
   routera `ochrona.Trasa`):
-  `GET /raporty?rodzaj=<zadanie>&przed=<ts>&limit=<1..100>` → {raporty (od najnowszego, `nowy` = nieprzeczytany),
-  rodzaje [{rodzaj, nazwa, liczba, ostatni}], nieprzeczytane, przeczytane_do, dalej (ts następnej strony albo null)};
-  `POST /raporty/przeczytane` {do: ts} → {nieprzeczytane, przeczytane_do} (znacznik tylko rośnie).
+  `GET /raporty?rodzaj=<zadanie>&od=<ts>&przed=<ts>&limit=<1..100>` → {raporty (od najnowszego, `nowy` = nieprzeczytany),
+  rodzaje [{rodzaj, nazwa, liczba, ostatni}], nieprzeczytane, przeczytane_do, dalej (ts następnej strony albo null);
+  z `od` (okno dnia) też poprzedni / nastepny: czas najbliższego raportu przed i po oknie, w obrębie rodzaju};
+  `GET /raporty/kalendarz?od=<ts>&do=<ts>` (okno ≤ 62 dni) → {wpisy [{ts, rodzaj, nowy, blad}] bez treści, rodzaje,
+  najnowszy}; `POST /raporty/przeczytane` {do: ts} → {nieprzeczytane, przeczytane_do} (znacznik tylko rośnie).
 Rozmowa o raporcie zostaje w rozmowie z Jarvem: rutyna z `attach_to_session` wpisuje go też do sesji tematu JARVO.
 Testy: tests/test_raporty.py.
 """
@@ -34,6 +36,8 @@ RUNDA_S = 30.0
 TEKST_MAKS = 20_000
 LIMIT = 40
 LIMIT_MAKS = 100
+KALENDARZ_OKNO_S = 62 * 86400          # kalendarz pyta o miesiąc widoku (z zapasem na strefy i zmianę czasu)
+KALENDARZ_MAKS = 5000
 ODCZYT_ZRODLA = ("same-origin", "none")
 CISZA = {"[silent]", "silent", "no_reply", "no reply"}
 ZADANIE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
@@ -176,7 +180,8 @@ class Archiwum:
             db = self._baza()
             return {"nieprzeczytane": self._nieprzeczytane(db), "przeczytane_do": self._przeczytane_do(db)}
 
-    def lista(self, *, rodzaj: str | None = None, przed: float | None = None, limit: int = LIMIT) -> dict:
+    def lista(self, *, rodzaj: str | None = None, przed: float | None = None, od: float | None = None,
+              limit: int = LIMIT) -> dict:
         limit = max(1, min(LIMIT_MAKS, int(limit)))
         with self._lock:
             if self._db is None and not self.plik.exists():
@@ -189,6 +194,9 @@ class Archiwum:
             if przed is not None:
                 gdzie.append("ts < ?")
                 arg.append(float(przed))
+            if od is not None:
+                gdzie.append("ts >= ?")
+                arg.append(float(od))
             sql = "SELECT * FROM raporty" + (f" WHERE {' AND '.join(gdzie)}" if gdzie else "") + \
                 " ORDER BY ts DESC, id DESC LIMIT ?"
             wiersze = [dict(r) for r in db.execute(sql, [*arg, limit + 1])]
@@ -197,10 +205,37 @@ class Archiwum:
                        for r in db.execute("SELECT rodzaj, nazwa, COUNT(*) AS liczba, MAX(ts) AS ostatni FROM raporty "
                                            "GROUP BY rodzaj ORDER BY ostatni DESC")]
             nieprzeczytane = self._nieprzeczytane(db)
+            # okno dnia (od i przed): czas najbliższego raportu przed oknem i po nim (tego samego rodzaju), żeby ‹ ›
+            # skakały po dniach z raportami bez pobierania kalendarza
+            sasiedzi = {}
+            if od is not None:
+                tyl = [rodzaj] if rodzaj else []
+                warunek = " AND rodzaj = ?" if rodzaj else ""
+                sasiedzi["poprzedni"] = db.execute(f"SELECT MAX(ts) FROM raporty WHERE ts < ?{warunek}",
+                                                   [float(od), *tyl]).fetchone()[0]
+                if przed is not None:
+                    sasiedzi["nastepny"] = db.execute(f"SELECT MIN(ts) FROM raporty WHERE ts >= ?{warunek}",
+                                                      [float(przed), *tyl]).fetchone()[0]
         dalej = wiersze[limit - 1]["ts"] if len(wiersze) > limit else None
         raporty = [{**w, "blad": bool(w["blad"]), "nowy": w["ts"] > granica} for w in wiersze[:limit]]
         return {"raporty": raporty, "rodzaje": rodzaje, "nieprzeczytane": nieprzeczytane, "przeczytane_do": granica,
-                "dalej": dalej}
+                "dalej": dalej, **sasiedzi}
+
+    def kalendarz(self, od: float, do: float) -> dict:
+        """Kalendarz widoku: raporty z [od, do) bez treści, [{ts, rodzaj, nowy, blad}] od najstarszego; dzień liczy
+        przeglądarka w swojej strefie. Rodzaje jak w `lista` (filtr i legenda kolorów)."""
+        with self._lock:
+            if self._db is None and not self.plik.exists():
+                return {"wpisy": [], "rodzaje": [], "najnowszy": None}
+            db = self._baza()
+            granica = self._przeczytane_do(db)
+            wpisy = [{"ts": r["ts"], "rodzaj": r["rodzaj"], "nowy": r["ts"] > granica, "blad": bool(r["blad"])}
+                     for r in db.execute("SELECT ts, rodzaj, blad FROM raporty WHERE ts >= ? AND ts < ? ORDER BY ts LIMIT ?",
+                                         (float(od), float(do), KALENDARZ_MAKS))]
+            rodzaje = [{"rodzaj": r["rodzaj"], "nazwa": r["nazwa"], "liczba": r["liczba"], "ostatni": r["ostatni"]}
+                       for r in db.execute("SELECT rodzaj, nazwa, COUNT(*) AS liczba, MAX(ts) AS ostatni FROM raporty "
+                                           "GROUP BY rodzaj ORDER BY ostatni DESC")]
+        return {"wpisy": wpisy, "rodzaje": rodzaje, "najnowszy": rodzaje[0]["ostatni"] if rodzaje else None}
 
     def przeczytane(self, do: float) -> dict:
         """Znacznik przeczytanych rośnie (stara karta nie cofnie go); nie dalej niż najnowszy raport."""
@@ -233,14 +268,28 @@ def dolacz(router, *, archiwum: Archiwum, hub=None, log: Callable[[str], None] |
         return False
 
     @router.get("/raporty")
-    async def raporty(request: Request, rodzaj: str | None = None, przed: float | None = None, limit: int = LIMIT):
+    async def raporty(request: Request, rodzaj: str | None = None, przed: float | None = None, od: float | None = None,
+                      limit: int = LIMIT):
         if obca(request):
             return blad(403, "csrf", "Odmowa odczytu: żądanie nie przyszło z panelu Jarvo.",
                         "Read refused: the request did not come from the Jarvo dashboard.")
         if rodzaj is not None and not ZADANIE.match(rodzaj):
             return blad(422, "zle_dane", "Niepoprawny rodzaj raportu.", "Invalid report type.")
         try:
-            return await asyncio.to_thread(archiwum.lista, rodzaj=rodzaj or None, przed=przed, limit=limit)
+            return await asyncio.to_thread(archiwum.lista, rodzaj=rodzaj or None, przed=przed, od=od, limit=limit)
+        except sqlite3.Error as e:
+            log(f"jarvo-hq: raporty: {type(e).__name__}")
+            return blad(503, "archiwum", "Archiwum raportów jest niedostępne.", "The report archive is unavailable.")
+
+    @router.get("/raporty/kalendarz")
+    async def kalendarz(request: Request, od: float, do: float):
+        if obca(request):
+            return blad(403, "csrf", "Odmowa odczytu: żądanie nie przyszło z panelu Jarvo.",
+                        "Read refused: the request did not come from the Jarvo dashboard.")
+        if not 0 < do - od <= KALENDARZ_OKNO_S:
+            return blad(422, "zle_dane", "Niepoprawny zakres kalendarza (od, do).", "Invalid calendar range (od, do).")
+        try:
+            return await asyncio.to_thread(archiwum.kalendarz, od, do)
         except sqlite3.Error as e:
             log(f"jarvo-hq: raporty: {type(e).__name__}")
             return blad(503, "archiwum", "Archiwum raportów jest niedostępne.", "The report archive is unavailable.")

@@ -325,7 +325,8 @@ Object.assign(liveApi, {
   },
   // Aktualizacje (raporty.py): archiwum raportów rutyn i znacznik przeczytanych
   raporty: {
-    lista: (p) => zadanie("GET", `/raporty${zapytanieUrl(p)}`),                // {rodzaj, przed, limit}
+    lista: (p) => zadanie("GET", `/raporty${zapytanieUrl(p)}`),                // {rodzaj, od, przed, limit}
+    kalendarz: (p) => zadanie("GET", `/raporty/kalendarz${zapytanieUrl(p)}`),  // {od, do}: miesiąc widoku
     przeczytane: (ts) => zadanie("POST", "/raporty/przeczytane", { do: ts }),
   },
   aplikacja: () => zadanie("GET", "/app"),

@@ -22,7 +22,7 @@ Aplikacja (szczegóły: sekcja [2f](#2f-aplikacja-rozmowa-pasek-szuflada)):
 | Element | Skąd dane | Co pokazuje |
 |---|---|---|
 | Ekran startu (`#/`) | `GET /app` (właściciel z `USER.md`, gotowość), `GET /podpowiedzi` | robot Jarva (CRT) i powitanie po imieniu („Dzień dobry, Ania”, pod spodem firma); bez imienia w `USER.md` zamiast startu **pierwsze spotkanie** na całym ekranie (rozmowa bez modelu, głos Jarva, zapis do `USER.md`, mózg na miejscu, potem wątek „Pierwsza sesja”; `POST /app/poznanie`, `POST /app/glos`, `POST /app/klucz`, `POST /app/mozg/chatgpt`, `POST /app/pierwsza-sesja`). Jedno zdanie gotowości z najwyżej jednym przyciskiem, tylko gdy czegoś brakuje: **Podłącz** („Podłącz mózg, a zacznę pierwszą sesję.”; otwiera kartę mózgu pierwszego spotkania), **Poznajmy się** (otwiera pierwsze spotkanie po „Pomiń”), **Zacznij pierwszą sesję** (profil i mózg są, sesji jeszcze nie było; × = „Nie teraz”, `localStorage` `jarvo.pierwsza.odrzucona.v1`); brama, która wstaje, = „Jarvo się uruchamia…” bez czerwonego paska. Pole wiadomości zakłada nową rozmowę; pod nim najwyżej 4 rzeczy: **Czeka na Ciebie** (zgody, pytania zespołu, nieudana praca) i **Na początek** (startery tylko z połączonym modelem; × ukrywa, potem „Nie pokazuj tego więcej”) |
-| Pasek rozmów | `rozmowy.db` (`GET /rozmowy`) + strumień | **Nowa rozmowa**, szukaj, wątki w grupach (Przypięte, Dziś, Wczoraj, …), menu wiersza, Archiwum i Kosz; nawigacja Aktualizacje, Mózg, **Ustawienia** (jedyne wejście do szuflady w pasku); stopka: stan połączenia słowem („● połączono”, bez połączenia „⚠ Łączę ponownie…”), odznaka **⬆ N** (dostępna aktualizacja) |
+| Pasek rozmów | `rozmowy.db` (`GET /rozmowy`) + strumień | **Nowa rozmowa**, pod nią **Aktualizacje** (raporty rutyn z licznikiem), szukaj, wątki w grupach (Przypięte, Dziś, Wczoraj, …), menu wiersza, Archiwum i Kosz; nawigacja Mózg, **Ustawienia** (jedyne wejście do szuflady w pasku); stopka: stan połączenia słowem („● połączono”, bez połączenia „⚠ Łączę ponownie…”), odznaka **⬆ N** (dostępna aktualizacja) |
 | Rozmowa (`#/r/<wątek>`) | oś czasu wątku (`rozmowy.db` + `state.db` agentów) | wiadomości z Markdownem, żywy dymek pracy agenta (tekst na bieżąco, kroki, czas, **Zatrzymaj**), zgody z odliczaniem, karty plików (Podgląd, Pobierz, Kopiuj ścieżkę, Odpal), błąd z **Ponów**, znacznik „bezpośrednio” |
 | Pole wiadomości | wybór adresata, załączniki, szkic | „Do: Jarvo”; `@uchwyt` na początku albo lista **Do:** = tylko ta wiadomość wprost do agenta, potem znów Jarvo; zdjęcia (wklejenie, przeciągnięcie) i pliki; szkic na wątek |
 | Szuflada ustawień (pozycja Ustawienia, Ctrl/⌘+,) | strony Hermesa w ramce, `GET/POST /update` | **Połączenia** (Klucze, Modele), **Wygląd** (motyw), **Konto** (język PL/EN także dla stron Hermesa, Wyloguj, klasyczny panel, skróty), **System › Aktualizacja** (bezpieczna aktualizacja: przy pracy agentów pytanie „Zaktualizuj, gdy skończą”), **Stara Baza** |
@@ -1348,19 +1348,31 @@ innych kanałów etap 6.
 
 ### Aktualizacje (`#/aktualizacje`)
 
-Kanał pod rozmówcami (pozycja „↻ Aktualizacje” z licznikiem nieprzeczytanych, na telefonie na ekranie rozmówców):
-archiwum raportów rutyn floty (poranny brief, patrol, przegląd tygodnia, świeżość wiedzy, nowe wersje, rutyny agentów)
-do przeglądania, tylko odczyt. Od najnowszego, pogrupowane po dniu (Dziś, Wczoraj, data) i w dniu po rodzaju raportu;
-filtr rodzaju w adresie (`#/aktualizacje/<id zadania>`); długi raport zwinięty z „Pokaż całość”; „Odpowiedz
-w rozmowie” otwiera rozmówcę profilu rutyny (Jarvo: temat JARVO). Wejście bez filtra oznacza raporty jako przeczytane.
+Kanał na górze paska, pod „+ Nowa rozmowa” (pozycja „↻ Aktualizacje” z licznikiem nieprzeczytanych; na telefonie na
+ekranie rozmówców pod „Nowa rozmowa”): raporty rutyn floty (poranny brief, patrol, przegląd tygodnia, świeżość wiedzy,
+nowe wersje, rutyny agentów) dzień po dniu. Adres `#/aktualizacje[/<RRRR-MM-DD>][/<id zadania>]`; bez dnia widok
+otwiera ostatni dzień z raportami (tego rodzaju przy filtrze).
+
+- **Szeroko:** u góry data dnia (Dziś / Wczoraj / dzień tygodnia) z ‹ › (i strzałkami ←/→) skaczącymi po dniach
+  z raportami oraz „Najnowsze”; raporty dnia od najnowszego jako karty z kropką i paskiem w kolorze rodzaju, godziną,
+  znacznikiem „nowy”; obok mały kalendarz miesiąca (kropki rodzajów, pogrubione dni z nowymi, czerwony punkt przy
+  rutynie, która się nie udała, dni przyszłe wyłączone) i lista rodzajów jako filtr (Wszystkie + rodzaje z liczbą;
+  filtr zostaje na dniu, gdy ten ma raport rodzaju, inaczej idzie na ostatni dzień rodzaju). Kolor rodzaju: stała
+  kolejność wyraźnych barw `--j-barwa-N` po id rodzaju. Długi raport (> 1600 znaków) zwinięty z „Pokaż całość”.
+- **Telefon (≤ 760 px kontenera):** data z ‹ › na górze, kalendarz pod klikniętą datą, rodzaje w jednym rzędzie.
+- **Odpowiedz** (przycisk przy raporcie): otwiera rozmowę z rozmówcą profilu rutyny (Jarvo: temat JARVO) z cytatem
+  raportu w polu wiadomości („> Odpowiadam na raport „<rodzaj>” (<czas>): <pierwsza linia>”), kursor na końcu;
+  drugi klik nie dubluje cytatu. Dzień obejrzany bez filtra oznacza raporty do jego najnowszego jako przeczytane.
 
 - **Archiwum** (`hq/plugin/raporty.py`, w kodzie „raporty”, bo „aktualizacja” to aktualizacja Jarva): pętla silnika co
   30 s czyta nowe zapisy `<dane>/profiles/<profil>/cron/output/<zadanie>/*.md` (Hermes trzyma 50 na zadanie) i przepisuje
   raporty do `<jarvo>/state/raporty.db`. Raport = odpowiedź po `## Response`, wyjście skryptu `no_agent` albo błąd;
   cisza (`[SILENT]`, `**Status:** silent`, `wakeAgent=false`) nie jest raportem. Treść przez `utajnij`.
-- **Trasy**: `GET /raporty?rodzaj=&przed=&limit=` (tylko z karty panelu), `POST /raporty/przeczytane {do}` (znacznik
-  tylko rośnie). `GET /app` ma `raporty: {nieprzeczytane, przeczytane_do}`; strumień: `raporty.nowe` (nowy raport,
-  otwarty widok wczytuje się na nowo) i `raporty.licznik`.
+- **Trasy**: `GET /raporty?rodzaj=&od=&przed=&limit=` (z `od`: także `poprzedni`/`nastepny` = czas najbliższego
+  raportu przed i po oknie dnia, w obrębie rodzaju), `GET /raporty/kalendarz?od=&do=` (okno ≤ 62 dni: wpisy
+  `{ts, rodzaj, nowy, blad}` bez treści, rodzaje, najnowszy), `POST /raporty/przeczytane {do}` (znacznik tylko
+  rośnie); GET tylko z karty panelu. `GET /app` ma `raporty: {nieprzeczytane, przeczytane_do}`; strumień:
+  `raporty.nowe` (nowy raport, otwarty widok wczytuje się na nowo) i `raporty.licznik`.
 - **Pakiet** `raporty` (`hq/web/src/64-raporty.js`, style w bloku „@@pakiet raporty”) ładuje się po wejściu w widok.
 - **Raport w rozmowie**: rutyna z `attach_to_session` wpisuje raport do sesji tematu JARVO jako wiadomość użytkownika
   `[Cron delivery: <rutyna>]`; oś (`scalanie.py`, rodzaj `rutyna`) pokazuje ją jako wiadomość Jarva ze znacznikiem

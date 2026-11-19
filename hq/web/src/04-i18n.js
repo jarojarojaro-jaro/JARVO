@@ -562,18 +562,30 @@ Object.assign(SLOWNIK.en, {
 /* === Aktualizacje (raporty rutyn, 64-raporty.js) === */
 Object.assign(SLOWNIK.pl, {
   "rap.tytul": "Aktualizacje", "rap.rutyna": "Rutyna",
-  "rap.opis": "Raporty rutyn floty: brief, patrol, przegląd tygodnia, nowe wersje. Odpowiadasz na nie w rozmowie z Jarvem; tam też je widzi.",
   "rap.filtr": "Rodzaj raportu", "rap.wszystkie": "Wszystkie", "rap.nowy": "nowy", "rap.blad": "rutyna się nie udała",
-  "rap.odpowiedz": "Odpowiedz w rozmowie", "rap.calosc": "Pokaż całość", "rap.zwin": "Zwiń", "rap.starsze": "Starsze raporty",
-  "rap.pusto": "Jeszcze nie ma raportów. Pierwszy przyjdzie z najbliższą rutyną.", "rap.pusto_rodzaj": "Brak raportów tego rodzaju.",
+  "rap.odpowiedz": "Odpowiedz", "rap.odpowiedz_tip": "Otwiera rozmowę z: {kto}, z cytatem tego raportu w polu wiadomości",
+  "rap.calosc": "Pokaż całość", "rap.zwin": "Zwiń",
+  "rap.pusto": "Jeszcze nie ma raportów. Pierwszy przyjdzie z najbliższą rutyną.",
+  "rap.dzien_pusto": "Tego dnia nie było raportów.", "rap.dzien_pusto_rodzaj": "Tego dnia nie było raportów tego rodzaju.",
+  "rap.najnowsze": "Najnowsze", "rap.najnowsze_tip": "Ostatni dzień z raportami",
+  "rap.poprzedni": "Poprzedni dzień z raportami (←)", "rap.nastepny": "Następny dzień z raportami (→)",
+  "rap.kalendarz": "Kalendarz", "rap.mies_poprz": "Poprzedni miesiąc", "rap.mies_nast": "Następny miesiąc",
+  "rap.w_dniu": { one: "{n} raport", few: "{n} raporty", many: "{n} raportów", other: "{n} raportu" },
   "rap.nowe": { one: "{n} nowy raport", few: "{n} nowe raporty", many: "{n} nowych raportów", other: "{n} nowego raportu" },
+  "rap.cytat": "Odpowiadam na raport",
 });
 Object.assign(SLOWNIK.en, {
   "rap.tytul": "Updates", "rap.rutyna": "Routine",
-  "rap.opis": "Reports from the fleet routines: brief, patrol, weekly review, new versions. Reply to them in the conversation with Jarvo; he sees them there too.",
   "rap.filtr": "Report type", "rap.wszystkie": "All", "rap.nowy": "new", "rap.blad": "routine failed",
-  "rap.odpowiedz": "Reply in the conversation", "rap.calosc": "Show all", "rap.zwin": "Collapse", "rap.starsze": "Older reports",
-  "rap.pusto": "No reports yet. The first one arrives with the next routine.", "rap.pusto_rodzaj": "No reports of this type.",
+  "rap.odpowiedz": "Reply", "rap.odpowiedz_tip": "Opens the conversation with {kto}, with this report quoted in the message box",
+  "rap.calosc": "Show all", "rap.zwin": "Collapse",
+  "rap.pusto": "No reports yet. The first one arrives with the next routine.",
+  "rap.dzien_pusto": "No reports on this day.", "rap.dzien_pusto_rodzaj": "No reports of this type on this day.",
+  "rap.najnowsze": "Latest", "rap.najnowsze_tip": "Last day with reports",
+  "rap.poprzedni": "Previous day with reports (←)", "rap.nastepny": "Next day with reports (→)",
+  "rap.kalendarz": "Calendar", "rap.mies_poprz": "Previous month", "rap.mies_nast": "Next month",
+  "rap.w_dniu": { one: "{n} report", other: "{n} reports" },
   "rap.nowe": { one: "{n} new report", other: "{n} new reports" },
+  "rap.cytat": "Replying to the report",
 });
 /* === koniec Aktualizacji === */

@@ -14,12 +14,12 @@ const PLIKI = ["02-sklep.js", "03-trasa.js", "04-i18n.js", "05-skroty.js", "06-t
   "13-markdown.js", "14-czas.js", "15-os.js", "37-poznajmy.js", "64-raporty.js"];
 const PRZED = `const React = {}; const useMemo = (f) => f(); const useRef = (v) => ({ current: v }); const useEffect = () => {};
 let HQ_LANG = null; const isPL = () => T.wymus !== "en"; const Zasoby = { daj() {} };\n`;
-const PO = "\n;({ T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, sklep, USTAWIENIA_DOMYSLNE, Poznanie, kwestiePoznania, Sciezki, grupujRaporty });";
+const PO = "\n;({ T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, sklep, USTAWIENIA_DOMYSLNE, Poznanie, kwestiePoznania, Sciezki, kluczDnia, granicyDnia, siatkaMiesiaca, dniKalendarza, koloryRodzajow, cytatRaportu });";
 const kod = PRZED + PLIKI.map((f) => `// ---- ${f}\n` + fs.readFileSync(path.join(SRC, f), "utf8")).join("\n") + PO;
 const kontekst = vm.createContext({ Intl, Date, Math, JSON, URLSearchParams, setTimeout, clearTimeout, console, Set, Map,
   encodeURIComponent, decodeURIComponent, Number, String, Object, Array, RegExp });
 const M = vm.runInContext(kod, kontekst, { filename: "hq-front.js" });
-const { T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, Poznanie, kwestiePoznania, Sciezki, grupujRaporty } = M;
+const { T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, Poznanie, kwestiePoznania, Sciezki, kluczDnia, granicyDnia, siatkaMiesiaca, dniKalendarza, koloryRodzajow, cytatRaportu } = M;
 
 let ile = 0;
 function test(nazwa, f) {
@@ -678,16 +678,38 @@ test("Poznanie.dostawca: jak mozg.rozpoznaj na serwerze (przedrostek, kształt)"
   eq(Poznanie.dostawca(""), null);
 });
 
-test("Aktualizacje: trasa, dni i rodzaje raportów, licznik ze strumienia", () => {
+test("Aktualizacje: trasa z dniem i rodzajem, dni kalendarza, kolory rodzajów, cytat do odpowiedzi", () => {
   eq(Trasa.parsuj("#/aktualizacje"), { widok: "aktualizacje" });
   eq(Trasa.parsuj("#/aktualizacje/jarvo-patrol"), { widok: "aktualizacje", rodzaj: "jarvo-patrol" });
+  eq(Trasa.parsuj("#/aktualizacje/2026-11-18"), { widok: "aktualizacje", dzien: "2026-11-18" });
+  eq(Trasa.parsuj("#/aktualizacje/2026-11-18/jarvo-patrol"), { widok: "aktualizacje", dzien: "2026-11-18", rodzaj: "jarvo-patrol" });
+  eq(Trasa.parsuj("#/aktualizacje/2026-13-40"), { widok: "aktualizacje", rodzaj: "2026-13-40" });
   eq(Trasa.parsuj("#/aktualizacje/..%2Fx"), { widok: "aktualizacje" });
   assert.strictEqual(Trasa.zbuduj({ widok: "aktualizacje", rodzaj: "jarvo-daily-brief" }), "#/aktualizacje/jarvo-daily-brief");
-  const r = (id, rodzaj, kiedy) => ({ id, rodzaj, nazwa: rodzaj, ts: ts(kiedy) });
-  const dni = grupujRaporty([r("a", "patrol", "2026-11-18T12:00"), r("b", "brief", "2026-11-18T07:50"),
-    r("c", "patrol", "2026-11-18T07:30"), r("d", "brief", "2026-11-17T07:50")]);
-  eq(dni.map((d) => [d.dzien, d.sekcje.map((s) => [s.rodzaj, s.raporty.map((x) => x.id)])]),
-    [["2026-11-18", [["patrol", ["a", "c"]], ["brief", ["b"]]]], ["2026-11-17", [["brief", ["d"]]]]]);
+  assert.strictEqual(Trasa.zbuduj({ widok: "aktualizacje", dzien: "2026-11-18", rodzaj: "jarvo-patrol" }), "#/aktualizacje/2026-11-18/jarvo-patrol");
+  // dzień w strefie przeglądarki, także w dniu zmiany czasu (25 h): północ do północy
+  assert.strictEqual(kluczDnia(ts("2026-11-18T23:59")), "2026-11-18");
+  const zmiana = granicyDnia("2026-10-25");
+  eq([zmiana.od, zmiana.przed - zmiana.od], [ts("2026-10-25T00:00"), 25 * 3600]);
+  // siatka od poniedziałku, pełne tygodnie: listopad 2026 zaczyna się w niedzielę (6 dni października przed nim)
+  const s11 = siatkaMiesiaca(2026, 10);
+  eq([s11.length, s11[0].klucz, s11[6].klucz, s11[0].wMiesiacu, s11[6].wMiesiacu, s11[s11.length - 1].klucz], [42, "2026-10-26", "2026-11-01", false, true, "2026-12-06"]);
+  assert.strictEqual(siatkaMiesiaca(2027, 1).length, 28);           // luty 2027: od poniedziałku, 4 tygodnie
+  const w = (kiedy, rodzaj, nowy = false, blad = false) => ({ ts: ts(kiedy), rodzaj, nowy, blad });
+  const dni = dniKalendarza([w("2026-11-18T07:50", "brief"), w("2026-11-18T14:47", "patrol", true), w("2026-11-18T19:00", "patrol", true, true), w("2026-11-17T07:50", "brief")]);
+  eq(dni["2026-11-18"], { liczba: 3, nowe: 2, blad: true, rodzaje: ["brief", "patrol"] });
+  eq(dni["2026-11-17"], { liczba: 1, nowe: 0, blad: false, rodzaje: ["brief"] });
+  // kolory: stałe po id, różne dla różnych rodzajów
+  const k = koloryRodzajow(["jarvo-patrol", "jarvo-daily-brief", "jarvo-weekly-review", "jarvo-patrol"]);
+  eq(Object.keys(k).sort(), ["jarvo-daily-brief", "jarvo-patrol", "jarvo-weekly-review"]);
+  assert.strictEqual(new Set(Object.values(k)).size, 3);
+  assert.strictEqual(koloryRodzajow(["jarvo-patrol", "jarvo-daily-brief"])["jarvo-patrol"], k["jarvo-patrol"]);
+  // cytat: pierwsza treściwa linia bez znaczników Markdown, rodzaj i czas; dziś sama godzina
+  const r = { nazwa: "Patrol floty", ts: ts("2026-11-18T14:47"), tekst: "\n## ✅ **Monid** — oceniony\n\nreszta" };
+  T.wymus = "pl";
+  assert.strictEqual(cytatRaportu(r, ts("2026-11-18T20:00")), "> Odpowiadam na raport „Patrol floty” (14:47): ✅ Monid — oceniony\n\n");
+  assert.ok(cytatRaportu({ ...r, tekst: "x".repeat(300) }, ts("2026-11-19T08:00")).includes("…"));
+  T.wymus = null;
   let s = stanPoczatkowy();
   s = Os.zastosujZdarzenie(s, "raporty.nowe", { nieprzeczytane: 3 });
   eq(s.raporty, { nieprzeczytane: 3, wersja: 1 });

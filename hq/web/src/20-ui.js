@@ -34,7 +34,10 @@ const Fokus = (() => {
     const el = [...document.querySelectorAll(CELE[cel] || cel)].find((x) => x.offsetParent !== null && !x.closest("[inert]"));
     if (el) {
       if (!el.matches(FOKUSOWALNE) && !el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");   // nagłówek, linia
-      el.focus({ preventScroll: true }); if (document.activeElement === el) { cel = null; return; } }
+      el.focus({ preventScroll: true });
+      // pole z gotowym szkicem (cytat raportu, ↑ ostatnia wiadomość): kursor na końcu, pisze się dalej
+      if (el.tagName === "TEXTAREA" && el.value) el.setSelectionRange(el.value.length, el.value.length);
+      if (document.activeElement === el) { cel = null; return; } }
     t = setTimeout(sprobuj, 60);
   }
   return {

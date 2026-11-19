@@ -103,6 +103,32 @@ def test_filtr_strony_i_przeczytane(arch):
     assert [r["nowy"] for r in a.lista()["raporty"]] == [False] * 7
 
 
+def test_dzien_sasiedzi_i_kalendarz(arch):
+    """Widok dnia: okno [od, przed) z czasem najbliższego raportu przed i po (‹ › skaczą po dniach z raportami, też
+    w obrębie filtra rodzaju); kalendarz: wpisy bez treści z „nowy” i błędem."""
+    a, dane, _ = arch
+    _zapisz(dane, "jarvo-daily-brief", "b1", _agent("Poranny brief", "jarvo-daily-brief", "Brief 1"), 1_000)
+    _zapisz(dane, "jarvo-patrol", "p1", _agent("Patrol floty", "jarvo-patrol", "Patrol 1"), 5_000)
+    _zapisz(dane, "jarvo-daily-brief", "b2", _agent("Poranny brief", "jarvo-daily-brief", "Brief 2"), 9_000)
+    _zapisz(dane, "jarvo-patrol", "p2", _skrypt("Patrol floty", "jarvo-patrol", "**Status:** script failed\n\nKeyError\n"), 9_500)
+    a.zbierz()
+    dzien = a.lista(od=4_000, przed=6_000)
+    assert [r["tekst"] for r in dzien["raporty"]] == ["Patrol 1"]
+    assert (dzien["poprzedni"], dzien["nastepny"]) == (1_000.0, 9_000.0)
+    tylko_briefy = a.lista(od=4_000, przed=6_000, rodzaj="jarvo-daily-brief")
+    assert tylko_briefy["raporty"] == [] and (tylko_briefy["poprzedni"], tylko_briefy["nastepny"]) == (1_000.0, 9_000.0)
+    skraj = a.lista(od=9_000, przed=10_000, rodzaj="jarvo-patrol")
+    assert (skraj["poprzedni"], skraj["nastepny"]) == (5_000.0, None)
+    assert "poprzedni" not in a.lista()                              # bez okna dnia: bez sąsiadów
+    a.przeczytane(5_000)
+    k = a.kalendarz(0, 9_500)                                        # koniec okna wyłączny
+    assert k["wpisy"] == [{"ts": 1_000.0, "rodzaj": "jarvo-daily-brief", "nowy": False, "blad": False},
+                          {"ts": 5_000.0, "rodzaj": "jarvo-patrol", "nowy": False, "blad": False},
+                          {"ts": 9_000.0, "rodzaj": "jarvo-daily-brief", "nowy": True, "blad": False}]
+    assert k["najnowszy"] == 9_500.0 and {x["rodzaj"] for x in k["rodzaje"]} == {"jarvo-daily-brief", "jarvo-patrol"}
+    assert a.kalendarz(9_400, 9_600)["wpisy"][0]["blad"] is True
+
+
 def test_runda_co_30_s_z_nowymi(arch):
     a, dane, zegar = arch
     _zapisz(dane, "jarvo-daily-brief", "b1", _agent("Poranny brief", "jarvo-daily-brief", "Brief"), 500)
@@ -148,3 +174,9 @@ def test_trasy(arch):
     assert hub.zdarzenia == [("raporty.licznik", {"nieprzeczytane": 0, "przeczytane_do": 500.0})]
     assert c.post("/raporty/przeczytane", content="[]").status_code == 422
     assert c.post("/raporty/przeczytane", content=json.dumps({"do": "jutro"})).status_code == 422
+    k = c.get("/raporty/kalendarz", params={"od": 0, "do": 86_400}).json()
+    assert [w["rodzaj"] for w in k["wpisy"]] == ["jarvo-patrol", "jarvo-daily-brief"]
+    assert c.get("/raporty/kalendarz", params={"od": 0, "do": 90 * 86_400}).json()["blad"]["kod"] == "zle_dane"
+    assert c.get("/raporty/kalendarz", params={"od": 0, "do": 86_400}, headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+    d = c.get("/raporty", params={"od": 450, "przed": 600}).json()
+    assert [r["nazwa"] for r in d["raporty"]] == ["Poranny brief"] and d["poprzedni"] == 400.0 and d["nastepny"] is None

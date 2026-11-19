@@ -4,14 +4,15 @@
 //   #/r/<watek>            wątek          #/r/<watek>/m/<pozycja>    wątek przewinięty do pozycji
 //   #/s/<profil>/<sesja>   obca sesja (tylko odczyt)
 //   #/mozg                 Mózg Jarva (pakiet „mozg” na żądanie)
-//   #/aktualizacje[/<rodzaj>]   Aktualizacje: raporty rutyn, filtr rodzaju = id zadania crona (pakiet „raporty”)
+//   #/aktualizacje[/<dzień RRRR-MM-DD>][/<rodzaj>]   Aktualizacje: raporty z dnia (domyślnie najnowszy dzień z raportami),
+//                          filtr rodzaju = id zadania crona (pakiet „raporty”)
 //   #/ustawienia[/<sekcja>[/<pod>]]   strona Ustawień      …?n=<narzędzie>&p=<ścieżka>   narzędzie na pełny ekran
 // parsuj/zbuduj są czyste (testy node); reszta dotyka location i sessionStorage.
 
 const Trasa = (() => {
   const WATEK = /^w_[0-9a-f]{21}$/, PROFIL = /^[a-z0-9-]{1,64}$/, SESJA = /^[A-Za-z0-9_.:-]{1,128}$/;
   const POZYCJA = /^[A-Za-z0-9_:.-]{1,200}$/, SEKCJA = /^[a-z0-9-]{1,32}$/, ROZMOWCA = /^[fs]:[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
-  const RODZAJ = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/;
+  const RODZAJ = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/, DZIEN = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
   const NARZEDZIA = ["edytor", "animacja", "konwerter", "wiedza"];
   const KLUCZ_PO_LOGOWANIU = "jarvo.po_logowaniu";
   const dekoduj = (s) => { try { return decodeURIComponent(s); } catch (_) { return ""; } };
@@ -33,7 +34,9 @@ const Trasa = (() => {
     else if (a === "mozg" && !b) t = { widok: "mozg" };
     else if (a === "aktualizacje") {
       t = { widok: "aktualizacje" };
-      if (RODZAJ.test(b || "")) t.rodzaj = b;
+      const [dz, rodz] = DZIEN.test(b || "") ? [b, c] : [null, b];
+      if (dz) t.dzien = dz;
+      if (RODZAJ.test(rodz || "") && !DZIEN.test(rodz)) t.rodzaj = rodz;
     } else if (a === "ustawienia") {
       t = { widok: "ustawienia" };
       if (SEKCJA.test(b || "")) { t.sekcja = b; if (SEKCJA.test(c || "")) t.pod = c; }
@@ -52,7 +55,7 @@ const Trasa = (() => {
     else if (t.widok === "watek" && t.watek) s += `r/${e(t.watek)}` + (t.pozycja ? `/m/${e(t.pozycja)}` : "");
     else if (t.widok === "sesja" && t.profil && t.sesja) s += `s/${e(t.profil)}/${e(t.sesja)}`;
     else if (t.widok === "mozg") s += "mozg";
-    else if (t.widok === "aktualizacje") s += "aktualizacje" + (t.rodzaj ? `/${e(t.rodzaj)}` : "");
+    else if (t.widok === "aktualizacje") s += "aktualizacje" + (t.dzien ? `/${e(t.dzien)}` : "") + (t.rodzaj ? `/${e(t.rodzaj)}` : "");
     else if (t.widok === "ustawienia") s += "ustawienia" + (t.sekcja ? `/${e(t.sekcja)}${t.pod ? "/" + e(t.pod) : ""}` : "");
     const q = [];
     if (t.n) { q.push(`n=${e(t.n)}`); if (t.p) q.push(`p=${e(t.p)}`); }

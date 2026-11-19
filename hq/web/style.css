@@ -2010,6 +2010,8 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-nawig a:hover, .j-nawig button:hover, .j-inne a:hover { background: var(--j-tlo-hover); }
 .j-nawig-t, .j-inne-l { flex: 1; text-align: left; }
 .j-nawig small, .j-nawig kbd { color: var(--j-tekst-3); font-size: 11px; }
+.j-nawig.is-gora { margin-top: 4px; padding-top: 0; border-top: 0; }
+.j-nawig.is-gora a.is-aktywny, .j-nawig a.is-aktywny { background: var(--j-tlo-aktywne); }
 .j-ekran-rozm { display: flex; flex-direction: column; min-height: 100%; padding-bottom: 8px; }
 .j-ekran-rozm-t { margin: 0; padding: 10px 16px 6px; font: 15px var(--j-font-mono); letter-spacing: .12em; color: var(--j-tekst-3); }
 .j-ekran-rozm-st { flex: none; padding: 4px 16px; }
@@ -2127,35 +2129,80 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 /* Aktualizacje w rdzeniu: znacznik rutyny przy raporcie w rozmowie (licznik pozycji pod rozmówcami: .j-rozm-licz) */
 .j-tag.is-rutyna { color: var(--j-tekst-2); }
 /* @@pakiet raporty */
-/* Aktualizacje (#/aktualizacje, hq/web/src/64-raporty.js): nagłówek z filtrem rodzaju, dni, sekcje rodzajów, raporty */
+/* Aktualizacje (#/aktualizacje, hq/web/src/64-raporty.js): nagłówek z datą i ‹ ›, raporty dnia, z prawej kalendarz
+   i rodzaje (kolor rodzaju: --j-rap-kolor z --j-barwa-N); telefon: kalendarz pod przyciskiem z datą, rodzaje w rzędzie */
 .j-rap { height: 100%; overflow: auto; }
-.j-rap-g { position: sticky; top: 0; z-index: 1; padding: 18px 24px 12px; background: var(--j-tlo); border-bottom: 1px solid var(--j-linia); }
-.j-rap-g h1, .j-rap-t { margin: 0; font: 600 1.05rem var(--j-font-mono); letter-spacing: .04em; }
-.j-rap-g h1:focus { outline: none; }
-.j-rap-opis { margin: 4px 0 10px; color: var(--j-tekst-3); font-size: 13px; max-width: 72ch; }
-.j-rap-filtr { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
-.j-rap-f { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 1px solid var(--j-linia-2); border-radius: 16px; color: var(--j-tekst-2); text-decoration: none; white-space: nowrap; font-size: 13px; }
-.j-rap-f:hover { background: var(--j-tlo-hover); }
-.j-rap-f.is-aktywny { background: var(--j-tekst); color: var(--j-tlo); border-color: var(--j-tekst); }
-.j-rap-f small { font: 11px var(--j-font-mono); opacity: .7; }
-.j-rap-f:focus-visible { outline: 2px solid var(--j-akcent); outline-offset: 1px; }
-.j-rap-lista { max-width: 820px; padding: 8px 24px 32px; }
-.j-rap-dzien { margin: 0; }
-.j-rap-dzien-t { margin: 22px 0 8px; font: 600 12px var(--j-font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--j-tekst-3); }
-.j-rap-sekcja { margin: 0 0 14px; }
-.j-rap-sekcja-t { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
-.j-rap-sekcja-t small { color: var(--j-tekst-3); font-weight: 400; }
-.j-rap-r { margin: 0 0 8px; padding: 10px 14px 6px; border: 1px solid var(--j-linia); border-radius: 10px; background: var(--j-tlo-karta); }
-.j-rap-r.is-nowy { border-left: 3px solid var(--j-akcent); }
+.j-rap-g { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 14px 28px; background: var(--j-tlo); border-bottom: 1px solid var(--j-linia); }
+.j-rap-tytul { margin: 0; font: 600 1.05rem var(--j-font-mono); letter-spacing: .04em; }
+.j-rap-tytul:focus { outline: none; }
+.j-rap-nawig { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.j-rap-data { display: grid; grid-template-columns: auto auto; align-items: center; column-gap: 6px; min-width: 0; padding: 4px 10px; border: 0; border-radius: var(--j-promien-2, 8px); background: none; color: var(--j-tekst); text-align: left; font: inherit; cursor: default; }
+.j-rap-data b { font-size: 15px; font-weight: 600; }
+.j-rap-data small { grid-column: 1; color: var(--j-tekst-3); font-size: 12px; }
+.j-rap-data-i { display: none; grid-row: 1 / span 2; grid-column: 2; color: var(--j-tekst-3); }
+.j-rap-uklad { display: grid; grid-template-columns: minmax(0, 760px) 280px; gap: 32px; align-items: start; padding: 20px 28px 48px; }
+.j-rap-lista { min-width: 0; }
+.j-rap-podsum { margin: 0 0 10px; color: var(--j-tekst-3); font-size: 12px; font-family: var(--j-font-mono); letter-spacing: .04em; }
+.j-rap-bok { position: sticky; top: 84px; display: grid; gap: 18px; }
+/* raport */
+.j-rap-r { margin: 0 0 14px; padding: 14px 18px 10px; border: 1px solid var(--j-linia); border-radius: 12px; background: var(--j-tlo-karta); box-shadow: inset 3px 0 0 var(--j-rap-kolor, var(--j-linia-2)); }
+.j-rap-r.is-nowy { border-color: var(--j-linia-2); }
 .j-rap-r.is-blad { border-color: var(--j-uwaga); }
-.j-rap-r-g { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--j-tekst-3); }
-.j-rap-nowy { font: 600 10px var(--j-font-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--j-akcent); }
-.j-rap-r-t { margin-top: 4px; }
-.j-rap-r.is-zwiniety .j-rap-r-t { max-height: 16em; overflow: hidden; mask-image: linear-gradient(#000 70%, transparent); }
-.j-rap-r-s { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
-.j-rap-odp { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
-@container app (max-width: 700px) {
-  .j-rap-g { padding: 12px 14px 10px; }
-  .j-rap-lista { padding: 4px 12px 24px; }
+.j-rap-r-g { display: flex; align-items: center; gap: 8px; }
+.j-rap-r-g h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.j-rap-r-g time { color: var(--j-tekst-3); font: 12px var(--j-font-mono); }
+.j-rap-kropka { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--j-rap-kolor, var(--j-tekst-3)); }
+.j-rap-kropka.is-wszystkie { background: conic-gradient(var(--j-barwa-0) 0 25%, var(--j-barwa-3) 0 50%, var(--j-barwa-5) 0 75%, var(--j-barwa-1) 0); }
+.j-rap-nowy { font: 600 10px var(--j-font-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--j-akcent-na); background: var(--j-akcent); border-radius: 4px; padding: 1px 5px; }
+.j-rap-r-t { margin-top: 8px; }
+.j-rap-r.is-zwiniety .j-rap-r-t { max-height: 22em; overflow: hidden; mask-image: linear-gradient(#000 75%, transparent); }
+.j-rap-r-s { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--j-linia); }
+.j-rap-kopiuj { margin-left: auto; }
+/* kalendarz */
+.j-kal { padding: 12px; border: 1px solid var(--j-linia); border-radius: 12px; background: var(--j-tlo-karta); }
+.j-kal-g { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.j-kal-t { font-size: 13px; font-weight: 600; }
+.j-kal-siatka { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.j-kal-dt { padding: 4px 0; text-align: center; color: var(--j-tekst-3); font-size: 11px; text-transform: lowercase; }
+.j-kal-d { position: relative; display: grid; justify-items: center; align-content: center; gap: 2px; aspect-ratio: 1; min-height: 32px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--j-tekst-3); font: 12px var(--j-font-ui); cursor: pointer; }
+.j-kal-d:hover:not(:disabled) { background: var(--j-tlo-hover); color: var(--j-tekst); }
+.j-kal-d:focus-visible { outline: 2px solid var(--j-fokus); outline-offset: -2px; }
+.j-kal-d:disabled { cursor: default; opacity: .35; }
+.j-kal-d.is-obok { opacity: .45; }
+.j-kal-d.is-ma { color: var(--j-tekst); }
+.j-kal-d.is-nowe span { font-weight: 700; }
+.j-kal-d.is-dzis { box-shadow: inset 0 0 0 1px var(--j-linia-mocna); }
+.j-kal-d.is-wybrany, .j-kal-d.is-wybrany:hover { background: var(--j-tekst); color: var(--j-tlo); }
+.j-kal-kropki { display: flex; gap: 2px; height: 4px; }
+.j-kal-kropki b { width: 4px; height: 4px; border-radius: 50%; }
+.j-kal-d.is-blad::after { content: ""; position: absolute; top: 3px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: var(--j-uwaga); }
+/* rodzaje (filtr) */
+.j-rap-rodzaje ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.j-rap-f { display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 0 10px; border-radius: 8px; color: var(--j-tekst-2); text-decoration: none; font-size: 13px; white-space: nowrap; }
+.j-rap-f span { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.j-rap-f small { color: var(--j-tekst-3); font: 11px var(--j-font-mono); }
+.j-rap-f:hover { background: var(--j-tlo-hover); color: var(--j-tekst); }
+.j-rap-f.is-aktywny { background: var(--j-tlo-aktywne); color: var(--j-tekst); font-weight: 600; }
+.j-rap-f:focus-visible { outline: 2px solid var(--j-fokus); outline-offset: -2px; }
+@container app (max-width: 1023px) {
+  .j-rap-uklad { grid-template-columns: minmax(0, 1fr) 248px; gap: 20px; padding: 16px 20px 40px; }
+}
+@container app (max-width: 760px) {
+  .j-rap-g { gap: 6px; padding: 8px 10px; }
+  .j-rap-tytul { display: none; }
+  .j-rap-nawig { width: 100%; margin: 0; }
+  .j-rap-data { flex: 1; justify-content: center; text-align: center; cursor: pointer; }
+  .j-rap-data small { grid-column: 1; }
+  .j-rap-data-i { display: block; }
+  .j-rap-data[aria-expanded="true"] .j-rap-data-i { transform: rotate(180deg); }
+  .j-rap-uklad { display: flex; flex-direction: column-reverse; gap: 12px; padding: 0 12px 32px; }
+  .j-rap-bok { position: static; gap: 10px; }
+  .j-rap-bok .j-kal { display: none; }
+  .j-rap-bok.is-otwarty .j-kal { display: block; }
+  .j-rap-rodzaje { margin: 0 -12px; padding: 8px 12px 0; overflow-x: auto; scrollbar-width: none; }
+  .j-rap-rodzaje ul { display: flex; gap: 6px; }
+  .j-rap-f { min-height: 32px; border: 1px solid var(--j-linia-2); border-radius: 16px; }
+  .j-rap-r { padding: 12px 14px 8px; }
+  .j-kal-d { aspect-ratio: auto; height: 40px; }
 }
 /* @@pakiet rdzen */

@@ -176,7 +176,8 @@ function ListaRozmowcow({ trasa, duza = false }) {
   </ul>`;
 }
 
-// Aktualizacje (raporty rutyn z licznikiem nieprzeczytanych), Mózg i Ustawienia pod rozmówcami (⌘M, ⌘,)
+// Aktualizacje (raporty rutyn z licznikiem nieprzeczytanych) na górze, pod „+ Nowa rozmowa” (19.11 właściciel:
+// „Aktualizacje ma być na górze”); Mózg i Ustawienia pod rozmówcami (⌘M, ⌘,)
 function PozycjaAktualizacji({ trasa }) {
   const n = useSklep((s) => s.raporty.nieprzeczytane);
   const tu = trasa.widok === "aktualizacje";
@@ -189,7 +190,7 @@ function PozycjaAktualizacji({ trasa }) {
 
 function NawigacjaCentrum({ trasa }) {
   const poz = [["mozg", "◇", T("rozm.mozg"), "Mod+M"], ["ustawienia", "⚙", T("pasek.ustawienia"), "Mod+,"]];
-  return html`<ul class="j-nawig"><${PozycjaAktualizacji} trasa=${trasa}/>${poz.map(([w, znak, tekst, komb]) => html`<li key=${w}>
+  return html`<ul class="j-nawig">${poz.map(([w, znak, tekst, komb]) => html`<li key=${w}>
     <a href=${Trasa.zbuduj({ widok: w })} aria-current=${trasa.widok === w ? "page" : undefined} class=${cx(trasa.widok === w && "is-aktywny")}>
       <span aria-hidden="true">${znak}</span><span class="j-nawig-t">${tekst}</span>
       <kbd class="j-rozm-skrot" aria-hidden="true">${Skroty.opis(komb)}</kbd></a></li>`)}</ul>`;
@@ -210,10 +211,10 @@ function EkranRozmowcow() {
   return html`<section class="j-ekran-rozm" aria-labelledby="j-ekran-rozm-t">
     <h1 class="j-sr" id="j-ekran-rozm-t">${T("rozm.sekcja")}</h1>
     <${NowaRozmowa} duza=${true}/>
+    <ul class="j-nawig is-duza is-gora"><${PozycjaAktualizacji} trasa=${trasa}/></ul>
     <${StanPolaczenia} klasa="j-ekran-rozm-st"/>
     <${ListaRozmowcow} trasa=${trasa} duza=${true}/>
     <ul class="j-nawig is-duza">
-      <${PozycjaAktualizacji} trasa=${trasa}/>
       <li><a href="#/mozg"><span aria-hidden="true">◇</span><span class="j-nawig-t">${T("rozm.mozg")}</span></a></li>
       <li><a href="#/ustawienia"><span aria-hidden="true">⚙</span><span class="j-nawig-t">${T("pasek.ustawienia")}</span></a></li>
       <li><button type="button" onClick=${() => sklep.ustaw((s) => ({ ...s, inne_otwarte: true, pasek: { ...s.pasek, otwarty: true } }))}>
@@ -331,6 +332,7 @@ function Pasek({ trasa, warstwa = false }) {
         onClick=${() => sklep.zmien("pasek", { otwarty: false })}/>
     </div>
     <${NowaRozmowa} fokus=${!saRozmowcy}/>
+    <ul class="j-nawig is-gora"><${PozycjaAktualizacji} trasa=${trasa}/></ul>
     ${saRozmowcy && html`<div class="j-pasek-rozm">
       <h2 class="j-sekcja" id="j-sekcja-rozm">${T("rozm.sekcja_t")}</h2>
       <${ListaRozmowcow} trasa=${trasa}/>
