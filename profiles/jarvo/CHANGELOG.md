@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Aktualizacja nie przerywa już odpowiedzi agentów: restart bramy po zmianie floty (`jarvo instaluj`, `jarvo update`, `jarvo telegram tematy`) czeka, aż żaden agent nie odpowiada (najdłużej 30 min). 19.11 przy dodawaniu nowego agenta trzy restarty przerwały odpowiedź Jarva na wiadomość właściciela z Telegrama („Operation interrupted” w panelu; brama wznowiła ją dopiero po starcie).
 - Walidacja: każdy plik YAML profilu (`config.yaml`, `toolbox.yaml`, `cron/jobs.yaml`…) musi się parsować już w `validate.py`, także u agentów nakładki. 19.11 `toolbox.yaml` nowego agenta biznesowego z wartością „REST: /v2/…” bez cudzysłowu przeszedł walidację i wywrócił dopiero build w `jarvo instaluj`.
 - Panel: Aktualizacje mają jeden zestaw strzałek (19.11 właściciel: „dwa sety strzałek, jedne działają, jedne nie… nie mamy miesięcy”). Kalendarz nie ma już strzałek miesiąca, idzie za wybranym dniem; ‹ › dnia w nagłówku nie uciekają spod kursora (data ma stałą szerokość), a ←/→ działają od razu po wejściu w widok.
 - Panel spójny (19.11 właściciel: „Operator jest idealnie na wysokości Jarvo, a Aktualizacje dziwnie niżej… Mózg zupełnie się różni, mała czcionka… diabeł tkwi w detalach”): Aktualizacje, Mózg i Ustawienia zaczynają się tą samą belką co rozmowa (tytuł na wysokości logo Jarvo, ten sam krój, szara linia opisu, ikona widoku), zamiast pustej belki i własnego nagłówka niżej. Ikony w pasku są te same co w nagłówkach. Mózg ma ten sam rozmiar liter co reszta panelu (lista 14,5 px, notatka 15 px jak rozmowa; wcześniej ok. 12,5 px).

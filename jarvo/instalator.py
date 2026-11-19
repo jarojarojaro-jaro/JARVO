@@ -128,6 +128,7 @@ PIERWSZE = ("uv", "python313", "python312", "git", "node")
 OPISY = {"uv": "uv", "python313": "Python 3.13", "python312": "Python 3.12", "git": "git i Git Bash",
          "node": "Node.js i npm"}
 CZAS_PANELU = 180.0             # pierwszy start panelu (import Hermesa, bazy) trwa kilkanaście–kilkadziesiąt sekund
+CZAS_TUR = 1800.0               # restart bramy czeka na koniec odpowiedzi agentów najwyżej 30 min (_czekaj_na_tury)
 CZAS_NADZORCY = 30.0            # tyle czekamy, aż nadzorca otworzy kanał (start przez autostart, czekanie na panel)
 CZAS_STOPU = 120.0              # drenaż bramy i zatrzymanie panelu; dłużej, gdy nadzorca poda CZAS_ZATRZYMANIA
 PATH_RC = ('case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac  '
@@ -851,6 +852,16 @@ def usluga_nadzorcy(stan: dict | None, nazwa: str) -> dict:
     uslugi = stan.get("uslugi") if isinstance(stan, dict) else None
     us = uslugi.get(nazwa) if isinstance(uslugi, dict) else None
     return us if isinstance(us, dict) else {}
+
+
+def aktywne_tury(u: Uklad) -> int:
+    """Odpowiedzi agentów w toku według bramy (`active_agents` w `<dane>/gateway_state.json`, Hermes zapisuje go przy
+    każdej zmianie). Brak pliku, zły plik albo brama nie w stanie `running` = 0 (nie ma na co czekać)."""
+    try:
+        d = json.loads((u.dane / "gateway_state.json").read_text(encoding="utf-8"))
+        return int(d.get("active_agents") or 0) if d.get("gateway_state") == "running" else 0
+    except (OSError, ValueError, TypeError, AttributeError):
+        return 0
 
 
 def czekaj_na_panel(u: Uklad, ot: Otoczenie, log: Callable[[str], None], limit: float = CZAS_PANELU) -> str:
@@ -2565,6 +2576,8 @@ class _Instalacja:
         tury), a my czekamy, aż usługa wstanie z nowym PID-em i będzie gotowa (najdłużej CZAS_PANELU s)."""
         nadzorca = self.ot.modul("nadzorca")
         przed = {n: usluga_nadzorcy(stan, n).get("pid") for n in uslugi}
+        if "brama" in uslugi:
+            self._czekaj_na_tury()
         self.podlog(f"flota się zmieniła: restart {' i '.join(uslugi)} przez nadzorcę")
         for nazwa in uslugi:
             wywolaj(nadzorca.polacz(self.u).restart, nazwa)
@@ -2582,6 +2595,27 @@ class _Instalacja:
             self.ot.czekaj(1.0)
         self.panel_po_flocie = "panel" in uslugi
         self.podlog(f"po restarcie gotowe: {', '.join(uslugi)}")
+
+    def _czekaj_na_tury(self) -> None:
+        """Brama przerywa tury rozmów od razu (restart_drain_timeout 0, wznawia je po starcie), więc restart w trakcie
+        odpowiedzi agenta = „Operation interrupted” u właściciela. 19.11 dwa `jarvo instaluj` i `jarvo telegram tematy`
+        operatora przerwały tak dwa razy odpowiedź Jarva na wiadomość z Telegrama. Czekamy, aż brama nie ma aktywnych
+        tur (najdłużej CZAS_TUR s), potem restart i tak (przerwane tury brama wznowi sama)."""
+        koniec, zglosil = self.ot.zegar() + CZAS_TUR, False
+        # wołany z narzędzia agenta (np. Jarvo na prośbę „zaktualizuj się”): jego własna tura też jest aktywna
+        wlasna = 1 if self.ot.env.get("HERMES_HOME") else 0
+        while (n := aktywne_tury(self.u) - wlasna) > 0:
+            if not zglosil:
+                self.podlog(f"brama ma {n} odpowiedź w toku: czekam na jej koniec przed restartem "
+                            f"(najdłużej {int(CZAS_TUR // 60)} min)")
+                zglosil = True
+            if self.ot.zegar() >= koniec:
+                self.uwagi.append(f"restart bramy przerwał {n} odpowiedź w toku po {int(CZAS_TUR // 60)} min czekania "
+                                  "(brama wznowi ją po starcie)")
+                return
+            self.ot.czekaj(5.0)
+        if zglosil:
+            self.podlog("odpowiedzi skończone: restartuję")
 
     def panel(self) -> None:
         self.podlog(f"panel Jarva odpowiada: {czekaj_na_panel(self.u, self.ot, self.log)}")

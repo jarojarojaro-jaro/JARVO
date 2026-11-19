@@ -778,6 +778,50 @@ def test_pelna_instalacja_z_flota_i_restart_uslug_przez_nadzorce(tmp_path, stano
     assert "Gotowe. Zmiany w tym przebiegu: brak." in s["log"] and s["nadzorca"].restarty == ["brama", "panel"]
 
 
+def test_restart_bramy_czeka_na_odpowiedzi_w_toku(tmp_path, stanowisko, monkeypatch):
+    """19.11: `jarvo instaluj` i `jarvo telegram tematy` restartowały bramę w trakcie odpowiedzi Jarva na Telegramie
+    („Operation interrupted” u właściciela). Restart czeka, aż brama nie ma aktywnych tur; własna tura agenta,
+    który woła instalację (HERMES_HOME w środowisku), się nie liczy; po CZAS_TUR restart i tak, z uwagą."""
+    s = stanowisko
+    app = tc._aplikacja(tmp_path, s["adres"], s["www"])
+    assert tc._instaluj(s, app) == 0, "\n".join(s["log"])
+    monkeypatch.delenv("HERMES_HOME", raising=False)
+    stany = iter([1, 1, 0])
+    monkeypatch.setattr(instalator, "aktywne_tury", lambda u: next(stany, 0))
+    s["flota"].zmiany = ["profil jarvo-web"]
+    assert tc._instaluj(s, app) == 0, "\n".join(s["log"])
+    log = "\n".join(s["log"])
+    assert log.index("czekam na jej koniec przed restartem") < log.index("odpowiedzi skończone: restartuję") \
+        < log.index("flota się zmieniła: restart")
+    assert s["nadzorca"].restarty[-2:] == ["brama", "panel"]
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "h"))               # sama tura agenta, który instaluje
+    monkeypatch.setattr(instalator, "aktywne_tury", lambda u: 1)
+    s["flota"].zmiany = ["profil jarvo-web"]
+    assert tc._instaluj(s, app) == 0 and "czekam na jej koniec" not in "\n".join(s["log"])
+
+    monkeypatch.delenv("HERMES_HOME")
+    s["flota"].zmiany = ["profil jarvo-web"]
+    przed = len(s["nadzorca"].restarty)
+    assert tc._instaluj(s, app) == 0
+    assert len(s["nadzorca"].restarty) == przed + 2                         # po 30 min restart i tak
+    assert any("przerwał 1 odpowiedź w toku po 30 min" in x for x in s["log"])
+
+
+def test_aktywne_tury_z_pliku_bramy(stanowisko):
+    u = stanowisko["u"]
+    u.dane.mkdir(parents=True, exist_ok=True)
+    plik = u.dane / "gateway_state.json"
+    plik.unlink(missing_ok=True)
+    assert instalator.aktywne_tury(u) == 0
+    plik.write_text(json.dumps({"gateway_state": "running", "active_agents": 2}), encoding="utf-8")
+    assert instalator.aktywne_tury(u) == 2
+    plik.write_text(json.dumps({"gateway_state": "stopped", "active_agents": 2}), encoding="utf-8")
+    assert instalator.aktywne_tury(u) == 0
+    plik.write_text("{zły", encoding="utf-8")
+    assert instalator.aktywne_tury(u) == 0
+
+
 def test_instalacja_bez_venvu_narzedzi_pomija_programy_floty(tmp_path, stanowisko):
     s = stanowisko
     app = tc._aplikacja(tmp_path, s["adres"], s["www"])
