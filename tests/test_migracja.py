@@ -43,6 +43,13 @@ GIT_HEAD = "a" * 40
 SQLITE_INSTALACJI = (3, 53, 1)
 
 
+@pytest.fixture(autouse=True)
+def _miejsce_niezalezne_od_maszyny(monkeypatch):
+    """Próg wolnego miejsca (2 GB) sprawdza prawdziwy dysk tmp_path: wynik testu nie może zależeć od maszyny
+    (19.11: tmpfs /tmp 2 GB na InstaBoxie, 1,9 GB wolnego → 23 testy padły na progu)."""
+    monkeypatch.setattr(mig, "MIN_WOLNE_GB", 0.0)
+
+
 # ---------------------------------------------------------------- stara instalacja: pliki i archiwum
 
 def _baza_stanu(p: Path, cwds: list[str]) -> None:

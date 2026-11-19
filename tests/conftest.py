@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import shutil
+import signal
 import subprocess
 import sys
 from functools import lru_cache
@@ -138,6 +139,31 @@ def _bez_starej_instalacji(monkeypatch):
         sys.path.insert(0, str(REPO))
     from jarvo import instalator
     monkeypatch.setattr(instalator, "wykryj_stara", lambda u, ot: None)
+
+
+# Obsługa sygnałów to stan całego procesu testów: test, który ją zmienia i nie przywraca, psuje wszystkie następne.
+# 18.11: zrodlo.main() w teście ustawiało SIGPIPE=SIG_DFL; potem pierwszy zapis do zamkniętego potoku zabijał worker
+# xdist bez śladu („node down: Not properly terminated” w losowym teście, ~95% biegów -n 4). SIGKILL i SIGSTOP
+# nie mają obsługi.
+SYGNALY = sorted(set(signal.valid_signals()) - {getattr(signal, "SIGKILL", None), getattr(signal, "SIGSTOP", None)})
+
+
+@pytest.fixture(autouse=True)
+def _sygnaly_bez_zmian():
+    """Test kończy się z tą samą obsługą sygnałów procesu, z którą zaczął; zmienioną przywraca i zgłasza jako błąd
+    (kod pod testem ustawia sygnały tylko w `if __name__ == "__main__"` albo przywraca je sam; test: monkeypatch)."""
+    przed = {s: signal.getsignal(s) for s in SYGNALY}
+    yield
+    zmienione = []
+    for s, obsluga in przed.items():
+        if signal.getsignal(s) != obsluga:
+            nazwa = signal.Signals(s).name if s in signal.Signals._value2member_map_ else f"sygnał {s}"
+            zmienione.append(f"{nazwa}: {obsluga!r} → {signal.getsignal(s)!r}")
+            if obsluga is not None:
+                signal.signal(s, obsluga)
+    if zmienione:
+        pytest.fail("test zmienił obsługę sygnałów procesu testów (przywrócona): " + "; ".join(zmienione),
+                    pytrace=False)
 
 
 @pytest.fixture
