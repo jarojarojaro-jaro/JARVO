@@ -236,7 +236,7 @@ def skarbiec(tmp_path, monkeypatch):
 
 def chrome_z_instalacji(tmp_path) -> Path:
     """Układ jak w manifeście: <wersja>/chrome-headless-shell-<platforma>/chrome-headless-shell[.exe]."""
-    chrome = tmp_path / "narzedzia" / "chrome-headless-shell" / "153.0.8010.12" / "chrome-headless-shell-win64" / \
+    chrome = tmp_path / "narzedzia" / "chrome-headless-shell" / "158.0.8127.36" / "chrome-headless-shell-win64" / \
         "chrome-headless-shell.exe"
     chrome.parent.mkdir(parents=True)
     chrome.write_bytes(b"x")

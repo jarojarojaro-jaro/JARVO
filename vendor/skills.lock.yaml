@@ -107,8 +107,8 @@ sources:
   hyperframes:
     type: git
     repo: https://github.com/heygen-com/hyperframes
-    # tag v0.9.52; paczka npm hyperframes 0.9.56 z infra/node ma te same polecenia i flagi (--help 50 poleceń bez zmian).
-    # Skille v0.9.56 (#7879) wołają każde polecenie przez scripts/plugin-cli.mjs, który bez manifestu wtyczki robi
+    # tag v0.9.52; paczka npm hyperframes 0.9.69 z infra/node ma te same polecenia i flagi (0.9.69: tylko nowe flagi renderu).
+    # Skille od v0.9.56 (#7879) wołają każde polecenie przez scripts/plugin-cli.mjs, który bez manifestu wtyczki robi
     # `npx --yes hyperframes@>=0.9.34` z katalogu domowego: pobiera najnowszą wersję z npm (sprawdzone 2026-11-16:
     # 183 MB do cache npx mimo przypiętej kopii w globalnym bin npm), więc zostają skille v0.9.52 (docs/SOURCES.md)
     rev: ad3a2389ee82b87eaee4bbf9a046c6a4273a6661

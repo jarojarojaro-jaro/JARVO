@@ -419,7 +419,7 @@ def test_required_service_present_keeps_skills(tmp_path, monkeypatch):
 
 WIN_DANE = "D:/JarvoTest/proba-build/Michał Żółć/dane"
 WIN_PROGRAM = "D:/JarvoTest/proba-build/Michał Żółć/program"
-WIN_CHROME = f"{WIN_PROGRAM}/narzedzia/chrome-headless-shell/153.0.8010.12/chrome-headless-shell-win64/chrome-headless-shell.exe"
+WIN_CHROME = f"{WIN_PROGRAM}/narzedzia/chrome-headless-shell/158.0.8127.36/chrome-headless-shell-win64/chrome-headless-shell.exe"
 WIN_OPCJE = ["--uklad", "natywny", "--system", "windows", "--dane", WIN_DANE,
              "--runtime-build-dir", "D:/JarvoTest/proba-build/Michał Żółć/build",
              "--repo-dir", f"{WIN_PROGRAM}/app/0123abcd",

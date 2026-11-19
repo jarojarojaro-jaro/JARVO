@@ -47,40 +47,40 @@ hermes:
 narzedzia:
   uv:
     zrodlo: uv
-    wersja: "0.13.8"
+    wersja: "0.13.9"
     licencja: Apache-2.0 OR MIT
     rola: "instalator Pythona i paczek (uv sync --locked Hermesa, venvy Jarva z --require-hashes)"
     pliki:
       windows-x64:
-        url: https://github.com/astral-sh/uv/releases/download/0.13.8/uv-x86_64-pc-windows-msvc.zip
-        sha256: 529e78a9cec6cd7e3e014f7ecd8bda0c113969d4ed0f2efeedb85c30943325b8
-        rozmiar: 15529884
+        url: https://github.com/astral-sh/uv/releases/download/0.13.9/uv-x86_64-pc-windows-msvc.zip
+        sha256: edd61f7f5728a56cc62455386661860bdfc7bab65872f39b0c25bdcc1d8e1beb
+        rozmiar: 15567875
         format: zip
         bin: ["."]
       windows-arm64:
-        url: https://github.com/astral-sh/uv/releases/download/0.13.8/uv-aarch64-pc-windows-msvc.zip
-        sha256: 59e6d919bed1f72035e622a7c930058f08a8931c4c78ceaf9f56e7fb74dd2c48
-        rozmiar: 15590791
+        url: https://github.com/astral-sh/uv/releases/download/0.13.9/uv-aarch64-pc-windows-msvc.zip
+        sha256: 72eed595983a4d7d22d79f21065b0f4479cc7e5c7a89104bb410c8f47559a878
+        rozmiar: 15747415
         format: zip
         bin: ["."]
       macos-arm64:
-        url: https://github.com/astral-sh/uv/releases/download/0.13.8/uv-aarch64-apple-darwin.tar.gz
-        sha256: 6b71028a6b904f2ae3340ef52e595512de807d06c0a20eaef2f692581b246558
-        rozmiar: 14375545
+        url: https://github.com/astral-sh/uv/releases/download/0.13.9/uv-aarch64-apple-darwin.tar.gz
+        sha256: 5aeca67f2283f75235de40d0bd9c0a5bbc5fce23b6d48b3bf9fa1b2db08382ca
+        rozmiar: 14554974
         format: tar.gz
         usun_poziom: 1
         bin: ["."]
       linux-x64:
-        url: https://github.com/astral-sh/uv/releases/download/0.13.8/uv-x86_64-unknown-linux-gnu.tar.gz
-        sha256: 5acfd9177cfecf0bf87578f059728215ccc884388988f55f7a65041b57387d91
-        rozmiar: 16855069
+        url: https://github.com/astral-sh/uv/releases/download/0.13.9/uv-x86_64-unknown-linux-gnu.tar.gz
+        sha256: a7fbaff2b9a271d85c1bdb540941090fd1ce011797b4abeb48e4dcd39c2471d5
+        rozmiar: 17068176
         format: tar.gz
         usun_poziom: 1
         bin: ["."]
       linux-arm64:
-        url: https://github.com/astral-sh/uv/releases/download/0.13.8/uv-aarch64-unknown-linux-gnu.tar.gz
-        sha256: 74f2f5c6024d397481db228db8fc25eed420db192243f88438c118e7e013e585
-        rozmiar: 16065638
+        url: https://github.com/astral-sh/uv/releases/download/0.13.9/uv-aarch64-unknown-linux-gnu.tar.gz
+        sha256: 0797542018e541a9288855df555c8077eed06f7a47d206362030480e8ecc9f3d
+        rozmiar: 16120245
         format: tar.gz
         usun_poziom: 1
         bin: ["."]
@@ -324,22 +324,24 @@ narzedzia:
         bin: ["."]
 
   # ── Przeglądarki (C01–C07) ────────────────────────────────────────────────────────────────────────────────────────
-  # Chrome for Testing: chrome-headless-shell rewizji Playwrighta 1243 (browsers.json playwright-core 1.63.0 =
-  # CfT 153.0.8010.12) dla skryptów floty, a na Windows także silnik browser_* (C06). Pliki u Google
+  # Chrome for Testing: chrome-headless-shell 158.0.8127.36 dla skryptów floty, a na Windows także silnik browser_*
+  # (C06). playwright-core 1.63.0 (browsers.json: rewizja 1243 = CfT 153) zostaje, bo musi trafić w Chromium obrazu
+  # Hermesa; natywnie skrypty kładą tę binarkę jako chromium_headless_shell-<rewizja z browsers.json>, a Playwright
+  # 1.63.0 steruje 158 bez zmian (2026-11-19: launch, setContent, PDF, zrzut). Pliki u Google
   # (storage.googleapis.com; cdn.playwright.dev/builds/cft/... przekierowuje do tych samych obiektów). Google nie
   # publikuje sha256: policzone przy przeglądzie dwa razy, md5 z x-goog-hash zgodne. Archiwum zostaje z katalogiem
-  # chrome-headless-shell-<platforma>/ (bez usun_poziom), jak w PLAYWRIGHT_BROWSERS_PATH/chromium_headless_shell-1243.
+  # chrome-headless-shell-<platforma>/ (bez usun_poziom), jak w PLAYWRIGHT_BROWSERS_PATH/chromium_headless_shell-<rewizja>.
   # Windows arm64: plik win64 w emulacji x64 (tylko Windows 11), bo CfT nie wydaje win-arm64.
   chrome-headless-shell:
     zrodlo: chrome-for-testing
-    wersja: "153.0.8010.12"
+    wersja: "158.0.8127.36"
     licencja: BSD-3-Clause (Chromium) + składniki w LICENSE.headless_shell; binarka Google (chrome://terms)
     rola: "Chromium headless dla skryptów floty (zrzuty, PDF, Lighthouse, Playwright, HyperFrames); na Windows silnik browser_*"
     pliki:
       windows-x64: &chs-win64
-        url: https://storage.googleapis.com/chrome-for-testing-public/153.0.8010.12/win64/chrome-headless-shell-win64.zip
-        sha256: 7aec872f3090e639c4237467624ea863c20fe2878914c93a6556bdbb52aa6c4c
-        rozmiar: 120200717
+        url: https://storage.googleapis.com/chrome-for-testing-public/158.0.8127.36/win64/chrome-headless-shell-win64.zip
+        sha256: 9655950dfeddf565561cd64cfe8ee716ccd6482fa3798503b632219efc65a71e
+        rozmiar: 127876264
         format: zip
         env:
           CHROME_PATH: "{katalog}/chrome-headless-shell-win64/chrome-headless-shell.exe"
@@ -349,9 +351,9 @@ narzedzia:
           PUPPETEER_SKIP_DOWNLOAD: "1"
       windows-arm64: *chs-win64
       macos-arm64:
-        url: https://storage.googleapis.com/chrome-for-testing-public/153.0.8010.12/mac-arm64/chrome-headless-shell-mac-arm64.zip
-        sha256: 89d80a6d26ccd0ccfd51e22d9e1297283862af2b0cd91dce07459b35ca0059f2
-        rozmiar: 98831293
+        url: https://storage.googleapis.com/chrome-for-testing-public/158.0.8127.36/mac-arm64/chrome-headless-shell-mac-arm64.zip
+        sha256: c24d40a3786322ff3a5e3ac6eed162226cbaf07ebe468715407827226b0f8897
+        rozmiar: 105057133
         format: zip
         env:
           CHROME_PATH: "{katalog}/chrome-headless-shell-mac-arm64/chrome-headless-shell"
@@ -360,9 +362,9 @@ narzedzia:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
           PUPPETEER_SKIP_DOWNLOAD: "1"
       linux-x64:
-        url: https://storage.googleapis.com/chrome-for-testing-public/153.0.8010.12/linux64/chrome-headless-shell-linux64.zip
-        sha256: a9da028861a0cf789ff25c2fed45f5f1aaf969ed9247835b6a7821a4f7af9d1d
-        rozmiar: 119809080
+        url: https://storage.googleapis.com/chrome-for-testing-public/158.0.8127.36/linux64/chrome-headless-shell-linux64.zip
+        sha256: 2d3a23017323c54fd457a678e4351f895c4076d8050e39d5aa6247f93448b73a
+        rozmiar: 132087165
         format: zip
         env:
           CHROME_PATH: "{katalog}/chrome-headless-shell-linux64/chrome-headless-shell"
@@ -371,9 +373,9 @@ narzedzia:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
           PUPPETEER_SKIP_DOWNLOAD: "1"
       linux-arm64:
-        url: https://storage.googleapis.com/chrome-for-testing-public/153.0.8010.12/linux-arm64/chrome-headless-shell-linux-arm64.zip
-        sha256: d433c45172c7836e38124fe545f767b02210bfb43a6262f08a297473a8e91c99
-        rozmiar: 120278638
+        url: https://storage.googleapis.com/chrome-for-testing-public/158.0.8127.36/linux-arm64/chrome-headless-shell-linux-arm64.zip
+        sha256: 176ee5c55486c22de43128871189061365ea28e881fc96016fd18e7cb59437c8
+        rozmiar: 129938239
         format: zip
         env:
           CHROME_PATH: "{katalog}/chrome-headless-shell-linux-arm64/chrome-headless-shell"
@@ -548,20 +550,20 @@ narzedzia:
   # <dane>/jarvo/komputer/profil, sterowany przez CDP po potoku (komputer/usluga.py, bez portu DevTools), cały ruch przez
   # proxy filtrujące. Pobiera go dopiero `jarvo komputer on` (kiedy: przy-uzyciu), z paskiem i sumą; `jarvo komputer
   # odswiez` i następne `on` biorą nowy pin po `jarvo update`. CfT sam się nie aktualizuje: pin podbijany co tydzień
-  # w rutynie źródeł (nowy pin = nowy przegląd). Google nie publikuje sha256: policzone strumieniowo w trzech
-  # niezależnych pobraniach, md5 z x-goog-hash zgodne (Windows także Get-FileHash). Archiwum zostaje z katalogiem
+  # w rutynie źródeł (nowy pin = nowy przegląd). Google nie publikuje sha256: policzone strumieniowo w dwóch
+  # niezależnych pobraniach, md5 z x-goog-hash zgodne. Archiwum zostaje z katalogiem
   # chrome-<platforma>/ (bez usun_poziom). Windows arm64: plik win64 w emulacji x64 (CfT nie wydaje win-arm64).
   chrome-komputer:
     zrodlo: chrome-for-testing
-    wersja: "157.0.8103.78"
+    wersja: "158.0.8127.36"
     licencja: BSD-3-Clause (Chromium) + składniki w LICENSE i ABOUT; binarka Google Chrome for Testing (chrome://terms)
     rola: "Przeglądarka Jarva dla Komputera: osobny profil, CDP po potoku, proxy filtrujące, podgląd w HQ"
     kiedy: przy-uzyciu
     pliki:
       windows-x64: &cftk-win64
-        url: https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.78/win64/chrome-win64.zip
-        sha256: 5f6ec40206407112702e163bf694d07f9fdc8ccbd346c70ce61fa62f716493f9
-        rozmiar: 209854321
+        url: https://storage.googleapis.com/chrome-for-testing-public/158.0.8127.36/win64/chrome-win64.zip
+        sha256: 6a8ad290952cc612c7777ffb3eb62f345539a2a1a8d440cfac190c6d36b34d2c
+        rozmiar: 214927656
         format: zip
         env:
           JARVO_KOMPUTER_CHROME: "{katalog}/chrome-win64/chrome.exe"
@@ -569,23 +571,23 @@ narzedzia:
       # z main, którego renderer pada na sprawdzeniu Blink: docs/NATYWNIE.md Z42)
       windows-arm64: *cftk-win64
       macos-arm64:
-        url: https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.78/mac-arm64/chrome-mac-arm64.zip
-        sha256: bf3b49d0fe62a62397e98641aa736ef813c46014f03ec13d4913442e6966c7fc
-        rozmiar: 196634479
+        url: https://storage.googleapis.com/chrome-for-testing-public/158.0.8127.36/mac-arm64/chrome-mac-arm64.zip
+        sha256: b86d3b393def1f87d369b022abff0a51acb015d6fcb79ddfd1c379c9d72fbbe2
+        rozmiar: 200339070
         format: zip
         env:
           JARVO_KOMPUTER_CHROME: "{katalog}/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
       linux-x64:
-        url: https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.78/linux64/chrome-linux64.zip
-        sha256: 9223832977a13db3646201b1341c1f9cf08afa3ceae92540116d7b0c062364fb
-        rozmiar: 203266906
+        url: https://storage.googleapis.com/chrome-for-testing-public/158.0.8127.36/linux64/chrome-linux64.zip
+        sha256: dba9cc838e1ce269c33ea68170881127bd15d078fc3ca5891c90802819a4d7c7
+        rozmiar: 208062943
         format: zip
         env:
           JARVO_KOMPUTER_CHROME: "{katalog}/chrome-linux64/chrome"
       linux-arm64:
-        url: https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.78/linux-arm64/chrome-linux-arm64.zip
-        sha256: f354d666822a11d8fe99e923c44be77dd226fab2750c5b5947e6318818bf10f1
-        rozmiar: 203144198
+        url: https://storage.googleapis.com/chrome-for-testing-public/158.0.8127.36/linux-arm64/chrome-linux-arm64.zip
+        sha256: f811b64a50cbc73f94fda7b3f3b3bf62be5d9409b3207e6ead9b61e6706afffe
+        rozmiar: 205790900
         format: zip
         env:
           JARVO_KOMPUTER_CHROME: "{katalog}/chrome-linux-arm64/chrome"

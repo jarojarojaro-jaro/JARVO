@@ -44,7 +44,7 @@ tools:
   - name: przegladarka-jarva
     source: "własny (komputer/: usluga.py, sterownik_cdp.py, wejscie_natywne.py, filtr.py, kanal.py) + Chrome for Testing (GoogleChromeLabs/chrome-for-testing)"
     license: "MIT (kod Jarva); BSD-3-Clause i warunki Google (Chrome for Testing)"
-    version: "Chrome for Testing Stable 157.0.8103.78 (wpis chrome-komputer manifestu natywnego, kiedy: przy-uzyciu, sha256 z przeglądu)"
+    version: "Chrome for Testing Stable 158.0.8127.36 (wpis chrome-komputer manifestu natywnego, kiedy: przy-uzyciu, sha256 z przeglądu)"
     install: {method: binary, spec: "instalacja natywna: jarvo komputer on pobiera przeglądarkę z sumą przy pierwszym włączeniu (ok. 200 MB); jarvo komputer odswiez bierze nowy pin po jarvo update"}
     integration: hermes-plugin
     used_by_skills: [praca-na-ekranie, formularze, dane-z-ekranu, przejscie-strony, oddaj-ekran]

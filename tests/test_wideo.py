@@ -1082,7 +1082,7 @@ NODE = REPO / "infra" / "node"
 
 
 def test_lock_npm_floty_z_hyperframes_i_sumami():
-    """infra/node/package-lock.json (docs/NATYWNIE.md P02, I32): te same paczki co package.json, HyperFrames 0.9.56
+    """infra/node/package-lock.json (docs/NATYWNIE.md P02, I32): te same paczki co package.json, HyperFrames 0.9.69
     w tym samym locku, każda paczka z sumą integrity z registry.npmjs.org; wersja jak w toolbox.yaml Wideografa."""
     pkg = json.loads((NODE / "package.json").read_text(encoding="utf-8"))
     lock = json.loads((NODE / "package-lock.json").read_text(encoding="utf-8"))
@@ -1091,13 +1091,13 @@ def test_lock_npm_floty_z_hyperframes_i_sumami():
     paczki = {k: v for k, v in lock["packages"].items() if k}
     for nazwa, wersja in pkg["dependencies"].items():
         assert paczki[f"node_modules/{nazwa}"]["version"] == wersja, nazwa
-    assert pkg["dependencies"]["hyperframes"] == "0.9.56"
+    assert pkg["dependencies"]["hyperframes"] == "0.9.69"
     for k, v in paczki.items():
         if v.get("link"):
             continue
         assert v["integrity"].startswith("sha512-") and v["resolved"].startswith("https://registry.npmjs.org/"), k
     toolbox = (REPO / "profiles" / "jarvo-wideo" / "toolbox.yaml").read_text(encoding="utf-8")
-    assert re.search(r"name: hyperframes, .*version: 0\.9\.56, ", toolbox)
+    assert re.search(r"name: hyperframes, .*version: 0\.9\.69, ", toolbox)
     assert b"\r\n" not in (NODE / "package-lock.json").read_bytes()
 
 

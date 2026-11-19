@@ -126,7 +126,7 @@ Wideo: sekcja [`jarvo-wideo`](#jarvo-wideo-wideograf).
 | [Pexels API](https://www.pexels.com/api/) | darmowe ujęcia i zdjęcia stock (klucz `PEXELS_API_KEY`) | Pexels License | n/d | `stock.py` |
 | [Pixabay API](https://pixabay.com/api/docs/) | darmowe ujęcia i zdjęcia stock (klucz `PIXABAY_API_KEY`), cache 24 h | Pixabay Content License | n/d | `stock.py` |
 | [Openverse API](https://api.openverse.org/v1/) (WordPress, bez klucza: 20 zapytań/min, 200/dzień; więcej z `OPENVERSE_CLIENT_ID`/`_SECRET`) | dźwięki do filmów: efekty, tło, muzyka; z indeksu tylko Freesound (Wikimedia to głównie wymowa słów, strony Jamendo nie dają się sprawdzić); CC0 i PDM, CC BY z podpisem, nigdy NC/ND/SA; licencja i to, że dźwięk istnieje, sprawdzane na stronie pliku (indeks pokazuje też usunięte); cache 24 h | licencja każdego pliku (CC0 / CC BY) | 2026-10 | `stock.py --typ dzwiek` |
-| HyperFrames 0.9.56 (skille `hyperframes`, `hyperframes-cli`, `media-use`, `slideshow` z tagu v0.9.52) | wideo z HTML + GSAP → MP4/WebM | Apache-2.0 | 2026-11 | CLI w obrazie (`npx hyperframes` bez pobierania; render przez Chromium obrazu, GSAP z paczki, bez telemetrii) |
+| HyperFrames 0.9.69 (skille `hyperframes`, `hyperframes-cli`, `media-use`, `slideshow` z tagu v0.9.52) | wideo z HTML + GSAP → MP4/WebM | Apache-2.0 | 2026-11 | CLI w obrazie (`npx hyperframes` bez pobierania; render przez Chromium obrazu, GSAP z paczki, bez telemetrii) |
 | [motion-broll](https://github.com/Barty-Bart/motion-graphics) | animowany B-roll do nagrania, zgrany ze słowami; panele ProRes 4444 z alfą | MIT | 2026-09 | skill + `narzedzia.py` |
 | [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) | cały film w 43 stylach (keynote, akwarela, anime, 3D, miedzioryt, hologram…); lektor PL przez `lektor_linie.py` | MIT | 2026-09 | skill + biblioteka (`narzedzia.py`; sample i Kokoro tylko z `JARVO_EXTRAS=lemo` w `compose/.env`, bez przebudowy obrazu: compose przekazuje zmienną do kontenera) |
 | [anidoodle](https://github.com/alexgreensh/anidoodle) | rysunek kodem w 31 stylach, timelapse, HTML offline, muzyka syntezowana | Apache-2.0 | 2026-09 | skill + `narzedzia.py` |
@@ -526,18 +526,18 @@ natywny ma mniej funkcji.
 
 | Narzędzie | Wersja | Windows x64 | Windows arm64 | macOS arm64 | Linux x64 i arm64 | Kiedy | Wynik |
 |---|---|---|---|---|---|---|---|
-| uv | 0.13.8 | zip | zip arm64 | tar.gz | tar.gz | instalacja | sumy z `.sha256` |
+| uv | 0.13.9 | zip | zip arm64 | tar.gz | tar.gz | instalacja | sumy z `.sha256` |
 | Python (python-build-standalone 20261021) | 3.13.17, 3.12.15 | tar.gz | x64 w emulacji | tar.gz | tar.gz | instalacja | SQLite 3.53.1 bez błędu WAL-reset |
 | Node.js | 26.13.1 | zip | x64 w emulacji | tar.gz | tar.xz | instalacja | `SHASUMS256.txt` z podpisem GPG; `npm_config_update_notifier=false` |
 | Git for Windows | 2.56.1.windows.1 | tar.bz2 (ucrt64) | tar.bz2 (clangarm64) | brak: git z systemu | brak: git z systemu | instalacja | `git --version`, `ls-remote` po https i Git Bash 5.3 na Windows 11; `GIT_CONFIG_NOSYSTEM=1` |
 | ripgrep | 15.2.0 | zip | x64 w emulacji | tar.gz | tar.gz (musl) | instalacja | PCRE2 10.46 w binarce |
 | jq | 1.8.2 | `jq.exe` | `jq.exe` arm64 | plik | plik | instalacja | atestacja SLSA; kod floty go nie używa |
-| chrome-headless-shell (Chrome for Testing) | 153.0.8010.12 | zip | x64 w emulacji | zip | zip | instalacja | rewizja 1243 Playwrighta 1.63; na Windows silnik `browser_*` |
+| chrome-headless-shell (Chrome for Testing) | 158.0.8127.36 | zip | x64 w emulacji | zip | zip | instalacja | pod rewizją 1243 Playwrighta 1.63 (obraz: Chromium Hermesa 153); na Windows silnik `browser_*` |
 | ffmpeg Playwrighta | 1011 | zip | x64 w emulacji | zip | zip | instalacja | LGPL, tylko VP8/WebM, PNG, MJPEG |
 | Lightpanda | 1.0.4 | brak: silnik `chrome` | brak: silnik `chrome` | plik | plik | instalacja | Linux = binarka z obrazu; telemetria wyłączona zmiennymi |
 | agent-browser | 0.43.0 | plik z wydania | x64 w emulacji | plik | plik | instalacja | te same bajty co w paczce npm platformy z atestacją |
 | Camoufox | 159.0-beta.42 | zip | x64 w emulacji | zip | zip, bez grup fontów macOS i Windows | przy użyciu | paczki Windows i macOS mają fonty wszystkich systemów (decyzja właściciela); 1,30–1,33 GB |
-| Chrome for Testing (Komputer Jarva) | 157.0.8103.78 | zip | x64 w emulacji | zip | zip | przy użyciu | `jarvo komputer on`; CDP po potoku, ruch przez proxy filtrujące; 134/134 sprawdzeń Komputera na Windows 11 |
+| Chrome for Testing (Komputer Jarva) | 158.0.8127.36 | zip | x64 w emulacji | zip | zip | przy użyciu | `jarvo komputer on`; CDP po potoku, ruch przez proxy filtrujące; 134/134 sprawdzeń Komputera na Windows 11 (na 157) |
 | FFmpeg (BtbN, gpl) | 9.0.2 | zip | x64 w emulacji (winarm64 bez libvpx) | brak: build Riedla | tar.xz | instalacja | filtry i kodery floty na Windows 11; libass na Windows potrzebuje `fontsdir` |
 | FFmpeg i ffprobe (Martin Riedl) | 9.0.2 | brak: BtbN | brak: BtbN | dwa zipy, Developer ID | brak: BtbN | instalacja | bez vidstab i librsvg |
 | Fonty Inter i DejaVu | 4.1, 2.37 | zip | ten sam zip | ten sam zip | ten sam zip | instalacja | `JARVO_FONTY_INTER`, `JARVO_FONTY_DEJAVU` |

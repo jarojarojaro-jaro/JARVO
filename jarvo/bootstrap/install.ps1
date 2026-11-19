@@ -39,18 +39,18 @@
 
   $JarvoRepo = 'jarojarojaro-jaro/JARVO'
   $JarvoNaSucho = $env:JARVO_DRY_RUN -eq '1'
-  # vendor/natywne.lock.json: uv 0.13.8 i python313 3.13.17+20261021. Windows ARM64: uv natywny, Python x64
+  # vendor/natywne.lock.json: uv 0.13.9 i python313 3.13.17+20261021. Windows ARM64: uv natywny, Python x64
   # w emulacji (decyzja I27: cryptography 50 nie ma kola win_arm64).
   $JarvoPliki = @(
-    @{ platforma = 'windows-x64'; nazwa = 'uv'; katalog = '0.13.8'; format = 'zip'; poziom = 0; rozmiar = 15529884
-       url = 'https://github.com/astral-sh/uv/releases/download/0.13.8/uv-x86_64-pc-windows-msvc.zip'
-       sha256 = '529e78a9cec6cd7e3e014f7ecd8bda0c113969d4ed0f2efeedb85c30943325b8' }
+    @{ platforma = 'windows-x64'; nazwa = 'uv'; katalog = '0.13.9'; format = 'zip'; poziom = 0; rozmiar = 15567875
+       url = 'https://github.com/astral-sh/uv/releases/download/0.13.9/uv-x86_64-pc-windows-msvc.zip'
+       sha256 = 'edd61f7f5728a56cc62455386661860bdfc7bab65872f39b0c25bdcc1d8e1beb' }
     @{ platforma = 'windows-x64'; nazwa = 'python313'; katalog = '3.13.17'; format = 'tar.gz'; poziom = 1; rozmiar = 21986637
        url = 'https://github.com/astral-sh/python-build-standalone/releases/download/20261021/cpython-3.13.17%2B20261021-x86_64-pc-windows-msvc-install_only_stripped.tar.gz'
        sha256 = '56cde3b1a1dcc36576753cb408ee0c3568d211baafa0eee40423adc147c480f2' }
-    @{ platforma = 'windows-arm64'; nazwa = 'uv'; katalog = '0.13.8'; format = 'zip'; poziom = 0; rozmiar = 15590791
-       url = 'https://github.com/astral-sh/uv/releases/download/0.13.8/uv-aarch64-pc-windows-msvc.zip'
-       sha256 = '59e6d919bed1f72035e622a7c930058f08a8931c4c78ceaf9f56e7fb74dd2c48' }
+    @{ platforma = 'windows-arm64'; nazwa = 'uv'; katalog = '0.13.9'; format = 'zip'; poziom = 0; rozmiar = 15747415
+       url = 'https://github.com/astral-sh/uv/releases/download/0.13.9/uv-aarch64-pc-windows-msvc.zip'
+       sha256 = '72eed595983a4d7d22d79f21065b0f4479cc7e5c7a89104bb410c8f47559a878' }
     @{ platforma = 'windows-arm64'; nazwa = 'python313'; katalog = '3.13.17'; format = 'tar.gz'; poziom = 1; rozmiar = 21986637
        url = 'https://github.com/astral-sh/python-build-standalone/releases/download/20261021/cpython-3.13.17%2B20261021-x86_64-pc-windows-msvc-install_only_stripped.tar.gz'
        sha256 = '56cde3b1a1dcc36576753cb408ee0c3568d211baafa0eee40423adc147c480f2' }

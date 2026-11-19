@@ -118,7 +118,7 @@ RUN set -e; cd /opt/jarvo/node && \
 ENV HYPERFRAMES_BROWSER_PATH=/usr/local/bin/chromium \
     HYPERFRAMES_NO_TELEMETRY=1 \
     HYPERFRAMES_NO_UPDATE_CHECK=1
-# Jedna kopia HyperFrames: ta z locka w /opt/jarvo/node (wyżej; wersja przejrzana, 0.9.56, z poleceniami skilli z
+# Jedna kopia HyperFrames: ta z locka w /opt/jarvo/node (wyżej; wersja przejrzana, 0.9.69, z poleceniami skilli z
 # vendor/skills.lock.yaml, tag v0.9.52). Skille HyperFrames wołają `npx hyperframes`, a npx szuka programu
 # w node_modules/.bin katalogu projektu i w globalnym bin npm, nie w PATH: bez wpisu tam ściągałby najnowszą wersję
 # przy pierwszym użyciu (a bez sieci healthcheck padał). Dlatego globalny bin dostaje dowiązania do tej kopii zamiast

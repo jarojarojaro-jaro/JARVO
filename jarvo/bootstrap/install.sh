@@ -37,24 +37,24 @@ plan() { printf '  (na sucho) %s\n' "$*"; }
 die() { printf 'JARVO: %s\n' "$*" >&2; exit 1; }
 
 # plik <platforma> <nazwa>: ustawia U (adres), S (sha256), P (ile katalogów zdjąć), K (katalog wersji), F (format)
-# z vendor/natywne.lock.json: uv 0.13.8, python313 3.13.17+20261021
+# z vendor/natywne.lock.json: uv 0.13.9, python313 3.13.17+20261021
 plik() {
   case "$1:$2" in
-    macos-arm64:uv) K=0.13.8; P=1; F=tar.gz
-      U='https://github.com/astral-sh/uv/releases/download/0.13.8/uv-aarch64-apple-darwin.tar.gz'
-      S=6b71028a6b904f2ae3340ef52e595512de807d06c0a20eaef2f692581b246558 ;;
+    macos-arm64:uv) K=0.13.9; P=1; F=tar.gz
+      U='https://github.com/astral-sh/uv/releases/download/0.13.9/uv-aarch64-apple-darwin.tar.gz'
+      S=5aeca67f2283f75235de40d0bd9c0a5bbc5fce23b6d48b3bf9fa1b2db08382ca ;;
     macos-arm64:python313) K=3.13.17; P=1; F=tar.gz
       U='https://github.com/astral-sh/python-build-standalone/releases/download/20261021/cpython-3.13.17%2B20261021-aarch64-apple-darwin-install_only_stripped.tar.gz'
       S=8dc60610a82f1e73be7faf964383e02520f95f6e39592a5c37c3809f5a7b798e ;;
-    linux-x64:uv) K=0.13.8; P=1; F=tar.gz
-      U='https://github.com/astral-sh/uv/releases/download/0.13.8/uv-x86_64-unknown-linux-gnu.tar.gz'
-      S=5acfd9177cfecf0bf87578f059728215ccc884388988f55f7a65041b57387d91 ;;
+    linux-x64:uv) K=0.13.9; P=1; F=tar.gz
+      U='https://github.com/astral-sh/uv/releases/download/0.13.9/uv-x86_64-unknown-linux-gnu.tar.gz'
+      S=a7fbaff2b9a271d85c1bdb540941090fd1ce011797b4abeb48e4dcd39c2471d5 ;;
     linux-x64:python313) K=3.13.17; P=1; F=tar.gz
       U='https://github.com/astral-sh/python-build-standalone/releases/download/20261021/cpython-3.13.17%2B20261021-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz'
       S=f829adc9d888e76c8801b4799ed444188d35239fcae3a9808a99ec5cb0d8d92c ;;
-    linux-arm64:uv) K=0.13.8; P=1; F=tar.gz
-      U='https://github.com/astral-sh/uv/releases/download/0.13.8/uv-aarch64-unknown-linux-gnu.tar.gz'
-      S=74f2f5c6024d397481db228db8fc25eed420db192243f88438c118e7e013e585 ;;
+    linux-arm64:uv) K=0.13.9; P=1; F=tar.gz
+      U='https://github.com/astral-sh/uv/releases/download/0.13.9/uv-aarch64-unknown-linux-gnu.tar.gz'
+      S=0797542018e541a9288855df555c8077eed06f7a47d206362030480e8ecc9f3d ;;
     linux-arm64:python313) K=3.13.17; P=1; F=tar.gz
       U='https://github.com/astral-sh/python-build-standalone/releases/download/20261021/cpython-3.13.17%2B20261021-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz'
       S=c6857c65b996701a5da104cbb49b35249c0c026dc0664239b04f7156aa88326a ;;
