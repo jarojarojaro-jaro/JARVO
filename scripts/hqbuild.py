@@ -97,8 +97,9 @@ PAKIETY = {
     # Aktualizacje (#/aktualizacje): archiwum raportów rutyn, poza pierwszym wyświetleniem rozmowy
     "raporty": {"pliki": ("64-raporty.js",), "zalezy": ()},
 }
-# budżet gzip (bajty) z projektu etapu 1 §7: przekroczenie zatrzymuje build
-BUDZET_GZIP = {"app-rdzen.js": 95 * 1024, "app-rdzen.css": 18 * 1024, "mozg.js": 6 * 1024}
+# budżet gzip (bajty) z projektu etapu 1 §7: przekroczenie zatrzymuje build. Mózg 14 KB (19.11, było 6 KB): części,
+# grupy, szukanie w treści, [[linki]] w notatce i skupiska w grafie; pakiet idzie tylko po wejściu w Mózg
+BUDZET_GZIP = {"app-rdzen.js": 95 * 1024, "app-rdzen.css": 18 * 1024, "mozg.js": 14 * 1024}
 ZNACZNIK_PAKIETOW = '"@@PAKIETY@@"'
 ZNACZNIK_CSS = re.compile(r"^/\* @@pakiet (\w+) \*/$", re.M)
 DEKLARACJA = re.compile(r"^(?:async\s+)?(?:function\*?\s+([A-Za-z_$][\w$]*)|class\s+([A-Za-z_$][\w$]*)"

@@ -6,6 +6,10 @@
   `{"nazwa", "nazwa_en"?, "graf": "<plik json>", "notatka_url"?: "https://…/{id}.html", "widok_3d"?: "https://…"}`
   (bez `widok_3d` = strona główna serwisu z `notatka_url`).
   Repo nie zna żadnej prywatnej ścieżki: plik pisze właściciel instalacji.
+- **Części Mózgu** (główne punkty wejścia widoku): `"kategorie": [{"nazwa", "nazwa_en"?, "opis"?, "opis_en"?,
+  "foldery": ["agenci", …], "ikona"?, "drugorzedna"?}]` na górze pliku (`{"kategorie": […], "zrodla": […]}`) zmienia
+  części skarbca, w wpisie źródła: części tego grafu. Bez nich widok bierze domyślne części skarbca (63-mozg.js
+  MOZG_KATEGORIE), a graf z pliku części z folderów. Wpisy sprawdzone (najwyżej 12, klucz `k` z nazwy).
 - **`GET /mozg/{klucz}`**: graf źródła z pliku w kształcie skarbca `{wezly, linki}`. Plik może mieć kształt skarbca
   albo `{nodes, links}` (`source/target`, `stopien`), jak dane mózgu 3D. Ścieżka pliku nie wychodzi do przeglądarki.
   Plik > 16 MB, brak pliku albo zły JSON = 404/422 w kształcie błędów aplikacji. Wynik w pamięci do zmiany mtime.
@@ -27,6 +31,38 @@ KLUCZ = re.compile(r"^[a-z0-9-]{1,40}$")
 ODCZYT_ZRODLA = ("same-origin", "none")
 SKARBIEC = {"klucz": "jarvo", "nazwa": "Skarbiec Jarva", "nazwa_en": "Jarvo's vault", "rodzaj": "skarbiec"}
 _POLA_WEZLA = ("tytul", "krotki", "folder", "typ", "status", "zmieniono", "opis")
+IKONA = re.compile(r"^[a-z]{1,16}$")
+
+
+def _czytaj(plik: Path):
+    try:
+        return json.loads(Path(plik).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def kategorie(lista) -> list[dict]:
+    """Części Mózgu z konfiguracji: tylko poprawne wpisy (nazwa i lista folderów pierwszego poziomu), najwyżej 12,
+    klucz `k` z nazwy. Zły kształt = [] (widok bierze swoje domyślne)."""
+    wynik, zajete = [], set()
+    for d in lista if isinstance(lista, list) else []:
+        if not isinstance(d, dict) or not str(d.get("nazwa") or "").strip() or not isinstance(d.get("foldery"), list):
+            continue
+        nazwa = str(d["nazwa"]).strip()[:40]
+        w = {"k": _klucz(nazwa, zajete), "nazwa": nazwa,
+             "foldery": [f for f in d["foldery"] if isinstance(f, str) and "/" not in f and len(f) <= 60][:20]}
+        zajete.add(w["k"])
+        for pole, ile in (("nazwa_en", 40), ("opis", 160), ("opis_en", 160)):
+            if isinstance(d.get(pole), str) and d[pole].strip():
+                w[pole] = d[pole].strip()[:ile]
+        if isinstance(d.get("ikona"), str) and IKONA.match(d["ikona"]):
+            w["ikona"] = d["ikona"]
+        if d.get("drugorzedna") is True:
+            w["drugorzedna"] = True
+        wynik.append(w)
+        if len(wynik) == 12:
+            break
+    return wynik
 
 
 def _blad(status: int, kod: str, pl: str, en: str):
@@ -55,10 +91,7 @@ def _klucz(nazwa: str, zajete: set[str]) -> str:
 
 def wczytaj_konfig(plik: Path) -> list[dict]:
     """Wpisy konfiguracji z kluczami (bez ścieżki dla przeglądarki: pole `graf` zostaje po stronie serwera)."""
-    try:
-        dane = json.loads(Path(plik).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return []
+    dane = _czytaj(plik)
     if isinstance(dane, dict):
         dane = dane.get("zrodla") if isinstance(dane.get("zrodla"), list) else [dane]
     wynik, zajete = [], set()
@@ -70,9 +103,13 @@ def wczytaj_konfig(plik: Path) -> list[dict]:
         k = k if KLUCZ.match(k) and k not in zajete and k not in ("jarvo", "zrodla") else _klucz(nazwa, zajete)
         zajete.add(k)
         notatka = _adres(w.get("notatka_url"))
-        wynik.append({"klucz": k, "nazwa": nazwa, "nazwa_en": str(w.get("nazwa_en") or nazwa).strip()[:60], "rodzaj": "plik",
-                      "notatka_url": notatka if "{id}" in notatka else "",
-                      "widok_3d": _adres(w.get("widok_3d")) or _start(notatka), "_graf": Path(str(w["graf"])).expanduser()})
+        wpis = {"klucz": k, "nazwa": nazwa, "nazwa_en": str(w.get("nazwa_en") or nazwa).strip()[:60], "rodzaj": "plik",
+                "notatka_url": notatka if "{id}" in notatka else "",
+                "widok_3d": _adres(w.get("widok_3d")) or _start(notatka), "_graf": Path(str(w["graf"])).expanduser()}
+        ks = kategorie(w.get("kategorie"))
+        if ks:
+            wpis["kategorie"] = ks
+        wynik.append(wpis)
     return wynik
 
 
@@ -117,7 +154,10 @@ class Zrodla:
         self._pamiec: dict[str, tuple[tuple, dict]] = {}
 
     def lista(self) -> list[dict]:
-        return [SKARBIEC] + [{k: v for k, v in w.items() if not k.startswith("_")} for w in wczytaj_konfig(self.konfig)]
+        dane = _czytaj(self.konfig)
+        ks = kategorie(dane.get("kategorie")) if isinstance(dane, dict) else []
+        return [{**SKARBIEC, "kategorie": ks} if ks else SKARBIEC] + [{k: v for k, v in w.items() if not k.startswith("_")}
+                                                                        for w in wczytaj_konfig(self.konfig)]
 
     def graf(self, klucz: str) -> dict | None:
         """Graf źródła z pliku; None = nie ma takiego źródła albo pliku. ValueError = zły plik."""

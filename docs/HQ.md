@@ -1345,7 +1345,7 @@ innych kanałów etap 6.
   a nazwy drugiego pakietu (Baza ↔ edytor) dostaje, gdy ten dojdzie. Wejście pakietu wystawia `Zasoby.daj({…})`, więc
   ten sam kod działa w pełnym pakiecie demo i testów (`bundle_js`). Build usuwa komentarze i wcięcia (`zwiez_js`;
   w szablonach `html` także wcięcia po nowej linii, które htm i tak pomija) i pilnuje budżetu gzip
-  (`BUDZET_GZIP`: rdzeń JS ≤ 95 KB, CSS ≤ 18 KB, Mózg ≤ 6 KB; przekroczenie zatrzymuje build). 17.11: rdzeń JS
+  (`BUDZET_GZIP`: rdzeń JS ≤ 95 KB, CSS ≤ 18 KB, Mózg ≤ 14 KB; przekroczenie zatrzymuje build). 17.11: rdzeń JS
   ok. 278 KB (86,6 KB gzip), CSS 80 KB (16,1 KB gzip); wcześniej jeden pakiet 262 KB gzip. Pliki rdzenia nie mogą
   sięgać do nazw z pakietów inaczej niż przez `Zasoby.wez`, a pakiety nie zmieniają `let` rdzenia (język ustawia
   `ustawJezyk`).
@@ -1385,31 +1385,63 @@ otwiera ostatni dzień z raportami (tego rodzaju przy filtrze).
 
 ### Mózg (`#/mozg`)
 
-Graf wiedzy w aplikacji, w etapie 1 centrum dowodzenia (pakiet `mozg` ładowany dopiero po wejściu w widok):
+Wiedza Jarva w aplikacji, poukładana w kilka głównych części, w które wchodzi się krok po kroku (19.11 właściciel:
+„musi być posegregowana… główne punkty, w które wchodzą wszystkie notatki… a nie scroll na 10 minut”). Pakiet `mozg`
+ładuje się dopiero po wejściu w widok.
 
-- **Kod.** `hq/web/src/63-mozg.js` (widok `MozgWidok`, lista „Notatki”, karta notatki) i wspólny graf
+- **Kod.** `hq/web/src/63-mozg.js` (widok `MozgWidok`, części, grupy, notatka, szukanie; czyste funkcje `mozgMapa`,
+  `mozgSekcje`, `mozgSzukaj`, `mozgGraf`, `mozgWiki`, `mozgStan`/`mozgHash` testowane w node) i wspólny graf
   `shared/web/graf.js` (canvas, własny układ sił z drzewem czwórkowym Barnes-Hut, bez bibliotek). Ten sam `graf.js`
   rysuje graf zakładki Wiedza (`scripts/build.py` dołącza go przez `bundle_js(..., wspolne=...)`). Style w
-  `hq/web/style.css` w bloku `/* @@pakiet mozg */`. Budżet: kod pakietu ≤ 6 KB gzip po minifikacji buildu.
+  `hq/web/style.css` w bloku `/* @@pakiet mozg */`. Budżet: kod pakietu ≤ 14 KB gzip po minifikacji (19.11: ok.
+  13 KB; było 6 KB przed częściami, grupami, szukaniem w treści, [[linkami]] i skupiskami w grafie).
+- **Części** (główne punkty wejścia): domyślnie z folderów skarbca (`wiedza.py` FOLDERY): **Ty** (`user`), **Projekty
+  i marki** (`projekty`, `brands`, `inspiracje`), **Zespół** (`agenci`, `fleet`), **Firmy i narzędzia** (`podmioty`),
+  **Lekcje i zasady** (`pojecia`, `orzeczenia`, `bledy`), **Rozmowy i briefy** (`rozmowy`, `briefy`); z boku,
+  drugorzędnie, **Dokumentacja i źródła** (`zrodla`, `skrzynka`, pliki w korzeniu). Folder spoza listy jest własną
+  częścią (graf z pliku bez części: najwyżej 7 części z folderów, reszta w „Pozostałych”). Instalacja zmienia części
+  w `konfig/mozg.json` (`kategorie`, niżej). W części **grupy**: katalog do dwóch członów (`agenci/jarvo-web`,
+  `fleet/skille`); podkatalog bez huba i z mniej niż 3 notatkami wraca do folderu, a grupa z samym hubem nie jest
+  grupą (hub zostaje „Przeglądem tej części”). Nazwa grupy: słownik folderów, tytuł huba bez „(klucz)” albo nazwa
+  katalogu. W grupie notatki w **sekcjach rodzaju** (Lekcje, Fakty, Decyzje…, od najnowszej), każda zwinięta do 6
+  (jedna sekcja: 15) z „Pokaż wszystkie (N)”.
+- **Poziomy i adres.** Wejście: kafle części (ikona, liczba notatek, jedno zdanie), „Ostatnio zmienione” (5) i link do
+  źródeł. Część: opis, „Przegląd tej części”, grupy z liczbami, „Ostatnio zmienione tutaj”. Grupa: sekcje notatek.
+  Okruszki u góry (Mózg › część › grupa). Stan w hashu `#/mozg?k=<część>&g=<grupa>&o=<notatka>&z=<źródło>` (trasa
+  aplikacji widzi `#/mozg`, parametry czyta tylko Mózg), więc linki są zwykłymi `<a href>`, a „Wstecz” przeglądarki
+  cofa o krok. Po zmianie poziomu fokus idzie na jego nagłówek (czytnik ekranu czyta, gdzie jesteś), a szukanie się
+  czyści.
+- **Szukaj w całym mózgu** (pole nad poziomem): od pierwszej litery po tytule i ścieżce, bez ogonków, każde słowo
+  musi pasować (tytuł od zapytania > tytuł z nim > ścieżka), do 40 wyników z miejscem (część › grupa); skarbiec po
+  250 ms dokłada „W treści notatek” z `GET /search` wtyczki `jarvo-wiedza` (od 3 znaków, ze streszczeniem).
+  Combobox z `aria-activedescendant`: strzałki, Enter otwiera, Esc czyści. Wybór otwiera notatkę w jej grupie.
+- **Notatka** (kolumna po prawej; do 1000 px zasłania graf; telefon: cały ekran): miejsce, tytuł, rodzaj i data,
+  treść skarbca w Markdown (`TrescMd`, bez `innerHTML`) z `[[linkami]]` jako linkami Mózgu (napis albo tytuł celu),
+  bez własnej sekcji „## Powiązane” i komentarzy generatora; dla źródła z pliku opis i „Otwórz notatkę ↗”. Pod spodem
+  „Powiązane” (sąsiedzi w grafie z obu stron linku, 10 + „Pokaż wszystkie”). Esc i × zamykają.
+- **Graf tylko bieżącego poziomu.** Wejście: skupiska głównych części w kolorach kafli (`--j-barwa-<i>`), etykieta
+  „Część · liczba” w środku skupiska; część: skupiska grup; grupa: jej notatki w kolorach rodzaju, 6 najważniejszych
+  z napisem. Skupiska (`grupa`, `stale` w `graf.js`): odpychanie i grawitacja w obrębie skupiska, kotwice na okręgu
+  na miarę skupisk (bez nachodzenia), linki między skupiskami jednym mostem na parę (łuk, grubość od liczby linków).
+  Klik w skupisko wchodzi głębiej, w kropkę otwiera notatkę; zaznaczona notatka ma linki w kolorze fokusu, a widok
+  trzyma ją w środku (mały graf, do 40 węzłów, zostaje cały). Napisy od najważniejszego bez nachodzenia, przy brzegu
+  przesunięte do środka; mysz nad węzłem pokazuje jego nazwę. Bez obwódki sierot (dla właściciela to szum).
 - **Źródła** (`hq/plugin/mozg_zrodla.py`): `GET /mozg/zrodla` zawsze zaczyna od skarbca Jarva (graf i notatki
-  z tras `jarvo-wiedza`: `/graph`, `/note`), dalej źródła z `<dane>/jarvo/konfig/mozg.json` instalacji:
-  `{"nazwa", "nazwa_en"?, "graf": "<plik json>", "notatka_url"?: "https://…/{id}.html", "widok_3d"?}` (jeden obiekt,
-  lista albo `{"zrodla": [...]}`). `GET /mozg/<klucz>` oddaje graf pliku w kształcie skarbca `{wezly, linki}`;
-  plik może mieć też kształt `{nodes, links}` (`source/target`, `stopien`). Ścieżka pliku nie wychodzi do
-  przeglądarki, adresy tylko http(s), plik do 16 MB, wynik w pamięci do zmiany mtime, odczyt tylko z karty panelu.
-  Bez `widok_3d` link „Widok 3D ↗” prowadzi na stronę główną serwisu z `notatka_url`.
-- **Widok.** Domyślnie skarbiec Jarva, przełącznik źródeł nad grafem (gdy jest więcej niż jedno). Lista „Notatki”:
-  szukanie bez ogonków, strzałki, Enter otwiera (combobox z `aria-activedescendant`), więc Mózg działa bez myszy
-  i z czytnikiem ekranu. Klik w węzeł albo wybór z listy otwiera kartę i centruje węzeł; Esc zamyka kartę.
-  Karta: notatka skarbca w Markdown (`TrescMd`, bez `innerHTML`), dla źródła z pliku opis i link „Otwórz notatkę ↗”;
-  pod spodem „Powiązane” (sąsiedzi w grafie).
-- **Kolory z motywu:** foldery dostają kolejno `--j-krawedz`, `--j-akcent`, `--j-tekst-3` w trzech jasnościach,
-  huby `--j-tekst`, sieroty obwódkę `--j-akcent`, zaznaczony `--j-fokus`; motyw czytany co 120 klatek.
+  z tras `jarvo-wiedza`: `/graph`, `/note`, `/search`), dalej źródła z `<dane>/jarvo/konfig/mozg.json` instalacji:
+  `{"nazwa", "nazwa_en"?, "graf": "<plik json>", "notatka_url"?: "https://…/{id}.html", "widok_3d"?, "kategorie"?}`
+  (jeden obiekt, lista albo `{"zrodla": [...], "kategorie"?: [...]}`; `kategorie` na górze = części skarbca, we wpisie
+  = części tego grafu: `[{"nazwa", "nazwa_en"?, "opis"?, "opis_en"?, "foldery": [...], "ikona"?, "drugorzedna"?}]`,
+  najwyżej 12, sprawdzone, klucz `k` z nazwy). `GET /mozg/<klucz>` oddaje graf pliku w kształcie skarbca
+  `{wezly, linki}`; plik może mieć też kształt `{nodes, links}` (`source/target`, `stopien`). Ścieżka pliku nie
+  wychodzi do przeglądarki, adresy tylko http(s), plik do 16 MB, wynik w pamięci do zmiany mtime, odczyt tylko
+  z karty panelu. Bez `widok_3d` link „Widok 3D ↗” prowadzi na stronę główną serwisu z `notatka_url`.
 - **Wydajność:** układ liczony w budżecie 10 ms na klatkę, linki jedną ścieżką na styl, węzły poza ekranem
-  pominięte, etykiety tylko po przybliżeniu; uspokojony graf nie rysuje kolejnych klatek. Test w node: 1200 węzłów,
-  najdłuższa klatka < 40 ms na atrapie canvasa, graf zasypia (`tests/test_mozg_zrodla.py`).
-- **Telefon (≤ 700 px kontenera):** graf na cały ekran, lista pod przyciskiem „Notatki”, karta arkuszem od dołu,
-  dwa palce przybliżają i przesuwają.
+  pominięte; uspokojony graf nie rysuje kolejnych klatek, a ukryty (telefon, lista) nic nie liczy. Graf poziomu ma
+  najwyżej tyle węzłów, ile główne części (skarbiec 19.11: ok. 460 zamiast 664 naraz). Test w node: 1200 węzłów
+  bez skupisk i w 7 skupiskach, najdłuższa klatka < 40 ms na atrapie canvasa, graf zasypia, skupiska rozłączne
+  (`tests/test_mozg_zrodla.py`).
+- **Telefon (≤ 700 px kontenera):** lista poziomu na cały ekran, graf tego poziomu pod przyciskiem „Mapa” (wraca
+  „Lista”), notatka na cały ekran; dwa palce przybliżają i przesuwają.
 ## 2g. Panel w sieci (Tailscale)
 
 Instalacja natywna: panel słucha na `127.0.0.1:<port>` (domyślnie 9119) bez hasła. Żeby właściciel używał go

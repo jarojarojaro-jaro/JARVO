@@ -72,6 +72,23 @@ def test_lista_kluczy_adresy_i_zle_wpisy(tmp_path):
     assert MZ.wczytaj_konfig(k) == []
 
 
+def test_czesci_mozgu_z_konfiguracji(klient, tmp_path):
+    c, konfig, _ = klient
+    plik = _graf_operatora(tmp_path)
+    czesci = [{"nazwa": "Ludzie", "foldery": ["podmioty", "a/b", 3], "ikona": "users", "opis": "o", "drugorzedna": "tak"},
+              {"nazwa": "Ludzie", "foldery": [], "ikona": "<svg>", "drugorzedna": True}, {"nazwa": "bez folderów"}, "zle"]
+    konfig.write_text(json.dumps({"kategorie": czesci, "zrodla": [{"nazwa": "G", "graf": str(plik), "kategorie": czesci[:1]}]}),
+                      encoding="utf-8")
+    sk, g = c.get("/mozg/zrodla").json()["zrodla"]
+    assert sk["klucz"] == "jarvo" and sk["kategorie"] == [
+        {"k": "ludzie", "nazwa": "Ludzie", "foldery": ["podmioty"], "opis": "o", "ikona": "users"},
+        {"k": "ludzie-2", "nazwa": "Ludzie", "foldery": [], "drugorzedna": True}]
+    assert g["kategorie"] == sk["kategorie"][:1] and "graf" not in g
+    assert MZ.kategorie({"nazwa": "x"}) == [] and len(MZ.kategorie([{"nazwa": f"n{i}", "foldery": []} for i in range(20)])) == 12
+    konfig.write_text(json.dumps({"kategorie": "zle"}), encoding="utf-8")
+    assert c.get("/mozg/zrodla").json() == {"zrodla": [MZ.SKARBIEC]}
+
+
 def test_zly_brakujacy_i_zmieniony_plik(klient, tmp_path):
     c, konfig, zrodla = klient
     plik = tmp_path / "g.json"
@@ -126,6 +143,9 @@ const N = Number(process.argv[2]);
 const wezly = [], linki = [];
 for (let i = 0; i < N; i++) wezly.push({ id: `f${i %% 7}/n${i}`, folder: `f${i %% 7}`, hub: i < 7, we: i %% 5 });
 for (let i = 7; i < N; i++) { linki.push({ z: `f${i %% 7}/n${i %% 7}`, do: `f${i %% 7}/n${i}` }); if (i %% 3 === 0) linki.push({ z: `f${i %% 7}/n${i}`, do: `f${(i - 3) %% 7}/n${i - 3}`, auto: true }); }
+// skupiska (Mózg): grupa = folder i przybita etykieta każdej grupy
+const SKUPISKA = process.argv[3] === "skupiska";
+if (SKUPISKA) { for (const q of wezly) q.grupa = q.folder; for (let i = 0; i < 7; i++) wezly.push({ id: `@f${i}`, grupa: `f${i}`, stale: true, r: 15 }); }
 const otwarte = [];
 const g = utworzGraf(canvas, { kolor: () => "#888", motyw: () => ({}), otworz: (id) => otwarte.push(id) });
 const liczby = g.dane({ wezly, linki }, {});
@@ -142,20 +162,25 @@ zdarzenia.pointermove({ pointerId: 3, clientX: 300, clientY: 300 });
 const k2 = g.stan()[0].k;
 zdarzenia.pointerup({ pointerId: 2 }); zdarzenia.pointerup({ pointerId: 3 });
 g.zniszcz();
+// skupiska: zasięg węzłów każdej grupy od jej kotwicy; dwa skupiska nie nachodzą na siebie
+const zasieg = sim.grupy.map((gr) => Math.max(0, ...gr.nodes.filter((q) => !q.stale).map((q) => Math.hypot(q.x - gr.x, q.y - gr.y))));
+let nachodza = 0;
+sim.grupy.forEach((a, i) => sim.grupy.forEach((b, j) => { if (i < j && Math.hypot(a.x - b.x, a.y - b.y) < zasieg[i] + zasieg[j]) nachodza++; }));
 console.log(JSON.stringify({ liczby, maks, klatki: n, spokoj: s.alpha <= 0.003, czeka, otwarte, k: s.k, k2,
-  skonczone: s.wezly.every((q) => Number.isFinite(q.x) && Number.isFinite(q.y)), zdarzenia: Object.keys(zdarzenia).length }));
+  skonczone: s.wezly.every((q) => Number.isFinite(q.x) && Number.isFinite(q.y)), zdarzenia: Object.keys(zdarzenia).length,
+  grupy: sim.grupy.length, nachodza, mosty: sim.mosty.length, przybite: s.wezly.filter((q) => q.stale).every((q) => q.x === q.g.x && q.y === q.g.y) }));
 """
 
 
 @pytest.mark.skipif(not NODE, reason="brak node")
-@pytest.mark.parametrize("n", [120, 1200])
-def test_graf_plynny_i_zasypia(tmp_path, n):
+@pytest.mark.parametrize("n,tryb", [(120, ""), (1200, ""), (1200, "skupiska")])
+def test_graf_plynny_i_zasypia(tmp_path, n, tryb):
     skrypt = tmp_path / "g.js"
     skrypt.write_text(ATRAPA % GRAF_JS.read_text(encoding="utf-8"), encoding="utf-8")
-    r = subprocess.run([NODE, str(skrypt), str(n)], capture_output=True, text=True, encoding="utf-8", timeout=120)
+    r = subprocess.run([NODE, str(skrypt), str(n), tryb], capture_output=True, text=True, encoding="utf-8", timeout=120)
     assert r.returncode == 0, r.stderr
     w = json.loads(r.stdout)
-    assert w["liczby"]["wezly"] == n and w["liczby"]["linki"] > n
+    assert w["liczby"]["wezly"] == n + (7 if tryb else 0) and w["liczby"]["linki"] > n
     assert w["skonczone"] and w["spokoj"], w
     # płynnie: klatka mieści się w ~16 ms (budżet układu 10 ms + rysowanie), z zapasem na wolną maszynę CI
     assert w["maks"] < 40, w
@@ -163,22 +188,59 @@ def test_graf_plynny_i_zasypia(tmp_path, n):
     assert w["czeka"] == 0 and w["klatki"] < 400
     assert w["otwarte"] == [f"f3/n10"] and w["k2"] > w["k"] * 1.5
     assert w["zdarzenia"] == 0
+    if tryb:
+        # 7 skupisk rozłącznych, etykiety w kotwicach, linki między folderami jako mosty (każda para sąsiadów)
+        assert w["grupy"] == 7 and w["nachodza"] == 0 and w["przybite"] and w["mosty"] == 7, w
+    else:
+        assert w["grupy"] == 1 and w["mosty"] == 0
 
 
-FILTR = r"""
+WIDOK = r"""
 global.window = {}; const isPL = () => true; const L = (a) => a; const html = () => null; const zadanie = () => null;
 %s
-const w = ["Łódź", "Zażółć", "abc"].map((t, i) => ({ id: "x/" + i, hub: i === 2, _t: t, _s: mozgProste(t + " x/" + i) }));
-console.log(JSON.stringify([mozgFiltruj(w, "").map((n) => n._t), mozgFiltruj(w, "LODZ").map((n) => n._t), mozgFiltruj(w, "zazo").map((n) => n._t),
-  mozgUrl({ notatka_url: "https://h/{id}.html" }, "a b/c")]));
+const n = (id, o = {}) => { const t = o.tytul || id.split("/").pop(); return { id, hub: false, typ: "", zmieniono: "", ...o, _t: t, _p: mozgProste(t), _s: mozgProste(t + " " + id) }; };
+const wezly = [n("_hub-skarbiec", { hub: true }), n("user/_hub-ty", { hub: true, tytul: "Ty" }), n("user/kim jestem", { typ: "fakt" }),
+  n("agenci/_hub-agenci", { hub: true, tytul: "Agenci" }), n("agenci/jarvo-web/_hub-web", { hub: true, tytul: "🌐 Web Senior Dev (jarvo-web)" }),
+  n("agenci/jarvo-web/lekcja a", { typ: "lekcja", zmieniono: "2026-11-10" }), n("agenci/jarvo-web/fakt b", { typ: "fakt" }),
+  n("agenci/jarvo-x/samotna", { typ: "lekcja" }), n("fleet/skille/s1", { typ: "skill" }), n("fleet/skille/s2", { typ: "skill" }),
+  n("fleet/skille/s3", { typ: "skill" }), n("zrodla/jarvo-repo/HQ"), n("inne/x"), n("Łódź/zażółć", { tytul: "Zażółć gęślą" })];
+const m = mozgMapa(wezly, MOZG_KATEGORIE), zespol = m.kat.find((d) => d.k === "zespol"), web = zespol.grupy[0];
+const hash = mozgHash({ z: "jarvo", k: "zespol", g: "agenci/jarvo-web", o: "a (b)" });
+const cel = (t) => (t === "agenci/jarvo-web/lekcja a" ? ["#h", "Lekcja A"] : null);
+const graf = (k, g) => { const d = mozgGraf(m, [{ z: "agenci/jarvo-web/lekcja a", do: "fleet/skille/s1" }], k, g); return [d.wezly.filter((q) => q.stale).map((q) => q.id), d.wezly.length, d.linki.length]; };
+console.log(JSON.stringify({
+  glowne: m.glowne.map((d) => [d.k, d.ile]), boczne: m.kat.filter((d) => d.drugorzedna).map((d) => [d.k, d.hub && d.hub.id]),
+  zespol: [zespol.hub.id, zespol.grupy.map((x) => [x.k, x.nazwa, x.ile])], ty: m.kat[0].hub.id, samotna: m.gdzie.get("agenci/jarvo-x/samotna"),
+  sekcje: mozgSekcje(web.wezly).map((x) => [x.nazwa, x.wezly.map((q) => q._t)]),
+  szukaj: [mozgSzukaj(wezly, "ZAZOL")[0].map((q) => q._t), mozgSzukaj(wezly, "web")[0].map((q) => q.id), mozgSzukaj(wezly, "web", 1)[1], mozgSzukaj(wezly, " ")[1]],
+  hash, stan: mozgStan(hash), pusty: mozgHash({ z: "", k: "", g: "", o: "" }),
+  wiki: mozgWiki("x [[agenci/jarvo-web/lekcja a]] i [[nie ma|N]] <!-- c -->\n## Powiązane\n- [[y]]\n## Dalej\nz", cel),
+  grafy: [graf(null, null), graf(zespol, null), graf(zespol, web)], url: mozgUrl({ notatka_url: "https://h/{id}.html" }, "a b/c") }));
 """
 
 
 @pytest.mark.skipif(not NODE, reason="brak node")
-def test_lista_notatek_filtr_i_adresy(tmp_path):
+def test_czesci_grupy_szukanie_i_adresy(tmp_path):
     src = (REPO / "hq" / "web" / "src" / "63-mozg.js").read_text(encoding="utf-8")
-    skrypt = tmp_path / "f.js"
-    skrypt.write_text(FILTR % src, encoding="utf-8")
+    skrypt = tmp_path / "w.js"
+    skrypt.write_text(WIDOK % src, encoding="utf-8")
     r = subprocess.run([NODE, str(skrypt)], capture_output=True, text=True, encoding="utf-8", timeout=20)
     assert r.returncode == 0, r.stderr
-    assert json.loads(r.stdout) == [["abc", "Łódź", "Zażółć"], ["Łódź"], ["Zażółć"], "https://h/a%20b/c.html"]
+    w = json.loads(r.stdout)
+    # wejście: części z notatkami (puste znikają), foldery spoza listy jako własne części, źródła na boku
+    assert w["glowne"] == [["ty", 1], ["zespol", 6], ["f-inne", 1], ["f-Łódź", 1]]
+    assert w["boczne"] == [["zrodla", "_hub-skarbiec"]]
+    # grupy: podkatalog z hubem zostaje (nazwa z huba bez „(jarvo-web)”), mały bez huba wraca do folderu
+    assert w["zespol"] == ["agenci/_hub-agenci", [["agenci/jarvo-web", "🌐 Web Senior Dev", 2], ["agenci", "Agenci", 1],
+                                                  ["fleet/skille", "Umiejętności", 3]]]
+    assert w["ty"] == "user/_hub-ty" and w["samotna"] == {"kat": "zespol", "grupa": "agenci"}
+    assert w["sekcje"] == [["Lekcje", ["lekcja a"]], ["Fakty", ["fakt b"]]]
+    assert w["szukaj"] == [["Zażółć gęślą"], ["agenci/jarvo-web/_hub-web", "agenci/jarvo-web/fakt b", "agenci/jarvo-web/lekcja a"], 3, 0]
+    assert w["hash"] == "#/mozg?k=zespol&g=agenci%2Fjarvo-web&o=a%20%28b%29" and w["pusty"] == "#/mozg"
+    assert w["stan"] == {"z": "", "k": "zespol", "g": "agenci/jarvo-web", "o": "a (b)"}
+    assert w["wiki"] == "x [Lekcja A](#h) i N \n## Dalej\nz"
+    # graf: wejście = skupiska części, część = skupiska grup (link między nimi zostaje), grupa = same notatki
+    assert w["grafy"][0][0] == ["@ty", "@zespol", "@f-inne", "@f-Łódź"] and w["grafy"][0][2] == 1
+    assert w["grafy"][1][0] == ["@agenci/jarvo-web", "@agenci", "@fleet/skille"] and w["grafy"][1][1] == 11
+    assert w["grafy"][2] == [[], 3, 0]
+    assert w["url"] == "https://h/a%20b/c.html"
