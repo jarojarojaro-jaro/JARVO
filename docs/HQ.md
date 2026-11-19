@@ -1403,8 +1403,10 @@ Wiedza Jarva w aplikacji, poukładana w kilka głównych części, w które wcho
   w `konfig/mozg.json` (`kategorie`, niżej). W części **grupy**: katalog do dwóch członów (`agenci/jarvo-web`,
   `fleet/skille`); podkatalog bez huba i z mniej niż 3 notatkami wraca do folderu, a grupa z samym hubem nie jest
   grupą (hub zostaje „Przeglądem tej części”). Nazwa grupy: słownik folderów, tytuł huba bez „(klucz)” albo nazwa
-  katalogu. W grupie notatki w **sekcjach rodzaju** (Lekcje, Fakty, Decyzje…, od najnowszej), każda zwinięta do 6
-  (jedna sekcja: 15) z „Pokaż wszystkie (N)”.
+  katalogu. Agent `jarvo` to w całym Mózgu „Jarvo” (grupa, okruszki, „Przegląd”, graf, nagłówek notatki; `MOZG_AGENCI`
+  w 63-mozg.js), choć hub w skarbcu ma tytuł roli „Main Judge”: osobnego sędziego nie ma (decyzja 19.11), a notatek
+  skarbca widok nie zmienia; szukanie zna obie nazwy. W grupie notatki w **sekcjach rodzaju** (Lekcje, Fakty,
+  Decyzje…, od najnowszej), każda zwinięta do 6 (jedna sekcja: 15) z „Pokaż wszystkie (N)”.
 - **Poziomy i adres.** Wejście: kafle części (ikona, liczba notatek, jedno zdanie), „Ostatnio zmienione” (5) i link do
   źródeł. Część: opis, „Przegląd tej części”, grupy z liczbami, „Ostatnio zmienione tutaj”. Grupa: sekcje notatek.
   Okruszki u góry (Mózg › część › grupa). Stan w hashu `#/mozg?k=<część>&g=<grupa>&o=<notatka>&z=<źródło>` (trasa

@@ -198,12 +198,13 @@ def test_graf_plynny_i_zasypia(tmp_path, n, tryb):
 WIDOK = r"""
 global.window = {}; const isPL = () => true; const L = (a) => a; const html = () => null; const zadanie = () => null;
 %s
-const n = (id, o = {}) => { const t = o.tytul || id.split("/").pop(); return { id, hub: false, typ: "", zmieniono: "", ...o, _t: t, _p: mozgProste(t), _s: mozgProste(t + " " + id) }; };
+const n = (id, o = {}) => { const t = mozgTytul({ id, tytul: o.tytul || id.split("/").pop() }); return { id, hub: false, typ: "", zmieniono: "", ...o, _t: t, _p: mozgProste(t), _s: mozgProste(`${t} ${o.tytul || ""} ${id}`) }; };
 const wezly = [n("_hub-skarbiec", { hub: true }), n("user/_hub-ty", { hub: true, tytul: "Ty" }), n("user/kim jestem", { typ: "fakt" }),
   n("agenci/_hub-agenci", { hub: true, tytul: "Agenci" }), n("agenci/jarvo-web/_hub-web", { hub: true, tytul: "🌐 Web Senior Dev (jarvo-web)" }),
   n("agenci/jarvo-web/lekcja a", { typ: "lekcja", zmieniono: "2026-11-10" }), n("agenci/jarvo-web/fakt b", { typ: "fakt" }),
   n("agenci/jarvo-x/samotna", { typ: "lekcja" }), n("fleet/skille/s1", { typ: "skill" }), n("fleet/skille/s2", { typ: "skill" }),
-  n("fleet/skille/s3", { typ: "skill" }), n("zrodla/jarvo-repo/HQ"), n("inne/x"), n("Łódź/zażółć", { tytul: "Zażółć gęślą" })];
+  n("fleet/skille/s3", { typ: "skill" }), n("zrodla/jarvo-repo/HQ"), n("inne/x"), n("Łódź/zażółć", { tytul: "Zażółć gęślą" }),
+  n("agenci/jarvo/_hub-jarvo", { hub: true, tytul: "🛰️ Main Judge (jarvo)" }), n("agenci/jarvo/lekcja j", { typ: "lekcja" })];
 const m = mozgMapa(wezly, MOZG_KATEGORIE), zespol = m.kat.find((d) => d.k === "zespol"), web = zespol.grupy[0];
 const hash = mozgHash({ z: "jarvo", k: "zespol", g: "agenci/jarvo-web", o: "a (b)" });
 const cel = (t) => (t === "agenci/jarvo-web/lekcja a" ? ["#h", "Lekcja A"] : null);
@@ -212,7 +213,9 @@ console.log(JSON.stringify({
   glowne: m.glowne.map((d) => [d.k, d.ile]), boczne: m.kat.filter((d) => d.drugorzedna).map((d) => [d.k, d.hub && d.hub.id]),
   zespol: [zespol.hub.id, zespol.grupy.map((x) => [x.k, x.nazwa, x.ile])], ty: m.kat[0].hub.id, samotna: m.gdzie.get("agenci/jarvo-x/samotna"),
   sekcje: mozgSekcje(web.wezly).map((x) => [x.nazwa, x.wezly.map((q) => q._t)]),
-  szukaj: [mozgSzukaj(wezly, "ZAZOL")[0].map((q) => q._t), mozgSzukaj(wezly, "web")[0].map((q) => q.id), mozgSzukaj(wezly, "web", 1)[1], mozgSzukaj(wezly, " ")[1]],
+  szukaj: [mozgSzukaj(wezly, "ZAZOL")[0].map((q) => q._t), mozgSzukaj(wezly, "web")[0].map((q) => q.id), mozgSzukaj(wezly, "web", 1)[1], mozgSzukaj(wezly, " ")[1],
+    mozgSzukaj(wezly, "main judge")[0].map((q) => [q.id, q._t])],
+  pin: mozgGraf(m, [], zespol, null).wezly.find((q) => q.id === "@agenci/jarvo").etykieta,
   hash, stan: mozgStan(hash), pusty: mozgHash({ z: "", k: "", g: "", o: "" }),
   wiki: mozgWiki("x [[agenci/jarvo-web/lekcja a]] i [[nie ma|N]] <!-- c -->\n## Powiązane\n- [[y]]\n## Dalej\nz", cel),
   grafy: [graf(null, null), graf(zespol, null), graf(zespol, web)], url: mozgUrl({ notatka_url: "https://h/{id}.html" }, "a b/c") }));
@@ -228,19 +231,22 @@ def test_czesci_grupy_szukanie_i_adresy(tmp_path):
     assert r.returncode == 0, r.stderr
     w = json.loads(r.stdout)
     # wejście: części z notatkami (puste znikają), foldery spoza listy jako własne części, źródła na boku
-    assert w["glowne"] == [["ty", 1], ["zespol", 6], ["f-inne", 1], ["f-Łódź", 1]]
+    assert w["glowne"] == [["ty", 1], ["zespol", 7], ["f-inne", 1], ["f-Łódź", 1]]
     assert w["boczne"] == [["zrodla", "_hub-skarbiec"]]
-    # grupy: podkatalog z hubem zostaje (nazwa z huba bez „(jarvo-web)”), mały bez huba wraca do folderu
+    # grupy: podkatalog z hubem zostaje (nazwa z huba bez „(jarvo-web)”), mały bez huba wraca do folderu;
+    # agent `jarvo` to dla właściciela „Jarvo”, nie tytuł roli z huba („Main Judge”)
     assert w["zespol"] == ["agenci/_hub-agenci", [["agenci/jarvo-web", "🌐 Web Senior Dev", 2], ["agenci", "Agenci", 1],
-                                                  ["fleet/skille", "Umiejętności", 3]]]
+                                                  ["agenci/jarvo", "Jarvo", 1], ["fleet/skille", "Umiejętności", 3]]]
     assert w["ty"] == "user/_hub-ty" and w["samotna"] == {"kat": "zespol", "grupa": "agenci"}
     assert w["sekcje"] == [["Lekcje", ["lekcja a"]], ["Fakty", ["fakt b"]]]
-    assert w["szukaj"] == [["Zażółć gęślą"], ["agenci/jarvo-web/_hub-web", "agenci/jarvo-web/fakt b", "agenci/jarvo-web/lekcja a"], 3, 0]
+    assert w["szukaj"] == [["Zażółć gęślą"], ["agenci/jarvo-web/_hub-web", "agenci/jarvo-web/fakt b", "agenci/jarvo-web/lekcja a"], 3, 0,
+                           [["agenci/jarvo/_hub-jarvo", "Jarvo"]]]
+    assert w["pin"] == "Jarvo · 1"
     assert w["hash"] == "#/mozg?k=zespol&g=agenci%2Fjarvo-web&o=a%20%28b%29" and w["pusty"] == "#/mozg"
     assert w["stan"] == {"z": "", "k": "zespol", "g": "agenci/jarvo-web", "o": "a (b)"}
     assert w["wiki"] == "x [Lekcja A](#h) i N \n## Dalej\nz"
     # graf: wejście = skupiska części, część = skupiska grup (link między nimi zostaje), grupa = same notatki
     assert w["grafy"][0][0] == ["@ty", "@zespol", "@f-inne", "@f-Łódź"] and w["grafy"][0][2] == 1
-    assert w["grafy"][1][0] == ["@agenci/jarvo-web", "@agenci", "@fleet/skille"] and w["grafy"][1][1] == 11
+    assert w["grafy"][1][0] == ["@agenci/jarvo-web", "@agenci", "@agenci/jarvo", "@fleet/skille"] and w["grafy"][1][1] == 14
     assert w["grafy"][2] == [[], 3, 0]
     assert w["url"] == "https://h/a%20b/c.html"

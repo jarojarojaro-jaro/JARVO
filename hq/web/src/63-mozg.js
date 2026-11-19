@@ -41,6 +41,14 @@ const MOZG_TYPY = { projekt: ["Projekty", "Projects"], lekcja: ["Lekcje", "Lesso
 const MOZG_RODZAJE = Object.keys(MOZG_TYPY);
 const mozgN = (p) => (p ? L(p[0], p[1]) : "");
 
+// agent → nazwa dla właściciela w całym Mózgu (grupa, okruszki, „Przegląd”, graf, notatka): koordynator floty to
+// „Jarvo”, choć hub w skarbcu ma tytuł roli („Main Judge”); notatek w skarbcu nie zmieniamy
+const MOZG_AGENCI = { jarvo: "Jarvo" };
+const mozgTytul = (n) => {
+  const m = /^agenci\/([^/]+)\/_hub-/.exec(n.id);
+  return m && MOZG_AGENCI[m[1]] ? MOZG_AGENCI[m[1]] : String(n.tytul || n.id);
+};
+
 // paleta z motywu: barwy kafli i skupisk (--j-barwa-*), reszta grafu z kolorów motywu
 function mozgMotyw(el) {
   const cs = getComputedStyle(el), v = (n) => cs.getPropertyValue(n).trim();
@@ -84,7 +92,7 @@ function mozgMapa(wezly, defs) {
     for (const d of auto.slice(7)) { inne.wezly.push(...d.wezly); inne.foldery.push(...d.foldery); kat.splice(kat.indexOf(d), 1); }
   }
   for (const d of kat) {
-    if (d.auto) { const f = d.foldery[0], h = huby.get(f); d.nazwa = f ? (MOZG_NAZWY[f] ? MOZG_NAZWY[f][0] : h ? h.tytul : mozgDuza(f)) : "Ogólne"; d.nazwa_en = f ? (MOZG_NAZWY[f] ? MOZG_NAZWY[f][1] : d.nazwa) : "General"; }
+    if (d.auto) { const f = d.foldery[0], h = huby.get(f); d.nazwa = f ? (MOZG_NAZWY[f] ? MOZG_NAZWY[f][0] : h ? h._t : mozgDuza(f)) : "Ogólne"; d.nazwa_en = f ? (MOZG_NAZWY[f] ? MOZG_NAZWY[f][1] : d.nazwa) : "General"; }
     const gr = new Map(), wloz = (dir, n) => { if (!gr.has(dir)) gr.set(dir, []); gr.get(dir).push(n); };
     for (const n of d.wezly) { const cz = n.id.split("/"); wloz(cz.length > 2 ? cz[0] + "/" + cz[1] : cz.length > 1 ? cz[0] : "", n); }
     for (const [dir, l] of [...gr]) if (dir.includes("/") && l.length < 3 && !l.some((n) => n.hub)) { gr.delete(dir); for (const n of l) wloz(dir.split("/")[0], n); }
@@ -95,7 +103,7 @@ function mozgMapa(wezly, defs) {
       if (hub && (!przeglad || fi(dir) < przeglad[0] || (fi(dir) === przeglad[0] && dir.length < przeglad[1]))) przeglad = [fi(dir), dir.length, hub];
       if (!ile) { for (const n of l) gdzie.set(n.id, { kat: d.k, grupa: "" }); continue; }
       const ost = dir.split("/").pop(), nz = MOZG_NAZWY[dir.includes("/") ? ost : dir];
-      const nazwa = nz ? nz : hub ? [hub.tytul.replace(/\s*\([^)]*\)\s*$/, "")] : [dir ? mozgDuza(ost) : "Ogólne", dir ? mozgDuza(ost) : "General"];
+      const nazwa = nz ? nz : hub ? [hub._t.replace(/\s*\([^)]*\)\s*$/, "")] : [dir ? mozgDuza(ost) : "Ogólne", dir ? mozgDuza(ost) : "General"];
       d.grupy.push({ k: dir, wezly: l, hub, ile, nazwa: L(nazwa[0], nazwa[1] || nazwa[0]) });
       d.ile += ile;
     }
@@ -193,7 +201,7 @@ function MozgNotatka({ z, id, dane, mapa, href, nazwaMiejsca, onClose }) {
       <span class="j-mozg-wg">${gd && nazwaMiejsca(gd)}</span>
       <button type="button" class="j-mozg-x" aria-label=${L("Zamknij notatkę", "Close the note")} onClick=${onClose}>×</button>
     </div>
-    <h2 id="j-mozg-tytul">${w.tytul || id}</h2>
+    <h2 id="j-mozg-tytul">${w._t || id}</h2>
     <p class="j-mozg-wd">${[mozgN(MOZG_TYPY[w.typ]), mozgData(w.zmieniono)].filter(Boolean).join(" · ")}</p>
     ${skarbiec && (!n ? html`<${Spinner}/>` : n.blad ? html`<p>${L("Nie udało się otworzyć notatki.", "Could not open the note.")}</p>` : html`<${TrescMd} tekst=${tresc}/>`)}
     ${!skarbiec && w.opis && html`<p>${w.opis}</p>`}
@@ -236,7 +244,8 @@ function MozgWidok() {
     setDane(null); setBlad(false);
     (z.rodzaj === "skarbiec" ? zadanie("GET", "/graph", undefined, MOZG_WIEDZA) : zadanie("GET", `/mozg/${encodeURIComponent(z.klucz)}`)).then((d) => {
       if (!zywy) return;
-      const wezly = (d.wezly || []).map((n) => { const t = String(n.tytul || n.id); return { ...n, _t: t, _p: mozgProste(t), _s: mozgProste(`${t} ${n.id}`) }; });
+      // _t: nazwa do pokazania (mozgTytul), szukanie zna też tytuł ze skarbca
+      const wezly = (d.wezly || []).map((n) => { const t = mozgTytul(n); return { ...n, _t: t, _p: mozgProste(t), _s: mozgProste(`${t} ${n.tytul || ""} ${n.id}`) }; });
       const byId = new Map(wezly.map((n) => [n.id, n])), sasiedzi = new Map(), ogon = new Map();
       for (const n of wezly) { const o = mozgProste(n.id.split("/").pop()); if (!ogon.has(o)) ogon.set(o, n.id); }
       for (const l of d.linki || []) for (const [a, b] of [[l.z, l.do], [l.do, l.z]]) if (a !== b && byId.has(b)) { if (!sasiedzi.has(a)) sasiedzi.set(a, new Set()); sasiedzi.get(a).add(b); }
