@@ -3,12 +3,25 @@
 
     python3 security_check.py repo <katalog projektu> [--offline] [--json]   # kod: sekrety, .env w gicie, zależności, wzorce ryzyka
                                                                              # i polityki RLS w *.sql (auth.uid() bez select)
-    python3 security_check.py url https://strona.pl [--json]                 # działająca strona: nagłówki, ciasteczka, CORS,
-                                                                             # wycieki, klucze w JS wysyłanym do przeglądarki,
-                                                                             # publiczne mapy źródeł (.js.map z kodem),
-                                                                             # GPS w zdjęciach strony (miejsce zrobienia),
-                                                                             # ciasteczko sesji w odpowiedzi dla cache CDN
+    python3 security_check.py naglowki https://strona.pl [--json]            # produkcja po wgraniu: JEDNO żądanie HEAD
+                                                                             # (jak `curl -sI`, bez przekierowań): nagłówki,
+                                                                             # HTTPS, ciasteczka, CORS
+    python3 security_check.py url https://strona.pl [--json]                 # działająca strona: nagłówki, ciasteczka, CORS
+                                                                             # (jedno żądanie HTML z obcym Origin), klucze
+                                                                             # w JS wysyłanym do przeglądarki, publiczne mapy
+                                                                             # źródeł (.js.map z kodem), ciasteczko sesji
+                                                                             # w odpowiedzi dla cache CDN
+    python3 security_check.py url http://localhost:4321 --zgoda-wlasciciela  # nasz podgląd, pełny skan: do tego sondy
+                                                                             # wycieków (/.env, /.git…), pliki .map obok
+                                                                             # skryptów i GPS w zdjęciach strony
     python3 security_check.py atak http://localhost:4321 [próby…] [--json]    # nieniszczące próby na działającej aplikacji
+
+Ruch w `url` i `naglowki` (SEOHost 18.11 zablokował nasze IP po ~660 żądaniach na 12 domen w 48 s): twardy limit żądań
+na domenę, w tym każde przekierowanie (`naglowki` 1, `url` 20, podgląd z `--zgoda-wlasciciela` 120), i odstęp między
+żądaniami do jednego hosta (`--odstep`, domyślnie 1 s, na podglądzie 0; poza podglądem nie mniej niż 1 s). Sondy wycieków,
+zgadywane `.map` i zdjęcia tylko na naszym podglądzie (localhost, adres prywatny) z `--zgoda-wlasciciela`; ta flaga przy
+`url` na innym adresie to odmowa. User-Agent zostaje jawny (`jarvo-web-security/1.0`): nie udajemy przeglądarki,
+chroni nas mała liczba żądań.
 
 `atak` (tylko nasz podgląd albo aplikacja użytkownika za jego zgodą: `--zgoda-wlasciciela`), próby wybierasz flagami:
     --chronione /api/orders /admin       trasy, które bez sesji muszą odmówić (401/403/przekierowanie na logowanie)
@@ -24,8 +37,8 @@ To nie zastępuje przeglądu kodu (model czyta przepływ danych: skill, referenc
 to, co da się wykryć maszynowo i bez fałszywych alarmów. Każde ustalenie ma wagę: KRYTYCZNE / WYSOKIE / ŚREDNIE / NISKIE.
 Kod wyjścia: 0 = brak KRYTYCZNYCH i WYSOKICH, 1 = są, 2 = złe wejście albo brak zgody. Sieć: badana strona, a w `repo`
 rejestry npm i PyPI (czy zależności istnieją, wiek, pobrania; `--offline` pomija). Bez zależności poza biblioteką standardową.
-`repo` i `url` szukają też współrzędnych GPS w zdjęciach (EXIF w JPEG, PNG, WebP, HEIC, AVIF, TIFF i XMP): zdjęcie
-z telefonu zdradza, gdzie je zrobiono (często dom właściciela).
+`repo` i `url` z `--zgoda-wlasciciela` na podglądzie szukają też współrzędnych GPS w zdjęciach (EXIF w JPEG, PNG, WebP,
+HEIC, AVIF, TIFF i XMP): zdjęcie z telefonu zdradza, gdzie je zrobiono (często dom właściciela).
 """
 from __future__ import annotations
 
@@ -41,6 +54,8 @@ import ssl
 import struct
 import subprocess
 import sys
+import threading
+import time
 import tomllib
 import urllib.error
 import urllib.parse
@@ -142,6 +157,17 @@ lxml selenium playwright pytest black ruff mypy flake8 click typer rich pyyaml p
 cryptography pyjwt bcrypt argon2-cffi passlib stripe twilio sentry-sdk python-multipart markdown bleach""".split()
 UWAGI: list[str] = []          # czego nie dało się ocenić (brak sieci, limit rejestru): nigdy „czysto”
 SPRAWDZONE: list[str] = []     # próby `atak`, które przeszły (dowód do listy kontrolnej)
+
+UA = "jarvo-web-security/1.0"   # jawny, nie udaje przeglądarki (decyzja 18.11): chroni nas mała liczba żądań, nie przebranie
+LIMIT_ZADAN = 20               # `url`: najwyżej tyle żądań na domenę, z przekierowaniami (HTML + skrypty + ich mapy)
+LIMIT_PODGLAD = 120            # `url` na podglądzie z --zgoda-wlasciciela: do tego sondy wycieków i zdjęcia
+MAX_PRZEKIEROWAN = 5
+OBCY_ORIGIN = "https://atak.example"
+LIMIT: int | None = None       # limit na domenę w bieżącym przebiegu (`url`, `naglowki`); None = bez limitu (`atak`, testy)
+ODSTEP = 0.0                   # sekundy między żądaniami do jednego hosta
+_ZADANIA: dict[str, int] = {}
+_NASTEPNE: dict[str, float] = {}
+_ZAMEK = threading.Lock()
 
 
 def u(waga, co, gdzie, poprawka):
@@ -257,8 +283,8 @@ def manifesty(root: Path) -> list[tuple[str, str, str]]:
 def _json_z(url: str, timeout=10):
     """(kod, dane) z rejestru; kod 0 = brak odpowiedzi (sieć)."""
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "jarvo-web-security/1.0",
-                                                                          "Accept": "application/json"}), timeout=timeout) as r:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"}),
+                                    timeout=timeout) as r:
             return r.status, json.loads(r.read(8_000_000) or b"null")
     except urllib.error.HTTPError as e:
         return e.code, None
@@ -354,16 +380,45 @@ class BezPrzekierowan(urllib.request.HTTPRedirectHandler):
         return None
 
 
+def _kolejka(url: str) -> bool:
+    """Limit żądań na domenę i odstęp między żądaniami do jednego hosta (`url`, `naglowki`); False = limit wyczerpany."""
+    if LIMIT is None:
+        return True
+    host = (urllib.parse.urlsplit(url).hostname or "").lower()
+    with _ZAMEK:
+        if _ZADANIA.get(host, 0) >= LIMIT:
+            uwaga = f"limit {LIMIT} żądań do {host} wyczerpany (z przekierowaniami): reszta nie sprawdzona"
+            if uwaga not in UWAGI:
+                UWAGI.append(uwaga)
+            return False
+        _ZADANIA[host] = _ZADANIA.get(host, 0) + 1
+        teraz = time.monotonic()
+        start = max(teraz, _NASTEPNE.get(host, teraz))
+        _NASTEPNE[host] = start + ODSTEP
+    if start > teraz:
+        time.sleep(start - teraz)
+    return True
+
+
 def pobierz(url: str, method="GET", headers=None, timeout=15, limit=3000, dane: bytes | None = None, przekierowania=True):
-    req = urllib.request.Request(url, data=dane, method=method, headers={"User-Agent": "jarvo-web-security/1.0", **(headers or {})})
-    ctx = ssl.create_default_context()
-    opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx),
-                                         *([] if przekierowania else [BezPrzekierowan()]))
-    try:
-        with opener.open(req, timeout=timeout) as r:
-            return r.status, {k.lower(): v for k, v in r.headers.items()}, r.headers.get_all("Set-Cookie") or [], r.read(limit)
-    except urllib.error.HTTPError as e:
-        return e.code, {k.lower(): v for k, v in e.headers.items()}, e.headers.get_all("Set-Cookie") or [], e.read(limit)
+    """Przekierowania (do MAX_PRZEKIEROWAN) idą po kolei przez `_kolejka`: każde liczy się do limitu domeny.
+    Wyczerpany limit: status 0 bez wysyłania żądania."""
+    opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl.create_default_context()), BezPrzekierowan())
+    for _ in range(MAX_PRZEKIEROWAN + 1):
+        if not _kolejka(url):
+            return 0, {}, [], b""
+        req = urllib.request.Request(url, data=dane, method=method, headers={"User-Agent": UA, **(headers or {})})
+        try:
+            with opener.open(req, timeout=timeout) as r:
+                return r.status, {k.lower(): v for k, v in r.headers.items()}, r.headers.get_all("Set-Cookie") or [], r.read(limit)
+        except urllib.error.HTTPError as e:
+            wynik = e.code, {k.lower(): v for k, v in e.headers.items()}, e.headers.get_all("Set-Cookie") or [], e.read(limit)
+        if not przekierowania or wynik[0] not in (301, 302, 303, 307, 308) or not wynik[1].get("location"):
+            return wynik
+        url = urllib.parse.urljoin(url, wynik[1]["location"])
+        if wynik[0] == 303 or (wynik[0] in (301, 302) and method == "POST"):
+            method, dane = "GET", None
+    return wynik
 
 
 CDN_CACHE = ("cdn-cache-control", "surrogate-control", "cloudflare-cdn-cache-control", "vercel-cdn-cache-control")
@@ -428,10 +483,11 @@ def _krotko(zrodlo: str) -> str:
     return re.sub(r"^(?:\.\./|\./)+", "", re.sub(r"^(?:webpack|vite|turbopack)://[^/]*/", "", zrodlo))[-60:]
 
 
-def mapa_zrodel(js: str, tekst: str, naglowki: dict) -> list[dict]:
-    """Publiczna mapa źródeł skryptu: komentarz sourceMappingURL, nagłówek SourceMap albo plik <skrypt>.map obok.
-    Mapa z `sourcesContent` odtwarza czytelny kod frontu (minifikacja to nie szyfrowanie): ŚREDNIE; sekret w odzyskanym
-    kodzie: KRYTYCZNE; mapa bez kodu (nazwy plików i struktura projektu): NISKIE. Mapa z obcej domeny poza zakresem."""
+def mapa_zrodel(js: str, tekst: str, naglowki: dict, sondy: bool = False) -> list[dict]:
+    """Publiczna mapa źródeł skryptu: komentarz sourceMappingURL, nagłówek SourceMap, a z `sondy` (nasz podgląd) także
+    zgadywany plik <skrypt>.map obok. Mapa z `sourcesContent` odtwarza czytelny kod frontu (minifikacja to nie
+    szyfrowanie): ŚREDNIE; sekret w odzyskanym kodzie: KRYTYCZNE; mapa bez kodu (nazwy plików i struktura projektu):
+    NISKIE. Mapa z obcej domeny poza zakresem."""
     ref = naglowki.get("sourcemap") or naglowki.get("x-sourcemap") or ""
     if m := re.findall(r"[#@]\s*sourceMappingURL=(\S+)", tekst[-20000:]):
         ref = m[-1]
@@ -441,7 +497,7 @@ def mapa_zrodel(js: str, tekst: str, naglowki: dict) -> list[dict]:
         except (ValueError, IndexError):
             return []
         gdzie = f"{js} (mapa wbudowana w skrypt)"
-    else:
+    elif ref or sondy:
         gdzie = urllib.parse.urljoin(js, ref) if ref else js.split("?")[0] + ".map"
         if urllib.parse.urlsplit(gdzie).netloc != urllib.parse.urlsplit(js).netloc:
             return []
@@ -452,6 +508,8 @@ def mapa_zrodel(js: str, tekst: str, naglowki: dict) -> list[dict]:
             mapa = json.loads(b)
         except ValueError:
             return []
+    else:                                                         # bez odnośnika poza podglądem: nie zgadujemy .map
+        return []
     if not isinstance(mapa, dict) or not mapa.get("sources"):
         return []
     zrodla = [str(z) for z in mapa["sources"]]
@@ -477,7 +535,7 @@ def skrypty_strony(base: str, html: str) -> list[str]:
 
 
 OBRAZY = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".avif", ".tif", ".tiff"}
-MAX_ZDJEC = 40                   # `url`: tyle zdjęć strony sprawdzamy (początek pliku, nie całość)
+MAX_ZDJEC = 40                   # `url` na podglądzie z --zgoda-wlasciciela: tyle zdjęć strony sprawdzamy (początek pliku)
 POCZATEK = 512_000               # EXIF i XMP leżą na początku pliku
 
 
@@ -641,20 +699,9 @@ def gps_na_stronie(base: str, html: str) -> list[dict]:
     return wyn
 
 
-def strona(url: str) -> list[dict]:
+def odpowiedz(base: str, h: dict, cookies: list[str], body: bytes) -> list[dict]:
+    """Ocena jednej odpowiedzi strony (żądanie z obcym Origin): HTTPS, nagłówki, ciasteczka, cache CDN, CORS, debug."""
     wyn = []
-    base = url.rstrip("/")
-    st, h, cookies, body = pobierz(base, limit=3_000_000)
-    html = body.decode("utf-8", "replace")
-    wyn += sekrety_w_js(html, base)                              # skrypty wbudowane w HTML
-    for js in skrypty_strony(base, html):
-        s, hjs, _, b = pobierz(js, limit=8_000_000)
-        if s == 200:
-            tekst = b.decode("utf-8", "replace")
-            wyn += sekrety_w_js(tekst, js) + mapa_zrodel(js, tekst, hjs)
-    if st == 200:
-        wyn += gps_na_stronie(base, html)
-    body = body[:3000]
     if base.startswith("http://"):
         wyn.append(u("WYSOKIE", "strona bez HTTPS", base, "certyfikat (Let's Encrypt) i przekierowanie 301 na https"))
     for nag, waga, po_co in NAGLOWKI:
@@ -680,18 +727,53 @@ def strona(url: str) -> list[dict]:
                          POPRAWKA_CACHE))
         else:
             SPRAWDZONE.append(f"ciasteczko sesji {sesyjne[0]}: odpowiedź poza wspólnym cache")
-    st2, h2, _, _ = pobierz(base, headers={"Origin": "https://atak.example"})
-    acao = h2.get("access-control-allow-origin", "")
-    if acao == "https://atak.example" or (acao == "*" and h2.get("access-control-allow-credentials") == "true"):
+    acao = h.get("access-control-allow-origin", "")
+    if acao == OBCY_ORIGIN or (acao == "*" and h.get("access-control-allow-credentials") == "true"):
         wyn.append(u("WYSOKIE", f"CORS wpuszcza dowolną domenę ({acao})", base, "lista dozwolonych domen; bez odbijania Origin"))
-    if re.search(rb"(?i)(Traceback \(most recent|Whoops!|DEBUG = True|stack trace|at Object\.<anonymous>)", body):
+    if re.search(rb"(?i)(Traceback \(most recent|Whoops!|DEBUG = True|stack trace|at Object\.<anonymous>)", body[:3000]):
         wyn.append(u("WYSOKIE", "strona pokazuje ślad błędu / tryb debug", base, "wyłącz debug na produkcji; własne strony błędów"))
+    return wyn
+
+
+def strona(url: str, sondy: bool = False) -> list[dict]:
+    """Jedno żądanie HTML (z obcym Origin: od razu próba CORS) i skrypty tej domeny z odnośnikami do map. `sondy`
+    (tylko nasz podgląd z --zgoda-wlasciciela): także zgadywane pliki .map, zdjęcia (GPS) i sondy wycieków."""
+    base = url.rstrip("/")
+    st, h, cookies, body = pobierz(base, headers={"Origin": OBCY_ORIGIN}, limit=3_000_000)
+    html = body.decode("utf-8", "replace")
+    wyn = sekrety_w_js(html, base)                               # skrypty wbudowane w HTML
+    for js in skrypty_strony(base, html):
+        s, hjs, _, b = pobierz(js, limit=8_000_000)
+        if s == 200:
+            tekst = b.decode("utf-8", "replace")
+            wyn += sekrety_w_js(tekst, js) + mapa_zrodel(js, tekst, hjs, sondy)
+    wyn += odpowiedz(base, h, cookies, body)
+    if not sondy:
+        UWAGI.append("sondy wycieków (/.env, /.git…), pliki .map bez odnośnika i GPS w zdjęciach strony: tylko na naszym "
+                     "podglądzie z --zgoda-wlasciciela (na produkcji nie sondujemy)")
+        return wyn
+    if st == 200:
+        wyn += gps_na_stronie(base, html)
     for sciezka, waga in WYCIEKI:
         s, hh, _, b = pobierz(base + sciezka)
         typ = hh.get("content-type", "")
         if s == 200 and b and "text/html" not in typ and not b.lstrip().startswith(b"<"):
             wyn.append(u(waga, f"publicznie dostępny {sciezka}", base + sciezka, "zablokuj na serwerze (deny) i usuń z katalogu publicznego"))
     return wyn
+
+
+def tylko_naglowki(url: str) -> list[dict]:
+    """Jedno żądanie HEAD (jak `curl -sI`), bez przekierowań: nagłówki, HTTPS, ciasteczka, CORS. Na pomiar po wgraniu."""
+    base = url.rstrip("/")
+    st, h, cookies, _ = pobierz(base, method="HEAD", headers={"Origin": OBCY_ORIGIN}, przekierowania=False)
+    if st in (301, 302, 303, 307, 308):
+        UWAGI.append(f"{base}: {st} → {h.get('location', '?')}; nagłówki strony docelowej niezmierzone "
+                     "(jedno żądanie na domenę: podaj adres docelowy)")
+        return []
+    if st in (405, 501):
+        UWAGI.append(f"{base}: serwer nie przyjmuje HEAD ({st}); nagłówki niezmierzone")
+        return []
+    return odpowiedz(base, h, cookies, b"")
 
 
 def lokalny(url: str) -> bool:
@@ -829,11 +911,15 @@ def atak(base: str, a) -> list[dict]:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("tryb", choices=["repo", "url", "atak"])
+    ap.add_argument("tryb", choices=["repo", "naglowki", "url", "atak"])
     ap.add_argument("cel")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--offline", action="store_true", help="repo: bez pytania rejestrów npm/PyPI o zależności")
-    ap.add_argument("--zgoda-wlasciciela", action="store_true", help="atak na adres spoza podglądu: właściciel się zgodził")
+    ap.add_argument("--zgoda-wlasciciela", action="store_true",
+                    help="atak na adres spoza podglądu: właściciel się zgodził; url: pełny skan naszego podglądu "
+                         "(sondy wycieków, pliki .map, zdjęcia), poza podglądem odmowa")
+    ap.add_argument("--odstep", type=float, help="url/naglowki: sekundy między żądaniami do jednego hosta "
+                                                  "(domyślnie 1, na podglądzie 0; poza podglądem najmniej 1)")
     ap.add_argument("--chronione", nargs="+")
     ap.add_argument("--sesja-a")
     ap.add_argument("--sesja-b")
@@ -850,10 +936,25 @@ def main(argv=None) -> int:
         print("✗ atak tylko na naszym podglądzie (localhost, adres prywatny) albo z --zgoda-wlasciciela "
               "po zgodzie właściciela aplikacji", file=sys.stderr)
         return 2
+    if a.tryb == "url" and a.zgoda_wlasciciela and not lokalny(a.cel):
+        print("✗ sondy wycieków, pliki .map i zdjęcia tylko na naszym podglądzie (localhost, adres prywatny); na produkcji "
+              "`naglowki` (jedno żądanie) albo `url` bez --zgoda-wlasciciela", file=sys.stderr)
+        return 2
+    global LIMIT, ODSTEP
+    LIMIT, ODSTEP = None, 0.0
+    if a.tryb in ("url", "naglowki"):
+        _ZADANIA.clear()
+        _NASTEPNE.clear()
+        LIMIT = 1 if a.tryb == "naglowki" else LIMIT_PODGLAD if a.zgoda_wlasciciela else LIMIT_ZADAN
+        ODSTEP = 0.0 if a.odstep is None else a.odstep
+        if not lokalny(a.cel):                                        # cudzy serwer: nigdy szybciej niż 1 żądanie na s
+            ODSTEP = max(ODSTEP, 1.0)
     if a.tryb == "repo":
         wyn = repo(Path(a.cel)) + rls_w_sql(Path(a.cel)) + gps_w_repo(Path(a.cel)) + ([] if a.offline else zaleznosci(Path(a.cel)))
+    elif a.tryb == "naglowki":
+        wyn = tylko_naglowki(a.cel)
     else:
-        wyn = strona(a.cel) if a.tryb == "url" else atak(a.cel, a)
+        wyn = strona(a.cel, sondy=a.zgoda_wlasciciela) if a.tryb == "url" else atak(a.cel, a)
     wyn.sort(key=lambda x: WAGI.index(x["waga"]))
     licz = {w: sum(x["waga"] == w for x in wyn) for w in WAGI}
     if a.json:

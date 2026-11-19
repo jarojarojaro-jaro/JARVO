@@ -1,7 +1,7 @@
 ---
 name: bramka-jakosci
 description: "Przed oddaniem strony: rubryka designu 0–100 i testy wrogie."
-version: 1.1.1
+version: 1.2.0
 author: "Jarvo (rubryka i werdykt na bazie oh-my-hermes, MIT)"
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-web
     autonomy: A1
-    reviewed: "2026-09-28"
+    reviewed: "2026-11-19"
 ---
 
 # Bramka jakości (design i odporność strony)
@@ -41,7 +41,9 @@ u seniora product designu (klasa Linear / Stripe / Supabase). **Technicznie czys
    **Znaki AI (bez modelu):** `sh "$HERMES_HOME/skills/design/impeccable/scripts/impeccable" detect <katalog|url> --json`
    → `out/jakosc/impeccable.json` (fioletowe gradienty, sprężynujący easing, oklepane fonty…); każde trafienie to
    różnica w werdykcie albo świadomy wyjątek z uzasadnieniem. Animacje strony: przegląd wg `review-animations`.
-3a. **Bezpieczeństwo.** `@@PY@@ "$HERMES_HOME/scripts/security_check.py" url <url>` zawsze; strona z backendem,
+3a. **Bezpieczeństwo.** Na podglądzie zawsze `@@PY@@ "$HERMES_HOME/scripts/security_check.py" url <url podglądu> --zgoda-wlasciciela`
+   (pełny skan: także sondy wycieków i GPS w zdjęciach); żywa strona (ocena w audycie): tylko `security_check.py naglowki <url>`,
+   jedno żądanie, nigdy `url` na produkcji. Strona z backendem,
    logowaniem albo formularzem: cały skill `bezpieczenstwo-aplikacji`. KRYTYCZNE lub WYSOKIE = **BLOCK**, niezależnie od wyniku rubryki.
 4. **Ocena rubryką.** Przejdź 10 osi z `references/rubryka.md`. Każda oś: zaliczona albo różnica z dowodem
    (który zrzut, co widać) i **najmniejszą zmianą**, która ją naprawi.

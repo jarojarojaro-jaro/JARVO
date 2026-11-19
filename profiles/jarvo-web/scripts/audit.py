@@ -5,7 +5,8 @@
 
 Każde narzędzie działa niezależnie: awaria jednego nie przerywa reszty i trafia do summary.json (na stdout), a status
 każdego narzędzia na stderr. Raporty narzędzi leżą obok: lighthouse-{mobile,desktop}.report.{json,html}, axe.json,
-links.json, seo.json, security.json, screenshots/ i <narzędzie>.log z wyjściem.
+links.json, seo.json, security.json, screenshots/ i <narzędzie>.log z wyjściem. `security_check.py url` tylko na podglądzie
+na tym komputerze (localhost); każdy inny adres dostaje `security_check.py naglowki`: jedno żądanie na domenę.
 
 Ta sama logika co dawny audit.sh, ale w Pythonie (bash 3.2 na macOS nie zna tablic asocjacyjnych, a Windows nie ma
 basha poza Git Bash; docs/NATYWNIE.md F02). Narzędzia npm (lighthouse, linkinator) uruchamia Node na skrypcie `bin`
@@ -21,6 +22,7 @@ import os
 import shutil
 import subprocess
 import sys
+import urllib.parse
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -197,6 +199,12 @@ def flagi_chrome() -> str:
     return " ".join(["--headless=new", *(["--no-sandbox"] if bez_piaskownicy() else []), "--disable-gpu"])
 
 
+def tryb_bezpieczenstwa(url: str) -> str:
+    """`url` (HTML i skrypty) tylko na podglądzie na tym komputerze; produkcja: `naglowki`, jedno żądanie na domenę
+    (SEOHost 18.11 zablokował IP po skanie 12 domen)."""
+    return "url" if urllib.parse.urlsplit(url).hostname in ("localhost", "127.0.0.1", "::1") else "naglowki"
+
+
 def podsumowanie(out: Path) -> dict:
     summary = {"lighthouse": {}, "axe": None, "links": None, "seo": None, "security": None, "screenshots": None}
     for ff in ("mobile", "desktop"):
@@ -294,7 +302,7 @@ def main(argv: list[str] | None = None) -> int:
     if isinstance(linki, dict) and isinstance(linki.get("links"), list) and sprawdz_ponownie(linki["links"]):
         (out / "links.json").write_text(json.dumps(linki, ensure_ascii=False, indent=1), encoding="utf-8")
     a.run_findings("seo", [sys.executable, str(HERE / "seo_check.py"), url, "--json"], kopia="seo.json")
-    a.run_findings("security", [sys.executable, str(HERE / "security_check.py"), "url", url, "--json"],
+    a.run_findings("security", [sys.executable, str(HERE / "security_check.py"), tryb_bezpieczenstwa(url), url, "--json"],
                    kopia="security.json")
     a.run("screenshots", node and [node, str(HERE / "screenshots.cjs"), url, str(out / "screenshots")])
 

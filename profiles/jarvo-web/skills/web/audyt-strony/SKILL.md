@@ -1,7 +1,7 @@
 ---
 name: audyt-strony
 description: "Audyt strony: Lighthouse, a11y, SEO, linki, obrazy, mobile."
-version: 1.8.0
+version: 1.9.0
 author: Jarvo
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-web
     autonomy: A0
-    reviewed: "2026-11-09"
+    reviewed: "2026-11-19"
 ---
 
 # Audyt strony
@@ -32,8 +32,13 @@ Wynik: raport priorytetów, który da się od razu zamienić na karty poprawek.
      raz, po kolei i wolno; co dalej ogranicza, jest w `links.niesprawdzone`, a nie w `broken`,
    - `seo_check.py` (head, meta, OG, JSON-LD, H1, alt, wymiary obrazów, linki wewnętrzne, czyste adresy, robots,
      sitemap, llms.txt, strona 404, obraz OG, landmarki, hreflang); pełna lista widoczności (23 punkty, llms.txt, 404, linki zewnętrzne): `references/widocznosc.md`,
-   - `security_check.py url` (nagłówki, HTTPS, wycieki, GPS w zdjęciach; w `summary.json` liczby ustaleń
-     według wagi, całość w `security.json`; szczegóły: skill `bezpieczenstwo-aplikacji`),
+   - bezpieczeństwo: na podglądzie (localhost) `security_check.py url` (nagłówki, HTTPS, CORS, klucze w JS), na każdym
+     innym adresie `security_check.py naglowki` (jedno żądanie HEAD, jak `curl -sI`); w `summary.json` liczby ustaleń
+     według wagi, całość w `security.json`; szczegóły: skill `bezpieczenstwo-aplikacji`,
+   - **nagłówki tylko na domenie ze zmiany** (tej, na której właśnie coś wgrano): jedno żądanie nagłówków na domenę
+     (`curl -sI`), nie skrypt i nie scrapowanie; nagłówki zmienia wgranie, nie upływ czasu. `security_check.py url` wolno
+     tylko na naszym podglądzie (localhost), nigdy na produkcji. Audyt wielu stron robisz z zewnątrz (InstaBox flota-01
+     przez `zapas-mocy`), nie z serwera JARO (18.11: skan 12 domen z serwera, ok. 660 żądań, i SEOHost zablokował nasze IP),
    - zrzuty 375/768/1440 + wykrywanie poziomego przewijania.
    - ✅ Punkt kontrolny: `out/audyt/summary.json` istnieje; błędy narzędzi są opisane, nie przemilczane.
 2. **Ocena eksperta:** przejdź checklisty `web-quality-audit` i `seo-technical` z wynikami automatów w ręku.

@@ -1,7 +1,7 @@
 ---
 name: bezpieczenstwo-aplikacji
 description: "Bezpieczeństwo aplikacji: skan, próby, 28 punktów."
-version: 1.4.1
+version: 1.5.0
 author: "Jarvo (metodyka przeglądu wg anthropics/claude-code-security-review, MIT)"
 license: MIT
 metadata:
@@ -11,7 +11,7 @@ metadata:
   jarvo:
     agent: jarvo-web
     autonomy: A1
-    reviewed: "2026-09-30"
+    reviewed: "2026-11-19"
 ---
 
 # Bezpieczeństwo aplikacji
@@ -45,7 +45,7 @@ statyczny landing: tylko krok 2 (nagłówki, wycieki, klucze w JS). Skany i pró
    `@@PY@@ "$D/render.py" out/bezpieczenstwo/zaleznosci.json --out out/bezpieczenstwo/zaleznosci.md`.
    Podatności z lockfile'a (OSV), porzucone repo, jeden wydawca pakietu npm, skrypty instalacyjne. Brak danych
    (np. limit GitHuba bez tokenu) to „nie oceniono”, nigdy „czysto”; kod ≠ 0 z `collect.py` przekazujesz dosłownie.
-2. **Skan działającej strony** (podgląd albo produkcja): `@@PY@@ "$HERMES_HOME/scripts/security_check.py" url <URL>`
+2. **Skan działającej strony na podglądzie**: `@@PY@@ "$HERMES_HOME/scripts/security_check.py" url http://localhost:4321 --zgoda-wlasciciela`
    (HTTPS, HSTS, CSP, clickjacking, nosniff, Referrer/Permissions-Policy, flagi ciasteczek sesji, CORS z obcej domeny,
    ślady błędów, publiczne `/.env`, `/.git`, kopie zapasowe, **klucze serwerowe w JS wysyłanym do przeglądarki**;
    klucz `anon` Supabase i klucze Google Maps/Firebase są publiczne z założenia, liczy się ich ograniczenie;
@@ -53,6 +53,15 @@ statyczny landing: tylko krok 2 (nagłówki, wycieki, klucze w JS). Skany i pró
    szyfrowanie: ŚREDNIE, a sekret w odzyskanym kodzie KRYTYCZNE; **GPS w zdjęciach strony**: do 40 zdjęć z `<img>`,
    `srcset` i `og:image`, ŚREDNIE z linkiem do mapy, a obrazy z CSS i skryptów są w `nie_ocenione`; **cache CDN**: ciasteczko
    sesji w odpowiedzi z `Cache-Control: public`/`s-maxage` WYSOKIE, a podane z cache (`cf-cache-status: HIT`) KRYTYCZNE). W `repo` także `productionBrowserSourceMaps: true`.
+   Sondy wycieków, pliki `.map` bez odnośnika i zdjęcia idą tylko z `--zgoda-wlasciciela` i tylko na podglądzie (localhost,
+   adres prywatny); na innym adresie skrypt z tą flagą odmawia.
+   **Produkcja: nagłówki tylko na domenie ze zmiany** (tej, na której właśnie coś wgrano), jedno żądanie nagłówków na domenę:
+   `curl -sI https://domena.pl` albo `security_check.py naglowki https://domena.pl` (też jedno żądanie HEAD, bez
+   przekierowań). Nie skrypt `url`, nie scrapowanie i nie pętla po innych domenach: nagłówki zmienia wgranie, nie upływ
+   czasu. `security_check.py url` wolno tylko na naszym podglądzie (localhost), nigdy na produkcji. Audyt wielu stron
+   robisz z zewnątrz (InstaBox flota-01 przez `zapas-mocy`), nie z serwera JARO: 18.11 skan 12 domen z serwera (ok. 660
+   żądań w 48 s) i SEOHost zablokował nasze IP. Skrypt sam pilnuje ruchu: limit żądań na domenę razem z przekierowaniami
+   (`naglowki` 1, `url` 20, podgląd z `--zgoda-wlasciciela` 120) i co najmniej 1 s między żądaniami do cudzego hosta.
 2b. **Próby na działającej aplikacji** (podgląd z backendem): dwa konta testowe (A i B) zakładasz sam na podglądzie,
    ich nagłówki sesji bierzesz z odpowiedzi logowania, potem:
    ```bash
@@ -80,7 +89,8 @@ statyczny landing: tylko krok 2 (nagłówki, wycieki, klucze w JS). Skany i pró
 
 ## Zasady
 - **Nigdy nie wypisujesz znalezionego sekretu** w raporcie ani w czacie: tylko rodzaj i miejsce (`plik:linia`).
-- Nie testujesz cudzych stron bez zgody właściciela: `url` tylko dla stron użytkownika albo naszego podglądu.
+- Nie testujesz cudzych stron bez zgody właściciela: `url` tylko na naszym podglądzie; produkcję (także stron
+  użytkownika) sprawdzasz jednym żądaniem nagłówków (`curl -sI` albo `naglowki`) i tylko na domenie ze zmiany.
   `atak` sam odmawia poza podglądem (localhost, adres prywatny); na produkcji użytkownika tylko po jego wyraźnej zgodzie
   (`--zgoda-wlasciciela`), na kontach testowych, nigdy na kontach prawdziwych klientów.
 - Bez ataków niszczących (DoS, masowe żądania, łamanie haseł). Próby `atak` to kilkanaście żądań na trasę. To audyt, nie pentest.

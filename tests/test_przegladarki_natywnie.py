@@ -152,6 +152,8 @@ def test_audit_wszystkie_narzedzia_i_podsumowanie(npm, tmp_path, monkeypatch, ca
     monkeypatch.setenv("CHROME_PATH", str(chrome))
     out = tmp_path / "out" / "audyt"
     assert AUDIT.main(["https://x.pl/?a=1&b=2", str(out)]) == 0
+    assert AUDIT.tryb_bezpieczenstwa("https://x.pl/?a=1&b=2") == "naglowki"      # produkcja: jedno żądanie na domenę
+    assert AUDIT.tryb_bezpieczenstwa("http://localhost:4321/") == "url"
     io = capsys.readouterr()
     summary = json.loads(io.out)
     assert json.loads((out / "summary.json").read_text(encoding="utf-8")) == summary

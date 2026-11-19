@@ -5,6 +5,7 @@ import datetime as dt
 import json
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -156,7 +157,81 @@ def test_url_finds_server_keys_in_page_js(capsys):
     finally:
         srv.shutdown()
     czyste = json.loads(capsys.readouterr().out)["ustalenia"]
-    assert not [x for x in czyste if "JS" in x["co"] or "map" in x["co"]]     # klucz anon jest publiczny; .map to strona SPA, nie mapa
+    assert not [x for x in czyste if "JS" in x["co"] or "map" in x["co"]]     # klucz anon jest publiczny; bez odnośnika .map nie zgadujemy
+
+
+def licznik(skryptow: int = 30):
+    """Strona z 30 skryptami, zdjęciem i łańcuchem przekierowań /r1 → /r2 → /; zapisuje każde żądanie."""
+    zadania = []
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def odp(self):
+            zadania.append((self.command, self.path, self.headers.get("User-Agent"), self.headers.get("Origin")))
+            nag, tresc = {"Content-Type": "text/html"}, b"<html>404</html>"
+            if self.path in ("/r1", "/r2"):
+                kod, nag["Location"] = (301, "/r2") if self.path == "/r1" else (302, "/")
+            elif self.path == "/":
+                kod, nag["Access-Control-Allow-Origin"] = 200, self.headers.get("Origin", "")
+                tresc = ("".join(f'<script src="/s{i}.js"></script>' for i in range(skryptow)) + '<img src="/img/a.jpg">').encode()
+            elif self.path.endswith(".js"):
+                kod, nag, tresc = 200, {"Content-Type": "application/javascript"}, b"x()"
+            else:
+                kod = 404
+            self.send_response(kod)
+            for k, v in {**nag, "Content-Length": str(len(tresc))}.items():
+                self.send_header(k, v)
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(tresc)
+
+        do_GET = do_HEAD = odp
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv, f"http://127.0.0.1:{srv.server_address[1]}", zadania
+
+
+def test_traffic_per_domain_is_capped(capsys, monkeypatch):
+    """SEOHost 18.11: ~55 żądań na domenę zablokowało IP. `naglowki` = 1 żądanie, `url` mieści się w limicie razem
+    z przekierowaniami, bez sond wycieków i zdjęć; pełny skan tylko na podglądzie z --zgoda-wlasciciela."""
+    srv, base, zadania = licznik()
+    try:
+        sc.main(["naglowki", base + "/", "--json"])
+        assert [(m, p) for m, p, *_ in zadania] == [("HEAD", "/")]
+        assert any("CORS wpuszcza dowolną domenę" in x["co"] for x in json.loads(capsys.readouterr().out)["ustalenia"])
+        zadania.clear()
+        sc.main(["naglowki", base + "/r1", "--json"])                       # przekierowania nie śledzi
+        assert [p for _, p, *_ in zadania] == ["/r1"]
+        assert any("301 → /r2" in x for x in json.loads(capsys.readouterr().out)["nie_ocenione"])
+
+        zadania.clear()
+        sc.UWAGI.clear()
+        sc.main(["url", base + "/r1", "--json"])
+        sciezki = [p for _, p, *_ in zadania]
+        assert len(zadania) == sc.LIMIT_ZADAN and sciezki[:3] == ["/r1", "/r2", "/"]   # każde przekierowanie się liczy
+        assert sciezki.count("/") == 1 and zadania[2][3] == sc.OBCY_ORIGIN    # CORS w tym samym żądaniu HTML
+        assert not [p for p in sciezki if not p.endswith(".js") and p not in ("/r1", "/r2", "/")]  # bez wycieków, zdjęć, .map
+        assert {ua for _, _, ua, _ in zadania} == {sc.UA}                     # jawny User-Agent (decyzja 18.11)
+        uwagi = " | ".join(json.loads(capsys.readouterr().out)["nie_ocenione"])
+        assert f"limit {sc.LIMIT_ZADAN} żądań do 127.0.0.1 wyczerpany" in uwagi and "--zgoda-wlasciciela" in uwagi
+
+        zadania.clear()
+        sc.main(["url", base, "--zgoda-wlasciciela", "--json"])              # nasz podgląd: pełny skan
+        sciezki = [p for _, p, *_ in zadania]
+        assert len(zadania) <= sc.LIMIT_PODGLAD and "/.env" in sciezki and "/img/a.jpg" in sciezki and "/s0.js.map" in sciezki
+        capsys.readouterr()
+
+        zadania.clear()
+        monkeypatch.setattr(sc, "LIMIT_ZADAN", 3)
+        start = time.monotonic()
+        sc.main(["url", base + "/r1", "--odstep", "0.15", "--json"])
+        assert len(zadania) == 3 and time.monotonic() - start >= 0.29         # odstęp między żądaniami do hosta
+    finally:
+        srv.shutdown()
+    assert sc.main(["url", "https://jarvo.pl", "--zgoda-wlasciciela"]) == 2  # sondy poza podglądem: odmowa bez żądania
 
 
 def test_source_maps_inline_and_without_code(monkeypatch):
@@ -175,8 +250,9 @@ def test_source_maps_inline_and_without_code(monkeypatch):
     assert pytania == ["https://a.pl/maps/x.js.map"] and wyn[0]["waga"] == "NISKIE" and "2 plików" in wyn[0]["co"]
     assert sc.mapa_zrodel("https://a.pl/x.js", "x()\n//# sourceMappingURL=https://cdn.obca.pl/x.js.map", {}) == []   # obca domena
     assert pytania == ["https://a.pl/maps/x.js.map"]
-    sc.mapa_zrodel("https://a.pl/y.js?v=1", "y()", {})
-    assert pytania[-1] == "https://a.pl/y.js.map"                               # bez komentarza: plik .map obok skryptu
+    assert sc.mapa_zrodel("https://a.pl/y.js?v=1", "y()", {}) == [] and len(pytania) == 1   # produkcja: bez zgadywania
+    sc.mapa_zrodel("https://a.pl/y.js?v=1", "y()", {}, sondy=True)
+    assert pytania[-1] == "https://a.pl/y.js.map"                               # podgląd: plik .map obok skryptu
 
 
 def test_dependencies_missing_young_and_lookalike(tmp_path, monkeypatch):

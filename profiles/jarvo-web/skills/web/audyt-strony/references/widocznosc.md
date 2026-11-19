@@ -1,12 +1,12 @@
 ---
 source: "Google Search Central (dokumentacja indeksowania, 2026); llmstxt.org (propozycja llms.txt, J. Howard); checklista „show up in Google” (film, wrzesień 2026)"
-reviewed: "2026-10-05"
+reviewed: "2026-11-19"
 ---
 # Widoczność w Google i w wyszukiwarkach AI: 23 punkty
 
 | # | Punkt | Sprawdza | Dobry stan |
 |---|---|---|---|
-| 1 | sitemap | `seo_check.py` (crawl, `--dir`) | `sitemap.xml` albo `sitemap-index.xml` (`@astrojs/sitemap`), wszystkie kanoniczne strony, zgłoszona w Search Console i Bing Webmaster Tools, plik klucza IndexNow (`indexnow.py`, skill `wdrozenie`) |
+| 1 | sitemap | `seo_check.py` (crawl, `--dir`) | `sitemap.xml` albo `sitemap-index.xml` (`@astrojs/sitemap`), wszystkie kanoniczne strony, zgłoszona w Search Console i Bing Webmaster Tools, plik klucza IndexNow (`indexnow.py`, skill `wdrozenie`), **raport AI Performance przejrzany — tak/nie** (dane po ok. 48 h od dodania witryny, są próbką, nie pełnym logiem; procedura i `ai_performance.py`: `wdrozenie/references/wyszukiwarki.md`, punkt 2a) |
 | 2 | robots.txt | `seo_check.py` | istnieje, **nie** `Disallow: /` dla `*`, wpis `Sitemap:` |
 | 3 | brak noindex | `seo_check.py` (head) | produkcja bez `noindex`; podglądy i staging z `noindex`, sprawdzane z `--podglad` (noindex to wtedy info) |
 | 4 | canonical | `seo_check.py` | bezwzględny URL tej strony na domenie produkcyjnej (`--dir --base-url`: host i ścieżka) |
@@ -21,7 +21,7 @@ reviewed: "2026-10-05"
 | 13 | kompresja obrazów | `optymalizacja-obrazow` | AVIF/WebP, `srcset`, wymiary |
 | 14 | Core Web Vitals | Lighthouse / `core-web-vitals` | LCP < 2,5 s, INP < 200 ms, CLS < 0,1 |
 | 15 | responsywność | zrzuty 375/768/1440, `hostile.cjs` | brak poziomego przewijania, cele dotyku ≥ 44 px |
-| 16 | HTTPS | `security_check.py url` | certyfikat, 301 z http, HSTS |
+| 16 | HTTPS | produkcja: `curl -sI` albo `security_check.py naglowki` (jedno żądanie na domenę); podgląd: `security_check.py url` | certyfikat, 301 z http, HSTS |
 | 17 | czyste adresy | `seo_check.py` (content) | małe litery, myślniki, słowa zamiast ID, bez `.php` |
 | 18 | llms.txt | `seo_check.py` (crawl) | `/llms.txt` wg szablonu niżej |
 | 19 | strategia linków zewnętrznych | ręcznie + Sherlock | plan poniżej |
