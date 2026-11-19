@@ -358,7 +358,7 @@ function AplikacjaJarvo() {
       <div class="j-zaslona-paska" onClick=${() => sklep.zmien("pasek", { otwarty: false })}></div>
       <main class=${cx("j-glowna", `is-${trasa.widok}`)} data-region="glowna" tabIndex="-1" aria-label=${T("glowna.etykieta")}>
         <${Gora} trasa=${trasa}/>
-        ${widok}
+        <${OslonaWidoku} klucz=${Trasa.zbuduj(trasa)}>${widok}</${OslonaWidoku}>
         ${telefon && trasa.widok === "rozmowca" && html`<${DokRozmowcow} trasa=${trasa}/>`}
       </main>
     </div>

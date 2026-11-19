@@ -686,16 +686,24 @@ def slownik_i18n(tekst: str) -> dict[str, dict[str, set[str] | None]]:
 FORMY_MNOGIE = {"pl": {"one", "few", "many", "other"}, "en": {"one", "other"}}
 
 
+STYL_TEKSTEM = re.compile(r"""\bstyle=(?:\$\{\s*`|"|')""")
+
+
 def check_hq_pakiet(r: Report) -> None:
     """Pakiet aplikacji (docs/HQ.md „Aplikacja”): jednoznaczne nazwy globalne i te same klucze tekstów PL/EN."""
     src = fl.REPO_ROOT / "hq" / "web" / "src"
     gdzie: dict[str, str] = {}
     for f in sorted(src.glob("*.js")):
-        for nazwa in nazwy_globalne_js(f.read_text(encoding="utf-8")):
+        tekst = f.read_text(encoding="utf-8")
+        for nazwa in nazwy_globalne_js(tekst):
             if nazwa in gdzie:
                 r.err(f"hq/web/src/{f.name}: nazwa {nazwa!r} jest już w {gdzie[nazwa]} (pakiet to jeden zakres)")
             else:
                 gdzie[nazwa] = f.name
+        # React przyjmuje `style` tylko jako obiekt; tekst wywraca cały widok (błąd React #62, Ustawienia › Wygląd 19.11)
+        for m in STYL_TEKSTEM.finditer(tekst):
+            r.err(f"hq/web/src/{f.name}:{tekst.count(chr(10), 0, m.start()) + 1}: `style` jako tekst; w htm tylko "
+                  "obiekt: style=${{ background: kolor }}")
     i18n = src / "04-i18n.js"
     if not i18n.exists():
         return

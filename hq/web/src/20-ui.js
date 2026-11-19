@@ -127,6 +127,24 @@ const Klawisz = ({ k }) => html`<kbd class="j-kbd">${Skroty.opis(k)}</kbd>`;
 const Pusto = ({ ikona, tytul, children }) => html`<div class="j-pusto">
   ${ikona && html`<${Ikona} n=${ikona} r=${22}/>`}${tytul && html`<p class="j-pusto-t">${tytul}</p>`}${children}</div>`;
 
+// Osłona widoku: błąd renderowania jednego widoku (Ustawienia › Wygląd 19.11: `style` jako tekst) zostaje w tym
+// widoku, a pasek, rozmowy i reszta aplikacji działają dalej; bez niej wyjątek przechodził do osłony loadera, która
+// chowa aplikację i odsłania klasyczny panel Hermesa. `klucz` = adres widoku: zmiana trasy próbuje od nowa.
+class OslonaWidoku extends React.Component {
+  constructor(p) { super(p); this.state = { blad: null, klucz: p.klucz }; }
+  static getDerivedStateFromError(blad) { return { blad }; }
+  static getDerivedStateFromProps(p, s) { return p.klucz !== s.klucz ? { blad: null, klucz: p.klucz } : null; }
+  componentDidCatch(blad) { console.error("Jarvo: widok", this.props.klucz, blad); }
+  render() {
+    if (!this.state.blad) return this.props.children;
+    return html`<div class="j-pusto" role="alert" data-blad-widoku="">
+      <${Ikona} n="alert" r=${22}/><p class="j-pusto-t">${T("blad.widok")}</p>
+      <p><small><code>${String((this.state.blad && this.state.blad.message) || this.state.blad).slice(0, 200)}</code></small></p>
+      <p><button type="button" class="j-link" onClick=${() => location.reload()}>${T("ui.odswiez")}</button> · <a class="j-link" href="#/">${T("blad.widok_start")}</a></p>
+    </div>`;
+  }
+}
+
 // menu podręczne: role=menu, strzałki, Home/End, Esc i klik obok zamykają; kotwica = element albo DOMRect
 function Menu({ kotwica, pozycje, onZamknij, etykieta }) {
   const ref = useRef(null);

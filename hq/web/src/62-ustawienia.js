@@ -232,7 +232,7 @@ function SekcjaWyglad() {
     <p class="j-sz-sub">${T("ust.paleta")}</p>
     <div class="j-wybor j-ust-palety" role="radiogroup" aria-label=${T("ust.paleta")}>${PALETY.map((p) => html`<button type="button"
       key=${p.id} role="radio" aria-checked=${String(p.id === paleta)} data-paleta=${p.id}
-      onClick=${() => sklep.zmien("ustawienia", { paleta: p.id })}><span class="j-ust-probka" style=${`background:${p.kolor}`}></span>${isPL() ? p.pl : p.en}</button>`)}</div>
+      onClick=${() => sklep.zmien("ustawienia", { paleta: p.id })}><span class="j-ust-probka" style=${{ background: p.kolor }}></span>${isPL() ? p.pl : p.en}</button>`)}</div>
     <p class="j-sz-uwaga">${T("ust.paleta_opis")}</p>`;
 }
 
