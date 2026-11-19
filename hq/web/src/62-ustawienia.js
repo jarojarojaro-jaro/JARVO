@@ -311,9 +311,10 @@ function Ustawienia({ trasa }) {
   }[aktywna];
   const tytul = T("szuflada.tytul");
   return html`<section class=${cx("j-ust", osadzona && "is-szeroka")} data-widok=${sekcja ? "sekcja" : "lista"} data-region="ustawienia" aria-label=${tytul} onKeyDown=${esc}>
+    <${NaglowekWidoku} ikona=${IKONY_WIDOKOW.ustawienia} tytul=${tytul} opis=${waski && !sekcja ? null : T(`ust.${aktywna}`)} klasa="j-ust-gora">
+      <${Przycisk} rodzaj="cichy" ikona="x" etykieta=${T("ui.zamknij")} klasa="j-na-telefonie" onClick=${wyjdz}/>
+    </${NaglowekWidoku}>
     <nav class="j-sz-nav" aria-label=${tytul} onKeyDown=${klawisz}>
-      <div class="j-sz-gora"><h2>${tytul}</h2>
-        <${Przycisk} rodzaj="cichy" ikona="x" etykieta=${T("ui.zamknij")} klasa="j-na-telefonie" onClick=${wyjdz}/></div>
       ${SEKCJE_USTAWIEN.map((s, i) => (s.oddzielnik ? html`<div key=${i} class="j-sz-sep"></div>` : html`<button type="button"
         key=${s.id} class="j-sz-p" data-sekcja=${s.id} aria-current=${s.id === aktywna ? "true" : undefined} data-fokus=${s.id === aktywna ? "" : undefined}
         onClick=${() => wejdz(s.id)}><${Ikona} n=${s.ikona}/><span>${T(`ust.${s.id}`)}</span><${Ikona} n="right" r=${16} klasa="j-sz-dalej"/></button>`))}

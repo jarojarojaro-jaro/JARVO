@@ -1357,7 +1357,11 @@ ekranie rozmówców pod „Nowa rozmowa”): raporty rutyn floty (poranny brief,
 nowe wersje, rutyny agentów) dzień po dniu. Adres `#/aktualizacje[/<RRRR-MM-DD>][/<id zadania>]`; bez dnia widok
 otwiera ostatni dzień z raportami (tego rodzaju przy filtrze).
 
-- **Szeroko:** u góry data dnia (Dziś / Wczoraj / dzień tygodnia) z ‹ › (i strzałkami ←/→) skaczącymi po dniach
+- **Nagłówek** jak u rozmówcy (`NaglowekWidoku` w `20-ui.js`, ta sama belka `j-gora` 56 px na wysokości logo Jarvo,
+  tytuł 15 px, szara linia opisu, ikona widoku z `IKONY_WIDOKOW` jak w pasku): „Aktualizacje”, pod nim liczba raportów
+  dnia; z prawej nawigacja dnia. Tak samo zaczynają się Mózg (okruszki w tytule, liczba notatek i połączeń w opisie)
+  i Ustawienia (w opisie bieżąca sekcja); te trzy widoki nie dostają pustej belki `Gora` z `90-app.js`.
+- **Szeroko:** w nagłówku data dnia (Dziś / Wczoraj / dzień tygodnia) z ‹ › (i strzałkami ←/→) skaczącymi po dniach
   z raportami oraz „Najnowsze”; raporty dnia od najnowszego jako karty z kropką i paskiem w kolorze rodzaju, godziną,
   znacznikiem „nowy”; obok mały kalendarz miesiąca (kropki rodzajów, pogrubione dni z nowymi, czerwony punkt przy
   rutynie, która się nie udała, dni przyszłe wyłączone) i lista rodzajów jako filtr (Wszystkie + rodzaje z liczbą;

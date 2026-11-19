@@ -398,7 +398,7 @@ def test_stopka_paska_bez_drugiego_wejscia_do_ustawien():
     assert "<button" not in stopka + stan and "Przycisk" not in stopka + stan and "j-ja" not in stopka
     assert "<${StanPolaczenia}/>" in stopka and 'role="status"' in stan and 'T("polaczenie.krotko")' in stan
     assert "${!saRozmowcy && html`<${NawigacjaCentrum} trasa=${trasa}/>`}" in t
-    assert '["ustawienia", "⚙", T("pasek.ustawienia"), "Mod+,"]' in t
+    assert '["ustawienia", T("pasek.ustawienia"), "Mod+,"]' in t
     assert 'ikona="gear"' not in _tekst("90-app.js") and "j-gora-ust" not in _tekst("90-app.js")   # telefon też
 
 

@@ -121,6 +121,10 @@ function OknoStarejBazy() {
   </div>`;
 }
 
+// widoki z własną belką `NaglowekWidoku` (ta sama wysokość i krój co belka rozmowy): pusta belka nad nimi spychała
+// ich tytuł 56 px niżej niż u rozmówcy
+const WLASNY_NAGLOWEK = new Set(["aktualizacje", "mozg", "ustawienia"]);
+
 function Gora({ trasa }) {
   const watek = useSklep((s) => (trasa.watek ? s.watki[trasa.watek] || (s.lista.wg_klucza[`w:${trasa.watek}`] || {}).watek : null));
   const otwarty = useSklep((s) => s.pasek.otwarty);
@@ -357,7 +361,7 @@ function AplikacjaJarvo() {
       <${Pasek} trasa=${trasa} warstwa=${pasekWarstwa}/>
       <div class="j-zaslona-paska" onClick=${() => sklep.zmien("pasek", { otwarty: false })}></div>
       <main class=${cx("j-glowna", `is-${trasa.widok}`)} data-region="glowna" tabIndex="-1" aria-label=${T("glowna.etykieta")}>
-        <${Gora} trasa=${trasa}/>
+        ${!WLASNY_NAGLOWEK.has(trasa.widok) && html`<${Gora} trasa=${trasa}/>`}
         <${OslonaWidoku} klucz=${Trasa.zbuduj(trasa)}>${widok}</${OslonaWidoku}>
         ${telefon && trasa.widok === "rozmowca" && html`<${DokRozmowcow} trasa=${trasa}/>`}
       </main>

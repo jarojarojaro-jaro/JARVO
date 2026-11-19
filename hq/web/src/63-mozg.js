@@ -339,15 +339,15 @@ function MozgWidok() {
   const hub = grupa && kat.grupy.length > 1 ? grupa.hub : kat && kat.hub;
 
   return html`<div ref=${korzen} class=${cx("j-mozg", s.o && dane && "is-notatka", naMapie && "is-mapa")} onKeyDown=${esc} data-mozg>
-    <div class="j-mozg-gora">
-      <nav aria-label=${L("Gdzie jesteś", "Where you are")} class="j-mozg-okruszki"><ol>${okruszki.map(([t, h], k) => html`<li key=${k}>${k === okruszki.length - 1
-        ? html`<h1 aria-current=${s.o ? undefined : "page"}>${s.o ? html`<a href=${h}>${t}</a>` : t}</h1>` : html`<a href=${h}>${t}</a>`}</li>`)}</ol></nav>
+    <${NaglowekWidoku} klasa="j-mozg-gora" ikona=${IKONY_WIDOKOW.mozg}
+      tytul=${html`<span class="j-mozg-okruszki">${okruszki.map(([t, h], k) => html`<span key=${k} class="j-mozg-ok">${k > 0 && html`<span class="j-mozg-ok-sep" aria-hidden="true">›</span>`}${k === okruszki.length - 1 && !s.o
+        ? html`<span aria-current="page">${t}</span>` : html`<a href=${h}>${t}</a>`}</span>`)}</span>`}
+      opis=${dane && `${dane.wezly.length} ${L("notatek", "notes")} · ${dane.linki.length} ${L("połączeń", "links")}`}>
       ${zrodla.length > 1 && html`<div class="j-mozg-zrodla">${zrodla.map((x) => html`<button key=${x.klucz} type="button"
         aria-pressed=${x === z} onClick=${() => { location.hash = mozgHash({ z: x.klucz }); }}>${L(x.nazwa, x.nazwa_en)}</button>`)}</div>`}
       ${z.widok_3d && html`<a class="j-mozg-3d" href=${z.widok_3d} target="_blank" rel="noopener noreferrer">${L("Widok 3D ↗", "3D view ↗")}</a>`}
-      <span class="j-mozg-meta">${dane && `${dane.wezly.length} ${L("notatek", "notes")} · ${dane.linki.length} ${L("połączeń", "links")}`}</span>
       <button type="button" class="j-mozg-mapa-btn" onClick=${() => setNaMapie(!naMapie)}>${naMapie ? L("Lista", "List") : L("Mapa", "Map")}</button>
-    </div>
+    </${NaglowekWidoku}>
     <div class="j-mozg-nav">
       <input type="search" value=${q} placeholder=${L("Szukaj w całym mózgu…", "Search the whole brain…")} aria-label=${L("Szukaj notatki", "Search notes")} role="combobox"
         aria-expanded=${szukam} aria-controls="j-mozg-wyniki" aria-autocomplete="list" aria-activedescendant=${szukam && opcje[i] ? `j-mozg-${i}` : undefined}

@@ -245,21 +245,21 @@ function Aktualizacje({ trasa }) {
   const nowe = st.raporty.filter((r) => r.nowy).length;
   const pusto = !kal.rodzaje.length && kal.wczytany;
 
-  return html`<section class="j-rap" aria-labelledby="j-rap-tytul" onKeyDown=${klawisz}>
-    <header class="j-rap-g">
-      <h1 id="j-rap-tytul" tabIndex="-1" class="j-rap-tytul">${T("rap.tytul")}</h1>
+  const podsumowanie = st.dzien === dzien && st.raporty.length
+    ? `${T("rap.w_dniu", { n: st.raporty.length })}${nowe > 0 ? ` · ${T("rap.nowe", { n: nowe })}` : ""}` : null;
+  return html`<section class="j-rap" aria-label=${T("rap.tytul")} onKeyDown=${klawisz}>
+    <${NaglowekWidoku} ikona=${IKONY_WIDOKOW.aktualizacje} tytul=${T("rap.tytul")} opis=${podsumowanie}>
       ${nd && html`<div class="j-rap-nawig">
+        ${trasa.dzien && trasa.dzien !== ostatni && html`<${Przycisk} rodzaj="cichy" maly podpowiedz=${T("rap.najnowsze_tip")}
+          onClick=${() => Trasa.idz({ widok: "aktualizacje", rodzaj: rodzaj || undefined })}>${T("rap.najnowsze")}</${Przycisk}>`}
         <${Przycisk} rodzaj="cichy" ikona="back" etykieta=${T("rap.poprzedni")} disabled=${!poprzedni} onClick=${() => idzDo(poprzedni)}/>
         <button type="button" class="j-rap-data" aria-expanded=${String(kalOtwarty)} aria-controls="j-rap-bok" onClick=${() => setKalOtwarty(!kalOtwarty)}>
           <b>${nd.glowna}</b>${nd.pod && html`<small>${nd.pod}</small>`}<${Ikona} n="down" r=${14} klasa="j-rap-data-i"/></button>
         <${Przycisk} rodzaj="cichy" ikona="right" etykieta=${T("rap.nastepny")} disabled=${!nastepny} onClick=${() => idzDo(nastepny)}/>
-        ${trasa.dzien && trasa.dzien !== ostatni && html`<${Przycisk} rodzaj="cichy" maly podpowiedz=${T("rap.najnowsze_tip")}
-          onClick=${() => Trasa.idz({ widok: "aktualizacje", rodzaj: rodzaj || undefined })}>${T("rap.najnowsze")}</${Przycisk}>`}
       </div>`}
-    </header>
-    <div class="j-rap-uklad">
-      <div class="j-rap-lista" ref=${lista}>
-        ${st.raporty.length > 0 && html`<p class="j-rap-podsum" role="status">${T("rap.w_dniu", { n: st.raporty.length })}${nowe > 0 ? ` · ${T("rap.nowe", { n: nowe })}` : ""}</p>`}
+    </${NaglowekWidoku}>
+    <div class="j-rap-tresc" ref=${lista}><div class="j-rap-uklad">
+      <div class="j-rap-lista">
         ${st.raporty.map((r) => html`<${Raport} key=${r.id} r=${r} rozmowca=${rozmowcaRaportu(r)} kolor=${kolory[r.rodzaj]}/>`)}
         ${st.blad && html`<p class="j-pasek-pusto" role="alert">${st.blad}
           <button type="button" class="j-link" onClick=${() => wczytajDzien()}>${T("ui.ponow")}</button></p>`}
@@ -274,7 +274,7 @@ function Aktualizacje({ trasa }) {
         <${Kalendarz} miesiac=${miesiac} setMiesiac=${setMiesiac} wybrany=${dzien} dni=${dni} rodzaj=${rodzaj} idzDo=${idzDo} dzis=${dzis} kolory=${kolory}/>
         ${rodzaje.length > 0 && html`<${Rodzaje} rodzaje=${rodzaje} rodzaj=${rodzaj} dzien=${trasa.dzien} rodzajeDnia=${(dni[dzien] || {}).rodzaje || []} kolory=${kolory}/>`}
       </aside>
-    </div>
+    </div></div>
   </section>`;
 }
 

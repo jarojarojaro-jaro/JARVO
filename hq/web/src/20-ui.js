@@ -148,6 +148,25 @@ class OslonaWidoku extends React.Component {
   }
 }
 
+// jedna ikona widoku w pasku i w jego nagłówku
+const IKONY_WIDOKOW = { aktualizacje: "repeat", mozg: "spark", ustawienia: "gear" };
+// Nagłówek widoku bez rozmówcy (Aktualizacje, Mózg, Ustawienia): ta sama belka co nad rozmową (`j-gora`: 56 px, na
+// wysokości logo Jarvo, tytuł 15 px, pod nim szara linia opisu, ikona w miejscu awatara), żeby każdy widok zaczynał
+// się tak samo (19.11 właściciel: „Operator jest idealnie na wysokości Jarvo, a Aktualizacje dziwnie niżej”).
+// `tytul` może być węzłem (okruszki Mózgu), `children` stoją z prawej (nawigacja dnia, przyciski).
+function NaglowekWidoku({ ikona, tytul, opis, children, klasa, tytulRef }) {
+  const otwarty = useSklep((s) => s.pasek.otwarty);
+  return html`<header class=${cx("j-gora", "is-widok", klasa)}>
+    <${Przycisk} rodzaj="cichy" ikona="menu" etykieta=${T("pasek.pokaz")} klasa="j-menu-btn" aria-expanded=${String(!!otwarty)}
+      aria-controls="jarvo-pasek" onClick=${() => sklep.zmien("pasek", (p) => ({ ...p, otwarty: true, zwiniety: false }))}/>
+    ${ikona && html`<span class="j-gora-ikona" aria-hidden="true"><${Ikona} n=${ikona} r=${18}/></span>`}
+    <div class="j-gora-rozm"><h1 class="j-gora-t" tabIndex="-1" ref=${tytulRef}>${tytul}</h1>
+      ${opis && html`<p class="j-gora-opis">${opis}</p>`}</div>
+    <span class="j-rozpych"></span>
+    ${children}
+  </header>`;
+}
+
 // menu podręczne: role=menu, strzałki, Home/End, Esc i klik obok zamykają; kotwica = element albo DOMRect
 function Menu({ kotwica, pozycje, onZamknij, etykieta }) {
   const ref = useRef(null);
