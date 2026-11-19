@@ -419,8 +419,6 @@ def drukuj_schemat(s: dict) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    if hasattr(signal, "SIGPIPE"):
-        signal.signal(signal.SIGPIPE, signal.SIG_DFL)       # `zrodlo.py har … | head` bez BrokenPipeError
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("nagraj")
@@ -453,4 +451,8 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    # `zrodlo.py har … | head` bez BrokenPipeError; tylko jako skrypt: main() wołane w cudzym procesie (testy) nie
+    # zmienia jego sygnałów, bo z SIGPIPE=SIG_DFL proces ginie bez śladu przy pierwszym zapisie do zamkniętego potoku
+    if hasattr(signal, "SIGPIPE"):
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
     sys.exit(main())
