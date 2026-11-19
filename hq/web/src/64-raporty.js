@@ -230,12 +230,20 @@ function Aktualizacje({ trasa }) {
   const idzDo = (k, zastap = false) => { setKalOtwarty(false); Trasa.idz({ widok: "aktualizacje", dzien: k, rodzaj: rodzaj || undefined }, { zastap }); };
   const poprzedni = st.dzien === dzien && st.poprzedni ? kluczDnia(st.poprzedni) : null;
   const nastepny = st.dzien === dzien && st.nastepny ? kluczDnia(st.nastepny) : null;
-  // ←/→ poza polami tekstowymi: poprzedni / następny dzień z raportami
-  const klawisz = (e) => {
-    if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.target.closest("input, textarea, [contenteditable]")) return;
-    const cel = e.key === "ArrowLeft" ? poprzedni : e.key === "ArrowRight" ? nastepny : null;
-    if (cel) { e.preventDefault(); idzDo(cel); }
-  };
+  // ←/→ poprzedni / następny dzień z raportami, gdy widok jest otwarty (na całym dokumencie: po wejściu fokus nie
+  // stoi w widoku, a strzałki działają od razu), ale nie w polach tekstowych, menu i oknach
+  const sasiedzi = useRef({});
+  sasiedzi.current = { poprzedni, nastepny, idzDo };
+  useEffect(() => {
+    const klawisz = (e) => {
+      if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if (e.target.closest && e.target.closest("input, textarea, select, [contenteditable], [role=menu], [role=listbox], [role=dialog]")) return;
+      const s = sasiedzi.current, cel = e.key === "ArrowLeft" ? s.poprzedni : e.key === "ArrowRight" ? s.nastepny : null;
+      if (cel) { e.preventDefault(); s.idzDo(cel); }
+    };
+    document.addEventListener("keydown", klawisz);
+    return () => document.removeEventListener("keydown", klawisz);
+  }, []);
 
   const dni = useMemo(() => dniKalendarza(kal.wpisy), [kal.wpisy]);
   const kolory = useMemo(() => koloryRodzajow(kal.rodzaje.map((x) => x.rodzaj).concat(st.raporty.map((r) => r.rodzaj))), [kal.rodzaje, st.raporty]);
@@ -247,7 +255,7 @@ function Aktualizacje({ trasa }) {
 
   const podsumowanie = st.dzien === dzien && st.raporty.length
     ? `${T("rap.w_dniu", { n: st.raporty.length })}${nowe > 0 ? ` · ${T("rap.nowe", { n: nowe })}` : ""}` : null;
-  return html`<section class="j-rap" aria-label=${T("rap.tytul")} onKeyDown=${klawisz}>
+  return html`<section class="j-rap" aria-label=${T("rap.tytul")}>
     <${NaglowekWidoku} ikona=${IKONY_WIDOKOW.aktualizacje} tytul=${T("rap.tytul")} opis=${podsumowanie}>
       ${nd && html`<div class="j-rap-nawig">
         ${trasa.dzien && trasa.dzien !== ostatni && html`<${Przycisk} rodzaj="cichy" maly podpowiedz=${T("rap.najnowsze_tip")}
