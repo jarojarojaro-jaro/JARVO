@@ -354,6 +354,29 @@ test("Os.widok: karty pod wiadomością, która je zapowiada; w trwającej turze
   eq(Os.widok([wpis, kroki(1, true), karta(2, true), karta(3, true)], [zywy]).map((x) => x.id), ["e1", "z:r1", "p2", "p3"]);
 });
 
+test("Os.widok: tura z Telegrama to jedna wiadomość, komentarze między narzędziami w krokach", () => {
+  // 19.11: link z Telegrama, Jarvo komentował każdy krok („Sprawdzam…”, „Działa…”) i panel pokazał 15 wiadomości
+  const wl = { id: "w1", rodzaj: "wlasciciel", ts: 0 };
+  const k = (n, ts) => ({ id: `k${n}`, rodzaj: "kroki", ts, agent: "jarvo", kroki: [{ ts, narzedzie: `n${n}` }] });
+  const a = (n, ts, tekst, extra = {}) => ({ id: `a${n}`, rodzaj: "agent", ts, agent: "jarvo", tekst, ...extra });
+  const poz = [wl, k(1, 10), a(1, 10, "Sprawdzam."), k(2, 20), a(2, 20, "Działa."), a(3, 30, "Wynik: 82/100", { pliki: [{ path: "/r.md" }] }),
+    { id: "w2", rodzaj: "wlasciciel", ts: 40 }, a(4, 50, "Następna tura")];
+  const v = Os.widok(poz, []);
+  eq(v.map((x) => x.id), ["w1", "a3", "w2", "a4"]);
+  eq(v[1].tekst, "Wynik: 82/100");
+  eq(v[1].ts, 10);                                                                    // nagłówek: początek tury
+  eq(v[1].kroki.map((x) => x.komentarz || x.narzedzie), ["Sprawdzam.", "n1", "Działa.", "n2"]);
+  eq(v[1].pliki, [{ path: "/r.md" }]);
+  eq(Os.krokiPodsumowanie(v[1].kroki).n, 2);                                         // komentarze nie są krokami
+  eq(Os.krokiPodsumowanie(v[1].kroki).ostatni.narzedzie, "n2");
+  // Szczegóły: każda wiadomość osobno; tura w toku: kroki po ostatnim tekście też idą do wiadomości
+  eq(Os.widok(poz, [], { szczegoly: true }).filter((x) => x.rodzaj === "agent").length, 4);
+  eq(Os.widok([wl, a(1, 10, "Sprawdzam."), k(2, 20)], []).map((x) => x.id), ["w1", "a1"]);
+  // inny przebieg albo prośba o „tak” nie skleja się z poprzednią wiadomością
+  eq(Os.widok([wl, a(1, 10, "x", { przebieg_id: "r1" }), a(2, 20, "y", { przebieg_id: "r2" })], []).map((x) => x.id), ["w1", "a1", "a2"]);
+  eq(Os.widok([wl, a(1, 10, "x"), a(2, 20, "Zrobić?", { czeka_na_tak: true })], []).map((x) => x.id), ["w1", "a1", "a2"]);
+});
+
 test("Os.widok: żywy dymek za wpisem, schowane pozycje w toku, koniec po odpowiedzi", () => {
   const poz = [p("m1", { rodzaj: "wlasciciel" }), p("t1", { rodzaj: "agent", przebieg_id: "p1", w_toku: true }), p("m2", { rodzaj: "wlasciciel" })];
   const zywy = { id: "p1", wpis_id: "m1", stan: "pracuje", tekst: "pi" };

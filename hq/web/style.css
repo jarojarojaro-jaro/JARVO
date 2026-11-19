@@ -1680,6 +1680,9 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-kroki-l time { color: var(--j-tekst-3); font-variant-numeric: tabular-nums; }
 .j-kroki-l b { font-weight: 600; color: var(--j-tekst); }
 .j-kroki-o { overflow-wrap: anywhere; }
+.j-kroki-l li.is-komentarz { margin: 4px 0; }
+.j-kroki-kom { color: var(--j-tekst-2); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.j-kroki-kom .j-md > * + * { margin-top: .3em; }
 .j-kroki-czas { color: var(--j-tekst-3); font-variant-numeric: tabular-nums; }
 .j-kroki-podglad { grid-column: 2; margin: 2px 0 6px; padding: 6px 8px; border-radius: 6px; background: var(--j-tlo-2); font: 12px/1.5 var(--j-font-mono);
   white-space: pre-wrap; overflow-wrap: anywhere; max-height: 160px; overflow: auto; }

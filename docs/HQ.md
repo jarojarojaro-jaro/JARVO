@@ -1232,7 +1232,11 @@ innych kanałów etap 6.
   przejścia).
 - **Oś i przebiegi** (`15-os.js`, czyste reduktory): strony osi scalane po stałym `id` pozycji, `watek.wpis`
   dokłada wiadomość, `przebieg.*` buduje przebieg (delty i kroki tylko po kursorze migawki). Widok: w trybie
-  Prosty kolejne grupy kroków jednego agenta sklejone; trwająca tura jest jednym żywym dymkiem za wiadomością,
+  Prosty kolejne grupy kroków jednego agenta sklejone, a jedna tura agenta (kolejne jego wiadomości tego samego
+  przebiegu, np. tura z Telegrama, gdzie Hermes zapisuje każdy komentarz między narzędziami osobno) to jedna
+  wiadomość: tekst = ostatnia odpowiedź, wcześniejsze komentarze („Sprawdzam…”) stoją w rozwijanej linii kroków
+  między narzędziami (`{ts, komentarz}`, nie liczą się jako kroki), czas nagłówka = początek tury (`zlozTury`;
+  Szczegóły pokazują wiadomości osobno); trwająca tura jest jednym żywym dymkiem za wiadomością,
   na którą odpowiada, a jej pozycje `w_toku` są schowane; dymek znika, gdy oś ma już skończoną odpowiedź z tym
   `przebieg_id` (bez mrugnięcia między końcem przebiegu a wpisem osi). Przebieg zatrzymany (Stop), po którym oś ma
   już odpowiedź agenta, nie zostawia drugiego dymka: ostatnia jego pozycja agenta dostaje `zatrzymany` i pod

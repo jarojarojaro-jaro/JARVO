@@ -290,6 +290,7 @@ const Os = (() => {
         out.splice(j, i - j + 1, { ...a, kroki: (k.kroki || []).concat(a.kroki || []) }, ...kartyTury);
       } else out.splice(j + 1, i - j, a, ...kartyTury);
     }
+    if (!szczegoly) zlozTury(out);
     if (stop.size) {
       const ostatnia = new Map();
       out.forEach((x, i) => { if (x.rodzaj === "agent" && stop.has(x.przebieg_id)) ostatnia.set(x.przebieg_id, i); });
@@ -352,12 +353,55 @@ const Os = (() => {
   }
 
   // kroki: liczba, czas (suma czasów narzędzi, bez nich rozpiętość znaczników), błędy, ostatni krok
+  // komentarze tury (`komentarz` w krokach) nie są krokami: licznik i „teraz” liczą tylko narzędzia
   function krokiPodsumowanie(kroki) {
     const k = kroki || [];
-    let ms = 0, bledy = 0;
-    for (const x of k) { if (x.czas_ms > 0) ms += x.czas_ms; if (x.blad) bledy++; }
+    let ms = 0, bledy = 0, n = 0, ostatni = null;
+    for (const x of k) {
+      if (x.komentarz != null) continue;
+      n++; ostatni = x;
+      if (x.czas_ms > 0) ms += x.czas_ms;
+      if (x.blad) bledy++;
+    }
     const rozpietosc = k.length > 1 ? Math.max(0, (k[k.length - 1].ts || 0) - (k[0].ts || 0)) : 0;
-    return { n: k.length, sekundy: Math.round(ms ? ms / 1000 : rozpietosc), bledy, ostatni: k[k.length - 1] || null };
+    return { n, sekundy: Math.round(ms ? ms / 1000 : rozpietosc), bledy, ostatni };
+  }
+
+  // Prosty: jedna tura agenta = jedna wiadomość (19.11 właściciel: tura z Telegrama wyglądała jak 15 odpowiedzi).
+  // Hermes zapisuje każdy komentarz między narzędziami („Sprawdzam…”, „Działa. Testuję…”) jako osobną wiadomość
+  // asystenta; kolejne wiadomości tego samego agenta i przebiegu (z krokami i kartami między nimi, bez niczego od
+  // właściciela czy systemu) składają się w jedną: kroki z komentarzami po kolei (`{ts, komentarz}`), tekst = ostatnia
+  // odpowiedź, czas nagłówka = początek tury, pliki ze wszystkich; karty przekazane w turze stoją pod nią. Kroki po
+  // ostatnim tekście (tura w toku) też idą do niej. Raport rutyny i Szczegóły zostają osobno. Zmienia `out` w miejscu.
+  function zlozTury(out) {
+    const tura = (a, x) => a.agent === x.agent && (a.przebieg_id || null) === (x.przebieg_id || null);
+    const komentarz = (a, ts) => (String(a.tekst || "").trim() ? [{ ts, komentarz: a.tekst }] : []);
+    let i = 0;
+    while (i < out.length) {
+      const a = out[i];
+      if (a.rodzaj !== "agent" || a.czeka_na_tak) { i++; continue; }
+      let m = a, j = i + 1, tsTekstu = a.ts;
+      const karty = [];
+      while (j < out.length) {
+        const x = out[j];
+        if (x.rodzaj === "przekazanie" && x.agent === a.agent && !x.w_toku) { karty.push(x); j++; continue; }
+        if (x.rodzaj === "kroki" && tura(a, x)) { m = { ...m, kroki: (m.kroki || []).concat(x.kroki || []) }; j++; continue; }
+        if (x.rodzaj === "agent" && tura(a, x) && !x.czeka_na_tak) {
+          m = { ...x, ts: m.ts, kroki: (m.kroki || []).concat(komentarz(m, tsTekstu), x.kroki || []),
+            pliki: (m.pliki || []).concat((x.pliki || []).filter((p) => !(m.pliki || []).some((q) => q.path === p.path))) };
+          tsTekstu = x.ts;
+          j++; continue;
+        }
+        break;
+      }
+      if (j > i + 1) {
+        // po czasie, komentarz przed narzędziami ze swojej wiadomości (Hermes zapisuje je w jednym wierszu)
+        const k = (m.kroki || []).map((x, n) => [x, n]);
+        k.sort((p, q) => (p[0].ts || 0) - (q[0].ts || 0) || (q[0].komentarz != null) - (p[0].komentarz != null) || p[1] - q[1]);
+        out.splice(i, j - i, { ...m, kroki: k.map((p) => p[0]) }, ...karty);
+      }
+      i += 1 + karty.length;
+    }
   }
 
   // przebiegi wątku, które Stop (i Esc Esc) zatrzymuje: także nadzór i wysyłane

@@ -179,11 +179,13 @@ function KrokiLista({ kroki, szczegoly }) {
   return html`<div class="j-kroki-l">
     ${widoczne.length < kroki.length && html`<button type="button" class="j-link" onClick=${() => setWszystkie(true)}>
       ${T("kroki.wczesniejsze", { n: kroki.length - widoczne.length })}</button>`}
-    <ol>${widoczne.map((k, i) => html`<li key=${i} class=${cx(k.blad && "is-blad")}>
+    <ol>${widoczne.map((k, i) => (k.komentarz != null
+      ? html`<li key=${i} class="is-komentarz"><time>${Czas.godzina(k.ts)}</time><div class="j-kroki-kom"><${TrescMd} tekst=${bezZnacznika(k.komentarz)}/></div></li>`
+      : html`<li key=${i} class=${cx(k.blad && "is-blad")}>
       <time>${Czas.godzina(k.ts)}</time>
       <span class="j-kroki-o"><b>${czasownik(k)}</b>${k.detail ? ` ${k.detail}` : ""}${k.blad ? html` <span class="j-kroki-blad">· ${T("kroki.blad")}</span>` : null}
         ${szczegoly && k.czas_ms > 0 && html` <span class="j-kroki-czas">${Czas.trwanie(k.czas_ms / 1000)}</span>`}</span>
-      ${szczegoly && k.podglad && html`<pre class="j-kroki-podglad">${k.podglad}</pre>`}</li>`)}</ol></div>`;
+      ${szczegoly && k.podglad && html`<pre class="j-kroki-podglad">${k.podglad}</pre>`}</li>`))}</ol></div>`;
 }
 
 // Prosty: zwinięta linia „12 kroków · 2:05” (przy trwającej pracy też ostatni krok), bez licznika błędów narzędzi
