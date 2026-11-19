@@ -122,19 +122,15 @@ function Raport({ r, rozmowca, kolor }) {
 }
 
 // ------------------------------------------------------------------------------------------------- kalendarz
-function Kalendarz({ miesiac, setMiesiac, wybrany, dni, rodzaj, idzDo, dzis, kolory }) {
+// Bez własnych strzałek miesiąca (19.11 właściciel: „dwa sety strzałek, po co miesiące”): miesiąc kalendarza idzie
+// za wybranym dniem, a dni zmieniają ‹ › w nagłówku i ←/→; jedyne strzałki w widoku to te dzienne.
+function Kalendarz({ miesiac, wybrany, dni, rodzaj, idzDo, dzis, kolory }) {
   const komorki = useMemo(() => siatkaMiesiaca(miesiac.r, miesiac.m), [miesiac.r, miesiac.m]);
   const pl = isPL() ? "pl-PL" : "en-GB";
   const tytul = new Date(miesiac.r, miesiac.m, 1).toLocaleDateString(pl, { month: "long", year: "numeric" }).replace(/^./, (z) => z.toUpperCase());
   const naglowki = DNI_TYGODNIA[isPL() ? "pl" : "en"];
-  const przesun = (o) => setMiesiac(({ r, m }) => { const d = new Date(r, m + o, 1); return { r: d.getFullYear(), m: d.getMonth() }; });
-  const naprzod = new Date(miesiac.r, miesiac.m + 1, 1).getTime() / 1000 > Date.now() / 1000;
   return html`<div class="j-kal" role="group" aria-label=${T("rap.kalendarz")}>
-    <div class="j-kal-g">
-      <${Przycisk} rodzaj="cichy" maly ikona="back" etykieta=${T("rap.mies_poprz")} onClick=${() => przesun(-1)}/>
-      <b class="j-kal-t" aria-live="polite">${tytul}</b>
-      <${Przycisk} rodzaj="cichy" maly ikona="right" etykieta=${T("rap.mies_nast")} disabled=${naprzod} onClick=${() => przesun(1)}/>
-    </div>
+    <div class="j-kal-g"><b class="j-kal-t" aria-live="polite">${tytul}</b></div>
     <div class="j-kal-siatka">
       ${naglowki.map((n) => html`<span key=${n} class="j-kal-dt" aria-hidden="true">${n}</span>`)}
       ${komorki.map((c) => {
@@ -279,7 +275,7 @@ function Aktualizacje({ trasa }) {
         ${st.laduje && !st.raporty.length && html`<p class="j-pasek-pusto"><${Spinner}/></p>`}
       </div>
       <aside class=${cx("j-rap-bok", kalOtwarty && "is-otwarty")} id="j-rap-bok">
-        <${Kalendarz} miesiac=${miesiac} setMiesiac=${setMiesiac} wybrany=${dzien} dni=${dni} rodzaj=${rodzaj} idzDo=${idzDo} dzis=${dzis} kolory=${kolory}/>
+        <${Kalendarz} miesiac=${miesiac} wybrany=${dzien} dni=${dni} rodzaj=${rodzaj} idzDo=${idzDo} dzis=${dzis} kolory=${kolory}/>
         ${rodzaje.length > 0 && html`<${Rodzaje} rodzaje=${rodzaje} rodzaj=${rodzaj} dzien=${trasa.dzien} rodzajeDnia=${(dni[dzien] || {}).rodzaje || []} kolory=${kolory}/>`}
       </aside>
     </div></div>

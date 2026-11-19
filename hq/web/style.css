@@ -2210,7 +2210,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-rap-kopiuj { margin-left: auto; }
 /* kalendarz */
 .j-kal { padding: 12px; border: 1px solid var(--j-linia); border-radius: 12px; background: var(--j-tlo-karta); }
-.j-kal-g { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.j-kal-g { display: flex; align-items: center; justify-content: center; min-height: 28px; margin-bottom: 6px; }
 .j-kal-t { font-size: 13px; font-weight: 600; }
 .j-kal-siatka { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
 .j-kal-dt { padding: 4px 0; text-align: center; color: var(--j-tekst-3); font-size: 11px; text-transform: lowercase; }
