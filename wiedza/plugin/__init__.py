@@ -136,12 +136,22 @@ def blokada_przed_tura(**kwargs) -> Optional[Dict[str, Any]]:
 
 
 def blokada_bez_ciszy(**kwargs) -> Optional[str]:
-    """Hak `transform_llm_output`: blokada `needs_input` nigdy nie kończy się `[SILENT]` (cisza_tablicy.py)."""
+    """Hak `transform_llm_output` (Hermes bierze pierwszy wynik tekstowy, więc obie straże w jednym haku):
+    blokada `needs_input` nigdy nie kończy się `[SILENT]` (cisza_tablicy.py), a tekst do właściciela idzie bez
+    myślników (styl.py, właściciel 20.11)."""
+    tekst = kwargs.get("response_text")
     try:
-        return _modul("jarvo_cisza_tablicy", "cisza_tablicy.py").po_odpowiedzi(**kwargs)
+        po_ciszy = _modul("jarvo_cisza_tablicy", "cisza_tablicy.py").po_odpowiedzi(**kwargs)
     except Exception as e:
         logger.warning("jarvo-wiedza: straż ciszy przy blokadzie niedostępna: %s", e)
-        return None
+        po_ciszy = None
+    wynik = po_ciszy if isinstance(po_ciszy, str) and po_ciszy else tekst
+    try:
+        if isinstance(wynik, str):
+            wynik = _modul("jarvo_styl", "styl.py").bez_myslnikow(wynik)
+    except Exception as e:
+        logger.warning("jarvo-wiedza: styl odpowiedzi niedostępny: %s", e)
+    return wynik if isinstance(wynik, str) and wynik and wynik != tekst else None
 
 
 def przypomnienie_bledu(tool_name: str = "", result: Any = None, status: str = "", session_id: str = "", task_id: str = "",
