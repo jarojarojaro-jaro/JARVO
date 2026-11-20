@@ -91,6 +91,22 @@ def test_soul_gets_protocol_with_reviewer(built):
         assert f'kanban_request_review(reviewer="{fleet.reviewer}"' in soul, a.name
 
 
+def test_soul_skladany_z_postaci_i_zasad(built):
+    """19.11: SOUL.md w repo to sama postać, ZASADY.md to zasady pracy; Hermes czyta jeden SOUL.md, więc build
+    skleja oba (postać pierwsza, protokół z zasad), a w profilu nie zostaje osobny ZASADY.md."""
+    fleet, out = built
+    jarvo = fl.REPO_ROOT / "profiles" / "jarvo"
+    soul = (out / "jarvo" / "SOUL.md").read_text(encoding="utf-8")
+    postac = "## Charakter"
+    zasada = "= zgoda na tę akcję.**"
+    assert "**Polecenie @@WLASCICIEL@@ " + zasada in (jarvo / fl.ZASADY_FILE).read_text(encoding="utf-8")
+    assert soul.index(postac) < soul.index(zasada) < soul.index("## Kontrakt zlecenia floty")
+    assert not (out / "jarvo" / fl.ZASADY_FILE).exists()
+    # zamykający <critical> nie stoi drugi raz w środku promptu: osobny plik, który wtyczka kładzie na końcu
+    koniec = (out / "jarvo" / fl.KRYTYCZNE_FILE).read_text(encoding="utf-8")
+    assert koniec.startswith("<critical>") and soul.count("<critical>") == 1 and koniec.strip() not in soul
+
+
 def test_protocol_by_role(built):
     """Jarvo pisze karty i ocenia wyniki: bez zasad pracy wykonawcy (1–7, 12, 14, 15), ze wspólnymi i kształtem
     wyniku. Agenci dostają protokół bez zmian (ten sam stały prefiks, ten sam cache)."""

@@ -332,7 +332,8 @@ def test_hq_plugin_build(tmp_path):
     names = [a["name"] for a in fleet["agents"]]
     assert names[0] == fleet["orchestrator"] == "jarvo"
     jarvo = fleet["agents"][0]
-    assert jarvo["room"] == "bridge" and jarvo["short"] == "Jarvo" and ["Szczerość", 90] in jarvo["personality"]
+    # 19.11 SOUL Jarva to postać bez „parametrów” w procentach (klisza): panel nie pokazuje mu pokręteł
+    assert jarvo["room"] == "bridge" and jarvo["short"] == "Jarvo" and jarvo["personality"] == []
     assert all(a["model"] for a in fleet["agents"])
 
 

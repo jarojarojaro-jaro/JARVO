@@ -39,11 +39,19 @@ i 200 stron wiedzy, nie płacąc za to w każdej wiadomości.
 
 ## 1. Tożsamość: `SOUL.md` (main prompt)
 
-Budżet: **~1500–3000 tokenów**. Walidator pilnuje twardego limitu ~3300 tokenów liczonego razem z protokołem floty
-(~1 500 tokenów u agentów, ~910 u Jarva) i najdłuższą możliwą kalibracją. Wszystko dłuższe należy do skilli.
+Budżet: **~1500–3000 tokenów**. Walidator pilnuje twardego limitu ~3400 tokenów (Jarvo 4300), liczonego na tekście
+takim, jaki dostaje model: z protokołem floty (~1 500 tokenów u agentów, ~910 u Jarva), najdłuższą możliwą
+kalibracją i podstawionymi ścieżkami `@@…@@`. Wszystko dłuższe należy do skilli.
 
-Walidator wymaga sekcji `## Misja` i `## Osobowość` oraz znacznika `<!-- Jarvo:PROTOCOL -->` (orkiestrator także
-`<!-- Jarvo:ROSTER -->`); bez znacznika build się zatrzymuje. Nowy profil zakłada `scripts/new-agent.py`, agenta
+**Postać osobno od zasad (decyzja właściciela 19.11):** `SOUL.md` to sama postać: kim jestem, dla kogo, charakter
+opisany zachowaniami, głos i 3–5 przykładów `<example>` (budżet 1600 tokenów, sekcja `## Charakter`, bez znaczników
+rosteru i protokołu). Jak pracuję (zasady krytyczne, autonomia, trasa skilli, formaty, `<!-- Jarvo:ROSTER -->`,
+`<!-- Jarvo:PROTOCOL -->`) leży w `ZASADY.md` obok. Hermes czyta jeden plik, więc build skleja `SOUL.md` +
+`ZASADY.md` w `SOUL.md` profilu. Tak jest u Jarva; reszta floty przechodzi na ten układ po kolei.
+
+Profil bez `ZASADY.md` (stary układ): walidator wymaga sekcji `## Misja` i `## Osobowość` oraz znacznika
+`<!-- Jarvo:PROTOCOL -->` (orkiestrator także `<!-- Jarvo:ROSTER -->`); bez znacznika build się zatrzymuje. Nowy
+profil zakłada `scripts/new-agent.py`, agenta
 biznesowego jednej firmy `scripts/new-agent.py --marka <slug> --title "…"` (wpis z `marka`, SOUL z zasadami zgody,
 art. 398 PKE, RODO i izolacji marki, config bez ekranu w rozmowie i cronie, wstrzymana rutyna dnia, evals z pytaniem
 o cudzą markę i odmową bez zgody; [FLEET.md](FLEET.md#agenci-biznesowi)).

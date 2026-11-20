@@ -38,6 +38,35 @@ MODEL_FAMILIES = (("gpt-", "gpt"), ("chatgpt", "gpt"), ("o3", "gpt"), ("o4", "gp
 PROTOCOL_MARKER = "<!-- Jarvo:PROTOCOL -->"
 SWIEZOSC_DNI = 120        # skill sprawdzony dawniej = do przejrzenia (walidator, rutyna profiles/jarvo/scripts/swiezosc.py)
 ROSTER_MARKER = "<!-- Jarvo:ROSTER -->"
+# SOUL.md to sama postać agenta (kim jest, charakter, głos); jak pracuje (zasady, mapa skilli, formaty, protokół floty)
+# leży obok w ZASADY.md (decyzja właściciela 19.11: „w SOUL.md sam charakter i zajebistość”). Hermes czyta jeden
+# plik SOUL.md, więc build składa prompt: SOUL.md + ZASADY.md; profil bez ZASADY.md ma wszystko w SOUL.md.
+ZASADY_FILE = "ZASADY.md"
+
+
+def soul_zrodlo(katalog: Path) -> str:
+    """Tekst promptu agenta ze źródeł profilu: SOUL.md, a po nim ZASADY.md, gdy istnieje."""
+    soul = katalog / "SOUL.md"
+    zasady = katalog / ZASADY_FILE
+    tekst = soul.read_text(encoding="utf-8") if soul.exists() else ""
+    if zasady.exists():
+        tekst = tekst.rstrip() + "\n\n" + zasady.read_text(encoding="utf-8").lstrip()
+    return tekst
+
+
+KRYTYCZNE_FILE = "KRYTYCZNE.md"     # w zbudowanym profilu: zamykający <critical>, który wtyczka jarvo-wiedza kładzie na końcu
+
+
+def wydziel_koniec(soul: str) -> tuple[str, str]:
+    """(SOUL bez zamykającego bloku `<critical>`, ten blok) gdy SOUL kończy się blokiem `<critical>…</critical>`
+    i ma też inny wcześniej (powtórka zasad z początku); inaczej (SOUL, "")."""
+    tekst = soul.rstrip()
+    if not tekst.endswith("</critical>") or tekst.count("<critical>") < 2:
+        return soul, ""
+    start = tekst.rindex("<critical>")
+    return tekst[:start].rstrip() + "\n", tekst[start:]
+
+
 # tabela „komu oddać” generowana z fleet.yaml (pole `oddaj_gdy` każdego specjalisty): Ręka i każdy, kto routuje
 ODDAJ_MARKER = "<!-- Jarvo:ODDAJ -->"
 COMPOSE_FILE = Path(__file__).resolve().parent.parent / "infra" / "docker-compose.yml"
@@ -52,8 +81,9 @@ HQ_ROOMS = {"bridge", "study", "devlab", "atelier", "filmstudio", "workshop", "o
 SKILL_PROMPT_DESC_LIMIT = 60
 # krój figur skilla `izometria` (JetBrains Mono, OFL, z krojów HQ): build skilla i plugin HQ kładą go obok iso.py
 ISO_KROJE = ("jetbrains-mono-latin-wght-normal.woff2", "jetbrains-mono-latin-ext-wght-normal.woff2", "OFL-JetBrainsMono.txt")
-# Budżet main promptu (SOUL.md) w przybliżonych tokenach (~3.5 znaku/token dla PL/EN).
-SOUL_TOKEN_BUDGET = 3300
+# Budżet main promptu (SOUL.md) w przybliżonych tokenach (~3.5 znaku/token dla PL/EN), liczony od 19.11 na zbudowanym
+# tekście (ścieżki podstawione): Web, Wideo, Ads i Mobile mają tak ~3 310–3 390 od dawna, choć źródło mieściło się w 3 300.
+SOUL_TOKEN_BUDGET = 3400
 
 
 # --------------------------------------------------------------------------- YAML
@@ -191,6 +221,7 @@ class Fleet:
     raw: dict
     agents: list[Agent]
     nakladka: Path | None = None              # nakładka prywatna, z której doszli agenci (load_fleet)
+    wlasciciel: dict[str, str] = field(default_factory=dict)   # kim jest właściciel (nakładka; repo jest publiczne)
 
     @property
     def orchestrator(self) -> str:
@@ -298,6 +329,17 @@ def _plik_nakladki(n: Path, nazwa: str, klucze: set[str]) -> dict:
     return dane
 
 
+# Tożsamość właściciela w SOUL (@@WLASCICIEL@@…): imię, marka i to, za co agent odpowiada, przychodzą z nakładki
+# prywatnej (`wlasciciel:` w jej fleet.yaml), bo publiczne repo nie zna właściciela. Bez nakładki: słowo ogólne.
+WLASCICIEL_DOMYSLNIE = {"imie": "właściciel", "marka": "", "cel": "jego firma ma rosnąć"}
+
+
+def tokeny_wlasciciela(fleet: "Fleet") -> dict[str, str]:
+    w = {**WLASCICIEL_DOMYSLNIE, **{k: " ".join(str(v).split()) for k, v in fleet.wlasciciel.items() if v}}
+    return {"WLASCICIEL": w["imie"], "WLASCICIEL_MARKA": f" (marka {w['marka']})" if w["marka"] else "",
+            "WLASCICIEL_CEL": w["cel"]}
+
+
 def _agent(entry: dict, root: Path | None = None) -> Agent:
     return Agent(
         name=entry["name"],
@@ -333,7 +375,11 @@ def load_fleet(path: Path | None = None, nakladka: Path | None = _Z_ENV) -> Flee
     agents = [_agent(entry) for entry in raw.get("agents", [])]
     n = _nakladka(nakladka)
     if n is not None:
-        wpisy = list(_plik_nakladki(n, "fleet.yaml", {"agents"}).get("agents") or [])
+        dane = _plik_nakladki(n, "fleet.yaml", {"agents", "wlasciciel"})
+        wpisy = list(dane.get("agents") or [])
+        wlasciciel = {str(k): str(v) for k, v in (dane.get("wlasciciel") or {}).items()}
+        if set(wlasciciel) - set(WLASCICIEL_DOMYSLNIE):
+            raise SystemExit(f"nakładka {n}: wlasciciel ma tylko {', '.join(WLASCICIEL_DOMYSLNIE)}")
         publiczni = {a.name for a in agents}
         for entry in wpisy:
             if entry.get("name") in publiczni:
@@ -341,6 +387,7 @@ def load_fleet(path: Path | None = None, nakladka: Path | None = _Z_ENV) -> Flee
                                  "agent nakładki potrzebuje własnej nazwy")
         raw["agents"] = [*(raw.get("agents") or []), *wpisy]
         agents += [_agent(entry, n) for entry in wpisy]
+        return Fleet(raw=raw, agents=agents, nakladka=n, wlasciciel=wlasciciel)
     return Fleet(raw=raw, agents=agents, nakladka=n)
 
 

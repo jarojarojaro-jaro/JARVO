@@ -4,6 +4,7 @@ import importlib.util
 import inspect
 import json
 import os
+import re
 import shutil
 import sqlite3
 import sys
@@ -85,20 +86,83 @@ def test_blok_promptu_i_przypomnienie(srodowisko):
     root, home, sk, p = srodowisko
     blok = p.system_prompt_block()
     assert "agenci/jarvo-web/_hub-web" in blok and "orzeczenia/web" in blok and "wiedza_orzeczenie" in blok
+    assert "Mam wspólny skarbiec" in blok and "Gdy właściciel mnie poprawia" in blok and "Twój hub" not in blok   # „ja” = agent
+    for linia in ("[web] W stronach użytkownika nie używaj innerHTML", "[wszyscy] Odpowiadaj po polsku", "[acme] Przyciski zaokrąglone"):
+        assert blok.count(linia) == 1                  # agent bez marki: orzeczenia każdej marki (15.11), raz w prompcie
     assert p.prefetch("ok") == "" and p.prefetch("/new") == ""
     r = p.prefetch("czemu zrzut strony z three.js jest pusty?")
     assert "`agenci/jarvo-web/lightpanda nie renderuje three.js`" in r and "Zrzuty stron z WebGL" in r
-    assert "## Orzeczenia (wiążące)" in r and "[web] W stronach użytkownika nie używaj innerHTML" in r and "[wszyscy] Odpowiadaj po polsku" in r
-    assert "[acme] Przyciski zaokrąglone" in r     # agent bez marki: orzeczenia każdej marki, bez trafienia w markę (15.11)
+    assert "Orzeczenia" not in r and "innerHTML" not in r and "Odpowiadaj po polsku" not in r   # nie co turę (20.11)
     r2 = p.prefetch("jakie kolory ma marka Acme?")
-    assert "brands/acme/BRAND" in r2 and "[acme] Przyciski zaokrąglone" in r2
+    assert "brands/acme/BRAND" in r2 and "Przyciski zaokrąglone" not in r2
     dziennik = (root / "jarvo" / "state" / "wiedza-przypomnienia.jsonl").read_text(encoding="utf-8").splitlines()
     assert b"\r" not in (root / "jarvo" / "state" / "wiedza-przypomnienia.jsonl").read_bytes()      # LF także na Windows
     wpis = json.loads(dziennik[-1])
     assert wpis["agent"] == "jarvo-web" and wpis["zapytanie"] == "jakie kolory ma marka Acme?" and "brands/acme/BRAND" in wpis["notatki"]
-    assert wpis["orzeczen"] >= 3 and wpis["sesja"] == "sesja-123" and wpis["znakow"] == len(r2)
+    assert wpis["orzeczen"] == 0 and wpis["sesja"] == "sesja-123" and wpis["znakow"] == len(r2)
     assert len(r2) <= pl.MAX_PRZYPOMNIENIA
-    assert p.prefetch("o niczym konkretnym xyzzy") .startswith("## Orzeczenia")   # bez trafień zostają orzeczenia
+    assert p.prefetch("o niczym konkretnym xyzzy") == ""                           # bez trafień: nic przed turą
+
+
+def test_orzeczenie_dopisane_w_sesji_przed_tura_i_w_nowej_instancji(srodowisko):
+    """Prompt jest zamrożony na sesję: orzeczenie dopisane po jego budowie idzie przed turą (tylko ono), także gdy
+    brama tworzy agenta od nowa na turę i bierze prompt z bazy (odciski w state/), a po kompresji (nowa sesja,
+    blok od nowa) stoi już w prompcie. Prompt nieznany (sesja sprzed tej wersji): orzeczenia jak dawniej."""
+    root, home, sk, p = srodowisko
+    p.system_prompt_block()
+    w.dodaj_orzeczenie(sk, "jarvo-web", "Zawsze podawaj wynik Lighthouse mobile", "rozmowa")
+    r = p.prefetch("czemu zrzut strony z three.js jest pusty?")
+    assert r.startswith("## Nowe orzeczenia (wiążące od tej tury)\n- 2026-09-30 · [web] Zawsze podawaj wynik Lighthouse mobile.")
+    assert "innerHTML" not in r and "lightpanda" in r
+    swieza = pl.SkarbiecProvider()                                                   # brama: nowy agent, ten sam prompt
+    swieza.initialize("sesja-123", hermes_home=str(home), platform="telegram", agent_context="primary")
+    r = swieza.prefetch("czemu zrzut strony z three.js jest pusty?")
+    assert "Lighthouse mobile" in r and "innerHTML" not in r
+    p.system_prompt_block()                                                          # kompresja: blok od nowa…
+    p.on_session_switch("sesja-po-kompresji", parent_session_id="sesja-123")         # …i nowa sesja
+    p._cache = ("", 0.0, "")
+    assert "Orzeczenia" not in p.prefetch("czemu zrzut strony z three.js jest pusty?", session_id="sesja-po-kompresji")
+    stara = pl.SkarbiecProvider()
+    stara.initialize("sesja-sprzed-zmiany", hermes_home=str(home), platform="telegram", agent_context="primary")
+    r = stara.prefetch("czemu zrzut strony z three.js jest pusty?")
+    assert r.startswith("## Orzeczenia (wiążące)") and "innerHTML" in r and "Lighthouse mobile" in r
+
+
+def test_uchylone_orzeczenie_nie_trafia_do_promptu(srodowisko):
+    """orzeczenia/marki/enigmalabz.md 14.11: orzeczenie i jego uchylenie szły razem w każdym przypomnieniu. Uchylone
+    (data + cytowany początek treści) i samo uchylenie odpadają; obowiązuje nowsza linia. Uchylenie dopisane po
+    budowie promptu idzie przed turą, bo prompt nadal ma starą linię."""
+    root, home, sk, p = srodowisko
+    w.dodaj_orzeczenie(sk, "marki/enigmalabz", "W wynikach Enigmy nie raportuj porównania ze stockową llama.cpp", "rozmowa")
+    w.dodaj_orzeczenie(sk, "marki/enigmalabz", "Porównania wobec stock llama.cpp robimy ZAWSZE", "rozmowa")
+    w.dodaj_orzeczenie(sk, "marki/enigmalabz", "Orzeczenie z 2026-09-30 „W wynikach Enigmy nie raportuj porównania ze stockową "
+                       "llama.cpp” jest uchylone i nie obowiązuje nikogo", "rozmowa")
+    blok = p.system_prompt_block()
+    assert "Porównania wobec stock llama.cpp robimy ZAWSZE" in blok
+    assert "nie raportuj porównania" not in blok and "uchylone" not in blok
+    assert "nie raportuj" not in p.prefetch("ile t/s robi Enigma wobec stock llama")
+    w.dodaj_orzeczenie(sk, "wszyscy", "Orzeczenie z 2026-09-30 „Odpowiadaj po polsku” jest uchylone", "rozmowa")
+    p._cache = ("", 0.0, "")
+    r = p.prefetch("ile t/s robi Enigma wobec stock llama")
+    assert r.startswith("## Nowe orzeczenia") and "„Odpowiadaj po polsku” jest uchylone" in r
+    assert "Odpowiadaj po polsku" not in p.system_prompt_block()
+    linie, uchylenia = pl.orzeczenia_obowiazujace(sk, [("orzeczenia/wszyscy", 20)])
+    assert linie == [] and len(uchylenia) == 1
+    w.dodaj_orzeczenie(sk, "wszyscy", "Orzeczenie z 2026-09-30 „Takiej linii nie ma” jest uchylone", "rozmowa")   # chybione
+    assert "Takiej linii nie ma" in p.system_prompt_block()                         # zostaje widoczne, nic nie znika po cichu
+
+
+def test_ostatni_blok_critical_z_soul_na_koncu(srodowisko):
+    """Najważniejsze zasady na obu krawędziach promptu: ostatni blok <critical> z SOUL.md profilu stoi na końcu
+    bloku skarbca (dosłownie); SOUL bez bloku albo bez pliku: nic."""
+    root, home, sk, p = srodowisko
+    assert "<critical>" not in p.system_prompt_block()                              # bez SOUL.md
+    (home / "SOUL.md").write_text("# Web\n\nTreść.\n", encoding="utf-8")
+    assert "<critical>" not in p.system_prompt_block()
+    (home / "SOUL.md").write_text("<critical>\nPierwszy\n</critical>\n\nŚrodek.\n\n<critical>\n- Zgoda JARO.\n- Po polsku.\n</critical>\n",
+                                  encoding="utf-8")
+    blok = p.system_prompt_block()
+    assert blok.endswith("\n\n<critical>\n- Zgoda JARO.\n- Po polsku.\n</critical>") and "Pierwszy" not in blok
 
 
 def test_arsenal_w_bloku_promptu_kazdego_agenta(srodowisko):
@@ -111,9 +175,46 @@ def test_arsenal_w_bloku_promptu_kazdego_agenta(srodowisko):
         "# Arsenał floty\n\n**Lista.**\n\n## Zasoby\n- **Zapas mocy** · 4 vCPU · `zapas-mocy uruchom -- 'x'`\n"
         "- **Serwer** · CPU 80%\n\n## Powiązane\n- hub: [[_hub-skarbiec]]\n", encoding="utf-8")
     blok = p.system_prompt_block()                                                   # profil jarvo-web, nie Jarvo
-    assert "# Arsenał floty" in blok and "`zapas-mocy uruchom -- 'x'`" in blok and "- **Serwer** · CPU 80%" in blok
+    assert "# Arsenał floty" in blok and "- Zapas mocy: 4 vCPU; `zapas-mocy uruchom -- 'x'`" in blok and "- Serwer: CPU 80%" in blok
     assert "_hub-skarbiec" not in blok.split("# Arsenał floty")[1]                   # tylko sekcja Zasoby
     assert pl._zapis_w_skarbcu({"path": str(sk.plik("fleet/arsenal.md"))}) is None   # Jarvo dopisuje wprost
+
+
+ARSENAL_DLUGI = """## Zasoby
+- **Zapas mocy: InstaBox × 3 — `flota-01`, `flota-02`, `flota-03`** (od 14.11 jedna, od 19.11 trzy, 0 zł) · każda Linux w chmurze, 4 vCPU, 8 GB, Debian 13, python, docker; razem 12 vCPU / 24 GB · kiedy: CPU serwera zajęte (limit 80%), kilka renderów, buildów albo testów naraz, testy kerneli na CPU, długi build · jak: `zapas-mocy uruchom --wyslij PLIK --odbierz WYNIK -- 'polecenie'` (pomoc: `zapas-mocy pomoc`), maszynę wybiera `ZAPAS_MOCY_MASZYNA=flota-02` · limity: 1 maszyna na konto, pauza po 30 min bezczynności, 600 s na polecenie (dłużej `--tlo`), ffmpeg doinstaluj raz; bez sekretów i danych klientów · """ + "dalsze uwagi o maszynach " * 30 + """
+- **Modern Web Guidance 1.0 (Chrome/Edge/Firefox/MDN)** · skille dla agentów kodujących: 250 nowoczesnych API (CSS, HTML, JS) + 203 przypadki użycia; `legacy-scan` na landingu: 3 s · kiedy: nowa strona albo przebudowa komponentu, żeby agent nie pisał starych wzorców (view transitions, popover, container queries, `scheduler.yield`) · jak: skill `modern-web-guidance` u Weba · """ + "dalsze uwagi o skanerze " * 30 + """
+- **AssemblyAI — 3 konta floty, po $50 darmowych kredytów (19.11.2026)** · transkrypcja, TTS, streaming; plany Free, bez karty · kiedy: transkrypcje i napisy (jarvo-translator), testy API mowy · konta: first `ktos.pierwszy@gmail.com` ($50), second `ktos.drugi@gmail.com` ($50) · jak: klucz w panelu · """ + "dalsze uwagi o kontach " * 30 + """
+- **Serwer** · Dell OptiPlex, i5 7. gen 4 rdzenie, 32 GB, bez GPU · CPU najwyżej 80%, ciężkie rzeczy `nice -n 15`, wideo koduj na karcie Intela (`h264_vaapi`, `/dev/dri/renderD128`).
+- **Komputer Jarva** · przeglądarka Jarva w oknie na pulpicie serwera; właściciel widzi i przejmuje przez VNC · konta, logowanie, panele www: robi Jarvo.
+- **Telefony** · 3 × realme (`first`, `second`, `third`) przez PhoneUse, zalogowane konta Google · konta przez „Zaloguj przez Google”, aplikacje mobilne, zrzuty z telefonu: robi Jarvo · adb: `first` = `100.99.219.95:5555` · YouTube: `first` kanał (nie ruszać)
+- **GPU** · jaroserverai, RX 7900 XTX 24 GB, zwykle wyłączony · tylko sesja Kernel (testy kerneli i inferencji), produkcyjny czat :8080 nietykalny.
+
+## Powiązane
+- hub: [[_hub-skarbiec]]
+"""
+
+
+def test_arsenal_indeks_bez_ciecia_w_pol_wpisu(srodowisko):
+    """20.11: Arsenał szedł w całości ucięty na 2400 znakach w pół słowa („…testy API mowy, tes”), więc Serwer,
+    Komputer Jarva, Telefony i GPU wypadały z promptu. Teraz indeks: jedna linia na każdy zasób (nazwa: co; kiedy),
+    całość ≤ MAX_ARSENAL, cięcie tylko na granicy słowa, bez adresów e-mail kont; pełny wpis przez wiedza_czytaj."""
+    root, home, sk, p = srodowisko
+    sk.plik("fleet/arsenal.md").parent.mkdir(parents=True, exist_ok=True)
+    sk.plik("fleet/arsenal.md").write_text("# Arsenał floty\n\n" + ARSENAL_DLUGI, encoding="utf-8")
+    sekcja = "# Arsenał floty" + p.system_prompt_block().split("\n\n# Arsenał floty")[1]
+    assert len(sekcja) <= pl.MAX_ARSENAL and "wiedza_czytaj `fleet/arsenal`" in sekcja
+    linie = [l for l in sekcja.splitlines() if l.startswith("- ")]
+    nazwy = ["Zapas mocy: InstaBox × 3", "Modern Web Guidance 1.0", "AssemblyAI — 3 konta floty", "Serwer:", "Komputer Jarva:",
+             "Telefony:", "GPU:"]
+    assert len(linie) == 7 and all(l.startswith("- " + n) for l, n in zip(linie, nazwy))
+    assert "@" not in sekcja and "dalsze uwagi" not in sekcja and "100.99.219.95" not in sekcja
+    assert "- Serwer: Dell OptiPlex, i5 7. gen 4 rdzenie, 32 GB, bez GPU; CPU najwyżej 80%" in sekcja
+    assert "- GPU: jaroserverai, RX 7900 XTX 24 GB, zwykle wyłączony; tylko sesja Kernel" in sekcja
+    tresc = sk.plik("fleet/arsenal.md").read_text(encoding="utf-8")
+    for l in linie:
+        assert l.count("`") % 2 == 0
+        for slowo in l[2:].rstrip("…").replace(":", " ").replace(";", " ").split():
+            assert re.search(rf"(?<!\w){re.escape(slowo)}(?!\w)", tresc), slowo           # całe słowa z pliku, nic w pół
 
 
 def test_przypomnienie_wektorami_z_uslugi_i_slowami_bez_niej(srodowisko):

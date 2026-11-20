@@ -103,7 +103,7 @@ USUNIETE_PROFILE = ("jarvo-operator",)              # decyzja właściciela 2026
 USUNIETE = ".usuniete"                              # <dane>/profiles/.usuniete/<agent>-<data>
 RUTYNY = ("jarvo-patrol", "jarvo-daily-brief", "jarvo-weekly-review", "jarvo-knowledge-freshness", "jarvo-new-versions")
 ZNACZNIK_PANELU = ".odcisk-panelu"
-PLIKI_PROFILU = ("config.yaml", "SOUL.md", "profile.yaml", "mcp.json", ".env")
+PLIKI_PROFILU = ("config.yaml", "SOUL.md", "KRYTYCZNE.md", "profile.yaml", "mcp.json", ".env")
 KLUCZ_API = re.compile(r"^API_SERVER_KEY=.{16,}", re.M)
 LINIA_ENV = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$")
 SEKRET = re.compile(r"TOKEN|KEY|SECRET|PASS|HASLO|KLUCZ|AUTH|COOKIE", re.I)   # jak jarvo/srodowisko.py

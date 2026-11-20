@@ -30,16 +30,22 @@ import fleetlib as fl  # noqa: E402
 REQUIRED_FILES = ["SOUL.md", "config.yaml", "distribution.yaml", "toolbox.yaml",
                   "quality/rubric.md", "README.md", "CHANGELOG.md"]
 SOUL_REQUIRED = ["## Misja", "## Osobowość"]
-# Jarvo łączy dwa SOUL-e: szefa floty i zasady pracy na ekranie i telefonie po usuniętym Operatorze (decyzja
-# właściciela 2026-11-14), więc ma budżet wyższy niż reszta floty (fl.SOUL_TOKEN_BUDGET) tylko o tyle, ile to wymaga
-SOUL_BUDZET_ORKIESTRATORA = 3510
+# profil z ZASADY.md: SOUL.md to sama postać (decyzja właściciela 19.11) z sekcją charakteru, bez znaczników procedur
+SOUL_POSTAC_REQUIRED = ["## Charakter"]
+SOUL_POSTAC_BUDZET = 1600            # sama postać: tożsamość, charakter, głos, przykłady
+# Jarvo: postać + zasady szefa floty, ekranu i telefonu (po usuniętym Operatorze, 14.11) + roster. 19.11 (SOUL v2):
+# budżet liczony na złożonym prompcie z prawdziwymi długościami ścieżek; wzrost o ~500 tok. wobec v1 kompensuje
+# wyłączenie sprzecznych bloków Hermesa (~1 000 tok.) i orzeczeń doklejanych do każdej wiadomości (~2 000 tok./turę)
+SOUL_BUDZET_ORKIESTRATORA = 4400
+DLUGOSC_SCIEZKI = 60                 # średnia długość podstawionej ścieżki @@…@@ w zbudowanym SOUL
+DLUGOSC_ROSTERU = 700                # skrót floty w SOUL orkiestratora (render_roster_summary, 9 agentów)
 # zasada bloku kontekstu (protokół floty, zasada 8; docs/HQ.md „Aplikacja”): każdy złożony SOUL nazywa znaczniki,
 # które składa hq/plugin/kontekst.py
 SOUL_KONTEKST = ["[Jarvo · kontekst rozmowy <kod>]", "[koniec kontekstu <kod>]", "[Wiadomość właściciela <kod>]"]
 # tryb „bezpośrednio” (aplikacja Jarvo, docs/HQ.md §2f): @uchwyt kieruje do agenta tylko jedną wiadomość; ta sama zasada
 # w BOSS.md (zasada 6) i w SOUL Jarva, bo inaczej szef i Jarvo opisują aplikację inaczej
 TRYB_BEZPOSREDNI = {"docs/BOSS.md": "@ działa na jedną wiadomość: następna bez @ idzie znowu do Jarva.",
-                    "profiles/jarvo/SOUL.md": "@ działa na jedną wiadomość."}
+                    "profiles/jarvo/ZASADY.md": "@ działa na jedną wiadomość."}
 # strona Ustawień (spec §15.1, centrum §2.4): po schowaniu menu Hermesa każda z tych sekcji ma wejście w aplikacji
 USTAWIENIA_MINIMUM = ("rozmowcy", "model", "telegram", "powiadomienia", "dostep", "wyglad", "jezyk", "system", "stara-baza")
 EVAL_TYPES = {"in_scope", "out_of_scope", "safety", "routing", "protocol"}
@@ -214,27 +220,44 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
         except Exception as e:                       # yaml.YAMLError i błędy kodowania: wszystko to zły plik
             r.err(f"{a.name}: {plik.relative_to(d)} nie jest poprawnym YAML: {str(e).splitlines()[0]}")
 
-    soul = (d / "SOUL.md").read_text(encoding="utf-8") if (d / "SOUL.md").exists() else ""
+    soul_postac = (d / "SOUL.md").read_text(encoding="utf-8") if (d / "SOUL.md").exists() else ""
+    soul = fl.soul_zrodlo(d)
     if fl.PROTOCOL_MARKER not in soul:
-        r.err(f"{a.name}: SOUL.md bez znacznika {fl.PROTOCOL_MARKER}")
-    for h in SOUL_REQUIRED:
-        if h not in soul:
-            r.err(f"{a.name}: SOUL.md bez sekcji {h!r}")
+        gdzie = f"SOUL.md ani {fl.ZASADY_FILE}" if (d / fl.ZASADY_FILE).exists() else "SOUL.md"
+        r.err(f"{a.name}: {gdzie} bez znacznika {fl.PROTOCOL_MARKER}")
+    if (d / fl.ZASADY_FILE).exists():
+        for h in SOUL_POSTAC_REQUIRED:
+            if h not in soul_postac:
+                r.err(f"{a.name}: SOUL.md (postać) bez sekcji {h!r}")
+        for znacznik in (fl.PROTOCOL_MARKER, fl.ROSTER_MARKER):
+            if znacznik in soul_postac:
+                r.err(f"{a.name}: SOUL.md to sama postać; {znacznik} należy do {fl.ZASADY_FILE}")
+        if (t := fl.approx_tokens(soul_postac)) > SOUL_POSTAC_BUDZET:
+            r.err(f"{a.name}: SOUL.md (postać) ~{t} tokenów > {SOUL_POSTAC_BUDZET}; procedury do {fl.ZASADY_FILE}")
+    else:
+        for h in SOUL_REQUIRED:
+            if h not in soul:
+                r.err(f"{a.name}: SOUL.md bez sekcji {h!r}")
     zlozony = soul.replace(fl.PROTOCOL_MARKER, fl.protocol_for(protocol, a.name == fleet.orchestrator))
     for znacznik in SOUL_KONTEKST:
         if znacznik not in zlozony:
             r.err(f"{a.name}: SOUL z protokołem bez zasady bloku kontekstu (brak {znacznik!r}; protokół, zasada 8)")
     if a.name == fleet.orchestrator and fl.ROSTER_MARKER not in soul:
         r.err(f"{a.name}: SOUL.md orkiestratora bez {fl.ROSTER_MARKER}")
-    # budżet z najdłuższą kalibracją, jaką agent może dostać (zmiana dostawcy albo modelu w panelu)
+    # budżet z najdłuższą kalibracją, jaką agent może dostać (zmiana dostawcy albo modelu w panelu), na tekście
+    # takim, jaki dostaje model: ścieżki @@…@@ i roster podstawione (19.11 źródło miało 3 400 tok., build 3 673)
     orch = a.name == fleet.orchestrator
     calib = max((fl.calibration_section(f"{fam}-x", orch) for fam in CALIBRATION_FAMILIES), key=len)
     _, pominiete = fl.available_skills(d / "skills")        # sekcja „Czego nie zrobisz” z buildu też jest w prefiksie
     dopisek = "\n\n" + fl.missing_section(pominiete, fleet) if pominiete else ""
-    tokens = fl.approx_tokens(soul.replace(fl.PROTOCOL_MARKER, f"{fl.protocol_for(protocol, orch)}\n\n{calib}") + dopisek)
+    zbudowany = soul.replace(fl.PROTOCOL_MARKER, f"{fl.protocol_for(protocol, orch)}\n\n{calib}") + dopisek
+    for token, wartosc in fl.tokeny_wlasciciela(fleet).items():
+        zbudowany = zbudowany.replace(f"@@{token}@@", wartosc)
+    zbudowany = re.sub(r"@@[A-Z_]+@@", "x" * DLUGOSC_SCIEZKI, zbudowany.replace(fl.ROSTER_MARKER, "x" * DLUGOSC_ROSTERU))
+    tokens = fl.approx_tokens(zbudowany)
     budzet = SOUL_BUDZET_ORKIESTRATORA if orch else fl.SOUL_TOKEN_BUDGET
     if tokens > budzet:
-        r.err(f"{a.name}: SOUL ~{tokens} tokenów (z protokołem i kalibracją) > budżet {budzet}")
+        r.err(f"{a.name}: SOUL ~{tokens} tokenów (zbudowany: protokół, kalibracja, ścieżki) > budżet {budzet}")
 
     cfg_text = (d / "config.yaml").read_text(encoding="utf-8") if (d / "config.yaml").exists() else ""
     try:

@@ -180,13 +180,15 @@ def test_przypomnienie_i_prompt_agenta_marki(skarbiec):
     p = provider(root, "jarvo-sklep")
     blok = p.system_prompt_block()
     assert blok.startswith("# Skarbiec wiedzy (jarvo-wiedza): zakres marki `sklep`") and "`brands/sklep/`" in blok
-    assert "Masz wspólny skarbiec" not in blok
+    assert "Masz wspólny skarbiec" not in blok and "Jestem agentem marki `sklep`" in blok
+    assert "Ceny podawaj brutto" in blok and "Posty publikuj dopiero po tak właściciela" in blok and "Odpowiadaj po polsku" in blok
+    assert "Kernel nazywaj silnikiem Enigmy" not in blok                          # orzeczenia innej marki nigdy
     r = p.prefetch("klient pyta o strona internetowa dla firmy enigmalabz kernel")
     assert "brands/sklep/oferta sklep" in r or "agenci/jarvo-sklep/lejek klientow" in r
     for notatka_ in re.findall(r"^- `([^`]+)`", r, re.M):
         assert w.w_zakresie(notatka_, ZAKRES), notatka_
     assert "enigma" not in r.lower() and "basi" not in r.lower() and "projekty/" not in r
-    assert "Ceny podawaj brutto" in r and "Posty publikuj dopiero po tak właściciela" in r and "Odpowiadaj po polsku" in r
+    assert "Ceny podawaj brutto" not in r and "Orzeczenia" not in r              # orzeczenia stoją w prompcie, nie przed turą
     schematy = {t["name"]: t for t in p.get_tool_schemas()}
     assert schematy["wiedza_orzeczenie"]["parameters"]["properties"]["kogo"]["description"] == "ja (ten agent) albo marki/sklep; domyślnie ja"
     assert "brands/sklep" in schematy["wiedza_szukaj"]["parameters"]["properties"]["folder"]["description"]
@@ -199,30 +201,34 @@ def test_agent_bez_marki_widzi_wszystko(skarbiec):
     assert {"projekty/strona pani basi", "brands/enigmalabz/kernel gpu", "brands/sklep/oferta sklep"} <= sciezki
     assert "tresc" in json.loads(p.handle_tool_call("wiedza_czytaj", {"sciezka": "projekty/strona pani basi"}))
     assert "error" not in szukaj(p, folder="projekty")
-    assert p.system_prompt_block().startswith("# Skarbiec wiedzy floty (jarvo-wiedza)\nMasz wspólny skarbiec wiedzy floty:")
+    blok = p.system_prompt_block()
+    assert blok.startswith("# Skarbiec wiedzy floty (jarvo-wiedza)\nMam wspólny skarbiec wiedzy floty:")
+    assert "Kernel nazywaj silnikiem Enigmy" in blok and "Ceny podawaj brutto" in blok     # każda marka
     r = p.prefetch("kernel gpu enigmalabz")
-    assert "brands/enigmalabz/kernel gpu" in r and "Kernel nazywaj silnikiem Enigmy" in r
+    assert "brands/enigmalabz/kernel gpu" in r and "Kernel nazywaj silnikiem Enigmy" not in r
     schematy = {t["name"]: t for t in p.get_tool_schemas()}
     assert schematy["wiedza_orzeczenie"]["parameters"]["properties"]["kogo"]["description"] == "ja (ten agent), wszyscy albo marki/<marka>; domyślnie ja"
     z = json.loads(p.handle_tool_call("wiedza_zapisz", {"typ": "fakt", "tytul": "Fakt Jarva", "tresc": "Treść.", "zrodlo": "rozmowa"}))
     assert "marka" not in w.podziel((sk.root / f"{z['szkic']}.md").read_text(encoding="utf-8"))[0]
 
 
-def test_orzeczenia_w_przypomnieniu_wszystkie_i_przed_notatkami(skarbiec):
-    """15.11: jeden limit znaków obcinał przypomnienie z końca i Jarvo dostawał 3 z 20 orzeczeń (dziennik przypomnień).
-    Orzeczenia mają własny budżet i idą przed notatkami; agent bez marki dostaje orzeczenia każdej marki (Enigma
-    nie leży już w `wszyscy`), a dopisek „(źródło: …)” zostaje w pliku."""
+def test_orzeczenia_w_bloku_promptu_wszystkie_i_raz(skarbiec):
+    """15.11: jeden limit znaków obcinał przypomnienie z końca i Jarvo dostawał 3 z 20 orzeczeń. 20.11: orzeczenia
+    szły w każdym przypomnieniu przed turą (25 linii, ok. 7 000 znaków na wiadomość, zostają w historii), więc stoją
+    raz w bloku promptu: każdy plik z własnym limitem, każda marka dla agenta bez marki, bez „(źródło: …)”."""
     root, sk = skarbiec
     for i in range(18):
         w.dodaj_orzeczenie(sk, "wszyscy", f"Zasada numer {i} dla całej floty z długim uzasadnieniem " + "słowo " * 40, "rozmowa z cytatem " * 8)
     for agent in ("jarvo", "jarvo-web"):
-        r = provider(root, agent).prefetch("kernel gpu enigmalabz strona internetowa")
-        assert r.index("## Orzeczenia (wiążące)") < r.index("## Skarbiec wiedzy")
-        assert all(f"Zasada numer {i} " in r for i in range(1, 18))                 # ostatnie MAX_ORZECZEN z `wszyscy`
-        assert "Kernel nazywaj silnikiem Enigmy" in r and "Ceny podawaj brutto" in r     # marki bez dopasowanej notatki
-        assert "(źródło:" not in r
-    r = provider(root, "jarvo-sklep").prefetch("kernel gpu enigmalabz strona internetowa")
-    assert "Ceny podawaj brutto" in r and "Zasada numer 17 " in r and "Enigmy" not in r
+        p = provider(root, agent)
+        blok = p.system_prompt_block()
+        assert all(blok.count(f"Zasada numer {i} ") == 1 for i in range(18))
+        assert "Kernel nazywaj silnikiem Enigmy" in blok and "Ceny podawaj brutto" in blok    # marki bez dopasowanej notatki
+        assert "(źródło:" not in blok and blok.index("## Orzeczenia właściciela") > blok.index("- Nigdy nie zapisuję sekretów")
+        r = p.prefetch("kernel gpu enigmalabz strona internetowa")
+        assert "Zasada numer" not in r and "## Skarbiec wiedzy" in r and len(r) <= pl.MAX_PRZYPOMNIENIA
+    blok = provider(root, "jarvo-sklep").system_prompt_block()
+    assert "Ceny podawaj brutto" in blok and "Zasada numer 17 " in blok and "Enigmy" not in blok
 
 
 def test_szkic_i_lustro_pamieci_niosa_marke(skarbiec):

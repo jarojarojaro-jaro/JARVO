@@ -40,6 +40,22 @@ def test_soul_without_protocol_marker(repo_copy):
     assert errors_matching(validate.run(), r"jarvo-web: SOUL.md bez znacznika")
 
 
+def test_soul_postac_bez_procedur(repo_copy):
+    """19.11 właściciel: w SOUL.md sam charakter; procedury, roster i protokół floty w ZASADY.md."""
+    soul = repo_copy / "profiles/jarvo/SOUL.md"
+    soul.write_text(soul.read_text(encoding="utf-8") + "\n" + fl.PROTOCOL_MARKER + "\n", encoding="utf-8")
+    zasady = repo_copy / "profiles/jarvo/ZASADY.md"
+    zasady.write_text(zasady.read_text(encoding="utf-8").replace(fl.PROTOCOL_MARKER, ""), encoding="utf-8")
+    assert errors_matching(validate.run(), rf"jarvo: SOUL.md to sama postać; {fl.PROTOCOL_MARKER} należy do ZASADY.md")
+
+
+def test_budzet_soul_na_zbudowanym_tekscie(repo_copy):
+    """19.11: walidator liczył źródło z krótkimi @@ŚCIEŻKAMI@@ (3 400 tok.), a model dostawał 3 673 tok."""
+    zasady = repo_copy / "profiles/jarvo/ZASADY.md"
+    zasady.write_text(zasady.read_text(encoding="utf-8") + "\n" + "@@JARVO_DIR@@ " * 400, encoding="utf-8")
+    assert errors_matching(validate.run(), r"jarvo: SOUL ~\d+ tokenów \(zbudowany")
+
+
 def test_profile_yaml_must_parse(repo_copy):
     toolbox = repo_copy / "profiles/jarvo-web/toolbox.yaml"
     toolbox.write_text(toolbox.read_text(encoding="utf-8") + "\n  - name: x\n    source: https://x.dev (REST: /v2)\n",

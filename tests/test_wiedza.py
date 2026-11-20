@@ -99,7 +99,7 @@ def test_zasiew_kopii_repo_linki_z_hubow_skilli_i_graf(tmp_path, monkeypatch):
     assert "- serwery MCP: `inspo` (trust: full · recommend, search_screens)" in hub
     assert "- zmienne środowiska (same nazwy, wartości w .env): `INSPO_TOKEN`" in hub
     assert "- narzędzia (toolbox.yaml, 1): `lighthouse`" in hub and "- evals (1): `web-new-site`" in hub
-    assert ("- z repo: [[zrodla/jarvo-repo/profiles/jarvo-web/SOUL|zasady (SOUL)]] · "
+    assert ("- z repo: [[zrodla/jarvo-repo/profiles/jarvo-web/SOUL|postać (SOUL)]] · "
             "[[zrodla/jarvo-repo/profiles/jarvo-web/CHANGELOG|wszystkie zmiany]]") in hub
     skill = (root / "fleet/skille/nowa-strona.md").read_text(encoding="utf-8")
     assert ("- materiały (references): [[zrodla/jarvo-repo/profiles/jarvo-web/skills/web/nowa-strona/references/seo|seo]]"

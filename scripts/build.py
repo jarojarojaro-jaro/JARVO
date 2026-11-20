@@ -549,6 +549,7 @@ def base_tokens(fleet: fl.Fleet, agent: fl.Agent, runtime_build_dir: str, env: d
         # REPO_DIR, BUILD_DIR, TOOLS_DIR, BIN_DIR i PY
         **sciezki_floty(fleet, u),
         "AGENT": agent.name,
+        **fl.tokeny_wlasciciela(fleet),       # @@WLASCICIEL@@…: tożsamość właściciela z nakładki (repo jest publiczne)
         "REVIEWER": fleet.reviewer,
         "ORCHESTRATOR": fleet.orchestrator,
         # cel dostarczania rutyn Jarva: jego dom (temat General grupy Jarvo HQ, bez grupy DM właściciela)
@@ -934,10 +935,11 @@ def repo_do_skarbca(fleet: fl.Fleet, out: Path, dane: dict) -> int:
 
     for a in fleet.active():
         baza = f"profiles/{a.name}"
-        soul = a.dir / "SOUL.md"
-        if soul.is_file():
-            kopiuj(soul, f"{baza}/SOUL.md", soul.read_text(encoding="utf-8").replace(fl.PROTOCOL_MARKER + "\n\n", "")
-                   .replace(fl.PROTOCOL_MARKER, ""))
+        for nazwa in ("SOUL.md", fl.ZASADY_FILE):
+            plik = a.dir / nazwa
+            if plik.is_file():
+                kopiuj(plik, f"{baza}/{nazwa}", plik.read_text(encoding="utf-8").replace(fl.PROTOCOL_MARKER + "\n\n", "")
+                       .replace(fl.PROTOCOL_MARKER, ""))
         for rel in ("README.md", "CHANGELOG.md", "quality/rubric.md"):
             kopiuj(a.dir / rel, f"{baza}/{rel}")
     for a in dane["agents"]:
@@ -1178,16 +1180,23 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
         # biblioteka dźwięków CC0 (ta sama co w menu Audio edytora): projekt.py dzwieki / dodaj-dzwiek, podkłady film.py
         shutil.copytree(fl.REPO_ROOT / "hq" / "web" / "dzwieki", dest / "scripts" / "dzwieki", dirs_exist_ok=True)
 
-    # SOUL.md
+    # SOUL.md: postać (SOUL.md) + zasady pracy (ZASADY.md, gdy profil je ma) → jeden plik, który czyta Hermes
     soul_path = dest / "SOUL.md"
-    soul = soul_path.read_text(encoding="utf-8")
+    soul = fl.soul_zrodlo(dest)
+    (dest / fl.ZASADY_FILE).unlink(missing_ok=True)
     if fl.PROTOCOL_MARKER not in soul:
-        raise SystemExit(f"[{agent.name}] SOUL.md nie ma znacznika {fl.PROTOCOL_MARKER}")
+        raise SystemExit(f"[{agent.name}] SOUL.md ani {fl.ZASADY_FILE} nie ma znacznika {fl.PROTOCOL_MARKER}")
     # kalibracja pod rodzinę modelu agenta (shared/calibration/, za oh-my-hermes): tuż po protokole floty
     calibration = fl.calibration_section(fleet.model_for(agent.model_tier), agent.name == fleet.orchestrator)
     soul = soul.replace(fl.PROTOCOL_MARKER, f"{fl.protocol_for(protocol, agent.name == fleet.orchestrator).strip()}\n\n{calibration}")
     if agent.name == fleet.orchestrator:
         soul = soul.replace(fl.ROSTER_MARKER, render_roster_summary(fleet))
+    # zamykający blok <critical> (powtórka najważniejszych zasad) stoi na samym końcu promptu: dokleja go wtyczka
+    # jarvo-wiedza za swoim blokiem (ostatnim przed datą i środowiskiem Hermesa); w SOUL byłby drugą kopią w środku
+    soul, koniec = fl.wydziel_koniec(soul)
+    (dest / fl.KRYTYCZNE_FILE).unlink(missing_ok=True)
+    if koniec:
+        zapisz(dest / fl.KRYTYCZNE_FILE, render_tokens(koniec, tokens) + "\n")
     if pominiete:
         soul = soul.rstrip() + "\n\n" + fl.missing_section(pominiete, fleet)
     zapisz(soul_path, render_tokens(soul, tokens))

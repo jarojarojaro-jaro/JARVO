@@ -1,6 +1,6 @@
 ---
 name: sdlc-review
-description: "Sędzia: niezależna ocena karty z toru review wobec DoD."
+description: "Ocena wyniku zadania w torze review: werdykt wobec DoD."
 version: 2.12.0
 author: "Jarvo (na bazie Hermes Agent sdlc-review: Jakub Wolniewicz + Hermes Agent, MIT)"
 license: MIT

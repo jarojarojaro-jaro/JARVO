@@ -10,6 +10,13 @@ model:
 agent:
   reasoning_effort: high
   max_turns: 200
+  # Bez angielskiego bloku „# Execution discipline” Hermesa (dla DeepSeek domyślnie włączony, ~1000 tok.): jego
+  # <verification> każe „confirm scope before executing” przy każdym zapisie i poleceniu (wbrew zasadzie 2 SOUL:
+  # polecenie właściciela jest zgodą), a <mandatory_tool_use> „current facts → ALWAYS use a tool” (wbrew zasadzie 10:
+  # najpierw skarbiec, świeżej notatki nie sprawdzam drugi raz). „# Finishing the job”, „# Parallel tool calls”
+  # i „# Tool-use enforcement” zostają (osobne bramki: task_completion_guidance, parallel_tool_call_guidance,
+  # tool_use_enforcement).
+  execution_guidance: false
 
 timezone: "@@TIMEZONE@@"
 
@@ -22,6 +29,10 @@ memory:
 
 skills:
   creation_nudge_interval: 0      # Jarvo nie tworzy skilli sam; ulepszenia idą przez fleet-improvement → repo
+  # Hermes w prompcie każe poprawiać skille przez skill_manage („fix it with skill_manage(action='patch')”), a skille
+  # Jarva to kod floty (zasada 8 SOUL): zapis skill_manage czeka w poczekalni na zgodę właściciela (poczekalnia.py),
+  # jak u specjalistów, zamiast nadpisywać zainstalowany skill, który i tak zniknie przy aktualizacji.
+  write_approval: true
 
 web:
   search_backend: searxng         # SEARXNG_URL ustawia docker-compose (własny SearXNG)
@@ -29,10 +40,24 @@ web:
 # Czat (Telegram, HQ) i pracownik karty (cli): ekran, terminal i kanban; Jarvo robi sam pracę na ekranie,
 # na telefonie, konta i terminal (decyzja właściciela 2026-11-14), pracę dziedzinową dają specjaliści.
 platform_toolsets:
-  telegram: [kanban, memory, file, terminal, computer_use, komputer, web, session_search, clarify, todo, skills, cronjob]
-  api_server: [kanban, memory, file, terminal, computer_use, komputer, web, session_search, todo, skills, cronjob]   # czat Jarvo HQ: jak Telegram, bez clarify (API go nie obsługuje)
+  telegram: [kanban, memory, file, terminal, computer_use, komputer, web, vision, session_search, clarify, todo, skills, cronjob]
+  api_server: [kanban, memory, file, terminal, computer_use, komputer, web, vision, session_search, todo, skills, cronjob]   # czat Jarvo HQ: jak Telegram, bez clarify (API go nie obsługuje)
   cli: [kanban, memory, file, terminal, computer_use, komputer, web, browser, vision, session_search, todo, skills, cronjob]
   cron: [kanban, memory, file, skills, session_search]
+
+# Czat aplikacji Jarvo idzie przez platformę api_server (`POST /v1/runs`), a domyślny hint Hermesa dla niej mówi
+# „assume plain text, no markdown” i „runs endpoint intercepts nothing — MEDIA: renders as literal text”. Panel
+# renderuje Markdown (hq/web/src/13-markdown.js), linię MEDIA: i pełną ścieżkę floty pokazuje kartą pliku
+# (07-sciezki.js, 34-pliki.js), a podgląd obsługuje tylko katalogi PREVIEW_ROOTS (hq/plugin/hq_core.py).
+platform_hints:
+  api_server:
+    replace: >-
+      Rozmawiasz w aplikacji Jarvo (panel HQ). Markdown się renderuje: nagłówki, pogrubienie, kursywa, listy
+      (też [ ] i [x]), tabele, cytaty, `kod`, bloki kodu i linki http(s). Pliki pokazujesz z katalogów
+      @@JARVO_DIR@@/workspaces, missions, knowledge i inbox: pełna ścieżka w tekście jest klikalna (podgląd,
+      pobranie), linia `MEDIA:<pełna ścieżka>` sama w linii daje kartę pliku (obraz z miniaturą), a
+      `![opis](<pełna ścieżka>)` wstawia obraz w tekst. Pliku spoza tych katalogów aplikacja nie otworzy:
+      najpierw skopiuj go do workspaces.
 
 terminal:
   backend: local

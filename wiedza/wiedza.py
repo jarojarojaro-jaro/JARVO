@@ -1769,7 +1769,8 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
             if a.get("evals"):
                 mcp_linia += f"\n- evals ({len(a['evals'])}): " + ", ".join(f"`{e['id']}`" for e in a["evals"])
             pliki_repo = [(f"profiles/{a['name']}/{r}", etykieta) for r, etykieta in
-                          (("SOUL.md", "zasady (SOUL)"), ("README.md", "README"), ("quality/rubric.md", "rubryka"),
+                          (("SOUL.md", "postać (SOUL)"), ("ZASADY.md", "zasady pracy"), ("README.md", "README"),
+                           ("quality/rubric.md", "rubryka"),
                            ("CHANGELOG.md", "wszystkie zmiany"))]
             z_repo = [f"[[{lustro(r)}|{etykieta}]]" for r, etykieta in pliki_repo if lustro(r) in w_lustrze]
             if z_repo:
