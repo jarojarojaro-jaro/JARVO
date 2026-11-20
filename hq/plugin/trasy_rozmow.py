@@ -10,7 +10,11 @@ więc każda trasa zapisu dostaje ochronę CSRF z `ochrona.Trasa`).
 - Wysyłka: `POST /rozmowy/{id}/wiadomosci` (wzmianki, załączniki przez `safe_path`, obrazy sprawdzane po magicznych
   bajtach i limit 7 000 000 bajtów zakodowanych data URL → 413 `za_duze` zanim cokolwiek pójdzie do bramy). Tekst
   będący komendą `/…` (także po wzmiance) = 409 `komenda`: brama nie wykonuje komend, robi to `POST /komendy`
-  (komendy.py), więc komenda nigdy nie trafia do modelu jako tekst.
+  (komendy.py), więc komenda nigdy nie trafia do modelu jako tekst. `tryb_kolejki: "dopisz"` (panel wysyła tak
+  zawsze: Enter w trakcie pracy jak w terminalu): adresat, który pracuje, dostaje wiadomość od razu jako dopisek do
+  trwającej tury (`Rejestr.do_dopisania`, Hermes `dopisz`, omp `dopisz_omp`, także z obrazami jako liniami 📎); gdy
+  się nie da, wiadomość czeka w kolejce, a odpowiedź niesie `dopisz_niemozliwe:<powód>` (`zgoda`, `zatrzymywanie`,
+  `wysylanie`, `terminal`, `odmowa`). Domyślne `czekaj` (inni klienci API) = kolejka jak dotąd.
 - Przebiegi: `GET /przebiegi/{id}`, `POST …/stop` (i `…/zatrzymaj`), `…/anuluj`, `…/wyslij` (i `…/wyslij-teraz`),
   `…/zgoda`, `…/dopisz`, `…/ponow`.
 - Strumień: `GET /strumien` (SSE, jeden na przeglądarkę), `POST /strumien/{klient}/subskrypcje`.
@@ -149,8 +153,8 @@ def blad(status: int, kod: str, komunikat: str, komunikat_en: str = "", **dane) 
                         status_code=status)
 
 
-SILNIK = ("Silnik rozmów nie działa — odśwież stronę albo zajrzyj do Ustawienia › Stan.",
-          "The conversation engine is not running — reload the page or check Settings › Status.")
+SILNIK = ("Silnik rozmów nie działa: odśwież stronę albo zajrzyj do Ustawienia › Stan.",
+          "The conversation engine is not running: reload the page or check Settings › Status.")
 
 
 async def czytaj_cialo(request: Request, model: type[_Model], *, maks: int = CIALO_MAKS) -> _Model:
@@ -162,8 +166,8 @@ async def czytaj_cialo(request: Request, model: type[_Model], *, maks: int = CIA
         dlugosc = int(request.headers.get("content-length") or 0)
     except ValueError:
         dlugosc = 0
-    za_duze = BladTrasy(413, "za_duze", "Za duża wiadomość — wyślij mniejsze albo mniej obrazów.",
-                        "The message is too large — send smaller or fewer images.")
+    za_duze = BladTrasy(413, "za_duze", "Za duża wiadomość: wyślij mniejsze albo mniej obrazów.",
+                        "The message is too large: send smaller or fewer images.")
     if dlugosc > maks:
         raise za_duze
     dane = bytearray()
@@ -314,8 +318,8 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
         if w is None:
             raise BladTrasy(404, "brak", "Nie ma takiej rozmowy.", "No such conversation.")
         if not kosz and w.get("usuniety_at"):
-            raise BladTrasy(409, "w_koszu", "Ta rozmowa jest w koszu — przywróć ją, żeby pisać dalej.",
-                            "This conversation is in the trash — restore it to keep writing.")
+            raise BladTrasy(409, "w_koszu", "Ta rozmowa jest w koszu: przywróć ją, żeby pisać dalej.",
+                            "This conversation is in the trash: restore it to keep writing.")
         return w
 
     async def watek_lub_404(sil, wid: str, *, kosz: bool = True) -> dict:
@@ -371,10 +375,10 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
         if len(okno) >= granice[0]:
             za = max(1, int(granice[1] - (time.monotonic() - okno[0])) + 1)     # kiedy zwolni się miejsce w oknie
             if rodzaj == "watek":
-                raise BladTrasy(429, "za_szybko", "Za dużo nowych rozmów naraz — poczekaj chwilę.",
-                                "Too many new conversations at once — wait a moment.", ponow_za_s=za)
-            raise BladTrasy(429, "za_szybko", "Za dużo wiadomości naraz — poczekaj chwilę.",
-                            "Too many messages at once — wait a moment.", ponow_za_s=za)
+                raise BladTrasy(429, "za_szybko", "Za dużo nowych rozmów naraz, poczekaj chwilę.",
+                                "Too many new conversations at once, wait a moment.", ponow_za_s=za)
+            raise BladTrasy(429, "za_szybko", "Za dużo wiadomości naraz, poczekaj chwilę.",
+                            "Too many messages at once, wait a moment.", ponow_za_s=za)
         t = time.monotonic()
         okno.append(t)
         return okno, t
@@ -395,8 +399,8 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
             raise BladTrasy(422, "za_duzo_obrazow", f"Najwyżej {OBRAZY_MAKS} obrazy w jednej wiadomości.",
                             f"At most {OBRAZY_MAKS} images per message.")
         if sum(len(o.dane) for o in body.obrazy) > OBRAZY_BAJTY:
-            raise BladTrasy(413, "za_duze", "Obrazy są za duże — wyślij mniejsze albo mniej.",
-                            "The images are too large — send smaller or fewer.")
+            raise BladTrasy(413, "za_duze", "Obrazy są za duże: wyślij mniejsze albo mniej.",
+                            "The images are too large: send smaller or fewer.")
         out = []
         for o in body.obrazy:
             naglowek, _, b64 = o.dane.partition(",")
@@ -442,8 +446,8 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
                         continue
                     break
                 else:
-                    raise BladTrasy(409, "zajete", "Nie da się zapisać obrazu — spróbuj jeszcze raz.",
-                                    "The image could not be saved — try again.")
+                    raise BladTrasy(409, "zajete", "Nie da się zapisać obrazu, spróbuj jeszcze raz.",
+                                    "The image could not be saved, try again.")
                 try:
                     with os.fdopen(fd, "wb") as f:
                         f.write(dane)
@@ -453,8 +457,8 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
                 out.append({"path": cel.as_posix(), "name": cel.name, "size": len(dane), "mime": mime})
         except OSError:
             usun_obrazy(out)
-            raise BladTrasy(507, "dysk", "Nie da się zapisać obrazu na dysku — sprawdź wolne miejsce.",
-                            "The image could not be saved to disk — check free space.") from None
+            raise BladTrasy(507, "dysk", "Nie da się zapisać obrazu na dysku, sprawdź wolne miejsce.",
+                            "The image could not be saved to disk, check free space.") from None
         except BaseException:
             usun_obrazy(out)
             raise
@@ -508,8 +512,8 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
         else:
             adresaci, tresc, ostrzezenia = adresaci_z(body, koordynator)
         if m.komendy.parsuj(body.tekst) or m.komendy.parsuj(tresc):
-            raise BladTrasy(409, "komenda", "To komenda — panel wykonuje ją sam (POST /komendy), nie wysyła jej agentowi.",
-                            "This is a command — the panel runs it itself (POST /komendy) instead of sending it to the agent.")
+            raise BladTrasy(409, "komenda", "To komenda: panel wykonuje ją sam (POST /komendy), nie wysyła jej agentowi.",
+                            "This is a command: the panel runs it itself (POST /komendy) instead of sending it to the agent.")
         if not tresc and not obrazy and not zalaczniki:
             raise BladTrasy(409, "pusta_tresc", "Nie ma czego wysłać.", "There is nothing to send.")
         ostrzezenia = [o for o in ostrzezenia if o != "pusta_tresc"]
@@ -557,22 +561,26 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
             n = nazwy()
             przed = {c["agent"] for c in db.czlonkowie(wid, rola="rozmowa")}
             dane: dict[str, Any] = {}
-            dopisany = None
-            if body.tryb_kolejki == "dopisz":
-                akt = None
-                if len(adresaci) == 1 and not obrazy:
-                    akt = next((p for p in db.przebiegi_watku(wid, aktywne=True)
-                                if p["agent"] == adresaci[0] and (p.get("rola") or "rozmowa") == "rozmowa"
-                                and p["stan"] in ("pracuje", "czeka_na_ture", "przyjety") and p.get("run_id")), None)
-                if akt is not None:
+            dopisane: dict[str, dict] = {}          # adresat → przebieg dopisku do jego trwającej pracy
+            if body.tryb_kolejki == "dopisz":       # Enter w trakcie pracy: od razu do trwającej tury, jak w terminalu
+                for a in adresaci:
+                    cel, powod = rej.do_dopisania(wid, a)
+                    if cel is None:
+                        if powod:                   # agent pracuje, ale dopisać się nie da: czeka w kolejce z powodem
+                            ostrzezenia.append(f"dopisz_niemozliwe:{powod}")
+                        continue
+                    tekst_a = m.kontekst.prosba_wlasciciela(prosba, inni=[x for x in adresaci if x != a], nazwy=n)
                     try:
-                        dopisany = await rej.dopisz(akt["id"], prosba)
-                        dane["dopisane_do"] = akt["id"]
+                        if cel.get("zaplecze") == "omp":
+                            dopisane[a] = await rej.dopisz_omp(cel["id"], tekst_a, media=[o["path"] for o in obrazy])
+                        else:
+                            dopisane[a] = await rej.dopisz(cel["id"], tekst_a)
                     except przebiegi.Blad:
-                        ostrzezenia.append(f"dopisz_niemozliwe:{adresaci[0]}")
+                        ostrzezenia.append("dopisz_niemozliwe:odmowa")
                     sprawdz_watek(db.watek(wid))    # usunięty na stałe w trakcie steera: 404 (w koszu: wpis zostaje)
-                else:
-                    ostrzezenia.append(f"dopisz_niemozliwe:{','.join(adresaci)}")
+                cele = [q["dopisany_do"] for q in dopisane.values() if q.get("dopisany_do")]
+                if cele:
+                    dane["dopisane_do"] = cele[0]
             if body.odpowiedz_na and ochrona.WPIS_RE.fullmatch(body.odpowiedz_na):
                 dane["odpowiedz_na"] = body.odpowiedz_na
             w = db.dodaj_wpis(wid, rodzaj="wlasciciel", tekst=body.tekst, tresc=tresc, adresaci=adresaci, tryb=tryb,
@@ -595,14 +603,14 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
             for a in adresaci:
                 db.zapewnij_czlonka(wid, a)
         nowe: list[dict] = []
-        if dopisany is not None:
-            nowe.append(db.zmien_przebieg(dopisany["id"], wpis_id=w["id"]))
-        else:
-            for a in adresaci:
-                tekst_a = m.kontekst.prosba_wlasciciela(prosba, inni=[x for x in adresaci if x != a], nazwy=n)
-                nowe.append(rej.zlec(watek_id=wid, wpis_id=w["id"], agent=a, prosba=tekst_a,
-                                     obrazy=[{"path": o["path"], "mime": o["mime"]} for o in obrazy],
-                                     lancuch_id=w["id"], nadzorowany=a != koordynator))
+        for a in adresaci:
+            if a in dopisane:
+                nowe.append(db.zmien_przebieg(dopisane[a]["id"], wpis_id=w["id"]))
+                continue
+            tekst_a = m.kontekst.prosba_wlasciciela(prosba, inni=[x for x in adresaci if x != a], nazwy=n)
+            nowe.append(rej.zlec(watek_id=wid, wpis_id=w["id"], agent=a, prosba=tekst_a,
+                                 obrazy=[{"path": o["path"], "mime": o["mime"]} for o in obrazy],
+                                 lancuch_id=w["id"], nadzorowany=a != koordynator))
         if not watek.get("tytul") and watek.get("tytul_zrodlo", "auto") == "auto":
             tytul = m.rozmowy.tytul_z_tresci(tresc, obrazy=len(obrazy), at=w["utworzony_at"])
             if tytul:
@@ -707,8 +715,8 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
         db, rej = sil.db, sil.rejestr
         trwa = praca_trwa(sil, wid)
         if trwa is not None and praca is None:
-            raise BladTrasy(409, "praca_trwa", "W tej rozmowie trwa praca — zatrzymać ją czy zostawić?",
-                            "Work is running in this conversation — stop it or leave it?", **trwa)
+            raise BladTrasy(409, "praca_trwa", "W tej rozmowie trwa praca: zatrzymać ją czy zostawić?",
+                            "Work is running in this conversation: stop it or leave it?", **trwa)
         for p in db.przebiegi_watku(wid, aktywne=True):
             if p["stan"] == "kolejka" or (p["stan"] == "dopisany" and praca != "zostaw"):
                 await rej.anuluj(p["id"], dopisany=True)

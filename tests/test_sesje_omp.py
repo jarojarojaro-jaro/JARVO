@@ -1,11 +1,17 @@
-"""jarvo/sesje_omp.py z atrapą `omp`: tura JSONL, błąd, SIGTERM, trzymana dzierżawa = brak tury, partia,
-powiadomienie o zajętej sesji, terminal z blokadą, polecenie `jarvo sesja`."""
+"""jarvo/sesje_omp.py z atrapą `omp --mode rpc` (tests/atrapa_omp.py): tura, błąd, stop, trzymana dzierżawa = brak
+tury, partia, powiadomienie o zajętej sesji, terminal z blokadą, dopisek w trakcie tury (steer), niedostarczony
+steer wraca, /compact, licznik, bezczynny proces się zamyka, terminal prosi o sesję, padnięty proces, restart
+skrzynki w trakcie tury, polecenie `jarvo sesja`."""
 from __future__ import annotations
 
 import json
 import os
+import signal
+import subprocess
+import sys
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -17,6 +23,7 @@ fcntl = pytest.importorskip("fcntl")
 from jarvo import cli, sesje_omp as so  # noqa: E402
 
 om = so.rdzen
+REPO = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture
@@ -24,16 +31,20 @@ def at(tmp_path, monkeypatch):
     k = tmp_path / "atrapa"
     monkeypatch.setenv("ATRAPA_OMP", str(k))
     monkeypatch.setenv("JARVO_OMP", str(atrapa_omp.zrob(k)))
+    monkeypatch.setattr(so, "BEZCZYNNA_S", 0.0)        # jak dawna tura `-p`: proces kończy się, gdy nic nie czeka
     om._dzierzawy.clear()
     return k
 
 
+def surowy_wpis(tmp_path, **panel):
+    return {"nazwa": "Kernel", "skrzynka": str(tmp_path / "k" / "skrzynka"), "czat": "-1001", "watek": "7",
+            "panel": {"zaplecze": "omp", "sesje": str(tmp_path / "k" / "sesje"), "sesja": "01a13b13-14db",
+                      "cwd": str(tmp_path), "omp_arg": ["--no-context-files"], "potwierdzenia": True, **panel}}
+
+
 @pytest.fixture
 def w(tmp_path, at):
-    surowy = {"nazwa": "Kernel", "skrzynka": str(tmp_path / "k" / "skrzynka"), "czat": "-1001", "watek": "7",
-              "panel": {"zaplecze": "omp", "sesje": str(tmp_path / "k" / "sesje"), "sesja": "01a13b13-14db",
-                        "cwd": str(tmp_path), "omp_arg": ["--no-context-files"], "potwierdzenia": True}}
-    wpis = om.wpis_z("gpu", surowy, tmp_path)
+    wpis = om.wpis_z("gpu", surowy_wpis(tmp_path), tmp_path)
     (tmp_path / "k" / "sesje").mkdir(parents=True)
     wpis.katalogi()
     return wpis
@@ -53,8 +64,18 @@ def wywolania(at):
     return [json.loads(l) for l in p.read_text().splitlines()] if p.exists() else []
 
 
+def procesy(at):
+    return [a for a in wywolania(at) if "rpc" in a]
+
+
+def komendy(at, typ=None):
+    p = at / "rpc.jsonl"
+    wszystkie = [json.loads(l) for l in p.read_text().splitlines()] if p.exists() else []
+    return [c for c in wszystkie if typ is None or c["type"] == typ]
+
+
 def tury(at):
-    return [a for a in wywolania(at) if "-p" in a]
+    return komendy(at, "prompt")
 
 
 def telegramowa(w, nazwa, tekst="z telefonu"):
@@ -62,16 +83,32 @@ def telegramowa(w, nazwa, tekst="z telefonu"):
                                        "chat_id": "-1001", "watek": "7", "media": []})
 
 
+def czekaj(warunek, czas=15.0, opis=""):
+    koniec = time.time() + czas
+    while time.time() < koniec:
+        if warunek():
+            return
+        time.sleep(0.05)
+    raise AssertionError(f"nie doczekałem się: {opis}")
+
+
+def w_tle(w, tg=None):
+    t = threading.Thread(target=so.skrzynka, args=(w, tg or Telegram()), daemon=True)
+    t.start()
+    return t
+
+
 def test_tura_z_panelu(w, at):
+    (w.nowe / "a.png").write_bytes(b"\x89PNG obraz")
     om.wyslij(w, "sprawdź GPU", "k1", media=[str(w.nowe / "a.png")])
     tg = Telegram()
     assert so.skrzynka(w, tg) == 0
-    (argv,) = tury(at)
-    i = argv.index("--session-dir")
-    assert argv[i + 1] == str(w.sesje) and argv[argv.index("--resume") + 1] == w.sesja
-    assert argv[argv.index("--mode") + 1] == "json" and "--no-context-files" in argv and argv[-1] == f"@{w.nowe}/a.png"
-    tresc = argv[argv.index("--mode") + 2]
-    assert "[Panel · gpu · " in tresc and "sprawdź GPU" in tresc and "[[czeka-na-tak]]" in tresc
+    (argv,) = procesy(at)
+    assert argv[argv.index("--session-dir") + 1] == str(w.sesje) and argv[argv.index("--resume") + 1] == w.sesja
+    assert argv[argv.index("--mode") + 1] == "rpc" and "--no-ui" in argv and "--no-context-files" in argv
+    (p,) = tury(at)
+    assert "[Panel · gpu · " in p["message"] and "sprawdź GPU" in p["message"] and "[[czeka-na-tak]]" in p["message"]
+    assert f"(załącznik: {w.nowe}/a.png)" in p["message"] and p["images"] == 1
     d = json.loads((w.zrobione / "panel-k1.json").read_text())
     assert d["odpowiedz"] == "Gotowe, zrobione." and om.przebieg(w, "k1")["stan"] == "gotowe"
     plik = w.tura / f"{d['tura']}.jsonl"
@@ -80,7 +117,8 @@ def test_tura_z_panelu(w, at):
     assert zdarzenia[0] == {"typ": "narzedzie", "nazwa": "bash", "intencja": "Sprawdzam GPU"}
     assert zdarzenia[-1]["ok"] is True and "SEKRET" not in plik.read_text()
     assert tg.wyslane == [("🖥 sprawdź GPU", "-1001", "7"), ("Kernel\n\nGotowe, zrobione.", "-1001", "7")]
-    assert om.czytaj_stan(w)["tura"] is None and om.stan(w)["stan"] == "wolny"
+    s = om.czytaj_stan(w)
+    assert s["tura"] is None and s["rpc"] is None and om.stan(w)["stan"] == "wolny"
 
 
 def test_bez_lustra_i_z_telegrama(w, at):
@@ -91,7 +129,7 @@ def test_bez_lustra_i_z_telegrama(w, at):
     telegramowa(w, "1.json")
     so.skrzynka(w, tg)
     assert tg.wyslane == [("Kernel\n\nGotowe, zrobione.", "-1001", "7")]
-    assert "[Telegram · gpu" in tury(at)[-1][tury(at)[-1].index("--mode") + 2]
+    assert "[Telegram · gpu" in tury(at)[-1]["message"]
 
 
 def test_blad_tury(w, at):
@@ -104,13 +142,13 @@ def test_blad_tury(w, at):
     assert tg.wyslane[0][0].startswith("⚠️ Kernel: tura nie wyszła")
 
 
-def test_partia_po_szesc(w, at):
+def test_partia_po_szesc_w_jednym_procesie(w, at):
     for i in range(8):
         telegramowa(w, f"{i}.json", f"wiadomość {i}")
     so.skrzynka(w, Telegram())
     t = tury(at)
-    assert len(t) == 2
-    assert "wiadomość 6/6" in t[0][t[0].index("--mode") + 2] and "wiadomość 2/2" in t[1][t[1].index("--mode") + 2]
+    assert len(t) == 2 and len(procesy(at)) == 1
+    assert "wiadomość 6/6" in t[0]["message"] and "wiadomość 2/2" in t[1]["message"]
     assert len(list(w.zrobione.glob("*.json"))) == 8
 
 
@@ -119,7 +157,7 @@ def test_trzymana_dzierzawa_bez_tury(w, at):
     om.wyslij(w, "x", "k1")
     tg = Telegram()
     so.skrzynka(w, tg)
-    assert tury(at) == [] and (w.nowe / "panel-k1.json").exists() and tg.wyslane == []
+    assert procesy(at) == [] and (w.nowe / "panel-k1.json").exists() and tg.wyslane == []
     stary = time.time() - 300
     os.utime(w.nowe / "panel-k1.json", (stary, stary))
     so.skrzynka(w, tg)
@@ -130,30 +168,238 @@ def test_trzymana_dzierzawa_bez_tury(w, at):
     assert len(tury(at)) == 1 and om.czytaj_stan(w)["powiadomiono"] is None
 
 
-def test_blokada_terminala_bez_tury(w, at):
+def test_terminal_trzyma_blokade(w, at):
+    om.wyslij(w, "x", "k1")
+    om.komenda(w, "compact", "", "c1")
+    with w.blokada.open("a") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        assert so.skrzynka(w, Telegram()) == 0
+        assert om.stan(w)["stan"] == "terminal"
+    assert procesy(at) == [] and om.przebieg(w, "k1")["stan"] == "kolejka"
+    assert om.wynik_komendy(w, "c1")["stan"] == "kolejka"
+
+
+def test_proba_panelu_nie_zatrzymuje_skrzynki(w, at):
+    """InstaBox 20.11: stan() panelu (próbny flock) trafił w chwilę startu skrzynki, ta uznała sesję za zajętą
+    i skończyła się bez tury. Krótko trzymana blokada (tu 0,2 s, jak powolna próba) nie może tego zrobić."""
     om.wyslij(w, "x", "k1")
     with w.blokada.open("a") as f:
         fcntl.flock(f, fcntl.LOCK_EX)
-        so.skrzynka(w, Telegram())
-    assert tury(at) == [] and om.przebieg(w, "k1")["stan"] == "kolejka"
+        watek = w_tle(w)
+        time.sleep(0.2)
+        fcntl.flock(f, fcntl.LOCK_UN)
+    watek.join(15)
+    assert om.przebieg(w, "k1")["stan"] == "gotowe" and len(tury(at)) == 1
 
 
-def test_sigterm_zatrzymuje_ture(w, at):
+def test_stop_z_panelu(w, at):
     (at / "tryb").write_text("spi")
     om.wyslij(w, "długie", "k1")
-    watek = threading.Thread(target=so.skrzynka, args=(w, Telegram()))
-    watek.start()
-    for _ in range(100):
-        if om.stan(w)["stan"] == "pracuje" and (at / "spi").exists():
-            break
-        time.sleep(0.1)
+    watek = w_tle(w)
+    czekaj(lambda: om.stan(w)["stan"] == "pracuje" and (at / "spi").exists(), opis="tura śpi")
     assert om.przebieg(w, "k1")["stan"] == "pracuje"
     assert om.zatrzymaj(w) is True
     watek.join(20)
+    assert not watek.is_alive()
     p = om.przebieg(w, "k1")
     assert p["stan"] == "blad" and "zatrzymana" in p["blad"]
+    assert komendy(at, "abort_and_restore_queue")                  # abort przez RPC, proces nie był zabijany
     zdarzenia, _ = om.ogon(w, p["tura"])
     assert zdarzenia[-1]["typ"] == "koniec" and zdarzenia[-1]["ok"] is False
+
+
+def test_dopisek_w_trakcie_tury(w, at):
+    (at / "tryb").write_text("czekaj")
+    om.wyslij(w, "zrób raport", "k1")
+    tg = Telegram()
+    watek = w_tle(w, tg)
+    czekaj(lambda: (at / "czeka").exists() and om.stan(w)["stan"] == "pracuje", opis="tura czeka na steer")
+    om.wyslij(w, "zwykła, po turze", "k3")                          # bez steer: czeka na własną turę
+    r = om.dopisz(w, "i dodaj wykres", "k2")
+    assert r["nowy"] and r["tryb"] == "steer"
+    czekaj(lambda: om.przebieg(w, "k2")["stan"] == "wlaczony", opis="dopisek w turze")
+    tura = om.przebieg(w, "k1")["tura"]
+    assert om.przebieg(w, "k2")["tura"] == tura
+    watek.join(20)
+    (steer,) = komendy(at, "steer")
+    assert steer["message"].startswith(so.WSTEP_DOPISKU) and "#k2 · wiadomość 1/1]\ni dodaj wykres" in steer["message"]
+    assert om.przebieg(w, "k1")["stan"] == "gotowe"
+    p2 = om.przebieg(w, "k2")
+    assert p2 == {**p2, "stan": "wlaczony", "tura": tura} and p2["odpowiedz"] == "Gotowe, zrobione. Dopiski: 1."
+    assert len(tury(at)) == 2 and "zwykła, po turze" in tury(at)[1]["message"]
+    assert om.przebieg(w, "k3")["stan"] == "gotowe" and om.przebieg(w, "k3")["tura"] != tura
+    assert tg.wyslane[0] == ("🖥 zrób raport\n\ni dodaj wykres", "-1001", "7")
+    assert om.dopisz(w, "po wszystkim", "k4")["tryb"] == "kolejka"
+
+
+def test_niedostarczony_dopisek_wraca_jako_tura(w, at):
+    (at / "tryb").write_text("nie_dostarczaj")
+    om.wyslij(w, "pierwsza", "k1")
+    watek = w_tle(w)
+    czekaj(lambda: (at / "czeka").exists(), opis="tura czeka")
+    om.dopisz(w, "spóźniony", "k2")
+    watek.join(20)
+    (usun,) = komendy(at, "remove_queued_message")
+    assert usun["queue"] == "steering" and "spóźniony" in usun["message"]
+    p1, p2 = om.przebieg(w, "k1"), om.przebieg(w, "k2")
+    assert p1["stan"] == p2["stan"] == "gotowe" and p1["tura"] != p2["tura"]
+    assert "spóźniony" in tury(at)[1]["message"]
+
+
+def test_compact_i_licznik(w, at):
+    assert om.komendy_omp(w) == [{"nazwa": "compact", "opis": om.KOMENDY["compact"][0], "aliasy": ["compress"]}]
+    assert om.licznik(w) == om.LICZNIK_PUSTY
+    om.wyslij(w, "x", "k1")
+    so.skrzynka(w, Telegram())
+    lic = om.licznik(w)
+    assert (lic["model"], lic["kontekst"], lic["okno"], lic["procent"]) == ("atrapa/model-x", 5000, 200000, 2.5)
+    assert (lic["wejscie"], lic["wyjscie"], lic["cache_odczyt"], lic["cache_zapis"]) == (100, 10, 900, 50)
+    r = om.komenda(w, "/compress", "skup się na GPU", "c1")
+    assert r["nowy"] and om.komenda(w, "compact", "", "c1")["nowy"] is False
+    assert (w.nowe / om.BUDZIK).exists() and om.czekajace(w) == []    # budzik nie jest wiadomością
+    assert om.wynik_komendy(w, "c1")["stan"] == "kolejka"
+    so.skrzynka(w, Telegram())
+    (c,) = komendy(at, "compact")
+    assert c["customInstructions"] == "skup się na GPU"
+    wk = om.wynik_komendy(w, "c1")
+    assert wk["stan"] == "gotowe" and wk["wynik"] == "Kontekst skompresowany: było 5 000 tokenów, jest 1 200 (0,6% okna)."
+    assert om.licznik(w)["kontekst"] == 1200
+    (at / "compact_blad").write_text("")
+    om.komenda(w, "compact", "", "c2")
+    so.skrzynka(w, Telegram())
+    wk = om.wynik_komendy(w, "c2")
+    assert wk["stan"] == "blad" and "Nothing to compact" in wk["blad"]
+    with pytest.raises(ValueError):
+        om.komenda(w, "reboot", "", "c3")
+    assert om.wynik_komendy(w, "nie-ma")["stan"] == "brak"
+
+
+def test_licznik_z_pliku_sesji(w, at):
+    om.wyslij(w, "x", "k1")
+    so.skrzynka(w, Telegram())
+    (w.skrzynka / om.PLIK_LICZNIKA).unlink()
+    lic = om.licznik(w)
+    assert (lic["model"], lic["kontekst"], lic["okno"], lic["procent"]) == ("atrapa/model-x", 1050, 0, 0.0)
+    om.zapisz_atomowo(w.skrzynka / om.PLIK_LICZNIKA, {**om.LICZNIK_PUSTY, "model": "atrapa/model-x", "okno": 200000})
+    stary = time.time() - 600
+    os.utime(w.skrzynka / om.PLIK_LICZNIKA, (stary, stary))           # terminal pracował po skrzynce
+    lic = om.licznik(w)
+    assert (lic["kontekst"], lic["okno"], lic["procent"], round(lic["koszt"], 2)) == (1050, 200000, 0.5, 0.01)
+    (w.skrzynka / om.PLIK_LICZNIKA).write_text("zepsuty")
+    assert om.licznik(w)["kontekst"] == 1050
+
+
+def test_bezczynny_proces_zamyka_sie(w, at, monkeypatch):
+    monkeypatch.setattr(so, "BEZCZYNNA_S", 1.5)
+    om.wyslij(w, "a", "k1")
+    watek = w_tle(w)
+    czekaj(lambda: om.przebieg(w, "k1")["stan"] == "gotowe", opis="pierwsza tura")
+    s = om.stan(w)
+    assert s["stan"] == "wolny" and s["proces_od"] and watek.is_alive()   # sesja w procesie RPC, nie „terminal”
+    om.wyslij(w, "b", "k2")
+    czekaj(lambda: om.przebieg(w, "k2")["stan"] == "gotowe", opis="druga tura w tym samym procesie")
+    watek.join(10)
+    assert not watek.is_alive() and len(procesy(at)) == 1 and len(tury(at)) == 2
+    assert om.czytaj_stan(w)["rpc"] is None and not om.blokada_zajeta(w) and om.stan(w)["proces_od"] is None
+
+
+def test_zamykaj_bezczynna_min_z_wpisu(tmp_path, at):
+    wpis = om.wpis_z("gpu", surowy_wpis(tmp_path, zamykaj_bezczynna_min=30), tmp_path)
+    assert so.Sesja(wpis).bezczynna_s == 1800
+
+
+def test_przed_tura_i_nowy_system(tmp_path, at, monkeypatch):
+    """Kernel: `kernel.py system` przed każdą turą składa system.md; zmieniony system = nowy proces omp (omp czyta
+    `--append-system-prompt` przy starcie), niezmieniony = ten sam proces."""
+    monkeypatch.setattr(so, "BEZCZYNNA_S", 60.0)
+    zrodlo, system, licz = tmp_path / "zasady.md", tmp_path / "system.md", tmp_path / "hak.txt"
+    zrodlo.write_text("v1")
+    hak = ("import pathlib, sys; z, s, n = map(pathlib.Path, sys.argv[1:]); n.write_text((n.read_text() if n.exists()"
+           " else '') + '.'); t = z.read_text(); (s.read_text() if s.exists() else None) != t and s.write_text(t)")
+    wpis = om.wpis_z("gpu", surowy_wpis(tmp_path, omp_arg=["--append-system-prompt", str(system)],
+                                        przed_tura=[sys.executable, "-c", hak, str(zrodlo), str(system), str(licz)]),
+                     tmp_path)
+    (tmp_path / "k" / "sesje").mkdir(parents=True)
+    wpis.katalogi()
+    om.wyslij(wpis, "k1", "k1")
+    watek = w_tle(wpis)
+    czekaj(lambda: om.przebieg(wpis, "k1")["stan"] == "gotowe", opis="k1")
+    om.wyslij(wpis, "k2", "k2")
+    czekaj(lambda: om.przebieg(wpis, "k2")["stan"] == "gotowe", opis="k2")
+    assert system.read_text() == "v1" and licz.read_text() == ".." and len(procesy(at)) == 1
+    time.sleep(0.05)
+    zrodlo.write_text("v2 z nowym arsenałem")
+    om.wyslij(wpis, "k3", "k3")
+    czekaj(lambda: om.przebieg(wpis, "k3")["stan"] == "gotowe", opis="k3")
+    assert system.read_text() == "v2 z nowym arsenałem" and licz.read_text() == "..." and len(procesy(at)) == 2
+    (wpis.skrzynka / om.PLIK_ZWOLNIJ).write_text(str(os.getpid()))
+    watek.join(10)
+    assert not watek.is_alive()
+
+
+def test_terminal_prosi_skrzynke_o_sesje(w, at, monkeypatch):
+    monkeypatch.setattr(so, "BEZCZYNNA_S", 60.0)
+    om.wyslij(w, "a", "k1")
+    watek = w_tle(w)
+    czekaj(lambda: om.przebieg(w, "k1")["stan"] == "gotowe", opis="tura")
+    start = time.time()
+    assert so.terminal(w, [], po_wyjsciu=lambda *a: None) == 0
+    assert time.time() - start < 20 and not watek.is_alive()
+    assert not (w.skrzynka / om.PLIK_ZWOLNIJ).exists() and wywolania(at)[-1][:2] == ["--session-dir", str(w.sesje)]
+
+
+def test_proces_padl(w, at):
+    (at / "tryb").write_text("padnij")
+    om.wyslij(w, "x", "k1")
+    so.skrzynka(w, Telegram())
+    p = om.przebieg(w, "k1")
+    assert p["stan"] == "blad" and "omp padł" in p["blad"] and "kod 3" in p["blad"]
+    (at / "tryb").write_text("ok")
+    om.wyslij(w, "y", "k2")
+    so.skrzynka(w, Telegram())
+    assert om.przebieg(w, "k2")["stan"] == "gotowe" and len(procesy(at)) == 2
+
+
+def test_restart_skrzynki_w_trakcie_tury(w, at, tmp_path):
+    (at / "tryb").write_text("spi")
+    om.wyslij(w, "długie", "k1")
+    kod = ("import json, signal, sys; from pathlib import Path; sys.path.insert(0, sys.argv[3]);"
+           "from jarvo import sesje_omp as so;"
+           "w = so.rdzen.wpis_z('gpu', json.loads(sys.argv[1]), Path(sys.argv[2]));"
+           "signal.signal(signal.SIGTERM, so.koniec_uslugi); so.skrzynka(w, lambda *a: True)")
+    usluga = subprocess.Popen([sys.executable, "-c", kod, json.dumps(surowy_wpis(tmp_path)), str(tmp_path), str(REPO)],
+                              cwd=REPO)
+    try:
+        czekaj(lambda: (at / "spi").exists() and om.stan(w)["stan"] == "pracuje", opis="tura usługi")
+        omp = om.czytaj_stan(w)["rpc"]["pid"]
+        tura = om.czytaj_stan(w)["tura"]["id"]
+        usluga.send_signal(signal.SIGTERM)
+        assert usluga.wait(20) == 128 + signal.SIGTERM
+    finally:
+        usluga.kill()
+    assert not om.zyje(omp) and (w.nowe / "panel-k1.json").exists()   # wiadomość czeka, omp zamknięty
+    zdarzenia, _ = om.ogon(w, tura)
+    assert zdarzenia[-1]["typ"] == "koniec" and zdarzenia[-1]["ok"] is False
+    (at / "tryb").write_text("ok")
+    so.skrzynka(w, Telegram())
+    assert om.przebieg(w, "k1")["stan"] == "gotowe"
+
+
+def test_sierota_po_padnietej_skrzynce(w, at):
+    sierota = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)", "omp", "--session-dir", str(w.sesje)])
+    threading.Thread(target=sierota.wait, daemon=True).start()     # jak init: zombie znika od razu
+    try:
+        (w.tura / "20261117-120000-abcdef.jsonl").write_text('{"typ": "delta", "tekst": "A"}\n')
+        om.zapisz_stan(w, rpc={"pid": sierota.pid, "skrzynka": 999999, "od": 1},
+                       tura={"id": "20261117-120000-abcdef", "pid": sierota.pid, "start": 1, "klucze": ["k1"]})
+        om.wyslij(w, "x", "k1")
+        so.skrzynka(w, Telegram())
+        assert sierota.wait(10) != 0
+    finally:
+        sierota.kill()
+    zdarzenia, _ = om.ogon(w, "20261117-120000-abcdef")
+    assert zdarzenia[-1] == {"typ": "koniec", "ok": False, "kod": 1, "odpowiedz": ""}
+    assert om.przebieg(w, "k1")["stan"] == "gotowe"
 
 
 def test_terminal(w, at):

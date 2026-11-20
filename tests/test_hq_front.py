@@ -183,7 +183,7 @@ def test_przewijane_pola_bez_kontekstu_nakladania():
     """Menu i podpowiedzi to `position: fixed` w środku rozmowy i listy: mask, filter, transform, contain albo
     will-change na ich przodku przycina je albo chowa pod kompozytorem (menu karty pliku nad kompozytorem znikało)."""
     import re
-    for klasa in (".j-watek-s", ".j-watek", ".j-os", ".j-lista", ".j-pasek-l"):
+    for klasa in (".j-watek-s", ".j-watek", ".j-os", ".j-lista", ".j-pasek-l", ".j-pasek-s"):
         for m in re.finditer(r"(?m)^([^{}@/]*)\{([^}]*)\}", CSS):
             sel = [s.strip() for s in m.group(1).split(",")]
             if klasa in sel:
@@ -391,13 +391,18 @@ def test_pliki_bez_logowania_bez_adresu_file():
 def test_stopka_paska_bez_drugiego_wejscia_do_ustawien():
     """Uwaga właściciela 18.11 („JARO” z kropką i zębatką obok pozycji Ustawienia to masło maślane): stopka paska
     nie ma żadnego przycisku, tylko stan połączenia słowem (role=status) i odznakę aktualizacji; Ustawienia są jedną
-    pozycją nawigacji, także bez rozmówców."""
+    pozycją nawigacji, także bez rozmówców. 20.11: Mózg i Ustawienia przypięte do rogu (poza przewijanym środkiem
+    `j-pasek-s`, zaraz nad stopką), Inne rozmowy w środku pod rozmówcami."""
     t = _tekst("30-pasek.js")
     stopka = t.split("function StopkaPaska()", 1)[1].split("\nfunction ", 1)[0]
     stan = t.split("function StanPolaczenia(", 1)[1].split("\nfunction ", 1)[0]
     assert "<button" not in stopka + stan and "Przycisk" not in stopka + stan and "j-ja" not in stopka
     assert "<${StanPolaczenia}/>" in stopka and 'role="status"' in stan and 'T("polaczenie.krotko")' in stan
-    assert "${!saRozmowcy && html`<${NawigacjaCentrum} trasa=${trasa}/>`}" in t
+    pasek = t.split("function Pasek(", 1)[1]
+    assert pasek.count("<${NawigacjaCentrum} trasa=${trasa}/>") == 1
+    srodek = pasek.split('<div class="j-pasek-s"', 1)[1].split("<${NawigacjaCentrum}", 1)[0]
+    assert "<${ListaRozmowcow}" in srodek and 'class="j-lista"' in srodek and 'class="j-inne"' in srodek
+    assert "<${NawigacjaCentrum} trasa=${trasa}/>\n    <${StopkaPaska}/>" in pasek
     assert '["ustawienia", T("pasek.ustawienia"), "Mod+,"]' in t
     assert 'ikona="gear"' not in _tekst("90-app.js") and "j-gora-ust" not in _tekst("90-app.js")   # telefon też
 

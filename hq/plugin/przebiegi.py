@@ -47,6 +47,11 @@ Stany (nazwy dokładnie jak w `przebiegi.stan`): `kolejka` (powód `start` | `za
   konflikt, tura z osi czasu), restart (także dopisek sprzed restartu: steer mógł nie dojść do bramy), a przy `zatrzymane`/`przerwane` każdy niezwrócony (Hermes przy twardym
   przerwaniu gubi niedostarczony steer) = kontrola szuka wiersza `steer` w state.db: jest → `wlaczony`, nie ma →
   `kolejka(wstrzymane)`.
+  Panel wysyła każdą wiadomość z `tryb_kolejki: "dopisz"` (Enter w trakcie pracy = dopisek, jak w terminalu):
+  `do_dopisania` wskazuje trwający przebieg członka albo powód, czemu wiadomość czeka w kolejce (`zgoda`: brama
+  przyjmuje steer tylko od przebiegu `running`; `zatrzymywanie`; `wysylanie`; `terminal`). Sesja omp: `dopisz_omp`
+  (`omp_sesje.dopisz`, steer RPC skrzynki); skrzynka mówi `wlaczony` albo puszcza dopisek jako własną turę
+  (`dopisany` → `przyjety` → `pracuje` → koniec).
 - **Ponów**: nowy przebieg (`ponowienie_z`); gdy nasz wiersz jest w state.db, krótkie „Poprzednia tura nie
   dokończyła się (…). Odpowiedz jeszcze raz na moją ostatnią wiadomość.”, inaczej cała prośba z nowym blokiem.
   Drugie Ponów tego samego przebiegu zwraca ponowienie, które trwa albo się udało (bez drugiej wysyłki); po
@@ -84,7 +89,9 @@ PRZEJSCIA: dict[str, set[str]] = {
     "czeka_na_ture": {"czeka_na_ture", "pracuje", "czeka_na_zgode", "zatrzymywanie"} | _K,
     "czeka_na_zgode": {"czeka_na_zgode", "pracuje", "zatrzymywanie"} | _K,
     "zatrzymywanie": {"zatrzymywanie"} | _K,
-    "dopisany": {"dopisany", "kolejka", "wlaczony", "anulowane"},
+    # `dopisany` → `przyjety`/`pracuje`/koniec tylko w omp: skrzynka nie wcisnęła dopisku w turę (skończyła się
+    # w międzyczasie), więc wiadomość idzie jako własna tura skrzynki (Hermes rozstrzyga dopisek przez kolejkę)
+    "dopisany": {"dopisany", "kolejka", "wlaczony", "anulowane", "przyjety", "pracuje"} | _K,
 }
 BRAMA_KONCOWE = {"completed", "failed", "cancelled", "interrupted"}
 ZDARZENIA_KONCOWE = {f"run.{s}" for s in BRAMA_KONCOWE}
@@ -420,6 +427,9 @@ class Rejestr:
         self._dziala = True
         for p in self.db.przebiegi_aktywne():
             if p["stan"] == "dopisany":
+                if p.get("zaplecze") == "omp":         # dopisek omp rozstrzyga skrzynka: śledzimy go dalej
+                    self._sledz_omp(p["id"])
+                    continue
                 # wiersz powstaje przed steerem: proces mógł paść, zanim steer doszedł do bramy, więc niezwrócony
                 # w `pending_steer` tekst nie znaczy, że agent go przeczytał (rozstrzyga wiersz `steer` w state.db)
                 self._sprzed_startu.add(p["id"])
@@ -749,11 +759,17 @@ class Rejestr:
                     p = self.db.przebieg(pid) or p
                 if s == "kolejka":
                     powod = "terminal" if st.get("terminal") else "kolejka"
-                    if p["stan"] == "przyjety" and p.get("powod") != powod:
+                    if p["stan"] == "dopisany":         # tura skończyła się przed dopiskiem: czeka jako własna tura
+                        teraz = self.zegar()
+                        self._przejdz(p, "przyjety", powod=powod, dopisany_do=None, wyslany_at=teraz, przyjety_at=teraz)
+                    elif p["stan"] == "przyjety" and p.get("powod") != powod:
                         self._zmien(p, powod=powod)
+                elif s == "wlaczony":                   # dopisek wszedł do trwającej tury skrzynki
+                    self._koniec(p, "wlaczony")
+                    return
                 elif s == "pracuje":
-                    if p["stan"] in ("przyjety", "czeka_na_ture"):
-                        self._przejdz(p, "pracuje")
+                    if p["stan"] in ("przyjety", "czeka_na_ture", "dopisany"):
+                        self._przejdz(p, "pracuje", **({"dopisany_do": None} if p["stan"] == "dopisany" else {}))
                 elif s == "gotowe":
                     if not dz.tekst and st.get("odpowiedz"):
                         dz.dopisz(str(st["odpowiedz"]))
@@ -890,7 +906,7 @@ class Rejestr:
             nastepna = teraz + float(e.ponow_za or 1) + random.uniform(0, 0.5)
             self._pierwszy_429[pid] = (pierwszy, nastepna)
             if teraz - pierwszy > LIMIT_429_S:
-                self._koniec(p, "blad", blad={"kod": "limit_bramy", "komunikat": "Jarvo ma teraz za dużo pracy naraz — spróbuj za chwilę."})
+                self._koniec(p, "blad", blad={"kod": "limit_bramy", "komunikat": "Jarvo ma teraz za dużo pracy naraz, spróbuj za chwilę."})
             else:
                 self._przejdz(p, "kolejka", powod="limit", nastepna_proba_at=nastepna)
             return
@@ -899,7 +915,7 @@ class Rejestr:
             limit = None if self.aktualizacja() else (BRAMA_MLODA_S if self.brama_mloda() else BRAMA_LIMIT_S)
             if limit is not None and teraz - pierwszy > limit:
                 self._pierwszy_blad.pop(pid, None)
-                self._koniec(p, "blad", blad={"kod": "brama_niedostepna", "komunikat": "Jarvo nie odpowiada — sprawdź stan."})
+                self._koniec(p, "blad", blad={"kod": "brama_niedostepna", "komunikat": "Jarvo nie odpowiada, sprawdź stan."})
             else:
                 odstep = ODSTEPY_BRAMY[min(max(int(p.get("proby") or 1) - 1, 0), len(ODSTEPY_BRAMY) - 1)]
                 self._przejdz(p, "kolejka", powod="brama", nastepna_proba_at=teraz + odstep)
@@ -1085,8 +1101,8 @@ class Rejestr:
     async def zgoda(self, pid: str, wybor: str, request_id: str) -> dict:
         p = self._wez(pid)
         z = p.get("zgoda") or {}
-        wygasla = Blad(409, "zgoda_wygasla", "Czas minął — polecenie nie zostało wykonane.",
-                       "Time is up — the command did not run.")
+        wygasla = Blad(409, "zgoda_wygasla", "Czas minął: polecenie nie zostało wykonane.",
+                       "Time is up: the command did not run.")
         if not z or z.get("request_id") != request_id or p["stan"] in STANY_KONCOWE:
             raise wygasla
         if z.get("wygasla") or self.zegar() >= float(z.get("wygasa_at") or 0):
@@ -1108,8 +1124,8 @@ class Rejestr:
                 if q and (q.get("zgoda") or {}).get("request_id") == request_id:
                     self._wygas(q)
                 raise wygasla from None
-            raise Blad(503, "brama", "Jarvo chwilowo nie odpowiada — spróbuj jeszcze raz.",
-                       "Jarvo is not responding right now — try again.") from None
+            raise Blad(503, "brama", "Jarvo chwilowo nie odpowiada, spróbuj jeszcze raz.",
+                       "Jarvo is not responding right now, try again.") from None
         except BaseException:
             self._odpowiadane.discard(request_id)
             raise
@@ -1223,8 +1239,8 @@ class Rejestr:
         wiersz usunięty, bez śladu w strumieniu."""
         p = self._wez(pid)
         if p["stan"] not in ("pracuje", "czeka_na_ture", "przyjety") or not p.get("run_id"):
-            raise Blad(409, "nieaktywny", "Agent teraz nie pracuje — wiadomość może poczekać w kolejce.",
-                       "The agent is not working right now — the message can wait in the queue.")
+            raise Blad(409, "nieaktywny", "Agent teraz nie pracuje, wiadomość może poczekać w kolejce.",
+                       "The agent is not working right now, the message can wait in the queue.")
         q = self.db.dodaj_przebieg(watek_id=p["watek_id"], wpis_id=wpis_id, agent=p["agent"], rola=p.get("rola") or "rozmowa",
                                    zrodlo="wlasciciel", lancuch_id=p["lancuch_id"], stan="dopisany", powod="",
                                    dopisany_do=pid, payload={"prosba": tekst, "obrazy": []})
@@ -1236,10 +1252,10 @@ class Rejestr:
             self.db.usun_przebieg(q["id"])
             if isinstance(e, self.BladBramy):
                 if e.kod in ("nieaktywny", "konflikt", "brak"):
-                    raise Blad(409, "nieaktywny", "Agent właśnie kończy — wiadomość może poczekać w kolejce.",
-                               "The agent is finishing — the message can wait in the queue.") from None
-                raise Blad(503, "brama", "Jarvo chwilowo nie odpowiada — spróbuj jeszcze raz.",
-                           "Jarvo is not responding right now — try again.") from None
+                    raise Blad(409, "nieaktywny", "Agent właśnie kończy, wiadomość może poczekać w kolejce.",
+                               "The agent is finishing, the message can wait in the queue.") from None
+                raise Blad(503, "brama", "Jarvo chwilowo nie odpowiada, spróbuj jeszcze raz.",
+                           "Jarvo is not responding right now, try again.") from None
             raise
         self._w_locie.discard(q["id"])
         self.log(f"jarvo-hq: przebieg {q['id']} {q['agent']} —→dopisany (do {pid})")
@@ -1259,8 +1275,8 @@ class Rejestr:
                     if a["agent"] == q["agent"] and (a.get("rola") or "rozmowa") == (q.get("rola") or "rozmowa")
                     and a["stan"] in ("pracuje", "czeka_na_ture", "przyjety") and a.get("run_id")), None)
         if akt is None:
-            raise Blad(409, "nieaktywny", "Agent teraz nie pracuje — wiadomość pójdzie normalnie.",
-                       "The agent is not working right now — the message will be sent normally.")
+            raise Blad(409, "nieaktywny", "Agent teraz nie pracuje, wiadomość pójdzie normalnie.",
+                       "The agent is not working right now, the message will be sent normally.")
         payload = dict(q.get("payload") or {})
         tekst = payload.get("prosba") or ""
         powod = q.get("powod") or "start"
@@ -1279,11 +1295,67 @@ class Rejestr:
             self._przejdz(q, "kolejka", powod=powod, dopisany_do=None, **({"payload": payload} if klucz else {}))
             self._budz()
             if isinstance(e, self.BladBramy):
-                raise Blad(409, "nieaktywny", "Agent właśnie kończy — wiadomość pójdzie normalnie.",
-                           "The agent is finishing — the message will be sent normally.") from None
+                raise Blad(409, "nieaktywny", "Agent właśnie kończy, wiadomość pójdzie normalnie.",
+                           "The agent is finishing, the message will be sent normally.") from None
             raise
         self._w_locie.discard(pid)
         return self._po_steerze(q)
+
+    def do_dopisania(self, wid: str, agent: str) -> tuple[dict | None, str]:
+        """Enter w trakcie pracy (trasa wiadomości z `tryb_kolejki: "dopisz"`): trwający przebieg członka, do którego
+        nowa wiadomość idzie od razu, albo (None, powód). Pusty powód = agent nic nie robi (zwykła wysyłka); inny =
+        czemu dopisać się nie da, a wiadomość czeka w kolejce: `zgoda` (brama nie przyjmuje steera, gdy tura czeka na
+        decyzję), `zatrzymywanie`, `wysylanie` (brama jeszcze nie przyjęła tury), `terminal` (sesję omp trzyma
+        terminal)."""
+        akt = [p for p in self.db.przebiegi_watku(wid, aktywne=True)
+               if p["agent"] == agent and (p.get("rola") or "rozmowa") == "rozmowa" and p.get("zrodlo") != "nadzor"
+               and p["stan"] in STANY_W_LIMICIE]
+        if not akt:
+            return None, ""
+        p = akt[0]
+        if p["stan"] in ("czeka_na_zgode", "zatrzymywanie"):
+            return None, "zgoda" if p["stan"] == "czeka_na_zgode" else "zatrzymywanie"
+        if p.get("zaplecze") == "omp":
+            if p["stan"] == "przyjety" and p.get("powod") == "terminal":
+                return None, "terminal"
+            return (p, "") if p["stan"] in ("przyjety", "pracuje") else (None, "wysylanie")
+        if p["stan"] in ("pracuje", "czeka_na_ture", "przyjety") and p.get("run_id"):
+            return p, ""
+        return None, "wysylanie"
+
+    async def dopisz_omp(self, pid: str, tekst: str, *, media: Iterable[str] = ()) -> dict:
+        """Dopisek do sesji omp (`omp_sesje.dopisz`, klucz = id nowego przebiegu): trwająca tura skrzynki dostaje go
+        jako `steer` (przebieg `dopisany`, potem `wlaczony` albo, gdy tura skończyła się przed nim, własna tura:
+        `przyjety` → `pracuje` → koniec; rozstrzyga `_omp_petla`); bez trwającej tury skrzynka kładzie go jak
+        zwykłą wiadomość (od razu `przyjety`). Wiersz powstaje przed zapisem do skrzynki; błąd zapisu = wiersz usunięty."""
+        p = self._wez(pid)
+        if p.get("zaplecze") != "omp" or p["stan"] not in ("przyjety", "pracuje"):
+            raise Blad(409, "nieaktywny", "Rozmówca teraz nie pracuje, wiadomość pójdzie normalnie.",
+                       "The partner is not working right now, the message will be sent normally.")
+        w = await self._w_tle(self._wpis_omp, p)
+        if w is None or getattr(w, "blad", ""):
+            raise Blad(409, "nieaktywny", "Rozmówca jest niedostępny.", "The partner is unavailable.")
+        q = self.db.dodaj_przebieg(watek_id=p["watek_id"], wpis_id=None, agent=p["agent"], rola="rozmowa",
+                                   zrodlo="wlasciciel", lancuch_id=p["lancuch_id"], stan="dopisany", powod="",
+                                   dopisany_do=pid, payload={"prosba": tekst, "obrazy": []}, zaplecze="omp")
+        try:
+            lustro = bool((self.db.rozmowca_watku(p["watek_id"]) or {}).get("lustro", True))
+            wynik = await self._w_tle(lambda: self.omp.dopisz(w, tekst, q["id"], list(media), lustro=lustro))
+        except Exception as exc:
+            self.db.usun_przebieg(q["id"])
+            self.log(f"jarvo-hq: przebieg {q['id']}: dopisek do skrzynki {type(exc).__name__}")
+            raise Blad(503, "skrzynka", "Nie udało się położyć wiadomości w skrzynce sesji.",
+                       "Could not put the message into the session inbox.") from None
+        self.log(f"jarvo-hq: przebieg {q['id']} {q['agent']} —→dopisany (do {pid}, {wynik.get('tryb') or '?'})")
+        if wynik.get("tryb") == "kolejka":
+            teraz = self.zegar()
+            q = self._przejdz(q, "przyjety", powod="kolejka", dopisany_do=None, wyslany_at=teraz, przyjety_at=teraz)
+        else:
+            q = self.db.przebieg(q["id"]) or q
+            self._nadaj_stan(q)
+        self._status_watku(q["watek_id"])
+        self._sledz_omp(q["id"])
+        return q
 
     def _po_steerze(self, q: Mapping) -> dict:
         """Steer przyjęty. Gdy tura celu skończyła się w trakcie (jej koniec pominął przebieg w locie), rozstrzyga od
@@ -1471,7 +1543,7 @@ class Rejestr:
         if stan == "gotowe":
             tekst = (dz.tekst if dz else "") or "gotowe"
         elif stan == "blad":
-            tekst = "błąd — " + str((p.get("blad") or {}).get("komunikat") or "")
+            tekst = "błąd: " + str((p.get("blad") or {}).get("komunikat") or "")
         elif stan == "zatrzymane":
             tekst = "zatrzymane"
         else:

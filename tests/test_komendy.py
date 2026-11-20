@@ -1,13 +1,16 @@
 """Komendy po „/” w panelu (hq/plugin/komendy.py, docs/HQ.md „Komendy”): komenda czy zwykły tekst (wektory wspólne
 z 33-komendy.js), komenda nigdy nie idzie do agenta (409 `komenda` na trasie wiadomości), `/model` (lista z bramy,
 wybór sesji w ciele `/v1/runs`, `--global` przez zapis profilu, omp przez model.json skrzynki), `/new` (rotacja sesji),
-`/stop`, `/usage`, nieznana i niedostępna komenda, powtórka z tym samym kluczem; z atrapą bramy i prawdziwym silnikiem."""
+`/stop`, `/usage`, nieznana i niedostępna komenda, powtórka z tym samym kluczem; z atrapą bramy i prawdziwym silnikiem;
+`/compact` i komendy skrzynki omp, licznik rozmowy (`GET /rozmowy/{id}/licznik`) i `/context`."""
 from __future__ import annotations
 
 import asyncio
 import json
 import secrets
+import sqlite3
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -44,10 +47,13 @@ def test_katalog_hermesa_dzialajace_najpierw_reszta_rejestru_z_powodem():
     assert "commands" not in nazwy                       # alias /help panelu, nie druga pozycja
     retry = next(c for c in kat if c["nazwa"] == "retry")
     assert not retry["dziala"] and not retry["panel"] and retry["powod"]
-    compress = next(c for c in kat if c["nazwa"] == "compress")
-    assert not compress["dziala"] and "kompresji" in compress["powod"]
-    omp = {c["nazwa"]: c for c in K.katalog("omp", rejestr)}
-    assert "retry" not in omp and not omp["new"]["dziala"] and omp["model"]["dziala"]
+    compact = next(c for c in kat if c["nazwa"] == "compact")
+    assert not compact["dziala"] and "kompresji" in compact["powod"] and "compress" in compact["aliasy"]
+    assert next(c for c in kat if c["nazwa"] == "context")["dziala"]
+    omp = {c["nazwa"]: c for c in K.katalog("omp", rejestr, [{"nazwa": "compact", "opis": "x"},
+                                                              {"nazwa": "export", "opis": "Eksport sesji"}])}
+    assert "retry" not in omp and not omp["new"]["dziala"] and omp["model"]["dziala"] and omp["compact"]["dziala"]
+    assert omp["export"]["dziala"] and not omp["export"]["panel"]       # komenda zgłoszona przez skrzynkę
 
 
 def test_znajdz_model():
@@ -83,7 +89,9 @@ def swiat(tmp_path):
     s.zapisy = []
     router = APIRouter(route_class=M.ochrona.Trasa)
     wyk = K.Wykonawca(m=M, rejestr=lambda: [{"nazwa": "retry", "aliasy": [], "opis_en": "Retry"}],
-                      zapis_globalny=lambda profil, dostawca, model: s.zapisy.append((profil, dostawca, model)))
+                      zapis_globalny=lambda profil, dostawca, model: s.zapisy.append((profil, dostawca, model)),
+                      okno=lambda profil, wybrany: {"model": (wybrany or {}).get("model") or "gpt-5.4",
+                                                    "provider": "openai-codex", "okno": 100_000})
     K.dolacz(router, m=M, trasy=T.trasy, silnik=lambda: s.sil, agenci=s.agenci, hub=s.hub, log=s.logi.append, wykonawca=wyk)
     s.k.app.include_router(router, prefix=P)
     yield s
@@ -250,6 +258,71 @@ def test_omp_model_usage_i_niedostepne(tmp_path):
     k.sil = type("S", (), {"db": type("D", (), {"przebiegi_watku": lambda self, wid, aktywne=False: []})()})()
     d = run("/usage")
     assert d["ok"] and "2 odpowiedzi" in d["wynik"] and "$0.30" in d["wynik"]
-    for tekst, slowo in (("/new", "sesje.json"), ("/compress", "kompresuje"), ("/model x --global", "omp_arg")):
+    for tekst, slowo in (("/new", "sesje.json"), ("/model x --global", "omp_arg")):
         d = run(tekst)
         assert not d["ok"] and slowo in d["wynik"], tekst
+
+
+def test_omp_compact_komendy_skrzynki_i_licznik(tmp_path, monkeypatch):
+    """`/compact` (alias `/compress`) i komendy zgłoszone przez skrzynkę idą do skrzynki sesji omp (`komenda` +
+    `wynik_komendy`); dłuższa niż `czekaj_s` kończy się drugim wpisem (`po_czasie`); licznik i `/context` z
+    `omp_sesje.licznik`."""
+    w = _wpis_omp(tmp_path)
+    om = M.omp_sesje
+    wyniki, komendy = {}, []
+    monkeypatch.setattr(om, "komenda", lambda w_, nazwa, args, klucz: komendy.append((nazwa, args, klucz)) or {"nowy": True},
+                        raising=False)
+    monkeypatch.setattr(om, "wynik_komendy", lambda w_, klucz: wyniki.get(klucz, {"stan": "pracuje", "wynik": "", "blad": None}),
+                        raising=False)
+    monkeypatch.setattr(om, "komendy_omp", lambda w_: [{"nazwa": "compact", "opis": "x"}, {"nazwa": "export", "opis": "Eksport"}],
+                        raising=False)
+    monkeypatch.setattr(om, "licznik", lambda w_: {"model": "anthropic/claude-opus-5", "kontekst": 50_000, "okno": 200_000,
+                                                   "procent": 25.0, "wejscie": 10, "wyjscie": 20, "cache_odczyt": 100,
+                                                   "cache_zapis": 5, "koszt": 0.3, "czas": 1.0}, raising=False)
+    wyk = K.Wykonawca(m=M, lista_omp=lambda: [], rejestr=lambda: [], czekaj_s=0.3, odstep_s=0.05, maks_s=2)
+    zadania, po = [], []
+    sil = SimpleNamespace(rejestr=SimpleNamespace(zadanie=lambda coro: zadania.append(asyncio.ensure_future(coro))))
+    k = K.Kontekst(sil=sil, watek={"id": "w_x"}, agent="op", nazwa="Operator", zaplecze="omp", wpis_omp=w, klucz="kC1",
+                   po_czasie=po.append)
+
+    async def scenariusz():
+        wyniki["kC1"] = {"stan": "gotowe", "wynik": "120k na 20k tokenów", "blad": None}
+        d1 = (await wyk.wykonaj(k, *K.parsuj("/compress skup się na GPU"))).dane()
+        k.klucz = "kC2"
+        d2 = (await wyk.wykonaj(k, *K.parsuj("/compact"))).dane()          # dłużej niż czekaj_s: wynik drugim wpisem
+        wyniki["kC2"] = {"stan": "blad", "wynik": "", "blad": "lock held"}
+        await asyncio.gather(*zadania)
+        k.klucz, wyniki["kC3"] = "kC3", {"stan": "gotowe", "wynik": "plik.md", "blad": None}
+        d3 = (await wyk.wykonaj(k, *K.parsuj("/export"))).dane()
+        pomoc = (await wyk.wykonaj(k, "help", "")).dane()
+        return d1, d2, d3, pomoc, await wyk.licznik(k), (await wyk.wykonaj(k, "context", "")).dane()
+
+    d1, d2, d3, pomoc, lic, ctx = asyncio.run(scenariusz())
+    assert komendy[0] == ("compact", "skup się na GPU", "kC1")
+    assert d1["ok"] and "skompresowany" in d1["wynik"] and "120k" in d1["wynik"]
+    assert d2["ok"] and "trwa" in d2["wynik"] and len(po) == 1
+    assert not po[0].ok and "lock held" in po[0].dane()["wynik"]
+    assert komendy[2][0] == "export" and "plik.md" in d3["wynik"] and "/export" in pomoc["wynik"]
+    assert lic["zaplecze"] == "omp" and lic["procent"] == 25.0 and lic["okno"] == 200_000 and not lic["szacunek"]
+    assert ctx["ok"] and "50 000" in ctx["wynik"] and "25%" in ctx["wynik"] and "$0.30" in ctx["wynik"]
+    assert "—" not in json.dumps([d1, d2, d3, pomoc, ctx], ensure_ascii=False)
+
+
+def test_licznik_i_context_hermes(swiat):
+    """Licznik rozmowy z Hermesem: liczniki i koszt z wierszy `sessions` rodowodu członka (większe niż suma `usage`
+    przebiegów), kontekst szacowany z treści sesji, okno z metadanych modelu; tylko z panelu."""
+    wid, _ = _watek_po_turze(swiat)
+    d = swiat.k.get(f"{P}/rozmowy/{wid}/licznik").json()["licznik"]
+    assert d["zaplecze"] == "hermes" and d["szacunek"] and d["wejscie"] == 1 and d["wyjscie"] == 1 and d["kontekst"] > 0
+    assert d["model"] == "gpt-5.4" and d["okno"] == 100_000 and d["procent"] == round(100 * d["kontekst"] / 100_000, 1)
+    sid = swiat.sil.db.czlonek(wid, "jarvo")["sesja_tip"]
+    c = sqlite3.connect(swiat.home / "profiles" / "jarvo" / "state.db")
+    c.execute("UPDATE sessions SET input_tokens = 500, cache_read_tokens = 70, estimated_cost_usd = 0.12 WHERE id = ?", (sid,))
+    c.commit()
+    c.close()
+    d = swiat.k.get(f"{P}/rozmowy/{wid}/licznik").json()["licznik"]
+    assert (d["wejscie"], d["wyjscie"], d["cache_odczyt"], d["koszt"]) == (500, 1, 70, 0.12)
+    assert swiat.k.get(f"{P}/rozmowy/{wid}/licznik", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+    assert swiat.k.get(f"{P}/rozmowy/w_nie_ma/licznik").status_code == 404
+    w = _komenda(swiat, "/ctx", wid)["wynik"]
+    assert w["ok"] and "≈" in w["wynik"] and "100 000" in w["wynik"] and "$0.12" in w["wynik"]

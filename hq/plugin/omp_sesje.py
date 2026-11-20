@@ -11,24 +11,44 @@ Wpis w `<dane>/jarvo/konfig/sesje.json` (klucz = dopisek; rozmówcą jest tylko 
                  "panel": {"zaplecze": "omp", "sesje": "~/…/sesje", "sesja": "<id sesji>", "cwd": "~/…",
                            "omp_arg": ["--no-context-files", "--append-system-prompt", "~/…/system.md"],
                            "opis": "…", "kolejnosc": 2, "potwierdzenia": false, "zamykaj_bezczynna_min": 30,
-                           "pobierz_linki": ["/ścieżka/python", "/ścieżka/pobierz_link.py"]}}}
+                           "pobierz_linki": ["/ścieżka/python", "/ścieżka/pobierz_link.py"],
+                           "przed_tura": ["python3", "~/…/kernel.py", "system"]}}}
+
+`przed_tura`: polecenie, które skrzynka uruchamia przed każdą turą (np. Kernel składa system.md z arsenałem floty);
+gdy zmieni plik podany w `omp_arg` (np. `--append-system-prompt`), skrzynka między turami startuje nowy proces omp.
 
 Układ skrzynki: `nowe/` (czeka), `zrobione/`, `bledy/`, `tura/<tura>.jsonl` (strumień tury), `sesja.lock` (flock:
-skrzynka i terminal), `stan.json` (`tura {id, pid, start, klucze}`, `terminal {pid, od}`, `powiadomiono`).
+skrzynka i terminal), `stan.json` (`tura {id, pid, start, klucze}`, `rpc {pid, skrzynka, od}` (proces `omp --mode rpc`
+skrzynki), `terminal {pid, od}`, `powiadomiono`), `komendy/<klucz>.json` i `komendy/zrobione/` (komendy panelu, np.
+/compact), `licznik.json` (zużycie sesji, skrzynka odświeża je w trakcie tury), `zatrzymaj` (prośba o abort tury),
+`zwolnij` (terminal czeka na sesję: proces RPC kończy się po turze), `nowe/.budzik` (budzi usługę skrzynki: jednostka
+systemd `.path` patrzy na `nowe/`).
 
 Kontrakt dla panelu (CentrumUI; wszystko synchroniczne i szybkie, wołać w wątku albo `asyncio.to_thread`):
 
     wpisy(dane) -> dict[klucz, Wpis]          wpisy omp z sesje.json; zły wpis ma `blad` (np. „niebezpieczna ścieżka”)
     rozmowcy(dane) -> list[dict]              lista do lewej kolumny: klucz, nazwa, opis, kolejnosc, potwierdzenia
     stan(wpis) -> dict                        {stan: pracuje|terminal|kolejka|wolny|offline, czeka, najstarsza_s,
-                                               tura, terminal_od, powod}; dzierżawa omp w pamięci 2 s (dla odznak)
+                                               tura, terminal_od, proces_od, powod}; dzierżawa omp w pamięci 2 s
     wyslij(wpis, tekst, klucz, media=(), lustro=True) -> dict
                                               {plik, nowy}; ten sam `klucz` = ten sam plik (idempotencja)
-    przebieg(wpis, klucz) -> dict             {stan: kolejka|pracuje|gotowe|blad|brak, terminal, tura, odpowiedz, blad}
+    dopisz(wpis, tekst, klucz, media=(), lustro=True) -> dict
+                                              {plik, nowy, tryb: steer|kolejka}: w trakcie tury skrzynka wysyła ją do
+                                              tury jako steer (jak Enter w terminalu omp), bez tury = zwykła wiadomość
+    przebieg(wpis, klucz) -> dict             {stan: kolejka|pracuje|wlaczony|gotowe|blad|brak, terminal, tura,
+                                              odpowiedz, blad}; `wlaczony` = dopisek doszedł do trwającej tury `tura`
     ogon(wpis, tura, od=0) -> (zdarzenia, od) zdarzenia tury od bajtu `od`: {typ: delta, tekst} |
                                               {typ: narzedzie, nazwa, intencja} | {typ: koniec, ok, kod, odpowiedz}
-    zatrzymaj(wpis) -> bool                   SIGTERM dla omp bieżącej tury (tylko proces z `--session-dir` wpisu)
+    zatrzymaj(wpis) -> bool                   abort bieżącej tury (prośba do skrzynki; bez skrzynki SIGTERM, tylko
+                                              dla procesu omp z `--session-dir` wpisu)
     ponow(wpis, klucz) -> dict                ta sama wiadomość jeszcze raz do `nowe/` (nowy klucz `<klucz>-p<n>`)
+    komendy_omp(wpis) -> list[dict]           komendy, które skrzynka wykonuje: [{nazwa, opis, aliasy}]
+    komenda(wpis, nazwa, argumenty, klucz) -> dict
+                                              {plik, nowy}: komenda do skrzynki (compact = compress); w trakcie tury
+                                              czeka na jej koniec (compact w omp przerywa trwającą turę)
+    wynik_komendy(wpis, klucz) -> dict        {stan: kolejka|pracuje|gotowe|blad|brak, wynik, blad}
+    licznik(wpis) -> dict                     {model, kontekst, okno, procent, wejscie, wyjscie, cache_odczyt,
+                                              cache_zapis, koszt, czas}: na żywo od skrzynki, bez niej z pliku sesji
     plik_sesji(wpis) -> Path | None           plik *.jsonl sesji (oś: czytnik_omp.os_sesji)
     model_skrzynki(wpis) -> str               model z `/model` w panelu (`<skrzynka>/model.json`), "" = z `omp_arg`
     ustaw_model_skrzynki(wpis, model|None)    zapis albo usunięcie wyboru; argumenty_tury(wpis) wstawia go do tury
@@ -61,6 +81,12 @@ SESJA_RE = re.compile(r"[0-9A-Za-z][0-9A-Za-z-]{5,63}")
 TURA_RE = re.compile(r"\d{8}-\d{6}-[0-9a-f]{6}")
 DZIERZAWA_S = 2.0
 _dzierzawy: dict[str, tuple[float, bool | None]] = {}
+PLIK_LICZNIKA, PLIK_ZATRZYMAJ, PLIK_ZWOLNIJ, BUDZIK = "licznik.json", "zatrzymaj", "zwolnij", ".budzik"
+# komendy panelu, które skrzynka wykonuje przez RPC omp (jarvo/sesje_omp.py): nazwa → (opis, aliasy)
+KOMENDY = {"compact": ("Skompresuj kontekst sesji; po spacji możesz dodać, na czym się skupić", ("compress",))}
+LICZNIK_PUSTY = {"model": "", "kontekst": 0, "okno": 0, "procent": 0.0, "wejscie": 0, "wyjscie": 0, "cache_odczyt": 0,
+                 "cache_zapis": 0, "koszt": 0.0, "czas": None}
+_podsumowania: dict[str, tuple[int, int, dict]] = {}
 
 
 @dataclass
@@ -79,10 +105,11 @@ class Wpis:
     potwierdzenia: bool = False
     zamykaj_bezczynna_min: float = 0
     pobierz_linki: list[str] = field(default_factory=list)
+    przed_tura: list[str] = field(default_factory=list)
     blad: str = ""
 
-    def __getattr__(self, nazwa):                 # katalogi skrzynki: w.nowe, w.zrobione, w.bledy, w.tura
-        if nazwa in ("nowe", "zrobione", "bledy", "tura") and self.skrzynka is not None:
+    def __getattr__(self, nazwa):                 # katalogi skrzynki: w.nowe, w.zrobione, w.bledy, w.tura, w.komendy
+        if nazwa in ("nowe", "zrobione", "bledy", "tura", "komendy") and self.skrzynka is not None:
             return self.skrzynka / nazwa
         raise AttributeError(nazwa)
 
@@ -95,7 +122,7 @@ class Wpis:
         return self.skrzynka / "stan.json"
 
     def katalogi(self) -> None:
-        for k in (self.nowe, self.zrobione, self.bledy, self.tura):
+        for k in (self.nowe, self.zrobione, self.bledy, self.tura, self.komendy / "zrobione"):
             k.mkdir(parents=True, exist_ok=True)
 
 
@@ -158,6 +185,7 @@ def wpis_z(klucz: str, surowy: dict, dom: Path | None = None) -> Wpis | None:
         w.blad = "zły wpis"
     w.omp_arg = [_arg(str(a)) for a in panel.get("omp_arg") or [] if isinstance(a, (str, int, float))]
     w.pobierz_linki = [_program_narzedzi(_arg(str(a))) for a in panel.get("pobierz_linki") or [] if isinstance(a, str)]
+    w.przed_tura = [_arg(str(a)) for a in panel.get("przed_tura") or [] if isinstance(a, str)]
     w.sesja = str(panel.get("sesja") or "")
     if not KLUCZ_RE.fullmatch(klucz):
         w.blad = w.blad or "zły klucz"
@@ -321,6 +349,10 @@ def podsumowanie_sesji(w: Wpis) -> dict:
     if plik is None:
         return wynik
     try:
+        st = plik.stat()
+        juz = _podsumowania.get(str(plik))
+        if juz and juz[:2] == (st.st_mtime_ns, st.st_size):  # panel pyta co 2 s (licznik), plik sesji bywa duży
+            return dict(juz[2])
         linie = plik.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
         return wynik
@@ -340,8 +372,10 @@ def podsumowanie_sesji(w: Wpis) -> dict:
         wynik["cache_zapis"] += _liczba(u, "cacheWrite")
         koszt = u.get("cost").get("total") if isinstance(u.get("cost"), dict) else None
         wynik["koszt"] += float(koszt) if isinstance(koszt, (int, float)) else 0.0
-        wynik["kontekst"] = _liczba(u, "input") + _liczba(u, "cacheRead") + _liczba(u, "cacheWrite")
+        kontekst = _liczba(u, "input") + _liczba(u, "cacheRead") + _liczba(u, "cacheWrite")
+        wynik["kontekst"] = kontekst or wynik["kontekst"]   # odpowiedź z błędem dostawcy ma same zera
         wynik["model"], wynik["dostawca"] = str(m.get("model") or ""), str(m.get("provider") or "")
+    _podsumowania[str(plik)] = (st.st_mtime_ns, st.st_size, dict(wynik))
     return wynik
 
 
@@ -350,10 +384,19 @@ def _liczba(u: dict, k: str) -> int:
     return int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else 0
 
 
+def proces_skrzynki(w: Wpis, s: dict | None = None) -> dict | None:
+    """`rpc` ze stanu, gdy żyją i skrzynka, i jej proces `omp --mode rpc` (sesję trzyma skrzynka, nie terminal)."""
+    r = (czytaj_stan(w) if s is None else s).get("rpc")
+    if isinstance(r, dict) and zyje(r.get("skrzynka")) and zyje(r.get("pid")):
+        return r
+    return None
+
+
 def stan(w: Wpis) -> dict:
-    """Stan rozmówcy dla odznak (wołać co ~2 s; dzierżawa omp w pamięci 2 s)."""
+    """Stan rozmówcy dla odznak (wołać co ~2 s; dzierżawa omp w pamięci 2 s). Sesja otwarta w procesie RPC skrzynki
+    bez tury to `wolny` albo `kolejka` (wiadomość ruszy od razu), z `proces_od`."""
     wynik = {"klucz": w.klucz, "stan": "offline", "czeka": 0, "najstarsza_s": 0, "tura": None, "terminal_od": None,
-             "powod": w.blad or None}
+             "proces_od": None, "powod": w.blad or None}
     if w.blad:
         return wynik
     if fcntl is None:
@@ -374,8 +417,11 @@ def stan(w: Wpis) -> dict:
     if tura and zyje(tura.get("pid")):
         wynik.update(stan="pracuje", tura={k: tura.get(k) for k in ("id", "pid", "start", "klucze")})
         return wynik
+    rpc = proces_skrzynki(w, s)
+    if rpc is not None:
+        wynik["proces_od"] = rpc.get("od")
     term = s.get("terminal") if isinstance(s.get("terminal"), dict) else None
-    if blokada_zajeta(w) or dzierzawa(w, pamiec=DZIERZAWA_S):
+    if rpc is None and (blokada_zajeta(w) or dzierzawa(w, pamiec=DZIERZAWA_S)):
         wynik["stan"] = "terminal"
         if term and zyje(term.get("pid")):
             wynik["terminal_od"] = term.get("od")
@@ -400,7 +446,7 @@ def _znajdz(w: Wpis, nazwa: str) -> tuple[str, Path] | None:
     return None
 
 
-def wyslij(w: Wpis, tekst: str, klucz: str, media=(), lustro: bool = True) -> dict:
+def wyslij(w: Wpis, tekst: str, klucz: str, media=(), lustro: bool = True, **dodatki) -> dict:
     """Wiadomość z panelu do `nowe/` (zapis atomowy). Ścieżki `media` (obrazy z inbox/) trafiają do pola `media`."""
     if w.blad or w.skrzynka is None:
         raise ValueError(w.blad or "wpis bez skrzynki")
@@ -413,12 +459,26 @@ def wyslij(w: Wpis, tekst: str, klucz: str, media=(), lustro: bool = True) -> di
     zapisz_atomowo(plik, {"dopisek": w.klucz, "nazwa": w.nazwa, "tekst": str(tekst or ""),
                           "media": [str(m) for m in media], "czas": time.strftime("%Y-%m-%d %H:%M:%S"),
                           "zrodlo": "panel", "klucz": klucz, "lustro": bool(lustro),
-                          "chat_id": w.czat, "watek": w.watek, "odpowiedz_na": ""})
+                          "chat_id": w.czat, "watek": w.watek, "odpowiedz_na": "", **dodatki})
     return {"plik": str(plik), "nowy": True}
 
 
+def _tura_trwa(w: Wpis) -> bool:
+    t = czytaj_stan(w).get("tura")
+    return isinstance(t, dict) and zyje(t.get("pid"))
+
+
+def dopisz(w: Wpis, tekst: str, klucz: str, media=(), lustro: bool = True) -> dict:
+    """Wiadomość, którą skrzynka w trakcie tury wysyła do niej jako steer (`steer: true` w `nowe/`); bez tury zwykła
+    wiadomość. `tryb` mówi, co było w chwili zapisu: tura mogła się skończyć tuż potem, wtedy wiadomość rusza jako
+    własna tura i przebieg() pokaże kolejka, pracuje, gotowe zamiast wlaczony."""
+    r = wyslij(w, tekst, klucz, media, lustro, steer=True)
+    return {**r, "tryb": "steer" if _tura_trwa(w) else "kolejka"}
+
+
 def przebieg(w: Wpis, klucz: str) -> dict:
-    """Gdzie jest wiadomość panelu: kolejka (terminal: True, gdy sesję trzyma terminal), pracuje, gotowe, blad."""
+    """Gdzie jest wiadomość panelu: kolejka (terminal: True, gdy sesję trzyma terminal), pracuje, wlaczony (dopisek
+    doszedł do trwającej tury `tura`; jej odpowiedź jest odpowiedzią i na niego), gotowe, blad."""
     nazwa = _plik_klucza(klucz)
     wynik = {"stan": "brak", "terminal": False, "tura": None, "odpowiedz": None, "blad": None}
     if w.skrzynka is None:
@@ -427,16 +487,19 @@ def przebieg(w: Wpis, klucz: str) -> dict:
     if not znal:
         return wynik
     gdzie, p = znal
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+        d = d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        d = {}
+    if d.get("wlaczony"):
+        return {**wynik, "stan": "wlaczony", "tura": d["wlaczony"], "odpowiedz": d.get("odpowiedz")}
     if gdzie == "nowe":
         s = stan(w)
         t = s.get("tura") or {}
         if s["stan"] == "pracuje" and klucz in (t.get("klucze") or []):
             return {**wynik, "stan": "pracuje", "tura": t.get("id")}
         return {**wynik, "stan": "kolejka", "terminal": s["stan"] == "terminal"}
-    try:
-        d = json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        d = {}
     if gdzie == "zrobione":
         return {**wynik, "stan": "gotowe", "tura": d.get("tura"), "odpowiedz": d.get("odpowiedz")}
     return {**wynik, "stan": "blad", "tura": d.get("tura"), "blad": str(d.get("blad") or "")[-300:]}
@@ -481,10 +544,16 @@ def proces_tury(w: Wpis, pid) -> bool:
 
 
 def zatrzymaj(w: Wpis) -> bool:
-    tura = czytaj_stan(w).get("tura") or {}
+    """Stop bieżącej tury: przy żywej skrzynce prośba `zatrzymaj` (skrzynka wysyła RPC `abort`, a gdy omp nie
+    odpowie, SIGTERM); bez skrzynki SIGTERM, tylko dla procesu omp z `--session-dir` wpisu."""
+    s = czytaj_stan(w)
+    tura = s.get("tura") or {}
     pid = tura.get("pid") if isinstance(tura, dict) else None
     if not pid or not zyje(pid) or not proces_tury(w, pid):
         return False
+    if proces_skrzynki(w, s) is not None:
+        (w.skrzynka / PLIK_ZATRZYMAJ).write_text(str(tura.get("id") or ""), encoding="utf-8")
+        return True
     try:
         os.kill(int(pid), signal.SIGTERM)
     except OSError:
@@ -511,3 +580,102 @@ def ponow(w: Wpis, klucz: str) -> dict:
 
 def nowa_tura() -> str:
     return time.strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(3)
+
+
+# ---------------------------------------------------------------- komendy panelu i licznik (skrzynka RPC)
+
+def obudz(w: Wpis) -> None:
+    """Plik w `nowe/` bez `.json`: jednostka `.path` uruchamia skrzynkę, a nikt nie bierze go za wiadomość."""
+    (w.nowe / BUDZIK).write_text(str(time.time()), encoding="utf-8")
+
+
+def komendy_omp(w: Wpis) -> list[dict]:
+    if w.blad:
+        return []
+    return [{"nazwa": n, "opis": o, "aliasy": list(a)} for n, (o, a) in KOMENDY.items()]
+
+
+def nazwa_komendy(nazwa: str) -> str:
+    n = str(nazwa or "").strip().lstrip("/").lower()
+    for k, (_opis, aliasy) in KOMENDY.items():
+        if n == k or n in aliasy:
+            return k
+    raise ValueError("nieznana komenda")
+
+
+def komenda(w: Wpis, nazwa: str, argumenty, klucz: str) -> dict:
+    """Komenda do `komendy/<klucz>.json` (ten sam klucz = ten sam plik) i budzik skrzynki; wykonuje ją skrzynka
+    przez RPC omp, także gdy procesu nie ma (uruchamia go). W trakcie tury czeka na jej koniec."""
+    if w.blad or w.skrzynka is None:
+        raise ValueError(w.blad or "wpis bez skrzynki")
+    n = nazwa_komendy(nazwa)
+    if not KLUCZ_RE.fullmatch(klucz or ""):
+        raise ValueError("zły klucz komendy")
+    w.katalogi()
+    for p in (w.komendy / f"{klucz}.json", w.komendy / "zrobione" / f"{klucz}.json"):
+        if p.exists():
+            return {"plik": str(p), "nowy": False}
+    arg = " ".join(map(str, argumenty)) if isinstance(argumenty, (list, tuple)) else str(argumenty or "")
+    plik = w.komendy / f"{klucz}.json"
+    zapisz_atomowo(plik, {"nazwa": n, "argumenty": arg.strip()[:4000], "klucz": klucz, "stan": "kolejka",
+                          "czas": time.strftime("%Y-%m-%d %H:%M:%S")})
+    obudz(w)
+    return {"plik": str(plik), "nowy": True}
+
+
+def komendy_czekajace(w: Wpis) -> list[Path]:
+    return sorted(w.komendy.glob("*.json")) if w.skrzynka is not None and w.komendy.is_dir() else []
+
+
+def wynik_komendy(w: Wpis, klucz: str) -> dict:
+    """{stan: kolejka|pracuje|gotowe|blad|brak, wynik, blad}."""
+    if not KLUCZ_RE.fullmatch(klucz or ""):
+        raise ValueError("zły klucz komendy")
+    wynik = {"stan": "brak", "wynik": "", "blad": None}
+    if w.skrzynka is None:
+        return wynik
+    for p, gotowa in ((w.komendy / "zrobione" / f"{klucz}.json", True), (w.komendy / f"{klucz}.json", False)):
+        try:
+            d = json.loads(p.read_text(encoding="utf-8"))
+            d = d if isinstance(d, dict) else {}
+        except OSError:
+            continue
+        except ValueError:
+            d = {}
+        if gotowa:
+            return {"stan": "blad" if d.get("blad") else "gotowe", "wynik": str(d.get("wynik") or ""),
+                    "blad": str(d["blad"]) if d.get("blad") else None}
+        return {**wynik, "stan": "pracuje" if d.get("stan") == "pracuje" else "kolejka"}
+    return wynik
+
+
+def licznik(w: Wpis) -> dict:
+    """Zużycie sesji dla panelu: `licznik.json` skrzynki (get_session_stats RPC, odświeżany po każdej odpowiedzi
+    modelu), gdy proces RPC żyje albo plik sesji nie jest od niego nowszy; inaczej z pliku sesji (okno kontekstu
+    tylko, gdy skrzynka znała je dla tego samego modelu). Nic nie wiadomo = zera; nigdy wyjątek."""
+    wynik = dict(LICZNIK_PUSTY)
+    try:
+        if w.blad or w.skrzynka is None:
+            return wynik
+        plik = w.skrzynka / PLIK_LICZNIKA
+        try:
+            zapis = json.loads(plik.read_text(encoding="utf-8"))
+            zapis = {k: zapis[k] for k in LICZNIK_PUSTY if k in zapis} if isinstance(zapis, dict) else {}
+            t_zapisu = plik.stat().st_mtime
+        except (OSError, ValueError):
+            zapis, t_zapisu = {}, 0.0
+        sesja = plik_sesji(w)
+        t_sesji = sesja.stat().st_mtime if sesja is not None else 0.0
+        if zapis and (proces_skrzynki(w) is not None or t_sesji <= t_zapisu + 5):
+            return {**wynik, **zapis}
+        if sesja is None:
+            return wynik
+        p = podsumowanie_sesji(w)
+        model = f"{p['dostawca']}/{p['model']}" if p["dostawca"] and p["model"] else p["model"]
+        okno = int(zapis.get("okno") or 0) if zapis.get("model") == model else 0
+        wynik.update(model=model, kontekst=p["kontekst"], okno=okno, wejscie=p["wejscie"], wyjscie=p["wyjscie"],
+                     cache_odczyt=p["cache_odczyt"], cache_zapis=p["cache_zapis"], koszt=round(p["koszt"], 6),
+                     procent=round(p["kontekst"] * 100 / okno, 1) if okno else 0.0, czas=t_sesji)
+        return wynik
+    except Exception:                               # licznik to dodatek: nigdy nie psuje panelu
+        return dict(LICZNIK_PUSTY)

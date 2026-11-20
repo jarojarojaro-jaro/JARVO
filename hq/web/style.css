@@ -1190,7 +1190,9 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-szukaj input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; font-size: 14px; color: var(--j-tekst); padding: 0; }
 .j-szukaj input::placeholder { color: var(--j-tekst-3); }
 .j-szukaj input::-webkit-search-cancel-button { filter: grayscale(1); }
-.j-lista { flex: 1; overflow: auto; margin: 6px -6px 0; padding: 0 6px 10px; }
+/* środek paska przewija się w całości (rozmówcy i Inne rozmowy); góra i dół (Mózg, Ustawienia, stan) zostają na miejscu */
+.j-pasek-s { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0 -10px; padding: 0 10px; }
+.j-lista { margin: 6px -6px 0; padding: 0 6px 10px; }
 .j-grupa-t { font-size: 12px; font-weight: 550; color: var(--j-tekst-3); padding: 14px 8px 5px; }
 .j-wiersz-w { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; column-gap: 10px; align-items: center; min-height: 34px;
   padding: 7px 8px; border-radius: 9px; color: var(--j-tekst-3); content-visibility: auto; contain-intrinsic-size: auto 34px; }
@@ -1852,6 +1854,9 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-komp-pasek { display: flex; align-items: center; gap: 6px; padding: 6px 8px 8px 10px; min-width: 0; }
 .j-komp-pod { min-height: 18px; margin: 6px 4px 0; font-size: 12.5px; color: var(--j-tekst-3); line-height: 1.4; }
 .j-komp-pod.is-zle { color: var(--j-blad); }
+.j-licznik { margin: 0 6px; font: 11.5px/1.4 var(--j-font-mono); color: var(--j-tekst-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.j-licznik.is-duzo { color: var(--j-uwaga); }
+.j-msg-stan.is-dop { gap: 4px; }
 .j-komp-w.is-start { margin-top: 26px; }
 .j-komp-w.is-start .j-komp { border-radius: 22px; }
 .j-komp-w.is-start .j-komp-pole { font-size: 16.5px; padding: 17px 20px 4px; min-height: 62px; }
@@ -1934,7 +1939,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-wiersz-pole { height: 28px; }
 .j-filtr { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 4px 0 8px; font-size: 13px; flex: none; }
 .j-filtr b { font-weight: 600; }
-.j-szukaj-w { display: flex; align-items: center; gap: 2px; margin-top: 6px; flex: none; }
+.j-szukaj-w { display: flex; align-items: center; gap: 2px; margin-top: 6px; flex: none; position: sticky; top: 0; z-index: 1; background: var(--j-tlo-pasek); }
 .j-szukaj-w .j-szukaj { flex: 1; margin-top: 0; min-width: 0; }
 .j-szukaj-m { flex: none; }
 

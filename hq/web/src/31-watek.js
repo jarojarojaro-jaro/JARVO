@@ -203,7 +203,7 @@ function Watek({ id, panel = 0, rozmowca = null }) {
       ${rozmowca && html`<${BanerRozmowcy} klucz=${rozmowca}/>`}
       ${wKoszu ? html`<div class="j-kosz-uwaga"><${Ikona} n="trash" r=${16}/><span>${T("watek.w_koszu_opis")}</span>
           <${Przycisk} maly onClick=${() => akcje.przywroc(id)}>${T("watek.przywroc")}</${Przycisk}></div>`
-        : html`<${Kompozytor} key=${id} watek=${id} panel=${panel} koordynator=${koordynator}/>`}
+        : html`<${Kompozytor} key=${id} watek=${id} panel=${panel} koordynator=${koordynator}/><${Licznik} key=${`l${id}`} watek=${id}/>`}
     </div>
   </div>`;
 }

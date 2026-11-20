@@ -122,6 +122,33 @@ function PasekNaZywo({ przebiegi, watek }) {
 const stanPracy = (p) => (p.stan === "przyjety" && (p.powod === "terminal" || p.powod === "kolejka")
   ? T(p.powod === "terminal" ? "zywo.terminal" : "zywo.kolejka") : T(`przebieg.${p.stan}`));
 
+// licznik rozmowy pod kompozytorem, jak stopka terminala omp i Hermesa: model, kontekst (≈ = szacunek) i % okna,
+// tokeny ↑ wejścia i ↓ wyjścia, cache odczyt/zapis, koszt. GET /rozmowy/{id}/licznik co 2 s, gdy w rozmowie trwa
+// praca (i zaraz po jej końcu), inaczej co 30 s; w ukrytej karcie przeglądarki nie pyta
+const krotko = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k` : String(n || 0));
+function Licznik({ watek }) {
+  const praca = useSklep((s) => Os.doZatrzymania(Object.values(s.przebiegi).filter((p) => p.watek_id === watek)).length > 0);
+  const [d, setD] = useState(null);
+  useEffect(() => {
+    let zywy = true, t = 0;
+    const tik = async () => {
+      if (!document.hidden) {
+        try { const r = await api.rozmowy.licznik(watek); if (zywy) setD(r.licznik); } catch (_) { /* bez licznika */ }
+      }
+      if (zywy) t = setTimeout(tik, praca ? 2000 : 30000);
+    };
+    tik();
+    return () => { zywy = false; clearTimeout(t); };
+  }, [watek, praca]);
+  if (!d || !(d.model || d.kontekst || d.wejscie)) return null;
+  const c = [d.model, `${d.szacunek ? "≈" : ""}${krotko(d.kontekst)}${d.okno ? `/${krotko(d.okno)} (${Math.round(d.procent)}%)` : ""}`,
+    `↑${krotko(d.wejscie)} ↓${krotko(d.wyjscie)}`];
+  if (d.cache_odczyt || d.cache_zapis) c.push(`cache ${krotko(d.cache_odczyt)}/${krotko(d.cache_zapis)}`);
+  if (d.koszt) c.push(`$${d.koszt.toFixed(2)}`);
+  const t = c.filter(Boolean).join(" · ");
+  return html`<p class=${cx("j-licznik", d.procent >= 80 && "is-duzo")} title=${T("licznik.opis")} aria-label=${`${T("licznik.opis")} ${t}`}>${t}</p>`;
+}
+
 // ------------------------------------------------------------------------------------------------- kompozytor
 function Kompozytor({ watek = null, panel = 0, koordynator = "jarvo", start = false }) {
   const k = watek || "nowa";

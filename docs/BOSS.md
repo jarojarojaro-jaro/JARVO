@@ -233,11 +233,18 @@ Przejęte z kontraktu firstmate i dostosowane do nas:
   bramy, także gdy Jarvo jest w trakcie tury) tylko wiadomości od dozwolonych osób; awaria haka oddaje wiadomość Jarvowi.
   Format pliku: `{"gpu": {"nazwa": "Kernel", "skrzynka": "/ścieżka/skrzynki", "czat": "-100…", "watek": "11"}}`.
   **Sesja omp jako rozmówca panelu** (wpis z blokiem `panel`, `zaplecze: "omp"`): sesję prowadzi tylko
-  `jarvo sesja <klucz> skrzynka` (tura `omp --session-dir <sesje> --resume <sesja> <omp_arg…> -p --mode json`)
-  albo `jarvo sesja <klucz> terminal`; oba biorą blokadę `<skrzynka>/sesja.lock` i pytają omp o dzierżawę
-  (`omp session lease --json`), więc sesja nigdy się nie odgałęzia. Zajęta sesja = wiadomości czekają, po 2 min jedno
-  powiadomienie, po wyjściu z terminala skrzynka rusza sama. Panel pisze do `nowe/` (`zrodlo: "panel"`, `klucz`), czyta
-  `stan.json`, `tura/<tura>.jsonl` (tekst, nazwa i intencja narzędzia; nigdy wyniki ani argumenty) i plik sesji.
+  `jarvo sesja <klucz> skrzynka` (jeden proces `omp --session-dir <sesje> --resume <sesja> <omp_arg…> --mode rpc
+  --no-ui`, jak sesja terminala) albo `jarvo sesja <klucz> terminal`; oba biorą blokadę `<skrzynka>/sesja.lock` i pytają
+  omp o dzierżawę (`omp session lease --json`), więc sesja nigdy się nie odgałęzia. Zajęta sesja = wiadomości czekają,
+  po 2 min jedno powiadomienie, po wyjściu z terminala skrzynka rusza sama. Panel pisze do `nowe/` (`zrodlo: "panel"`,
+  `klucz`), czyta `stan.json`, `tura/<tura>.jsonl` (tekst, nazwa i intencja narzędzia; nigdy wyniki ani argumenty)
+  i plik sesji. Wiadomość panelu z `steer` (dopisek) i wiadomość z Telegrama w trakcie tury idą do niej jako steer
+  (niedostarczony wraca jako następna tura); `/compact` z panelu idzie przez `komendy/` (w trakcie tury czeka na jej
+  koniec); zużycie (model, kontekst i % okna, tokeny, cache, koszt) skrzynka zapisuje na bieżąco w `licznik.json`.
+  Proces omp bez pracy przez `zamykaj_bezczynna_min` (domyślnie 5 min) kończy się i zwalnia sesję; terminal, który
+  czeka na sesję, prosi skrzynkę o nią (`zwolnij`) i dostaje ją po bieżącej turze. `przed_tura` (lista argumentów)
+  skrzynka uruchamia przed każdą turą: Kernel (`kernel.py skrzynka` przekazuje pracę `jarvo sesja gpu skrzynka`) ma tam
+  `kernel.py system`, który składa system.md z arsenałem floty; zmieniony plik z `omp_arg` = nowy proces omp między turami.
   Wzór: `{"inz": {"nazwa": "Inżynier", "skrzynka": "~/inz/skrzynka", "czat": "-100…", "watek": "12",
   "panel": {"zaplecze": "omp", "sesje": "~/inz/sesje", "sesja": "<id>", "cwd": "~/…", "omp_arg": [],
   "kolejnosc": 0, "potwierdzenia": true, "zamykaj_bezczynna_min": 0}}}` (kontrakt: `hq/plugin/omp_sesje.py`).

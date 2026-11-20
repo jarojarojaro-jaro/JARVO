@@ -791,7 +791,14 @@ dashboardu, a każda trasa zapisu przechodzi ochronę CSRF (`ochrona.Trasa`, sek
     rozstrzyga każdy `dopisany`, którego cel już się skończył. `…/dopisz` na wiadomości czekającej w kolejce
     wysyła jej treść jako steer do trwającej tury tego agenta (odrzucony: wraca do kolejki z tym samym powodem, po
     Stop celu w tym czasie: `wstrzymane`; powtórka z tym samym `klucz` po zerwanym połączeniu = ten sam przebieg).
-    `tryb_kolejki: "dopisz"` przy wysyłce robi to od razu (jeden adresat, bez obrazów). Ten sam `klucz` dopisku =
+    `tryb_kolejki: "dopisz"` przy wysyłce (panel wysyła tak każdą wiadomość: Enter w trakcie pracy jak w terminalu)
+    robi to od razu dla każdego adresata, który pracuje (`Rejestr.do_dopisania`; obrazy idą jako linie 📎 ze ścieżką
+    w inboxie, wpis dostaje `dopisane_do`); gdy się nie da, wiadomość idzie do kolejki, a odpowiedź niesie
+    `dopisz_niemozliwe:<powód>`: `zgoda` (brama przyjmuje steer tylko od przebiegu `running`, nie
+    `waiting_for_approval`), `zatrzymywanie`, `wysylanie` (brama jeszcze nie przyjęła tury), `terminal` (sesję omp
+    trzyma terminal), `odmowa` (brama albo skrzynka odrzuciły). Sesja omp: `dopisz_omp` kładzie dopisek przez
+    `omp_sesje.dopisz` (steer RPC skrzynki); skrzynka mówi `wlaczony` albo puszcza go jako własną turę (`dopisany`
+    → `przyjety` → `pracuje` → koniec), a po restarcie dashboardu `dopisany` omp śledzi dalej `_omp_petla`. Ten sam `klucz` dopisku =
     ta sama odpowiedź bez drugiego steera; klucze wiadomości i dopisków są osobne, a `klucz` należący już do innej
     wiadomości = 409 `klucz_zajety`. Dopisz w wątku w koszu = 409 `w_koszu`. Archiwum albo kosz z `praca=zatrzymaj`
     w trakcie steera nie kończy się błędem: dopisek w drodze rozstrzyga się sam. Obserwator i oś czasu rozpoznają
@@ -1001,7 +1008,10 @@ innych kanałów etap 6.
   przeglądarki), wiersz z ikoną źródła, tytułem i znakiem stanu (z tekstem dla czytnika), **Więcej** dla następnej
   strony; nawigacja z pozycją Ustawienia (także bez rozmówców); stopka: stan połączenia słowem (`StanPolaczenia`,
   `polaczenie.*`, tylko informacja) i odznaka aktualizacji, bez drugiego wejścia do Ustawień (na telefonie też bez
-  koła zębatego w nagłówku).
+  koła zębatego w nagłówku). Układ (20.11): góra stała (marka, Nowa rozmowa, Aktualizacje), środek przewijany w całości
+  (`j-pasek-s`: ROZMÓWCY, zaraz pod nimi „Inne rozmowy” z wyszukiwarką przyklejoną u góry i listą), dół przypięty do
+  rogu (Mózg, Ustawienia, stan połączenia), więc rozwinięte Inne rozmowy nie wypychają niczego poza ekran; długa lista
+  liczy widoczne wiersze od swojego miejsca w przewijanym środku.
   Lista żyje ze strumienia: `watek.zmiana` wstawia, aktualizuje albo usuwa wiersz zależnie od filtra,
   `watek.usuniety` usuwa. Pokazuje tylko wątki aplikacji; wiersz idzie przez `WierszListy` (typ elementu), gotowy na
   jednolitą listę z sesjami innych kanałów (etap 6). Menu wiersza ⋯ (Zmień nazwę w miejscu, Przypnij/Odepnij,
@@ -1147,7 +1157,7 @@ innych kanałów etap 6.
   **Zezwól raz**, **Zezwól do końca tej odpowiedzi** (`session`), **Odmów**, a **Zawsze** tylko pod **Więcej**.
   Nagłówek z agentem i odliczaniem (`role=timer`), ryzyko prostymi słowami (`Os.ryzyko`: usuwa pliki, uprawnienia
   administratora, wysyła na zewnątrz, sieć, restart, inne), **Pokaż polecenie** w bloku kodu. Po czasie karta
-  zostaje jako „Czas minął — polecenie nie zostało wykonane” także po końcu przebiegu, z **Poproś ponownie** (jedna
+  zostaje jako „Czas minął: polecenie nie zostało wykonane” także po końcu przebiegu, z **Poproś ponownie** (jedna
   wiadomość do tego samego agenta).
 - **Kompozytor** (`33-kompozytor.js`): pole rośnie z treścią, Enter wysyła, Shift+Enter to nowa linia, ↑ w pustym
   polu przywołuje ostatnią własną wiadomość. Adresat: domyślnie „Do: <koordynator>”; wybór z listy **Do:**
@@ -1160,7 +1170,13 @@ innych kanałów etap 6.
   `localStorage` po 500 ms). Gdy brama startuje albo nie odpowiada, pod polem stoi „wiadomość poczeka w kolejce”.
   Nad polem pasek trwającej pracy (agent, stan, czas) z **Zatrzymaj**; Esc Esc zatrzymuje wszystkie prace wątku.
   PageUp/PageDown w polu przewijają rozmowę. Lista **Do:** zamyka się po Tab i po wyjściu fokusu poza nią. Po
-  wysłaniu z nowego wątku fokus zostaje w polu nowej rozmowy.
+  wysłaniu z nowego wątku fokus zostaje w polu nowej rozmowy. **Enter w trakcie pracy agenta** działa jak w terminalu:
+  panel wysyła każdą wiadomość z `tryb_kolejki: "dopisz"`, więc trafia ona od razu do trwającej tury (dymek właściciela
+  ma pod sobą „Dopisuję do trwającej pracy…”, potem „Dopisana do trwającej pracy”); gdy się nie da, wiadomość czeka
+  w kolejce, a komunikat mówi czemu (`dopisz.*`: tura czeka na Twoją decyzję, agent się zatrzymuje, dopiero zaczyna,
+  sesję trzyma terminal, brama odmówiła). Pod polem **licznik rozmowy** (`Licznik`, `GET /rozmowy/<id>/licznik`, co
+  2 s w trakcie pracy, inaczej co 30 s, nie w ukrytej karcie), jak stopka terminala: model, kontekst w tokenach
+  i % okna (≈ = szacunek), ↑ wejście, ↓ wyjście, cache odczyt/zapis, koszt; od 80% okna w kolorze uwagi.
 - <a id="komendy"></a>**Komendy** (`33-komendy.js`, serwer `hq/plugin/komendy.py`): tekst `/nazwa …` nigdy nie idzie do
   agenta (brama Hermesa nie wykonuje komend: `input` `/v1/runs` trafia prosto do modelu, a obsługa `/…` żyje tylko
   w kanałach gatewaya; trasa wiadomości odpowiada 409 `komenda`). Po wpisaniu „/” menu komend rozmowy (`GET /komendy`:
@@ -1170,10 +1186,15 @@ innych kanałów etap 6.
   `/model` (lista i bieżący model z `GET /api/model/options` profilu, wybór dla sesji członka w `meta` rozmowy, wysyłany
   w ciele `/v1/runs` jako `model` + `provider`; `--provider`, `--global` = config.yaml profilu funkcją dashboardu;
   przyciski modeli w wyniku wybierają od razu), `/new` (`/reset`: stop pracy agenta i nowa sesja członka jako rotacja),
-  `/stop`, `/usage` (tokeny przebiegów rozmowy), `/status`, `/help`. omp: `/model` (`omp models --json`, wybór w
-  `<skrzynka>/model.json` dla tur skrzynki), `/stop`, `/usage` i `/status` z pliku sesji, `/help`. Niedostępne:
-  `/compress` (brama nie ma kompresji na żądanie; sesja kompresuje się sama przy progu) i `/new` w sesji omp (sesja
-  stała we wpisie sesje.json). Testy: `tests/test_komendy.py`, wektory `tests/data/komendy.json`.
+  `/stop`, `/usage` (tokeny przebiegów rozmowy), `/context` (`/ctx`: to samo co licznik, tekstem), `/status`, `/help`.
+  omp: `/model` (`omp models --json`, wybór w `<skrzynka>/model.json` dla tur skrzynki), `/compact` (`/compress`,
+  opcjonalnie instrukcje: komenda RPC skrzynki `omp_sesje.komenda`, także w trakcie tury; wynik po najwyżej 20 s,
+  dłuższa kompresja dopisuje drugi wpis z wynikiem po końcu), komendy zgłoszone przez skrzynkę (`komendy_omp`),
+  `/stop`, `/usage`, `/context` i `/status`, `/help`. Niedostępne: `/compress` dla Hermesa (brama API nie ma
+  kompresji na żądanie, a ręczna kompresja `_run_manual_compression` żyje tylko w GatewayRunnerze kanałów: tymczasowy
+  AIAgent z poświadczeniami profilu, blokada kompresji, rotacja sesji; potrzebna trasa bramy, np.
+  `POST /api/sessions/{id}/compress` na tym samym rdzeniu) i `/new` w sesji omp (sesja stała we wpisie sesje.json).
+  Testy: `tests/test_komendy.py`, wektory `tests/data/komendy.json`.
 - **Pliki** (`34-pliki.js`): karta pliku z miniaturą, nazwą i główną akcją (**Pobierz**, dla HTML **Odpal**), w menu
   Podgląd, Kopiuj ścieżkę, Otwórz w nowej karcie, Kopiuj obraz, Pokaż w folderze. Podgląd w oknie
   (`sklep.podglad`): obraz, wideo, dźwięk, PDF (w `<iframe sandbox>` z `/file`, z linkiem zapasowym), tekst i kod
@@ -1364,7 +1385,8 @@ innych kanałów etap 6.
   w szablonach `html` także wcięcia po nowej linii, które htm i tak pomija) i pilnuje budżetu gzip
   (`BUDZET_GZIP`: rdzeń JS ≤ 100 KB, CSS ≤ 18 KB, Mózg ≤ 14 KB; przekroczenie zatrzymuje build). 17.11: rdzeń JS
   ok. 278 KB (86,6 KB gzip), CSS 80 KB (16,1 KB gzip); wcześniej jeden pakiet 262 KB gzip. 20.11: rdzeń 97,2 KB gzip
-  (rozwijane kroki i komendy po „/” w kompozytorze), budżet 95 → 100 KB. Pliki rdzenia nie mogą
+  (rozwijane kroki i komendy po „/” w kompozytorze), budżet 95 → 100 KB; potem 97,8 KB JS i 17,4 KB CSS (licznik
+  rozmowy, dopisek Enterem, pasek z przewijanym środkiem). Pliki rdzenia nie mogą
   sięgać do nazw z pakietów inaczej niż przez `Zasoby.wez`, a pakiety nie zmieniają `let` rdzenia (język ustawia
   `ustawJezyk`).
 

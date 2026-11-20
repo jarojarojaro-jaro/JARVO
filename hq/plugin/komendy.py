@@ -1,4 +1,5 @@
-"""Komendy po `/` w panelu Jarvo (docs/HQ.md „Komendy”): `/model`, `/new`, `/stop`, `/usage`, `/status`, `/help`.
+"""Komendy po `/` w panelu Jarvo (docs/HQ.md „Komendy”): `/model`, `/new`, `/stop`, `/usage`, `/context`, `/status`,
+`/compact` (omp), `/help`, oraz licznik zużycia rozmowy (`GET /rozmowy/{id}/licznik`).
 
 Brama Hermesa (API server: `/v1/runs`, `/api/sessions`) nie wykonuje komend: `input` przebiegu idzie prosto do
 `AIAgent.run_conversation`, a obsługa `/…` żyje tylko w GatewayRunnerze kanałów (Telegram, Discord). Dlatego panel
@@ -15,9 +16,22 @@ samymi drogami co Hermes:
   w rodowodzie: oś pokazuje dalej starą, agent zaczyna bez historii). Sesja omp jest stała we wpisie sesje.json.
 - **`/stop`**: zatrzymuje pracę w rozmowie (jak Esc Esc). **`/usage`**: tokeny przebiegów rozmowy (Hermes, `usage`
   ze stanu przebiegu) albo sesji omp (plik sesji). **`/status`**: agent, zaplecze, sesja, model, zużycie.
+  **`/context`** (alias `/ctx`): to, co pokazuje licznik pod kompozytorem, jako tekst.
+- **`/compact`** (alias `/compress`) w sesji omp: komenda RPC skrzynki (`omp_sesje.komenda` + `wynik_komendy`), także
+  w trakcie tury; wynik w rozmowie od razu, a gdy kompresja trwa dłużej niż `KOMENDA_CZEKAJ_S`, drugi wpis z wynikiem
+  po jej końcu. Komendy, które skrzynka zgłasza w `omp_sesje.komendy_omp`, też działają tą drogą. Dla Hermesa
+  `/compress` jest niedostępne: brama API nie ma kompresji na żądanie (nie wykonuje komend: `input` idzie do modelu,
+  `PATCH /api/sessions/{id}` zmienia tylko pola sesji), a ręczna kompresja żyje tylko w GatewayRunnerze kanałów
+  (`gateway/slash_commands_session.py` `_run_manual_compression`: tymczasowy AIAgent z poświadczeniami profilu, blokada
+  kompresji, rotacja sesji, zrzut agenta z pamięci bramy). Dashboard nie może tego zrobić bez poświadczeń profilu
+  i wyścigu z bramą; trzeba trasy w bramie (np. `POST /api/sessions/{id}/compress` na tym samym rdzeniu).
 - **`/help`** (alias `/commands`): komendy tej rozmowy. Pozostałe komendy z rejestru Hermesa
-  (`hermes_cli.commands.COMMAND_REGISTRY`, bez `cli_only`) lista pokazuje jako niedostępne w panelu z powodem;
-  `/compress` też: kompresji na żądanie brama nie udostępnia (sesja API kompresuje się sama przy progu kontekstu).
+  (`hermes_cli.commands.COMMAND_REGISTRY`, bez `cli_only`) lista pokazuje jako niedostępne w panelu z powodem.
+- **Licznik** (`Wykonawca.licznik`): model, kontekst (tokeny i % okna), tokeny wejścia i wyjścia, cache, koszt.
+  omp: `omp_sesje.licznik` (skrzynka odświeża go w trakcie tury). Hermes: liczniki i koszt z wierszy `sessions`
+  rodowodu członka (`czytnik.zuzycie`, Hermes pisze je w trakcie tury; dolnym progiem jest suma `usage` przebiegów
+  rozmowy), kontekst szacowany z rozmiaru aktywnych wierszy najnowszej sesji (znaki / 4, `szacunek`), okno z metadanych
+  modelu Hermesa (`okno_modelu`).
 
 Wynik w rozmowie to wpis systemowy `{typ: "komenda", polecenie, agent, ok, wynik, wynik_en, wybor}` (scalanie nie
 daje go do bloku kontekstu agenta), poza rozmową (ekran startu) tylko odpowiedź trasy. Trasy: `GET /komendy`
@@ -30,8 +44,10 @@ from __future__ import annotations
 import asyncio
 import functools
 import json
+import os
 import re
 import subprocess
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
@@ -45,6 +61,11 @@ MODELE_NA_DOSTAWCE = 8
 DOSTAWCY_MAKS = 8
 KANDYDACI_MAKS = 12
 DO_ZATRZYMANIA = ("wysylanie", "przyjety", "pracuje", "czeka_na_ture", "czeka_na_zgode", "zatrzymywanie")
+KOMENDA_CZEKAJ_S = 20.0          # tyle trasa czeka na wynik komendy skrzynki omp, potem wynik przychodzi drugim wpisem
+KOMENDA_MAKS_S = 900.0           # dłużej komenda skrzynki nie może trwać (potem wpis „nie skończyła się”)
+OKNO_PAMIEC_S = 600.0            # okno kontekstu modelu pamiętane 10 min (metadane Hermesa mogą pytać sieci)
+LICZNIK_ZERO = {"model": "", "kontekst": 0, "okno": 0, "procent": 0.0, "wejscie": 0, "wyjscie": 0, "cache_odczyt": 0,
+                "cache_zapis": 0, "koszt": 0.0, "czas": 0.0}
 
 
 def parsuj(tekst: str) -> tuple[str, str] | None:
@@ -79,13 +100,16 @@ PANEL: tuple[Def, ...] = (
     Def("stop", "Zatrzymaj trwającą pracę w tej rozmowie", "Stop the work running in this conversation"),
     Def("usage", "Zużycie tokenów w tej rozmowie", "Token usage in this conversation"),
     Def("status", "Sesja, model i zużycie agenta", "Agent session, model and usage"),
-    Def("compress", "Skompresuj kontekst rozmowy", "Compress the conversation context", aliasy=("compact",), zaplecza=(),
+    Def("context", "Kontekst: model, tokeny i % okna, cache, koszt", "Context: model, tokens and % of the window, cache, cost",
+        aliasy=("ctx",)),
+    Def("compact", "Skompresuj kontekst sesji (opcjonalnie: na czym się skupić)",
+        "Compact the session context (optionally: what to focus on)", "[instrukcje]", aliasy=("compress",),
+        zaplecza=("omp",),
         powody={"hermes": ("Brama Hermesa nie ma kompresji na żądanie dla sesji z panelu (tylko automatyczną przy progu "
-                           "kontekstu). Czysta sesja: /new.",
+                           "kontekstu); ręczne /compress działa w Telegramie i w terminalu. Czysta sesja: /new.",
                            "The Hermes gateway has no on-demand compression for panel sessions (only the automatic one "
-                           "at the context threshold). For a clean session: /new."),
-                "omp": ("Sesja omp kompresuje się sama; ręczne /compact działa w terminalu omp.",
-                        "The omp session compacts itself; a manual /compact works in the omp terminal.")}),
+                           "at the context threshold); a manual /compress works in Telegram and in the terminal. For a "
+                           "clean session: /new.")}),
     Def("help", "Komendy dostępne w tej rozmowie", "Commands available in this conversation", aliasy=("commands",)),
 )
 _PANEL = {n: d for d in PANEL for n in (d.nazwa, *d.aliasy)}
@@ -111,15 +135,21 @@ def rejestr_hermesa() -> list[dict]:
     return out
 
 
-def katalog(zaplecze: str, rejestr: Iterable[Mapping] | None = None) -> list[dict]:
-    """Komendy rozmowy: najpierw te, które panel wykonuje, potem niedostępne (z powodem), potem reszta rejestru
-    Hermesa (tylko w rozmowie z agentem Hermesa)."""
+def katalog(zaplecze: str, rejestr: Iterable[Mapping] | None = None, omp: Iterable[Mapping] = ()) -> list[dict]:
+    """Komendy rozmowy: najpierw te, które panel wykonuje (w sesji omp także te, które zgłasza skrzynka:
+    `omp_sesje.komendy_omp`), potem niedostępne (z powodem), potem reszta rejestru Hermesa (tylko w rozmowie
+    z agentem Hermesa)."""
     dzialaja, nie = [], []
     for d in PANEL:
         powod = d.powody.get(zaplecze) or ("", "")
         wpis = {"nazwa": d.nazwa, "aliasy": list(d.aliasy), "opis": d.opis, "opis_en": d.opis_en, "panel": True,
                 "argumenty": d.argumenty, "dziala": zaplecze in d.zaplecza, "powod": powod[0], "powod_en": powod[1]}
         (dzialaja if wpis["dziala"] else nie).append(wpis)
+    if zaplecze == "omp":
+        for c in omp:
+            if c.get("nazwa") and c["nazwa"] not in _PANEL:
+                dzialaja.append({"nazwa": c["nazwa"], "aliasy": [], "opis": c.get("opis") or "", "opis_en": c.get("opis") or "",
+                                 "panel": False, "argumenty": "", "dziala": True, "powod": "", "powod_en": ""})
     if zaplecze == "hermes":
         znane = set(_PANEL)
         for c in rejestr_hermesa() if rejestr is None else rejestr:
@@ -283,21 +313,52 @@ class Kontekst:
     nazwa: str
     zaplecze: str = "hermes"
     wpis_omp: Any = None
+    klucz: str = ""                                  # klucz wpisu komendy (komenda skrzynki omp dostaje ten sam)
+    po_czasie: Callable[["Wynik"], None] | None = None    # drugi wpis z wynikiem, gdy komenda skończy się później
+
+
+def okno_modelu(profil: str, wybrany: Mapping | None = None) -> dict:
+    """{model, provider, okno}: model członka (wybór panelu albo z config.yaml profilu) i jego okno kontekstu
+    w tokenach z metadanych Hermesa (ta sama funkcja co `GET /api/model/info` dashboardu; nadpisanie
+    `model.context_length` z config.yaml dla modelu profilu). Bez Hermesa w procesie: puste i 0."""
+    try:
+        from hermes_cli.web_routers.models import get_model_info  # noqa: PLC0415
+        info = get_model_info(profile=profil) or {}
+    except Exception:
+        info = {}
+    model, provider = str(info.get("model") or ""), str(info.get("provider") or "")
+    okno = int(info.get("effective_context_length") or 0)
+    if wybrany and (str(wybrany.get("model") or ""), str(wybrany.get("provider") or "")) != (model, provider):
+        model, provider = str(wybrany.get("model") or ""), str(wybrany.get("provider") or "")
+        try:
+            from agent.model_metadata import get_model_context_length  # noqa: PLC0415
+            okno = int(get_model_context_length(model=model, base_url="", provider=provider,
+                                                config_context_length=None) or 0)
+        except Exception:
+            okno = 0
+    return {"model": model, "provider": provider, "okno": okno}
 
 
 class Wykonawca:
     """Wykonanie komend na pętli silnika (`sil.wykonaj`); blokujące rzeczy (omp, pliki, config.yaml) w wątkach."""
 
     def __init__(self, *, m, zapis_globalny: Callable[[Path, str, str], None] | None = None,
-                 lista_omp: Callable[[], list[dict]] | None = None, rejestr: Callable[[], list[dict]] | None = None):
+                 lista_omp: Callable[[], list[dict]] | None = None, rejestr: Callable[[], list[dict]] | None = None,
+                 okno: Callable[[str, Mapping | None], dict] | None = None, czekaj_s: float = KOMENDA_CZEKAJ_S,
+                 maks_s: float = KOMENDA_MAKS_S, odstep_s: float = 0.5):
         self.m = m
         self.zapis_globalny = zapis_globalny or zapisz_model_profilu
         self.lista_omp = lista_omp or (lambda: modele_omp(m.omp_sesje.program_omp()))
         self.rejestr = rejestr or rejestr_hermesa
+        self.okno = okno or okno_modelu
+        self.czekaj_s, self.maks_s, self.odstep_s = czekaj_s, maks_s, odstep_s
+        self._okna: dict[tuple, tuple[float, dict]] = {}
 
     async def wykonaj(self, k: Kontekst, nazwa: str, args: str) -> Wynik:
         d = _PANEL.get(nazwa)
         if d is None:
+            if k.zaplecze == "omp" and nazwa in {c["nazwa"] for c in await self._komendy_omp(k)}:
+                return await self._omp_komenda(k, nazwa, args)
             znane = {c["nazwa"]: c for c in await asyncio.to_thread(self.rejestr)} if k.zaplecze == "hermes" else {}
             znane.update({a: c for c in list(znane.values()) for a in c.get("aliasy") or []})
             if nazwa in znane:
@@ -311,17 +372,141 @@ class Wykonawca:
             return blad(f"{_kod('/' + d.nazwa)}: {pl}", f"{_kod('/' + d.nazwa)}: {en}")
         return await getattr(self, f"_{d.nazwa}")(k, args)
 
+    async def _komendy_omp(self, k: Kontekst) -> list[dict]:
+        """Komendy, które skrzynka sesji omp umie wykonać (`omp_sesje.komendy_omp`); niedostępna skrzynka: []."""
+        if k.zaplecze != "omp" or k.wpis_omp is None or getattr(k.wpis_omp, "blad", ""):
+            return []
+        try:
+            return [c for c in await asyncio.to_thread(self.m.omp_sesje.komendy_omp, k.wpis_omp) if c.get("nazwa")]
+        except Exception:
+            return []
+
+    # ------------------------------------------------------------------- komendy skrzynki omp (/compact)
+    async def _compact(self, k: Kontekst, args: str) -> Wynik:
+        return await self._omp_komenda(k, "compact", args)
+
+    async def _omp_komenda(self, k: Kontekst, nazwa: str, args: str) -> Wynik:
+        """Komenda RPC skrzynki sesji omp (także w trakcie tury): zapis do skrzynki, potem wynik. Czeka najwyżej
+        `czekaj_s`; dłuższa (kompresja potrafi trwać minuty) kończy się drugim wpisem w rozmowie (`po_czasie`)."""
+        omp, w = self.m.omp_sesje, k.wpis_omp
+        if w is None or getattr(w, "blad", ""):
+            return blad("Sesja omp tej rozmowy jest niedostępna.", "This conversation's omp session is unavailable.")
+        klucz = k.klucz or os.urandom(8).hex()
+        try:
+            await asyncio.to_thread(omp.komenda, w, nazwa, args, klucz)
+        except Exception as exc:
+            return blad(f"Skrzynka sesji nie przyjęła {_kod('/' + nazwa)} ({str(exc)[:120] or type(exc).__name__}).",
+                        f"The session inbox did not accept {_kod('/' + nazwa)} ({str(exc)[:120] or type(exc).__name__}).")
+        st = await self._czekaj_na_komende(w, klucz, self.czekaj_s)
+        if st is not None:
+            return self._wynik_omp(nazwa, st)
+        if k.po_czasie is not None:
+            k.sil.rejestr.zadanie(self._dokoncz_omp(k, nazwa, klucz))
+        return Wynik().linia(f"{_kod('/' + nazwa)} trwa w sesji omp {k.nazwa}; wynik pojawi się tutaj, gdy się skończy.",
+                             f"{_kod('/' + nazwa)} is running in {k.nazwa}'s omp session; the result will appear here "
+                             "when it finishes.")
+
+    async def _czekaj_na_komende(self, w, klucz: str, ile_s: float) -> dict | None:
+        koniec = time.monotonic() + ile_s
+        while True:
+            try:
+                st = await asyncio.to_thread(self.m.omp_sesje.wynik_komendy, w, klucz)
+            except Exception as exc:
+                st = {"stan": "blad", "blad": str(exc)[:200] or type(exc).__name__}
+            if st.get("stan") in ("gotowe", "blad"):
+                return st
+            if time.monotonic() >= koniec:
+                return None
+            await asyncio.sleep(self.odstep_s)
+
+    async def _dokoncz_omp(self, k: Kontekst, nazwa: str, klucz: str) -> None:
+        st = await self._czekaj_na_komende(k.wpis_omp, klucz, self.maks_s)
+        wynik = self._wynik_omp(nazwa, st) if st is not None else blad(
+            f"{_kod('/' + nazwa)} nie skończyła się w {int(self.maks_s // 60)} min. Stan sesji: {_kod('/context')}.",
+            f"{_kod('/' + nazwa)} did not finish within {int(self.maks_s // 60)} min. Session state: {_kod('/context')}.")
+        k.po_czasie(wynik)
+
+    def _wynik_omp(self, nazwa: str, st: Mapping) -> Wynik:
+        utajnij = self.m.ochrona.utajnij
+        if st.get("stan") == "blad":
+            b = utajnij(str(st.get("blad") or "nieznany błąd"))[:300]
+            return blad(f"{_kod('/' + nazwa)} się nie udała: {b}", f"{_kod('/' + nazwa)} failed: {b}")
+        tekst = utajnij(str(st.get("wynik") or "")).strip()[:2000]
+        if nazwa == "compact":
+            return Wynik().linia(f"Kontekst sesji skompresowany.{' ' + tekst if tekst else ''}",
+                                 f"Session context compacted.{' ' + tekst if tekst else ''}")
+        return Wynik().linia(f"{_kod('/' + nazwa)}: {tekst or 'gotowe'}", f"{_kod('/' + nazwa)}: {tekst or 'done'}")
+
+    # ------------------------------------------------------------------- licznik, /context
+    async def licznik(self, k: Kontekst) -> dict:
+        """Licznik rozmowy (pasek pod kompozytorem, `/context`): kształt `LICZNIK_ZERO` + `zaplecze`, `szacunek`.
+        Nigdy wyjątek: czego nie wiadomo, to zero."""
+        if k.zaplecze == "omp":
+            d: Mapping = {}
+            if k.wpis_omp is not None and not getattr(k.wpis_omp, "blad", ""):
+                try:
+                    d = await asyncio.to_thread(self.m.omp_sesje.licznik, k.wpis_omp) or {}
+                except Exception:
+                    d = {}
+            out = {x: d.get(x) or v for x, v in LICZNIK_ZERO.items()}
+            return {**out, "zaplecze": "omp", "szacunek": False}
+        wid = k.watek["id"] if k.watek else None
+        wybrany = k.sil.db.model_czlonka(wid, k.agent) if wid else None
+        klucz_okna = (k.agent, (wybrany or {}).get("model"), (wybrany or {}).get("provider"))
+        teraz = time.monotonic()
+        jest = self._okna.get(klucz_okna)
+        if jest is None or teraz - jest[0] > OKNO_PAMIEC_S:
+            try:
+                jest = (teraz, await asyncio.to_thread(self.okno, k.agent, wybrany))
+            except Exception:
+                jest = (teraz, {"model": (wybrany or {}).get("model") or "", "okno": 0})
+            self._okna[klucz_okna] = jest
+        m = jest[1]
+        z, u = (await asyncio.to_thread(self._zuzycie_hermes, k)) if wid else (dict(LICZNIK_ZERO), {})
+        kontekst = (int(z.get("znaki") or 0) + 3) // 4
+        okno = int(m.get("okno") or 0)
+        # state.db liczy wszystko, co Hermes rozliczył w sesji (także w trakcie tury), `usage` przebiegów tylko
+        # skończone tury panelu: większa z dwóch liczb, żeby licznik nie cofał się, gdy któreś źródło milczy
+        return {**LICZNIK_ZERO, "zaplecze": "hermes", "szacunek": True, "model": str(m.get("model") or ""),
+                "kontekst": kontekst, "okno": okno, "procent": round(100.0 * kontekst / okno, 1) if okno else 0.0,
+                **{x: max(int(z.get(x) or 0), int(u.get(x) or 0)) for x in ("wejscie", "wyjscie", "cache_odczyt", "cache_zapis")},
+                "koszt": float(z.get("koszt") or 0), "czas": time.time()}
+
+    def _zuzycie_hermes(self, k: Kontekst) -> tuple[dict, dict]:
+        rodowod = [s["sesja_id"] for s in k.sil.db.sesje_watku(k.watek["id"], agent=k.agent, rola="rozmowa")]
+        return k.sil.czytnik.zuzycie(k.agent, rodowod), self._uzycie_hermes(k)["rozmowa"]
+
+    async def _context(self, k: Kontekst, args: str) -> Wynik:
+        if not k.watek:
+            return blad("Kontekst liczę dla rozmowy: otwórz rozmowę.", "Context is counted per conversation: open one.")
+        d = await self.licznik(k)
+        ok_ = "≈ " if d["szacunek"] else ""
+        okno = f" z {_liczba(d['okno'])} ({d['procent']:.0f}%)" if d["okno"] else ""
+        okno_en = f" of {_liczba(d['okno'])} ({d['procent']:.0f}%)" if d["okno"] else ""
+        koszt = f" · koszt ${d['koszt']:.2f}" if d["koszt"] else ""
+        w = Wynik().linia(f"**{k.nazwa}** · {_kod(d['model'] or '?')}", f"**{k.nazwa}** · {_kod(d['model'] or '?')}")
+        w.linia(f"- Kontekst: {ok_}{_liczba(d['kontekst'])} tokenów{okno}",
+                f"- Context: {ok_}{_liczba(d['kontekst'])} tokens{okno_en}")
+        w.linia(f"- Wejście {_liczba(d['wejscie'])} · wyjście {_liczba(d['wyjscie'])} · cache {_liczba(d['cache_odczyt'])} "
+                f"odczyt, {_liczba(d['cache_zapis'])} zapis{koszt}",
+                f"- Input {_liczba(d['wejscie'])} · output {_liczba(d['wyjscie'])} · cache {_liczba(d['cache_odczyt'])} "
+                f"read, {_liczba(d['cache_zapis'])} write{koszt.replace('koszt', 'cost')}")
+        if d["szacunek"]:
+            w.linia("Kontekst Hermesa to szacunek z treści sesji (bez promptu systemowego i narzędzi).",
+                    "The Hermes context is an estimate from the session content (without the system prompt and tools).")
+        return w
+
     # ------------------------------------------------------------------- /help
     async def _help(self, k: Kontekst, args: str) -> Wynik:
         w = Wynik()
         zap = "omp" if k.zaplecze == "omp" else "Hermes"
         w.linia(f"**Komendy w tej rozmowie** ({k.nazwa} · {zap})", f"**Commands in this conversation** ({k.nazwa} · {zap})")
-        for c in katalog(k.zaplecze, []):
+        for c in katalog(k.zaplecze, [], await self._komendy_omp(k)):
             nazwa = " ".join(x for x in (f"/{c['nazwa']}", c["argumenty"]) if x)
             if c["dziala"]:
-                w.linia(f"- {_kod(nazwa)} — {c['opis']}", f"- {_kod(nazwa)} — {c['opis_en']}")
+                w.linia(f"- {_kod(nazwa)}: {c['opis']}", f"- {_kod(nazwa)}: {c['opis_en']}")
             else:
-                w.linia(f"- ~~/{c['nazwa']}~~ — {c['powod']}", f"- ~~/{c['nazwa']}~~ — {c['powod_en']}")
+                w.linia(f"- ~~/{c['nazwa']}~~: {c['powod']}", f"- ~~/{c['nazwa']}~~: {c['powod_en']}")
         if k.zaplecze == "hermes":
             w.linia("", "")
             w.linia("Pozostałe komendy Hermesa działają w Telegramie i w terminalu; panel pokaże je w menu jako "
@@ -355,20 +540,20 @@ class Wykonawca:
         if not a.cel:
             w = Wynik()
             if wybrany:
-                w.linia(f"Model tej rozmowy: {opis(wybrany)} — wybrany w panelu. Domyślny agenta: {opis(domyslny)}.",
-                        f"Model of this conversation: {opis(wybrany)} — picked in the panel. Agent default: "
+                w.linia(f"Model tej rozmowy: {opis(wybrany)}, wybrany w panelu. Domyślny agenta: {opis(domyslny)}.",
+                        f"Model of this conversation: {opis(wybrany)}, picked in the panel. Agent default: "
                         f"{opis(domyslny)}.")
             else:
-                w.linia(f"Model: {opis(domyslny)} — domyślny agenta {k.nazwa}.",
-                        f"Model: {opis(domyslny)} — {k.nazwa}'s default.")
+                w.linia(f"Model: {opis(domyslny)}, domyślny agenta {k.nazwa}.",
+                        f"Model: {opis(domyslny)}, {k.nazwa}'s default.")
             w.linia("", "")
             biezacy = wybrany or domyslny
             for d in dostawcy[:DOSTAWCY_MAKS]:
                 modele = d["modele"][:MODELE_NA_DOSTAWCE]
                 reszta = max(0, d["razem"] - len(modele))
                 w.linia(f"**{d['nazwa']}** {_kod('--provider ' + d['slug'])}"
-                        + (f" — jeszcze {reszta}" if reszta else ""),
-                        f"**{d['nazwa']}** {_kod('--provider ' + d['slug'])}" + (f" — {reszta} more" if reszta else ""))
+                        + (f", jeszcze {reszta}" if reszta else ""),
+                        f"**{d['nazwa']}** {_kod('--provider ' + d['slug'])}" + (f", {reszta} more" if reszta else ""))
                 for mm in modele:
                     w.wybor.append({"model": mm, "provider": d["slug"], "nazwa": d["nazwa"],
                                     "biezacy": mm == biezacy["model"] and d["slug"] == biezacy["provider"]})
@@ -384,7 +569,7 @@ class Wykonawca:
         cel, kandydaci = znajdz_model(dostawcy, a.cel, a.dostawca)
         if cel is None:
             if kandydaci:
-                w = blad(f"„{a.cel}” pasuje do kilku modeli — wybierz jeden:", f"“{a.cel}” matches several models — pick one:")
+                w = blad(f"„{a.cel}” pasuje do kilku modeli, wybierz jeden:", f"“{a.cel}” matches several models, pick one:")
                 w.wybor = kandydaci
                 return w
             return blad(f"Nie znalazłem modelu „{a.cel}”{' u ' + a.dostawca if a.dostawca else ''} u dostawców agenta "
@@ -405,9 +590,9 @@ class Wykonawca:
                                  f"{k.nazwa}'s default model: {opis(cel)}. Applies from the next message in all "
                                  "conversations with the agent.")
         if not wid:
-            return blad("Model rozmowy zmienia się w rozmowie — napisz pierwszą wiadomość albo dodaj "
+            return blad("Model rozmowy zmienia się w rozmowie: napisz pierwszą wiadomość albo dodaj "
                         f"{_kod('--global')}, żeby zmienić domyślny model agenta.",
-                        "A conversation's model is switched inside the conversation — send the first message or add "
+                        "A conversation's model is switched inside the conversation: send the first message or add "
                         f"{_kod('--global')} to change the agent's default model.")
         domyslny_wybor = cel["model"] == domyslny["model"] and cel["provider"] == domyslny["provider"]
         k.sil.db.ustaw_model_czlonka(wid, k.agent, None if domyslny_wybor else cel)
@@ -439,16 +624,16 @@ class Wykonawca:
         if not a.cel:
             r = Wynik()
             r.linia(f"Model sesji omp: **{biezacy or 'domyślny omp'}**"
-                    + (" — wybrany w panelu." if wybrany else ".")
+                    + (", wybrany w panelu." if wybrany else ".")
                     + (f" Ostatnia odpowiedź: {_kod(ostatni)}." if ostatni and ostatni != biezacy else ""),
-                    f"omp session model: **{biezacy or 'omp default'}**" + (" — picked in the panel." if wybrany else ".")
+                    f"omp session model: **{biezacy or 'omp default'}**" + (", picked in the panel." if wybrany else ".")
                     + (f" Last reply: {_kod(ostatni)}." if ostatni and ostatni != biezacy else ""))
             grupy: dict[str, list[dict]] = {}
             for x in modele:
                 grupy.setdefault(x["provider"], []).append(x)
             for dost, lista in list(grupy.items())[:DOSTAWCY_MAKS]:
                 reszta = max(0, len(lista) - MODELE_NA_DOSTAWCE)
-                r.linia(f"**{dost}**" + (f" — jeszcze {reszta}" if reszta else ""), f"**{dost}**" + (f" — {reszta} more" if reszta else ""))
+                r.linia(f"**{dost}**" + (f", jeszcze {reszta}" if reszta else ""), f"**{dost}**" + (f", {reszta} more" if reszta else ""))
                 r.wybor += [{"model": x["model"], "provider": "", "nazwa": x["nazwa"], "biezacy": x["model"] == biezacy}
                             for x in lista[:MODELE_NA_DOSTAWCE]]
             r.linia("", "")
@@ -462,7 +647,7 @@ class Wykonawca:
         pasujace = dokladne or [x for x in modele if c in x["model"].lower() or c in x["nazwa"].lower()]
         if len(pasujace) != 1:
             if pasujace:
-                r = blad(f"„{a.cel}” pasuje do kilku modeli — wybierz jeden:", f"“{a.cel}” matches several models — pick one:")
+                r = blad(f"„{a.cel}” pasuje do kilku modeli, wybierz jeden:", f"“{a.cel}” matches several models, pick one:")
                 r.wybor = [{"model": x["model"], "provider": "", "nazwa": x["nazwa"]} for x in pasujace[:KANDYDACI_MAKS]]
                 return r
             return blad(f"omp nie zna modelu „{a.cel}”. Lista: {_kod('/model')}.",
@@ -504,8 +689,8 @@ class Wykonawca:
     # ------------------------------------------------------------------- /new
     async def _new(self, k: Kontekst, args: str) -> Wynik:
         if not k.watek:
-            return blad("Nowa rozmowa zaczyna się od pierwszej wiadomości — tu sesji jeszcze nie ma.",
-                        "A new conversation starts with the first message — there is no session here yet.")
+            return blad("Nowa rozmowa zaczyna się od pierwszej wiadomości: tu sesji jeszcze nie ma.",
+                        "A new conversation starts with the first message: there is no session here yet.")
         n = await self._zatrzymaj(k, [p for p in self._aktywne(k, agent=k.agent) if (p.get("rola") or "rozmowa") == "rozmowa"])
         try:
             sid = await k.sil.rejestr.nowa_sesja(k.watek["id"], k.agent)
@@ -513,8 +698,8 @@ class Wykonawca:
             return blad(f"Brama Hermesa nie założyła nowej sesji ({e.kod}). Spróbuj za chwilę.",
                         f"The Hermes gateway did not create a new session ({e.kod}). Try again shortly.")
         if sid is None:
-            return Wynik().linia(f"{k.nazwa} nie ma jeszcze sesji w tej rozmowie — następna wiadomość i tak zacznie "
-                                 "czystą.", f"{k.nazwa} has no session in this conversation yet — the next message starts "
+            return Wynik().linia(f"{k.nazwa} nie ma jeszcze sesji w tej rozmowie, następna wiadomość i tak zacznie "
+                                 "czystą.", f"{k.nazwa} has no session in this conversation yet, the next message starts "
                                  "a clean one anyway.")
         return Wynik().linia(
             ("Zatrzymałem trwającą pracę. " if n else "") + f"Nowa sesja: {k.nazwa} zaczyna od następnej wiadomości bez "
@@ -526,7 +711,7 @@ class Wykonawca:
     def _uzycie_hermes(self, k: Kontekst) -> dict:
         czl = k.sil.db.czlonek(k.watek["id"], k.agent) or {}
         tip = czl.get("sesja_tip") or czl.get("sesja_id")
-        suma = {"tury": 0, "wejscie": 0, "wyjscie": 0, "razem": 0}
+        suma = {"tury": 0, "wejscie": 0, "wyjscie": 0, "razem": 0, "cache_odczyt": 0, "cache_zapis": 0}
         sesja = dict(suma)
         for p in k.sil.db.przebiegi_watku(k.watek["id"]):
             u = p.get("uzycie") if isinstance(p.get("uzycie"), dict) else None
@@ -537,11 +722,13 @@ class Wykonawca:
                 cel["wejscie"] += int(u.get("input_tokens") or 0)
                 cel["wyjscie"] += int(u.get("output_tokens") or 0)
                 cel["razem"] += int(u.get("total_tokens") or 0) or int(u.get("input_tokens") or 0) + int(u.get("output_tokens") or 0)
+                cel["cache_odczyt"] += int(u.get("cache_read_tokens") or 0)
+                cel["cache_zapis"] += int(u.get("cache_write_tokens") or 0)
         return {"rozmowa": suma, "sesja": sesja, "tip": tip}
 
     async def _usage(self, k: Kontekst, args: str) -> Wynik:
         if not k.watek:
-            return blad("Zużycie liczę dla rozmowy — otwórz rozmowę.", "Usage is counted per conversation — open one.")
+            return blad("Zużycie liczę dla rozmowy: otwórz rozmowę.", "Usage is counted per conversation: open one.")
         if k.zaplecze == "omp":
             s = await asyncio.to_thread(self.m.omp_sesje.podsumowanie_sesji, k.wpis_omp)
             return Wynik().linia(
@@ -589,7 +776,7 @@ class Wykonawca:
             w.linia(f"- Model: {_kod(model)}", f"- Model: {_kod(model)}")
             if k.watek:
                 u = await asyncio.to_thread(self._uzycie_hermes, k)
-                w.linia(f"- Sesja: {_kod(u['tip'] or '—')}", f"- Session: {_kod(u['tip'] or '—')}")
+                w.linia(f"- Sesja: {_kod(u['tip'] or 'brak')}", f"- Session: {_kod(u['tip'] or 'none')}")
                 w.linia(f"- Tury w rozmowie: {u['rozmowa']['tury']} · razem {_liczba(u['rozmowa']['razem'])} tokenów",
                         f"- Turns in the conversation: {u['rozmowa']['tury']} · total {_liczba(u['rozmowa']['razem'])} tokens")
         if k.watek:
@@ -680,17 +867,32 @@ def dolacz(router, *, m, trasy, silnik: Callable[[], Any], agenci, hub, log: Cal
         watek: str | None = None
         agent: str | None = Field(None, max_length=64)
 
-    @trasa("GET", "/komendy")
-    @obsluga
-    async def lista_komend(request: Request, watek: str = "", agent: str = ""):
+    w_locie: dict[tuple, asyncio.Future] = {}          # (wątek, klucz) → wykonanie komendy w toku
+
+    def tylko_panel(request: Request) -> None:
         skad = (request.headers.get("sec-fetch-site") or "").strip().lower()
         if skad and skad not in trasy.ODCZYT_ZRODLA:
             raise Blad(403, "csrf", "Odmowa odczytu: żądanie nie przyszło z panelu Jarvo.",
                        "Read refused: the request did not come from the Jarvo dashboard.")
+
+    @trasa("GET", "/komendy")
+    @obsluga
+    async def lista_komend(request: Request, watek: str = "", agent: str = ""):
+        tylko_panel(request)
         sil = s()
         k, _ = await asyncio.to_thread(kontekst, sil, watek or None, agent or None)
-        lista = await asyncio.to_thread(katalog, k.zaplecze, None)
+        lista = await asyncio.to_thread(katalog, k.zaplecze, None, await wyk._komendy_omp(k))
         return {"zaplecze": k.zaplecze, "agent": k.agent, "nazwa": k.nazwa, "komendy": lista}
+
+    @trasa("GET", "/rozmowy/{wid}/licznik")
+    @obsluga
+    async def licznik(wid: str, request: Request):
+        """Licznik pod kompozytorem: model, kontekst i % okna, tokeny, cache, koszt (panel pyta co 2 s w trakcie pracy
+        otwartej rozmowy, rzadziej bez niej)."""
+        tylko_panel(request)
+        sil = s()
+        k, _ = await asyncio.to_thread(kontekst, sil, wid, None)
+        return {"licznik": await wyk.licznik(k)}
 
     @trasa("POST", "/komendy")
     @obsluga
@@ -711,9 +913,21 @@ def dolacz(router, *, m, trasy, silnik: Callable[[], Any], agenci, hub, log: Cal
         nazwa, args = p
         k, args = await asyncio.to_thread(kontekst, sil, body.watek, body.agent, args)
         if k.watek and k.watek.get("usuniety_at"):
-            raise Blad(409, "w_koszu", "Ta rozmowa jest w koszu — przywróć ją, żeby pisać dalej.",
-                       "This conversation is in the trash — restore it to keep writing.")
+            raise Blad(409, "w_koszu", "Ta rozmowa jest w koszu: przywróć ją, żeby pisać dalej.",
+                       "This conversation is in the trash: restore it to keep writing.")
         polecenie = " ".join(body.tekst.split())[:200]
+        k.klucz = body.klucz
+
+        def po_czasie(wynik: Wynik) -> None:
+            """Wynik komendy, która skończyła się po odpowiedzi trasy (kompresja omp): drugi wpis w rozmowie."""
+            wid = k.watek["id"]
+            dane = {"typ": "komenda", "polecenie": polecenie, "agent": k.agent, **wynik.dane()}
+            w = sil.db.dodaj_wpis(wid, rodzaj="system", tekst=polecenie, dane=dane, klucz=f"{body.klucz[:60]}_w")
+            if not w.get("powtorzony"):
+                hub.nadaj("watek.wpis", {"watek_id": wid, "wpis": w}, watek_id=wid)
+            log(f"jarvo-hq: komenda /{nazwa} {k.agent} ({k.zaplecze}) skończona → {'ok' if wynik.ok else 'odmowa'}")
+
+        k.po_czasie = po_czasie if k.watek else None
 
         async def _r():
             try:
@@ -730,6 +944,18 @@ def dolacz(router, *, m, trasy, silnik: Callable[[], Any], agenci, hub, log: Cal
                 hub.nadaj("watek.wpis", {"watek_id": wid, "wpis": w}, watek_id=wid)
             return {"wynik": {**wynik.dane(), "polecenie": polecenie, "agent": k.agent}, "wpis": w}
 
-        return await sil.wykonaj(_r())
+        async def _raz():
+            # ten sam klucz w trakcie wykonania (ponowione żądanie, gdy komenda skrzynki czeka do 20 s): to samo
+            # wykonanie, bez drugiej komendy
+            if not k.watek:
+                return await _r()
+            klucz = (k.watek["id"], body.klucz)
+            f = w_locie.get(klucz)
+            if f is None:
+                f = w_locie[klucz] = asyncio.ensure_future(_r())
+                f.add_done_callback(lambda _f: w_locie.pop(klucz, None))
+            return await asyncio.shield(f)
+
+        return await sil.wykonaj(_raz())
 
     return sciezki

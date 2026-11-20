@@ -73,6 +73,14 @@ function WiadomoscWlasciciela({ x, k, rozmowca }) {
     .concat((w.obrazy || []).filter((b) => b && b.path).map((b) => ({ ...fileFromPath(b.path), size: b.size })))
     .map((p) => [p.path, p])).values()];
   const obrazy = o ? (o.obrazy || []).filter((b) => OBRAZ_DATA.test(b.dane || "")) : [];
+  // Enter w trakcie pracy: wiadomość dopisana do trwającej tury („Dopisuję…”, potem „Dopisana”); wróciła do kolejki
+  // albo poszła jako własna tura = pokazuje to jej żywy dymek, nie ta linia
+  const dop = !!(w.dane && w.dane.dopisane_do);
+  const stanDop = useSklep((s) => {
+    if (!dop) return null;
+    for (const p of Object.values(s.przebiegi)) if (p.wpis_id === x.id) return p.stan;
+    return null;
+  });
   return html`<article class="j-msg j-msg-ja" data-wpis=${o ? undefined : x.id} data-zrodlo=${rozmowca ? x.zrodlo || "panel" : undefined}>
     <h3 class="j-sr">${T("os.ty")}, ${Czas.godzina(x.ts)}</h3>
     ${bezposrednio && adresaci.length > 0 && html`<p class="j-msg-tag"><${Ikona} n="turn" r=${14}/>
@@ -83,6 +91,8 @@ function WiadomoscWlasciciela({ x, k, rozmowca }) {
       ${obrazy.map((b, i) => html`<img key=${i} class="j-zal-obraz" src=${b.dane} alt=${b.nazwa || ""}/>`)}
       ${pliki.map((p) => html`<${KartaPliku} key=${p.path} plik=${p} kompakt=${true}/>`)}</div>`}
     ${o && html`<${StanWysylki} o=${o} k=${k}/>`}
+    ${dop && (!stanDop || stanDop === "dopisany" || stanDop === "wlaczony") && html`<p class="j-msg-stan is-dop">
+      <${Ikona} n="plus" r=${12}/>${T(stanDop === "dopisany" ? "msg.dopisuje" : "msg.dopisana")}</p>`}
   </article>`;
 }
 

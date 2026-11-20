@@ -186,6 +186,9 @@ def test_odczyty_hq_bez_skutkow(monkeypatch):
         "/rozmowcy",
         # komendy po „/” (komendy.py katalog): rejestr komend Hermesa, odczyt rozmowy.db i wpisów sesje.json, bez zapisu
         "/komendy",
+        # licznik zużycia (komendy.py): licznik.json skrzynki omp, plik sesji omp, state.db członka (czytnik, mode=ro);
+        # pamięć podręczna w procesie, bez zapisu
+        "/rozmowy/{wid}/licznik",
         # Aktualizacje (raporty.py lista, kalendarz): odczyt archiwum raportów; brak pliku = pusta lista (archiwum
         # zakłada silnik)
         "/raporty", "/raporty/kalendarz"}

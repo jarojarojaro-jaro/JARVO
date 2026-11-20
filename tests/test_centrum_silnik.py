@@ -81,6 +81,7 @@ class Centrum:
         monkeypatch.setattr(M.rozmowcy, "TEMAT_S", 0.2)
         M.omp_sesje._dzierzawy.clear()
         so.rdzen._dzierzawy.clear()
+        monkeypatch.setattr(so, "BEZCZYNNA_S", 0.0)    # pętla testu woła skrzynki po kolei: bez czekania na ruch
         M.czytnik_omp.zapomnij()
         (self.home / ".env").write_text(f"TELEGRAM_BOT_TOKEN={TOKEN}\n", encoding="utf-8")
         klucze = {}
@@ -379,3 +380,48 @@ def test_omp_terminal_kolejka_i_potwierdzenie(c):
     (plan,) = _agent(os_, "Plan: restart bramy.")
     assert plan["czeka_na_tak"] is True and "[[czeka-na-tak]]" not in plan["tekst"]
     czekaj(lambda: c.rozmowcy()["s:gpu"]["stan"] == "wolny", opis="wolny po turze")
+
+
+def test_omp_enter_w_trakcie_tury_dopisuje(c, monkeypatch):
+    """Enter w trakcie tury sesji omp (`tryb_kolejki: "dopisz"`): wiadomość idzie do skrzynki przez `omp_sesje.dopisz`
+    (steer RPC), przebieg `dopisany` → `wlaczony`; gdy skrzynka puści ją jako własną turę (tryb `kolejka`), przebieg
+    idzie `przyjety` → koniec jak zwykła wiadomość. Skrzynka zastąpiona atrapą stanów (bez procesu omp)."""
+    om = M.omp_sesje
+    stany, dopiski = {}, []
+
+    def wyslij(w, tekst, klucz, media=(), lustro=True):
+        stany[klucz] = {"stan": "pracuje", "tura": "t1"}
+        return {"nowy": True}
+
+    def dopisz(w, tekst, klucz, media=(), lustro=True):
+        tryb = "kolejka" if "osobno" in tekst else "steer"
+        dopiski.append((tekst, tryb))
+        stany[klucz] = {"stan": "wlaczony", "tura": "t1"} if tryb == "steer" else {"stan": "kolejka"}
+        return {"nowy": True, "tryb": tryb}
+
+    monkeypatch.setattr(om, "wyslij", wyslij)
+    monkeypatch.setattr(om, "przebieg", lambda w, klucz: stany.get(klucz, {"stan": "brak"}))
+    monkeypatch.setattr(om, "ogon", lambda w, tura, od=0: ([], od))
+    monkeypatch.setattr(om, "dopisz", dopisz, raising=False)
+    wid = c.wid("s:op")
+    pid = c.wyslij("s:op", "długa praca")["przebiegi"][0]["id"]
+    c.do_stanu(pid, "pracuje")
+
+    def enter(tekst):
+        r = c.k.post(f"{P}/rozmowy/{wid}/wiadomosci", json={"tekst": tekst, "klucz": secrets.token_hex(6),
+                                                             "tryb_kolejki": "dopisz"})
+        assert r.status_code == 202, r.text
+        return r.json()
+
+    d = enter("i jeszcze to")
+    (q,) = d["przebiegi"]
+    assert q["stan"] == "dopisany" and q["dopisany_do"] == pid and d["wpis"]["dane"]["dopisane_do"] == pid
+    assert "i jeszcze to" in dopiski[0][0] and not d["ostrzezenia"]
+    c.do_stanu(q["id"], "wlaczony")
+    d = enter("osobno proszę")
+    (q2,) = d["przebiegi"]
+    assert q2["stan"] == "przyjety" and not q2.get("dopisany_do") and "dopisane_do" not in d["wpis"]["dane"]
+    stany[q2["id"]] = {"stan": "gotowe", "odpowiedz": "ok"}
+    c.do_stanu(q2["id"], "gotowe")
+    stany[pid] = {"stan": "gotowe", "odpowiedz": "zrobione"}
+    c.do_stanu(pid, "gotowe")

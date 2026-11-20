@@ -202,6 +202,7 @@ const akcje = {
   // ------------------------------------------------------------------------------------------- wysyłka
   // Dymek właściciela od razu (wysylane w sklepie), potem POST. Bez wątku (`watek` null): POST /rozmowy z pierwszą
   // wiadomością i przejście do nowego wątku. Ten sam `klucz` przy ponowieniu = ta sama wiadomość na serwerze.
+  // Zawsze `tryb_kolejki: "dopisz"`: Enter w trakcie pracy agenta dopisuje wiadomość do trwającej tury (jak terminal).
   async wyslij({ watek = null, tekst = "", pliki = [], obrazy = [], adresaci = null, koordynator = "jarvo", klucz = null }) {
     const k = watek || "nowa";
     klucz = klucz || Pisanie.klucz(crypto.getRandomValues(new Uint8Array(16)));
@@ -209,7 +210,7 @@ const akcje = {
     const zmienO = (s, f) => ({ ...s.wysylane, [k]: (s.wysylane[k] || []).flatMap((x) => (x.klucz === klucz ? f(x) : [x])) });
     sklep.ustaw((s) => ({ ...s, wysylane: { ...s.wysylane, [k]: (s.wysylane[k] || []).filter((x) => x.klucz !== klucz).concat([o]) } }));
     if (window.performance && performance.mark) performance.mark("jarvo:babel");
-    const cialo = { tekst, klucz, zalaczniki: pliki.map((p) => p.path), obrazy: obrazy.map((x) => ({ nazwa: x.nazwa, dane: x.dane })) };
+    const cialo = { tekst, klucz, tryb_kolejki: "dopisz", zalaczniki: pliki.map((p) => p.path), obrazy: obrazy.map((x) => ({ nazwa: x.nazwa, dane: x.dane })) };
     if (adresaci) cialo.adresaci = adresaci;
     try {
       if (!watek) {
@@ -258,7 +259,7 @@ const akcje = {
     for (const o of lista || []) {
       const [rodzaj, reszta] = [o.split(":")[0], o.slice(o.indexOf(":") + 1)];
       if (rodzaj === "nieznany") Komunikaty.pokaz(T("wysylka.nieznany", { nazwa: reszta, koord: nazwaAgenta(koordynator) }));
-      else if (rodzaj === "dopisz_niemozliwe") Komunikaty.pokaz(T("wysylka.dopisz_niemozliwe"));
+      else if (rodzaj === "dopisz_niemozliwe") Komunikaty.pokaz(T(`dopisz.${["zgoda", "zatrzymywanie", "wysylanie", "terminal"].includes(reszta) ? reszta : "odmowa"}`));
       else if (rodzaj === "wielu") Komunikaty.pokaz(T("wysylka.wielu", { n: Number(reszta) || 0 }));
     }
   },

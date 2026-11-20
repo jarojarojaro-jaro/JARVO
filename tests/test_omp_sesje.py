@@ -133,6 +133,10 @@ def test_zatrzymaj_tylko_omp_wpisu(w, tmp_path):
         obcy.wait()
     nasz = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)", "omp", "--session-dir", str(w.sesje)])
     try:
+        # Popen wraca przed exec dziecka: do tego czasu /proc/<pid>/cmdline to jeszcze pytest (InstaBox -n 4, 20.11)
+        koniec = time.time() + 10
+        while not om.proces_tury(w, nasz.pid) and time.time() < koniec:
+            time.sleep(0.01)
         om.zapisz_stan(w, tura={"id": "t", "pid": nasz.pid})
         assert om.zatrzymaj(w) is True
         assert nasz.wait(timeout=10) != 0

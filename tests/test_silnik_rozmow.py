@@ -447,6 +447,31 @@ def test_dopisz_w_trakcie_pracy(swiat):
     assert r.status_code == 409 and r.json()["blad"]["kod"] == "nieaktywny"
 
 
+def test_enter_w_trakcie_pracy_dopisuje(swiat):
+    """Panel wysyła z `tryb_kolejki: "dopisz"` (Enter jak w terminalu): wiadomość do pracującego agenta idzie od razu do
+    trwającej tury (`dopisany` → `wlaczony`, wpis z `dopisane_do`, bez kolejki); do agenta bez pracy normalnie, bez
+    ostrzeżeń; tura czekająca na zgodę nie przyjmuje steera (brama: tylko `running`) = kolejka z powodem `zgoda`."""
+    out = swiat.nowy("@teste2ea [wolno:2] strona")
+    wid, pid = out["watek"]["id"], out["przebiegi"][0]["id"]
+    swiat.do_stanu(pid, "pracuje")
+    r = swiat.wyslij(wid, "@teste2ea dodaj NIP", tryb_kolejki="dopisz")
+    assert r.status_code == 202, r.text
+    d = r.json()
+    (q,) = d["przebiegi"]
+    assert q["stan"] == "dopisany" and q["dopisany_do"] == pid and not d["ostrzezenia"]
+    assert d["wpis"]["dane"]["dopisane_do"] == pid and swiat.p(q["id"])["wpis_id"] == d["wpis"]["id"]
+    swiat.do_stanu(pid, "gotowe")
+    swiat.do_stanu(q["id"], "wlaczony")
+    assert "dodaj NIP" in swiat.brama.przebiegi[swiat.p(pid)["run_id"]].odpowiedz
+    r = swiat.wyslij(wid, "@teste2ea [zgoda] usuń pliki", tryb_kolejki="dopisz")       # nic nie pracuje: zwykła wysyłka
+    (z,) = r.json()["przebiegi"]
+    assert z["stan"] == "kolejka" and not r.json()["ostrzezenia"]
+    swiat.do_stanu(z["id"], "czeka_na_zgode")
+    r = swiat.wyslij(wid, "@teste2ea i jeszcze to", tryb_kolejki="dopisz")
+    assert r.json()["ostrzezenia"] == ["dopisz_niemozliwe:zgoda"] and r.json()["przebiegi"][0]["stan"] == "kolejka"
+    assert "dopisane_do" not in r.json()["wpis"]["dane"]
+
+
 def test_stop_wstrzymuje_kolejke_i_wyslij_teraz(swiat):
     out = swiat.nowy("@teste2ea [wolno:3] długie")
     wid, pid = out["watek"]["id"], out["przebiegi"][0]["id"]

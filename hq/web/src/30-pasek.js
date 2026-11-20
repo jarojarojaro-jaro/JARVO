@@ -289,28 +289,30 @@ function Pasek({ trasa, warstwa = false }) {
   const grupy = useMemo(() => grupyListy(lista, Date.now() / 1000), [lista.porzadek, lista.wg_klucza]);
   const [menu, setMenu] = useState(null);           // {w, kotwica}
   const [edycja, setEdycja] = useState(null);       // id wątku ze zmienianą nazwą
-  const przewijana = useRef(null);
+  const przewijana = useRef(null), listaEl = useRef(null);
   const [okno, setOkno] = useState({ gora: 0, wys: 800, wiersz: 34 });
   const zwin = () => sklep.zmien("pasek", (p) => ({ ...p, zwiniety: !p.zwiniety, otwarty: false }));
   const ile = lista.porzadek.length;
   const dlugaLista = ile > OKNO_OD;
   const plaskie = useMemo(() => (dlugaLista ? grupy.flatMap((g) => [{ grupa: g.id }].concat(g.elementy)) : null), [grupy, dlugaLista]);
+  // przewija się środek paska (rozmówcy i Inne rozmowy razem); okno długiej listy liczone od jej początku w środku
   useEffect(() => {
     const el = przewijana.current;
-    if (!el || !dlugaLista) return undefined;
+    if (!el || !dlugaLista || !inne) return undefined;
     let ramka = 0;
     const mierz = () => {
       cancelAnimationFrame(ramka);
       ramka = requestAnimationFrame(() => {
-        const w = el.querySelector(".j-wiersz-l");
-        setOkno({ gora: el.scrollTop, wys: el.clientHeight, wiersz: (w && w.offsetHeight) || 34 });
+        const w = el.querySelector(".j-wiersz-l"), l = listaEl.current;
+        const od = l ? l.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop : 0;
+        setOkno({ gora: Math.max(0, el.scrollTop - od), wys: el.clientHeight, wiersz: (w && w.offsetHeight) || 34 });
       });
     };
     mierz();
     el.addEventListener("scroll", mierz, { passive: true });
     window.addEventListener("resize", mierz);
     return () => { cancelAnimationFrame(ramka); el.removeEventListener("scroll", mierz); window.removeEventListener("resize", mierz); };
-  }, [dlugaLista]);
+  }, [dlugaLista, inne]);
   const filtr = lista.filtr;
   const wiersz = (el) => html`<${WierszListy} key=${el.klucz} el=${el} aktywny=${trasa.watek === el.watek.id}
     edycja=${edycja === el.watek.id} onKoniecEdycji=${() => setEdycja(null)} onMenu=${(w, kotwica) => setMenu({ w, kotwica })}/>`;
@@ -324,6 +326,8 @@ function Pasek({ trasa, warstwa = false }) {
     tresc = grupy.map((g) => html`<div key=${g.id} class="j-grupa" role="group" aria-labelledby=${`j-grupa-${g.id}`}>
       <h3 class="j-grupa-t" id=${`j-grupa-${g.id}`}>${T(`grupa.${g.id}`)}</h3>${g.elementy.map(wiersz)}</div>`);
   }
+  // układ: góra stała (marka, Nowa rozmowa, Aktualizacje), środek przewijany (Rozmówcy, pod nimi Inne rozmowy
+  // z wyszukiwarką i listą), dół przypięty do rogu (Mózg, Ustawienia, stan połączenia)
   return html`<nav class="j-pasek" id="jarvo-pasek" aria-label=${T("pasek.rozmowy")} data-region="pasek" tabIndex="-1" ref=${nav}>
     <div class="j-pasek-g">
       <span class="j-marka"><${LogoJarvo}/><span>Jarvo</span></span>
@@ -333,10 +337,10 @@ function Pasek({ trasa, warstwa = false }) {
     </div>
     <${NowaRozmowa} fokus=${!saRozmowcy}/>
     <ul class="j-nawig is-gora"><${PozycjaAktualizacji} trasa=${trasa}/></ul>
+    <div class="j-pasek-s" ref=${przewijana}>
     ${saRozmowcy && html`<div class="j-pasek-rozm">
       <h2 class="j-sekcja" id="j-sekcja-rozm">${T("rozm.sekcja_t")}</h2>
       <${ListaRozmowcow} trasa=${trasa}/>
-      <${NawigacjaCentrum} trasa=${trasa}/>
       <button type="button" class="j-inne" aria-expanded=${String(inne)} aria-controls="j-inne-l"
         onClick=${() => sklep.ustaw((s) => ({ ...s, inne_otwarte: !inne }))}>
         <span>${T("rozm.inne")}</span><span aria-hidden="true">${inne ? "▾" : "▸"}</span>
@@ -354,7 +358,7 @@ function Pasek({ trasa, warstwa = false }) {
     ${filtr !== "rozmowy" && html`<div class="j-filtr">
       <button type="button" class="j-link" onClick=${() => akcje.filtrListy("rozmowy")}><${Ikona} n="back" r=${14}/>${T("pasek.rozmowy")}</button>
       <b>${T(`pasek.filtr_${filtr}`)}</b></div>`}
-    <div class="j-lista" ref=${przewijana}>
+    <div class="j-lista" ref=${listaEl}>
       ${tresc}
       ${lista.blad && html`<p class="j-pasek-pusto" role="alert">${lista.blad}
         <button type="button" class="j-link" onClick=${() => akcje.wczytajListe()}>${T("ui.ponow")}</button></p>`}
@@ -365,7 +369,8 @@ function Pasek({ trasa, warstwa = false }) {
         onClick=${() => akcje.wczytajListe({ dopisz: true })}>${T("pasek.wiecej")}</button>`}
     </div>
     </div>`}
-    ${!saRozmowcy && html`<${NawigacjaCentrum} trasa=${trasa}/>`}
+    </div>
+    <${NawigacjaCentrum} trasa=${trasa}/>
     <${StopkaPaska}/>
     ${menu && html`<${Menu} kotwica=${menu.kotwica} etykieta=${menu.w.tytul || T("watek.bez_tytulu")} onZamknij=${() => setMenu(null)}
       pozycje=${pozycjeMenuWatku(menu.w, { onZmienNazwe: () => setEdycja(menu.w.id) })}/>`}

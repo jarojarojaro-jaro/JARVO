@@ -398,6 +398,9 @@ class Czytnik:
     def steery_po(self, profil: str, sesje: Iterable[str], od_ts: float) -> list[str]:
         return self._sonda(profil, steery_po, list(sesje), od_ts, domyslna=[])
 
+    def zuzycie(self, profil: str, sesje: Iterable[str]) -> dict:
+        return self._sonda(profil, zuzycie, list(sesje), domyslna=dict(ZUZYCIE_ZERO))
+
     @staticmethod
     def tekst_steera(tresc: str) -> str:
         """Tekst dopisku z wiersza `steer` (funkcja modułu `tekst_steera`)."""
@@ -537,6 +540,29 @@ def stan_sesji(state_db: Path | str, sesje: list[str]) -> dict:
     finally:
         conn.close()
     return {"max_id": int(r[0] or 0), "skompaktowane": int(r[1] or 0)}
+
+
+ZUZYCIE_ZERO = {"wejscie": 0, "wyjscie": 0, "cache_odczyt": 0, "cache_zapis": 0, "koszt": 0.0, "znaki": 0}
+
+
+def zuzycie(state_db: Path | str, sesje: list[str]) -> dict:
+    """Licznik panelu (komendy.py `licznik`): liczniki tokenów i koszt z wierszy `sessions` rodowodu (Hermes zapisuje
+    je w trakcie tury) i rozmiar kontekstu najnowszej sesji rodowodu w znakach (wiersze aktywne, nie skompaktowane:
+    to, co model dostanie w następnym wywołaniu, bez promptu systemowego i narzędzi)."""
+    if not sesje:
+        return dict(ZUZYCIE_ZERO)
+    conn = _polacz(state_db)
+    try:
+        r = conn.execute(
+            "SELECT COALESCE(SUM(input_tokens), 0), COALESCE(SUM(output_tokens), 0), COALESCE(SUM(cache_read_tokens), 0), "
+            "COALESCE(SUM(cache_write_tokens), 0), COALESCE(SUM(CASE WHEN actual_cost_usd > 0 THEN actual_cost_usd "
+            f"ELSE estimated_cost_usd END), 0) FROM sessions WHERE id IN ({_w(sesje)})", sesje).fetchone()
+        z = conn.execute("SELECT COALESCE(SUM(LENGTH(COALESCE(content, '')) + LENGTH(COALESCE(tool_calls, ''))), 0) "
+                         "FROM messages WHERE session_id = ? AND active = 1 AND compacted = 0", (sesje[-1],)).fetchone()
+    finally:
+        conn.close()
+    return {"wejscie": int(r[0] or 0), "wyjscie": int(r[1] or 0), "cache_odczyt": int(r[2] or 0),
+            "cache_zapis": int(r[3] or 0), "koszt": float(r[4] or 0), "znaki": int(z[0] or 0)}
 
 
 def dzieci_kompresji(state_db: Path | str, sesje: list[str]) -> list[tuple[str, str]]:
