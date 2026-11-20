@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Darmowy głos neuronowy w venvie narzędzi: edge-tts 7.3.1 (ukraiński, polski i ~70 innych języków, bez klucza) dla dubbingu agenta Translator. 19.11 właściciel: Translator robi polskim YouTuberom za darmo napisy i dubbing na ukraiński, angielski, niemiecki, hiszpański i włoski; AssemblyAI ukraińskiego i polskiego nie mówi i liczy $15 za 1M znaków.
 - Panel: plik, którego nie da się wczytać (np. spoza katalogów floty), ma na karcie „Nie udało się wczytać pliku.” zamiast pustej karty bez słowa, a podgląd zamiast kręcącego się kółka mówi to samo (19.11 właściciel nie mógł obejrzeć klatki z próbki Translatora: plik leżał w `cache/scratch` agenta).
 - Aktualizacja nie przerywa już odpowiedzi agentów: restart bramy po zmianie floty (`jarvo instaluj`, `jarvo update`, `jarvo telegram tematy`) czeka, aż żaden agent nie odpowiada (najdłużej 30 min). 19.11 przy dodawaniu nowego agenta trzy restarty przerwały odpowiedź Jarva na wiadomość właściciela z Telegrama („Operation interrupted” w panelu; brama wznowiła ją dopiero po starcie).
 - Walidacja: każdy plik YAML profilu (`config.yaml`, `toolbox.yaml`, `cron/jobs.yaml`…) musi się parsować już w `validate.py`, także u agentów nakładki. 19.11 `toolbox.yaml` nowego agenta biznesowego z wartością „REST: /v2/…” bez cudzysłowu przeszedł walidację i wywrócił dopiero build w `jarvo instaluj`.

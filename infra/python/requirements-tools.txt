@@ -20,3 +20,5 @@ num2words==0.5.14
 # (ta wersja żyje tylko w tym venv; claude-seo ma własny venv z Playwright 1.63 pod Chromium obrazu).
 camoufox==0.5.6
 playwright==1.62.0
+# darmowy głos neuronowy (uk, pl i ~70 innych) dla dubbingu Translatora: API czytania na głos Edge, bez klucza
+edge-tts==7.3.1

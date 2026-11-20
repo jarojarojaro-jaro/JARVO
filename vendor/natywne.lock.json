@@ -1979,8 +1979,8 @@
   "narzedzia": {
    "python": "python312",
    "lock": "infra/python/natywne/narzedzia.lock",
-   "sha256": "bcc37257827c93c8d5f4c7fbe97807031edd4e34997f8f3c38dab8b17ff15f13",
-   "paczek": 127,
+   "sha256": "7a424e7199ddf6107e50f6d8bb715b11b7a778d5734b410f0d51dc74f95846df",
+   "paczek": 136,
    "kiedy": "instalacja",
    "bez": [
     "docopt"
