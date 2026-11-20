@@ -1,5 +1,5 @@
-"""Komendy po `/` w panelu Jarvo (docs/HQ.md „Komendy”): `/model`, `/new`, `/stop`, `/usage`, `/context`, `/status`,
-`/compact` (omp), `/help`, oraz licznik zużycia rozmowy (`GET /rozmowy/{id}/licznik`).
+"""Komendy po `/` w panelu Jarvo (docs/HQ.md „Komendy”): `/model`, `/effort`, `/fast`, `/new`, `/stop`, `/usage`,
+`/context`, `/status`, `/compact` (omp), `/help`, oraz stopka rozmowy (`GET /rozmowy/{id}/licznik` i `…/opcje`).
 
 Brama Hermesa (API server: `/v1/runs`, `/api/sessions`) nie wykonuje komend: `input` przebiegu idzie prosto do
 `AIAgent.run_conversation`, a obsługa `/…` żyje tylko w GatewayRunnerze kanałów (Telegram, Discord). Dlatego panel
@@ -27,11 +27,19 @@ samymi drogami co Hermes:
   i wyścigu z bramą; trzeba trasy w bramie (np. `POST /api/sessions/{id}/compress` na tym samym rdzeniu).
 - **`/help`** (alias `/commands`): komendy tej rozmowy. Pozostałe komendy z rejestru Hermesa
   (`hermes_cli.commands.COMMAND_REGISTRY`, bez `cli_only`) lista pokazuje jako niedostępne w panelu z powodem.
-- **Licznik** (`Wykonawca.licznik`): model, kontekst (tokeny i % okna), tokeny wejścia i wyjścia, cache, koszt.
-  omp: `omp_sesje.licznik` (skrzynka odświeża go w trakcie tury). Hermes: liczniki i koszt z wierszy `sessions`
-  rodowodu członka (`czytnik.zuzycie`, Hermes pisze je w trakcie tury; dolnym progiem jest suma `usage` przebiegów
-  rozmowy), kontekst szacowany z rozmiaru aktywnych wierszy najnowszej sesji (znaki / 4, `szacunek`), okno z metadanych
-  modelu Hermesa (`okno_modelu`).
+- **`/effort`** (alias `/thinking`, `/reasoning`) i **`/fast`**: wysiłek myślenia i tryb szybki dla tej rozmowy, jak
+  `/model`. Hermes: `meta` rozmowy (`przebiegi.opcje_czlonka`), przebieg wysyła je w `model_options.reasoning_effort`
+  i `model_options.fast` ciała `/v1/runs` (poziomy `przebiegi.WYSILKI_HERMESA`; tryb szybki tylko dla modeli, które
+  Hermes ma za szybkie: `model_supports_fast_mode`). omp: `<skrzynka>/model.json` (`myslenie`, `fast`), skrzynka
+  stosuje je w procesie RPC (`set_thinking_level`, `set_fast_mode`) przed turą; poziomy z katalogu `omp models --json`
+  (`thinking` modelu i `off`).
+- **Licznik** (`Wykonawca.licznik`): model, wysiłek, tryb szybki, kontekst (tokeny i % okna), tokeny wejścia
+  i wyjścia, cache, koszt. omp: `omp_sesje.licznik` (skrzynka odświeża go w trakcie tury; bez niej plik sesji czytany
+  przyrostowo), okno bez skrzynki z katalogu modeli omp (`katalog_omp`, w tle co 6 h), `koszt_dzis` = koszt odpowiedzi
+  z dzisiaj (koszt sesji to równoważnik cen API). Hermes: liczniki i koszt z wierszy `sessions` rodowodu członka
+  (`czytnik.zuzycie`, Hermes pisze je w trakcie tury; dolnym progiem jest suma `usage` przebiegów rozmowy), kontekst
+  szacowany z rozmiaru aktywnych wierszy najnowszej sesji (znaki / 4, `szacunek`), okno z metadanych modelu Hermesa
+  (`okno_modelu`). `Wykonawca.opcje` (stopka po kliknięciu): modele do wyboru, poziomy wysiłku, tryb szybki.
 
 Wynik w rozmowie to wpis systemowy `{typ: "komenda", polecenie, agent, ok, wynik, wynik_en, wybor}` (scalanie nie
 daje go do bloku kontekstu agenta), poza rozmową (ekran startu) tylko odpowiedź trasy. Trasy: `GET /komendy`
@@ -47,6 +55,7 @@ import json
 import os
 import re
 import subprocess
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -64,8 +73,9 @@ DO_ZATRZYMANIA = ("wysylanie", "przyjety", "pracuje", "czeka_na_ture", "czeka_na
 KOMENDA_CZEKAJ_S = 20.0          # tyle trasa czeka na wynik komendy skrzynki omp, potem wynik przychodzi drugim wpisem
 KOMENDA_MAKS_S = 900.0           # dłużej komenda skrzynki nie może trwać (potem wpis „nie skończyła się”)
 OKNO_PAMIEC_S = 600.0            # okno kontekstu modelu pamiętane 10 min (metadane Hermesa mogą pytać sieci)
+KATALOG_OMP_S = 6 * 3600.0       # katalog modeli omp (okna, poziomy myślenia) odświeżany co 6 h, w tle
 LICZNIK_ZERO = {"model": "", "kontekst": 0, "okno": 0, "procent": 0.0, "wejscie": 0, "wyjscie": 0, "cache_odczyt": 0,
-                "cache_zapis": 0, "koszt": 0.0, "czas": 0.0}
+                "cache_zapis": 0, "koszt": 0.0, "koszt_dzis": 0.0, "czas": 0.0}
 
 
 def parsuj(tekst: str) -> tuple[str, str] | None:
@@ -110,6 +120,10 @@ PANEL: tuple[Def, ...] = (
                            "The Hermes gateway has no on-demand compression for panel sessions (only the automatic one "
                            "at the context threshold); a manual /compress works in Telegram and in the terminal. For a "
                            "clean session: /new.")}),
+    Def("effort", "Wysiłek myślenia modelu w tej rozmowie", "Model thinking effort in this conversation", "[poziom]",
+        aliasy=("thinking", "reasoning")),
+    Def("fast", "Tryb szybki modelu (wyższy priorytet u dostawcy)", "Model fast mode (higher priority at the provider)",
+        "[on|off]"),
     Def("help", "Komendy dostępne w tej rozmowie", "Commands available in this conversation", aliasy=("commands",)),
 )
 _PANEL = {n: d for d in PANEL for n in (d.nazwa, *d.aliasy)}
@@ -279,7 +293,8 @@ def znajdz_model(dostawcy: list[dict], cel: str, dostawca: str = "") -> tuple[di
 
 
 def modele_omp(program: str | None) -> list[dict]:
-    """`omp models --json`: [{model: selektor dostawca/id, provider, nazwa}] (czat; bez sieci poza katalogiem omp)."""
+    """`omp models --json`: [{model: selektor dostawca/id, provider, nazwa, okno (contextWindow), myslenie (poziomy
+    thinking)}] (czat; bez sieci poza katalogiem omp)."""
     r = subprocess.run([program or "omp", "models", "--json"], capture_output=True, text=True, timeout=60,
                        encoding="utf-8", errors="replace")
     if r.returncode != 0:
@@ -289,7 +304,8 @@ def modele_omp(program: str | None) -> list[dict]:
     for m in d.get("models") or []:
         if isinstance(m, dict) and m.get("id") and m.get("provider") and (m.get("kind") or "chat") == "chat":
             out.append({"model": str(m.get("selector") or f"{m['provider']}/{m['id']}"), "provider": str(m["provider"]),
-                        "nazwa": str(m.get("name") or m["id"])})
+                        "nazwa": str(m.get("name") or m["id"]), "okno": int(m.get("contextWindow") or 0),
+                        "myslenie": [str(x) for x in m.get("thinking") or [] if isinstance(x, str)]})
     return out
 
 
@@ -336,7 +352,12 @@ def okno_modelu(profil: str, wybrany: Mapping | None = None) -> dict:
                                                 config_context_length=None) or 0)
         except Exception:
             okno = 0
-    return {"model": model, "provider": provider, "okno": okno}
+    try:
+        from hermes_cli.models import model_supports_fast_mode  # noqa: PLC0415
+        fast = bool(model and model_supports_fast_mode(model))
+    except Exception:
+        fast = False
+    return {"model": model, "provider": provider, "okno": okno, "fast_dostepny": fast}
 
 
 class Wykonawca:
@@ -353,6 +374,33 @@ class Wykonawca:
         self.okno = okno or okno_modelu
         self.czekaj_s, self.maks_s, self.odstep_s = czekaj_s, maks_s, odstep_s
         self._okna: dict[tuple, tuple[float, dict]] = {}
+        self._omp_katalog: dict[str, dict] = {}      # selektor modelu omp → {okno, myslenie, nazwa, provider}
+        self._omp_katalog_at, self._omp_katalog_trwa = 0.0, False
+
+    def katalog_omp(self) -> dict[str, dict]:
+        """Katalog modeli omp z pamięci (okno kontekstu, poziomy myślenia, lista do wyboru); `omp models --json`
+        odpowiada ok. 2 s, więc czyta go wątek w tle (pierwsze pytanie po starcie dostaje pusty katalog), co 6 h."""
+        teraz = time.monotonic()
+        if not self._omp_katalog_trwa and (not self._omp_katalog_at or teraz - self._omp_katalog_at > KATALOG_OMP_S):
+            self._omp_katalog_trwa = True
+            threading.Thread(target=self._czytaj_katalog_omp, name="omp-katalog", daemon=True).start()
+        return self._omp_katalog
+
+    def _czytaj_katalog_omp(self) -> None:
+        try:
+            self._omp_katalog = {x["model"]: x for x in self.lista_omp() if x.get("model")} or self._omp_katalog
+        except Exception:
+            pass
+        finally:
+            self._omp_katalog_at, self._omp_katalog_trwa = time.monotonic(), False
+
+    def model_omp(self, model: str) -> dict:
+        """Wpis katalogu dla `dostawca/id` (albo samego id); {} = nie wiadomo."""
+        kat = self.katalog_omp()
+        if model in kat:
+            return kat[model]
+        id_ = model.split("/", 1)[-1]
+        return next((v for k_, v in kat.items() if k_.split("/", 1)[-1] == id_), {})
 
     async def wykonaj(self, k: Kontekst, nazwa: str, args: str) -> Wynik:
         d = _PANEL.get(nazwa)
@@ -449,7 +497,12 @@ class Wykonawca:
                 except Exception:
                     d = {}
             out = {x: d.get(x) or v for x, v in LICZNIK_ZERO.items()}
-            return {**out, "zaplecze": "omp", "szacunek": False}
+            if not out["okno"] and out["model"]:     # bez skrzynki RPC okno zna tylko katalog modeli omp
+                out["okno"] = int(self.model_omp(str(out["model"])).get("okno") or 0)
+                out["procent"] = round(100.0 * int(out["kontekst"]) / out["okno"], 1) if out["okno"] else 0.0
+            return {**out, "wysilek": str(d.get("myslenie") or ""),
+                    "fast": d.get("fast") if isinstance(d.get("fast"), bool) else None,
+                    "fast_dostepny": True, "zaplecze": "omp", "szacunek": False}
         wid = k.watek["id"] if k.watek else None
         wybrany = k.sil.db.model_czlonka(wid, k.agent) if wid else None
         klucz_okna = (k.agent, (wybrany or {}).get("model"), (wybrany or {}).get("provider"))
@@ -467,10 +520,12 @@ class Wykonawca:
         okno = int(m.get("okno") or 0)
         # state.db liczy wszystko, co Hermes rozliczył w sesji (także w trakcie tury), `usage` przebiegów tylko
         # skończone tury panelu: większa z dwóch liczb, żeby licznik nie cofał się, gdy któreś źródło milczy
+        o = self.m.przebiegi.opcje_czlonka(k.sil.db, wid, k.agent) if wid else {"wysilek": "", "fast": None}
         return {**LICZNIK_ZERO, "zaplecze": "hermes", "szacunek": True, "model": str(m.get("model") or ""),
                 "kontekst": kontekst, "okno": okno, "procent": round(100.0 * kontekst / okno, 1) if okno else 0.0,
                 **{x: max(int(z.get(x) or 0), int(u.get(x) or 0)) for x in ("wejscie", "wyjscie", "cache_odczyt", "cache_zapis")},
-                "koszt": float(z.get("koszt") or 0), "czas": time.time()}
+                "koszt": float(z.get("koszt") or 0), "czas": time.time(), "wysilek": o["wysilek"], "fast": o["fast"],
+                "fast_dostepny": bool(m.get("fast_dostepny"))}
 
     def _zuzycie_hermes(self, k: Kontekst) -> tuple[dict, dict]:
         rodowod = [s["sesja_id"] for s in k.sil.db.sesje_watku(k.watek["id"], agent=k.agent, rola="rozmowa")]
@@ -495,6 +550,109 @@ class Wykonawca:
             w.linia("Kontekst Hermesa to szacunek z treści sesji (bez promptu systemowego i narzędzi).",
                     "The Hermes context is an estimate from the session content (without the system prompt and tools).")
         return w
+
+    # ------------------------------------------------------------------- /effort, /fast, opcje stopki
+    def _poziomy(self, k: Kontekst, model: str) -> list[str]:
+        """Poziomy wysiłku: omp z katalogu modelu (`thinking`, plus `off`), Hermes `model_options.reasoning_effort`."""
+        if k.zaplecze == "omp":
+            m = [x for x in self.model_omp(model).get("myslenie") or [] if x in self.m.omp_sesje.MYSLENIE]
+            return ["off"] + [x for x in m if x != "off"] if m else list(self.m.omp_sesje.MYSLENIE)
+        return list(self.m.przebiegi.WYSILKI_HERMESA)
+
+    def _ustaw_opcje(self, k: Kontekst, **zmiany) -> str:
+        if k.zaplecze == "omp":
+            self.m.omp_sesje.ustaw_opcje_skrzynki(k.wpis_omp, **{"myslenie" if x == "wysilek" else x: v
+                                                                 for x, v in zmiany.items()})
+            return "od następnej tury skrzynki (terminal zostaje przy swoim)"
+        self.m.przebiegi.ustaw_opcje_czlonka(k.sil.db, k.watek["id"], k.agent, **zmiany)
+        return "od następnej wiadomości"
+
+    def _bez_opcji(self, k: Kontekst) -> Wynik | None:
+        if not k.watek:
+            return blad("To ustawia się w rozmowie: otwórz rozmowę.", "This is set inside a conversation: open one.")
+        if k.zaplecze == "omp" and (k.wpis_omp is None or getattr(k.wpis_omp, "blad", "")):
+            return blad("Sesja omp tej rozmowy jest niedostępna.", "This conversation's omp session is unavailable.")
+        return None
+
+    async def _effort(self, k: Kontekst, args: str) -> Wynik:
+        if (b := self._bez_opcji(k)) is not None:
+            return b
+        d = await self.licznik(k)
+        poziomy = self._poziomy(k, d["model"])
+        a = args.strip().lower()
+        lista = ", ".join(_kod(p) for p in poziomy)
+        if not a:
+            return Wynik().linia(
+                f"Wysiłek myślenia ({k.nazwa}): **{d['wysilek'] or 'domyślny'}**. Poziomy: {lista}; "
+                f"{_kod('/effort domyslny')} wraca do ustawienia agenta.",
+                f"Thinking effort ({k.nazwa}): **{d['wysilek'] or 'default'}**. Levels: {lista}; "
+                f"{_kod('/effort default')} returns to the agent's setting.")
+        if a in ("domyslny", "domyślny", "default", "reset"):
+            nowy = ""
+        elif a in poziomy:
+            nowy = a
+        else:
+            return blad(f"Nie ma poziomu {_kod(a)} dla {_kod(d['model'] or k.nazwa)}. Poziomy: {lista}.",
+                        f"No level {_kod(a)} for {_kod(d['model'] or k.nazwa)}. Levels: {lista}.")
+        gdy = await asyncio.to_thread(self._ustaw_opcje, k, wysilek=nowy)
+        return Wynik().linia(f"Wysiłek myślenia: **{nowy or 'domyślny'}**, działa {gdy}.",
+                             f"Thinking effort: **{nowy or 'default'}**, applies from the next turn.")
+
+    async def _fast(self, k: Kontekst, args: str) -> Wynik:
+        if (b := self._bez_opcji(k)) is not None:
+            return b
+        d = await self.licznik(k)
+        a = args.strip().lower()
+        if a in ("status", "?"):
+            stan = "włączony" if d["fast"] else "wyłączony"
+            return Wynik().linia(f"Tryb szybki: **{stan}**.", f"Fast mode: **{'on' if d['fast'] else 'off'}**.")
+        if a in ("", "toggle", "przelacz", "przełącz"):
+            nowy: bool | None = not bool(d["fast"])
+        elif a in ("on", "wl", "wł", "tak", "fast", "1"):
+            nowy = True
+        elif a in ("off", "wyl", "wył", "nie", "normal", "0"):
+            nowy = False
+        elif a in ("domyslny", "domyślny", "default", "reset"):
+            nowy = None
+        else:
+            return blad(f"Składnia: {_kod('/fast [on|off|domyslny]')}.", f"Syntax: {_kod('/fast [on|off|default]')}.")
+        if nowy and not d["fast_dostepny"]:
+            return blad(f"Model {_kod(d['model'] or '?')} nie ma trybu szybkiego w Hermesie (Anthropic Opus, modele "
+                        "OpenAI i xAI u bezpośredniego dostawcy).",
+                        f"Model {_kod(d['model'] or '?')} has no fast mode in Hermes (Anthropic Opus, OpenAI and xAI "
+                        "models at the direct provider).")
+        gdy = await asyncio.to_thread(self._ustaw_opcje, k, fast=nowy)
+        stan = "domyślny" if nowy is None else "włączony" if nowy else "wyłączony"
+        return Wynik().linia(f"Tryb szybki: **{stan}**, działa {gdy}.",
+                             f"Fast mode: **{'default' if nowy is None else 'on' if nowy else 'off'}**, applies from the next turn.")
+
+    async def opcje(self, k: Kontekst) -> dict:
+        """Stopka rozmowy po kliknięciu (`GET /rozmowy/{id}/opcje`): modele do wyboru (Hermes: dostawcy bramy, omp:
+        katalog omp), poziomy wysiłku, bieżący wysiłek i tryb szybki. Wybór wykonuje panel komendą (`/model`,
+        `/effort`, `/fast`), więc zostaje ślad w rozmowie jak w terminalu."""
+        d = await self.licznik(k)
+        modele: list[dict] = []
+        if k.zaplecze == "omp":
+            if not self.katalog_omp():
+                await asyncio.to_thread(self._czytaj_katalog_omp)
+            grupy: dict[str, list[dict]] = {}
+            for x in self.katalog_omp().values():
+                grupy.setdefault(x.get("provider") or "", []).append(x)
+            for lista in list(grupy.values())[:DOSTAWCY_MAKS]:
+                modele += [{"model": x["model"], "provider": "", "nazwa": x.get("nazwa") or x["model"],
+                            "biezacy": x["model"] == d["model"]} for x in lista[:MODELE_NA_DOSTAWCE]]
+            if d["model"] and not any(x["biezacy"] for x in modele):
+                modele.insert(0, {"model": d["model"], "provider": "", "biezacy": True,
+                                  "nazwa": self.model_omp(d["model"]).get("nazwa") or d["model"]})
+        else:
+            try:
+                for dost in dostawcy_bramy(await k.sil.brama.opcje_modeli(k.agent))[:DOSTAWCY_MAKS]:
+                    modele += [{"model": mm, "provider": dost["slug"], "nazwa": dost["nazwa"],
+                                "biezacy": mm == d["model"]} for mm in dost["modele"][:MODELE_NA_DOSTAWCE]]
+            except self.m.brama.BladBramy:
+                pass
+        return {"zaplecze": k.zaplecze, "model": d["model"], "modele": modele[:60], "wysilek": d["wysilek"],
+                "poziomy": self._poziomy(k, d["model"]), "fast": d["fast"], "fast_dostepny": d["fast_dostepny"]}
 
     # ------------------------------------------------------------------- /help
     async def _help(self, k: Kontekst, args: str) -> Wynik:
@@ -893,6 +1051,15 @@ def dolacz(router, *, m, trasy, silnik: Callable[[], Any], agenci, hub, log: Cal
         sil = s()
         k, _ = await asyncio.to_thread(kontekst, sil, wid, None)
         return {"licznik": await wyk.licznik(k)}
+
+    @trasa("GET", "/rozmowy/{wid}/opcje")
+    @obsluga
+    async def opcje_rozmowy(wid: str, request: Request):
+        """Stopka po kliknięciu: modele do wyboru, poziomy wysiłku, bieżący wysiłek i tryb szybki."""
+        tylko_panel(request)
+        sil = s()
+        k, _ = await asyncio.to_thread(kontekst, sil, wid, None)
+        return {"opcje": await wyk.opcje(k)}
 
     @trasa("POST", "/komendy")
     @obsluga

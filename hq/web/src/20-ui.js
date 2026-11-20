@@ -204,11 +204,12 @@ function Menu({ kotwica, pozycje, onZamknij, etykieta }) {
   </div>`;
 }
 
-// okno dialogowe na środku (na telefonie pełny ekran)
+// okno dialogowe na środku (na telefonie pełny ekran). Miejsce: korzeń aplikacji, obok .j-uklad (jak OknoPytania),
+// bo pod oknem cały układ dostaje inert; okno postawione w widoku (Ustawienia) nie usypia jednak samego siebie
 function Okno({ tytul, onZamknij, children, stopka, klasa }) {
   const ref = useRef(null);
   useWarstwa(true, onZamknij, ref);
-  React.useLayoutEffect(() => { Bezwladnosc.okno(1); return () => Bezwladnosc.okno(-1); }, []);
+  React.useLayoutEffect(() => { const el = ref.current; Bezwladnosc.okno(el, true); return () => Bezwladnosc.okno(el, false); }, []);
   return html`<div class="j-scrim" onClick=${onZamknij}></div>
     <div class=${cx("j-okno", klasa)} role="dialog" aria-modal="true" aria-label=${tytul} ref=${ref} tabIndex="-1">
       <header class="j-okno-g"><h2>${tytul}</h2>
@@ -229,16 +230,20 @@ function Arkusz({ tytul, onZamknij, children, klasa, ...reszta }) {
 // krótkie komunikaty na dole ekranu (najwyżej 3); akcja opcjonalna („Cofnij”)
 // Układ pod oknem dialogowym jest nieaktywny (inert): okna (Okno) liczone tutaj, warstwy aplikacji (szuflada, Stara
 // Baza, wysunięty pasek na telefonie) ustawia AppJarvo. Jedno miejsce decyduje, żeby jedno nie zdejmowało drugiego.
+// Przodek otwartego okna nigdy nie dostaje inert: 20.11 okno „Agenci pracują” stało w widoku Ustawień, uśpiło samo
+// siebie razem z układem i X ani Anuluj nie działały (ratunkiem było tylko Esc albo przeładowanie).
 const Bezwladnosc = (() => {
-  let okna = 0, warstwa = false, pasek = false;
+  const okna = new Set();
+  let warstwa = false, pasek = false;
+  const zOknem = (el) => [...okna].some((o) => el.contains(o));
   function odswiez() {
     const uklad = document.querySelector("[data-jarvo-korzen] > .j-uklad");
     const glowna = uklad && uklad.querySelector(".j-glowna");
-    if (uklad) uklad.toggleAttribute("inert", warstwa || okna > 0);
-    if (glowna) glowna.toggleAttribute("inert", pasek);
+    if (uklad) uklad.toggleAttribute("inert", (warstwa || okna.size > 0) && !zOknem(uklad));
+    if (glowna) glowna.toggleAttribute("inert", pasek && !zOknem(glowna));
   }
   return {
-    okno(d) { okna = Math.max(0, okna + d); odswiez(); },
+    okno(el, otwarte) { if (el) okna[otwarte ? "add" : "delete"](el); odswiez(); },
     warstwa(t) { warstwa = !!t; odswiez(); },
     pasek(t) { pasek = !!t; odswiez(); },
   };

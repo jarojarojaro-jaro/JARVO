@@ -70,7 +70,7 @@ def _po_cyklach(ile_teraz, n=2, opis="cykle", czas=15.0):
 class Swiat:
     """Dom Hermesa w katalogu tymczasowym, atrapa bramy, silnik, trasy i klient HTTP."""
 
-    def __init__(self, tmp, *, limit: int = 8):
+    def __init__(self, tmp, *, limit: int = 8, auto_dopisek: bool = False):
         self.home = tmp / "data"
         self.jarvo = self.home / "jarvo"
         (self.jarvo / "state").mkdir(parents=True)
@@ -91,6 +91,7 @@ class Swiat:
         self.hub = M.strumien.Hub(zycie=1.5, ping=0.5)
         self.logi: list[str] = []
         self.limit = limit
+        self.auto_dopisek = auto_dopisek
         self.sil = self._silnik()
         app = FastAPI()
         router = APIRouter(route_class=M.ochrona.Trasa)
@@ -100,6 +101,10 @@ class Swiat:
         self.k = TestClient(app, headers={"X-Jarvo-Request": "1"})
 
     def _silnik(self):
+        # testy kolejki sprawdzają jej mechanikę (zajety_agent, Stop, Wyślij teraz): dyspozytor sam nie dopisuje
+        # (przed startem: pierwsza runda dyspozytora rusza od razu); samodopisywanie kolejki do trwającej tury:
+        # test_kolejka_dopisuje_sie_sama_do_trwajacej_tury
+        M.przebiegi.Rejestr.auto_dopisek = self.auto_dopisek
         s = M.silnik.Silnik(moduly=M, home=self.home, jarvo_dir=self.jarvo, api_base="http://brama.test",
                             agenci=self.agenci, hub=self.hub, log=self.logi.append, limit=self.limit,
                             http=httpx.AsyncClient(transport=self.brama.transport()), odstep_odpytania=0.2)
@@ -164,6 +169,13 @@ def swiat(tmp_path):
 @pytest.fixture
 def swiat_limit1(tmp_path):
     s = Swiat(tmp_path, limit=1)
+    yield s
+    s.zamknij()
+
+
+@pytest.fixture
+def swiat_auto(tmp_path):
+    s = Swiat(tmp_path, auto_dopisek=True)
     yield s
     s.zamknij()
 
@@ -470,6 +482,46 @@ def test_enter_w_trakcie_pracy_dopisuje(swiat):
     r = swiat.wyslij(wid, "@teste2ea i jeszcze to", tryb_kolejki="dopisz")
     assert r.json()["ostrzezenia"] == ["dopisz_niemozliwe:zgoda"] and r.json()["przebiegi"][0]["stan"] == "kolejka"
     assert "dopisane_do" not in r.json()["wpis"]["dane"]
+
+
+def test_kolejka_dopisuje_sie_sama_do_trwajacej_tury(swiat_auto):
+    """Wiadomość, która czeka w kolejce (wysłana, zanim tura ruszyła, albo sprzed wdrożenia), dyspozytor sam dopisuje
+    do tury członka, gdy tylko ta przyjmuje dopiski (`pracuje`), zamiast czekać na jej koniec."""
+    s = swiat_auto
+    out = s.nowy("@teste2ea [wolno:3] strona")
+    wid, pid = out["watek"]["id"], out["przebiegi"][0]["id"]
+    q = s.wyslij(wid, "@teste2ea dodaj NIP").json()["przebiegi"][0]["id"]     # domyślnie „czekaj”: najpierw kolejka
+    s.do_stanu(q, "dopisany", "wlaczony")
+    assert s.p(q)["dopisany_do"] == pid
+    s.do_stanu(pid, "gotowe")
+    s.do_stanu(q, "wlaczony")
+    assert "dodaj NIP" in s.brama.przebiegi[s.p(pid)["run_id"]].odpowiedz
+    assert any("dopisany sam" in linia for linia in s.logi)
+
+
+def test_wyslij_teraz_do_trwajacej_pracy_z_kolejki(swiat):
+    """„Wyślij teraz do trwającej pracy” przy wiadomości w kolejce (pusty tekst: bierze treść z kolejki), także
+    `wstrzymane`; gdy nic nie pracuje, 409 z powodem dla właściciela; pusty dopisek do trwającej tury = 422."""
+    out = swiat.nowy("@teste2ea [wolno:3] strona")
+    wid, pid = out["watek"]["id"], out["przebiegi"][0]["id"]
+    q = swiat.wyslij(wid, "@teste2ea dodaj REGON").json()["przebiegi"][0]["id"]
+    swiat.do_stanu(pid, "pracuje")
+    czekaj(lambda: swiat.p(q)["powod"] == "zajety_agent")
+    assert swiat.k.post(f"{P}/przebiegi/{pid}/dopisz", json={}).status_code == 422
+    r = swiat.k.post(f"{P}/przebiegi/{q}/dopisz", json={"klucz": "kW1"})
+    assert r.status_code == 200, r.text
+    assert r.json()["przebieg"]["stan"] == "dopisany" and r.json()["przebieg"]["dopisany_do"] == pid
+    swiat.do_stanu(pid, "gotowe")
+    swiat.do_stanu(q, "wlaczony")
+    p2 = swiat.wyslij(wid, "@teste2ea [wolno:4] dalej").json()["przebiegi"][0]["id"]
+    q2 = swiat.wyslij(wid, "@teste2ea po Stopie").json()["przebiegi"][0]["id"]
+    swiat.do_stanu(p2, "pracuje")
+    swiat.k.post(f"{P}/przebiegi/{p2}/stop")
+    swiat.do_stanu(p2, "zatrzymane")
+    czekaj(lambda: swiat.p(q2)["powod"] == "wstrzymane")
+    r = swiat.k.post(f"{P}/przebiegi/{q2}/dopisz", json={})
+    assert r.status_code == 409 and "nie pracuje" in r.json()["blad"]["komunikat"]
+    assert swiat.p(q2)["stan"] == "kolejka" and swiat.p(q2)["powod"] == "wstrzymane"
 
 
 def test_stop_wstrzymuje_kolejke_i_wyslij_teraz(swiat):

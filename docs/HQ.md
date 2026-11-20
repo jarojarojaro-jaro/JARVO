@@ -1110,15 +1110,21 @@ innych kanałów etap 6.
     idą za prawdziwym dźwiękiem; przed pierwszym kliknięciem przeglądarka nie gra, wtedy przycisk **Włącz głos**.
     **Zmień mój głos**: Męski / Damski, Spokojnie / Normalnie / Żwawo, Wycisz (`localStorage` `jarvo.glos.v1`),
     po zmianie Jarvo mówi próbkę nowym głosem.
-- **Aktualizacja** (spec §15.3; Ustawienia › System, `SekcjaSystem` w `61-szuflada.js`): stan z `GET /update` (co minutę,
-  co 5 s w trakcie i przy czekaniu na koniec pracy; `online` = pomocnik hosta odezwał się w ciągu 5 min, `praca` =
-  `praca.json`, `po_pracy` = czas prośby). **Aktualizuj** najpierw odświeża stan; przy pracy agentów okno „Agenci
-  pracują” z listą prac: **Zaktualizuj, gdy skończą** (domyślny fokus; `POST /update {action: update, gdy: wolne}`
-  = 202 i meta `aktualizacja_po_pracy` w `rozmowy.db`, obserwator pisze `state/update-request` dopiero po 30 s bez
-  pracy), **Aktualizuj teraz** albo **Anuluj**. Czekająca aktualizacja ma **Aktualizuj teraz** i **Nie
-  aktualizuj** (`cancel` kasuje prośbę); po 2 h czekania jedno przypomnienie. Pomocnik nie działa = 503
-  `pomocnik`, aktualizacja trwa = 409 `trwa`. Odznaka **⬆ N** w stopce paska (liczba nowych zmian; w trakcie wskaźnik, przy
-  czekaniu na koniec pracy i przy kłopocie inny kolor) otwiera tę sekcję.
+- **Aktualizacja** (spec §15.3; Ustawienia › System, `SekcjaSystem` w `62-ustawienia.js`): stan z `GET /update` (co
+  minutę, co 5 s w trakcie i przy czekaniu na koniec pracy; `online` = pomocnik hosta odezwał się w ciągu 5 min,
+  `praca` = `praca.json`, `po_pracy` = czas prośby). **Aktualizuj** najpierw odświeża stan; przy pracy agentów okno
+  „Agenci pracują” z listą prac i zdaniem, co dalej: **Zaktualizuj, gdy skończą** (domyślny fokus; `POST /update
+  {action: update, gdy: wolne}` = 202 i meta `aktualizacja_po_pracy` w `rozmowy.db`, obserwator pisze
+  `state/update-request` dopiero po 30 s bez pracy), **Aktualizuj teraz** albo **Anuluj**. Okno stoi w korzeniu
+  aplikacji (`sklep.okno_aktualizacji`, obok `OknoPytania`), zamykają je ×, **Anuluj**, Esc i klik w zasłonę; przodek
+  otwartego okna nigdy nie dostaje `inert` (`Bezwladnosc` w `20-ui.js`; 20.11 okno w widoku Ustawień uśpiło samo
+  siebie). Natywnie **Aktualizuj teraz** przy karcie kanbana w toku też czeka (202 `gdy: wolne, powod: karty`), bo
+  `jarvo update` w trakcie karty nie zaczyna. Czekająca aktualizacja ma **Aktualizuj teraz** i **Anuluj czekanie**
+  (`cancel` kasuje prośbę); po 2 h czekania jedno przypomnienie. Błąd albo odmowa ostatniej próby (`error`
+  w update.json) stoi pod stanem jako „Ostatnia próba: …”. Pomocnik nie działa = 503 `pomocnik`, aktualizacja trwa =
+  409 `trwa`. Odznaka **⬆ N** w stopce paska (liczba nowych zmian; w trakcie wskaźnik, przy czekaniu na koniec pracy
+  i przy kłopocie inny kolor) otwiera tę sekcję. **Wersja Jarva**: skrót kodu z `GET /update` (`current`, jak `jarvo
+  status`), w podpowiedzi także skrót paczki panelu (`app-rdzen-<skrót>.js`).
 - **Stany** (`Pasy` w `90-app.js`, spec §13.12, każdy pasek z `data-pas`): `aktualizacja` (neutralnie, bez czerwieni),
   `polaczenie` („Łączę ponownie…” po 5 s przerwy; pisać można dalej), `silnik` (awaria silnika z **Odśwież**),
   `aplikacja` (nieudane `GET /app` z **Ponów**), `wersja` („Nowa wersja Jarva” z **Odśwież**), `karty` (kilka kart
@@ -1174,9 +1180,15 @@ innych kanałów etap 6.
   panel wysyła każdą wiadomość z `tryb_kolejki: "dopisz"`, więc trafia ona od razu do trwającej tury (dymek właściciela
   ma pod sobą „Dopisuję do trwającej pracy…”, potem „Dopisana do trwającej pracy”); gdy się nie da, wiadomość czeka
   w kolejce, a komunikat mówi czemu (`dopisz.*`: tura czeka na Twoją decyzję, agent się zatrzymuje, dopiero zaczyna,
-  sesję trzyma terminal, brama odmówiła). Pod polem **licznik rozmowy** (`Licznik`, `GET /rozmowy/<id>/licznik`, co
-  2 s w trakcie pracy, inaczej co 30 s, nie w ukrytej karcie), jak stopka terminala: model, kontekst w tokenach
-  i % okna (≈ = szacunek), ↑ wejście, ↓ wyjście, cache odczyt/zapis, koszt; od 80% okna w kolorze uwagi.
+  sesję trzyma terminal, tura starej skrzynki omp, brama odmówiła). Wiadomość w kolejce ma **Wyślij teraz do trwającej
+  pracy** (obok Anuluj, także po Stopie: `POST /przebiegi/<id>/dopisz` z pustym tekstem, odmowa = powód w dymku),
+  a dyspozytor sam dopisuje czekające wiadomości właściciela do tury, gdy tylko ta pracuje (`Rejestr._auto_dopisz`;
+  `wstrzymane` i `misja` tylko ręcznie). Pod polem **stopka rozmowy** (`Licznik`, `GET /rozmowy/<id>/licznik` co 2 s
+  w trakcie pracy, inaczej co 30 s, nie w ukrytej karcie), jedna linia jak stopka terminala omp i Hermesa: model,
+  myślenie, tryb szybki, kontekst w tokenach z oknem i % (≈ = szacunek, od 80% w kolorze uwagi), ↑ wejście,
+  ↓ wyjście, cache odczyt/zapis, koszt (omp: z dzisiaj; dymek mówi, że to równoważnik cen API, a cała sesja ile).
+  Model, myślenie i tryb szybki są klikalne (menu z `GET /rozmowy/<id>/opcje`, wybór idzie komendą `/model`,
+  `/effort`, `/fast`, więc zostaje w rozmowie), w sesji omp kontekst też (Skompresuj teraz: `/compact`).
 - <a id="komendy"></a>**Komendy** (`33-komendy.js`, serwer `hq/plugin/komendy.py`): tekst `/nazwa …` nigdy nie idzie do
   agenta (brama Hermesa nie wykonuje komend: `input` `/v1/runs` trafia prosto do modelu, a obsługa `/…` żyje tylko
   w kanałach gatewaya; trasa wiadomości odpowiada 409 `komenda`). Po wpisaniu „/” menu komend rozmowy (`GET /komendy`:
@@ -1186,8 +1198,12 @@ innych kanałów etap 6.
   `/model` (lista i bieżący model z `GET /api/model/options` profilu, wybór dla sesji członka w `meta` rozmowy, wysyłany
   w ciele `/v1/runs` jako `model` + `provider`; `--provider`, `--global` = config.yaml profilu funkcją dashboardu;
   przyciski modeli w wyniku wybierają od razu), `/new` (`/reset`: stop pracy agenta i nowa sesja członka jako rotacja),
-  `/stop`, `/usage` (tokeny przebiegów rozmowy), `/context` (`/ctx`: to samo co licznik, tekstem), `/status`, `/help`.
-  omp: `/model` (`omp models --json`, wybór w `<skrzynka>/model.json` dla tur skrzynki), `/compact` (`/compress`,
+  `/stop`, `/usage` (tokeny przebiegów rozmowy), `/context` (`/ctx`: to samo co licznik, tekstem), `/effort`
+  (`/thinking`, `/reasoning`: poziom myślenia none…max albo `domyslny`, w ciele `/v1/runs` jako
+  `model_options.reasoning_effort`), `/fast` (`model_options.fast`, tylko modele, które Hermes ma za szybkie),
+  `/status`, `/help`. omp: `/model` (`omp models --json`, wybór w `<skrzynka>/model.json` dla tur skrzynki), `/effort`
+  i `/fast` (`myslenie`, `fast` w tym samym pliku; skrzynka wysyła `set_thinking_level` i `set_fast_mode` do procesu
+  RPC przed turą, poziomy z katalogu omp), `/compact` (`/compress`,
   opcjonalnie instrukcje: komenda RPC skrzynki `omp_sesje.komenda`, także w trakcie tury; wynik po najwyżej 20 s,
   dłuższa kompresja dopisuje drugi wpis z wynikiem po końcu), komendy zgłoszone przez skrzynkę (`komendy_omp`),
   `/stop`, `/usage`, `/context` i `/status`, `/help`. Niedostępne: `/compress` dla Hermesa (brama API nie ma
@@ -1711,6 +1727,7 @@ Agenci rozmawiają po polsku niezależnie od języka panelu (SOUL).
 | aplikacja: pierwsza wiadomość nowego wątku długo w `kolejka(brama)`, gdy agenci mają dużo pracy naraz | brama wykonuje tury `/v1/runs`, budzenia z kanbana, operacje na bazie sesji i streszczenia kompresji w tej samej puli wątków (rdzenie + 4, przy 4 rdzeniach 8). Silnik puszcza domyślnie o 3 przebiegi mniej (przy 4 rdzeniach 5), ale tury budzone z kanbana zajmują tę samą pulę (tury Telegrama mają własną). Gdy wszystkie wątki zajmują tury, założenie sesji członka (`POST /api/sessions`) czeka na wolny wątek; po 15 s silnik uznaje bramę za chwilowo niedostępną i ponawia (1, 2, 4… s). Rusza sama, gdy któraś tura się skończy; jeśli przez 2 min żadna się nie skończy, przebieg kończy się `blad(brama_niedostepna)` i wystarczy **Ponów**. Brama odpowiada 429 (→ `kolejka(limit)`) dopiero przy 10 przebiegach naraz; poniżej tego pełna pula widać tylko jako dłuższe `kolejka(brama)`. Przy słabej maszynie można zmniejszyć `JARVO_HQ_MAX_PRZEBIEGOW` |
 | aplikacja: ekran startu długo „Jarvo się uruchamia…”, potem „Jarvo chwilowo nie odpowiada” | brama nie odpowiada na `/health` (`GET /api/plugins/jarvo-hq/app` → `gotowosc.brama`): `hermes gateway status`, `/opt/data/logs/gateway.log`; wiadomości czekają w kolejce |
 | aplikacja: ekran startu mówi „Połącz model…”, choć klucz jest | status logowania profilu `jarvo` (wynik w pamięci 30 s): na klucz = niepusta zmienna klucza w `.env` profilu, OAuth = zalogowanie w Modele, `custom` = `model.base_url`; odśwież po minucie |
-| aplikacja: System › Aktualizacja czeka na koniec pracy | agenci pracują (`praca.json` `aktywne` > 0); **Aktualizuj teraz** albo **Nie aktualizuj**; prośba do pomocnika idzie sama 30 s po końcu pracy |
+| aplikacja: System › Aktualizacja czeka na koniec pracy | agenci pracują (`praca.json` `aktywne` > 0); **Aktualizuj teraz** albo **Anuluj czekanie**; prośba do pomocnika idzie sama 30 s po końcu pracy |
+| aplikacja: System › „Aktualizacja się nie udała”, choć działa najnowsza wersja | „failed” w update.json zostaje tylko przy wersji starszej niż na GitHubie: każde sprawdzenie (pomocnik co godzinę, „Sprawdź ponownie” w menu klasycznego panelu, `jarvo update`, `jarvo update --sprawdz`) zamienia go na „idle”, a nieaktualny wynik w `<stan>/aktualizacja.json` na „aktualne” (20.11: przebieg z CLI przełączył wersję i padł na zerwanym potoku ekranu) |
 | aplikacja: przebieg `przerwane` po aktualizacji | restart bramy przerwał turę; **Ponów** wysyła krótkie „Poprzednia tura nie dokończyła się…”, bez powtarzania wiadomości |
 | aplikacja: każda tura jednego agenta kończy się `blad` z „state.db was replaced underneath the gateway” | profil usunięto i założono od nowa pod tą samą nazwą (albo podmieniono jego `state.db`) przy działającej bramie, a brama trzyma stary plik otwarty do końca życia procesu. `hermes gateway restart` (w kontenerze jako hermes); `GET /p/<profil>/api/sessions` z kluczem profilu daje wtedy 200 zamiast 500 |

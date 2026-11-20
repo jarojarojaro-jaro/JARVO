@@ -308,6 +308,28 @@ def test_omp_compact_komendy_skrzynki_i_licznik(tmp_path, monkeypatch):
     assert "—" not in json.dumps([d1, d2, d3, pomoc, ctx], ensure_ascii=False)
 
 
+def test_omp_effort_i_fast_w_model_json(tmp_path, monkeypatch):
+    """omp: `/effort` przyjmuje poziomy modelu z katalogu omp (`thinking` + `off`) i zapisuje je w model.json skrzynki
+    (obok modelu), `/fast` przełącza; licznik bierze okno z katalogu, gdy skrzynka go nie zna."""
+    w = _wpis_omp(tmp_path)
+    (tmp_path / "skrzynka").mkdir()
+    katalog = [{"model": "anthropic/claude-sonnet-5", "provider": "anthropic", "nazwa": "Sonnet", "okno": 1_000_000,
+                "myslenie": ["low", "high", "max"]}]
+    wyk = K.Wykonawca(m=M, lista_omp=lambda: katalog, rejestr=lambda: [])
+    wyk._czytaj_katalog_omp()
+    k = K.Kontekst(sil=None, watek={"id": "w_x"}, agent="op", nazwa="Operator", zaplecze="omp", wpis_omp=w)
+    run = lambda tekst: asyncio.run(wyk.wykonaj(k, *K.parsuj(tekst))).dane()  # noqa: E731
+    lic = asyncio.run(wyk.licznik(k))
+    assert lic["model"] == "anthropic/claude-sonnet-5" and lic["okno"] == 1_000_000 and lic["procent"] == 0.0
+    assert not run("/effort medium")["ok"]                                    # sonnet w katalogu: low, high, max
+    assert run("/effort high")["ok"] and M.omp_sesje.opcje_skrzynki(w)["myslenie"] == "high"
+    assert run("/fast")["ok"] and M.omp_sesje.opcje_skrzynki(w)["fast"] is True
+    assert asyncio.run(wyk.licznik(k))["wysilek"] == "high"
+    assert run("/fast off")["ok"] and M.omp_sesje.opcje_skrzynki(w) == {"myslenie": "high", "fast": False}
+    o = asyncio.run(wyk.opcje(k))
+    assert o["poziomy"] == ["off", "low", "high", "max"] and o["modele"][0]["biezacy"]
+
+
 def test_licznik_i_context_hermes(swiat):
     """Licznik rozmowy z Hermesem: liczniki i koszt z wierszy `sessions` rodowodu członka (większe niż suma `usage`
     przebiegów), kontekst szacowany z treści sesji, okno z metadanych modelu; tylko z panelu."""
@@ -326,3 +348,28 @@ def test_licznik_i_context_hermes(swiat):
     assert swiat.k.get(f"{P}/rozmowy/w_nie_ma/licznik").status_code == 404
     w = _komenda(swiat, "/ctx", wid)["wynik"]
     assert w["ok"] and "≈" in w["wynik"] and "100 000" in w["wynik"] and "$0.12" in w["wynik"]
+
+
+def test_effort_fast_i_opcje_stopki_hermes(swiat):
+    """`/effort` (alias `/thinking`, `/reasoning`) i `/fast` dla członka rozmowy z Hermesem: wybór w `meta` rozmowy,
+    przebieg wysyła go w `model_options` ciała `/v1/runs`; licznik i `GET /rozmowy/{id}/opcje` (stopka) pokazują
+    bieżący wysiłek, poziomy i modele z bramy."""
+    wid, _ = _watek_po_turze(swiat)
+    w = _komenda(swiat, "/effort", wid)["wynik"]
+    assert w["ok"] and "domyślny" in w["wynik"] and "`xhigh`" in w["wynik"]
+    assert not _komenda(swiat, "/effort bardzo", wid)["wynik"]["ok"]
+    assert _komenda(swiat, "/thinking high", wid)["wynik"]["ok"]
+    assert not _komenda(swiat, "/fast on", wid)["wynik"]["ok"]            # atrapa: model bez trybu szybkiego
+    assert _komenda(swiat, "/fast off", wid)["wynik"]["ok"]
+    r = swiat.wyslij(wid, "dalej")
+    swiat.do_stanu(r.json()["przebiegi"][0]["id"], "gotowe")
+    cialo = swiat.brama.runs("jarvo")[-1]["cialo"]
+    assert cialo["model_options"] == {"reasoning_effort": "high", "fast": False} and "model" not in cialo
+    d = swiat.k.get(f"{P}/rozmowy/{wid}/licznik").json()["licznik"]
+    assert (d["wysilek"], d["fast"], d["fast_dostepny"]) == ("high", False, False)
+    o = swiat.k.get(f"{P}/rozmowy/{wid}/opcje").json()["opcje"]
+    assert o["wysilek"] == "high" and "max" in o["poziomy"] and any(m["model"] == "gpt-5.4" for m in o["modele"])
+    assert _komenda(swiat, "/reasoning domyslny", wid)["wynik"]["ok"] and _komenda(swiat, "/fast domyslny", wid)["wynik"]["ok"]
+    r = swiat.wyslij(wid, "jeszcze")
+    swiat.do_stanu(r.json()["przebiegi"][0]["id"], "gotowe")
+    assert "model_options" not in swiat.brama.runs("jarvo")[-1]["cialo"]

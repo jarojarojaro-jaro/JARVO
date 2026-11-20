@@ -47,11 +47,14 @@
            odczytać (np. `jarvo chat` uruchomiony jako administrator), a ma nazwę programu z wersji Jarva (python.exe,
            node.exe…), wstrzymuje całe sprzątanie. Zajęte zostają do następnej aktualizacji (np. pracownicy kanbana
            kończą kartę na starej wersji, H07).
-        Jedna aktualizacja naraz (`<stan>/aktualizacja.lock`), dziennik `<logi>/aktualizacja.log`, stan bez sekretów
-        w `<stan>/aktualizacja.json`. Każdy błąd, także nieprzewidziany (np. uszkodzone archiwum), kończy się
-        komunikatem po polsku, powrotem do poprzedniej wersji (gdy coś się przełączyło) i stanem „failed” dla
-        panelu. Kod 0: aktualne, zaktualizowane albo (--sprawdz) sprawdzone; 1: błąd albo wycofanie. Limity:
-        JARVO_UPDATE_TIMEOUT (instalator, domyślnie 3600 s), JARVO_UPDATE_ROZGRZEWKA (120 s).
+        Jedna aktualizacja naraz (`<stan>/aktualizacja.lock`), dziennik `<logi>/aktualizacja.log` (ekran to jego kopia:
+        zniknięty czytelnik wyjścia, np. przerwany potok, nie przerywa przebiegu), stan bez sekretów w
+        `<stan>/aktualizacja.json`: wynik przebiegu zawsze w komplecie (wynik, kiedy, opis, wersja, poprzednia, cel),
+        a sprawdzenie, które widzi najnowszą wersję, zastępuje nieaktualny wynik wynikiem „aktualne”. Każdy błąd, także
+        nieprzewidziany (np. uszkodzone archiwum), kończy się komunikatem po polsku, powrotem do poprzedniej wersji
+        (gdy coś się przełączyło) i stanem „failed” dla panelu. Karta kanbana w toku: odmowa z opisem także w
+        update.json (`error`). Kod 0: aktualne, zaktualizowane albo (--sprawdz) sprawdzone; 1: błąd albo wycofanie.
+        Limity: JARVO_UPDATE_TIMEOUT (instalator, domyślnie 3600 s), JARVO_UPDATE_ROZGRZEWKA (120 s).
 
   jarvo update --pomocnik [--raz]
         pomocnik aktualizacji (S09): usługa `aktualizacje` nadzorcy (jarvo/nadzorca.uslugi_jarva, docs/NATYWNIE.md c2)
@@ -61,7 +64,8 @@
         klucza to 60 zapytań na godzinę) sprawdzenie, co 60 s puls. Pierwsze sprawdzenie od razu, chyba że ostatnie
         udane dla tej wersji było niedawno (restart serwisu nie pyta GitHuba za każdym razem). Stan dla panelu:
         `<dane>/jarvo/state/update.json` (state idle|updating|done|failed, behind, commits, branch, current, latest,
-        checked_at, beat, started_at, finished_at, log, error). „update” uruchamia `jarvo update` jako osobny,
+        checked_at, beat, started_at, finished_at, log, error; „failed” zostaje tylko przy wersji starszej niż na
+        GitHubie, każde sprawdzenie najnowszej zamienia go na „idle”). „update” uruchamia `jarvo update` jako osobny,
         odłączony proces (w jednostce systemd --user Jarva przez `systemd-run --user --scope`, bo KillMode=mixed
         zabiłby go razem z nadzorcą): instalator nowej wersji zatrzymuje nadzorcę razem z pomocnikiem, a wyjście tego
         procesu idzie do `<logi>/aktualizacja-panel.log`. Stan „updating”, którego żaden `jarvo update` nie trzyma
@@ -479,10 +483,23 @@ def zapisz_panel(u: Uklad, **pola) -> None:
         przenosne.zapisz_atomowo(plik_panelu(u), json.dumps(dane, ensure_ascii=False) + "\n")
 
 
-def _stan_po_sprawdzeniu(u: Uklad) -> str:
-    """„done” i „failed” zostają do następnej aktualizacji (panel pokazuje „Odśwież” albo błąd), reszta to „idle”."""
+def _stan_po_sprawdzeniu(u: Uklad, aktualne: bool = False) -> str:
+    """„done” zostaje do następnej aktualizacji (panel pokazuje „Odśwież”), „failed” tylko przy wersji starszej niż
+    na GitHubie: gdy działa już najnowsza, porażka nikogo nie dotyczy (20.11: udana aktualizacja z CLI po przerwanej
+    zostawiła w panelu „Aktualizacja nieudana” i „Spróbuj ponownie”). Reszta to „idle”."""
     s = stan_panelu(u).get("state")
-    return s if s in ("done", "failed") else "idle"
+    return s if s == "done" or (s == "failed" and not aktualne) else "idle"
+
+
+def uzgodnij_wynik(u: Uklad, obecna: str, ref: str) -> None:
+    """Sprawdzenie pokazało, że działa najnowsza wersja refu: wynik w aktualizacja.json, który mówi o innej wersji
+    albo o porażce, już jej nie opisuje (przełączył ją instalator, bootstrap albo przebieg przerwany po przełączeniu),
+    więc zastępuje go komplet „aktualne”. Pola z wcześniejszych przebiegów nie zostają."""
+    s = stan(u)
+    if s.get("wynik") in ("zaktualizowano", "aktualne") and s.get("wersja") == obecna:
+        return
+    zapisz_stan(u, wynik="aktualne", kiedy=time.strftime("%Y-%m-%dT%H:%M:%S"), wersja=obecna,
+                poprzednia=s.get("wersja"), cel=None, opis=f"Działa wersja {obecna}, najnowsza na {ref}.")
 
 
 # ---------------------------------------------------------------- sprzątanie starych wersji
@@ -815,12 +832,28 @@ def regresje(przed: dict | None, po: dict | None) -> tuple[list[str], list[str]]
 
 # ---------------------------------------------------------------- przebieg aktualizacji
 
+def _pisz(strumien, tekst: str) -> None:
+    """Wiersz na ekran. Ekran to tylko kopia dziennika (`<logi>/aktualizacja.log`): gdy czytelnik zniknął (przerwany
+    potok `| tail`, zamknięte okno), strumień idzie do os.devnull i przebieg trwa dalej. 20.11 BrokenPipeError
+    w diagnozie nowej wersji przerwał `jarvo update` po przełączeniu, bez wyniku w aktualizacja.json, a panel został
+    z „Aktualizacja nieudana”. Devnull, a nie samo pominięcie: bufor z niewysłanym wierszem opróżni się przy wyjściu."""
+    try:
+        print(tekst, file=strumien, flush=True)
+    except (OSError, ValueError):             # BrokenPipeError, EIO; ValueError: strumień zamknięty
+        with contextlib.suppress(OSError, ValueError, AttributeError):
+            devnull = os.open(os.devnull, os.O_WRONLY)
+            try:
+                os.dup2(devnull, strumien.fileno())
+            finally:
+                os.close(devnull)
+
+
 def _wypisz(tekst: str) -> None:
-    print(tekst, flush=True)
+    _pisz(sys.stdout, tekst)
 
 
 def _na_stderr(tekst: str) -> None:
-    print(tekst, file=sys.stderr, flush=True)
+    _pisz(sys.stderr, tekst)
 
 
 CZEKAJ_NA_KARTY_S = 30          # `--po-kartach`: odstęp lokalnego sprawdzania tablicy (bez sieci)
@@ -916,8 +949,10 @@ class _Aktualizacja:
         behind, zmiany, pelna = (0, [], True) if aktualne else nowe_zmiany(przed, zdalna, self.klucz, self.ot.env)
         self.wynik.update(behind=behind, zmiany=zmiany)
         zapisz_panel(u, branch=ref, current=self.wynik["wersja_przed"][:7], latest=zdalna[:7], behind=behind,
-                     commits=zmiany, checked_at=time.time(), error=None, state=_stan_po_sprawdzeniu(u))
+                     commits=zmiany, checked_at=time.time(), error=None, state=_stan_po_sprawdzeniu(u, aktualne))
         zapisz_stan(u, ref=ref, repo=REPO_GH, sprawdzono=time.strftime("%Y-%m-%dT%H:%M:%S"), zdalna=zdalna)
+        if aktualne:
+            uzgodnij_wynik(u, self.wynik["wersja_przed"], ref)
         zrodlo = f"{FAKE} (próba)" if self.ot.env.get(FAKE) else "GitHub"
         if aktualne:
             self.podlog(f"{zrodlo}: {ref} = {zdalna[:12]}, to ta sama wersja")
@@ -946,6 +981,11 @@ class _Aktualizacja:
             # ją przerwie” i zrestartował bramę. Aktualizacja w trakcie karty czeka, aż karta się skończy.
             for k in karty[:5]:
                 self.podlog(f"  w toku: {k}")
+            # odmowa widoczna także w panelu (prośba z panelu inaczej kończyła się bez śladu, jakby nic nie zlecono)
+            odmowa = (f"Aktualizacja nie ruszyła, bo na tablicy pracuje agent ({'; '.join(karty[:3])}). Restart "
+                      "przerwałby jego kartę. Wybierz „Zaktualizuj, gdy skończą”, a Jarvo zaktualizuje się sam po "
+                      "końcu pracy.")
+            zapisz_panel(u, error=odmowa[:300])
             return self._koniec("karty", f"Na tablicy pracuje agent ({len(karty)} kart): aktualizuję po ich końcu, bo "
                                 "restart bramy przerywa kartę. Poczekaj na koniec: jarvo update --po-kartach; "
                                 "teraz mimo to: jarvo update --mimo-kart.", kod=1)
@@ -1006,15 +1046,14 @@ class _Aktualizacja:
             self.podlog(f"uwaga: nowe sprawdzenia z błędem: {', '.join(nowe)} (zobacz jarvo doctor)")
         self.podlog(f"doctor: {po.get('bledy', '?')} błędów, {po.get('uwagi', '?')} uwag")
         self.wynik["wersja_po"] = (wersja_kodu(self.biez.get("app")) or str(self.biez.get("wersja") or "?"))[:12]
-        zapisz_stan(u, wynik="zaktualizowano", kiedy=time.strftime("%Y-%m-%dT%H:%M:%S"),
-                    wersja=self.wynik["wersja_po"], poprzednia=self.wynik["wersja_przed"], opcje=opcje)
+        opis = f"Gotowe: Jarvo {self.wynik['wersja_po']} (było {self.wynik['wersja_przed']})."
+        self._zapisz_wynik("zaktualizowano", opis, self.wynik["wersja_po"], opcje=opcje)
         self.log("[Sprzątanie starych wersji]")
         self._sprzatanie(app=nowa)
         self._stop_pulsu()
         zapisz_panel(u, state="done", finished_at=time.time(), current=self.wynik["wersja_po"][:7], behind=0,
                      commits=[], latest=zdalna[:7], log="\n".join(self.ogon), error=None)
-        return self._koniec("zaktualizowano", f"Gotowe: Jarvo {self.wynik['wersja_po']} (było "
-                            f"{self.wynik['wersja_przed']}).", kod=0)
+        return self._koniec("zaktualizowano", opis, kod=0)
 
     def _opcje(self) -> tuple[list[str], bool]:
         """Opcje instalatora jak przy instalacji: --bez-path, gdy polecenie jarvo nie trafiło do PATH (dziennik zmian
@@ -1098,10 +1137,17 @@ class _Aktualizacja:
                         f"instalacji jeszcze raz.")
         elif not zmienione:
             opis += f" Działa dalej wersja {self.wynik['wersja_przed']} (nic się nie przełączyło)."
-        zapisz_stan(u, wynik=wynik, kiedy=time.strftime("%Y-%m-%dT%H:%M:%S"), opis=opis[:500])
+        self._zapisz_wynik(wynik, opis, self.wynik["wersja_przed"])     # każda gałąź kończy się na wersji sprzed
         self._stop_pulsu()
         zapisz_panel(u, state="failed", finished_at=time.time(), log="\n".join(self.ogon), error=powod[:300])
         return self._koniec(wynik, opis, kod=1)
+
+    def _zapisz_wynik(self, wynik: str, opis: str, wersja: str, **pola) -> None:
+        """Wynik przebiegu w aktualizacja.json zawsze w komplecie (wynik, kiedy, opis, działająca wersja, poprzednia
+        i cel), więc nic nie zostaje z wcześniejszego przebiegu (20.11: udana aktualizacja zostawiła obok „wynik:
+        zaktualizowano” opis porażki sprzed 5 dni)."""
+        zapisz_stan(self.u, wynik=wynik, kiedy=time.strftime("%Y-%m-%dT%H:%M:%S"), opis=opis[:500], wersja=wersja,
+                    poprzednia=self.wynik["wersja_przed"], cel=self.wynik["zdalna"], **pola)
 
     def _awaryjnie(self, migawka: dict) -> None:
         """Ostatnia deska: current.json i narzedzia.json sprzed aktualizacji, stałe ścieżki na nie, potem start
@@ -1208,6 +1254,10 @@ def _bezpiecznie(przebieg: "_Aktualizacja") -> int:
         blad = f"nieprzewidziany błąd ({tekst})"[:300]
         if stan_panelu(przebieg.u).get("state") == "updating":
             zapisz_panel(przebieg.u, state="failed", finished_at=time.time(), error=blad, log="\n".join(przebieg.ogon))
+            # błąd mógł przyjść po przełączeniu wersji: wynik mówi, która działa (sprawdzenie najnowszej go uzgodni)
+            teraz = srodowisko.biezace(przebieg.u)
+            dziala = (wersja_kodu(teraz.get("app")) or str(teraz.get("wersja") or "?"))[:12]
+            przebieg._zapisz_wynik("blad", f"Aktualizacja przerwana: {blad}. Działa wersja {dziala}.", dziala)
         else:
             zapisz_panel(przebieg.u, error=blad, checked_at=time.time(), state=_stan_po_sprawdzeniu(przebieg.u))
         return przebieg._koniec("blad", f"BŁĄD: nieprzewidziany błąd aktualizacji ({tekst}). Pełny opis: "
@@ -1263,8 +1313,10 @@ def sprawdz_dla_panelu(u: Uklad, ot: Otoczenie, magazyn: Callable[[Uklad], str |
     aktualne = zdalna == przed or (przed is None and str(biez.get("wersja") or "") == zdalna[:12])
     behind, zmiany, _ = (0, [], True) if aktualne else nowe_zmiany(przed, zdalna, klucz, ot.env)
     zapisz_panel(u, branch=ref, current=obecna[:7], latest=zdalna[:7], behind=behind, commits=zmiany,
-                 checked_at=time.time(), error=None, state=_stan_po_sprawdzeniu(u), updater_pid=os.getpid())
+                 checked_at=time.time(), error=None, state=_stan_po_sprawdzeniu(u, aktualne), updater_pid=os.getpid())
     zapisz_stan(u, ref=ref, repo=REPO_GH, sprawdzono=time.strftime("%Y-%m-%dT%H:%M:%S"), zdalna=zdalna)
+    if aktualne:
+        uzgodnij_wynik(u, obecna, ref)
     return stan_panelu(u)
 
 
@@ -1433,5 +1485,5 @@ def polecenie(u: Uklad, a, ot: Otoczenie, *, zaplecze: Zaplecze | None = None,
                              mimo_kart=bool(getattr(a, "mimo_kart", False)),
                              po_kartach=bool(getattr(a, "po_kartach", False)))
     if jako_json:
-        print(json.dumps(raport, ensure_ascii=False, indent=2), flush=True)
+        _wypisz(json.dumps(raport, ensure_ascii=False, indent=2))
     return kod

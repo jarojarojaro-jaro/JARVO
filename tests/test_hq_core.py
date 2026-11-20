@@ -893,6 +893,72 @@ def test_update_gdy_wolne_i_praca(tmp_path, monkeypatch):
     assert k.post(u, json={"action": "check"}).json()["blad"]["kod"] == "pomocnik"
 
 
+def test_update_teraz_przy_karcie_w_toku_czeka_na_koniec_pracy(tmp_path, monkeypatch):
+    """20.11: „Aktualizuj teraz” przy karcie kanbana w toku: `jarvo update` odmawiał (restart bramy przerwałby kartę),
+    a panel nie dostawał słowa. Natywnie POST /update `teraz` przy karcie = czekanie na koniec pracy (202, `gdy:
+    wolne`, `powod: karty`, meta silnika), bez silnika 409 `karty` z radą; po karcie zwykła prośba do pomocnika."""
+    pytest.importorskip("fastapi")
+    pytest.importorskip("httpx")
+    import sqlite3
+    import time
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("JARVO_HQ_SILNIK", "0")
+    api = load_script("hq/plugin/plugin_api.py", "jarvo_hq_plugin_api_upd_karty")
+    upd, req = tmp_path / "update.json", tmp_path / "update-request"
+    monkeypatch.setattr(api, "UPDATE_FILE", upd)
+    monkeypatch.setattr(api, "UPDATE_REQUEST", req)
+    monkeypatch.setattr(api, "PRACA_FILE", tmp_path / "praca.json")
+    monkeypatch.setattr(api, "HOME", tmp_path)
+    monkeypatch.setattr(api, "NATYWNIE", True)
+    upd.write_text(json.dumps({"state": "idle", "behind": 1, "checked_at": time.time()}), encoding="utf-8")
+    c = sqlite3.connect(tmp_path / "kanban.db")
+    c.execute("CREATE TABLE tasks (id TEXT, title TEXT, assignee TEXT, status TEXT, started_at INTEGER)")
+    c.execute("INSERT INTO tasks VALUES ('t_1', 'Research ankiet', 'jarvo-sherlock', 'running', 1)")
+    c.commit()
+    app = FastAPI()
+    app.include_router(api.router, prefix="/api/plugins/jarvo-hq")
+    k = TestClient(app, headers={"X-Jarvo-Request": "1"})
+    u = "/api/plugins/jarvo-hq/update"
+    r = k.post(u, json={"action": "update"})
+    assert r.status_code == 409 and r.json()["blad"]["kod"] == "karty" and not req.exists()
+
+    class Db:                                                          # meta silnika w rozmowy.db
+        def __init__(self):
+            self.m = {}
+
+        def meta(self, klucz):
+            return self.m.get(klucz)
+
+        def ustaw_meta(self, klucz, wartosc):
+            self.m[klucz] = wartosc
+
+        def usun_meta(self, klucz):
+            self.m.pop(klucz, None)
+
+    class Silnik:
+        db = Db()
+
+        def dziala(self):
+            return True
+
+        async def wykonaj_fn(self, f, *a):
+            return f(*a)
+    silnik = Silnik()
+    monkeypatch.setattr(api, "_silnik", lambda: silnik)
+    r = k.post(u, json={"action": "update", "gdy": "teraz"})
+    assert r.status_code == 202 and r.json()["gdy"] == "wolne" and r.json()["powod"] == "karty"
+    assert r.json()["karty"] == ["Research ankiet"] and not req.exists()
+    assert k.get(u).json()["po_pracy"] is not None                     # panel: „czeka na koniec pracy” z „Anuluj czekanie”
+    assert k.post(u, json={"action": "cancel"}).status_code == 200 and k.get(u).json()["po_pracy"] is None
+    c.execute("UPDATE tasks SET status = 'done'")
+    c.commit()
+    c.close()
+    r = k.post(u, json={"action": "update"})
+    assert r.status_code == 202 and "gdy" not in r.json() and req.read_text() == "update"
+
+
 # scripts/updater.py to pomocnik hosta instalacji z Dockerem (deploy.sh w bashu, grupa procesów): kod tylko kontenerowy
 @pytest.mark.posix_only
 def test_updater_heartbeat_and_timeout(tmp_path, monkeypatch):

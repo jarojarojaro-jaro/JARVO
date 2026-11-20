@@ -49,9 +49,12 @@ Stany (nazwy dokładnie jak w `przebiegi.stan`): `kolejka` (powód `start` | `za
   `kolejka(wstrzymane)`.
   Panel wysyła każdą wiadomość z `tryb_kolejki: "dopisz"` (Enter w trakcie pracy = dopisek, jak w terminalu):
   `do_dopisania` wskazuje trwający przebieg członka albo powód, czemu wiadomość czeka w kolejce (`zgoda`: brama
-  przyjmuje steer tylko od przebiegu `running`; `zatrzymywanie`; `wysylanie`; `terminal`). Sesja omp: `dopisz_omp`
-  (`omp_sesje.dopisz`, steer RPC skrzynki); skrzynka mówi `wlaczony` albo puszcza dopisek jako własną turę
-  (`dopisany` → `przyjety` → `pracuje` → koniec).
+  przyjmuje steer tylko od przebiegu `running`; `zatrzymywanie`; `wysylanie`; `terminal`; `stara_skrzynka`: tura omp
+  starej skrzynki `-p` bez procesu RPC). Sesja omp: `dopisz_omp` (`omp_sesje.dopisz`, steer RPC skrzynki); skrzynka
+  mówi `wlaczony` albo puszcza dopisek jako własną turę (`dopisany` → `przyjety` → `pracuje` → koniec).
+  „Wyślij teraz do trwającej pracy” (`dopisz_kolejke`, Hermes i omp, także `wstrzymane`) robi to z wiadomością
+  z kolejki; odmowa = 409 ze zdaniem z `POWODY_DOPISKU`. Dyspozytor sam (`_auto_dopisz`) dopisuje czekające wiadomości
+  właściciela (`zajety_agent`) do tury członka, gdy tylko ta pracuje (jedna próba na parę wiadomość, tura).
 - **Ponów**: nowy przebieg (`ponowienie_z`); gdy nasz wiersz jest w state.db, krótkie „Poprzednia tura nie
   dokończyła się (…). Odpowiedz jeszcze raz na moją ostatnią wiadomość.”, inaczej cała prośba z nowym blokiem.
   Drugie Ponów tego samego przebiegu zwraca ponowienie, które trwa albo się udało (bez drugiej wysyłki); po
@@ -67,6 +70,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import json
 import os
 import random
 import re
@@ -97,6 +101,56 @@ BRAMA_KONCOWE = {"completed", "failed", "cancelled", "interrupted"}
 ZDARZENIA_KONCOWE = {f"run.{s}" for s in BRAMA_KONCOWE}
 
 TRZYMANE = ("wstrzymane", "misja")      # powody kolejki, które zdejmuje tylko właściciel („Wyślij teraz”)
+# czemu wiadomość nie może teraz dołączyć do trwającej tury (`Rejestr.do_dopisania`): zdanie dla właściciela PL/EN
+POWODY_DOPISKU = {
+    "": ("Agent teraz nie pracuje, wiadomość pójdzie normalnie.",
+         "The agent is not working right now, the message will be sent normally."),
+    "zgoda": ("Agent czeka na Twoją decyzję, wiadomość pójdzie po niej.",
+              "The agent is waiting for your decision, the message goes after it."),
+    "zatrzymywanie": ("Agent właśnie się zatrzymuje, wiadomość pójdzie zaraz po nim.",
+                      "The agent is stopping, the message goes right after."),
+    "wysylanie": ("Tura dopiero rusza, wiadomość dopisze się sama, gdy agent zacznie pracę.",
+                  "The turn is just starting, the message is added by itself once the agent is working."),
+    "terminal": ("Sesję trzyma terminal, wiadomość wejdzie, gdy terminal ją zwolni.",
+                 "The terminal holds the session, the message goes in once it is released."),
+    "stara_skrzynka": ("Tura zaczęta na starej wersji skrzynki nie przyjmuje dopisków, wiadomość wejdzie zaraz po niej.",
+                       "A turn started on the old inbox version takes no additions, the message goes right after it."),
+    "inny_kanal": ("Sesję zajmuje tura z innego kanału (Telegram, terminal), wiadomość wejdzie zaraz po niej.",
+                   "A turn from another channel (Telegram, terminal) holds the session, the message goes right after it."),
+}
+
+# `/effort` i `/fast` w panelu (komendy.py) dla członka rozmowy z Hermesem: {wysilek, fast} w `meta` rozmowy pod
+# `opcje:<wątek>:<agent>` (obok wyboru modelu); przebieg wysyła je w `model_options` ciała `/v1/runs` (brama.cialo)
+OPCJE_META = "opcje:"
+WYSILKI_HERMESA = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
+
+
+def opcje_czlonka(db, wid: str, agent: str) -> dict:
+    """{wysilek: poziom albo "", fast: bool albo None} wybrane w panelu dla członka rozmowy."""
+    try:
+        d = json.loads(db.meta(f"{OPCJE_META}{wid}:{agent}") or "null")
+    except ValueError:
+        d = None
+    d = d if isinstance(d, dict) else {}
+    w, f = str(d.get("wysilek") or ""), d.get("fast")
+    return {"wysilek": w if w in WYSILKI_HERMESA else "", "fast": f if isinstance(f, bool) else None}
+
+
+def ustaw_opcje_czlonka(db, wid: str, agent: str, **zmiany) -> dict:
+    d = {**opcje_czlonka(db, wid, agent), **zmiany}
+    d = {k: v for k, v in d.items() if v not in (None, "")}
+    if d:
+        db.ustaw_meta(f"{OPCJE_META}{wid}:{agent}", json.dumps(d))
+    else:
+        db.usun_meta(f"{OPCJE_META}{wid}:{agent}")
+    return opcje_czlonka(db, wid, agent)
+
+
+def wybor_czlonka(db, wid: str, agent: str) -> dict | None:
+    """Wybór panelu do ciała przebiegu: model (`/model`) i opcje (`/effort`, `/fast`); None = nic nie wybrano."""
+    d = {**(db.model_czlonka(wid, agent) or {}), **{k: v for k, v in opcje_czlonka(db, wid, agent).items()
+                                                     if v not in (None, "")}}
+    return d or None
 
 
 def limit_domyslny(cpu: int | None = None) -> int:
@@ -236,6 +290,8 @@ class Dziennik:
 class Rejestr:
     """Rejestr przebiegów: jedna instancja na proces, wszystkie metody na pętli wątku silnika."""
 
+    auto_dopisek = True     # dyspozytor sam dopisuje kolejkę do trwającej tury (testy mechaniki kolejki: False)
+
     def __init__(self, db, brama, hub, *, czytnik, agenci, kontekst, scalanie, budzenia=None, cialo: Callable,
                  cialo_sha: Callable, blad_bramy: type, utajnij: Callable[[str], str] = lambda t: t,
                  etykieta: Callable | None = None, limit: int = LIMIT, zegar: Callable[[], float] = time.time,
@@ -278,6 +334,7 @@ class Rejestr:
         self.omp = None
         self.omp_dane: Path | None = None
         self._omp_sledzone: dict[str, asyncio.Task] = {}
+        self._auto_proby: dict[str, str] = {}         # wiadomość z kolejki → tura, do której dyspozytor już próbował
 
     # =========================================================================================== pomocnicze
     def _nazwy(self) -> dict[str, str]:
@@ -505,6 +562,8 @@ class Rejestr:
             k = (p["watek_id"], p["agent"], p.get("rola") or "rozmowa")
             if k in zajete or k in widziane:
                 widziane.add(k)
+                if k in zajete and await self._auto_dopisz(p):
+                    continue
                 self._powod(p, "zajety_agent")
                 continue
             widziane.add(k)
@@ -824,7 +883,7 @@ class Rejestr:
             # ponowienie po restarcie wysyła to samo ciało, nawet gdy właściciel zmienił model w międzyczasie
             model = (p.get("payload") or {}).get("model")
             if not p.get("cialo_sha") and (p.get("rola") or "rozmowa") == "rozmowa":
-                model = self.db.model_czlonka(p["watek_id"], p["agent"])
+                model = wybor_czlonka(self.db, p["watek_id"], p["agent"])
                 if (p.get("payload") or {}).get("model") != model:
                     p = self.db.zmien_przebieg(pid, payload={**(p.get("payload") or {}), "model": model})
             c = self.cialo(sesja, wejscie, p.get("autor"), model)
@@ -1261,22 +1320,51 @@ class Rejestr:
         self.log(f"jarvo-hq: przebieg {q['id']} {q['agent']} —→dopisany (do {pid})")
         return self._po_steerze(q)
 
+    async def _auto_dopisz(self, p: Mapping) -> bool:
+        """Dyspozytor: wiadomość właściciela czekająca na koniec tury członka (`zajety_agent`, np. sprzed wdrożenia
+        albo odrzucona przez steer, bo tura dopiero ruszała) idzie do tej tury, gdy tylko przyjmuje ona dopiski
+        (Hermes: `pracuje` z `run_id`; omp: tura procesu RPC skrzynki). Jedna próba na parę (wiadomość, tura);
+        `wstrzymane` i `misja` tu nie trafiają (tylko właściciel). True = wiadomość opuściła kolejkę."""
+        if not self.auto_dopisek or (p.get("zrodlo") or "wlasciciel") != "wlasciciel" \
+                or (p.get("rola") or "rozmowa") != "rozmowa":
+            return False
+        cel, _powod = await self.do_dopisania(p["watek_id"], p["agent"], auto=True)
+        if cel is None or self._auto_proby.get(p["id"]) == cel["id"]:
+            return False
+        self._auto_proby[p["id"]] = cel["id"]
+        try:
+            q = await self._dopisz_z_kolejki(p, cel, None)
+        except Blad:
+            return False
+        self.log(f"jarvo-hq: przebieg {p['id']} {p['agent']}: z kolejki dopisany sam do {cel['id']}")
+        return q.get("stan") != "kolejka"
+
     async def dopisz_kolejke(self, pid: str, *, klucz: str | None = None) -> dict:
-        """„Dopisz do trwającej pracy” na wiadomości czekającej w `kolejka(zajety_agent)`. Przebieg idzie do
-        `dopisany` przed steerem (dyspozytor nie wyśle go w tym czasie drugi raz) z `payload.klucz_dopisz` (powtórzone
-        żądanie dostaje ten sam przebieg); steer odrzucony = wraca do kolejki, a gdy cel w tym czasie zatrzymano,
-        jako `wstrzymane` (jak reszta kolejki tego członka po Stopie)."""
+        """„Wyślij teraz do trwającej pracy” na wiadomości czekającej w kolejce (także `wstrzymane`; Hermes i omp).
+        Cel wskazuje `do_dopisania`; gdy go nie ma, 409 z powodem po polsku i po angielsku (`dane.powod`)."""
         q = self._wez(pid)
         if klucz and (q.get("payload") or {}).get("klucz_dopisz") == klucz:
             return q
         if q["stan"] != "kolejka":
             raise Blad(409, "nieaktywny", "Ta wiadomość już nie czeka w kolejce.", "This message is no longer queued.")
-        akt = next((a for a in self.db.przebiegi_watku(q["watek_id"], aktywne=True)
-                    if a["agent"] == q["agent"] and (a.get("rola") or "rozmowa") == (q.get("rola") or "rozmowa")
-                    and a["stan"] in ("pracuje", "czeka_na_ture", "przyjety") and a.get("run_id")), None)
-        if akt is None:
-            raise Blad(409, "nieaktywny", "Agent teraz nie pracuje, wiadomość pójdzie normalnie.",
-                       "The agent is not working right now, the message will be sent normally.")
+        akt, powod = await self.do_dopisania(q["watek_id"], q["agent"])
+        if akt is None and not powod and q.get("powod") == "tura":
+            powod = "inny_kanal"                    # sesję członka trzyma cudza tura (budzenie, Telegram, terminal)
+        if akt is None or (q.get("rola") or "rozmowa") != "rozmowa":
+            pl, en = POWODY_DOPISKU.get(powod) or POWODY_DOPISKU[""]
+            raise Blad(409, "nieaktywny", pl, en, powod=powod or "wolny")
+        return await self._dopisz_z_kolejki(q, akt, klucz)
+
+    async def _dopisz_z_kolejki(self, q: Mapping, akt: Mapping, klucz: str | None) -> dict:
+        """Wiadomość z kolejki do trwającej tury `akt`. Przebieg idzie do `dopisany` przed steerem (dyspozytor nie wyśle
+        go w tym czasie drugi raz) z `payload.klucz_dopisz` (powtórzone żądanie dostaje ten sam przebieg); steer
+        odrzucony = wraca do kolejki z tym samym powodem, a gdy cel w tym czasie zatrzymano, jako `wstrzymane` (jak
+        reszta kolejki tego członka po Stopie). omp: `omp_sesje.dopisz` z kluczem tego przebiegu (`tryb: kolejka` =
+        tura skończyła się w międzyczasie, wiadomość czeka w skrzynce jako własna tura)."""
+        pid = q["id"]
+        q = self.db.przebieg(pid)
+        if q is None or q["stan"] != "kolejka":
+            raise Blad(409, "nieaktywny", "Ta wiadomość już nie czeka w kolejce.", "This message is no longer queued.")
         payload = dict(q.get("payload") or {})
         tekst = payload.get("prosba") or ""
         powod = q.get("powod") or "start"
@@ -1284,29 +1372,53 @@ class Rejestr:
                           **({"payload": {**payload, "klucz_dopisz": klucz}} if klucz else {}))
         if q["stan"] != "dopisany":
             raise Blad(409, "nieaktywny", "Ta wiadomość już nie czeka w kolejce.", "This message is no longer queued.")
+
+        def z_powrotem() -> None:
+            cel = self.db.przebieg(akt["id"])
+            p_ = "wstrzymane" if cel is not None and (cel.get("stop_lokalny") or cel["stan"] in ("zatrzymywanie", "zatrzymane")) \
+                else powod                          # Stop celu w trakcie steera: ta wiadomość też czeka na właściciela
+            self._przejdz(q, "kolejka", powod=p_, dopisany_do=None, **({"payload": payload} if klucz else {}))
+            self._budz()
+
         self._w_locie.add(pid)
         try:
-            await self.brama.dopisz(akt["agent"], akt["run_id"], tekst)
+            if akt.get("zaplecze") == "omp":
+                w = await self._w_tle(self._wpis_omp, q)
+                if w is None or getattr(w, "blad", ""):
+                    raise RuntimeError("rozmówca niedostępny")
+                lustro = bool((self.db.rozmowca_watku(q["watek_id"]) or {}).get("lustro", True))
+                media = [str(o["path"]) for o in payload.get("obrazy") or [] if o.get("path")]
+                tekst = payload.get("tekst") or tekst
+                wynik = await self._w_tle(lambda: self.omp.dopisz(w, tekst, pid, media, lustro=lustro))
+            else:
+                await self.brama.dopisz(akt["agent"], akt["run_id"], tekst)
         except BaseException as e:
             self._w_locie.discard(pid)
-            cel = self.db.przebieg(akt["id"])
-            if cel is not None and (cel.get("stop_lokalny") or cel["stan"] in ("zatrzymywanie", "zatrzymane")):
-                powod = "wstrzymane"                 # Stop celu w trakcie steera: ta wiadomość też czeka na właściciela
-            self._przejdz(q, "kolejka", powod=powod, dopisany_do=None, **({"payload": payload} if klucz else {}))
-            self._budz()
-            if isinstance(e, self.BladBramy):
+            z_powrotem()
+            if isinstance(e, Exception):            # odmowa bramy albo skrzynki; anulowanie zadania idzie dalej
                 raise Blad(409, "nieaktywny", "Agent właśnie kończy, wiadomość pójdzie normalnie.",
                            "The agent is finishing, the message will be sent normally.") from None
             raise
         self._w_locie.discard(pid)
-        return self._po_steerze(q)
+        if akt.get("zaplecze") != "omp":
+            return self._po_steerze(q)
+        self.log(f"jarvo-hq: przebieg {pid} {q['agent']} kolejka→dopisany (do {akt['id']}, {wynik.get('tryb') or '?'})")
+        if wynik.get("tryb") == "kolejka":
+            teraz = self.zegar()
+            q = self._przejdz(q, "przyjety", powod="kolejka", dopisany_do=None, wyslany_at=teraz, przyjety_at=teraz)
+        else:
+            self._nadaj_stan(q)
+        self._status_watku(q["watek_id"])
+        self._sledz_omp(pid)
+        return self.db.przebieg(pid) or dict(q)
 
-    def do_dopisania(self, wid: str, agent: str) -> tuple[dict | None, str]:
-        """Enter w trakcie pracy (trasa wiadomości z `tryb_kolejki: "dopisz"`): trwający przebieg członka, do którego
-        nowa wiadomość idzie od razu, albo (None, powód). Pusty powód = agent nic nie robi (zwykła wysyłka); inny =
-        czemu dopisać się nie da, a wiadomość czeka w kolejce: `zgoda` (brama nie przyjmuje steera, gdy tura czeka na
-        decyzję), `zatrzymywanie`, `wysylanie` (brama jeszcze nie przyjęła tury), `terminal` (sesję omp trzyma
-        terminal)."""
+    async def do_dopisania(self, wid: str, agent: str, *, auto: bool = False) -> tuple[dict | None, str]:
+        """Trwający przebieg członka, do którego wiadomość może pójść od razu (Enter w trakcie pracy, „Wyślij teraz
+        do trwającej pracy”, dyspozytor), albo (None, powód). Pusty powód = agent nic nie robi (zwykła wysyłka); inny =
+        czemu się nie da (`POWODY_DOPISKU`): `zgoda` (brama przyjmuje steer tylko od przebiegu `running`),
+        `zatrzymywanie`, `wysylanie` (tura jeszcze nie ruszyła), `terminal` (sesję omp trzyma terminal),
+        `stara_skrzynka` (tura omp zaczęta przez starą skrzynkę `-p`, bez procesu RPC: nie przyjmuje dopisków).
+        `auto` (dyspozytor): tylko tura, która już pracuje."""
         akt = [p for p in self.db.przebiegi_watku(wid, aktywne=True)
                if p["agent"] == agent and (p.get("rola") or "rozmowa") == "rozmowa" and p.get("zrodlo") != "nadzor"
                and p["stan"] in STANY_W_LIMICIE]
@@ -1315,13 +1427,31 @@ class Rejestr:
         p = akt[0]
         if p["stan"] in ("czeka_na_zgode", "zatrzymywanie"):
             return None, "zgoda" if p["stan"] == "czeka_na_zgode" else "zatrzymywanie"
+        if auto and p["stan"] != "pracuje":
+            return None, "wysylanie"
         if p.get("zaplecze") == "omp":
             if p["stan"] == "przyjety" and p.get("powod") == "terminal":
                 return None, "terminal"
-            return (p, "") if p["stan"] in ("przyjety", "pracuje") else (None, "wysylanie")
+            if p["stan"] not in ("przyjety", "pracuje"):
+                return None, "wysylanie"
+            if p["stan"] == "pracuje" and await self._w_tle(self._omp_stara_tura, p):
+                return None, "stara_skrzynka"
+            return p, ""
         if p["stan"] in ("pracuje", "czeka_na_ture", "przyjety") and p.get("run_id"):
             return p, ""
         return None, "wysylanie"
+
+    def _omp_stara_tura(self, p: Mapping) -> bool:
+        """Tura skrzynki trwa, ale bez procesu RPC (stara skrzynka `omp -p`): dopisek nie wejdzie do niej."""
+        try:
+            w = self._wpis_omp(p)
+            if w is None or getattr(w, "blad", ""):
+                return False
+            s = self.omp.czytaj_stan(w)
+            t = s.get("tura")
+            return isinstance(t, dict) and bool(self.omp.zyje(t.get("pid"))) and self.omp.proces_skrzynki(w, s) is None
+        except Exception:
+            return False
 
     async def dopisz_omp(self, pid: str, tekst: str, *, media: Iterable[str] = ()) -> dict:
         """Dopisek do sesji omp (`omp_sesje.dopisz`, klucz = id nowego przebiegu): trwająca tura skrzynki dostaje go
@@ -1517,6 +1647,7 @@ class Rejestr:
         for slownik in (self._konflikty, self._brak_404, self._pierwszy_blad, self._pierwszy_429, self._stop_proby):
             slownik.pop(pid, None)
         self._stop_ponowiony.discard(pid)
+        self._auto_proby.pop(pid, None)
         self._dopisane_po(p, stan, pending)
         if p.get("zrodlo") != "nadzor" and stan not in ("anulowane", "wlaczony"):
             self._aktywnosc_po(p, stan, dz)

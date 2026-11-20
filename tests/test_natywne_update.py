@@ -728,6 +728,9 @@ def test_aktualizacja_czeka_na_karty_w_toku(tmp_path):
     kod, raport, log = _aktualizuj(u, ot, _zaplecze(strumien=inst, przechwyc=Doctor()))
     assert kod == 1 and raport["wynik"] == "karty" and not inst.wywolania
     assert "t_1 jarvo-sherlock: Research ankiet" in log and "--mimo-kart" in log
+    # odmowa dochodzi też do panelu (prośba z panelu kończyła się bez słowa)
+    blad = aktualizacja.stan_panelu(u)["error"]
+    assert "na tablicy pracuje agent" in blad and "Research ankiet" in blad and "Zaktualizuj, gdy skończą" in blad
     kod, raport, log = _aktualizuj(u, ot, _zaplecze(strumien=inst, przechwyc=Doctor()), mimo_kart=True)
     assert kod == 0 and raport["wynik"] == "zaktualizowano", log
 
@@ -1106,6 +1109,92 @@ def test_blad_sprzatania_nie_wycofuje_udanej_aktualizacji(tmp_path, monkeypatch)
     kod, raport, log = _aktualizuj(u, ot, _zaplecze(strumien=inst, przechwyc=Doctor()))
     assert kod == 0 and raport["wynik"] == "zaktualizowano" and len(inst.wywolania) == 1, log
     assert "sprzątanie starych wersji nie przeszło" in log and aktualizacja.stan_panelu(u)["state"] == "done"
+
+
+def test_zerwany_potok_ekranu_nie_przerywa_aktualizacji(tmp_path, monkeypatch):
+    """20.11: `jarvo update --po-kartach --ref <sha>` z terminala operatora; czytelnik wyjścia zniknął w diagnozie nowej
+    wersji i BrokenPipeError przerwał przebieg po przełączeniu: bez wyniku w aktualizacja.json, panel „failed”. Ekran
+    to kopia dziennika: zerwany potok idzie do os.devnull, a aktualizacja kończy się normalnie."""
+    u, _ = _instalacja(tmp_path)
+    inst = Instalator(u)
+    ot = _ot(tmp_path, env={aktualizacja.FAKE: str(_kod(tmp_path / "zrodlo", SHA_NOWA))},
+             moduly={"nadzorca": Nadzorca(), "autostart": Autostart()})
+    czytaj, pisz = os.pipe()
+    os.close(czytaj)                                                  # czytelnik zniknął
+    ekran = os.fdopen(pisz, "w", encoding="utf-8")
+    monkeypatch.setattr(sys, "stdout", ekran)
+    try:
+        kod, raport = aktualizacja.aktualizuj(u, ot, log=aktualizacja._wypisz, zaplecze=_zaplecze(strumien=inst,
+                                              przechwyc=Doctor()), magazyn=lambda _u: None)
+        aktualizacja._wypisz("jeszcze jeden wiersz")
+        ekran.flush()                                                 # wyjście z procesu też nie rzuci
+    finally:
+        monkeypatch.undo()
+        ekran.close()
+    assert kod == 0 and raport["wynik"] == "zaktualizowano"
+    assert aktualizacja.stan(u)["wynik"] == "zaktualizowano" and aktualizacja.stan_panelu(u)["state"] == "done"
+    assert "Gotowe: Jarvo" in (u.logi / "aktualizacja.log").read_text(encoding="utf-8")
+
+
+def test_wynik_w_aktualizacja_json_zawsze_w_komplecie(tmp_path):
+    """20.11: udana aktualizacja zostawiła w aktualizacja.json „wynik: zaktualizowano” obok opisu porażki sprzed 5 dni.
+    Każdy przebieg pisze komplet: wynik, kiedy, opis, działająca wersja, poprzednia i cel."""
+    u, _ = _instalacja(tmp_path)
+    ot = _ot(tmp_path, env={aktualizacja.FAKE: str(_kod(tmp_path / "zrodlo", SHA_NOWA))},
+             moduly={"nadzorca": Nadzorca(), "autostart": Autostart()})
+    zla = Instalator(u, kody=(1,), przelacz=(False,))
+    kod, _, log = _aktualizuj(u, ot, _zaplecze(strumien=zla, przechwyc=Doctor()))
+    s = aktualizacja.stan(u)
+    assert kod == 1 and s["wynik"] == "blad" and "nic się nie przełączyło" in s["opis"], log
+    assert s["wersja"] == s["poprzednia"] == SHA_STARA[:12] and s["cel"] == SHA_NOWA[:12]
+    kod, _, log = _aktualizuj(u, ot, _zaplecze(strumien=Instalator(u), przechwyc=Doctor()))
+    s = aktualizacja.stan(u)
+    assert kod == 0 and s["wynik"] == "zaktualizowano", log
+    assert s["opis"] == f"Gotowe: Jarvo {SHA_NOWA[:12]} (było {SHA_STARA[:12]})."
+    assert s["wersja"] == s["cel"] == SHA_NOWA[:12] and s["poprzednia"] == SHA_STARA[:12]
+
+
+def test_przebieg_przerwany_po_przelaczeniu_a_potem_sprawdzenie(tmp_path, monkeypatch):
+    """20.11 na żywo: przebieg z CLI przełączył wersję i padł (BrokenPipeError także w obsłudze błędu), a `jarvo update
+    --ref main` („aktualne”) zostawił panelowi „failed” („Aktualizacja nieudana”, „Spróbuj ponownie”) i wynik
+    z wersją sprzed aktualizacji. Przerwany przebieg zapisuje działającą wersję, a sprawdzenie najnowszej uzgadnia
+    update.json („idle”) i aktualizacja.json („aktualne”)."""
+    u, _ = _instalacja(tmp_path)
+    ot = _ot(tmp_path, env={aktualizacja.FAKE: str(_kod(tmp_path / "zrodlo", SHA_NOWA))},
+             moduly={"nadzorca": Nadzorca(), "autostart": Autostart()})
+    peka = lambda *a, **k: (_ for _ in ()).throw(BrokenPipeError(32, "Broken pipe"))   # noqa: E731
+    monkeypatch.setattr(aktualizacja._Aktualizacja, "_doctor_po", peka)
+    monkeypatch.setattr(aktualizacja._Aktualizacja, "_nieudana", peka)
+    kod, raport, log = _aktualizuj(u, ot, _zaplecze(strumien=Instalator(u), przechwyc=Doctor()))
+    monkeypatch.undo()
+    assert kod == 1 and srodowisko.biezace(u)["app"] == str(u.program / "app" / SHA_NOWA[:12]), log
+    s = aktualizacja.stan(u)
+    assert s["wynik"] == "blad" and s["wersja"] == SHA_NOWA[:12] and "BrokenPipeError" in s["opis"]
+    assert aktualizacja.stan_panelu(u)["state"] == "failed"
+    kod, raport, log = _aktualizuj(u, ot, _zaplecze(strumien=Instalator(u), przechwyc=Doctor()), ref="main")
+    assert kod == 0 and raport["wynik"] == "aktualne", log
+    panel = aktualizacja.stan_panelu(u)
+    assert panel["state"] == "idle" and panel["error"] is None and panel["current"] == SHA_NOWA[:7]
+    s = aktualizacja.stan(u)
+    assert s["wynik"] == "aktualne" and s["wersja"] == SHA_NOWA[:12] and s["cel"] is None
+    assert "nie udała" not in s["opis"] and "przerwana" not in s["opis"] and SHA_NOWA[:12] in s["opis"]
+
+
+def test_sprawdzenie_pomocnika_czysci_porazke_tylko_przy_najnowszej(tmp_path):
+    """Sprawdzenie pomocnika (droga „auto” i przycisk „Sprawdź”): przy najnowszej wersji „failed” znika, a nieaktualny
+    wynik w aktualizacja.json zastępuje „aktualne”; przy starszej (np. po wycofaniu) porażka zostaje do aktualizacji."""
+    u, _ = _instalacja(tmp_path, sha=SHA_NOWA)
+    aktualizacja.zapisz_panel(u, state="failed", error="nieprzewidziany błąd", finished_at=time.time())
+    aktualizacja.zapisz_stan(u, wynik="zaktualizowano", wersja=SHA_STARA[:12], opis="Aktualizacja się nie udała: …")
+    ot = _ot(tmp_path, env={aktualizacja.FAKE: str(_kod(tmp_path / "zrodlo", SHA_NOWA))})
+    panel = aktualizacja.sprawdz_dla_panelu(u, ot, magazyn=lambda _u: None)
+    assert panel["state"] == "idle" and panel["behind"] == 0 and panel["error"] is None
+    s = aktualizacja.stan(u)
+    assert s["wynik"] == "aktualne" and s["wersja"] == SHA_NOWA[:12] and s["poprzednia"] == SHA_STARA[:12]
+    aktualizacja.zapisz_panel(u, state="failed")
+    ot = _ot(tmp_path, env={aktualizacja.FAKE: str(_kod(tmp_path / "zrodlo-inna", SHA_INNA))})
+    panel = aktualizacja.sprawdz_dla_panelu(u, ot, magazyn=lambda _u: None)
+    assert panel["state"] == "failed" and panel["behind"] == 1 and aktualizacja.stan(u)["wynik"] == "aktualne"
 
 
 @pytest.mark.windows_only

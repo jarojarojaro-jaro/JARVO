@@ -233,6 +233,7 @@ function AplikacjaJarvo() {
   const paleta = useSklep((s) => s.ustawienia.paleta) || "jarvo";
   const pasek = useSklep((s) => s.pasek, plytko);
   const staraBaza = useSklep((s) => s.stara_baza);
+  const oknoAkt = useSklep((s) => s.okno_aktualizacji);
   const got = useSklep((s) => s.gotowosc);
   const poznanie = useSklep((s) => s.poznanie);
   const korzen = useRef(null), uklad = useRef(null);
@@ -369,6 +370,7 @@ function AplikacjaJarvo() {
     ${staraBaza && html`<${OknoStarejBazy}/>`}
     <${PodgladPliku}/>
     <${OknoPytania}/>
+    ${oknoAkt && html`<${Leniwy} pakiet="ustawienia" nazwa="OknoAktualizacji"/>`}
     <${Pasy}/>
     <${Toasty}/>
   </div>`;

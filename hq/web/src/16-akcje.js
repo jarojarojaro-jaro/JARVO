@@ -111,10 +111,13 @@ const akcje = {
   // „Aktualizuj” (§15.3): gdy = "wolne" czeka na koniec pracy agentów, "teraz" prosi pomocnika od razu; cancel odwołuje
   async aktualizuj(action, gdy) {
     try {
-      await api.aktualizacja(action, gdy);
+      const r = await api.aktualizacja(action, gdy);
       const praca = ((sklep.stan().aktualizacja || {}).praca || {}).aktywne || 0;
-      Komunikaty.pokaz(T(action === "cancel" ? "akt.odwolana" : gdy === "wolne" ? "akt.po_pracy_ok" : praca ? "akt.zlecona_praca" : "akt.zlecona"));
-      if (action === "update" && gdy !== "wolne") sklep.ustaw((s) => ({ ...s, aktualizacja: { ...(s.aktualizacja || {}), pending: true } }));
+      // POST /update może odpowiedzieć {gdy: "wolne", powod: "karty"}: karta z tablicy w toku, aktualizacja czeka
+      const czeka = gdy === "wolne" || (r && r.gdy === "wolne");
+      Komunikaty.pokaz(T(action === "cancel" ? "akt.odwolana" : r && r.powod === "karty" ? "akt.czeka_karty"
+        : czeka ? "akt.po_pracy_ok" : praca ? "akt.zlecona_praca" : "akt.zlecona"));
+      if (action === "update" && !czeka) sklep.ustaw((s) => ({ ...s, aktualizacja: { ...(s.aktualizacja || {}), pending: true } }));
       return true;
     } catch (e) { akcje._blad(e); return false; } finally { akcje.wczytajAktualizacje(); }
   },
@@ -259,7 +262,7 @@ const akcje = {
     for (const o of lista || []) {
       const [rodzaj, reszta] = [o.split(":")[0], o.slice(o.indexOf(":") + 1)];
       if (rodzaj === "nieznany") Komunikaty.pokaz(T("wysylka.nieznany", { nazwa: reszta, koord: nazwaAgenta(koordynator) }));
-      else if (rodzaj === "dopisz_niemozliwe") Komunikaty.pokaz(T(`dopisz.${["zgoda", "zatrzymywanie", "wysylanie", "terminal"].includes(reszta) ? reszta : "odmowa"}`));
+      else if (rodzaj === "dopisz_niemozliwe") Komunikaty.pokaz(T(`dopisz.${["zgoda", "zatrzymywanie", "wysylanie", "terminal", "stara_skrzynka"].includes(reszta) ? reszta : "odmowa"}`));
       else if (rodzaj === "wielu") Komunikaty.pokaz(T("wysylka.wielu", { n: Number(reszta) || 0 }));
     }
   },
@@ -298,6 +301,11 @@ const akcje = {
   },
   async wyslijTeraz(pid) {
     try { const r = await api.przebiegi.wyslijTeraz(pid); akcje._przebieg(r && r.przebieg); } catch (e) { akcje._blad(e); }
+  },
+  // „Wyślij teraz do trwającej pracy”: wiadomość z kolejki jako dopisek do trwającej tury; gdy się nie da, serwer
+  // mówi czemu (komunikat błędu w dymku)
+  async doPracy(pid) {
+    try { const r = await api.przebiegi.dopisz(pid, "", Pisanie.klucz(crypto.getRandomValues(new Uint8Array(16)))); akcje._przebieg(r && r.przebieg); } catch (e) { akcje._blad(e); }
   },
   async anuluj(pid) {
     try { const r = await api.przebiegi.anuluj(pid); akcje._przebieg(r && r.przebieg); } catch (e) { akcje._blad(e); }

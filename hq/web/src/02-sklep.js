@@ -62,6 +62,7 @@ function stanPoczatkowy() {
     szkice: Pamiec.wez("jarvo.szkice.v1", null) || {},
     pasek: { otwarty: false, zwiniety: !!Pamiec.wez("jarvo.pasek_zwiniety", false) },
     toasty: [], aktualizacja: null, stara_baza: false,
+    okno_aktualizacji: false,   // okno „Agenci pracują” (62-ustawienia.js) w korzeniu aplikacji, obok OknoPytania
     funkcje: {}, blad_aplikacji: false,
     podpowiedzi: null,  // ekran startu: {tryb, podpowiedzi, czeka, wersja} z GET /podpowiedzi
     poznanie: null,     // „trwa”: pierwsze spotkanie otwarte (37-poznajmy.js) do „Do pracy”, „Pomiń” albo „Zrobię to później”

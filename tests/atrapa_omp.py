@@ -167,7 +167,14 @@ for linia in sys.stdin:
     typ = c.get("type")
     if typ == "get_state":
         odpowiedz(c, data={"model": {"provider": "atrapa", "id": "model-x", "contextWindow": 200000},
-                           "isStreaming": stan["tura"] is not None})
+                           "isStreaming": stan["tura"] is not None, "thinkingLevel": stan.get("myslenie", "medium"),
+                           "fastModeEnabled": stan.get("fast", False)})
+    elif typ == "set_thinking_level":
+        stan["myslenie"] = c.get("level")
+        odpowiedz(c)
+    elif typ == "set_fast_mode":
+        stan["fast"] = bool(c.get("enabled"))
+        odpowiedz(c)
     elif typ == "get_session_stats":
         odpowiedz(c, data=statystyki())
     elif typ == "prompt":

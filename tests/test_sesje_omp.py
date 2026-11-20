@@ -289,6 +289,40 @@ def test_licznik_z_pliku_sesji(w, at):
     assert om.licznik(w)["kontekst"] == 1050
 
 
+def test_opcje_panelu_w_procesie_rpc_i_liczniku(w, at):
+    """`/effort` i `/fast` z panelu (model.json: `myslenie`, `fast`, obok modelu) skrzynka stosuje w procesie RPC
+    (`set_thinking_level`, `set_fast_mode`) przed turą, bez restartu procesu; licznik pokazuje je, a podsumowanie
+    pliku sesji czyta dopisane linie przyrostowo."""
+    om.ustaw_model_skrzynki(w, "atrapa/model-x")
+    assert om.ustaw_opcje_skrzynki(w, myslenie="high", fast=True) == {"myslenie": "high", "fast": True}
+    assert json.loads((w.skrzynka / om.PLIK_MODELU).read_text()) == {"model": "atrapa/model-x", "myslenie": "high",
+                                                                     "fast": True}
+    with pytest.raises(ValueError):
+        om.ustaw_opcje_skrzynki(w, myslenie="bardzo")
+    om.wyslij(w, "x", "k1")
+    so.skrzynka(w, Telegram())
+    poz = [(c["type"], c.get("level", c.get("enabled"))) for c in komendy(at)
+           if c["type"] in ("set_thinking_level", "set_fast_mode")]
+    assert poz == [("set_thinking_level", "high"), ("set_fast_mode", True)] and len(procesy(at)) == 1
+    lic = om.licznik(w)
+    assert (lic["myslenie"], lic["fast"]) == ("high", True)
+    om.ustaw_opcje_skrzynki(w, myslenie="", fast=None)
+    om.ustaw_model_skrzynki(w, None)
+    assert not (w.skrzynka / om.PLIK_MODELU).exists()
+    p1 = om.podsumowanie_sesji(w)
+    om.wyslij(w, "y", "k2")
+    so.skrzynka(w, Telegram())
+    p2 = om.podsumowanie_sesji(w)
+    assert p2["odpowiedzi"] == p1["odpowiedzi"] + 1 and p2["model"] == "model-x"
+
+
+def test_dopisek_do_tury_starej_skrzynki_idzie_do_kolejki(w, at):
+    """Tura starej skrzynki (`omp -p`, bez procesu RPC w stan.json) nie przyjmuje steera: `dopisz` mówi `kolejka`."""
+    om.zapisz_stan(w, tura={"id": "20261120-120000-abcdef", "pid": os.getpid(), "start": time.time(), "klucze": []},
+                   rpc=None)
+    assert om.dopisz(w, "i jeszcze to", "k9")["tryb"] == "kolejka"
+
+
 def test_bezczynny_proces_zamyka_sie(w, at, monkeypatch):
     monkeypatch.setattr(so, "BEZCZYNNA_S", 1.5)
     om.wyslij(w, "a", "k1")

@@ -73,11 +73,11 @@ function WiadomoscWlasciciela({ x, k, rozmowca }) {
     .concat((w.obrazy || []).filter((b) => b && b.path).map((b) => ({ ...fileFromPath(b.path), size: b.size })))
     .map((p) => [p.path, p])).values()];
   const obrazy = o ? (o.obrazy || []).filter((b) => OBRAZ_DATA.test(b.dane || "")) : [];
-  // Enter w trakcie pracy: wiadomość dopisana do trwającej tury („Dopisuję…”, potem „Dopisana”); wróciła do kolejki
-  // albo poszła jako własna tura = pokazuje to jej żywy dymek, nie ta linia
+  // dopisana do trwającej tury (Enter w trakcie pracy, „Wyślij teraz do trwającej pracy” albo sama z kolejki):
+  // „Dopisuję…”, potem „Dopisana”; wróciła do kolejki albo poszła jako własna tura = pokazuje to jej żywy dymek
   const dop = !!(w.dane && w.dane.dopisane_do);
   const stanDop = useSklep((s) => {
-    if (!dop) return null;
+    if (o) return null;
     for (const p of Object.values(s.przebiegi)) if (p.wpis_id === x.id) return p.stan;
     return null;
   });
@@ -91,7 +91,7 @@ function WiadomoscWlasciciela({ x, k, rozmowca }) {
       ${obrazy.map((b, i) => html`<img key=${i} class="j-zal-obraz" src=${b.dane} alt=${b.nazwa || ""}/>`)}
       ${pliki.map((p) => html`<${KartaPliku} key=${p.path} plik=${p} kompakt=${true}/>`)}</div>`}
     ${o && html`<${StanWysylki} o=${o} k=${k}/>`}
-    ${dop && (!stanDop || stanDop === "dopisany" || stanDop === "wlaczony") && html`<p class="j-msg-stan is-dop">
+    ${(stanDop === "dopisany" || stanDop === "wlaczony" || (dop && !stanDop)) && html`<p class="j-msg-stan is-dop">
       <${Ikona} n="plus" r=${12}/>${T(stanDop === "dopisany" ? "msg.dopisuje" : "msg.dopisana")}</p>`}
   </article>`;
 }
@@ -378,6 +378,8 @@ function MetaPrzebiegu({ p }) {
   return html`<p class="j-msg-meta" data-stan=${p.stan}>${kolejka ? html`<span class="j-kropka"></span>` : null}<span>${tekst}</span>
     ${kolejka && (p.powod === "wstrzymane" || p.powod === "misja") && html`<button type="button" class="j-link"
       onClick=${() => akcje.wyslijTeraz(p.id)}>${T("kolejka.wyslij_teraz")}</button>`}
+    ${kolejka && (p.zrodlo || "wlasciciel") === "wlasciciel" && p.powod !== "misja" && html`<button type="button" class="j-link"
+      onClick=${() => akcje.doPracy(p.id)}>${T("kolejka.do_pracy")}</button>`}
     ${kolejka && html`<button type="button" class="j-link" onClick=${() => akcje.anuluj(p.id)}>${T("kolejka.anuluj")}</button>`}
     ${p.stan === "zatrzymane" && html`<button type="button" class="j-link" onClick=${() => akcje.ponow(p.id)}>${T("przebieg.ponow")}</button>`}
   </p>`;

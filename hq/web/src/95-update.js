@@ -1,7 +1,9 @@
 // Aktualizacje: pozycja w menu bocznym dashboardu, gdy na GitHubie jest nowsza wersja. Ten plik jest w pakiecie aplikacji,
 // który loader wczytuje dopiero na /jarvo: pozycja pojawia się, gdy zakładka Jarvo raz wczytała się w tej karcie ("/" sam
 // tam prowadzi), i zostaje przy przejściach do innych stron dashboardu. W etapie 5 przechodzi do szuflady ustawień.
-// Stan i samą aktualizację robi pomocnik na hoście (scripts/updater.py); tu tylko pokazujemy i prosimy.
+// Stan i samą aktualizację robi pomocnik na hoście (scripts/updater.py); tu tylko pokazujemy i prosimy. Przy pracy
+// agentów tak jak aplikacja (62-ustawienia.js): „Zaktualizuj, gdy skończą” (gdy: wolne), czekanie z „Anuluj czekanie”.
+// Panel zamyka ×, Esc i wejście na /jarvo (tam wszystko poza aplikacją dostaje inert, więc × by nie działał).
 
 (function updateWidget() {
   if (typeof document === "undefined" || window.JARVO_HQ_MOCK) return;
@@ -21,6 +23,8 @@
   panel.setAttribute("aria-label", L("Aktualizacja Jarvo", "Jarvo update"));
   panel.hidden = true;
   document.body.appendChild(panel);
+  const zamknij = () => { open = false; render(); };
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && open) zamknij(); });
 
   function el(tag, cls, text) {
     const e = document.createElement(tag);
@@ -40,13 +44,14 @@
     } catch (_) { /* dashboard się restartuje w trakcie aktualizacji: zostaje ostatni stan */ }
     render();
   }
-  async function send(action) {
+  async function send(action, gdy) {
     busy = true; err = ""; render();
     try {
-      await rawFetch(`${API_ROOT}/update`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }),
+      const r = await rawFetch(`${API_ROOT}/update`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(gdy ? { action, gdy } : { action }),
       });
-      if (action === "update") st = { ...st, pending: true, log: L("Czekam na pomocnika aktualizacji…", "Waiting for the update helper…") };
+      const d = await r.json().catch(() => ({}));       // odmowę (pomocnik, trwa) rawFetch rzuca z komunikatem: niżej err
+      if (action === "update" && d.gdy !== "wolne") st = { ...st, pending: true, log: L("Czekam na pomocnika aktualizacji…", "Waiting for the update helper…") };
     } catch (e) { err = e.message; }
     busy = false; render();
     setTimeout(load, 2500);
@@ -58,6 +63,7 @@
     if (!st) return null;
     if (st.state === "updating" || (st.pending && st.state !== "done")) return [L("⟳ Aktualizuję…", "⟳ Updating…"), "is-busy"];
     if (justUpdated()) return [L("✓ Odśwież stronę", "✓ Reload page"), "is-done"];
+    if (st.po_pracy) return [L("⏳ Czeka na koniec pracy", "⏳ Waiting for work to end"), "is-busy"];
     if (st.state === "failed") return [L("✗ Aktualizacja nieudana", "✗ Update failed"), "is-bad"];
     if (st.state === "stalled") return [L("⚠ Aktualizacja utknęła", "⚠ Update stalled"), "is-bad"];
     if (st.online && st.behind > 0) return [`⬆ ${L("Aktualizacja", "Update")} (${st.behind})`, ""];
@@ -72,7 +78,7 @@
     if (panel.hidden) return;
     panel.replaceChildren();
     const head = el("header", "thq-upd-head");
-    head.append(el("h2", null, L("Aktualizacja Jarvo", "Jarvo update")), btn("×", "thq-upd-x", () => { open = false; render(); }));
+    head.append(el("h2", null, L("Aktualizacja Jarvo", "Jarvo update")), btn("×", "thq-upd-x", zamknij));
     panel.append(head);
     if (justUpdated()) {
       // nowa wersja panelu jest już na serwerze; bez samodzielnego odświeżenia (szkic albo praca w toku by przepadły,
@@ -83,7 +89,10 @@
       panel.append(done);
       return;
     }
-    if (st.state === "stalled") {
+    const praca = (st.praca || {}).aktywne || 0;
+    if (st.po_pracy) {
+      panel.append(el("p", null, L("Czeka, aż agenci skończą, i ruszy sama.", "Waits until the agents finish, then starts by itself.")));
+    } else if (st.state === "stalled") {
       const min = Math.round((st.silent_for || 0) / 60);
       panel.append(el("p", null, L(
         `Pomocnik aktualizacji nie odzywa się od ${min} min (zamknięty terminal/WSL, restart komputera albo zawieszony build). Wersja sprzed aktualizacji dalej działa. Uruchom go ponownie: lokalnie bash scripts/local-up.sh, na serwerze sudo systemctl restart jarvo-updater, i kliknij „Spróbuj ponownie”.`,
@@ -104,10 +113,18 @@
       panel.append(ul);
     }
     if (st.log && (st.state === "updating" || st.state === "failed" || st.state === "stalled")) panel.append(el("pre", "thq-upd-log", st.log));
-    if (err) panel.append(el("p", "thq-upd-err", err));
+    if (praca > 0 && !st.po_pracy && st.state !== "updating" && !st.pending) {
+      panel.append(el("p", null, L(`Pracują agenci (${praca}): „Aktualizuj teraz” przerwie ich pracę.`, `Agents are working (${praca}): "Update now" interrupts them.`)));
+    }
+    const blad = err || (st.state !== "updating" && st.error) || "";
+    if (blad) panel.append(el("p", "thq-upd-err", blad));
     const actions = el("div", "thq-upd-actions");
-    if (st.state === "stalled" || (st.state !== "updating" && !st.pending)) {
-      actions.append(btn(st.state === "failed" || st.state === "stalled" ? L("Spróbuj ponownie", "Try again") : L("Aktualizuj teraz", "Update now"), "thq-upd-go", () => send("update"), busy));
+    if (st.po_pracy) {
+      actions.append(btn(L("Aktualizuj teraz", "Update now"), "thq-upd-go", () => send("update"), busy),
+        btn(L("Anuluj czekanie", "Cancel waiting"), "thq-upd-ghost", () => send("cancel"), busy));
+    } else if (st.state === "stalled" || (st.state !== "updating" && !st.pending)) {
+      if (praca > 0) actions.append(btn(L("Zaktualizuj, gdy skończą", "Update when they finish"), "thq-upd-go", () => send("update", "wolne"), busy));
+      actions.append(btn(st.state === "failed" || st.state === "stalled" ? L("Spróbuj ponownie", "Try again") : L("Aktualizuj teraz", "Update now"), praca > 0 ? "thq-upd-ghost" : "thq-upd-go", () => send("update"), busy));
       actions.append(btn(L("Sprawdź ponownie", "Check again"), "thq-upd-ghost", () => send("check"), busy));
     }
     panel.append(actions);
@@ -117,6 +134,7 @@
 
   // pozycja w menu nad sekcją System (Hermes może przerysować menu, więc pilnujemy miejsca)
   function mount() {
+    if (open && document.documentElement.hasAttribute("data-jarvo-app")) zamknij();
     const sys = document.querySelector("aside.fixed > div.shrink-0.flex.flex-col.border-t");
     if (sys && item.nextElementSibling !== sys) sys.parentElement.insertBefore(item, sys);
   }

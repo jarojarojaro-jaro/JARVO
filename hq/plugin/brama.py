@@ -125,7 +125,9 @@ class Klucze:
 
 def cialo(sesja_id: str, wejscie: Any, autor: dict | None = None, model: dict | None = None) -> dict:
     """Ciało `POST /v1/runs`. Bez `instructions`; `model` i `provider` tylko z wyboru `/model` w panelu (komendy.py,
-    zapisany w przebiegu przed pierwszym POST), inaczej decyduje konfiguracja profilu."""
+    zapisany w przebiegu przed pierwszym POST), inaczej decyduje konfiguracja profilu. `/effort` i `/fast` w panelu
+    (`wysilek`, `fast` w tym samym wyborze) idą jako `model_options.reasoning_effort` i `model_options.fast` (brama:
+    `_request_reasoning_config`, `_request_service_tier`; bez nich effort i tier z config.yaml profilu)."""
     out: dict[str, Any] = {"input": wejscie, "session_id": sesja_id}
     if autor:
         out["author"] = dict(autor)
@@ -133,6 +135,13 @@ def cialo(sesja_id: str, wejscie: Any, autor: dict | None = None, model: dict | 
         out["model"] = str(model["model"])
         if model.get("provider"):
             out["provider"] = str(model["provider"])
+    opcje: dict[str, Any] = {}
+    if model and model.get("wysilek"):
+        opcje["reasoning_effort"] = str(model["wysilek"])
+    if model and isinstance(model.get("fast"), bool):
+        opcje["fast"] = model["fast"]
+    if opcje:
+        out["model_options"] = opcje
     return out
 
 

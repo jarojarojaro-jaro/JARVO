@@ -1258,7 +1258,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-pusto-t { font-size: 15px; color: var(--j-tekst-2); }
 .j-scrim { position: absolute; inset: 0; background: var(--j-zaslona); z-index: 50; animation: j-pojaw .18s var(--j-ease); }
 @keyframes j-pojaw { from { opacity: 0; } }
-.j-menu { position: fixed; z-index: 70; min-width: 220px; max-width: 300px; background: var(--j-tlo-pop); border-radius: 12px; box-shadow: var(--j-cien-2); padding: 6px; font-size: 14px; }
+.j-menu { position: fixed; z-index: 70; min-width: 220px; max-width: 300px; max-height: min(70vh, 520px); overflow-y: auto; background: var(--j-tlo-pop); border-radius: 12px; box-shadow: var(--j-cien-2); padding: 6px; font-size: 14px; }
 .j-menu-p { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 9px; border-radius: 8px; --j-r: 8px; color: var(--j-tekst); }
 .j-menu-p:hover, .j-menu-p:focus-visible { background: var(--j-tlo-aktywne); outline: none; }
 .j-menu-p .j-i { color: var(--j-tekst-3); }
@@ -1855,7 +1855,10 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-komp-pod { min-height: 18px; margin: 6px 4px 0; font-size: 12.5px; color: var(--j-tekst-3); line-height: 1.4; }
 .j-komp-pod.is-zle { color: var(--j-blad); }
 .j-licznik { margin: 0 6px; font: 11.5px/1.4 var(--j-font-mono); color: var(--j-tekst-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.j-licznik.is-duzo { color: var(--j-uwaga); }
+.j-licznik .is-duzo { color: var(--j-uwaga); }
+.j-licznik-b { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; border-radius: 3px; }
+.j-licznik-b:hover, .j-licznik-b:focus-visible { color: var(--j-tekst); text-decoration: underline dotted; outline: none; }
+.j-licznik-b.is-wl { color: var(--j-akcent); }
 .j-msg-stan.is-dop { gap: 4px; }
 .j-komp-w.is-start { margin-top: 26px; }
 .j-komp-w.is-start .j-komp { border-radius: 22px; }

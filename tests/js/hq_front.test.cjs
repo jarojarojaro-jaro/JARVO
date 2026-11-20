@@ -194,7 +194,7 @@ test("plytko", () => {
 });
 test("stanPoczatkowy: kształt sklepu", () => {
   eq(Object.keys(stanPoczatkowy()).sort(), ["adresaci", "agenci", "aktualizacja", "blad_aplikacji", "decyzje", "dostep", "funkcje", "gotowe",
-    "gotowosc", "inne_otwarte", "karty", "kolejnosc", "lista", "os", "pasek", "podglad", "podpowiedzi", "podzial", "poznanie", "przebiegi", "pytanie", "raporty", "rozmowcy", "silnik",
+    "gotowosc", "inne_otwarte", "karty", "kolejnosc", "lista", "okno_aktualizacji", "os", "pasek", "podglad", "podpowiedzi", "podzial", "poznanie", "przebiegi", "pytanie", "raporty", "rozmowcy", "silnik",
     "stara_baza", "strumien", "szkice", "toasty", "ustawienia", "watki", "wersja", "wysylane"]);
   eq(stanPoczatkowy().lista.filtr, "rozmowy");
   eq(stanPoczatkowy().ustawienia.motyw, "system");
@@ -758,6 +758,46 @@ test("Komendy: komenda czy zwykły tekst (wektory wspólne z komendy.py), menu p
   assert.strictEqual(Komendy.komendaModelu({ model: "gpt-5.4", provider: "openai-codex" }), "/model gpt-5.4 --provider openai-codex");
   assert.strictEqual(Komendy.komendaModelu({ model: "anthropic/claude-opus-5", provider: "" }), "/model anthropic/claude-opus-5");
   assert.ok(Komendy.zWpisu({ wpis: { dane: { typ: "komenda" } } }) && !Komendy.zWpisu({ wpis: { dane: { typ: "dolaczyl" } } }));
+});
+
+// ------------------------------------------------------------------------------------------------ okna i wersja
+test("Bezwladnosc: otwarte okno nigdy nie usypia samego siebie (20.11: X i Anuluj w oknie aktualizacji)", () => {
+  const wezel = (rodzic) => {
+    const e = { rodzic, atr: new Set() };
+    e.contains = (x) => { for (let y = x; y; y = y.rodzic) if (y === e) return true; return false; };
+    e.toggleAttribute = (n, t) => { if (t) e.atr.add(n); else e.atr.delete(n); };
+    e.querySelector = (s) => (s === ".j-glowna" ? glowna : null);
+    return e;
+  };
+  const korzen = wezel(null), uklad = wezel(korzen), glowna = wezel(uklad), widok = wezel(glowna);
+  const document = { querySelector: (s) => (s === "[data-jarvo-korzen] > .j-uklad" ? uklad : null),
+    addEventListener() {}, removeEventListener() {} };
+  const { Bezwladnosc } = vm.runInContext(fs.readFileSync(path.join(SRC, "20-ui.js"), "utf8") + "\n;({ Bezwladnosc });",
+    vm.createContext({ document, React: { Component: class {} }, setTimeout, clearTimeout }), { filename: "20-ui.js" });
+  const spi = (e) => e.atr.has("inert");
+  const obokUkladu = wezel(korzen), wWidoku = wezel(widok);
+  Bezwladnosc.okno(obokUkladu, true);                // okno w korzeniu (OknoPytania, OknoAktualizacji): układ śpi
+  assert.ok(spi(uklad));
+  Bezwladnosc.okno(obokUkladu, false);
+  assert.ok(!spi(uklad));
+  Bezwladnosc.okno(wWidoku, true);                   // okno w widoku Ustawień: przodkowie okna bez inert
+  assert.ok(!spi(uklad) && !spi(glowna));
+  Bezwladnosc.pasek(true);                           // wysunięty pasek na telefonie też nie usypia okna w głównej
+  assert.ok(!spi(glowna));
+  Bezwladnosc.okno(wWidoku, false);
+  assert.ok(spi(glowna));
+  Bezwladnosc.pasek(false);
+  Bezwladnosc.warstwa(true);
+  assert.ok(spi(uklad));
+  Bezwladnosc.warstwa(false);
+  assert.ok(!spi(uklad) && !spi(glowna));
+});
+test("WERSJA_PAKIETU: skrót rdzenia app-rdzen-<12 hex>.js (20.11: „Wersja Jarva” = „—”)", () => {
+  const blok = /const WERSJA_PAKIETU = \(\(\) => \{[\s\S]*?\}\)\(\);/.exec(fs.readFileSync(path.join(SRC, "11-strumien.js"), "utf8"))[0];
+  const wersja = (src) => vm.runInContext(`${blok}\nWERSJA_PAKIETU`, vm.createContext({ document: { currentScript: { src } } }));
+  assert.strictEqual(wersja("http://127.0.0.1:9119/dashboard-plugins/jarvo-hq/dist/zasoby/app-rdzen-3e6309e88d82.js"), "3e6309e88d82");
+  assert.strictEqual(wersja("/api/plugins/jarvo-hq/zasoby/app-0123456789ab.js"), "0123456789ab");   // pełny pakiet (demo)
+  assert.strictEqual(wersja("/api/plugins/jarvo-hq/zasoby/app-baza-6c89e67a1ab9.js"), null);
 });
 
 console.log(`ok ${ile}`);

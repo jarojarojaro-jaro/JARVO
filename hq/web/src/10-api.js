@@ -287,7 +287,8 @@ Object.assign(liveApi, {
     os: (id, p) => zadanie("GET", `/rozmowy/${kodujUrl(id)}/os${zapytanieUrl(p)}`),   // {przed, po, limit}
     krok: (id, ref, p) => zadanie("GET", `/rozmowy/${kodujUrl(id)}/krok${zapytanieUrl({ ref, ...p })}`),   // {wiecej}
     wyslij: (id, cialo) => zadanie("POST", `/rozmowy/${kodujUrl(id)}/wiadomosci`, cialo, { ponawiaj: true }),
-    licznik: (id) => zadanie("GET", `/rozmowy/${kodujUrl(id)}/licznik`),   // {licznik: {model, kontekst, okno, procent, …}}
+    licznik: (id) => zadanie("GET", `/rozmowy/${kodujUrl(id)}/licznik`),   // {licznik: {model, kontekst, okno, procent, wysilek, fast, …}}
+    opcje: (id) => zadanie("GET", `/rozmowy/${kodujUrl(id)}/opcje`),       // {opcje: {modele, poziomy, wysilek, fast, …}}
     eksportUrl: (id) => `${basePath()}${API_ROOT}/rozmowy/${kodujUrl(id)}/eksport`,
     // plik Markdown całej rozmowy: {blob, nazwa} (pobranie przez <a download>, nazwa z Content-Disposition)
     async eksport(id) {

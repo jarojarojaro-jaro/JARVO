@@ -27,7 +27,7 @@ const PRZEGLADARKA = process.env.JARVO_E2E_CHROMIUM || "/usr/local/bin/chromium"
 const USER = process.env.HERMES_DASHBOARD_BASIC_AUTH_USERNAME || "";
 const PASS = process.env.HERMES_DASHBOARD_BASIC_AUTH_PASSWORD || "";
 const ZNACZNIK = `jarvo-e2e-${path.basename(DIR)}`;                  // nazwy plików i treść prób CSRF
-const APP_JS = /\/api\/plugins\/jarvo-hq\/zasoby\/app-[0-9a-f]{12}\.js$/;
+const APP_JS = /\/api\/plugins\/jarvo-hq\/zasoby\/app-(?:rdzen-)?[0-9a-f]{12}\.js$/;     // rdzeń: app-rdzen-<skrót>.js
 const SELEKTORY = JSON.parse(fs.readFileSync(path.join(REPO, "branding", "powloka.json"), "utf8")).css.map((c) => c.selektor);
 
 const wyniki = [];
@@ -2445,6 +2445,21 @@ async function etap3(browser) {
         przyciski: [...document.querySelectorAll(".j-okno-akt .j-btn")].map((b) => b.textContent.trim()).filter(Boolean),
         fokus: document.activeElement && document.activeElement.dataset.akcja }));
       musi(out.okno.n === "1" && out.okno.fokus === "wolne", `okno aktualizacji: ${JSON.stringify(out.okno)}`);
+      // 20.11: okno w widoku Ustawień uśpiło samo siebie (inert układu), × i Anuluj nie działały. Każdy sposób zamyka.
+      out.zamyka = {};
+      for (const [sposob, zrob] of [["x", () => page.click(".j-okno-akt .j-okno-g button", { timeout: 3000 })],
+        ["anuluj", () => page.click('.j-okno-akt [data-akcja="anuluj"]', { timeout: 3000 })], ["esc", () => page.keyboard.press("Escape")]]) {
+        if (!(await page.$(".j-okno-akt"))) {
+          await page.click('[data-region=ustawienia] .j-akt [data-akcja="aktualizuj"]');
+          await page.waitForSelector(".j-okno-akt", { timeout: 5000 });
+        }
+        const uspione = await korzen(() => !!document.querySelector(".j-okno-akt").closest("[inert]"));
+        await zrob();
+        out.zamyka[sposob] = !uspione && await page.waitForSelector(".j-okno-akt", { state: "detached", timeout: 3000 }).then(() => true, () => false);
+      }
+      musi(Object.values(out.zamyka).every(Boolean), `zamykanie okna aktualizacji: ${JSON.stringify(out.zamyka)}`);
+      await page.click('[data-region=ustawienia] .j-akt [data-akcja="aktualizuj"]');
+      await page.waitForSelector(".j-okno-akt", { timeout: 5000 });
       await page.click('.j-okno-akt [data-akcja="wolne"]');
       await page.waitForSelector('.j-akt[data-stan="czeka"]', { timeout: 5000 });
       out.czeka = (await page.textContent(".j-akt .j-akt-stan")).trim();

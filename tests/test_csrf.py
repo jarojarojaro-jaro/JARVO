@@ -189,6 +189,8 @@ def test_odczyty_hq_bez_skutkow(monkeypatch):
         # licznik zużycia (komendy.py): licznik.json skrzynki omp, plik sesji omp, state.db członka (czytnik, mode=ro);
         # pamięć podręczna w procesie, bez zapisu
         "/rozmowy/{wid}/licznik",
+        # opcje stopki (komendy.py): katalog modeli, poziomy myślenia, bieżący wybór z rozmowy/model.json, bez zapisu
+        "/rozmowy/{wid}/opcje",
         # Aktualizacje (raporty.py lista, kalendarz): odczyt archiwum raportów; brak pliku = pusta lista (archiwum
         # zakłada silnik)
         "/raporty", "/raporty/kalendarz"}

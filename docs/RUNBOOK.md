@@ -375,8 +375,9 @@ Gdy na GitHubie jest nowsza wersja, w aplikacji Jarvo na dole paska rozmów poja
 nowych zmian). Otwiera **Ustawienia › System › Aktualizacja**: **Aktualizuj** robi `git pull` i wdrożenie
 (z przebudową obrazu, gdy trzeba). Gdy agenci akurat pracują (`/opt/data/jarvo/state/praca.json`), aplikacja
 najpierw pyta: **Zaktualizuj, gdy skończą** (domyślnie: prośba do pomocnika idzie 30 s po końcu pracy; do tego
-czasu w Systemie są **Aktualizuj teraz** i **Nie aktualizuj**, a po 2 h jedno przypomnienie), **Aktualizuj teraz**
-(przerywa pracę; przerwane tury wznawia **Ponów**) albo **Anuluj**. Po wdrożeniu karta z niedokończonym szkicem
+czasu w Systemie są **Aktualizuj teraz** i **Anuluj czekanie**, a po 2 h jedno przypomnienie), **Aktualizuj teraz**
+(przerywa pracę; przerwane tury wznawia **Ponów**; przy karcie kanbana w toku natywnie i tak czeka na jej koniec)
+albo **Anuluj**; okno zamyka też × i Esc. Po wdrożeniu karta z niedokończonym szkicem
 albo widoczna pokazuje pasek „Nowa wersja Jarva” z **Odśwież**, a schowana i bezczynna odświeża się sama.
 Na klasycznych stronach dashboardu w menu bocznym jest nadal **„⬆ Aktualizacja (n)”** (od chwili, gdy zakładka
 Jarvo wczytała się w tej karcie przeglądarki): klik pokazuje listę zmian, **„Aktualizuj teraz”** wdraża, a na koniec
@@ -421,7 +422,7 @@ przeglądarki nieosiągalny. Wyniki otwiera **▶ Odpal** (w aplikacji Jarvo **O
 | aplikacja: przebiegi czekają w kolejce z powodem `brama` | brama Hermesa nie odpowiada: `docker exec -u hermes jarvo-hermes hermes gateway status`; po 2 min bez bramy przebieg kończy się błędem (bez limitu w trakcie aktualizacji). Restart bramy przerywa trwające tury: `install-fleet.sh` ostrzega przed nim („trwa praca agentów”), a przerwaną turę wznawia **Ponów** |
 | aplikacja: ekran startu stoi na „Jarvo się uruchamia…”, po 2 min „Jarvo chwilowo nie odpowiada” | brama Hermesa nie odpowiada na `/health` (stan z `GET /api/plugins/jarvo-hq/app`, pole `gotowosc.brama`): `docker exec -u hermes jarvo-hermes hermes gateway status`, log `/opt/data/logs/gateway.log`. Wiadomości wysłane w tym czasie czekają w kolejce |
 | aplikacja: ekran startu mówi „Połącz model…”, choć klucz jest | gotowość czyta status logowania Hermesa dla profilu Jarva (wynik w pamięci 30 s): dostawca na klucz potrzebuje niepustej zmiennej klucza w `.env` profilu `jarvo` (albo w środowisku), dostawca OAuth zalogowania w **Ustawienia › Połączenia › Modele**, dostawca `custom` adresu `model.base_url`. Odśwież stronę po minucie |
-| aplikacja: aktualizacja „czeka na koniec pracy” bez końca | agenci dalej pracują (`praca.json`: `aktywne` > 0, także karty kanbana w `running` i tury z innych kanałów). **Ustawienia › System**: **Aktualizuj teraz** (przerywa pracę) albo **Nie aktualizuj** |
+| aplikacja: aktualizacja „czeka na koniec pracy” bez końca | agenci dalej pracują (`praca.json`: `aktywne` > 0, także karty kanbana w `running` i tury z innych kanałów). **Ustawienia › System**: **Aktualizuj teraz** (przerywa pracę; przy karcie kanbana natywnie i tak czeka na jej koniec) albo **Anuluj czekanie** |
 | aplikacja: System › Aktualizacja „pomocnik nie działa” (503 `pomocnik`) | pomocnik hosta `scripts/updater.py` nie odezwał się od 5 min: lokalnie `jarvo up` (albo `bash scripts/local-up.sh`), na VPS `sudo systemctl status jarvo-updater` |
 | `/health`: `schemat_hermesa: zmieniony` po aktualizacji Hermesa | czytnik sesji nie znalazł kolumn, których potrzebuje; oś czasu pomija tych agentów (żółta linia „niedostępni”). Zrzuć schemat na nowo i popraw `SCHEMAT_WYMAGANY` ([HQ.md §2d](HQ.md#2d-rozmowy-magazyn-czytnik-wzmianki-kontekst), „Czytnik sesji”) |
 | `/health`: `silnik: awaria` (aplikacja pokazuje „Odśwież”) | wątek silnika rozmów padł 3 razy z rzędu; przyczyna w `jarvo-hq.log` („silnik padł …”). Restart samego dashboardu (tak jak `install-fleet.sh`): `docker exec jarvo-hermes sh -c '/command/s6-svc -wd -T 40000 -d /run/service/dashboard; /command/s6-svc -u /run/service/dashboard'`; przebiegi w toku wracają same (`odlaczony`), kolejka rusza bez otwartej karty |

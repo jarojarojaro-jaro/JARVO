@@ -75,40 +75,41 @@ const POLECENIA_POMOCNIKA = (start) => html`<div class="j-polecenia">
   <${Polecenie} etykieta=${T("akt.na_komputerze")} kod="jarvo updater"/>
   <${Polecenie} etykieta=${T("akt.na_serwerze")} kod=${`sudo systemctl ${start ? "start" : "restart"} jarvo-updater`}/></div>`;
 
-// ---- System › Aktualizacja (spec §15.3). Przy pracy agentów (praca.json silnika) „Aktualizuj” pyta: „Zaktualizuj,
-// gdy skończą” (domyślny fokus; update-request dopiero po 30 s bez pracy), „Aktualizuj teraz” albo „Anuluj”. Czekająca
-// aktualizacja ma „Aktualizuj teraz” i „Nie aktualizuj”. Nowa wersja: pasek „Odśwież”; sama odświeża się tylko karta
-// schowana i bezczynna (useNowaWersja w 90-app.js).
-function OknoAktualizacji({ praca, onWybor, onZamknij }) {
-  return html`<${Okno} tytul=${T("akt.okno_t")} onZamknij=${onZamknij} klasa="j-okno-akt" stopka=${html`
-      <${Przycisk} rodzaj="cichy" onClick=${onZamknij}>${T("ui.anuluj")}</${Przycisk}>
-      <${Przycisk} data-akcja="teraz" onClick=${() => onWybor("teraz")}>${T("akt.teraz")}</${Przycisk}>
-      <${Przycisk} rodzaj="mocny" data-fokus="" data-akcja="wolne" onClick=${() => onWybor("wolne")}>${T("akt.gdy_skoncza")}</${Przycisk}>`}>
+// ---- System › Aktualizacja (spec §15.3). Przy pracy agentów (praca.json silnika) „Aktualizuj” pyta w oknie: „Zaktualizuj,
+// gdy skończą” (domyślny fokus; update-request dopiero po 30 s bez pracy), „Aktualizuj teraz” albo „Anuluj”. Okno stoi
+// w korzeniu aplikacji (sklep.okno_aktualizacji, 90-app.js), bo pod oknem cały układ z tym widokiem dostaje inert.
+// Czekająca aktualizacja ma „Aktualizuj teraz” i „Anuluj czekanie”; karta kanbana w toku zamienia „teraz” na czekanie
+// (POST /update odpowiada gdy: wolne). Odmowa albo błąd ostatniej próby (update.json `error`) stoi pod stanem.
+// Nowa wersja: pasek „Odśwież”; sama odświeża się tylko karta schowana i bezczynna (useNowaWersja w 90-app.js).
+function OknoAktualizacji() {
+  const a = useSklep((s) => s.aktualizacja) || {};
+  const praca = { aktywne: 0, opis: [], ...(a.praca || {}) };
+  const zamknij = () => sklep.ustaw({ okno_aktualizacji: false });
+  const wybierz = (gdy) => { zamknij(); akcje.aktualizuj("update", gdy); };
+  return html`<${Okno} tytul=${T("akt.okno_t")} onZamknij=${zamknij} klasa="j-okno-akt" stopka=${html`
+      <${Przycisk} rodzaj="cichy" data-akcja="anuluj" onClick=${zamknij}>${T("ui.anuluj")}</${Przycisk}>
+      <${Przycisk} data-akcja="teraz" onClick=${() => wybierz("teraz")}>${T("akt.teraz")}</${Przycisk}>
+      <${Przycisk} rodzaj="mocny" data-fokus="" data-akcja="wolne" onClick=${() => wybierz("wolne")}>${T("akt.gdy_skoncza")}</${Przycisk}>`}>
     <p class="j-okno-p" data-praca=${praca.aktywne}>${T("akt.pracuje", { n: praca.aktywne })}</p>
     ${praca.opis.length > 0 && html`<ul class="j-akt-opis">${praca.opis.map((o, i) => html`<li key=${i}>${o}</li>`)}</ul>`}
+    <p class="j-okno-p">${T("akt.okno_co_dalej")}</p>
   </${Okno}>`;
 }
 
 function Aktualizacja() {
   const a = useSklep((s) => s.aktualizacja) || {};
-  const [okno, setOkno] = useState(false);
   const [trwa, setTrwa] = useState(false);
   useEffect(() => { akcje.wczytajAktualizacje(); }, []);
   const praca = { aktywne: 0, opis: [], ...(a.praca || {}) };
-  const wyslij = async (gdy) => {
-    setOkno(false);
-    setTrwa(true);
-    await akcje.aktualizuj("update", gdy);
-    setTrwa(false);
-  };
+  const teraz = async () => { setTrwa(true); await akcje.aktualizuj("update", "teraz"); setTrwa(false); };
   // świeży stan przed decyzją: liczba pracujących z praca.json (silnik odświeża go przy każdej zmianie)
   const aktualizuj = async () => {
     setTrwa(true);
     await akcje.wczytajAktualizacje();
     setTrwa(false);
     const st = sklep.stan().aktualizacja || {};
-    if (((st.praca || {}).aktywne || 0) > 0) setOkno(true);
-    else wyslij("teraz");
+    if (((st.praca || {}).aktywne || 0) > 0) sklep.ustaw({ okno_aktualizacji: true });
+    else teraz();
   };
   const odwolaj = async () => { setTrwa(true); await akcje.aktualizuj("cancel"); setTrwa(false); };
   const aktualizuje = a.state === "updating" || (a.pending && !["done", "stalled", "failed"].includes(a.state));
@@ -118,8 +119,8 @@ function Aktualizacja() {
   else if (a.po_pracy) {
     stan = html`<p class="j-akt-stan is-czeka" role="status"><${Ikona} n="alert" r=${16}/><span>${T("akt.czeka", { n: praca.aktywne })}</span></p>
       <p class="j-sz-uwaga">${T("akt.czeka_opis")}</p>`;
-    akcjeSekcji = html`<${Przycisk} data-akcja="teraz" disabled=${trwa} onClick=${() => wyslij("teraz")}>${T("akt.teraz")}</${Przycisk}>
-      <${Przycisk} rodzaj="cichy" data-akcja="nie" disabled=${trwa} onClick=${odwolaj}>${T("akt.nie")}</${Przycisk}>`;
+    akcjeSekcji = html`<${Przycisk} data-akcja="teraz" disabled=${trwa} onClick=${teraz}>${T("akt.teraz")}</${Przycisk}>
+      <${Przycisk} rodzaj="cichy" data-akcja="nie" disabled=${trwa} onClick=${odwolaj}>${T("akt.anuluj_czekanie")}</${Przycisk}>`;
   } else if (zrobiona) stan = html`<p class="j-akt-stan is-ok" role="status"><${Ikona} n="check" r=${16}/><span>${T("akt.zrobiona", { wersja: a.current || "" })}</span></p>`;
   else if (a.state === "stalled" || a.state === "failed") {
     stan = html`<p class="j-akt-stan is-zle" role="status"><${Ikona} n="alert" r=${16}/><span>${a.state === "stalled"
@@ -135,8 +136,8 @@ function Aktualizacja() {
   return html`
 <p class="j-sz-sub">${T("akt.tytul")}</p>
     <div class="j-karta j-akt" data-stan=${a.po_pracy ? "czeka" : aktualizuje ? "trwa" : a.state || "brak"}>${stan}
-      ${akcjeSekcji && html`<div class="j-sz-akcje">${akcjeSekcji}</div>`}</div>
-    ${okno && html`<${OknoAktualizacji} praca=${praca} onWybor=${wyslij} onZamknij=${() => setOkno(false)}/>`}`;
+      ${a.error && !aktualizuje && html`<p class="j-sz-uwaga" data-blad="">${T("akt.ostatnia_proba", { opis: a.error })}</p>`}
+      ${akcjeSekcji && html`<div class="j-sz-akcje">${akcjeSekcji}</div>`}</div>`;
 }
 
 // przełącznik wł./wył. (role=switch: Spacja i Enter z przycisku)
@@ -250,8 +251,10 @@ function SekcjaJezyk() {
     <p class="j-sz-uwaga">${T("szuflada.jezyk_opis")}</p>`;
 }
 
-// System: aktualizacja, konto (wylogowanie), klasyczny panel, wersja i skróty pod „Pokaż”
+// System: aktualizacja, konto (wylogowanie), klasyczny panel, wersja i skróty pod „Pokaż”. Wersja: kod Jarva z GET
+// /update (`current`, ten sam skrót co `jarvo status`), w podpowiedzi także skrót paczki panelu
 function SekcjaSystem() {
+  const program = (useSklep((s) => s.aktualizacja) || {}).current || "";
   return html`<${Naglowek} id="system"/>
     <${Aktualizacja}/>
     <p class="j-sz-sub">${T("szuflada.konto")}</p>
@@ -263,7 +266,8 @@ function SekcjaSystem() {
       <${Wiersz} ikona="ext" tytul=${T("szuflada.klasyczny")} opis=${T("szuflada.klasyczny_opis")}>
         <a class="j-btn j-btn-zwykly is-maly" data-akcja="klasyczny" href=${`${basePath()}/sessions`}>${T("ui.otworz")}</a></${Wiersz}>
       <${Wiersz} ikona="spark" tytul=${T("szuflada.wersja")} opis=${T("szuflada.wersja_opis")}>
-        <code class="j-sz-kod" title=${WERSJA_PAKIETU || ""}>${String(WERSJA_PAKIETU || "—").slice(0, 10)}</code></${Wiersz}>
+        <code class="j-sz-kod" data-wersja="" title=${[program && `Jarvo ${program}`, WERSJA_PAKIETU && `panel ${WERSJA_PAKIETU}`].filter(Boolean).join(", ")}>
+          ${String(program || WERSJA_PAKIETU || "—").slice(0, 10)}</code></${Wiersz}>
     </div>
     <details class="j-sz-det">
       <summary><${Ikona} n="right" r=${16}/>${T("szuflada.skroty_pokaz")}</summary>
@@ -327,4 +331,4 @@ function Ustawienia({ trasa }) {
   </section>`;
 }
 
-Zasoby.daj({ Ustawienia });
+Zasoby.daj({ Ustawienia, OknoAktualizacji });

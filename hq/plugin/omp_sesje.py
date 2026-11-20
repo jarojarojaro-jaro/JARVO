@@ -48,16 +48,21 @@ Kontrakt dla panelu (CentrumUI; wszystko synchroniczne i szybkie, wołać w wąt
                                               czeka na jej koniec (compact w omp przerywa trwającą turę)
     wynik_komendy(wpis, klucz) -> dict        {stan: kolejka|pracuje|gotowe|blad|brak, wynik, blad}
     licznik(wpis) -> dict                     {model, kontekst, okno, procent, wejscie, wyjscie, cache_odczyt,
-                                              cache_zapis, koszt, czas}: na żywo od skrzynki, bez niej z pliku sesji
+                                              cache_zapis, koszt, koszt_dzis, czas, myslenie, fast}: na żywo od
+                                              skrzynki, bez niej z pliku sesji (przyrostowo); okno bez skrzynki
+                                              uzupełnia panel z katalogu `omp models --json` (komendy.py)
     plik_sesji(wpis) -> Path | None           plik *.jsonl sesji (oś: czytnik_omp.os_sesji)
     model_skrzynki(wpis) -> str               model z `/model` w panelu (`<skrzynka>/model.json`), "" = z `omp_arg`
     ustaw_model_skrzynki(wpis, model|None)    zapis albo usunięcie wyboru; argumenty_tury(wpis) wstawia go do tury
-    podsumowanie_sesji(wpis) -> dict          model ostatniej odpowiedzi i zużycie sesji (`/model`, `/usage`)
+    opcje_skrzynki(wpis) -> dict              {myslenie, fast} z `/effort` i `/fast` w panelu (model.json; "" i None =
+                                              jak sesja); ustaw_opcje_skrzynki(wpis, myslenie=…, fast=…) zapisuje
+    podsumowanie_sesji(wpis) -> dict          model ostatniej odpowiedzi i zużycie sesji (`/model`, `/usage`, licznik)
 
 Wyników i argumentów narzędzi nie ma nigdzie: plik tury ma tylko tekst, nazwę i intencję narzędzia.
 """
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import re
@@ -65,6 +70,7 @@ import secrets
 import shutil
 import signal
 import subprocess
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -85,8 +91,13 @@ PLIK_LICZNIKA, PLIK_ZATRZYMAJ, PLIK_ZWOLNIJ, BUDZIK = "licznik.json", "zatrzymaj
 # komendy panelu, które skrzynka wykonuje przez RPC omp (jarvo/sesje_omp.py): nazwa → (opis, aliasy)
 KOMENDY = {"compact": ("Skompresuj kontekst sesji; po spacji możesz dodać, na czym się skupić", ("compress",))}
 LICZNIK_PUSTY = {"model": "", "kontekst": 0, "okno": 0, "procent": 0.0, "wejscie": 0, "wyjscie": 0, "cache_odczyt": 0,
-                 "cache_zapis": 0, "koszt": 0.0, "czas": None}
-_podsumowania: dict[str, tuple[int, int, dict]] = {}
+                 "cache_zapis": 0, "koszt": 0.0, "koszt_dzis": 0.0, "czas": None, "myslenie": "", "fast": None}
+MYSLENIE = ("off", "minimal", "low", "medium", "high", "xhigh", "max")   # ThinkingLevel omp (omp://rpc.md)
+# podsumowanie pliku sesji czytane przyrostowo (panel pyta co 2 s, plik ma setki MB i rośnie w trakcie tury):
+# ścieżka → {ino, od (bajt po ostatniej pełnej linii), wynik, dni {data: koszt}}
+_podsumowania: dict[str, dict] = {}
+_podsumowania_lock = threading.Lock()
+KAWALEK = 8 * 1024 * 1024
 
 
 @dataclass
@@ -301,27 +312,70 @@ def plik_sesji(w: Wpis) -> Path | None:
 # `/model <wzorzec>` w panelu zapisuje wybór w `<skrzynka>/model.json` ({"model": "<dostawca/model>"}); tura skrzynki
 # (jarvo/sesje_omp.py) bierze go zamiast `--model` z `omp_arg` wpisu. Terminal zostaje przy `omp_arg` (tam właściciel
 # ma własne /model omp). `/model` i `/usage` czytają model i zużycie z pliku sesji (wiadomości asystenta).
+# `/effort` i `/fast` (stopka panelu) dopisują w tym samym pliku `myslenie` (ThinkingLevel) i `fast` (bool): skrzynka
+# stosuje je w żywym procesie RPC (`set_thinking_level`, `set_fast_mode`) przed turą, bez restartu procesu.
 PLIK_MODELU = "model.json"
 
 
-def model_skrzynki(w: Wpis) -> str:
+def _wybor_skrzynki(w: Wpis) -> dict:
     if w.skrzynka is None:
-        return ""
+        return {}
     try:
         d = json.loads((w.skrzynka / PLIK_MODELU).read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return ""
-    return str(d.get("model") or "") if isinstance(d, dict) else ""
+        return {}
+    return d if isinstance(d, dict) else {}
 
 
-def ustaw_model_skrzynki(w: Wpis, model: str | None) -> None:
+def _zapisz_wybor(w: Wpis, d: dict) -> None:
     if w.skrzynka is None:
         raise ValueError("wpis bez skrzynki")
     plik = w.skrzynka / PLIK_MODELU
-    if model:
-        zapisz_atomowo(plik, {"model": str(model)})
+    d = {k: v for k, v in d.items() if v not in (None, "")}
+    if d:
+        zapisz_atomowo(plik, d)
     else:
         plik.unlink(missing_ok=True)
+
+
+def model_skrzynki(w: Wpis) -> str:
+    return str(_wybor_skrzynki(w).get("model") or "")
+
+
+def ustaw_model_skrzynki(w: Wpis, model: str | None) -> None:
+    _zapisz_wybor(w, {**_wybor_skrzynki(w), "model": str(model or "")})
+
+
+def opcje_skrzynki(w: Wpis) -> dict:
+    """{myslenie: ThinkingLevel albo "", fast: bool albo None}: wybór panelu (None/"" = jak sesja)."""
+    d = _wybor_skrzynki(w)
+    m = str(d.get("myslenie") or "")
+    f = d.get("fast")
+    return {"myslenie": m if m in MYSLENIE else "", "fast": f if isinstance(f, bool) else None}
+
+
+def ustaw_opcje_skrzynki(w: Wpis, **zmiany) -> dict:
+    """`myslenie` (poziom z MYSLENIE, "" = jak sesja) i `fast` (True/False, None = jak sesja) w model.json."""
+    d = _wybor_skrzynki(w)
+    if "myslenie" in zmiany:
+        m = str(zmiany["myslenie"] or "")
+        if m and m not in MYSLENIE:
+            raise ValueError(f"nieznany poziom myślenia: {m}")
+        d["myslenie"] = m
+    if "fast" in zmiany:
+        d["fast"] = zmiany["fast"] if isinstance(zmiany["fast"], bool) else None
+    _zapisz_wybor(w, d)
+    return opcje_skrzynki(w)
+
+
+def myslenie_z_argumentow(arg) -> str:
+    arg = list(arg)
+    for i, a in enumerate(arg):
+        if a == "--thinking" and i + 1 < len(arg):
+            return arg[i + 1]
+        if a.startswith("--thinking="):
+            return a.split("=", 1)[1]
+    return ""
 
 
 def argumenty_tury(w: Wpis) -> list[str]:
@@ -340,43 +394,109 @@ def argumenty_tury(w: Wpis) -> list[str]:
     return out + ["--model", model]
 
 
-def podsumowanie_sesji(w: Wpis) -> dict:
-    """Model ostatniej odpowiedzi i zużycie całej sesji z pliku *.jsonl: {model, dostawca, odpowiedzi, wejscie,
-    wyjscie, cache_odczyt, cache_zapis, koszt, kontekst}; brak pliku = zera i pusty model."""
-    wynik = {"model": "", "dostawca": "", "odpowiedzi": 0, "wejscie": 0, "wyjscie": 0, "cache_odczyt": 0,
-             "cache_zapis": 0, "koszt": 0.0, "kontekst": 0}
-    plik = plik_sesji(w)
-    if plik is None:
-        return wynik
-    try:
-        st = plik.stat()
-        juz = _podsumowania.get(str(plik))
-        if juz and juz[:2] == (st.st_mtime_ns, st.st_size):  # panel pyta co 2 s (licznik), plik sesji bywa duży
-            return dict(juz[2])
-        linie = plik.read_text(encoding="utf-8", errors="replace").splitlines()
-    except OSError:
-        return wynik
-    for linia in linie:
+def _podsumowanie_puste() -> dict:
+    return {"model": "", "dostawca": "", "odpowiedzi": 0, "wejscie": 0, "wyjscie": 0, "cache_odczyt": 0,
+            "cache_zapis": 0, "koszt": 0.0, "kontekst": 0}
+
+
+_DEKODER = json.JSONDecoder()
+
+
+def _napis_po(linia: bytes, klucz: bytes, przed: int) -> str:
+    """Wartość `"klucz":"…"` najbliżej przed bajtem `przed` (klucze wiadomości stoją tuż przed `usage`)."""
+    i = linia.rfind(klucz, 0, przed)
+    if i < 0:
+        return ""
+    i += len(klucz)
+    j = linia.find(b'"', i)
+    return linia[i:j].decode("utf-8", "replace") if j > i else ""
+
+
+def _dolicz(s: dict, linia: bytes) -> None:
+    """Jedna linia pliku sesji: odpowiedź asystenta (`type: message`, `role: assistant`) dolicza `usage`. omp pisze
+    zwarty JSON: wtedy bez parsowania całej linii (treść odpowiedzi bywa duża): `usage` to ostatni taki klucz w linii,
+    przed nim `model` i `provider` wiadomości, a `timestamp` wpisu stoi na początku linii (przed `message`). Linia ze
+    spacjami po dwukropkach (inny zapis) idzie przez pełny `json.loads`."""
+    if linia.startswith(b'{"type": "message"'):
         try:
             e = json.loads(linia)
         except ValueError:
-            continue
-        m = e.get("message") if isinstance(e, dict) and e.get("type") == "message" else None
-        if not isinstance(m, dict) or m.get("role") != "assistant":
-            continue
-        u = m.get("usage") if isinstance(m.get("usage"), dict) else {}
-        wynik["odpowiedzi"] += 1
-        wynik["wejscie"] += _liczba(u, "input")
-        wynik["wyjscie"] += _liczba(u, "output")
-        wynik["cache_odczyt"] += _liczba(u, "cacheRead")
-        wynik["cache_zapis"] += _liczba(u, "cacheWrite")
-        koszt = u.get("cost").get("total") if isinstance(u.get("cost"), dict) else None
-        wynik["koszt"] += float(koszt) if isinstance(koszt, (int, float)) else 0.0
-        kontekst = _liczba(u, "input") + _liczba(u, "cacheRead") + _liczba(u, "cacheWrite")
-        wynik["kontekst"] = kontekst or wynik["kontekst"]   # odpowiedź z błędem dostawcy ma same zera
-        wynik["model"], wynik["dostawca"] = str(m.get("model") or ""), str(m.get("provider") or "")
-    _podsumowania[str(plik)] = (st.st_mtime_ns, st.st_size, dict(wynik))
-    return wynik
+            return
+        m = e.get("message") if isinstance(e, dict) else None
+        if isinstance(m, dict) and m.get("role") == "assistant" and isinstance(m.get("usage"), dict):
+            _dolicz_usage(s, m["usage"], str(m.get("model") or ""), str(m.get("provider") or ""), str(e.get("timestamp") or ""))
+        return
+    if not linia.startswith(b'{"type":"message"'):
+        return
+    i = linia.rfind(b'"usage":{')
+    r = linia.find(b'"role":"assistant"')
+    if i < 0 or r < 0 or r > i:
+        return
+    try:
+        u, _k = _DEKODER.raw_decode(linia[i + 8:].decode("utf-8", "replace"))
+    except ValueError:
+        return
+    if not isinstance(u, dict):
+        return
+    t = linia.find(b'"timestamp":"', 0, 200)
+    kiedy = linia[t + 13:t + 37].decode("ascii", "replace").split('"')[0] if t > 0 else ""
+    _dolicz_usage(s, u, _napis_po(linia, b'"model":"', i), _napis_po(linia, b'"provider":"', i), kiedy)
+
+
+def _dolicz_usage(s: dict, u: dict, model: str, dostawca: str, kiedy: str) -> None:
+    w = s["wynik"]
+    w["odpowiedzi"] += 1
+    w["wejscie"] += _liczba(u, "input")
+    w["wyjscie"] += _liczba(u, "output")
+    w["cache_odczyt"] += _liczba(u, "cacheRead")
+    w["cache_zapis"] += _liczba(u, "cacheWrite")
+    koszt = u.get("cost").get("total") if isinstance(u.get("cost"), dict) else None
+    koszt = float(koszt) if isinstance(koszt, (int, float)) else 0.0
+    w["koszt"] += koszt
+    kontekst = _liczba(u, "input") + _liczba(u, "cacheRead") + _liczba(u, "cacheWrite")
+    w["kontekst"] = kontekst or w["kontekst"]       # odpowiedź z błędem dostawcy ma same zera
+    w["model"], w["dostawca"] = model, dostawca
+    if kiedy and koszt:
+        try:
+            dzien = datetime.datetime.fromisoformat(kiedy).astimezone().date().isoformat()
+        except ValueError:
+            return
+        s["dni"][dzien] = s["dni"].get(dzien, 0.0) + koszt
+
+
+def podsumowanie_sesji(w: Wpis) -> dict:
+    """Model ostatniej odpowiedzi i zużycie całej sesji z pliku *.jsonl: {model, dostawca, odpowiedzi, wejscie,
+    wyjscie, cache_odczyt, cache_zapis, koszt, koszt_dzis, kontekst}; `koszt` to równoważnik cen API całej sesji,
+    `koszt_dzis` odpowiedzi z dzisiaj (czas lokalny). Plik czytany przyrostowo (od ostatniej pełnej linii, kawałkami
+    po 8 MB); inny plik albo krótszy niż przeczytano = od nowa. Brak pliku = zera i pusty model."""
+    plik = plik_sesji(w)
+    if plik is None:
+        return {**_podsumowanie_puste(), "koszt_dzis": 0.0}
+    klucz = str(plik)
+    with _podsumowania_lock:                        # dwa odpytania naraz nie liczą tych samych linii dwa razy
+        try:
+            st = plik.stat()
+            s = _podsumowania.get(klucz)
+            if s is None or s["ino"] != st.st_ino or st.st_size < s["od"]:
+                s = {"ino": st.st_ino, "od": 0, "wynik": _podsumowanie_puste(), "dni": {}}
+            if st.st_size > s["od"]:
+                with plik.open("rb") as f:
+                    f.seek(s["od"])
+                    reszta = b""
+                    while True:
+                        dane = f.read(KAWALEK)
+                        if not dane:
+                            break
+                        dane = reszta + dane
+                        koniec = dane.rfind(b"\n") + 1
+                        for linia in dane[:koniec].split(b"\n"):
+                            _dolicz(s, linia)
+                        s["od"] += koniec
+                        reszta = dane[koniec:]
+            _podsumowania[klucz] = s
+        except OSError:
+            return {**_podsumowanie_puste(), "koszt_dzis": 0.0}
+        return {**s["wynik"], "koszt_dzis": s["dni"].get(datetime.date.today().isoformat(), 0.0)}
 
 
 def _liczba(u: dict, k: str) -> int:
@@ -464,14 +584,17 @@ def wyslij(w: Wpis, tekst: str, klucz: str, media=(), lustro: bool = True, **dod
 
 
 def _tura_trwa(w: Wpis) -> bool:
-    t = czytaj_stan(w).get("tura")
-    return isinstance(t, dict) and zyje(t.get("pid"))
+    """Tura skrzynki trwa w procesie RPC (przyjmuje dopiski). Tura starej skrzynki (`omp -p`, bez `rpc` w stan.json)
+    nie przyjmuje steera: wiadomość wejdzie dopiero po niej."""
+    s = czytaj_stan(w)
+    t = s.get("tura")
+    return isinstance(t, dict) and zyje(t.get("pid")) and proces_skrzynki(w, s) is not None
 
 
 def dopisz(w: Wpis, tekst: str, klucz: str, media=(), lustro: bool = True) -> dict:
-    """Wiadomość, którą skrzynka w trakcie tury wysyła do niej jako steer (`steer: true` w `nowe/`); bez tury zwykła
+    """Wiadomość, którą skrzynka w trakcie tury wysyła do niej jako steer (`steer: true` w `nowe/`); bez tury = zwykła
     wiadomość. `tryb` mówi, co było w chwili zapisu: tura mogła się skończyć tuż potem, wtedy wiadomość rusza jako
-    własna tura i przebieg() pokaże kolejka, pracuje, gotowe zamiast wlaczony."""
+    własna tura i przebieg() pokaże kolejka, pracuje, gotowe zamiast wlaczony; tura starej skrzynki = `kolejka`."""
     r = wyslij(w, tekst, klucz, media, lustro, steer=True)
     return {**r, "tryb": "steer" if _tura_trwa(w) else "kolejka"}
 
@@ -651,8 +774,10 @@ def wynik_komendy(w: Wpis, klucz: str) -> dict:
 
 def licznik(w: Wpis) -> dict:
     """Zużycie sesji dla panelu: `licznik.json` skrzynki (get_session_stats RPC, odświeżany po każdej odpowiedzi
-    modelu), gdy proces RPC żyje albo plik sesji nie jest od niego nowszy; inaczej z pliku sesji (okno kontekstu
-    tylko, gdy skrzynka znała je dla tego samego modelu). Nic nie wiadomo = zera; nigdy wyjątek."""
+    modelu), gdy proces RPC żyje albo plik sesji nie jest od niego nowszy; inaczej z pliku sesji (przyrostowo).
+    Okno kontekstu bez skrzynki: z jej zapisu dla tego samego modelu (resztę uzupełnia panel z katalogu modeli omp).
+    `koszt_dzis` zawsze z pliku sesji (koszt to
+    równoważnik cen API całej, często wielodniowej sesji). Nic nie wiadomo = zera; nigdy wyjątek."""
     wynik = dict(LICZNIK_PUSTY)
     try:
         if w.blad or w.skrzynka is None:
@@ -666,16 +791,27 @@ def licznik(w: Wpis) -> dict:
             zapis, t_zapisu = {}, 0.0
         sesja = plik_sesji(w)
         t_sesji = sesja.stat().st_mtime if sesja is not None else 0.0
+        p = podsumowanie_sesji(w) if sesja is not None else None
         if zapis and (proces_skrzynki(w) is not None or t_sesji <= t_zapisu + 5):
-            return {**wynik, **zapis}
-        if sesja is None:
+            wynik.update(zapis)
+        elif p is not None:
+            model = f"{p['dostawca']}/{p['model']}" if p["dostawca"] and p["model"] else p["model"]
+            wynik.update(model=model, kontekst=p["kontekst"], wejscie=p["wejscie"], wyjscie=p["wyjscie"],
+                         cache_odczyt=p["cache_odczyt"], cache_zapis=p["cache_zapis"], koszt=round(p["koszt"], 6),
+                         czas=t_sesji, okno=int(zapis.get("okno") or 0) if zapis.get("model") == model else 0)
+        else:
             return wynik
-        p = podsumowanie_sesji(w)
-        model = f"{p['dostawca']}/{p['model']}" if p["dostawca"] and p["model"] else p["model"]
-        okno = int(zapis.get("okno") or 0) if zapis.get("model") == model else 0
-        wynik.update(model=model, kontekst=p["kontekst"], okno=okno, wejscie=p["wejscie"], wyjscie=p["wyjscie"],
-                     cache_odczyt=p["cache_odczyt"], cache_zapis=p["cache_zapis"], koszt=round(p["koszt"], 6),
-                     procent=round(p["kontekst"] * 100 / okno, 1) if okno else 0.0, czas=t_sesji)
+        if p is not None:
+            # get_session_stats skrzynki liczy od startu jej procesu RPC, plik sesji całą sesję: większa z liczb,
+            # żeby tokeny i koszt nie spadały po restarcie procesu i zgadzały się z `koszt_dzis`
+            for k_ in ("wejscie", "wyjscie", "cache_odczyt", "cache_zapis", "koszt"):
+                wynik[k_] = max(wynik.get(k_) or 0, round(p[k_], 6) if k_ == "koszt" else p[k_])
+            wynik["koszt_dzis"] = round(p["koszt_dzis"], 6)
+        o = opcje_skrzynki(w)                       # wybór panelu, potem stan procesu skrzynki, potem `omp_arg`
+        wynik["myslenie"] = o["myslenie"] or str(zapis.get("myslenie") or "") or myslenie_z_argumentow(w.omp_arg)
+        wynik["fast"] = o["fast"] if o["fast"] is not None else (zapis.get("fast") if isinstance(zapis.get("fast"), bool) else None)
+        okno = int(wynik.get("okno") or 0)
+        wynik["procent"] = round(int(wynik.get("kontekst") or 0) * 100 / okno, 1) if okno else 0.0
         return wynik
     except Exception:                               # licznik to dodatek: nigdy nie psuje panelu
         return dict(LICZNIK_PUSTY)

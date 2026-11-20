@@ -434,7 +434,9 @@ Droga rekomendowana w raporcie „dystrybucja”: wydania u źródła + jeden ma
 7. Nadzorca na końcu uruchamia się ponownie z nowej wersji.
 
 **Karty w toku:** `jarvo update` (także z panelu) nie zaczyna, gdy na tablicy jest karta w statusie `running`: wypisuje
-karty i kończy kodem 1 („aktualizuję po ich końcu”), bo restart bramy przerywa kartę. Świadomie mimo to:
+karty i kończy kodem 1 („aktualizuję po ich końcu”), bo restart bramy przerywa kartę; odmowa trafia też do panelu
+(`error` w update.json, w Systemie „Ostatnia próba: …”). Panel przy karcie w toku nie prosi pomocnika wcale: **Aktualizuj
+teraz** zamienia na „Zaktualizuj, gdy skończą” (`POST /update` 202 `gdy: wolne, powod: karty`). Świadomie mimo to:
 `jarvo update --mimo-kart` (16.11 aktualizacja w trakcie karty Sherlocka zrestartowała bramę; instalator tylko ostrzegał).
 Poczekać i zaktualizować zaraz po końcu kart: `jarvo update --po-kartach` (wersję z GitHuba sprawdza raz, potem patrzy
 na tablicę lokalnie co 30 s; 16.11 ponawianie `jarvo update` co 30 s wyczerpało limit 60 zapytań GitHuba na godzinę).

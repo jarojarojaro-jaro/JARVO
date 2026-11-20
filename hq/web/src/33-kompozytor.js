@@ -122,13 +122,17 @@ function PasekNaZywo({ przebiegi, watek }) {
 const stanPracy = (p) => (p.stan === "przyjety" && (p.powod === "terminal" || p.powod === "kolejka")
   ? T(p.powod === "terminal" ? "zywo.terminal" : "zywo.kolejka") : T(`przebieg.${p.stan}`));
 
-// licznik rozmowy pod kompozytorem, jak stopka terminala omp i Hermesa: model, kontekst (≈ = szacunek) i % okna,
-// tokeny ↑ wejścia i ↓ wyjścia, cache odczyt/zapis, koszt. GET /rozmowy/{id}/licznik co 2 s, gdy w rozmowie trwa
-// praca (i zaraz po jej końcu), inaczej co 30 s; w ukrytej karcie przeglądarki nie pyta
-const krotko = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k` : String(n || 0));
+// stopka rozmowy pod kompozytorem, jak stopka terminala omp i Hermesa: model, wysiłek myślenia, tryb szybki, kontekst
+// (≈ = szacunek) i % okna, tokeny ↑ wejścia i ↓ wyjścia, cache odczyt/zapis, koszt. Model, wysiłek, tryb szybki i (omp)
+// kontekst są klikalne: menu z GET /rozmowy/{id}/opcje, wybór idzie komendą (/model, /effort, /fast, /compact), więc
+// zostaje w rozmowie jak w terminalu. GET /rozmowy/{id}/licznik co 2 s, gdy trwa praca (i zaraz po jej końcu albo po
+// komendzie), inaczej co 30 s; w ukrytej karcie przeglądarki nie pyta
+const krotko = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(n % 1e6 ? 1 : 0)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k` : String(n || 0));
 function Licznik({ watek }) {
   const praca = useSklep((s) => Os.doZatrzymania(Object.values(s.przebiegi).filter((p) => p.watek_id === watek)).length > 0);
   const [d, setD] = useState(null);
+  const [nr, setNr] = useState(0);
+  const [menu, setMenu] = useState(null);           // {co: model|wysilek|kontekst, kotwica, o}
   useEffect(() => {
     let zywy = true, t = 0;
     const tik = async () => {
@@ -139,14 +143,35 @@ function Licznik({ watek }) {
     };
     tik();
     return () => { zywy = false; clearTimeout(t); };
-  }, [watek, praca]);
+  }, [watek, praca, nr]);
   if (!d || !(d.model || d.kontekst || d.wejscie)) return null;
-  const c = [d.model, `${d.szacunek ? "≈" : ""}${krotko(d.kontekst)}${d.okno ? `/${krotko(d.okno)} (${Math.round(d.procent)}%)` : ""}`,
-    `↑${krotko(d.wejscie)} ↓${krotko(d.wyjscie)}`];
-  if (d.cache_odczyt || d.cache_zapis) c.push(`cache ${krotko(d.cache_odczyt)}/${krotko(d.cache_zapis)}`);
-  if (d.koszt) c.push(`$${d.koszt.toFixed(2)}`);
-  const t = c.filter(Boolean).join(" · ");
-  return html`<p class=${cx("j-licznik", d.procent >= 80 && "is-duzo")} title=${T("licznik.opis")} aria-label=${`${T("licznik.opis")} ${t}`}>${t}</p>`;
+  const kom = async (t) => {
+    try { await Komendy.wykonaj({ watek, tekst: t }); } catch (e) { akcje._blad(e); }
+    setNr((n) => n + 1);
+  };
+  const otworz = async (co, e) => {
+    const kotwica = e.currentTarget;
+    if (co === "kontekst") { setMenu({ co, kotwica }); return; }
+    try { setMenu({ co, kotwica, o: (await api.rozmowy.opcje(watek)).opcje }); } catch (er) { akcje._blad(er); }
+  };
+  const ok = (b) => (b ? "✓ " : "");
+  const pozycje = !menu ? [] : menu.co === "kontekst"
+    ? [{ id: "c", ikona: "repeat", tekst: T("licznik.kompresuj"), akcja: () => kom("/compact") }]
+    : menu.co === "model" ? menu.o.modele.map((m) => ({ id: m.model + m.provider, tekst: `${ok(m.biezacy)}${m.model} · ${m.nazwa}`,
+      akcja: () => kom(Komendy.komendaModelu(m)) }))
+      : menu.o.poziomy.map((p) => ({ id: p, tekst: ok(p === menu.o.wysilek) + p, akcja: () => kom(`/effort ${p}`) }))
+        .concat([{ id: "d", tekst: ok(!menu.o.wysilek) + T("licznik.domyslny"), akcja: () => kom("/effort domyslny") }]);
+  const b = (co, tekst, tip, klasa) => html`<button type="button" class=${cx("j-licznik-b", klasa)} title=${tip}
+    onClick=${(e) => (co === "fast" ? kom(`/fast ${d.fast ? "off" : "on"}`) : otworz(co, e))}>${tekst}</button>`;
+  const ctx = `${d.szacunek ? "≈" : ""}${krotko(d.kontekst)}${d.okno ? `/${krotko(d.okno)} ${Math.round(d.procent)}%` : ""}`;
+  const dzis = d.koszt_dzis > 0;
+  return html`<p class="j-licznik" aria-label=${T("licznik.opis")}>
+    ${b("model", d.model || "?", T("licznik.model"))} · ${b("wysilek", `${T("licznik.wysilek")} ${d.wysilek || T("licznik.domyslny_k")}`, T("licznik.wysilek_opis"))}
+    ${d.fast_dostepny && html` · ${b("fast", d.fast ? "⚡fast" : "normal", T("licznik.fast"), d.fast && "is-wl")}`}
+    ${" · "}${d.zaplecze === "omp" ? b("kontekst", ctx, T("licznik.kontekst"), d.procent >= 80 && "is-duzo") : html`<span class=${cx(d.procent >= 80 && "is-duzo")} title=${T("licznik.kontekst_h")}>${ctx}</span>`}
+    ${` · ↑${krotko(d.wejscie)} ↓${krotko(d.wyjscie)}${d.cache_odczyt || d.cache_zapis ? ` · cache ${krotko(d.cache_odczyt)}/${krotko(d.cache_zapis)}` : ""}`}
+    ${d.koszt > 0 && html` · <span title=${T(dzis ? "licznik.koszt_dzis" : "licznik.koszt", { sesja: `$${d.koszt.toFixed(2)}` })}>$${(dzis ? d.koszt_dzis : d.koszt).toFixed(2)}${dzis ? ` ${T("licznik.dzis")}` : ""}</span>`}
+  </p>${menu && html`<${Menu} kotwica=${menu.kotwica} etykieta=${T("licznik.opis")} onZamknij=${() => setMenu(null)} pozycje=${pozycje}/>`}`;
 }
 
 // ------------------------------------------------------------------------------------------------- kompozytor

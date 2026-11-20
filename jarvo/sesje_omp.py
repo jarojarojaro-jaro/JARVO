@@ -239,6 +239,7 @@ class Rpc:
     def __init__(self, w):
         self.argumenty = rdzen.argumenty_tury(w)
         self.odcisk = odcisk(self.argumenty)
+        self.myslenie, self.fast = "", None        # opcje panelu już wysłane do tego procesu (zastosuj_opcje)
         cmd = ["nice", "-n", "10", *polecenie(w, "--mode", "rpc", "--no-ui", tura=True)]
         if os.name == "nt" or not _jest("nice"):
             cmd = cmd[3:]
@@ -514,6 +515,7 @@ class Sesja:
         self.statystyki: str | None = None         # id oczekującego get_session_stats
         self.stan_id: str | None = None            # id oczekującego get_state
         self.model, self.okno = "", 0
+        self.myslenie, self.fast = "", None        # z get_state procesu (do licznika panelu)
         self.ruch = time.time()
         self.bezczynna_s = w.zamykaj_bezczynna_min * 60 if w.zamykaj_bezczynna_min else BEZCZYNNA_S
 
@@ -533,7 +535,23 @@ class Sesja:
             log(self.w, f"proces omp rpc {self.rpc.pid}")
             self.stan_id = self.rpc.wyslij("get_state")
             self.licz()
+        self.zastosuj_opcje()
         return self.rpc
+
+    def zastosuj_opcje(self) -> None:
+        """`/effort` i `/fast` z panelu (`<skrzynka>/model.json`: `myslenie`, `fast`) w żywym procesie RPC, przed turą
+        i komendą: `set_thinking_level`, `set_fast_mode` (tylko gdy wybór różni się od tego, co proces już dostał)."""
+        o = rdzen.opcje_skrzynki(self.w)
+        zmiana = False
+        if o["myslenie"] and o["myslenie"] != self.rpc.myslenie:
+            self.rpc.wyslij("set_thinking_level", level=o["myslenie"])
+            self.rpc.myslenie, zmiana = o["myslenie"], True
+        if o["fast"] is not None and o["fast"] != self.rpc.fast:
+            self.rpc.wyslij("set_fast_mode", enabled=o["fast"])
+            self.rpc.fast, zmiana = o["fast"], True
+        if zmiana:
+            log(self.w, f"opcje z panelu: myślenie {o['myslenie'] or 'jak sesja'}, fast {o['fast']}")
+            self.stan_id = self.rpc.wyslij("get_state")
 
     def zamknij_proces(self, szybko: bool = False) -> None:
         if self.rpc is not None:
@@ -573,10 +591,15 @@ class Sesja:
                 self.zapisz_licznik(e["data"])
         elif typ == "response" and e.get("id") == self.stan_id:
             self.stan_id = None
-            m = (e.get("data") or {}).get("model") if e.get("success") else None
+            d = (e.get("data") or {}) if e.get("success") else {}
+            m = d.get("model")
             if isinstance(m, dict):
                 self.model = "/".join(str(x) for x in (m.get("provider"), m.get("id")) if x)
                 self.okno = _liczba(m.get("contextWindow"))
+            if isinstance(d.get("thinkingLevel"), str):
+                self.myslenie = d["thinkingLevel"]
+            if isinstance(d.get("fastModeEnabled"), bool):
+                self.fast = d["fastModeEnabled"]
         elif typ == "response" and e.get("id") in self.komendy:
             self.komenda_odpowiedz(e)
         elif typ == "model_changed" and self.rpc is not None:
@@ -601,7 +624,8 @@ class Sesja:
             "model": self.model, "kontekst": kontekst, "okno": okno, "procent": procent,
             "wejscie": _liczba(tokeny.get("input")), "wyjscie": _liczba(tokeny.get("output")),
             "cache_odczyt": _liczba(tokeny.get("cacheRead")), "cache_zapis": _liczba(tokeny.get("cacheWrite")),
-            "koszt": round(float(koszt), 6) if isinstance(koszt, (int, float)) else 0.0, "czas": time.time()})
+            "koszt": round(float(koszt), 6) if isinstance(koszt, (int, float)) else 0.0, "czas": time.time(),
+            "myslenie": self.myslenie, "fast": self.fast})
 
     # ---- komendy panelu
     def komendy_z_plikow(self) -> None:

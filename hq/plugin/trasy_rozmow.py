@@ -130,7 +130,7 @@ class ZgodaBody(_Model):
 
 
 class DopiszBody(_Model):
-    tekst: str = Field(..., min_length=1, max_length=DOPISZ_MAKS)
+    tekst: str = Field("", max_length=DOPISZ_MAKS)      # pusty: „Wyślij teraz do trwającej pracy” wiadomości z kolejki
     klucz: str | None = Field(None, pattern=KLUCZ_WZOR)
 
 
@@ -564,7 +564,7 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
             dopisane: dict[str, dict] = {}          # adresat → przebieg dopisku do jego trwającej pracy
             if body.tryb_kolejki == "dopisz":       # Enter w trakcie pracy: od razu do trwającej tury, jak w terminalu
                 for a in adresaci:
-                    cel, powod = rej.do_dopisania(wid, a)
+                    cel, powod = await rej.do_dopisania(wid, a)
                     if cel is None:
                         if powod:                   # agent pracuje, ale dopisać się nie da: czeka w kolejce z powodem
                             ostrzezenia.append(f"dopisz_niemozliwe:{powod}")
@@ -1116,6 +1116,8 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
                         raise BladTrasy(409, "klucz_zajety", "Ten klucz należy już do innej wiadomości.",
                                         "This key already belongs to another message.")
                     return next((q for q in db.przebiegi_watku(wid) if q.get("wpis_id") == jest["id"]), None) or p
+            if not body.tekst.strip():
+                raise BladTrasy(422, "zle_dane", "Nie ma czego dopisać.", "There is nothing to add.")
             q = await rej.dopisz(pid, body.tekst)
             koord = (db.watek(wid) or {}).get("koordynator") or "jarvo"
             wpis = dict(rodzaj="wlasciciel", tekst=body.tekst, tresc=body.tekst, adresaci=[p["agent"]],

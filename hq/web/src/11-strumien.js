@@ -12,9 +12,11 @@
 // wtedy /api/ tylko z nim: lider czyta ten sam strumień przez fetch (ZrodloFetch, ten sam interfejs); jego koniec
 // albo błąd sieci to readyState 2 i to samo ponowienie z ?od= co po zamkniętym EventSource.
 
+// skrót paczki tej karty: rdzeń app-rdzen-<12 hex>.js (scripts/hqbuild.py, jak WERSJA w plugin_api._wersja_paczki).
+// 20.11 wzorzec znał tylko dawne app-<hex>.js: wersja była pusta („Wersja Jarva” = „—”, bez paska „Nowa wersja”)
 const WERSJA_PAKIETU = (() => {
   try {
-    const m = /app-([0-9a-f]{12})\.js/.exec((document.currentScript && document.currentScript.src) || "");
+    const m = /app-(?:rdzen-)?([0-9a-f]{12})\.js/.exec((document.currentScript && document.currentScript.src) || "");
     return m ? m[1] : null;
   } catch (_) { return null; }
 })();

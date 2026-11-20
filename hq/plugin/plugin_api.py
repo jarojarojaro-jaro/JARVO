@@ -2034,7 +2034,9 @@ def _blad_update(status: int, kod: str, pl: str, en: str) -> JSONResponse:
 @router.post("/update")
 async def update_request(request: Request):
     """`{action: check|update|cancel, gdy?: teraz|wolne}` (spec §15.3). `gdy: wolne` zapisuje w rozmowy.db prośbę
-    „Zaktualizuj, gdy skończą”: plik update-request pisze silnik po 30 s bez pracy. `cancel` ją kasuje."""
+    „Zaktualizuj, gdy skończą”: plik update-request pisze silnik po 30 s bez pracy. `cancel` ją kasuje. Natywnie
+    `teraz` przy karcie kanbana w toku też czeka (odpowiedź `gdy: wolne, powod: karty`): `jarvo update` i tak nie
+    zaczyna w trakcie karty, a jego odmowa nie dochodziła do panelu (prośba „znikała” bez słowa)."""
     try:
         body = await request.json()
     except ValueError:
@@ -2057,14 +2059,27 @@ async def update_request(request: Request):
         return _blad_update(503, "pomocnik", pl, en)
     if state.get("state") == "updating":
         return _blad_update(409, "trwa", "Aktualizacja już trwa.", "An update is already running.")
+    karty = []
+    if action == "update" and gdy == "teraz" and NATYWNIE:
+        karty = await asyncio.to_thread(roz.prace.karty_w_toku, HOME / "kanban.db")
+        if karty:
+            gdy = "wolne"
     if action == "update" and gdy == "wolne":
         s = _silnik()
         if s is None or not s.dziala():
-            return _blad_update(503, "silnik", "Silnik rozmów nie działa — nie mogę poczekać na koniec pracy.",
-                                "The conversation engine is not running — cannot wait for work to finish.")
+            if karty:
+                return _blad_update(409, "karty", "Na tablicy pracuje agent, a aktualizacja nie może zaczekać, bo silnik "
+                                    "rozmów nie działa. Spróbuj, gdy karta się skończy.",
+                                    "An agent is working on the board and the update cannot wait because the "
+                                    "conversation engine is not running. Try again when the card finishes.")
+            return _blad_update(503, "silnik", "Silnik rozmów nie działa, więc nie mogę poczekać na koniec pracy.",
+                                "The conversation engine is not running, so I cannot wait for work to finish.")
         await s.wykonaj_fn(s.db.ustaw_meta, "aktualizacja_po_pracy", repr(time.time()))
         HUB.nadaj("aktualizacja", await asyncio.to_thread(_update_state))
-        return JSONResponse({"ok": True, "action": action, "gdy": gdy}, status_code=202)
+        odp = {"ok": True, "action": action, "gdy": gdy}
+        if karty:
+            odp.update(powod="karty", karty=[k["tytul"] for k in karty][:5])
+        return JSONResponse(odp, status_code=202)
     UPDATE_REQUEST.parent.mkdir(parents=True, exist_ok=True)
     UPDATE_REQUEST.write_text(action, encoding="utf-8")
     if action == "update":
