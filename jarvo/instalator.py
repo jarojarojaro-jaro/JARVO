@@ -38,7 +38,9 @@ z paskiem i nazwą kroku:
       już zapisany, inaczej 8642) w `<dane>/.env` tylko dla właściciela; bez klucza brama nie otwiera /v1/runs,
   12. przełączenie wersji: `<program>/current.json` dopiero teraz, atomowo, po udanych krokach 3–11, więc nieudana
       aktualizacja zostawia działającą starą wersję; serwis starej zatrzymujemy tuż przed przełączeniem (na ten czas
-      znacznik zatrzymania), poprzedni current.json zostaje obok (current.poprzedni.json),
+      znacznik zatrzymania), poprzedni current.json zostaje obok (current.poprzedni.json); razem z nim stałe ścieżki
+      `<program>/app/current` i `<program>/venvs/narzedzia` (POSIX dowiązanie, Windows junction) na tę wersję,
+      które flota podaje w promptach i skillach zamiast katalogów ze skrótem (srodowisko.uzgodnij_stale, M5),
   13. programy floty w `<program>/bin-floty` (jarvo/bin_floty.py: python3, jarvo-tts, jarvo-stt, jarvo-klucz,
       tesseract; S01, F12; nakładka agent-browser i `manimgx`, który instaluje swój venv przy pierwszym wywołaniu,
       M04), tylko w PATH procesów Jarva,
@@ -2335,6 +2337,7 @@ class _Instalacja:
         nowe = {**biez, **self.nowe}
         if nowe == biez:
             self.podlog(f"bez zmian (wersja {nowe.get('wersja') or '?'})")
+            self._stale_sciezki(nowe)            # venv narzędzi mógł się zmienić bez zmiany current.json
             return
         if stan_serwisu(self.u, self.ot)[0] is not None:
             self.podlog("zatrzymuję serwis poprzedniej wersji (brama kończy trwające tury)…")
@@ -2346,6 +2349,17 @@ class _Instalacja:
         self.zmiany.append("current.json")
         self.restart = True
         self.podlog(f"current.json: wersja {nowe.get('wersja') or '?'}, Hermes {Path(str(nowe.get('hermes'))).name}")
+        self._stale_sciezki(nowe)
+
+    def _stale_sciezki(self, biez: dict) -> None:
+        """`<program>/app/current` i `<program>/venvs/narzedzia` na wersję z current.json i narzedzia.json (M5):
+        przed krokiem „Flota”, której prompty i skille je podają. Błąd to uwaga: flota dostaje wtedy ścieżki
+        z wersją."""
+        zmienione, bledy = srodowisko.uzgodnij_stale(self.u, biez=biez, narz=self._narz())
+        for opis in zmienione:
+            self.podlog(f"stała ścieżka {opis}")
+        for blad in bledy:
+            self.uwagi.append(f"stała ścieżka {blad}: prompty floty dostaną ścieżki z wersją (do następnej instalacji)")
 
     def zapis_srodowiska(self) -> None:
         ust = {k: str(self.ot.env[k]).strip() for k in USTAWIENIA if str(self.ot.env.get(k) or "").strip()}

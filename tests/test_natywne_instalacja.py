@@ -767,6 +767,10 @@ def test_pelna_instalacja_z_flota_i_restart_uslug_przez_nadzorce(tmp_path, stano
     zapis = json.loads((u.stan / "srodowisko.json").read_text(encoding="utf-8"))
     assert zapis["TESSDATA_PREFIX"].endswith("tessdata-fast") and zapis["JARVO_TOOLS_PYTHON"]
     assert json.loads((u.stan / "ustawienia.json").read_text(encoding="utf-8"))["JARVO_API_PORT"] == "19161"
+    # M5: stałe ścieżki na tę wersję już przed krokiem „Flota” (prompty i skille bez skrótu wersji)
+    assert os.path.samefile(u.program / "app" / "current", srodowisko.biezace(u)["app"])
+    assert os.path.samefile(u.program / "venvs" / "narzedzia", narz["venv-narzedzia"]["katalog"])
+    assert log.index("stała ścieżka") < re.search(r"\d+/\d+  Flota$", log, re.M).start()
     # serwis działa, zmieniła się tylko flota: restart bramy i panelu przez nadzorcę (bez zatrzymania całości)
     s["flota"].zmiany = ["profil jarvo-web"]
     zatrzymania = s["nadzorca"].zatrzymania

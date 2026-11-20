@@ -180,10 +180,17 @@ def python_hermesa(u: Uklad) -> tuple[Path, Path]:
 
 def python_floty(u: Uklad, hermes_py: Path) -> Path:
     """Python skryptów floty (token @@PY@@, F12): venv narzędzi z `<stan>/narzedzia.json` (wpis `venv-narzedzia`,
-    pole `python`), a do czasu jego instalacji Python Hermesa, jak `python3` w kontenerze."""
+    pole `python`) przez stałą ścieżkę `<program>/venvs/narzedzia` (srodowisko.stala_sciezka, M5), a do czasu jego
+    instalacji Python Hermesa, jak `python3` w kontenerze."""
     wpis = srodowisko.narzedzia(u).get("venv-narzedzia")
     py = (wpis or {}).get("python") if isinstance(wpis, dict) else None
-    return Path(py) if py and Path(py).is_file() else hermes_py
+    return srodowisko.stala_sciezka(u, py) if py and Path(py).is_file() else hermes_py
+
+
+def kod_floty(u: Uklad, app: Path) -> Path:
+    """Kod Jarva widziany przez flotę (token @@REPO_DIR@@): `<program>/app/current`, gdy wskazuje `app`, inaczej sam
+    `app` (M5: prompty i skille bez skrótu wersji)."""
+    return srodowisko.stala_sciezka(u, app)
 
 
 def wartosci_tokenow(u: Uklad, app: Path, py: Path) -> dict[str, str]:
@@ -199,7 +206,7 @@ def wartosci_tokenow(u: Uklad, app: Path, py: Path) -> dict[str, str]:
         "MISSIONS_DIR": (jd / "missions").as_posix(),
         "WORKSPACES_DIR": (jd / "workspaces").as_posix(),
         "INBOX_DIR": (jd / "inbox").as_posix(),
-        "REPO_DIR": Path(app).as_posix(),
+        "REPO_DIR": kod_floty(u, app).as_posix(),
         "BUILD_DIR": u.build.as_posix(),
         "TOOLS_DIR": (u.program / "narzedzia-floty").as_posix(),
         "BIN_DIR": u.bin_floty.as_posix(),
@@ -221,7 +228,7 @@ def argv_buildu(u: Uklad, app: Path, checkout: Path, python: Path, py_floty: Pat
         argv += list(OPCJA_UKLADU)
     if OPCJA_SYSTEMU in znane:
         argv += [OPCJA_SYSTEMU, system()]
-    sciezki_opcji = {"DATA_DIR": u.dane.as_posix(), "REPO_DIR": Path(app).as_posix(),
+    sciezki_opcji = {"DATA_DIR": u.dane.as_posix(), "REPO_DIR": kod_floty(u, app).as_posix(),
                      "TOOLS_DIR": (u.program / "narzedzia-floty").as_posix(), "BIN_DIR": u.bin_floty.as_posix(),
                      "PY": py_floty.as_posix()}
     uzyte: dict[str, str] = {}

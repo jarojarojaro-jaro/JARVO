@@ -21,7 +21,9 @@ skrótu Pythona i backendu>` (katalog_dla; stary sprząta potem `jarvo update`).
 Wpis dla `<stan>/narzedzia.json`: `venv-<nazwa>` = {"wersja": skrót locka, "katalog", "python", "bin", "env"}.
 `env` daje procesom floty interpreter venvu (JARVO_TOOLS_PYTHON, JARVO_OCR_PYTHON, CLAUDE_SEO_PYTHON…), a `bin`
 (tylko venv narzędzi) dokłada jego programy (yt-dlp, trafilatura) do PATH procesów floty, jak /opt/jarvo/venv/bin
-w obrazie. Python venvu narzędzi to też @@PY@@ skilli i shim python3 (jarvo/flota.py, jarvo/bin_floty.py, F12).
+w obrazie. Python venvu narzędzi to też @@PY@@ skilli i shim python3 (jarvo/flota.py, jarvo/bin_floty.py, F12);
+@@PY@@ idzie przez stałą ścieżkę `<program>/venvs/narzedzia` (dowiązanie albo junction na katalog z narzedzia.json,
+srodowisko.uzgodnij_stale, M5), więc prompty i skille nie zmieniają się z każdym nowym lockiem.
 
 Miejsce (c3 pkt 11, Z31): `miejsce(wpis, platforma)` liczy venv i koła w cache uv z manifestu (pobranie_mb platformy,
 venv_mb zmierzone na Windows 11 x64), a `sprzatnij_cache` po udanej instalacji robi `uv cache clean` w <cache>/uv:

@@ -27,12 +27,21 @@
            panel, a API bramy wstaje chwilę później; sprawdzone na Windows 11),
         5. przy błędzie instalatora albo regresji: powrót do current.poprzedni.json instalatorem POPRZEDNIEJ wersji
            (z jej katalogu, te same opcje: przywraca też narzędzia, programy floty, polecenie jarvo, autostart
-           i serwis); gdy i on zawiedzie, sam current.json sprzed aktualizacji i start serwisu,
+           i serwis); gdy i on zawiedzie, sam current.json sprzed aktualizacji i start serwisu; po powrocie stałe
+           ścieżki `<program>/app/current` i `<program>/venvs/narzedzia` znowu wskazują poprzednią wersję
+           (srodowisko.uzgodnij_stale, także gdy jej instalator ich nie zna),
         6. po udanej: stare wersje (kod, checkouty Hermesa, front panelu w `<program>/web-dist`, venvy, narzędzia:
            wszystko, czego ścieżek nie ma w current.json ani w narzedzia.json, resztki `.new`, `.stary-*`, `.usun-*`,
            stare archiwa w `<cache>/pobrane`) znikają, gdy żaden proces z nich nie korzysta (program albo wiersz
            polecenia, jarvo/odinstalowanie.uzywaja: to jedyna ochrona, bo na Windows katalog z działającym python.exe
-           i załadowanym .dll przechodzi zmianę nazwy). Katalog najpierw dostaje nazwę `<nazwa>.usun-<czas>` (niepełny
+           i załadowanym .dll przechodzi zmianę nazwy; proces ze stałą ścieżką w wierszu polecenia chroni każdą wersję
+           za nią, bo nie wiadomo, którą wskazywała przy jego starcie; samych stałych ścieżek sprzątanie nie rusza).
+           Kod (`app`) i venv zostają też wtedy, gdy ich ścieżkę ma wpisaną plik poza buildem (odwolania: konfig
+           Jarva *.json i *.yaml, pamięć profili, ~/.local/bin, jednostki systemd użytkownika, crontab, LaunchAgents
+           na macOS, Autostart i Harmonogram zadań na Windows; nigdy *.env ani pliki o nazwach sekretów): log podaje
+           plik i linię i radzi stałą ścieżkę (20.11: sesje.json Kernela z usuniętym venvem, pobieranie linków padało
+           całą noc).
+           Katalog najpierw dostaje nazwę `<nazwa>.usun-<czas>` (niepełny
            nie wygląda jak gotowa wersja; nie przejdzie jej tylko plik otwarty bez FILE_SHARE_DELETE albo katalog
            bieżący procesu). Na Windows proces w tej samej sesji, którego ścieżki ani wiersza polecenia nie da się
            odczytać (np. `jarvo chat` uruchomiony jako administrator), a ma nazwę programu z wersji Jarva (python.exe,
@@ -72,6 +81,7 @@ import os
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tarfile
@@ -85,10 +95,10 @@ import zlib
 from pathlib import Path
 from typing import Callable
 
-from . import instalator, manifest, pobieracz, przenosne, srodowisko, zmiany_hosta
+from . import instalator, manifest, pobieracz, przenosne, srodowisko, venvy, zmiany_hosta
 from .instalator import Otoczenie
 from .odinstalowanie import (MAGAZYN_KLUCZA, Proces, Zaplecze, env_podprocesu, rozmiar, uklad_instalacji, usun_drzewo,
-                             uzywaja)
+                             uzywaja, zawiera_sciezke)
 from .sciezki import LINUX, MACOS, WINDOWS, Uklad
 
 REPO_GH = "jarojarojaro-jaro/JARVO"           # jak $JarvoRepo w jarvo/bootstrap/install.ps1 i REPO_GH w install.sh
@@ -478,10 +488,34 @@ def _stan_po_sprawdzeniu(u: Uklad) -> str:
 # ---------------------------------------------------------------- sprzątanie starych wersji
 
 def _katalogi_w(katalog: Path) -> list[Path]:
+    """Podkatalogi bez dowiązań i junction (stałe ścieżki `app/current`, `venvs/narzedzia` nie są wersjami)."""
     try:
-        return sorted(Path(e.path) for e in os.scandir(katalog) if e.is_dir(follow_symlinks=False))
+        return sorted(Path(e.path) for e in os.scandir(katalog)
+                      if e.is_dir(follow_symlinks=False) and not przenosne.jest_dowiazaniem(Path(e.path)))
     except OSError:
         return []
+
+
+def _przez_stala(link: Path, lista: list[Proces], pomin: set[int]) -> list[Proces]:
+    """Procesy, które mają stałą ścieżkę `link` (dosłownie, bez rozwijania dowiązania: odinstalowanie.uzywaja
+    rozwinęłoby ją do bieżącej wersji) w programie albo wierszu polecenia, z separatorem, cudzysłowem, spacją albo
+    końcem za nią."""
+    postaci = {os.path.abspath(link), os.path.join(os.path.realpath(link.parent), link.name)}
+    if WINDOWS:
+        postaci |= {x.replace("\\", "/") for x in postaci}
+    if WINDOWS or MACOS:
+        postaci = {x.casefold() for x in postaci}
+
+    def jest(tekst: str) -> bool:
+        t = tekst.casefold() if WINDOWS or MACOS else tekst
+        for x in postaci:
+            i = t.find(x)
+            while i >= 0:
+                if i + len(x) == len(t) or t[i + len(x)] in "\\/\"' \t":
+                    return True
+                i = t.find(x, i + 1)
+        return False
+    return [p for p in lista if p.pid not in pomin and (jest(p.program or "") or jest(p.polecenie or ""))]
 
 
 def _sciezki_w(dane) -> set[str]:
@@ -573,13 +607,118 @@ def niewidoczne(u: Uklad, lista: list[Proces], z: Zaplecze) -> list[Proces]:
             and p.program.casefold() in nazwy and z.sesja(p.pid) == nasza]
 
 
-def sprzataj(u: Uklad, z: Zaplecze, log: Callable[[str], None], *, app: Path | None = None) -> dict:
+# Odwołania do katalogów wersji poza buildem (20.11: `<dane>/jarvo/konfig/sesje.json` Kernela miał
+# `venvs/narzedzia-bcc37257827c/bin/python`, sprzątanie po aktualizacji 19.11 usunęło ten venv i pobieranie linków
+# padało całą noc „No such file or directory”). Czytamy tylko zwykłe pliki tekstowe do MAX_PLIKU z tych miejsc; pliki
+# *.env, auth.json, *.token i o nazwach sekretów nigdy nie są otwierane, a w logu jest tylko plik, linia i sama ścieżka.
+MAX_PLIKU = 1 << 20
+_NIE_CZYTAJ = re.compile(r"(^|\.)env$|\.token$|^auth\.json$|credential|sejf|" + srodowisko.SEKRET.pattern, re.I)
+_GRANICA = "\"'` \t,;=()[]{}<>"
+
+
+def wolno_czytac(p: Path) -> bool:
+    """Czy skaner odwołań może otworzyć plik o tej nazwie (nigdy .env, *.env, *.token, auth.json, nazwy sekretów)."""
+    return not _NIE_CZYTAJ.search(Path(p).name)
+
+
+def miejsca_odwolan(u: Uklad, dom: Path) -> list[tuple[Path, bool]]:
+    """Pliki, w których może stać bezwzględna ścieżka wersji: (plik, tylko czytelne dla innych). Konfig Jarva
+    (*.json, *.yaml, *.yml), pamięć profili (memories/*.md), ~/.local/bin (bez plików tylko dla właściciela: tam
+    leżą pomocnicy poświadczeń), na Linuksie jednostki systemd użytkownika (*.service, *.timer), na macOS
+    ~/Library/LaunchAgents/*.plist, na Windows Autostart (*.cmd, *.bat, *.ps1, *.vbs)."""
+    konfig = u.jarvo_dane / "konfig"
+    pliki = [(p, False) for wzor in ("*.json", "*.yaml", "*.yml") for p in sorted(konfig.glob(wzor))]
+    pliki += [(p, False) for p in sorted(u.dane.glob("profiles/*/memories/*.md"))]
+    pliki += [(p, True) for p in sorted((dom / ".local" / "bin").glob("*"))]
+    if LINUX:
+        jednostki = dom / ".config" / "systemd" / "user"
+        pliki += [(p, False) for wzor in ("*.service", "*.timer") for p in sorted(jednostki.glob(wzor))]
+    if MACOS:
+        pliki += [(p, False) for p in sorted((dom / "Library" / "LaunchAgents").glob("*.plist"))]
+    if WINDOWS and os.environ.get("APPDATA"):
+        start = Path(os.environ["APPDATA"]) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+        pliki += [(p, False) for wzor in ("*.cmd", "*.bat", "*.ps1", "*.vbs") for p in sorted(start.glob(wzor))]
+    return [(p, publiczne) for p, publiczne in pliki if wolno_czytac(p)]
+
+
+def _linie_pliku(p: Path, publiczne: bool) -> list[str]:
+    """Linie zwykłego pliku tekstowego (bez bajtu 0, do MAX_PLIKU); dowiązanie: sam jego cel (bez otwierania)."""
+    if not wolno_czytac(p):
+        return []
+    try:
+        st = os.lstat(p)
+        if stat.S_ISLNK(st.st_mode):
+            return [os.readlink(p)]
+        if not stat.S_ISREG(st.st_mode) or st.st_size > MAX_PLIKU or (publiczne and not WINDOWS
+                                                                       and not st.st_mode & 0o044):
+            return []
+        with open(p, "rb") as f:
+            dane = f.read(MAX_PLIKU)
+    except OSError:
+        return []
+    if b"\0" in dane[:8192]:
+        return []
+    return dane.decode("utf-8", "replace").splitlines()
+
+
+def odwolania(u: Uklad, z: Zaplecze, dom: Path | None = None) -> list[tuple[str, int, str]]:
+    """(źródło, numer linii, linia) z miejsc_odwolan i z harmonogramów: `crontab -l` (macOS, Linux) albo
+    `schtasks /Query /XML` (Windows). Linii nie zapisujemy w logu (mogą mieć coś poza ścieżką)."""
+    wynik: list[tuple[str, int, str]] = []
+    for p, publiczne in miejsca_odwolan(u, Path.home() if dom is None else dom):
+        wynik += [(str(p), nr, linia) for nr, linia in enumerate(_linie_pliku(p, publiczne), 1)]
+    for argv, opis in ((["schtasks", "/Query", "/XML"], "Harmonogram zadań"),) if WINDOWS else \
+            ((["crontab", "-l"], "crontab"),):
+        with contextlib.suppress(Exception):
+            kod, tekst = z.wykonaj(argv)
+            if kod == 0:
+                wynik += [(opis, nr, linia) for nr, linia in enumerate(str(tekst).splitlines(), 1)]
+    return wynik
+
+
+def odwolanie_do(k: Path, linie: list[tuple[str, int, str]]) -> tuple[str, int, str] | None:
+    """Pierwsze odwołanie do katalogu `k` (lub czegoś w nim): (źródło, linia, sama ścieżka z linii). Windows: także
+    ścieżka z ukośnikami podwojonymi przez JSON."""
+    nazwa = k.name.casefold()
+    for zrodlo, nr, linia in linie:
+        niska = linia.casefold()
+        if nazwa not in niska:
+            continue
+        warianty = (linia, linia.replace("\\\\", "\\")) if "\\\\" in linia else (linia,)
+        if any(zawiera_sciezke(w, k) for w in warianty):
+            i = niska.index(nazwa)
+            a = i
+            while a > 0 and linia[a - 1] not in _GRANICA:
+                a -= 1
+            b = i + len(nazwa)
+            while b < len(linia) and linia[b] not in _GRANICA:
+                b += 1
+            return zrodlo, nr, linia[a:b]
+    return None
+
+
+def rada_odwolania(u: Uklad, k: Path) -> str:
+    """Jak naprawić odwołanie do wersji `k`: stała ścieżka (app/current, venvs/narzedzia) albo zmienna venvu."""
+    stala = srodowisko.stala_wersji(u, k)
+    if stala is not None:
+        return f"wpisz tam stałą ścieżkę {stala} zamiast {k}"
+    m = re.fullmatch(r"(.+)-[0-9a-f]{12}(?:-[0-9a-f]{8})?", k.name)
+    zmienna = venvy.ZMIENNE.get(m.group(1)) if m and k.parent.name == venvy.KATALOG else None
+    if zmienna:
+        return f"wpisz tam zmienną ${zmienna} procesów Jarva (Python bieżącego venvu) zamiast {k}"
+    return "wpisz tam ścieżkę bieżącej wersji z <program>/current.json albo <stan>/narzedzia.json"
+
+
+def sprzataj(u: Uklad, z: Zaplecze, log: Callable[[str], None], *, app: Path | None = None,
+             dom: Path | None = None) -> dict:
     """Usuwa stare wersje (do_sprzatniecia), których żaden proces nie używa, i stare archiwa. Jedyna ochrona to lista
     procesów (uzywaja: program albo wiersz polecenia w katalogu): na Windows katalog z działającym python.exe
     i załadowanym .dll przechodzi zmianę nazwy, więc ta jej nie zastąpi. Katalog najpierw dostaje nazwę
     `<nazwa>.usun-<czas>` (niepełny nie wygląda jak gotowa wersja; nie przejdzie jej tylko plik otwarty bez
     FILE_SHARE_DELETE albo katalog bieżący procesu), potem znika. Proces z niewidoczne() wstrzymuje całe sprzątanie
-    katalogów do następnej aktualizacji. {"usuniete", "w_uzyciu", "bledy", "zwolnione_mb", "wstrzymane"}."""
+    katalogów do następnej aktualizacji. Kod i venvy, do których odwołuje się plik spoza buildu (odwolania, `dom` =
+    katalog domowy, domyślnie Path.home()), zostają z radą w logu.
+    {"usuniete", "w_uzyciu", "bledy", "zwolnione_mb", "wstrzymane"}."""
     wynik: dict = {"usuniete": [], "w_uzyciu": [], "bledy": [], "zwolnione_mb": 0.0, "wstrzymane": []}
     kandydaci = do_sprzatniecia(u)
     if not kandydaci and not u.cache.is_dir():
@@ -593,11 +732,21 @@ def sprzataj(u: Uklad, z: Zaplecze, log: Callable[[str], None], *, app: Path | N
         kandydaci = []
     pomin = set()                                 # ten proces też się liczy: jego kod i Python zostają
     zwolnione = 0
+    wersje = [k for k in kandydaci if k.parent.name in ("app", venvy.KATALOG) and k.parent.parent == u.program]
+    linie = odwolania(u, z, dom) if wersje else []
     for k in kandydaci:
-        uzywajacy = uzywaja(k, lista, pomin)
+        stala = srodowisko.stala_wersji(u, k)
+        uzywajacy = uzywaja(k, lista, pomin) or (_przez_stala(stala, lista, pomin) if stala else [])
         if uzywajacy:
             wynik["w_uzyciu"].append({"katalog": str(k), "procesy": [p.opis() for p in uzywajacy[:5]]})
             log(f"zostaje {k} (używa go {', '.join(p.opis() for p in uzywajacy[:3])})")
+            continue
+        odw = odwolanie_do(k, linie) if k in wersje else None
+        if odw is not None:
+            zrodlo, nr, sciezka = odw
+            wynik["w_uzyciu"].append({"katalog": str(k), "procesy": [], "odwolanie": f"{zrodlo}:{nr}"})
+            log(f"zostaje {k}: odwołuje się do niego {zrodlo}:{nr} ({sciezka}); {rada_odwolania(u, k)}, a po poprawce "
+                "usunie go następna aktualizacja")
             continue
         bajty = rozmiar(k)
         cel = k if _RESZTKI.search(k.name) else k.with_name(f"{k.name}.usun-{int(time.time())}")
@@ -939,6 +1088,7 @@ class _Aktualizacja:
                 self.podlog(f"BŁĄD: instalator poprzedniej wersji: {type(e).__name__}: {str(e)[:200]}")
                 kod = 1
             if kod == 0 and instalator.ten_sam_katalog(str(srodowisko.biezace(u).get("app") or ""), stara):
+                self._stale_sciezki()
                 wynik, opis = "wycofano", (f"Aktualizacja się nie udała ({powod}), więc wróciła poprzednia wersja "
                                            f"{self.wynik['wersja_przed']} (current.poprzedni.json, jej instalatorem).")
             else:
@@ -954,14 +1104,28 @@ class _Aktualizacja:
         return self._koniec(wynik, opis, kod=1)
 
     def _awaryjnie(self, migawka: dict) -> None:
-        """Ostatnia deska: current.json i narzedzia.json sprzed aktualizacji, potem start serwisu, jeśli działał."""
+        """Ostatnia deska: current.json i narzedzia.json sprzed aktualizacji, stałe ścieżki na nie, potem start
+        serwisu, jeśli działał."""
         for p, tresc in migawka.items():
             if tresc is not None:
                 with contextlib.suppress(OSError):
                     przenosne.zapisz_atomowo(p, tresc)
+        self._stale_sciezki()
         if self.dzialal and instalator.stan_serwisu(self.u, self.ot)[0] is None:
             with contextlib.suppress(Exception):
                 instalator.uruchom_serwis(self.u, self.ot, self.podlog)
+
+    def _stale_sciezki(self) -> None:
+        """Stałe ścieżki (`app/current`, `venvs/narzedzia`) na wersję z current.json i narzedzia.json po powrocie:
+        instalator poprzedniej wersji mógł ich nie znać (M5), więc zostałyby na nowej, wycofanej."""
+        try:
+            zmienione, bledy = srodowisko.uzgodnij_stale(self.u)
+        except Exception as e:            # noqa: BLE001 - powrót nie może się wywrócić na dowiązaniu
+            zmienione, bledy = [], [f"{type(e).__name__}: {str(e)[:160]}"]
+        for opis in zmienione:
+            self.podlog(f"stała ścieżka {opis}")
+        for blad in bledy:
+            self.podlog(f"uwaga: stała ścieżka {blad}")
 
     def _sprzatanie(self, app: Path | None = None) -> None:
         """Sprzątanie starych wersji; błąd to tylko uwaga (nigdy powód do wycofania udanej aktualizacji)."""

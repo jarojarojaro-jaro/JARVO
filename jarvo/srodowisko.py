@@ -70,6 +70,70 @@ def narzedzia(u: Uklad) -> dict:
     return wczytaj_json(u.stan / "narzedzia.json")
 
 
+# Stałe ścieżki aktywnej wersji (M5): build floty wpisuje je w prompty i skille (@@REPO_DIR@@, @@PY@@, jarvo/flota.py)
+# zamiast katalogów ze skrótem wersji. Te zmieniała każda aktualizacja: długie sesje do kompresji i MEMORY.md trzymały
+# martwe ścieżki, a nowy tekst promptu psuł jego cache. Dowiązanie w <program> (Windows: junction) przełącza instalator
+# razem z current.json (instalator.przelaczenie), a powrót do poprzedniej wersji z nim (aktualizacja).
+STALY_KOD = Path("app") / "current"            # → `app` z current.json (`app/<sha12>`)
+STALY_VENV = Path("venvs") / "narzedzia"       # → `katalog` wpisu venv-narzedzia z narzedzia.json (`narzedzia-<skrót>`)
+
+
+def stale_cele(u: Uklad, *, biez: dict | None = None, narz: dict | None = None) -> dict[Path, Path | None]:
+    """{stała ścieżka: katalog aktywnej wersji albo None, gdy go jeszcze nie ma}."""
+    biez = biezace(u) if biez is None else biez
+    narz = narzedzia(u) if narz is None else narz
+    venv = narz.get("venv-narzedzia")
+    kat = venv.get("katalog") if isinstance(venv, dict) else None
+    return {u.program / STALY_KOD: Path(biez["app"]) if biez.get("app") else None,
+            u.program / STALY_VENV: Path(kat) if kat else None}
+
+
+def uzgodnij_stale(u: Uklad, *, biez: dict | None = None, narz: dict | None = None) -> tuple[list[str], list[str]]:
+    """Stałe ścieżki na katalogi aktywnej wersji (current.json, narzedzia.json): (zmienione, błędy po polsku).
+    Katalogu, którego nie ma, nie wskazujemy (dowiązanie zostaje). Błąd (system plików bez dowiązań, w miejscu
+    dowiązania cudzy katalog) nie zatrzymuje instalacji: wtedy stala_sciezka() daje ścieżkę z wersją, jak dawniej."""
+    zmienione: list[str] = []
+    bledy: list[str] = []
+    for link, cel in stale_cele(u, biez=biez, narz=narz).items():
+        if cel is None or not cel.is_dir():
+            continue
+        try:
+            if przenosne.ustaw_dowiazanie(link, cel):
+                zmienione.append(f"{link} → {cel.name}")
+        except OSError as e:
+            bledy.append(f"{link} → {cel}: {e.strerror or e}")
+    return zmienione, bledy
+
+
+def stala_sciezka(u: Uklad, sciezka: Path | str) -> Path:
+    """`sciezka` przez stałą ścieżkę, gdy ta wskazuje katalog wersji, w którym ona leży (np. `<program>/venvs/
+    narzedzia-<skrót>/bin/python` → `<program>/venvs/narzedzia/bin/python`); inaczej bez zmian. Bez realpath samej
+    `sciezka`: Python venvu to dowiązanie do Pythona bazowego."""
+    p = Path(sciezka)
+    for link in (u.program / STALY_KOD, u.program / STALY_VENV):
+        cel = przenosne.cel_dowiazania(link)
+        if cel is None:
+            continue
+        klucz = os.path.normcase(str(cel))
+        for przodek in (p, *p.parents):
+            if os.path.normcase(os.path.realpath(przodek)) == klucz:
+                return link / p.relative_to(przodek) if przodek != p else link
+    return p
+
+
+def stala_wersji(u: Uklad, katalog: Path) -> Path | None:
+    """Stała ścieżka, przez którą mógł działać katalog wersji `katalog` (każdy kod w `<program>/app`, venvy
+    `<program>/venvs/narzedzia-*`), albo None. Sprzątanie starych wersji (aktualizacja.sprzataj) traktuje proces ze
+    stałą ścieżką w wierszu polecenia jak proces z każdej takiej wersji: nie wiadomo, na którą wskazywała przy jego
+    starcie."""
+    k = Path(katalog)
+    for link in (u.program / STALY_KOD, u.program / STALY_VENV):
+        if os.path.normcase(str(k.parent)) == os.path.normcase(str(link.parent)) and k.name != link.name \
+                and (link == u.program / STALY_KOD or k.name.startswith(f"{link.name}-")):
+            return link
+    return None
+
+
 def env_buildu(u: Uklad) -> dict[str, str]:
     """Zmienne bramy z buildu floty (`<root>/build/host/srodowisko.json`, np. HERMES_LOCAL_STT_COMMAND): same napisy,
     nazwy WIELKIMI literami, bez nazw sekretów i bez zmiennych, które ustawia tylko Jarvo (PATH, HERMES_HOME…)."""

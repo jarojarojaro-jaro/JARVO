@@ -826,6 +826,235 @@ def test_sprzatanie_starych_wersji_poza_uzywanymi(tmp_path):
     assert wynik["zwolnione_mb"] > 0 and not list(p.rglob("*.usun-*"))
 
 
+def _venv(u: sciezki.Uklad, nazwa: str) -> Path:
+    """Atrapa venvu narzędzi `<program>/venvs/<nazwa>` z Pythonem venvu."""
+    kat = u.program / "venvs" / nazwa
+    venvy.python_venvu(kat).parent.mkdir(parents=True, exist_ok=True)
+    venvy.python_venvu(kat).write_bytes(b"")
+    return kat
+
+
+def _wersja(u: sciezki.Uklad, app: Path, venv: Path) -> None:
+    """current.json na `app` i wpis venv-narzedzia na `venv`, jak po kroku „Przełączenie wersji”."""
+    narz = srodowisko.narzedzia(u)
+    narz["venv-narzedzia"] = venvy.wpis_spisu("narzedzia", {"sha256": venv.name.split("-")[1]}, venv)
+    (u.stan / "narzedzia.json").write_text(json.dumps(narz), encoding="utf-8")
+    (u.program / "current.json").write_text(json.dumps({**srodowisko.biezace(u), "app": str(app),
+                                                        "wersja": app.name}), encoding="utf-8")
+
+
+def test_stale_sciezki_przelaczane_z_wersja(tmp_path):
+    """M5: `<program>/app/current` i `<program>/venvs/narzedzia` (POSIX dowiązanie, Windows junction) wskazują wersję
+    z current.json i narzedzia.json; ścieżki w nich (Python venvu, kod) idą przez nie, a po zmianie wersji te same
+    napisy prowadzą do nowej. Drugi przebieg nic nie zmienia; cudzy katalog w miejscu dowiązania zostaje (błąd)."""
+    u, stara = _instalacja(tmp_path)
+    nowa = _kod(u.program / "app" / SHA_NOWA[:12], SHA_NOWA)
+    v1, v2 = _venv(u, "narzedzia-aaaaaaaaaaaa"), _venv(u, "narzedzia-bbbbbbbbbbbb")
+    kod, venv = u.program / srodowisko.STALY_KOD, u.program / srodowisko.STALY_VENV
+    _wersja(u, stara, v1)
+    assert srodowisko.stala_sciezka(u, venvy.python_venvu(v1)) == venvy.python_venvu(v1)     # przed: bez zmian
+    zmienione, bledy = srodowisko.uzgodnij_stale(u)
+    assert len(zmienione) == 2 and not bledy
+    assert przenosne.jest_dowiazaniem(kod) and przenosne.jest_dowiazaniem(venv)
+    assert srodowisko.stala_sciezka(u, venvy.python_venvu(v1)) == venvy.python_venvu(venv)
+    assert srodowisko.stala_sciezka(u, stara) == kod
+    assert srodowisko.stala_sciezka(u, stara / "jarvo" / "start.py") == kod / "jarvo" / "start.py"
+    assert (kod / "jarvo" / "start.py").is_file() and venvy.python_venvu(venv).is_file()
+    assert srodowisko.uzgodnij_stale(u) == ([], [])                                       # drugi przebieg: nic
+    _wersja(u, nowa, v2)
+    przenosne.ustaw_dowiazanie(u.program / "app" / ".current.nowy", stara)     # resztka przerwanej podmiany
+    assert len(srodowisko.uzgodnij_stale(u)[0]) == 2
+    assert os.path.samefile(kod, nowa) and os.path.samefile(venv, v2)
+    assert srodowisko.stala_sciezka(u, venvy.python_venvu(v2)) == venvy.python_venvu(venv)
+    assert srodowisko.stala_sciezka(u, venvy.python_venvu(v1)) == venvy.python_venvu(v1)     # stara: z wersją
+    assert sorted(x.name for x in (u.program / "app").iterdir()) == sorted(["current", stara.name, nowa.name])
+    # cel zniknął (np. sprzątnięty po powrocie starszego instalatora): dowiązanie podmienione
+    shutil.rmtree(v2)
+    assert przenosne.cel_dowiazania(venv) is None
+    _wersja(u, nowa, v1)
+    assert srodowisko.uzgodnij_stale(u)[0] == [f"{venv} → {v1.name}"] and os.path.samefile(venv, v1)
+    # cudzy katalog w miejscu stałej ścieżki: zostaje, błąd po polsku, ścieżka z wersją
+    przenosne._usun_dowiazanie(kod)
+    kod.mkdir()
+    zmienione, bledy = srodowisko.uzgodnij_stale(u)
+    assert not zmienione and len(bledy) == 1 and str(kod) in bledy[0] and kod.is_dir()
+    assert srodowisko.stala_sciezka(u, nowa) == nowa
+
+
+def test_tokeny_floty_przez_stale_sciezki(tmp_path):
+    """@@PY@@ i @@REPO_DIR@@ buildu floty bez skrótu wersji, gdy stałe ścieżki wskazują wersję (M5); bez nich jak
+    dawniej ścieżki z wersją."""
+    from jarvo import flota
+    u, stara = _instalacja(tmp_path)
+    v1 = _venv(u, "narzedzia-aaaaaaaaaaaa")
+    _wersja(u, stara, v1)
+    hermes_py = tmp_path / "hermes-python"
+    assert flota.python_floty(u, hermes_py) == venvy.python_venvu(v1)
+    assert flota.wartosci_tokenow(u, stara, venvy.python_venvu(v1))["REPO_DIR"] == stara.as_posix()
+    srodowisko.uzgodnij_stale(u)
+    py = flota.python_floty(u, hermes_py)
+    t = flota.wartosci_tokenow(u, stara, py)
+    assert t["PY"].strip('"') == venvy.python_venvu(u.program / "venvs" / "narzedzia").as_posix()
+    assert t["REPO_DIR"] == (u.program / "app" / "current").as_posix()
+    argv, _, _ = flota.argv_buildu(u, stara, tmp_path, hermes_py, py, {"--repo-dir", "--py"})
+    assert argv[argv.index("--repo-dir") + 1] == t["REPO_DIR"]
+    assert argv[argv.index("--py") + 1] == venvy.python_venvu(u.program / "venvs" / "narzedzia").as_posix()
+    assert not any(re.search(r"narzedzia-[0-9a-f]{12}|app/[0-9a-f]{12}", x) for x in (*t.values(), *argv[3:]))
+
+
+def test_sprzatanie_nie_rusza_stalych_sciezek_i_chroni_wersje_za_nimi(tmp_path):
+    """Stałe ścieżki nie są wersjami do sprzątania (Windows: junction wygląda jak katalog), a proces, który ma je
+    w wierszu polecenia, chroni każdą wersję za nimi: nie wiadomo, którą wskazywały przy jego starcie. Proces z bieżącą
+    wersją (ścieżka z jej skrótem) starych nie chroni."""
+    u, stara = _instalacja(tmp_path)
+    nowa = _kod(u.program / "app" / SHA_NOWA[:12], SHA_NOWA)
+    v1, v2 = _venv(u, "narzedzia-aaaaaaaaaaaa"), _venv(u, "narzedzia-bbbbbbbbbbbb")
+    _wersja(u, stara, v1)
+    srodowisko.uzgodnij_stale(u)
+    _wersja(u, nowa, v2)
+    srodowisko.uzgodnij_stale(u)
+    stala_py = venvy.python_venvu(u.program / "venvs" / "narzedzia")
+    skrypt = Proces(61, 1, str(stala_py), f'"{stala_py}" {u.program / "app" / "current" / "x.py"} --dlugo')
+    biezacy = Proces(62, 1, str(venvy.python_venvu(v2)), f"{venvy.python_venvu(v2)} {nowa / 'y.py'}")
+    assert [k.name for k in aktualizacja.do_sprzatniecia(u) if k.parent.name in ("app", "venvs")] == \
+        [stara.name, v1.name]
+    log: list[str] = []
+    wynik = aktualizacja.sprzataj(u, _zaplecze(procesy=lambda: [skrypt, biezacy]), log.append, app=nowa)
+    assert stara.is_dir() and v1.is_dir() and not wynik["usuniete"]
+    assert len(wynik["w_uzyciu"]) == 2 and all("PID 61" in w["procesy"][0] for w in wynik["w_uzyciu"]), wynik
+    wynik = aktualizacja.sprzataj(u, _zaplecze(procesy=lambda: [biezacy]), log.append, app=nowa)
+    assert not stara.exists() and not v1.exists() and sorted(wynik["usuniete"]) == sorted([str(stara), str(v1)])
+    for link, cel in ((u.program / "app" / "current", nowa), (u.program / "venvs" / "narzedzia", v2)):
+        assert przenosne.jest_dowiazaniem(link) and os.path.samefile(link, cel)
+    assert venvy.python_venvu(v2).is_file() and (nowa / "jarvo" / "start.py").is_file()
+
+
+def _odwolania_stanowisko(tmp_path):
+    """Instalacja po aktualizacji: stary kod i stary venv narzędzi (jak 19.11 `narzedzia-bcc37257827c`) poza
+    current.json i narzedzia.json, pusty katalog domowy."""
+    u, stara = _instalacja(tmp_path)
+    nowa = _kod(u.program / "app" / SHA_NOWA[:12], SHA_NOWA)
+    stary_venv, nowy_venv = _venv(u, "narzedzia-bcc37257827c"), _venv(u, "narzedzia-7a424e7199dd")
+    _wersja(u, nowa, nowy_venv)
+    konfig = u.jarvo_dane / "konfig"
+    konfig.mkdir(parents=True, exist_ok=True)
+    dom = tmp_path / "dom"
+    (dom / ".local" / "bin").mkdir(parents=True)
+    return u, stara, nowa, stary_venv, konfig, dom
+
+
+def test_sprzatanie_zostawia_wersje_z_odwolaniem_poza_buildem(tmp_path):
+    """20.11: `konfig/sesje.json` (panel.pobierz_linki Kernela) miał ścieżkę venvu, który sprzątanie usunęło, i
+    pobieranie linków padało całą noc. Wersja z odwołaniem w konfigu, pamięci profilu albo crontabie zostaje, log
+    podaje plik:linię i stałą ścieżkę do wpisania; bez odwołań znika."""
+    u, stara, nowa, stary_venv, konfig, dom = _odwolania_stanowisko(tmp_path)
+    py = venvy.python_venvu(stary_venv)
+    sesje = konfig / "sesje.json"
+    sesje.write_text(json.dumps({"kernel": {"panel": {"pobierz_linki": [str(py), "linki.py"]}}}, indent=1),
+                     encoding="utf-8")
+    pamiec = u.dane / "profiles" / "jarvo-ads" / "memories" / "MEMORY.md"
+    pamiec.parent.mkdir(parents=True)
+    pamiec.write_text(f"# Pamięć\n- skrypt: {stara / 'scripts' / 'odcisk.py'}\n", encoding="utf-8")
+    ocr = _venv(u, "ocr-9f711b026e62")
+    cron = f"0 3 * * * {venvy.python_venvu(ocr)} /x/ocr.py\n"
+    z = _zaplecze(wykonaj=lambda argv: (0, cron))                   # crontab -l (Windows: schtasks /Query /XML)
+    log: list[str] = []
+    wynik = aktualizacja.sprzataj(u, z, log.append, app=nowa, dom=dom)
+    assert stary_venv.is_dir() and stara.is_dir() and ocr.is_dir() and not wynik["usuniete"], log
+    odw = {Path(w["katalog"]).name: w["odwolanie"] for w in wynik["w_uzyciu"]}
+    assert odw == {stary_venv.name: f"{sesje}:5", stara.name: f"{pamiec}:2",
+                   ocr.name: ("Harmonogram zadań" if WINDOWS else "crontab") + ":1"}, wynik
+    tekst = "\n".join(log)
+    assert f"stałą ścieżkę {u.program / 'venvs' / 'narzedzia'} zamiast {stary_venv}" in tekst
+    assert f"stałą ścieżkę {u.program / 'app' / 'current'} zamiast {stara}" in tekst
+    assert "$JARVO_OCR_PYTHON" in tekst and "linki.py" not in tekst          # w logu sama ścieżka, nie cała linia
+    # odwołania poprawione na stałe ścieżki: stare wersje znikają, bieżące zostają
+    srodowisko.uzgodnij_stale(u)
+    sesje.write_text(json.dumps({"kernel": {"panel": {"pobierz_linki": [
+        str(venvy.python_venvu(u.program / "venvs" / "narzedzia")), "linki.py"]}}}), encoding="utf-8")
+    pamiec.write_text(f"- skrypt: {u.program / 'app' / 'current' / 'scripts' / 'odcisk.py'}\n", encoding="utf-8")
+    wynik = aktualizacja.sprzataj(u, _zaplecze(), log.append, app=nowa, dom=dom)
+    assert not stary_venv.exists() and not stara.exists() and not ocr.exists() and not wynik["w_uzyciu"], wynik
+    assert nowa.is_dir() and (u.program / "venvs" / "narzedzia-7a424e7199dd").is_dir()
+
+
+@pytest.mark.skipif(WINDOWS, reason="dowiązanie symboliczne na Windows wymaga uprawnień")
+def test_sprzatanie_widzi_dowiazanie_i_jednostke_w_katalogu_domowym(tmp_path):
+    """~/.local/bin z dowiązaniem do programu starego venvu (cel czytany bez otwierania) i jednostka systemd
+    użytkownika ze starym kodem w ExecStart (Linux)."""
+    u, stara, nowa, stary_venv, _, dom = _odwolania_stanowisko(tmp_path)
+    (dom / ".local" / "bin" / "yt-dlp").symlink_to(stary_venv / "bin" / "yt-dlp")
+    if sciezki.LINUX:
+        jednostki = dom / ".config" / "systemd" / "user"
+        jednostki.mkdir(parents=True)
+        (jednostki / "moje.service").write_text(f"[Service]\nExecStart=/usr/bin/python3 {stara}/x.py\n",
+                                                encoding="utf-8")
+    wynik = aktualizacja.sprzataj(u, _zaplecze(), lambda _t: None, app=nowa, dom=dom)
+    odw = {Path(w["katalog"]).name: w["odwolanie"] for w in wynik["w_uzyciu"]}
+    assert odw[stary_venv.name] == f"{dom / '.local' / 'bin' / 'yt-dlp'}:1" and stary_venv.is_dir()
+    if sciezki.LINUX:
+        assert odw[stara.name] == f"{dom / '.config' / 'systemd' / 'user' / 'moje.service'}:2" and stara.is_dir()
+
+
+def test_skaner_odwolan_nie_otwiera_plikow_env_ani_sekretow(tmp_path, monkeypatch):
+    """Pliki .env, *.env, *.token, auth.json i o nazwach sekretów nigdy nie są otwierane, nawet gdy mają ścieżkę
+    wersji: ta wersja znika, bo czytelnych odwołań nie ma. Prywatne pliki w ~/.local/bin (pomocnicy poświadczeń)
+    też nie."""
+    import builtins
+    import io
+    u, stara, nowa, stary_venv, konfig, dom = _odwolania_stanowisko(tmp_path)
+    sciezka = str(venvy.python_venvu(stary_venv))
+    zakazane = [konfig / ".env", konfig / "jarvo.env", konfig / "host.env", konfig / "auth.json",
+                konfig / "github-token.json", konfig / "api-key.yaml", konfig / "sekrety.token",
+                dom / ".local" / "bin" / "klucz.env", dom / ".local" / "bin" / "git-credential-x"]
+    for p in zakazane:
+        p.write_text(f"X={sciezka}\n", encoding="utf-8")
+    prywatny = dom / ".local" / "bin" / "pomocnik"                        # tylko dla właściciela (POSIX)
+    if not WINDOWS:
+        prywatny.write_text(f"#!/bin/sh\nexec {sciezka}\n", encoding="utf-8")
+        os.chmod(prywatny, 0o700)
+    (konfig / "sesje.json").write_text("{}", encoding="utf-8")
+    otwarte: list[str] = []
+    prawdziwe = builtins.open
+
+    def sledz(plik, *a, **k):
+        otwarte.append(os.fspath(plik) if isinstance(plik, (str, os.PathLike)) else str(plik))
+        return prawdziwe(plik, *a, **k)
+    monkeypatch.setattr(builtins, "open", sledz)
+    monkeypatch.setattr(io, "open", sledz)
+    wynik = aktualizacja.sprzataj(u, _zaplecze(), lambda _t: None, app=nowa, dom=dom)
+    monkeypatch.undo()
+    assert str(konfig / "sesje.json") in otwarte                         # skaner naprawdę czytał konfig
+    assert not set(map(str, zakazane)) & set(otwarte), otwarte
+    assert all(not aktualizacja.wolno_czytac(p) for p in zakazane)
+    assert not stary_venv.exists() and not stara.exists(), wynik
+    if not WINDOWS:
+        assert str(prywatny) not in otwarte
+
+
+def test_powrot_do_poprzedniej_wersji_cofa_stale_sciezki(tmp_path):
+    """Instalator nowej wersji przełącza stałe ścieżki, a poprzedni (np. sprzed M5) ich nie zna: po powrocie jego
+    instalatorem i po awaryjnym current.json wskazują znowu poprzednią wersję."""
+    class ZeStalymi(Instalator):
+        def __call__(self, argv, **kw):
+            kod = super().__call__(argv, **kw)
+            if Path(str(argv[5])).parent.parent.name == SHA_NOWA[:12]:
+                srodowisko.uzgodnij_stale(self.u)                     # jak instalator.przelaczenie nowej wersji
+            return kod
+    for kody, przelacz, wynik in (((1, 0), (True, True), "wycofano"), ((1, 1), (True, False), "blad")):
+        u, stara = _instalacja(tmp_path / wynik)
+        srodowisko.uzgodnij_stale(u)
+        assert os.path.samefile(u.program / "app" / "current", stara)
+        inst = ZeStalymi(u, kody=kody, przelacz=przelacz)
+        ot = _ot(tmp_path / wynik, env={aktualizacja.FAKE: str(_kod(tmp_path / wynik / "zrodlo", SHA_NOWA))},
+                 moduly={"nadzorca": Nadzorca(), "autostart": Autostart()})
+        kod, raport, log = _aktualizuj(u, ot, _zaplecze(strumien=inst, przechwyc=Doctor()))
+        assert kod == 1 and raport["wynik"] == wynik and inst.aplikacje() == [SHA_NOWA[:12], SHA_STARA[:12]], log
+        assert srodowisko.biezace(u)["app"] == str(stara)
+        assert os.path.samefile(u.program / "app" / "current", stara), log
+        assert f"stała ścieżka {u.program / 'app' / 'current'} → {stara.name}" in log
+
+
 def test_regresje_doctora():
     def d(*w):
         return {"wyniki": [{"nazwa": n, "stan": s} for n, s in w]}

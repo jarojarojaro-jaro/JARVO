@@ -108,6 +108,21 @@ def test_ogon_tylko_pelne_linie(w):
     assert om.ogon(w, "../../etc/passwd") == ([], 0)
 
 
+def test_python_narzedzi_przezywa_aktualizacje(tmp_path):
+    """20.11: `pobierz_linki` w sesje.json wskazywał `venvs/narzedzia-bcc37257827c/bin/python`, który aktualizacja
+    usunęła, więc Kernel dostał zamiast treści linku „No such file or directory”."""
+    venvs = tmp_path / "venvs"
+    stary = f"{venvs}/narzedzia-bcc37257827c/bin/python"
+    nowy = venvs / "narzedzia-7a424e7199dd" / "bin" / "python"
+    nowy.parent.mkdir(parents=True)
+    nowy.write_text("")
+    assert om._program_narzedzi(stary) == str(nowy)                      # bez stałej ścieżki: obecny venv
+    (venvs / "narzedzia").symlink_to(venvs / "narzedzia-7a424e7199dd")
+    assert om._program_narzedzi(stary) == f"{venvs}/narzedzia/bin/python"   # z dowiązaniem instalatora: stała
+    assert om._program_narzedzi(str(nowy)) == str(nowy)                  # istniejący plik zostaje
+    assert om._program_narzedzi("/inne/skrypt.py") == "/inne/skrypt.py"
+
+
 def test_zatrzymaj_tylko_omp_wpisu(w, tmp_path):
     obcy = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
     try:

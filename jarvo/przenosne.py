@@ -6,6 +6,8 @@
 - `chron`: plik albo katalog tylko dla właściciela (POSIX chmod 0600/0700, Windows ACL przez icacls).
 - `program`: pełna ścieżka programu przez shutil.which (na Windows także .exe i .cmd).
 - `flagi_tla`: creationflags dla procesów w tle bez okna konsoli (Windows) i nowej grupy procesów.
+- `ustaw_dowiazanie`, `cel_dowiazania`, `jest_dowiazaniem`: stała ścieżka do katalogu (POSIX dowiązanie symboliczne,
+  Windows junction), np. `<program>/venvs/narzedzia` → `narzedzia-<skrót locka>` (srodowisko.uzgodnij_stale, M5).
 """
 from __future__ import annotations
 
@@ -173,3 +175,66 @@ def flagi_tla() -> int:
     if not WINDOWS:
         return 0
     return subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+
+
+def jest_dowiazaniem(p: Path) -> bool:
+    """Dowiązanie symboliczne albo junction (Windows), także takie, którego cel zniknął."""
+    sprawdz = getattr(os.path, "isjunction", None)                   # Python 3.12+
+    return os.path.islink(p) or bool(sprawdz and sprawdz(p))
+
+
+def cel_dowiazania(link: Path) -> Path | None:
+    """Katalog, który wskazuje dowiązanie albo junction `link` (realpath), albo None: to nie dowiązanie albo cel
+    zniknął."""
+    if not jest_dowiazaniem(link):
+        return None
+    cel = Path(os.path.realpath(link))
+    return cel if cel.is_dir() else None
+
+
+def _usun_dowiazanie(p: Path) -> None:
+    """Sam wpis dowiązania albo junction, bez wchodzenia do celu; brak wpisu to nic."""
+    if jest_dowiazaniem(p):
+        (os.rmdir if WINDOWS and os.path.isdir(p) else os.unlink)(p)
+
+
+def ustaw_dowiazanie(link: Path, cel: Path) -> bool:
+    """Stała ścieżka `link` do katalogu `cel`. POSIX: dowiązanie symboliczne, względne, gdy oba leżą w tym samym
+    katalogu (przeniesiony korzeń instalacji działa dalej), podmienione atomowo (nowe obok i os.replace). Windows:
+    junction (_winapi.CreateJunction, jak migracja.py: bez administratora i trybu dewelopera, których wymaga dowiązanie
+    symboliczne); katalogu nie da się nadpisać, więc podmiana to dwie zmiany nazwy i przez tę chwilę ścieżki nie ma
+    (nieudana druga przywraca stary junction). Resztki przerwanej podmiany (`.<nazwa>.nowy`, `.<nazwa>.stary`) znikają
+    przy następnej. True = zmieniono; ten sam cel = nic. W miejscu `link` zwykły plik albo katalog: FileExistsError
+    (cudzego nie usuwamy); system plików bez dowiązań (np. exFAT): OSError, a ścieżki zostają z wersją (wołający)."""
+    link, cel = Path(link).absolute(), Path(cel).absolute()
+    if not cel.is_dir():
+        raise FileNotFoundError(f"nie ma katalogu {cel}")
+    teraz = cel_dowiazania(link)
+    if teraz is not None and os.path.normcase(str(teraz)) == os.path.normcase(os.path.realpath(cel)):
+        return False
+    if os.path.lexists(link) and not jest_dowiazaniem(link):
+        raise FileExistsError(f"w miejscu stałej ścieżki {link} jest plik albo katalog")
+    nowy, stary = link.with_name(f".{link.name}.nowy"), link.with_name(f".{link.name}.stary")
+    _usun_dowiazanie(nowy)
+    link.parent.mkdir(parents=True, exist_ok=True)          # kod spoza <program>/app (instalacja z checkoutu)
+    if not WINDOWS:
+        os.symlink(cel.name if cel.parent == link.parent else str(cel), nowy, target_is_directory=True)
+        os.replace(nowy, link)
+        return True
+    import _winapi
+    _winapi.CreateJunction(str(cel), str(nowy))
+    _usun_dowiazanie(stary)
+    if os.path.lexists(link):
+        os.replace(link, stary)
+    try:
+        os.replace(nowy, link)
+    except OSError:
+        if os.path.lexists(stary) and not os.path.lexists(link):
+            os.replace(stary, link)
+        _usun_dowiazanie(nowy)
+        raise
+    try:
+        _usun_dowiazanie(stary)
+    except OSError:
+        pass                                      # resztka zniknie przy następnej podmianie
+    return True

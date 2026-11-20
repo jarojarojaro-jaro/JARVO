@@ -119,6 +119,27 @@ def _arg(a: str) -> str:
     return os.path.expanduser(a) if a.startswith("~/") else a
 
 
+_VENV_HASZ = re.compile(r"^(?P<venvs>.*[/\\]venvs)[/\\]narzedzia-[0-9a-f]{12}(?P<reszta>[/\\].*)$")
+
+
+def _program_narzedzi(a: str) -> str:
+    """Python venvu narzędzi wpisany ze skrótem wersji (`venvs/narzedzia-<12 hex>/bin/python`) po aktualizacji już nie
+    istnieje: 20.11 pobieranie linków dla Kernela padło na `narzedzia-bcc37257827c` usuniętym przez sprzątanie.
+    Brak pliku → stała ścieżka `venvs/narzedzia/…` (dowiązanie instalatora), a bez niej najnowszy `narzedzia-*`."""
+    m = _VENV_HASZ.match(a)
+    if not m or os.path.exists(a):
+        return a
+    venvs = Path(m.group("venvs"))
+    stala = str(venvs / "narzedzia") + m.group("reszta")
+    if os.path.exists(stala):
+        return stala
+    kandydaci = sorted(venvs.glob("narzedzia-*"), key=lambda p: p.stat().st_mtime, reverse=True)
+    for k in kandydaci:
+        if os.path.exists(str(k) + m.group("reszta")):
+            return str(k) + m.group("reszta")
+    return a
+
+
 def wpis_z(klucz: str, surowy: dict, dom: Path | None = None) -> Wpis | None:
     """Wpis omp albo None (wpis bez `panel.zaplecze = omp`). Wpis z błędem dostaje `blad` i stan `offline`."""
     panel = surowy.get("panel") if isinstance(surowy, dict) else None
@@ -133,7 +154,7 @@ def wpis_z(klucz: str, surowy: dict, dom: Path | None = None) -> Wpis | None:
     except (TypeError, ValueError):
         w.blad = "zły wpis"
     w.omp_arg = [_arg(str(a)) for a in panel.get("omp_arg") or [] if isinstance(a, (str, int, float))]
-    w.pobierz_linki = [_arg(str(a)) for a in panel.get("pobierz_linki") or [] if isinstance(a, str)]
+    w.pobierz_linki = [_program_narzedzi(_arg(str(a))) for a in panel.get("pobierz_linki") or [] if isinstance(a, str)]
     w.sesja = str(panel.get("sesja") or "")
     if not KLUCZ_RE.fullmatch(klucz):
         w.blad = w.blad or "zły klucz"
