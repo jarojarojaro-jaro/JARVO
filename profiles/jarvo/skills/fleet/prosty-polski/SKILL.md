@@ -39,6 +39,7 @@ nie robimy jednej reguły krótkości”).
 4. **Zwykłe słowa zamiast urzędowych:** `references/slownik.md` (zamiennik w drugiej kolumnie).
 5. **Złożone kroki jako lista numerowana,** po jednej czynności w punkcie.
 6. **Dokładne liczby i nazwy:** „3 posty”, „wersja a1b2c3”, a nie „kilka”, „najnowsza”.
+7. **Bez myślników** (— – --; właściciel 20.11: „AI slop”): przecinek, dwukropek albo nowe zdanie. Tak też w plikach dla właściciela (raporty, INDEX, tytuły misji).
 
 ## Ostrzeżenia
 Najpierw polecenie, potem ryzyko. Dwa poziomy:

@@ -74,7 +74,7 @@ to, co ma dowód (krok 4a).
 **Sygnały historyczne** (0 tokenów, przed werdyktem; próba M-261116-koszt-kontekstu-kart, paper „AutoRefine”):
 `@@PY@@ "$HERMES_HOME/scripts/liczby.py" --json` → `braki[<wykonawca>]` (powody jego ostatnich odesłań z 30 dni)
 i `jakosc[<wykonawca>]` (ile kart za 1. razem). Powtarzający się brak, który jest w DoD albo rubryce, sprawdzasz w tej
-karcie wprost i wpisujesz w `reviewer_checks` jako „znany brak: <co> — jest / nie ma”. Historia nie dodaje wymagań
+karcie wprost i wpisujesz w `reviewer_checks` jako „znany brak: <co>: jest / nie ma”. Historia nie dodaje wymagań
 spoza DoD i rubryki: tylko mówi, gdzie patrzeć najpierw. W `metadata` werdyktu zawsze `"runda": N`, żeby dało się
 policzyć przyjęcia za 1. razem.
 
@@ -232,7 +232,7 @@ kanban_complete(
 
 Poprawki:
 ```
-kanban_comment(task_id="<id>", body="Poprawki (runda N):\n1. <gdzie> — <co jest nie tak> — <jak sprawdzić> — <minimalny wynik, który zamknie punkt>\n2. …")
+kanban_comment(task_id="<id>", body="Poprawki (runda N):\n1. Gdzie: <miejsce>. Problem: <co jest nie tak>. Sprawdzenie: <jak>. Zamyka: <minimalny wynik>\n2. …")
 kanban_request_changes(reason="<zwięźle: co poprawić>")
 ```
 

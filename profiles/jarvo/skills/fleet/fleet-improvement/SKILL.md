@@ -68,7 +68,7 @@ pola rozdzielone „ · ”: tak czyta je `lekcje.py` (0 tokenów).
 
 ## Format propozycji
 ```
-Propozycja: <agent> — <co zmienić: SOUL / skill X / DoD w szablonie karty / nowy skill>
+Propozycja dla <agent>: <co zmienić: SOUL / skill X / DoD w szablonie karty / nowy skill>
 Dowód: <karty i cytaty z uwag sędziego; liczba potwierdzeń z księgi lekcji>
 Zmiana: <konkretny tekst albo reguła do dodania>
 Ryzyko: <co może się pogorszyć>
