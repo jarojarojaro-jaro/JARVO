@@ -106,3 +106,16 @@ def test_partia_panel_i_telegram_z_kluczami(tmp_path):
     assert [(x["rodzaj"], x.get("zrodlo"), x["tekst"]) for x in poz] == [("wlasciciel", "telegram", "z telefonu"),
                                                                            ("agent", None, "ok")]
     assert poz[1]["przebieg_id"] == "p_abc123" and poz[1]["przebiegi"] == ["p_abc123"]
+
+
+def test_tresc_linkow_nie_w_dymku_wlasciciela():
+    """20.11: panel pokazywał w dymku właściciela całą treść pobraną spod linku (i błąd pobierania), choć wysłał
+    tylko link z dopiskiem. Dopisek skrzynki to kontekst dla modelu; załączniki po nim zostają."""
+    from pathlib import Path
+    zrodlo = (Path(__file__).resolve().parents[1] / "jarvo" / "sesje_omp.py").read_text(encoding="utf-8")
+    assert f"\\n\\n{cz.ZNACZNIK_LINKOW}\\n" in zrodlo           # ten sam napis co w prompt() skrzynki
+    tekst = ("Wiadomości od właściciela (telegram). Zrób je według zasad sesji. Na końcu jedna odpowiedź.\n\n"
+             "[Telegram · gpu · 03:55 · wiadomość 1/1]\nhttps://x.com/a/status/1 o co w tym chodzi sprawdz dokladnie"
+             f"\n\n{cz.ZNACZNIK_LINKOW}\n{{\"error\": \"pobieranie linków: brak pliku\"}}\n(załącznik: /tmp/a.jpg)")
+    (blok,) = cz.bloki_obwiedni(tekst)
+    assert blok["tekst"] == "https://x.com/a/status/1 o co w tym chodzi sprawdz dokladnie\n(załącznik: /tmp/a.jpg)"
