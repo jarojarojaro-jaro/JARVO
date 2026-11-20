@@ -238,6 +238,11 @@ zrodla:
     repo: https://github.com/espeak-ng/espeak-ng
     status: uzywane
     przejrzane: ba90c8e9f440ad544f674a790bb5f53878b6ffc5
+  edge-tts:
+    repo: https://github.com/rany2/edge-tts
+    status: uzywane
+    przejrzane: 360fa8e1de354e1dda74c09bd695887d6a44df74
+    notatka: "LGPL-3.0, tag 7.3.1 = ten commit (wydanie PyPI 2026-10-13, koło py3-none-any z sumą w narzedzia.lock i obrazie). Biblioteka mówi z usługą czytania na głos przeglądarki Microsoft Edge (websocket, bez klucza i umowy): darmowy dubbing Translatora w uk, pl i innych językach, których AssemblyAI TTS nie ma. Ryzyko: Microsoft może zmienić albo zamknąć API; zapas napisy.py --silnik aai. Przegląd 2026-11-19"
   hermes-agent:
     repo: https://github.com/NousResearch/hermes-agent
     status: uzywane
