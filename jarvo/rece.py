@@ -208,6 +208,7 @@ def zrestartuj_brame(u) -> str:
         if brama.get("stan") in (None, "zatrzymana") and not brama.get("pid"):
             return "nie_dziala"
         try:
+            instalator.czekaj_na_tury(u)
             nadzorca.polacz(u).restart("brama")
         except nadzorca.BladNadzorcy as e:
             return f"blad: {e}"

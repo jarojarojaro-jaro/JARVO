@@ -1130,6 +1130,7 @@ def restart_bramy(u: Uklad, ot) -> bool:
     stan, _ = instalator.stan_serwisu(u, ot)
     if stan is None:
         return False
+    instalator.czekaj_na_tury(u)
     ot.modul("nadzorca").polacz(u).restart("brama")
     return True
 

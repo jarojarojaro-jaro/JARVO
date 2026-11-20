@@ -866,6 +866,26 @@ def aktywne_tury(u: Uklad) -> int:
         return 0
 
 
+def czekaj_na_tury(u: Uklad, log: Callable[[str], None] = print, limit: float = CZAS_TUR,
+                   czekaj: Callable[[float], None] = time.sleep, zegar: Callable[[], float] = time.monotonic) -> int:
+    """Przed każdym restartem bramy poza instalatorem (`jarvo telefon`, `jarvo komputer rece`, `jarvo telegram`):
+    czeka, aż brama nie ma odpowiedzi w toku, najdłużej `limit` s. 20.11 `jarvo telefon przydziel` zrestartował bramę
+    w trakcie testu Jarva („Operation interrupted”), bo czekanie było tylko w instalatorze. Zwraca liczbę odpowiedzi,
+    które restart i tak przerwie (0 = wolne); własna tura wołającego agenta (HERMES_HOME) się nie liczy."""
+    wlasna = 1 if os.environ.get("HERMES_HOME") else 0
+    koniec, zglosil = zegar() + limit, False
+    while (n := aktywne_tury(u) - wlasna) > 0:
+        if zegar() >= koniec:
+            log(f"Restart bramy przerwie {n} odpowiedź w toku po {int(limit // 60)} min czekania (brama wznowi ją).")
+            return n
+        if not zglosil:
+            log(f"Brama ma {n} odpowiedź agenta w toku: czekam na jej koniec przed restartem "
+                f"(najdłużej {int(limit // 60)} min).")
+            zglosil = True
+        czekaj(5.0)
+    return 0
+
+
 def czekaj_na_panel(u: Uklad, ot: Otoczenie, log: Callable[[str], None], limit: float = CZAS_PANELU) -> str:
     """Czeka, aż na porcie panelu odpowie panel TEJ instalacji (stan_panelu); zwraca adres. BladInstalacji od razu,
     gdy port trzyma inny program albo nadzorca postawił panel w postój (kod 78), po CZAS_NADZORCY s bez działającego

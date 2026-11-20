@@ -826,6 +826,22 @@ def test_aktywne_tury_z_pliku_bramy(stanowisko):
     assert instalator.aktywne_tury(u) == 0
 
 
+def test_restart_bramy_poza_instalatorem_czeka_na_odpowiedzi(stanowisko, monkeypatch):
+    """20.11: `jarvo telefon przydziel` zrestartował bramę w trakcie testu Jarva („Operation interrupted”), bo
+    czekanie na tury było tylko w instalatorze. czekaj_na_tury woła każdy restart bramy (telefon, ręce, telegram)."""
+    u = stanowisko["u"]
+    monkeypatch.delenv("HERMES_HOME", raising=False)
+    stany, czasy, log = iter([2, 1, 0]), iter([0.0, 0.0, 5.0, 10.0]), []
+    monkeypatch.setattr(instalator, "aktywne_tury", lambda _u: next(stany, 0))
+    assert instalator.czekaj_na_tury(u, log.append, limit=60, czekaj=lambda s: None, zegar=lambda: next(czasy)) == 0
+    assert len(log) == 1 and "czekam na jej koniec" in log[0]
+    monkeypatch.setattr(instalator, "aktywne_tury", lambda _u: 1)
+    zegar = iter([0.0, 0.0, 30.0, 61.0])
+    assert instalator.czekaj_na_tury(u, log.append, limit=60, czekaj=lambda s: None, zegar=lambda: next(zegar)) == 1
+    monkeypatch.setenv("HERMES_HOME", "/x")                                 # własna tura agenta się nie liczy
+    assert instalator.czekaj_na_tury(u, log.append, limit=60, czekaj=lambda s: 1 / 0) == 0
+
+
 def test_instalacja_bez_venvu_narzedzi_pomija_programy_floty(tmp_path, stanowisko):
     s = stanowisko
     app = tc._aplikacja(tmp_path, s["adres"], s["www"])
