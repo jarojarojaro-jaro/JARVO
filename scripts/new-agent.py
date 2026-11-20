@@ -100,6 +100,22 @@ ze źródłem. {{{{Definition of Done marki.}}}}
 Z właścicielem po polsku; szkice w języku odbiorcy („Pan/Pani” do firm, w grupie ton grupy).
 """
 
+# Każdy agent biznesowy dostaje telefon floty (20.11: Translatorowi go zabrakło, a właściciel pisze z agentem i zleca
+# mu zadania, które wymagają konta i ekranu): wpis w toolbox; przydział telefonu `jarvo telefon przydziel`.
+TELEFON_BIZNESOWY = """  - name: phoneuse-mcp
+    source: PHONEUSE (repo właściciela), tools/phone_mcp.py
+    license: własny kod właściciela
+    version: "serwer MCP stdio, SDK mcp>=2.3,<3"
+    install: {{method: none, spec: "jarvo telefon on --phoneuse KATALOG, potem jarvo telefon przydziel {name} <telefon> (docs/MOBILE.md)"}}
+    integration: mcp
+    used_by_skills: []
+    healthcheck: "jarvo telefon status"
+    autonomy: A1
+    optional: true
+    notes: "Jeden przydzielony telefon floty (PHONEUSE_ONLY): konta marki, sprawdzanie na żywo. confirm=true tylko za „tak” właściciela (wtyczka jarvo-zgody)."
+"""
+
+
 
 def config_biznesowy(name: str, marka: str) -> str:
     """Config agenta biznesowego bez ekranu: Komputer Jarva włącza się świadomie (`komputer: true`)."""
@@ -377,7 +393,8 @@ def dalej_biznesowy(name: str, slug: str, marka: str, n: Path | None) -> str:
         f"  1. SOUL ({{{{…}}}}), skille (≥ 3 workflowy z DoD), rubryka, toolbox; evals/{name}: scenariusze in_scope z TODO.",
         *kroki,
         f"  7. Po wdrożeniu: `jarvo telegram tematy` (wątek {slug} w grupie Jarvo HQ), "
-        f"`jarvo telefon przydziel {name} <telefon>` (jeden telefon, gdy potrzebny),",
+        f"`jarvo telefon przydziel {name} <telefon>` (każdy agent biznesowy dostaje telefon floty: właściciel z nim "
+        "rozmawia i zleca mu zadania, a bez telefonu agent nie sprawdzi niczego na żywo, 20.11),",
         f"     potem `hermes -p {name} cron resume {slug}-dzien` (rutyna instaluje się wstrzymana).",
     ])
 
@@ -451,7 +468,10 @@ def main(argv: list[str] | None = None) -> int:
            f"name: {args.name}\nversion: 0.0.1\ndescription: \"{args.title}\"\nauthor: \"Jarvo fleet\"\nlicense: MIT\n"
            "env_requires:\n  - name: OPENROUTER_API_KEY\n    description: \"Osobny klucz OpenRouter z limitem\"\n    required: true\n")
     shutil.copy2(T / "toolbox.template.yaml", dest / "toolbox.yaml")
-    zapisz(dest / "toolbox.yaml", (dest / "toolbox.yaml").read_text(encoding="utf-8").replace("jarvo-xyz", args.name))
+    toolbox = (dest / "toolbox.yaml").read_text(encoding="utf-8").replace("jarvo-xyz", args.name)
+    if args.marka:
+        toolbox = toolbox.replace("tools:\n", "tools:\n" + TELEFON_BIZNESOWY.format(name=args.name), 1)
+    zapisz(dest / "toolbox.yaml", toolbox)
     zapisz(dest / "quality" / "rubric.md",
            f"# Rubryka: {args.name}\n\n## Blokujące\n- TODO\n\n## Ważne\n- TODO\n\n## Uwagi (nie blokują)\n- TODO\n")
     zapisz(dest / "README.md", f"# {args.name}: {args.title}\n\nTODO: opis profilu.\n")
