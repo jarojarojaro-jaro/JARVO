@@ -1,0 +1,28 @@
+{
+  "_opis": "Komenda czy zwykły tekst: te same wektory dla hq/plugin/komendy.py (parsuj) i hq/web/src/33-komendy.js (Komendy.parsuj); tests/test_komendy.py i tests/js/hq_front.test.cjs.",
+  "komendy": [
+    ["/model", ["model", ""]],
+    ["/model gpt-5.4 --provider openai-codex", ["model", "gpt-5.4 --provider openai-codex"]],
+    ["  /Model  ", ["model", ""]],
+    ["/new", ["new", ""]],
+    ["/reset", ["reset", ""]],
+    ["/model@jarvo_bot opus", ["model", "opus"]],
+    ["/stop\n", ["stop", ""]],
+    ["/model\nopus", ["model", "opus"]],
+    ["/compress here 3", ["compress", "here 3"]],
+    ["/foo", ["foo", ""]]
+  ],
+  "tekst": [
+    "",
+    "model",
+    "hej /model",
+    "//model",
+    "// zwykły tekst",
+    "/etc/hosts nie działa",
+    "/home/jaro/plik.txt",
+    "/",
+    "/ model",
+    "/1abc",
+    "@web zmień model"
+  ]
+}

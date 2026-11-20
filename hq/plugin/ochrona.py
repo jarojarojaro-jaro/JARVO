@@ -19,7 +19,9 @@ każdej trasie z metodą zapisu (tests/test_csrf.py sprawdza oba routery i to, �
 `utajnij(tekst)` ukrywa klucze i tokeny w tekście, który aplikacja przekazuje agentom albo zapisuje (blok kontekstu
 rozmowy, raport nadzoru, błędy): `agent.redact.redact_sensitive_text(force=True)` Hermesa, gdy da się go
 zaimportować, a zawsze także wzorce zapasowe (kopia `SEKRETY` z infra/komputer/zasady.py, bo moduł Komputera nie
-leży na ścieżce wtyczki) i numery kart z sumą Luhna.
+leży na ścieżce wtyczki) i numery kart z sumą Luhna. `utajnij_krok` dokłada do tego wzorce dla argumentów i wyników
+narzędzi w rozwiniętym kroku panelu (Bearer, `KLUCZ=…`, hasło w adresie), a `poufny_krok` rozpoznaje krok, który
+dotyka pliku z poświadczeniami (.env, auth.json, ~/.ssh…): jego wyniku panel nie pokazuje wcale.
 
 Dane od klienta, zanim powstanie z nich ścieżka albo plik (docs/HQ.md „Rozmowy”): `profil(nazwa, znane)` (nazwa
 profilu `^[a-z0-9-]+$` z listy agentów, inaczej ValueError), `sprawdz_obraz(dane)` (typ obrazu po magicznych
@@ -176,6 +178,35 @@ def utajnij(tekst: str) -> str:
         if 13 <= len(cyfry) <= 19 and len(set(cyfry)) > 1 and _luhn(cyfry):
             tekst = tekst.replace(m.group(), UKRYTE)
     return tekst
+
+
+# szczegóły kroku w panelu (argumenty i wyniki narzędzi, scalanie.widok_kroku): ponad `utajnij` nagłówki
+# Bearer/Basic, przypisania sekretów (`API_KEY=…`, `"password": "…"`, `X-Api-Key: …`; wartość z literą, więc
+# `max_tokens: 4096` zostaje) i hasło w adresie (`scheme://user:hasło@`)
+_BEARER = re.compile(r"(?i)\b(bearer|basic)(\s+)[A-Za-z0-9._~+/-]{8,}=*")
+_PRZYPISANIE = re.compile(
+    r"(?i)(\b[A-Za-z0-9_.-]*(?:api[_-]?key|secret|token|passw(?:or)?d|pwd|credential|private[_-]?key|access[_-]?key)"
+    r"[A-Za-z0-9_.-]*[\"']?\s*[:=]\s*[\"']?)(?=[^\s\"',;}]*[A-Za-z])[^\s\"',;}]{4,}")
+_HASLO_W_ADRESIE = re.compile(r"(?i)(\b[a-z][a-z0-9+.-]*://[^:/\s@]+:)[^@/\s]+(@)")
+# pliki z poświadczeniami (zasady floty: nigdy nie pokazujemy ich treści): .env, *.env, auth.json, *.token,
+# body_token, adbkey, state.db, keystore, klucze w ~/.ssh (poza config i *.pub), ~/.secrets, ~/.config/gh, ~/deploy3, ~/.vnc
+_PLIK_POSWIADCZEN = re.compile(
+    r"(?:^|[\s/\"'=:(<])(?:[\w.-]*\.env|\.env(?:\.[\w-]+)?|\.envrc|auth\.json|[\w.-]+\.token|body_token|adbkey"
+    r"|state\.db(?:-wal|-shm)?|[\w.-]+\.(?:keystore|jks|p12|pfx)|id_(?:rsa|ed25519|ecdsa|dsa))(?=$|[\s\"';|)&>,])"
+    r"|\.ssh/(?!config\b|[\w.-]+\.pub\b)|\.secrets/|\.config/gh/|deploy3/|\.vnc/")
+
+
+def utajnij_krok(tekst: str) -> str:
+    """`utajnij` i dodatkowe wzorce dla argumentów i wyników narzędzi (rozwinięty krok w panelu)."""
+    tekst = utajnij(tekst)
+    tekst = _BEARER.sub(lambda m: f"{m.group(1)}{m.group(2)}{UKRYTE}", tekst)
+    tekst = _PRZYPISANIE.sub(lambda m: f"{m.group(1)}{UKRYTE}", tekst)
+    return _HASLO_W_ADRESIE.sub(lambda m: f"{m.group(1)}{UKRYTE}{m.group(2)}", tekst)
+
+
+def poufny_krok(tekst: str) -> bool:
+    """Czy tekst (argument albo intencja kroku) wskazuje plik z poświadczeniami: wtedy panel nie pokazuje wyniku."""
+    return bool(_PLIK_POSWIADCZEN.search(str(tekst or "")))
 
 
 # ------------------------------------------------------------------------------------------- dane od klienta

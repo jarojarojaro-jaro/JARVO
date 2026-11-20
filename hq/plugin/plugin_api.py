@@ -2118,7 +2118,7 @@ from types import SimpleNamespace  # noqa: E402
 roz = SimpleNamespace(hq_core=core, ochrona=ochrona)
 for _nazwa in ("agenci", "rozmowy", "czytnik", "kontekst", "wzmianki", "budzenia", "scalanie", "brama", "strumien",
                "przebiegi", "prace", "karty", "obserwator", "aplikacja", "podpowiedzi", "glos", "mozg", "tematy",
-               "lustro", "omp_sesje", "czytnik_omp", "rozmowcy", "raporty", "silnik"):
+               "lustro", "omp_sesje", "czytnik_omp", "rozmowcy", "raporty", "silnik", "komendy"):
     setattr(roz, _nazwa, _load(f"jarvo_hq_{_nazwa}", f"{_nazwa}.py"))
 trasy_rozmow = _load("jarvo_hq_trasy_rozmow", "trasy_rozmow.py")
 trasy_aplikacji = _load("jarvo_hq_trasy_aplikacji", "trasy_aplikacji.py")
@@ -2181,6 +2181,8 @@ def _start_silnika():
 
 HUB = _start_silnika()
 trasy_rozmow.dolacz(router, m=roz, silnik=_silnik, hub=HUB, agenci=AGENCI, inbox=core.JARVO_DIR / "inbox", log=_log_hq)
+# komendy po „/” w kompozytorze (komendy.py, docs/HQ.md „Komendy”): brama ich nie wykonuje, robi to panel
+roz.komendy.dolacz(router, m=roz, trasy=trasy_rozmow, silnik=_silnik, agenci=AGENCI, hub=HUB, log=_log_hq)
 # panel w sieci Tailscale (siec.py, docs/HQ.md „Panel w sieci”): drugi nasłuch tego dashboardu z logowaniem kluczem
 # jednorazowym, gdy <dane>/jarvo/konfig/panel-siec.json ma wlaczony (jarvo panel siec on); 127.0.0.1 bez zmian
 siec = _load("jarvo_hq_siec", "siec.py")

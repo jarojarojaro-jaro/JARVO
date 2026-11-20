@@ -6,7 +6,7 @@
 
 Plugin: <out>/dashboard/{manifest.json, plugin_api.py, hq_core.py, przenosne.py, sciezki.py, ochrona.py, edytor.py,
 animacja.py, rozmowy.py, czytnik.py, wzmianki.py, kontekst.py, agenci.py, brama.py, strumien.py, przebiegi.py, scalanie.py,
-budzenia.py, prace.py, obserwator.py, silnik.py, trasy_rozmow.py, aplikacja.py, podpowiedzi.py, glos.py, mozg.py,
+budzenia.py, prace.py, obserwator.py, silnik.py, trasy_rozmow.py, komendy.py, aplikacja.py, podpowiedzi.py, glos.py, mozg.py,
 trasy_aplikacji.py, pomiar.py, liczby.py, _sciezki.py, konwertuj.py, izometria/, fleet.json, logowanie.html, dzwieki/,
 dist/index.js, dist/zasoby/, dist/fonts/}. Pakiet, loader i pliki demo mają końce linii „\\n” także na Windows (te same
 bajty na każdym systemie).
@@ -42,6 +42,8 @@ PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "ochrona.py", "e
                 "rozmowy.py", "czytnik.py", "wzmianki.py", "kontekst.py", "agenci.py", "brama.py", "strumien.py",
                 "przebiegi.py", "scalanie.py", "budzenia.py", "prace.py", "karty.py", "obserwator.py", "silnik.py",
                 "trasy_rozmow.py",
+                # komendy po „/” w kompozytorze (docs/HQ.md „Komendy”): /model, /new, /stop, /usage, /status, /help
+                "komendy.py",
                 "aplikacja.py", "podpowiedzi.py", "glos.py", "mozg.py", "trasy_aplikacji.py",
                 # panel w sieci Tailscale: drugi nasłuch z logowaniem kluczem jednorazowym (docs/HQ.md „Panel w sieci”)
                 "siec.py",
@@ -98,8 +100,9 @@ PAKIETY = {
     "raporty": {"pliki": ("64-raporty.js",), "zalezy": ()},
 }
 # budżet gzip (bajty) z projektu etapu 1 §7: przekroczenie zatrzymuje build. Mózg 14 KB (19.11, było 6 KB): części,
-# grupy, szukanie w treści, [[linki]] w notatce i skupiska w grafie; pakiet idzie tylko po wejściu w Mózg
-BUDZET_GZIP = {"app-rdzen.js": 95 * 1024, "app-rdzen.css": 18 * 1024, "mozg.js": 14 * 1024}
+# grupy, szukanie w treści, [[linki]] w notatce i skupiska w grafie; pakiet idzie tylko po wejściu w Mózg. Rdzeń 100 KB
+# (20.11, było 95 KB): rozwijane kroki i komendy po „/” w kompozytorze (oba muszą działać od pierwszej rozmowy)
+BUDZET_GZIP = {"app-rdzen.js": 100 * 1024, "app-rdzen.css": 18 * 1024, "mozg.js": 14 * 1024}
 ZNACZNIK_PAKIETOW = '"@@PAKIETY@@"'
 ZNACZNIK_CSS = re.compile(r"^/\* @@pakiet (\w+) \*/$", re.M)
 DEKLARACJA = re.compile(r"^(?:async\s+)?(?:function\*?\s+([A-Za-z_$][\w$]*)|class\s+([A-Za-z_$][\w$]*)"

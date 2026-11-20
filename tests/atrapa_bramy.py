@@ -8,7 +8,8 @@ Zachowanie jak w Hermesie 0.21.5 (sprawdzone w kodzie obrazu): `POST /v1/runs` �
 `/approval` (409 `approval_not_pending`), `/steer` (409 `run_not_accepting_steer`; dopisek obcięty ze spacji, wiersz
 `steer` owinięty znacznikiem OUT-OF-BAND, a spóźnione dopiski jako jeden tekst `pending_steer` sklejony „\n”),
 `/stop` (409 `run_not_active`),
-`POST /api/sessions` (409 `session_exists`), `PATCH /api/sessions/{id}` (`title`, `pinned`). Tura zapisuje wiersze
+`POST /api/sessions` (409 `session_exists`), `PATCH /api/sessions/{id}` (`title`, `pinned`), `GET /api/model/options`
+(`opcje_modeli`, kształt jak `hermes_cli.inventory.build_model_options_payload`). Tura zapisuje wiersze
 do state.db profilu (schemat z obrazu, tests/data/hermes_state_schema.sql) i trzyma dzierżawę tury.
 
 Znaczniki w treści (jak w scripts/atrapa_modelu.py): `[wolno:<s>]` odpowiedź rozłożona na <s> sekund,
@@ -82,6 +83,16 @@ class AtrapaBramy:
         self.limit_429 = 0
         self.czas_zgody: float | None = None      # jak approvals.timeout bramy: sama odmawia po tylu sekundach
         self.niedostepna = False
+        # GET /api/model/options (picker `/model`): bieżący model profilu i zalogowani dostawcy z modelami
+        self.opcje_modeli: dict = {
+            "model": "gpt-5.4", "provider": "openai-codex",
+            "providers": [
+                {"slug": "openai-codex", "name": "OpenAI Codex", "is_current": True, "models": ["gpt-5.4", "gpt-5.4-mini"],
+                 "total_models": 2, "source": "built-in"},
+                {"slug": "anthropic", "name": "Anthropic", "is_current": False,
+                 "models": ["claude-opus-5", "claude-sonnet-5"], "total_models": 2, "source": "built-in"},
+                {"slug": "nous", "name": "Nous Portal", "is_current": False, "models": [], "total_models": 0,
+                 "source": "canonical"}]}
         self.loop = asyncio.new_event_loop()
         self._watek = threading.Thread(target=self.loop.run_forever, name="atrapa-bramy", daemon=True)
         self._watek.start()
@@ -202,6 +213,8 @@ class AtrapaBramy:
                 return
 
     async def _zadanie(self, metoda: str, sciezka: str, agent: str, dane, surowe: bytes, naglowki: dict):
+        if metoda == "GET" and sciezka == "/api/model/options":
+            return 200, json.loads(json.dumps(self.opcje_modeli)), {}
         if metoda == "POST" and sciezka == "/api/sessions":
             sid, tytul = dane["id"], dane.get("title") or ""
             if self.sesja(agent, sid):

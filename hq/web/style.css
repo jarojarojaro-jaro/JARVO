@@ -1686,6 +1686,17 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-kroki-czas { color: var(--j-tekst-3); font-variant-numeric: tabular-nums; }
 .j-kroki-podglad { grid-column: 2; margin: 2px 0 6px; padding: 6px 8px; border-radius: 6px; background: var(--j-tlo-2); font: 12px/1.5 var(--j-font-mono);
   white-space: pre-wrap; overflow-wrap: anywhere; max-height: 160px; overflow: auto; }
+/* krok do rozwinięcia (każdy osobno) i jego szczegóły: myśl, argumenty, wynik */
+.j-kroki-k { display: flex; align-items: flex-start; gap: 6px; width: 100%; margin-left: -6px; padding: 0 6px; border-radius: 6px; --j-r: 6px; text-align: left; }
+.j-kroki-k > span { flex: 1; min-width: 0; }
+.j-kroki-k:hover { background: var(--j-tlo-hover); }
+.j-kroki-k .j-i { flex: none; margin-top: .45em; color: var(--j-tekst-3); transition: transform .15s; }
+.j-kroki-k[aria-expanded="true"] .j-i { transform: rotate(90deg); }
+.j-krok-sz { grid-column: 2; margin: 2px 0 8px; padding-left: 10px; border-left: 2px solid var(--j-linia); line-height: 1.5; }
+.j-krok-sz-h { margin: 6px 0 2px; font-size: 12px; font-weight: 600; color: var(--j-tekst-3); }
+.j-krok-sz-n { display: flex; align-items: center; gap: 6px; margin: 4px 0; color: var(--j-tekst-3); }
+.j-krok-sz-mysl { color: var(--j-tekst-2); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 160px; overflow: auto; }
+.j-krok-sz .j-kroki-podglad { margin: 0 0 4px; max-height: 320px; }
 
 /* zgoda: karta w kolorze oczekiwania, wybory z wydarzenia, odliczanie; po czasie „Czas minął” */
 .j-zgoda { margin-top: 12px; max-width: 560px; border: 1px solid var(--j-uwaga-linia); background: var(--j-uwaga-tlo); border-radius: 14px; padding: 14px 16px; }
@@ -1869,6 +1880,32 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-opcja-t b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .j-opcja-t small { font-size: 12px; color: var(--j-tekst-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .j-opcja-u { font: 12px/1 var(--j-font-mono); color: var(--j-tekst-3); flex: none; }
+/* komendy po „/” (33-komendy.js): menu nad polem i wynik w rozmowie */
+.j-kom-menu { min-width: min(420px, calc(100vw - 32px)); max-width: min(520px, calc(100vw - 32px)); }
+.j-opcja-kom { display: grid; gap: 2px; padding: 7px 10px; border-radius: 8px; cursor: pointer; }
+.j-opcja-kom.is-aktywna { background: var(--j-tlo-aktywne); }
+.j-opcja-kom-n { font: 600 13.5px/1.3 var(--j-font-mono); color: var(--j-tekst); }
+.j-opcja-kom-n small { font-weight: 400; color: var(--j-tekst-3); }
+.j-opcja-kom-o { font-size: 12.5px; line-height: 1.35; color: var(--j-tekst-2); }
+.j-opcja-kom.is-niedostepna .j-opcja-kom-n { color: var(--j-tekst-3); }
+.j-opcja-kom-o em { font-style: normal; color: var(--j-uwaga); }
+.j-kom { margin: 18px 0; padding: 10px 14px 12px; max-width: 680px; border: 1px solid var(--j-linia-2); border-radius: 12px; --j-r: 12px;
+  background: var(--j-tlo-2); font-size: 14px; }
+.j-kom.is-zle { border-color: var(--j-uwaga-linia, var(--j-linia-2)); background: var(--j-uwaga-tlo); }
+.j-komp-w > .j-kom { margin: 0 0 10px; max-width: none; }
+.j-kom-pol { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-size: 12.5px; color: var(--j-tekst-3); }
+.j-kom-pol code { font: 600 12.5px/1.3 var(--j-font-mono); color: var(--j-tekst); overflow-wrap: anywhere; }
+.j-kom-ag { white-space: nowrap; }
+.j-kom-czas { margin-left: auto; }
+.j-kom-pol .j-btn { margin-left: auto; }
+.j-kom-t { line-height: 1.55; overflow-wrap: anywhere; }
+.j-kom-wybor { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.j-kom-model { display: inline-flex; align-items: baseline; gap: 6px; min-height: 30px; padding: 4px 11px; border-radius: 999px; --j-r: 999px;
+  border: 1px solid var(--j-linia-2); background: var(--j-tlo-karta); font: 12.5px/1.3 var(--j-font-mono); color: var(--j-tekst); cursor: pointer; }
+.j-kom-model:hover:not(:disabled) { border-color: var(--j-linia-mocna); background: var(--j-tlo-hover); }
+.j-kom-model small { font: 11.5px/1 var(--j-font-ui); color: var(--j-tekst-3); }
+.j-kom-model.is-biezacy { border-color: var(--j-akcent); }
+.j-kom-model:disabled { opacity: .6; cursor: default; }
 .j-zal { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 10px 10px 0; }
 .j-zal-p { display: inline-flex; align-items: center; gap: 6px; height: 32px; max-width: 260px; padding: 0 4px 0 9px; border-radius: 9px; background: var(--j-tlo-2);
   border: 1px solid var(--j-linia); font-size: 13px; color: var(--j-tekst-2); }

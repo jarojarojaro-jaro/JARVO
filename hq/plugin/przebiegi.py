@@ -644,6 +644,24 @@ class Rejestr:
         await self.przypnij(agent, sid)
         return sid
 
+    async def nowa_sesja(self, wid: str, agent: str) -> str | None:
+        """`/new` w panelu (komendy.py): nowa sesja Hermesa członka jako `rotacja` w rodowodzie (oś czyta dalej starą,
+        następna tura idzie do nowej bez jej historii). None, gdy członek nie ma jeszcze żadnej sesji (i tak zacznie
+        od czystej)."""
+        czl = self.db.czlonek(wid, agent)
+        tip = czl and (czl.get("sesja_tip") or czl.get("sesja_id"))
+        if not tip:
+            return None
+        watek = self.db.watek(wid) or {}
+        baza = f"jarvo_r_{agent}" if watek.get("rozmowca") else f"jarvo_{wid}_{agent}"
+        sid = f"{baza}_n{os.urandom(3).hex()}"
+        nazwa = self._nazwy().get(agent, agent)
+        tytul = " ".join(str(watek.get("tytul") or "Rozmowa").split())[:60]
+        await self.brama.utworz_sesje(agent, sid, f"Jarvo · {tytul} · {nazwa} · nowa sesja")
+        self.db.ustaw_sesje(wid, agent, sid, powod="rotacja", rodzic=tip)
+        await self.przypnij(agent, sid)
+        return sid
+
     async def przypnij(self, agent: str, sid: str) -> bool:
         """`pinned` w Hermesie (auto-prune nie usunie historii wątku); porażka nie blokuje, obserwator ponawia."""
         try:
@@ -786,7 +804,14 @@ class Rejestr:
             if p.get("stop_lokalny") and not p.get("wyslany_at") and pid not in self._stop_ponowiony:
                 self._koniec(p, "zatrzymane")       # nic jeszcze nie poszło do bramy: bez POST
                 return
-            c = self.cialo(sesja, wejscie, p.get("autor"))
+            # model z `/model` w panelu (komendy.py) ustalony raz, przed pierwszym POST, i zapisany w przebiegu:
+            # ponowienie po restarcie wysyła to samo ciało, nawet gdy właściciel zmienił model w międzyczasie
+            model = (p.get("payload") or {}).get("model")
+            if not p.get("cialo_sha") and (p.get("rola") or "rozmowa") == "rozmowa":
+                model = self.db.model_czlonka(p["watek_id"], p["agent"])
+                if (p.get("payload") or {}).get("model") != model:
+                    p = self.db.zmien_przebieg(pid, payload={**(p.get("payload") or {}), "model": model})
+            c = self.cialo(sesja, wejscie, p.get("autor"), model)
             sha = self.cialo_sha(c)
             if p.get("cialo_sha") and p["cialo_sha"] != sha:
                 self.log(f"jarvo-hq: BŁĄD przebieg {pid}: ciało ponowienia różni się od pierwszego, nie wysyłam")

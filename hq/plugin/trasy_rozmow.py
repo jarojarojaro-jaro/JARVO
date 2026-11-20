@@ -3,9 +3,14 @@ więc każda trasa zapisu dostaje ochronę CSRF z `ochrona.Trasa`).
 
 - Wątki: `GET/POST /rozmowy`, `GET/PATCH/DELETE /rozmowy/{id}`, `POST /rozmowy/{id}/przywroc`, `/przeczytane`.
 - Oś czasu: `GET /rozmowy/{id}/os` (scalanie wpisów aplikacji z sesjami członków w state.db, kursor nieprzezroczysty).
+- Szczegóły kroku: `GET /rozmowy/{id}/krok?ref=<adres kroku z osi>&wiecej=0|1` (argumenty, myśl, wynik; tylko to, co
+  już jest w zapisie sesji: omp z offsetów czytnika, Hermes z linii członka wątku; `ochrona.utajnij_krok`, krok przy
+  pliku z poświadczeniami bez wyniku, przycięte jak `scalanie.WIDOK_KROKU`); obcy adres albo krok spoza wątku = 404.
 - Eksport: `GET /rozmowy/{id}/eksport` (cała oś jako plik Markdown, przez `ochrona.utajnij`); agenci: `GET /agenci`.
 - Wysyłka: `POST /rozmowy/{id}/wiadomosci` (wzmianki, załączniki przez `safe_path`, obrazy sprawdzane po magicznych
-  bajtach i limit 7 000 000 bajtów zakodowanych data URL → 413 `za_duze` zanim cokolwiek pójdzie do bramy).
+  bajtach i limit 7 000 000 bajtów zakodowanych data URL → 413 `za_duze` zanim cokolwiek pójdzie do bramy). Tekst
+  będący komendą `/…` (także po wzmiance) = 409 `komenda`: brama nie wykonuje komend, robi to `POST /komendy`
+  (komendy.py), więc komenda nigdy nie trafia do modelu jako tekst.
 - Przebiegi: `GET /przebiegi/{id}`, `POST …/stop` (i `…/zatrzymaj`), `…/anuluj`, `…/wyslij` (i `…/wyslij-teraz`),
   `…/zgoda`, `…/dopisz`, `…/ponow`.
 - Strumień: `GET /strumien` (SSE, jeden na przeglądarkę), `POST /strumien/{klient}/subskrypcje`.
@@ -45,6 +50,7 @@ import hashlib
 import os
 import time
 import re
+import sqlite3
 import unicodedata
 from collections import deque
 from pathlib import Path
@@ -501,6 +507,9 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
             adresaci, tresc, ostrzezenia = [adresat], body.tekst.strip(), []
         else:
             adresaci, tresc, ostrzezenia = adresaci_z(body, koordynator)
+        if m.komendy.parsuj(body.tekst) or m.komendy.parsuj(tresc):
+            raise BladTrasy(409, "komenda", "To komenda — panel wykonuje ją sam (POST /komendy), nie wysyła jej agentowi.",
+                            "This is a command — the panel runs it itself (POST /komendy) instead of sending it to the agent.")
         if not tresc and not obrazy and not zalaczniki:
             raise BladTrasy(409, "pusta_tresc", "Nie ma czego wysłać.", "There is nothing to send.")
         ostrzezenia = [o for o in ostrzezenia if o != "pusta_tresc"]
@@ -825,6 +834,44 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
         except ValueError:
             raise BladTrasy(422, "zly_kursor", "Zły kursor osi czasu.", "Bad timeline cursor.") from None
 
+    @trasa("GET", "/rozmowy/{wid}/krok")
+    @obsluga
+    async def krok_rozmowy(wid: str, request: Request, ref: str = "", wiecej: int = 0):
+        """Jeden krok osi rozwinięty w panelu: dane czytane dopiero teraz (oś ich nie niesie)."""
+        tylko_ta_strona(request)
+        sil = s()
+        w = await watek_lub_404(sil, wid)
+        try:
+            rodzaj, czesci = m.scalanie.czytaj_ref(ref)
+        except ValueError:
+            raise BladTrasy(404, "brak", "Nie ma takiego kroku.", "No such step.") from None
+
+        def zbierz() -> dict | None:
+            if rodzaj == "o":                      # krok sesji omp rozmówcy tego wątku
+                czyt = getattr(m, "czytnik_omp", None)
+                r = sil.db.rozmowca_watku(w["id"]) if w.get("zaplecze") == "omp" else None
+                plik_ = plik_omp(sil, r)[0] if r and czyt is not None else None
+                surowy = czyt.szczegoly(plik_, *czesci) if plik_ else None
+            else:                                  # krok członka Hermesa: tylko sesje tego wątku
+                agent, rola, wywolanie = czesci
+                sesje = [x["sesja_id"] for x in sil.db.sesje_watku(w["id"], agent=agent, rola=rola)]
+                if not sesje:
+                    return None
+                try:
+                    linia = sil.czytnik.linia(agent, sesje)
+                except (ValueError, RuntimeError, sqlite3.Error):
+                    return None
+                surowy = m.scalanie.krok_hermesa(linia, wywolanie)
+            if surowy is None:
+                return None
+            return m.scalanie.widok_kroku(surowy, utajnij=ochrona.utajnij_krok, poufny=ochrona.poufny_krok,
+                                          wiecej=bool(wiecej))
+
+        krok = await asyncio.to_thread(zbierz)
+        if krok is None:
+            raise BladTrasy(404, "brak", "Nie ma takiego kroku.", "No such step.")
+        return {"krok": {**krok, "ref": ref}}
+
     @trasa("GET", "/rozmowy/{wid}/eksport")
     @obsluga
     async def eksport_rozmowy(wid: str, request: Request):
@@ -860,16 +907,24 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
         return {"agenci": await asyncio.to_thread(agenci.lista)}
 
     # ------------------------------------------------------------------------------------------- rozmówcy
-    def omp_os(sil, r: dict) -> dict:
-        """Oś sesji omp rozmówcy (czytnik_omp.os_sesji, tylko odczyt, bez wyników narzędzi)."""
-        omp, czyt = getattr(m, "omp_sesje", None), getattr(m, "czytnik_omp", None)
-        if omp is None or czyt is None:
-            return {"blad": "brak czytnika"}
+    def plik_omp(sil, r: dict) -> tuple[Path | None, str | None]:
+        """(plik *.jsonl sesji omp rozmówcy, None) albo (None, powód)."""
+        omp = getattr(m, "omp_sesje", None)
+        if omp is None:
+            return None, "brak czytnika"
         w = omp.wpisy(sil.home).get(r["cel"])
         if w is None or w.blad:
-            return {"blad": (w.blad if w is not None else "brak wpisu")}
+            return None, (w.blad if w is not None else "brak wpisu")
         plik_ = omp.plik_sesji(w)
-        return czyt.os_sesji(plik_) if plik_ else {"blad": "brak pliku sesji"}
+        return (plik_, None) if plik_ else (None, "brak pliku sesji")
+
+    def omp_os(sil, r: dict) -> dict:
+        """Oś sesji omp rozmówcy (czytnik_omp.os_sesji, tylko odczyt, bez wyników narzędzi)."""
+        czyt = getattr(m, "czytnik_omp", None)
+        if czyt is None:
+            return {"blad": "brak czytnika"}
+        plik_, blad_ = plik_omp(sil, r)
+        return czyt.os_sesji(plik_) if plik_ else {"blad": blad_}
 
     def adresat_rozmowcy(sil, w: dict) -> str | None:
         if not w.get("rozmowca"):

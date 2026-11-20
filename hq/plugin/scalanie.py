@@ -14,6 +14,8 @@ wierszami sesji Hermesa każdego członka (czytnik.py: projekcja Hermesa albo za
   tekstem (czas kroku z zapisanych `kroki` przebiegu), `kanban_create` dodatkowo `przekazanie`; asystent z tekstem =
   `agent`, ale bez linii `[SILENT]` (cicha odpowiedź na budzenie: Hermes jej nie dostarcza, my też nie pokazujemy;
   sama cisza = brak pozycji); `tool` uzupełnia błąd kroku; sesja rodowodu, której już nie ma = `luka`.
+- **Szczegóły kroku**: każdy krok z id wywołania ma adres `ref` (`h:<agent>:<rola>:<id>`, w sesji omp
+  `o:<wpis>:<id>`); argumenty, myśl i wynik czyta dopiero rozwinięcie kroku (`krok_hermesa`, `widok_kroku`).
 - **Tura w toku**: wiersze członka od `user_msg_id` aktywnego przebiegu mają `w_toku: true` i `przebieg_id`
   (klient składa je w żywy dymek); kursor `po` cofa się do nich, więc po końcu przebiegu przyjdą jeszcze raz już bez
   `w_toku` (klient podmienia pozycje po `id`). Tak samo otwarta grupa kroków.
@@ -270,7 +272,7 @@ def _czlonek(agent: str, rola: str, linia: list[dict], przebiegi: list[dict], wp
                         czas = zapisane[n].get("czas_ms")
                     krok = {"ts": float(m["ts"]), "narzedzie": nazwa, "verb": e.get("verb", nazwa),
                             "verb_en": e.get("verb_en", nazwa), "detail": e.get("detail", ""), "czas_ms": czas,
-                            "blad": False, "podglad": ""}
+                            "blad": False, "podglad": "", "ref": ref_kroku("h", agent, rola, tc.get("id"))}
                     grupa["kroki"].append(krok)
                     if tc.get("id"):
                         kroki_wywolan[str(tc["id"])] = krok
@@ -346,8 +348,9 @@ def _czas(v: Any) -> float:
 
 def pozycje_omp(r: Mapping, os_: Mapping) -> list[dict]:
     """Oś sesji omp (czytnik_omp.os_sesji) jako pozycje osi: wiadomości spoza panelu = dymek właściciela ze źródłem
-    (📱 telegram, ⌨ terminal; z panelu pokazuje je wpis), asystent = `agent`, narzędzia = `kroki` z samą nazwą
-    i intencją (wyników i argumentów czytnik nie ma), kompresja = `kompresja`. Odpowiedź na wiadomości panelu niesie
+    (📱 telegram, ⌨ terminal; z panelu pokazuje je wpis), asystent = `agent`, narzędzia = `kroki` z nazwą, intencją
+    i adresem `ref` (argumenty i wyniki dopiero na żądanie, czytnik_omp.szczegoly), kompresja = `kompresja`.
+    Odpowiedź na wiadomości panelu niesie
     `przebieg_id` (ostatni) i `przebiegi` (wszystkie z partii; klucz wiadomości = id przebiegu), więc żywy dymek
     przebiegu znika, gdy oś ma już odpowiedź z pliku sesji (bez dubla)."""
     out, agent, tura = [], r["klucz"], []
@@ -373,10 +376,127 @@ def pozycje_omp(r: Mapping, os_: Mapping) -> list[dict]:
             out.append(_pozycja(rodzaj="kroki", kroki=[
                 {"ts": wsp["ts"], "narzedzie": str(k.get("nazwa") or "?"), "verb": str(k.get("nazwa") or "?"),
                  "verb_en": str(k.get("nazwa") or "?"), "detail": str(k.get("intencja") or "")[:140], "czas_ms": None,
-                 "blad": False, "podglad": ""} for k in e.get("kroki") or []], **wsp))
+                 "blad": False, "podglad": "", "ref": ref_kroku("o", k.get("wpis"), k.get("id"))}
+                for k in e.get("kroki") or []], **wsp))
         elif typ == "streszczenie":
             out.append(_pozycja(rodzaj="kompresja", tekst="Streszczenie wcześniejszej rozmowy", **wsp))
     return out
+
+
+# ----------------------------------------------------------------------------------------------- szczegóły kroku
+# Rozwinięty krok w panelu (`GET /rozmowy/{id}/krok?ref=…`, trasy_rozmow.py): krok osi niesie adres `ref`
+# (`o:<wpis asystenta>:<id wywołania>` w sesji omp, `h:<agent>:<rola>:<id wywołania>` u członka Hermesa), trasa
+# czyta surowe dane (czytnik_omp.szczegoly albo krok_hermesa z linii członka), a widok_kroku redaguje i przycina.
+
+_ID_WYWOLANIA = r"[A-Za-z0-9_.:|+=-]{1,160}"
+_REF = {"o": re.compile(rf"o:([A-Za-z0-9_-]{{1,64}}):({_ID_WYWOLANIA})"),
+        "h": re.compile(rf"h:([a-z0-9-]{{1,64}}):([a-z0-9_-]{{1,32}}):({_ID_WYWOLANIA})")}
+# limity widoku (linie, bajty UTF-8): zwykły i po „Pokaż więcej” (twardy sufit)
+WIDOK_KROKU = {False: {"wynik": (60, 4096), "pole": (60, 4096), "mysl": (40, 4096), "zmiana": (80, 6144)},
+               True: {"wynik": (2000, 65536), "pole": (1000, 32768), "mysl": (1000, 32768), "zmiana": (2000, 65536)}}
+PRZED_REDAKCJA = 262_144                      # tyle znaków najwyżej idzie do redakcji (więcej i tak nie pokażemy)
+UKRYTE_ARGUMENTY = {"i", "intent", "_i"}       # intencja jest w nagłówku kroku
+UKRYTE_POSWIADCZENIA = "[ukryte: plik z poświadczeniami]"
+
+
+def ref_kroku(rodzaj: str, *czesci: Any) -> str | None:
+    """Adres kroku na osi; None, gdy brak części albo znaki spoza wzorca (krok bez rozwijania)."""
+    if rodzaj not in _REF or any(not c for c in czesci):
+        return None
+    ref = ":".join([rodzaj, *(str(c) for c in czesci)])
+    return ref if _REF[rodzaj].fullmatch(ref) else None
+
+
+def czytaj_ref(ref: str) -> tuple[str, tuple[str, ...]]:
+    """(rodzaj, części) adresu kroku; zły adres = ValueError (trasa: 404)."""
+    for rodzaj, wzor in _REF.items():
+        m = wzor.fullmatch(str(ref or ""))
+        if m:
+            return rodzaj, m.groups()
+    raise ValueError("zły adres kroku")
+
+
+def krok_hermesa(linia: Iterable[Mapping], wywolanie: str) -> dict | None:
+    """Surowe szczegóły kroku członka Hermesa (kształt czytnik_omp.szczegoly) z jego linii (Czytnik.linia): wiersz
+    asystenta z tym `tool_calls[].id` (argumenty; myśl = `reasoning` wiersza i jego tekst) i późniejszy wiersz `tool`
+    z tym `tool_call_id` (wynik; JSON z `output` jak u narzędzia terminal = sam output i kod wyjścia)."""
+    out: dict | None = None
+    for s in linia:
+        for m in s.get("wiersze") or []:
+            if out is None:
+                if m.get("rola") != "assistant":
+                    continue
+                tc = next((t for t in m.get("tool_calls") or []
+                           if isinstance(t, dict) and str(t.get("id") or "") == wywolanie), None)
+                if tc is None:
+                    continue
+                mysl = [str(m.get("mysl") or "").strip(), bez_ciszy(str(m.get("tresc") or "")).strip()]
+                out = {"narzedzie": _nazwa_narzedzia(tc), "intencja": "", "argumenty": _args(tc),
+                       "mysl": "\n\n".join(x for x in mysl if x), "wynik": None, "blad": False, "zmiana": None,
+                       "kod": None, "czas_ms": None, "_ts": float(m.get("ts") or 0)}
+            elif m.get("rola") == "tool" and str(m.get("tool_call_id") or "") == wywolanie:
+                tresc = str(m.get("tresc") or "")
+                out["blad"] = bool(BLAD_NARZEDZIA.match(tresc))
+                out["wynik"] = tresc
+                if tresc.lstrip().startswith("{"):
+                    try:
+                        d = json.loads(tresc)
+                    except ValueError:
+                        d = None
+                    if isinstance(d, dict) and isinstance(d.get("output"), str):
+                        out["wynik"] = d["output"] + (f"\n{d['error']}" if isinstance(d.get("error"), str) and d["error"] else "")
+                        if isinstance(d.get("exit_code"), int):
+                            out["kod"] = d["exit_code"]
+                ts = float(m.get("ts") or 0)
+                if ts >= out["_ts"] > 0:
+                    out["czas_ms"] = round((ts - out["_ts"]) * 1000)
+                out.pop("_ts")
+                return out
+    if out is not None:
+        out.pop("_ts")
+    return out
+
+
+def _przytnij(tekst: str, linie: int, bajty: int) -> tuple[str, bool]:
+    wiersze = tekst.split("\n")
+    przyciety = len(wiersze) > linie
+    if przyciety:
+        tekst = "\n".join(wiersze[:linie])
+    b = tekst.encode("utf-8", "surrogatepass")
+    if len(b) > bajty:
+        tekst, przyciety = b[:bajty].decode("utf-8", "ignore"), True
+    return tekst, przyciety
+
+
+def widok_kroku(surowy: Mapping, *, utajnij: Callable[[str], str], poufny: Callable[[str], bool] | None = None,
+                wiecej: bool = False) -> dict:
+    """Szczegóły kroku do panelu: argumenty `[{klucz, wartosc}]` (bez intencji; nie-tekst jako JSON), myśl, wynik
+    i diff po redakcji (`utajnij`, przed przycięciem: sekret nie zostanie w połowie) i przycięte do WIDOK_KROKU
+    (`wiecej` = sufit „Pokaż więcej”). Krok dotykający pliku z poświadczeniami (`poufny` na argumentach albo
+    intencji): bez wyniku i diffu, wieloliniowe i długie argumenty (treść zapisu) ukryte, `poufny: true`."""
+    lim = WIDOK_KROKU[bool(wiecej)]
+    przyciete = False
+
+    def pole(tekst: str, rodzaj: str) -> str:
+        nonlocal przyciete
+        t, cut = _przytnij(utajnij(tekst[:PRZED_REDAKCJA]), *lim[rodzaj])
+        przyciete = przyciete or cut
+        return t
+
+    args = [(str(k), v if isinstance(v, str) else json.dumps(v, ensure_ascii=False, indent=2))
+            for k, v in (surowy.get("argumenty") or {}).items() if str(k) not in UKRYTE_ARGUMENTY]
+    intencja = str(surowy.get("intencja") or "")
+    tajny = bool(poufny) and any(poufny(t) for t in [intencja, *(v for _k, v in args)])
+    argumenty = [{"klucz": k, "wartosc": UKRYTE_POSWIADCZENIA if tajny and ("\n" in v or len(v) > 200)
+                  else pole(v, "pole")} for k, v in args]
+    wynik, zmiana, mysl = surowy.get("wynik"), surowy.get("zmiana"), str(surowy.get("mysl") or "")
+    return {"narzedzie": str(surowy.get("narzedzie") or "?"), "intencja": utajnij(intencja[:400]),
+            "argumenty": argumenty, "mysl": pole(mysl, "mysl") if mysl else "",
+            "wynik": None if tajny or wynik is None else pole(str(wynik), "wynik"),
+            "zmiana": None if tajny or not zmiana else pole(str(zmiana), "zmiana"),
+            "linie": 0 if wynik is None else str(wynik).count("\n") + 1, "gotowy": wynik is not None,
+            "blad": bool(surowy.get("blad")), "kod": surowy.get("kod"), "czas_ms": surowy.get("czas_ms"),
+            "poufny": tajny, "przyciete": przyciete, "wiecej": bool(wiecej)}
 
 
 def zrodla(db, czytnik, wid: str, *, budzenia=None, etykieta: Callable | None = None,
@@ -485,7 +605,7 @@ def pozycje_kontekstu(db, czytnik, wid: str, **kw) -> list[dict]:
                         "pliki": [z.get("path") for z in w.get("zalaczniki") or [] if z.get("path")],
                         "obrazy": [o.get("path") for o in w.get("obrazy") or [] if o.get("path")], "wpis_id": w["id"]})
         elif r == "system" and p.get("wpis"):
-            if (p["wpis"].get("dane") or {}).get("typ") in ("dolaczyl", "kompresja"):
+            if (p["wpis"].get("dane") or {}).get("typ") in ("dolaczyl", "kompresja", "komenda"):   # komenda: komendy.py
                 continue
             out.append({"ts": p["ts"], "rodzaj": "system", "tekst": p.get("tekst") or ""})
         elif r == "agent":

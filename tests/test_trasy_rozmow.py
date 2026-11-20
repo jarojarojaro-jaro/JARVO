@@ -556,6 +556,37 @@ def test_eksport_rozmowy_markdown(swiat):
     assert swiat.k.get(f"{P}/rozmowy/w_{'0' * 21}/eksport").status_code == 404
 
 
+def test_szczegoly_kroku_hermesa(swiat):
+    """Rozwinięty krok członka Hermesa: argumenty, myśl i wynik z jego sesji w wątku, sekrety ukryte; odczyt tylko
+    z panelu; krok innego agenta, obcy wątek i zły adres = 404."""
+    out = swiat.nowy("@teste2ea sprawdź klucze")
+    wid = out["watek"]["id"]
+    swiat.do_stanu(out["przebiegi"][0]["id"], "gotowe")
+    sid = swiat.sil.db.sesje_watku(wid, agent="test-e2e-a", rola="rozmowa")[0]["sesja_id"]
+    klucz = "ghp_" + "Z" * 36
+    swiat.brama._wiersz("test-e2e-a", sid, "assistant", "Sprawdzam.", reasoning="Najpierw zmienne.", tool_calls=json.dumps(
+        [{"id": "call_k1", "type": "function", "function": {"name": "terminal",
+                                                             "arguments": json.dumps({"command": "env | grep TOKEN"})}}]))
+    swiat.brama._wiersz("test-e2e-a", sid, "tool", json.dumps({"output": f"GH_TOKEN={klucz}", "exit_code": 0}),
+                        tool_call_id="call_k1", tool_name="terminal")
+    pozycje = swiat.k.get(f"{P}/rozmowy/{wid}/os").json()["pozycje"]
+    (krok,) = [k for p in pozycje if p["rodzaj"] == "kroki" for k in p["kroki"] if k.get("ref", "").endswith(":call_k1")]
+    assert krok["ref"] == "h:test-e2e-a:rozmowa:call_k1" and klucz not in json.dumps(pozycje)
+    url = f"{P}/rozmowy/{wid}/krok"
+    r = swiat.k.get(url, params={"ref": krok["ref"]})
+    assert r.status_code == 200, r.text
+    k = r.json()["krok"]
+    assert k["argumenty"] == [{"klucz": "command", "wartosc": "env | grep TOKEN"}] and k["mysl"] == "Najpierw zmienne.\n\nSprawdzam."
+    assert k["wynik"] == "GH_TOKEN=[ukryte]" and k["kod"] == 0 and k["gotowy"] and klucz not in r.text
+    for skad in ("same-site", "cross-site"):
+        assert swiat.k.get(url, params={"ref": krok["ref"]}, headers={"sec-fetch-site": skad}).status_code == 403
+    inny = swiat.nowy("@teste2eb inny wątek")["watek"]["id"]
+    for wid_, ref in ((wid, "h:test-e2e-b:rozmowa:call_k1"), (inny, krok["ref"]), (wid, "o:a1:call_k1"),
+                      (wid, "h:test-e2e-a:rozmowa:call_brak"), (wid, "h:../x:rozmowa:c"), (wid, "")):
+        r = swiat.k.get(f"{P}/rozmowy/{wid_}/krok", params={"ref": ref})
+        assert r.status_code == 404 and r.json()["blad"]["kod"] == "brak", (wid_, ref, r.status_code)
+
+
 def test_eksport_md_czysty():
     tr = T.trasy
     poz = [{"rodzaj": "wlasciciel", "ts": 0, "tekst": "Hej", "tryb": "bezposrednio",

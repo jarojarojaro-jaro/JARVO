@@ -2,7 +2,8 @@
 // „Do: Jarvo” albo „Do: Web · tylko ta wiadomość”, × i Esc anulują, po wysłaniu wraca „Do: Jarvo”), podpowiedziami
 // @wzmianek (listbox, strzałki, Enter/Tab, Esc), załącznikami (przycisk, wklejenie, przeciągnięcie; obrazy jako data URL,
 // reszta przez /upload), szkicem na wątek, Enter = wyślij, Shift+Enter = nowa linia, ↑ w pustym polu = ostatnia własna
-// wiadomość, paskiem trwającej pracy z „Zatrzymaj” i Esc Esc (stop wszystkich prac wątku).
+// wiadomość, paskiem trwającej pracy z „Zatrzymaj” i Esc Esc (stop wszystkich prac wątku), komendami po „/” (menu
+// MenuKomend, wykonanie przez POST /komendy, nigdy jako wiadomość do agenta; 33-komendy.js).
 
 const ZAL_OBRAZ = /^image\/(png|jpeg|webp|gif)$/;
 const ZAL_PLIKI_MAKS = 8, ZAL_OBRAZY_MAKS = 4, ZAL_OBRAZY_BAJTY = 7000000, ZAL_PLIK_BAJTY = 50 * 1024 * 1024;
@@ -152,6 +153,47 @@ function Kompozytor({ watek = null, panel = 0, koordynator = "jarvo", start = fa
     czasUwagi.current = setTimeout(() => setUwaga(null), ms);
   };
 
+  // ------------------------------------------------------------------- komendy po „/” (33-komendy.js)
+  // adresat komendy: wybrany chipem na tę wiadomość, inaczej serwer bierze koordynatora albo rozmówcę wątku
+  const agentKom = (a.zrodlo === "wybor" && a.adresaci && a.adresaci[0]) || (watek ? null : koordynator);
+  const jestKom = tekst.trimStart().startsWith("/");
+  const qKom = Komendy.pisana(tekst);
+  const [katKom, setKatKom] = useState(null);
+  const [iKom, setIKom] = useState(0);
+  const [komZamkniete, setKomZamkniete] = useState(false);
+  const [wynikStart, setWynikStart] = useState(null);
+  useEffect(() => {
+    if (!jestKom) return undefined;
+    let zywy = true;
+    Komendy.katalog(watek, agentKom).then((x) => { if (zywy) setKatKom(x); }, () => { /* menu bez katalogu: Enter i tak wykona */ });
+    return () => { zywy = false; };
+  }, [jestKom, watek, agentKom]);
+  const podpKom = useMemo(() => (qKom != null && !komZamkniete && katKom ? Komendy.podpowiedzi(katKom.komendy, qKom) : []),
+    [qKom, komZamkniete, katKom]);
+  const iK = Math.min(iKom, Math.max(0, podpKom.length - 1));
+  // komenda nigdy nie idzie do agenta: POST /komendy, wynik w rozmowie (na starcie karta nad polem)
+  const wykonajKomende = async (t) => {
+    if (stan.current.pliki.length || stan.current.obrazy.length) { pokazUwage(T("komendy.bez_plikow"), true, 6000); return; }
+    setTekst(""); setWzm(null); setKomZamkniete(false); setIKom(0);
+    stan.current = { ...stan.current, tekst: "" };
+    zapiszSzkic(k, "", stan.current.pliki);
+    pokazUwage(T("komendy.wykonuje", { komenda: t.split(/\s+/)[0] }), false, 20000);
+    try {
+      const odp = await Komendy.wykonaj({ watek, agent: agentKom, tekst: t });
+      clearTimeout(czasUwagi.current);
+      setUwaga(null);
+      if (!watek && odp && odp.wynik) setWynikStart(odp.wynik);
+    } catch (e) {
+      pokazUwage(T("komendy.blad", { blad: e && e.tekst ? e.tekst() : String(e) }), true, 8000);
+      if (!stan.current.tekst) setTekst(t);
+    }
+  };
+  const dopiszKomende = (c) => {
+    const t = `/${c.nazwa} `;
+    setTekst(t);
+    requestAnimationFrame(() => { const el = pole.current; if (el) { el.focus(); el.setSelectionRange(t.length, t.length); } });
+  };
+
   // szkic tego wątku: zapis po chwili bez pisania i przy wyjściu z wątku; wybór adresata nie przechodzi na inny wątek
   useEffect(() => {
     const t = setTimeout(() => zapiszSzkic(k, tekst, pliki), 400);
@@ -232,6 +274,7 @@ function Kompozytor({ watek = null, panel = 0, koordynator = "jarvo", start = fa
   const mozna = !pusta && !wgrywa;
   const wyslij = async () => {
     if (!mozna) return;
+    if (Komendy.parsuj(tekst)) { wykonajKomende(tekst.trim()); return; }
     // powyżej progu WIELU (wzmianki.py i 12-wzmianki.js) pytamy, zanim praca pójdzie do kilku agentów naraz
     if (a.wielu && !(await akcje.zapytaj({ rodzaj: "wielu", dane: { n: a.agenci.length } }))) return;
     akcje.wyslij({ watek, tekst: tekst.trim(), pliki, obrazy, adresaci: a.zrodlo === "wybor" ? a.adresaci : null, koordynator });
@@ -250,6 +293,13 @@ function Kompozytor({ watek = null, panel = 0, koordynator = "jarvo", start = fa
 
   const klawisz = (e) => {
     if (e.isComposing || e.keyCode === 229) return;
+    if (podpKom.length && !wzm) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setIKom((iK + 1) % podpKom.length); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setIKom((iK - 1 + podpKom.length) % podpKom.length); return; }
+      if (e.key === "Tab") { e.preventDefault(); dopiszKomende(podpKom[iK]); return; }
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); wykonajKomende(`/${podpKom[iK].nazwa}`); return; }
+      if (e.key === "Escape") { e.preventDefault(); setKomZamkniete(true); return; }
+    }
     if (wzm && podp.length) {
       const i = wzm.i || 0;
       if (e.key === "ArrowDown") { e.preventDefault(); setWzm({ ...wzm, i: (i + 1) % podp.length }); return; }
@@ -292,18 +342,21 @@ function Kompozytor({ watek = null, panel = 0, koordynator = "jarvo", start = fa
   let pod = null;
   if (uwaga) pod = uwaga;
   else if (wzm) pod = null;
+  else if (jestKom && Komendy.parsuj(tekst)) pod = { t: T("komendy.podpowiedz") };
   else if (a.nieznany) pod = { t: T("kompozytor.nieznany", { nazwa: a.nieznany, koord }) };
   else if (a.srodek.length && a.zrodlo !== "tekst") pod = { t: T("kompozytor.srodek", { koord }) };
   else if (a.zrodlo === "wybor") pod = { t: T("kompozytor.wybor_opis") };
   // na starcie stan bramy pokazuje karta gotowości (jedno miejsce, nie dwa)
   else if (!start && (brama === "startuje" || brama === "niedostepna")) pod = { t: T(`kompozytor.brama_${brama}`) };
   const placeholder = T(start ? "kompozytor.ph_start" : "kompozytor.ph");
-  const aktywnaWzm = wzm && podp.length ? `${id}-w-${wzm.i || 0}` : undefined;
+  const aktywnaWzm = wzm && podp.length ? `${id}-w-${wzm.i || 0}` : !wzm && podpKom.length ? `${id}-k-${iK}` : undefined;
+  const listaPola = wzm && podp.length ? `${id}-w` : !wzm && podpKom.length ? `${id}-k` : undefined;
 
   return html`<div class=${cx("j-komp-w", start && "is-start")}
       onDragOver=${(e) => { if (zPlikami(e)) { e.preventDefault(); e.stopPropagation(); setNad(true); } }}
       onDragLeave=${(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setNad(false); }}
       onDrop=${(e) => { if (zPlikami(e)) { e.preventDefault(); e.stopPropagation(); setNad(false); dodajPliki(e.dataTransfer.files); } }}>
+   ${wynikStart && html`<${WynikKomendy} dane=${wynikStart} onZamknij=${() => setWynikStart(null)}/>`}
    <div class=${cx("j-komp", nad && "is-nad")}>
     <${PasekNaZywo} przebiegi=${aktywne} watek=${watek}/>
     <${ZalacznikiKompozytora} obrazy=${obrazy} pliki=${pliki} wgrywa=${wgrywa}
@@ -312,10 +365,11 @@ function Kompozytor({ watek = null, panel = 0, koordynator = "jarvo", start = fa
     <label class="j-sr" for=${`${id}-pole`}>${T("kompozytor.etykieta")}</label>
     <textarea id=${`${id}-pole`} ref=${pole} class="j-komp-pole" data-kompozytor="" rows="1" spellcheck="true"
       placeholder=${placeholder} value=${tekst} aria-describedby=${`${id}-pod`}
-      aria-autocomplete="list" aria-controls=${wzm && podp.length ? `${id}-w` : undefined} aria-activedescendant=${aktywnaWzm}
-      onInput=${(e) => { setTekst(e.target.value); sprawdzWzmianke(e.target); }}
+      aria-autocomplete="list" aria-controls=${listaPola} aria-activedescendant=${aktywnaWzm}
+      onInput=${(e) => { setTekst(e.target.value); setKomZamkniete(false); setIKom(0); sprawdzWzmianke(e.target); }}
       onKeyDown=${klawisz} onKeyUp=${(e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Home" || e.key === "End") sprawdzWzmianke(e.target); }}
-      onClick=${(e) => sprawdzWzmianke(e.target)} onBlur=${() => setTimeout(() => setWzm(null), 150)} onPaste=${wklej}></textarea>
+      onClick=${(e) => sprawdzWzmianke(e.target)} onFocus=${() => setKomZamkniete(false)}
+      onBlur=${() => setTimeout(() => { setWzm(null); setKomZamkniete(true); }, 150)} onPaste=${wklej}></textarea>
     ${wzm && podp.length > 0 && html`<ul class="j-wzm" role="listbox" id=${`${id}-w`} aria-label=${T("kompozytor.wzmianki")}>
       ${podp.map((ag, n) => html`<li key=${ag.name} id=${`${id}-w-${n}`} data-agent=${ag.name} role="option" aria-selected=${String(n === (wzm.i || 0))}
           class=${cx("j-opcja-ag", n === (wzm.i || 0) && "is-aktywna")} onMouseDown=${(e) => { e.preventDefault(); wybierzWzmianke(ag); }}>
@@ -323,6 +377,8 @@ function Kompozytor({ watek = null, panel = 0, koordynator = "jarvo", start = fa
           <small>${ag.name === koordynator ? T("kompozytor.koordynuje") : rolaAgenta(ag)}</small></span>
         <span class="j-opcja-u">@${uchwytAgenta(ag)}</span></li>`)}
     </ul>`}
+    ${!wzm && html`<${MenuKomend} id=${`${id}-k`} lista=${podpKom} aktywna=${iK} onNajedz=${setIKom}
+      onWybierz=${(c) => wykonajKomende(`/${c.nazwa}`)}/>`}
     <div class="j-komp-pasek">
       <${ChipAdresata} wybor=${a} koordynator=${koordynator} agenci=${agenci} onWybierz=${(x) => { ustawWybor(x); requestAnimationFrame(() => pole.current && pole.current.focus()); }}/>
       <span class="j-rozpych"></span>

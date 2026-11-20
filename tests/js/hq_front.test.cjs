@@ -11,15 +11,15 @@ const assert = require("assert");
 
 const SRC = path.join(__dirname, "..", "..", "hq", "web", "src");
 const PLIKI = ["02-sklep.js", "03-trasa.js", "04-i18n.js", "05-skroty.js", "06-tokeny.js", "07-sciezki.js", "12-wzmianki.js",
-  "13-markdown.js", "14-czas.js", "15-os.js", "37-poznajmy.js", "64-raporty.js"];
+  "13-markdown.js", "14-czas.js", "15-os.js", "33-komendy.js", "37-poznajmy.js", "64-raporty.js"];
 const PRZED = `const React = {}; const useMemo = (f) => f(); const useRef = (v) => ({ current: v }); const useEffect = () => {};
 let HQ_LANG = null; const isPL = () => T.wymus !== "en"; const Zasoby = { daj() {} };\n`;
-const PO = "\n;({ T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, sklep, USTAWIENIA_DOMYSLNE, Poznanie, kwestiePoznania, Sciezki, kluczDnia, granicyDnia, siatkaMiesiaca, dniKalendarza, koloryRodzajow, cytatRaportu });";
+const PO = "\n;({ T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, sklep, USTAWIENIA_DOMYSLNE, Poznanie, kwestiePoznania, Sciezki, kluczDnia, granicyDnia, siatkaMiesiaca, dniKalendarza, koloryRodzajow, cytatRaportu, Komendy });";
 const kod = PRZED + PLIKI.map((f) => `// ---- ${f}\n` + fs.readFileSync(path.join(SRC, f), "utf8")).join("\n") + PO;
 const kontekst = vm.createContext({ Intl, Date, Math, JSON, URLSearchParams, setTimeout, clearTimeout, console, Set, Map,
   encodeURIComponent, decodeURIComponent, Number, String, Object, Array, RegExp });
 const M = vm.runInContext(kod, kontekst, { filename: "hq-front.js" });
-const { T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, Poznanie, kwestiePoznania, Sciezki, kluczDnia, granicyDnia, siatkaMiesiaca, dniKalendarza, koloryRodzajow, cytatRaportu } = M;
+const { T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, Poznanie, kwestiePoznania, Sciezki, kluczDnia, granicyDnia, siatkaMiesiaca, dniKalendarza, koloryRodzajow, cytatRaportu, Komendy } = M;
 
 let ile = 0;
 function test(nazwa, f) {
@@ -737,6 +737,27 @@ test("Aktualizacje: trasa z dniem i rodzajem, dni kalendarza, kolory rodzajów, 
   s = Os.zastosujZdarzenie(s, "raporty.nowe", { nieprzeczytane: 3 });
   eq(s.raporty, { nieprzeczytane: 3, wersja: 1 });
   eq(Os.zastosujZdarzenie(s, "raporty.licznik", { nieprzeczytane: 0 }).raporty, { nieprzeczytane: 0, wersja: 1 });
+});
+
+// ------------------------------------------------------------------------------------------------ komendy po „/”
+test("Komendy: komenda czy zwykły tekst (wektory wspólne z komendy.py), menu przy pisaniu nazwy", () => {
+  const W = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "data", "komendy.json"), "utf8"));
+  for (const [tekst, [nazwa, args]] of W.komendy) eq(Komendy.parsuj(tekst), { nazwa, args });
+  for (const tekst of W.tekst) assert.strictEqual(Komendy.parsuj(tekst), null, JSON.stringify(tekst));
+  assert.strictEqual(Komendy.pisana("/"), "");
+  assert.strictEqual(Komendy.pisana("/Mo"), "mo");
+  assert.strictEqual(Komendy.pisana("/model "), null);
+  assert.strictEqual(Komendy.pisana("hej"), null);
+  const lista = [
+    { nazwa: "model", aliasy: [], panel: true, dziala: true }, { nazwa: "new", aliasy: ["reset"], panel: true, dziala: true },
+    { nazwa: "compress", aliasy: ["compact"], panel: true, dziala: false }, { nazwa: "retry", aliasy: [], panel: false, dziala: false },
+  ];
+  eq(Komendy.podpowiedzi(lista, "").map((c) => c.nazwa), ["model", "new", "compress"]);    // sam „/”: bez reszty rejestru
+  eq(Komendy.podpowiedzi(lista, "re").map((c) => c.nazwa), ["new", "retry"]);               // alias /reset i rejestr Hermesa
+  eq(Komendy.podpowiedzi(lista, "x"), []);
+  assert.strictEqual(Komendy.komendaModelu({ model: "gpt-5.4", provider: "openai-codex" }), "/model gpt-5.4 --provider openai-codex");
+  assert.strictEqual(Komendy.komendaModelu({ model: "anthropic/claude-opus-5", provider: "" }), "/model anthropic/claude-opus-5");
+  assert.ok(Komendy.zWpisu({ wpis: { dane: { typ: "komenda" } } }) && !Komendy.zWpisu({ wpis: { dane: { typ: "dolaczyl" } } }));
 });
 
 console.log(`ok ${ile}`);

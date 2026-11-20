@@ -2,6 +2,7 @@
 i kursor (strony, pokolenie kompresji), członek nieczytelny. Baza i czytnik to atrapy o kształcie Rozmowy/Czytnik;
 całość z prawdziwą bazą i bramą sprawdza tests/test_silnik_rozmow.py."""
 import hashlib
+import json
 
 import pytest
 
@@ -10,6 +11,7 @@ from conftest import load_script
 sc = load_script("hq/plugin/scalanie.py", "jarvo_test_scalanie")
 cz = load_script("hq/plugin/czytnik.py", "jarvo_test_scalanie_czytnik")
 bz = load_script("hq/plugin/budzenia.py", "jarvo_test_scalanie_budzenia")
+och = load_script("hq/plugin/ochrona.py", "jarvo_test_scalanie_ochrona")
 
 WID = "w_" + "a" * 21
 BLOK = "[Kontekst wątku]\n...\n\n@web zrób stopkę"
@@ -228,3 +230,85 @@ def test_raport_rutyny_w_sesji_tematu_to_wiadomosc_agenta():
     assert poz[1]["zrodlo"] == "telegram" and poz[1]["agent"] is None
     assert [k["rodzaj"] for k in sc.pozycje_kontekstu(BazaRozmowcy([], [], {"jarvo": ["s1"]}), Czytnik({"jarvo": linia}),
                                                       WID, budzenia=bz)] == ["agent"]
+
+
+# ----------------------------------------------------------------------------------------------- szczegóły kroku
+
+def test_krok_hermesa_z_adresem_mysla_i_wynikiem():
+    """Krok osi niesie adres `ref`; szczegóły z linii członka: argumenty, myśl (reasoning + tekst wiersza), wynik
+    terminala (output, kod wyjścia), czas między wywołaniem a wynikiem; sekret w wyniku ukryty."""
+    klucz = "sk-proj-" + "a" * 30
+    linia = [{"sesja_id": "s1", "stan": "ok", "wiersze": [
+        wiersz(1, "user", "zrób"),
+        wiersz(2, "assistant", "Sprawdzam.", mysl="Muszę sprawdzić klucz.", tool_calls=[{"id": "call_1", "function": {
+            "name": "terminal", "arguments": '{"command": "env | grep KEY"}'}}]),
+        wiersz(3, "tool", json.dumps({"output": f"OPENAI_API_KEY={klucz}\nok", "exit_code": 0}), ts=104.5,
+               tool_call_id="call_1"),
+        wiersz(4, "assistant", "Gotowe."),
+    ]}]
+    poz = sc.os_watku(Baza([], [], {"web": ["s1"]}), Czytnik({"web": linia}), WID)["pozycje"]
+    (grupa,) = [p for p in poz if p["rodzaj"] == "kroki"]
+    ref = grupa["kroki"][0]["ref"]
+    assert ref == "h:web:rozmowa:call_1" and sc.czytaj_ref(ref) == ("h", ("web", "rozmowa", "call_1"))
+    surowy = sc.krok_hermesa(linia, "call_1")
+    assert surowy["argumenty"] == {"command": "env | grep KEY"} and surowy["mysl"] == "Muszę sprawdzić klucz.\n\nSprawdzam."
+    assert (surowy["kod"], surowy["czas_ms"], surowy["blad"]) == (0, 2500, False)
+    widok = sc.widok_kroku(surowy, utajnij=och.utajnij_krok, poufny=och.poufny_krok)
+    assert widok["wynik"] == "OPENAI_API_KEY=[ukryte]\nok" and klucz not in json.dumps(widok)
+    assert widok["argumenty"] == [{"klucz": "command", "wartosc": "env | grep KEY"}] and widok["gotowy"]
+    assert sc.krok_hermesa(linia, "call_9") is None
+    linia[0]["wiersze"].pop(2)                                  # wynik jeszcze nie przyszedł
+    assert sc.widok_kroku(sc.krok_hermesa(linia, "call_1"), utajnij=str)["gotowy"] is False
+
+
+@pytest.mark.parametrize("ref", ["", "x:a:b", "o::c1", "o:a/b:c1", "h:Web:rozmowa:c1", "h:web:rozmowa", "o:" + "a" * 65 + ":c",
+                                 "o:a1:c 1", "h:web:rozmowa:c1\n"])
+def test_zly_adres_kroku(ref):
+    with pytest.raises(ValueError):
+        sc.czytaj_ref(ref)
+
+
+def test_widok_kroku_przyciecie_redakcja_i_plik_z_poswiadczeniami():
+    dlugi = "\n".join(f"linia {i}" for i in range(500))
+    s = {"narzedzie": "bash", "argumenty": {"command": "seq 500", "i": "Liczę"}, "wynik": dlugi, "mysl": ""}
+    w = sc.widok_kroku(s, utajnij=str)
+    assert w["argumenty"] == [{"klucz": "command", "wartosc": "seq 500"}]          # intencja jest w nagłówku kroku
+    assert w["wynik"].count("\n") == 59 and w["przyciete"] and w["linie"] == 500 and not w["wiecej"]
+    w = sc.widok_kroku(s, utajnij=str, wiecej=True)
+    assert w["wynik"] == dlugi and not w["przyciete"] and w["wiecej"]
+    w = sc.widok_kroku({**s, "wynik": "x" * 200_000}, utajnij=str, wiecej=True)
+    assert len(w["wynik"]) == 65536 and w["przyciete"]                              # twardy sufit „Pokaż więcej”
+    # redakcja przed przycięciem: sekret na granicy 4 KB nie zostaje w połowie
+    w = sc.widok_kroku({"argumenty": {}, "wynik": "x" * 4090 + "ghp_" + "A" * 36}, utajnij=och.utajnij_krok)
+    assert "ghp_" not in w["wynik"] and w["przyciete"]
+    # plik z poświadczeniami: bez wyniku i diffu, treść zapisu ukryta, ścieżka zostaje
+    w = sc.widok_kroku({"argumenty": {"path": "/home/x/.env", "content": "A=1\nB=2"}, "wynik": "A=1", "zmiana": "+A=1"},
+                       utajnij=och.utajnij_krok, poufny=och.poufny_krok)
+    assert w["poufny"] and w["wynik"] is None and w["zmiana"] is None and w["gotowy"]
+    assert w["argumenty"] == [{"klucz": "path", "wartosc": "/home/x/.env"},
+                              {"klucz": "content", "wartosc": sc.UKRYTE_POSWIADCZENIA}]
+
+
+@pytest.mark.parametrize("tekst,sekret", [
+    ("curl -H 'Authorization: Bearer abcdef1234567890' x", "abcdef1234567890"),
+    ("export GH_TOKEN=abc123def456", "abc123def456"),
+    ('{"api_key": "zxcv1234qwer"}', "zxcv1234qwer"),
+    ("psql postgres://jaro:tajne1haslo@db:5432/x", "tajne1haslo"),
+    ("password: hunter2x", "hunter2x"),
+    ("klucz sk-ant-" + "b" * 30, "b" * 30),
+])
+def test_utajnij_krok(tekst, sekret):
+    wynik = och.utajnij_krok(tekst)
+    assert sekret not in wynik and "[ukryte]" in wynik
+    assert och.utajnij_krok("max_tokens: 4096, model: x") == "max_tokens: 4096, model: x"
+
+
+@pytest.mark.parametrize("tekst,poufny", [
+    ("cat ~/.env", True), ("/opt/x/prod.env", True), ("cat .env.local", True), ("~/.config/gh/hosts.yml", True),
+    ("~/.ssh/id_ed25519", True), ("/root/auth.json", True), ("sqlite3 state.db .tables", True),
+    ("~/.phoneuse/body_token", True), ("~/.secrets/x", True), ("~/deploy3/a", True),
+    ("~/.ssh/config", False), ("~/.ssh/id_ed25519.pub", False), (".venv/bin/python", False),
+    ("docs/environment.md", False), ("README.md", False), ("", False),
+])
+def test_poufny_krok(tekst, poufny):
+    assert och.poufny_krok(tekst) is poufny

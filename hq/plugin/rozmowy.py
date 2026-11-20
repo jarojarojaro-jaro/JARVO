@@ -45,6 +45,7 @@ TYTUL_MAX = 120
 TYTUL_AUTO = 60
 OSTATNI_MAX = 2
 KOPIE_MIGRACJI = 2
+_MODEL = "model:"         # klucz `meta` modelu członka z `/model` w panelu: model:<wątek>:<agent>
 
 STANY_AKTYWNE = ("kolejka", "wysylanie", "przyjety", "pracuje", "czeka_na_ture", "czeka_na_zgode", "zatrzymywanie",
                  "dopisany")
@@ -582,6 +583,7 @@ class Rozmowy:
             sesje = [_wiersz("sesje", r) for r in c.execute("SELECT * FROM sesje WHERE watek_id = ?", (wid,))]
             if trwale:
                 c.execute("DELETE FROM watki WHERE id = ?", (wid,))
+                c.execute("DELETE FROM meta WHERE substr(klucz, 1, ?) = ?", (len(_MODEL + wid) + 1, f"{_MODEL}{wid}:"))
             else:
                 c.execute("UPDATE watki SET usuniety_at = ? WHERE id = ? AND usuniety_at IS NULL", (self.zegar(), wid))
         return sesje
@@ -983,6 +985,24 @@ class Rozmowy:
         with self._tx() as c:
             return c.execute("DELETE FROM meta WHERE klucz = ?", (klucz,)).rowcount == 1
 
+    # model sesji członka z `/model` w panelu (komendy.py): {model, provider} w `meta` pod `model:<wątek>:<agent>`
+    # (bez migracji schematu); przebieg zapisuje go w payload przed pierwszym POST (przebiegi._wyslij)
+    def model_czlonka(self, wid: str, agent: str) -> dict | None:
+        try:
+            d = json.loads(self.meta(f"{_MODEL}{wid}:{agent}") or "null")
+        except ValueError:
+            return None
+        if not isinstance(d, dict) or not d.get("model"):
+            return None
+        return {"model": str(d["model"]), "provider": str(d.get("provider") or "")}
+
+    def ustaw_model_czlonka(self, wid: str, agent: str, model: Mapping | None) -> None:
+        if model and model.get("model"):
+            self.ustaw_meta(f"{_MODEL}{wid}:{agent}", json.dumps(
+                {"model": str(model["model"]), "provider": str(model.get("provider") or "")}, ensure_ascii=False))
+        else:
+            self.usun_meta(f"{_MODEL}{wid}:{agent}")
+
     def czeka_na_wlasciciela(self, *, limit: int = 4, od: float | None = None) -> list[dict]:
         """„Czeka na Ciebie” na ekranie startu (docs/HQ.md „Ekran startu”): zgody w toku i nieudane przebiegi z ostatniej
         doby, po których ten agent nie pracował już w tym wątku (Ponów zakłada nowy przebieg), tylko z wątków na
@@ -1014,6 +1034,7 @@ class Rozmowy:
                 f"SELECT agent, sesja_id FROM sesje WHERE przypieta = 1 AND watek_id IN ({', '.join('?' * len(stare))})", stare)]
             for wid in stare:
                 c.execute("DELETE FROM watki WHERE id = ?", (wid,))
+                c.execute("DELETE FROM meta WHERE substr(klucz, 1, ?) = ?", (len(_MODEL + wid) + 1, f"{_MODEL}{wid}:"))
             c.execute("DELETE FROM blokady_kart WHERE task_id IN (SELECT task_id FROM karty WHERE ostatni_stan IN "
                       "('done', 'archived') AND zmieniona_at < ?)", (teraz - BLOKADY_DNI * 86400,))
             zerowane = c.execute(

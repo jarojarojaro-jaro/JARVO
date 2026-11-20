@@ -285,6 +285,7 @@ Object.assign(liveApi, {
     przywroc: (id) => zadanie("POST", `/rozmowy/${kodujUrl(id)}/przywroc`),
     przeczytane: (id, doAt) => zadanie("POST", `/rozmowy/${kodujUrl(id)}/przeczytane`, { do_at: doAt }),
     os: (id, p) => zadanie("GET", `/rozmowy/${kodujUrl(id)}/os${zapytanieUrl(p)}`),   // {przed, po, limit}
+    krok: (id, ref, p) => zadanie("GET", `/rozmowy/${kodujUrl(id)}/krok${zapytanieUrl({ ref, ...p })}`),   // {wiecej}
     wyslij: (id, cialo) => zadanie("POST", `/rozmowy/${kodujUrl(id)}/wiadomosci`, cialo, { ponawiaj: true }),
     eksportUrl: (id) => `${basePath()}${API_ROOT}/rozmowy/${kodujUrl(id)}/eksport`,
     // plik Markdown całej rozmowy: {blob, nazwa} (pobranie przez <a download>, nazwa z Content-Disposition)
@@ -305,6 +306,11 @@ Object.assign(liveApi, {
     dopisz: (id, tekst, klucz) => zadanie("POST", `/przebiegi/${kodujUrl(id)}/dopisz`, { tekst, klucz }, { ponawiaj: !!klucz }),
     ponow: (id) => zadanie("POST", `/przebiegi/${kodujUrl(id)}/ponow`),
     nadzor: (id) => zadanie("POST", `/przebiegi/${kodujUrl(id)}/nadzor`),
+  },
+  // komendy po „/” (komendy.py): katalog rozmowy {zaplecze, agent, nazwa, komendy} i wykonanie {wynik, wpis}
+  komendy: {
+    lista: (p) => zadanie("GET", `/komendy${zapytanieUrl(p)}`),                    // {watek, agent}
+    wykonaj: (cialo) => zadanie("POST", "/komendy", cialo, { ponawiaj: !!cialo.watek }),   // {tekst, klucz, watek, agent}
   },
   // karty pracy w wątku (przekazania Jarva): stan z tablicy i sesji pracownika; {karty: {id: karta}} / {karta}
   karty: {

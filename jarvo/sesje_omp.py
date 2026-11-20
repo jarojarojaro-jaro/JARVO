@@ -71,8 +71,10 @@ def telegram(tekst: str, czat: str, watek: str) -> bool:
     return r.returncode == 0
 
 
-def polecenie(w, *reszta: str) -> list[str]:
-    return [rdzen.program_omp() or "omp", "--session-dir", str(w.sesje), "--resume", w.sesja, *w.omp_arg, *reszta]
+def polecenie(w, *reszta: str, tura: bool = False) -> list[str]:
+    """`omp` w sesji wpisu; tura skrzynki (`tura=True`) bierze model wybrany w panelu (`/model`, omp_sesje)."""
+    arg = rdzen.argumenty_tury(w) if tura else w.omp_arg
+    return [rdzen.program_omp() or "omp", "--session-dir", str(w.sesje), "--resume", w.sesja, *arg, *reszta]
 
 
 def cel(w, m: dict) -> tuple[str, str]:
@@ -172,7 +174,7 @@ class Tura:
                     self.odpowiedz = tekst
 
     def uruchom(self, tresc: str, obrazy: list[str], klucze: list[str]) -> tuple[int, str]:
-        cmd = ["nice", "-n", "10", *polecenie(self.w, "-p", "--mode", "json", tresc, *obrazy)]
+        cmd = ["nice", "-n", "10", *polecenie(self.w, "-p", "--mode", "json", tresc, *obrazy, tura=True)]
         if os.name == "nt" or not _jest("nice"):
             cmd = cmd[3:]
         cwd = self.w.cwd if self.w.cwd and self.w.cwd.is_dir() else Path.home()

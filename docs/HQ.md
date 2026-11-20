@@ -840,7 +840,7 @@ dashboardu, a każda trasa zapisu przechodzi ochronę CSRF (`ochrona.Trasa`, sek
 - **Oś czasu** (`hq/plugin/scalanie.py`, `GET /rozmowy/<id>/os?przed=|po=&limit=`): wpisy aplikacji scalone
   z wierszami sesji członków (czytnik, sekcja 2d). Nasze wiersze użytkownika (z blokiem kontekstu i obrazami jako
   `[screenshot]`) są ukryte, bo pokazuje je wpis właściciela. Rodzaje pozycji: `wlasciciel`, `system`, `agent`,
-  `kroki` (narzędzia z czasem i błędem), `przekazanie` (`kanban_create`), `budzenie` (wiersz `[kanban] Task …`,
+  `kroki` (narzędzia z czasem, błędem i adresem `ref` do szczegółów), `przekazanie` (`kanban_create`), `budzenie` (wiersz `[kanban] Task …`,
   `hq/plugin/budzenia.py`, szablon z `/opt/hermes/locales/en.yaml`), `dopisano` (obcy steer), `dostawa`, `obca`
   (wiadomość spoza aplikacji), `kompresja`, `blad_tury`, `luka` (sesja rodowodu usunięta). Obcy dopisek pokazujemy
   bez znacznika Hermesa. Odpowiedź asystenta bez linii `[SILENT]` (cicha odpowiedź na budzenie, `scalanie.bez_ciszy`);
@@ -870,6 +870,7 @@ dashboardu, a każda trasa zapisu przechodzi ochronę CSRF (`ochrona.Trasa`, sek
   | `GET /rozmowy/<id>`, `PATCH` (`tytul`, `przypiety`, `archiwum`, `praca`), `DELETE ?trwale&praca=` | wątek; archiwum i kosz z pracą w toku = 409 `praca_trwa`, aż wybierzesz `praca=zatrzymaj\|zostaw` |
   | `POST /rozmowy/<id>/przywroc`, `/przeczytane` | z kosza; licznik nieprzeczytanych |
   | `GET /rozmowy/<id>/os` | oś czasu (wyżej) |
+  | `GET /rozmowy/<id>/krok?ref=&wiecej=0\|1` | szczegóły jednego kroku dopiero po jego rozwinięciu (oś ich nie niesie): argumenty (polecenie, plik, wzorzec…), myśl i tekst modelu tuż przed wywołaniem, wynik (60 linii / 4 KB, po „Pokaż więcej” do 64 KB), diff edycji, kod wyjścia, czas. Tylko z zapisu sesji: omp z offsetów czytnika (`czytnik_omp.szczegoly`, dwie linie pliku, bez skanowania), Hermes z linii członka tego wątku (`scalanie.krok_hermesa`, `reasoning` wiersza). Redakcja `ochrona.utajnij_krok` przed przycięciem; krok przy pliku z poświadczeniami (`.env`, `auth.json`, `~/.ssh`…) bez wyniku i treści zapisu. Adres spoza wątku = 404, odczyt tylko z panelu (`Sec-Fetch-Site`) |
   | `POST /rozmowy/<id>/wiadomosci {tekst, klucz, zalaczniki, obrazy, adresaci?, tryb_kolejki?}` | wysyłka (202): wpis właściciela i przebieg na adresata; ten sam `klucz` = ten sam wpis; wątek w koszu = 409 `w_koszu`, usunięty = 404, także gdy DELETE przyszedł w trakcie sprawdzania wysyłki (silnik czyta wątek na nowo przed zapisem obrazów, steerem i wpisem) |
   | `GET /rozmowy/<id>/eksport` | cała rozmowa jako plik Markdown do pobrania (`rozmowa-<tytuł ASCII>.md`, `Content-Disposition: attachment`): teksty, ścieżki plików, kroki w jednej linii, notatki kursywą; całość przez `ochrona.utajnij`, najwyżej 100 stron osi |
   | `GET /agenci` | agenci aplikacji: nazwa, uchwyt, aliasy wzmianek, opis (z `JARVO_E2E=1` także testowi); źródło listy „Do:” i podpowiedzi `@` |
@@ -1132,7 +1133,10 @@ innych kanałów etap 6.
   i **Zatrzymaj** pokazuje raz pasek nad kompozytorem; pod dymkiem zostaje tylko to, czego pasek nie mówi (powód
   kolejki z jej przyciskami, „trwa dłużej niż zwykle”, „Zatrzymane · Ponów”). Kroki: w trybie Prosty jedna linia
   „12 kroków · 2:05” do rozwinięcia, bez licznika błędów narzędzi (błędny krok widać na rozwiniętej liście),
-  w Szczegółach lista z podglądem wyników i liczba błędów (`ustawienia.szczegoly`). Błąd tury
+  w Szczegółach lista z podglądem wyników i liczba błędów (`ustawienia.szczegoly`). Każdy krok z adresem rozwija
+  się osobno jak w terminalu: myśl, polecenie i argumenty, diff, wynik z **Pokaż więcej** (`GET /rozmowy/<id>/krok`);
+  kroki żywego dymka rozwijają się, gdy tura stanie na osi (strumień bramy i plik tury omp nie niosą wpisu
+  z wywołaniem; do tego czasu krok pokazuje nazwę i intencję jak dotąd). Błąd tury
   jednym zdaniem po polsku z wielkiej litery (`blad.komunikat` z przebiegu: znana przyczyna, np. „Model przestał
   odpowiadać”, inaczej „Praca się nie udała”), surowy komunikat zwinięty pod **Szczegóły** (`blad.szczegoly`),
   przyciski **Ponów** (`POST /przebiegi/<id>/ponow`) i, gdy to wina klucza albo modelu, Klucze/Modele. Karta błędu
@@ -1157,6 +1161,19 @@ innych kanałów etap 6.
   Nad polem pasek trwającej pracy (agent, stan, czas) z **Zatrzymaj**; Esc Esc zatrzymuje wszystkie prace wątku.
   PageUp/PageDown w polu przewijają rozmowę. Lista **Do:** zamyka się po Tab i po wyjściu fokusu poza nią. Po
   wysłaniu z nowego wątku fokus zostaje w polu nowej rozmowy.
+- <a id="komendy"></a>**Komendy** (`33-komendy.js`, serwer `hq/plugin/komendy.py`): tekst `/nazwa …` nigdy nie idzie do
+  agenta (brama Hermesa nie wykonuje komend: `input` `/v1/runs` trafia prosto do modelu, a obsługa `/…` żyje tylko
+  w kanałach gatewaya; trasa wiadomości odpowiada 409 `komenda`). Po wpisaniu „/” menu komend rozmowy (`GET /komendy`:
+  działające najpierw, reszta rejestru Hermesa po wpisaniu nazwy jako niedostępna z powodem); Enter wykonuje, Tab
+  dopisuje do argumentów, Esc zamyka; „//tekst” to zwykła wiadomość. `POST /komendy` wykonuje, wynik staje w rozmowie
+  jako wpis systemowy `komenda` (poza blokiem kontekstu agenta), na ekranie startu jako karta nad polem. Hermes:
+  `/model` (lista i bieżący model z `GET /api/model/options` profilu, wybór dla sesji członka w `meta` rozmowy, wysyłany
+  w ciele `/v1/runs` jako `model` + `provider`; `--provider`, `--global` = config.yaml profilu funkcją dashboardu;
+  przyciski modeli w wyniku wybierają od razu), `/new` (`/reset`: stop pracy agenta i nowa sesja członka jako rotacja),
+  `/stop`, `/usage` (tokeny przebiegów rozmowy), `/status`, `/help`. omp: `/model` (`omp models --json`, wybór w
+  `<skrzynka>/model.json` dla tur skrzynki), `/stop`, `/usage` i `/status` z pliku sesji, `/help`. Niedostępne:
+  `/compress` (brama nie ma kompresji na żądanie; sesja kompresuje się sama przy progu) i `/new` w sesji omp (sesja
+  stała we wpisie sesje.json). Testy: `tests/test_komendy.py`, wektory `tests/data/komendy.json`.
 - **Pliki** (`34-pliki.js`): karta pliku z miniaturą, nazwą i główną akcją (**Pobierz**, dla HTML **Odpal**), w menu
   Podgląd, Kopiuj ścieżkę, Otwórz w nowej karcie, Kopiuj obraz, Pokaż w folderze. Podgląd w oknie
   (`sklep.podglad`): obraz, wideo, dźwięk, PDF (w `<iframe sandbox>` z `/file`, z linkiem zapasowym), tekst i kod
@@ -1345,8 +1362,9 @@ innych kanałów etap 6.
   a nazwy drugiego pakietu (Baza ↔ edytor) dostaje, gdy ten dojdzie. Wejście pakietu wystawia `Zasoby.daj({…})`, więc
   ten sam kod działa w pełnym pakiecie demo i testów (`bundle_js`). Build usuwa komentarze i wcięcia (`zwiez_js`;
   w szablonach `html` także wcięcia po nowej linii, które htm i tak pomija) i pilnuje budżetu gzip
-  (`BUDZET_GZIP`: rdzeń JS ≤ 95 KB, CSS ≤ 18 KB, Mózg ≤ 14 KB; przekroczenie zatrzymuje build). 17.11: rdzeń JS
-  ok. 278 KB (86,6 KB gzip), CSS 80 KB (16,1 KB gzip); wcześniej jeden pakiet 262 KB gzip. Pliki rdzenia nie mogą
+  (`BUDZET_GZIP`: rdzeń JS ≤ 100 KB, CSS ≤ 18 KB, Mózg ≤ 14 KB; przekroczenie zatrzymuje build). 17.11: rdzeń JS
+  ok. 278 KB (86,6 KB gzip), CSS 80 KB (16,1 KB gzip); wcześniej jeden pakiet 262 KB gzip. 20.11: rdzeń 97,2 KB gzip
+  (rozwijane kroki i komendy po „/” w kompozytorze), budżet 95 → 100 KB. Pliki rdzenia nie mogą
   sięgać do nazw z pakietów inaczej niż przez `Zasoby.wez`, a pakiety nie zmieniają `let` rdzenia (język ustawia
   `ustawJezyk`).
 

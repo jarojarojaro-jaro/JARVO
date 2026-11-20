@@ -174,6 +174,8 @@ def test_odczyty_hq_bez_skutkow(monkeypatch):
         # w pamięci procesu połączenie i jego subskrypcje
         "/rozmowy", "/rozmowy/{wid}", "/rozmowy/{wid}/os", "/rozmowy/{wid}/eksport", "/przebiegi/{pid}", "/strumien",
         "/agenci",
+        # szczegóły kroku (rozwinięty krok): plik sesji omp i state.db członka tylko do odczytu, pamięć w procesie
+        "/rozmowy/{wid}/krok",
         # karty pracy (karty.py): kanban.db i state.db pracowników tylko do odczytu (mode=ro)
         "/karty", "/karty/{tid}",
         # start aplikacji (trasy_aplikacji.py): USER.md, config i .env profilu Jarva tylko po nazwach, nawyki.db mode=ro
@@ -182,6 +184,8 @@ def test_odczyty_hq_bez_skutkow(monkeypatch):
         "/mozg/zrodla", "/mozg/{klucz}",
         # rozmówcy centrum (rozmowcy.py lista): konfiguracja + odczyt rozmowy.db, bez zapisu
         "/rozmowcy",
+        # komendy po „/” (komendy.py katalog): rejestr komend Hermesa, odczyt rozmowy.db i wpisów sesje.json, bez zapisu
+        "/komendy",
         # Aktualizacje (raporty.py lista, kalendarz): odczyt archiwum raportów; brak pliku = pusta lista (archiwum
         # zakłada silnik)
         "/raporty", "/raporty/kalendarz"}

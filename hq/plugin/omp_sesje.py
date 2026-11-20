@@ -30,6 +30,9 @@ Kontrakt dla panelu (CentrumUI; wszystko synchroniczne i szybkie, wołać w wąt
     zatrzymaj(wpis) -> bool                   SIGTERM dla omp bieżącej tury (tylko proces z `--session-dir` wpisu)
     ponow(wpis, klucz) -> dict                ta sama wiadomość jeszcze raz do `nowe/` (nowy klucz `<klucz>-p<n>`)
     plik_sesji(wpis) -> Path | None           plik *.jsonl sesji (oś: czytnik_omp.os_sesji)
+    model_skrzynki(wpis) -> str               model z `/model` w panelu (`<skrzynka>/model.json`), "" = z `omp_arg`
+    ustaw_model_skrzynki(wpis, model|None)    zapis albo usunięcie wyboru; argumenty_tury(wpis) wstawia go do tury
+    podsumowanie_sesji(wpis) -> dict          model ostatniej odpowiedzi i zużycie sesji (`/model`, `/usage`)
 
 Wyników i argumentów narzędzi nie ma nigdzie: plik tury ma tylko tekst, nazwę i intencję narzędzia.
 """
@@ -264,6 +267,87 @@ def plik_sesji(w: Wpis) -> Path | None:
         return None
     pliki = sorted(w.sesje.glob(f"*_{w.sesja}*.jsonl")) or sorted(w.sesje.glob(f"*{w.sesja}*.jsonl"))
     return pliki[-1] if pliki else None
+
+
+# ---------------------------------------------------------------- model i zużycie (komendy panelu, komendy.py)
+# `/model <wzorzec>` w panelu zapisuje wybór w `<skrzynka>/model.json` ({"model": "<dostawca/model>"}); tura skrzynki
+# (jarvo/sesje_omp.py) bierze go zamiast `--model` z `omp_arg` wpisu. Terminal zostaje przy `omp_arg` (tam właściciel
+# ma własne /model omp). `/model` i `/usage` czytają model i zużycie z pliku sesji (wiadomości asystenta).
+PLIK_MODELU = "model.json"
+
+
+def model_skrzynki(w: Wpis) -> str:
+    if w.skrzynka is None:
+        return ""
+    try:
+        d = json.loads((w.skrzynka / PLIK_MODELU).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    return str(d.get("model") or "") if isinstance(d, dict) else ""
+
+
+def ustaw_model_skrzynki(w: Wpis, model: str | None) -> None:
+    if w.skrzynka is None:
+        raise ValueError("wpis bez skrzynki")
+    plik = w.skrzynka / PLIK_MODELU
+    if model:
+        zapisz_atomowo(plik, {"model": str(model)})
+    else:
+        plik.unlink(missing_ok=True)
+
+
+def argumenty_tury(w: Wpis) -> list[str]:
+    """`omp_arg` wpisu dla tury skrzynki: model z panelu zastępuje `--model` wpisu (omp przyjmuje flagę raz)."""
+    model = model_skrzynki(w)
+    if not model:
+        return list(w.omp_arg)
+    out, pomin = [], False
+    for a in w.omp_arg:
+        if pomin:
+            pomin = False
+        elif a == "--model":
+            pomin = True
+        elif not a.startswith("--model="):
+            out.append(a)
+    return out + ["--model", model]
+
+
+def podsumowanie_sesji(w: Wpis) -> dict:
+    """Model ostatniej odpowiedzi i zużycie całej sesji z pliku *.jsonl: {model, dostawca, odpowiedzi, wejscie,
+    wyjscie, cache_odczyt, cache_zapis, koszt, kontekst}; brak pliku = zera i pusty model."""
+    wynik = {"model": "", "dostawca": "", "odpowiedzi": 0, "wejscie": 0, "wyjscie": 0, "cache_odczyt": 0,
+             "cache_zapis": 0, "koszt": 0.0, "kontekst": 0}
+    plik = plik_sesji(w)
+    if plik is None:
+        return wynik
+    try:
+        linie = plik.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return wynik
+    for linia in linie:
+        try:
+            e = json.loads(linia)
+        except ValueError:
+            continue
+        m = e.get("message") if isinstance(e, dict) and e.get("type") == "message" else None
+        if not isinstance(m, dict) or m.get("role") != "assistant":
+            continue
+        u = m.get("usage") if isinstance(m.get("usage"), dict) else {}
+        wynik["odpowiedzi"] += 1
+        wynik["wejscie"] += _liczba(u, "input")
+        wynik["wyjscie"] += _liczba(u, "output")
+        wynik["cache_odczyt"] += _liczba(u, "cacheRead")
+        wynik["cache_zapis"] += _liczba(u, "cacheWrite")
+        koszt = u.get("cost").get("total") if isinstance(u.get("cost"), dict) else None
+        wynik["koszt"] += float(koszt) if isinstance(koszt, (int, float)) else 0.0
+        wynik["kontekst"] = _liczba(u, "input") + _liczba(u, "cacheRead") + _liczba(u, "cacheWrite")
+        wynik["model"], wynik["dostawca"] = str(m.get("model") or ""), str(m.get("provider") or "")
+    return wynik
+
+
+def _liczba(u: dict, k: str) -> int:
+    v = u.get(k)
+    return int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else 0
 
 
 def stan(w: Wpis) -> dict:

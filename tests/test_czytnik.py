@@ -47,8 +47,8 @@ def test_sesja_z_indeksem_wyswietlania(baza):
     assert pierwszy["tool_calls"] == stan_hermesa.WYWOLANIE and pierwszy["skompaktowany"] and not pierwszy["aktywny"]
     assert wiersze[2]["tool_call_id"] == "call_1" and wiersze[2]["tool_name"] == "terminal"
     assert wiersze[-1]["meta"] == {"reactions": ["👍"]}
-    assert all(set(w) == {"id", "sesja_id", "rola", "tresc", "tool_calls", "tool_call_id", "tool_name", "ts", "rodzaj",
-                          "meta", "podsumowanie", "aktywny", "skompaktowany", "klucz"} for w in wiersze)
+    assert all(set(w) == {"id", "sesja_id", "rola", "tresc", "tool_calls", "mysl", "tool_call_id", "tool_name", "ts",
+                          "rodzaj", "meta", "podsumowanie", "aktywny", "skompaktowany", "klucz"} for w in wiersze)
     assert len({w["klucz"] for w in wiersze}) == len(wiersze)
 
 

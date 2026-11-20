@@ -3,7 +3,8 @@ z `multiplex_profiles` (`/p/<profil>/…`; profil domyślny bez prefiksu, `jarvo
 
 - **Klucze.** `API_SERVER_KEY` z `.env` profilu czyta proces dashboardu (`Klucze`, pamięć 60 s); klucz nie trafia do
   przeglądarki, do dziennika ani do odpowiedzi.
-- **Przebieg.** `POST /v1/runs {input, session_id[, author]}` z `Idempotency-Key: jarvo-<id przebiegu>` → 202
+- **Przebieg.** `POST /v1/runs {input, session_id[, author][, model, provider]}` (model z `/model` w panelu) z
+  `Idempotency-Key: jarvo-<id przebiegu>` → 202
   `{run_id, status}`. Brama liczy odcisk z całego ciała JSON, więc ciało jest czystą funkcją tego, co przebieg ma
   zapisane przed pierwszym POST (`cialo`, `cialo_sha`): ponowienie po restarcie daje to samo ciało i ten sam przebieg.
 - **Zdarzenia.** `GET /v1/runs/{id}/events`: ramki `data: <json>` bez linii `event:` (nazwa w polu `event`),
@@ -122,11 +123,16 @@ class Klucze:
             self._pamiec.pop(agent, None)
 
 
-def cialo(sesja_id: str, wejscie: Any, autor: dict | None = None) -> dict:
-    """Ciało `POST /v1/runs` (bez model/provider/instructions: decyduje konfiguracja profilu)."""
+def cialo(sesja_id: str, wejscie: Any, autor: dict | None = None, model: dict | None = None) -> dict:
+    """Ciało `POST /v1/runs`. Bez `instructions`; `model` i `provider` tylko z wyboru `/model` w panelu (komendy.py,
+    zapisany w przebiegu przed pierwszym POST), inaczej decyduje konfiguracja profilu."""
     out: dict[str, Any] = {"input": wejscie, "session_id": sesja_id}
     if autor:
         out["author"] = dict(autor)
+    if model and model.get("model"):
+        out["model"] = str(model["model"])
+        if model.get("provider"):
+            out["provider"] = str(model["provider"])
     return out
 
 
@@ -261,6 +267,12 @@ class KlientBramy:
             raise BladBramy("odrzucone", "ciało za duże", status=413, typ="za_duze")
         r = await self._zadanie("POST", agent, "/v1/runs", tresc=tresc, naglowki={"Idempotency-Key": idem})
         return self._json(r)
+
+    async def opcje_modeli(self, agent: str, *, odswiez: bool = False) -> dict:
+        """`GET /api/model/options` profilu (ten sam wybór co `/model` w Telegramie i strona Modele dashboardu):
+        {model, provider, providers: [{slug, name, is_current, models, total_models, …}]}."""
+        return self._json(await self._zadanie("GET", agent, "/api/model/options" + ("?refresh=1" if odswiez else ""),
+                                              ok=(200,)))
 
     async def stan(self, agent: str, run_id: str) -> dict:
         return self._json(await self._zadanie("GET", agent, f"/v1/runs/{_przebieg(run_id)}"))

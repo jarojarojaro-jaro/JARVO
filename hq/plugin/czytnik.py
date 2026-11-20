@@ -162,6 +162,8 @@ def normalizuj(m: dict, sesja_id: str) -> dict:
         "rola": rola,
         "tresc": tresc,
         "tool_calls": tool_calls if isinstance(tool_calls, list) else [],
+        # myśl modelu przy wywołaniu narzędzi (rozwinięty krok w panelu, scalanie.krok_hermesa)
+        "mysl": tekst_tresci(m.get("reasoning") or m.get("reasoning_content")) if rola == "assistant" and tool_calls else "",
         "tool_call_id": m.get("tool_call_id"),
         "tool_name": m.get("tool_name"),
         "ts": ts,

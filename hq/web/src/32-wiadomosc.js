@@ -1,8 +1,9 @@
 // Wiadomości w osi wątku (docs/HQ.md „Aplikacja”, makieta V2 · Spokojny): dymek właściciela (od razu, zanim serwer
 // odpowie; nieudana wysyłka z „Spróbuj ponownie” i „Usuń”), wiadomość agenta (Markdown, karty plików, Kopiuj,
 // „Odpowiedz: <agent>”, znacznik „bezpośrednio”), kroki pracy (Prosty: jedna linia do rozwinięcia; Szczegóły: lista
-// z podglądem wyników), żywy dymek trwającej pracy (tekst z delt, stan, czas, kolejka), prośba o zgodę (dokładnie
-// wybory zdarzenia, odliczanie, „Czas minął” i „Poproś ponownie”), błąd z „Ponów” i pozycje systemowe.
+// z podglądem wyników; każdy krok rozwija się osobno: polecenie, myśl i wynik), żywy dymek trwającej pracy (tekst
+// z delt, stan, czas, kolejka), prośba o zgodę (dokładnie wybory zdarzenia, odliczanie, „Czas minął” i „Poproś
+// ponownie”), błąd z „Ponów” i pozycje systemowe.
 
 const useIdJarvo = React.useId || (() => {
   const r = useRef(null);
@@ -142,7 +143,7 @@ function WiadomoscAgenta({ x, ctx, ostatniaPrzebiegu, tak }) {
   return html`<article class=${cx("j-msg", "j-msg-ag", rutyna && "is-rutyna")} data-pozycja=${x.id} data-agent=${x.agent}>
     <h3 class="j-sr">${nazwaAgenta(x.agent)}${rutyna ? ` · ${rutyna}` : ""}, ${Czas.godzina(x.ts)}</h3>
     <${NaglowekAgenta} agent=${x.agent} ts=${x.ts} bezposrednio=${bezposrednio} rutyna=${rutyna}/>
-    ${x.kroki && x.kroki.length > 0 && html`<${Kroki} kroki=${x.kroki} szczegoly=${ctx.szczegoly}/>`}
+    ${x.kroki && x.kroki.length > 0 && html`<${Kroki} kroki=${x.kroki} szczegoly=${ctx.szczegoly} watek=${ctx.watek}/>`}
     <${TrescMd} tekst=${tekst} pomin=${pomin} klasa="j-msg-t"/>
     ${x.pliki && x.pliki.length > 0 && html`<div class="j-pliki">${x.pliki.map((p) => html`<${KartaPliku} key=${p.path} plik=${p}/>`)}</div>`}
     ${tak && html`<${TakNie} tak=${tak} ctx=${ctx}/>`}
@@ -173,25 +174,93 @@ function ZgodaOdpowiedz({ odp, pid }) {
 const czasownik = (k) => (isPL() ? k.verb || k.narzedzie : k.verb_en || k.verb || k.narzedzie) || "";
 const KROKI_NAJPIERW = 80;
 
-function KrokiLista({ kroki, szczegoly }) {
+// Rozwinięty krok (jak w terminalu): myśl tuż przed wywołaniem, argumenty (polecenie, plik, wzorzec…), diff edycji
+// i wynik przycięty z „Pokaż więcej” (sufit serwera). Dane z GET /rozmowy/{id}/krok dopiero po kliknięciu (oś ich nie
+// niesie); krok z wynikiem zostaje w pamięci karty, krok w toku pyta serwer przy każdym rozwinięciu.
+const krokiPamiec = new Map();
+const KROKI_PAMIEC_MAKS = 100;
+const ARGUMENTY_KROKU = { command: "polecenie", cmd: "polecenie", path: "plik", file_path: "plik", paths: "pliki",
+  pattern: "wzorzec", query: "zapytanie", url: "adres", content: "tresc", code: "kod", edits: "zmiany", input: "wejscie",
+  title: "tytul", language: "jezyk" };
+const etykietaArgumentu = (k) => (ARGUMENTY_KROKU[k] ? T(`krok.a_${ARGUMENTY_KROKU[k]}`) : k);
+
+function KrokSzczegoly({ id, watek, krokRef }) {
+  const [wiecej, setWiecej] = useState(false);
+  const klucz = `${watek}|${krokRef}|${wiecej ? 1 : 0}`;
+  const [k, setK] = useState(() => krokiPamiec.get(klucz) || null);
+  const [blad, setBlad] = useState(false);
+  useEffect(() => {
+    const jest = krokiPamiec.get(klucz);
+    if (jest) { setK(jest); return undefined; }
+    let zywy = true;
+    setBlad(false);
+    api.rozmowy.krok(watek, krokRef, wiecej ? { wiecej: 1 } : null).then((d) => {
+      if (!zywy) return;
+      const krok = (d && d.krok) || null;
+      if (krok && krok.gotowy) {
+        if (krokiPamiec.size >= KROKI_PAMIEC_MAKS) krokiPamiec.delete(krokiPamiec.keys().next().value);
+        krokiPamiec.set(klucz, krok);
+      }
+      setK(krok);
+    }).catch(() => { if (zywy) setBlad(true); });
+    return () => { zywy = false; };
+  }, [klucz]);
+  const meta = k && [k.gotowy && k.linie > 1 && T("krok.linie", { n: k.linie }), k.kod != null && T("krok.kod", { n: k.kod }),
+    k.czas_ms > 0 && Czas.trwanie(k.czas_ms / 1000)].filter(Boolean);
+  return html`<div class="j-krok-sz" id=${id}>
+    ${blad && html`<p class="j-krok-sz-n">${T("krok.nie_wczytano")}</p>`}
+    ${!k && !blad && html`<p class="j-krok-sz-n"><${Spinner}/> ${T("krok.wczytuje")}</p>`}
+    ${k && html`
+      ${k.mysl && html`<p class="j-krok-sz-h">${T("krok.mysl")}</p><p class="j-krok-sz-mysl">${k.mysl}</p>`}
+      ${(k.argumenty || []).map((a, i) => html`<p key=${`h${i}`} class="j-krok-sz-h">${etykietaArgumentu(a.klucz)}</p>
+        <pre key=${`a${i}`} class="j-kroki-podglad">${a.wartosc}</pre>`)}
+      ${k.zmiana && html`<p class="j-krok-sz-h">${T("krok.zmiana")}</p><pre class="j-kroki-podglad">${k.zmiana}</pre>`}
+      <p class="j-krok-sz-h">${T("krok.wynik")}${meta.length ? html` <span class="j-kroki-czas">· ${meta.join(" · ")}</span>` : null}
+        ${k.blad && html` <span class="j-kroki-blad">· ${T("kroki.blad")}</span>`}</p>
+      ${k.poufny ? html`<p class="j-krok-sz-n">${T("krok.poufny")}</p>`
+        : !k.gotowy ? html`<p class="j-krok-sz-n">${T("krok.w_toku")}</p>`
+          : html`<pre class="j-kroki-podglad">${k.wynik || T("krok.pusty")}</pre>`}
+      ${k.przyciete && !k.wiecej && html`<button type="button" class="j-link" onClick=${() => setWiecej(true)}>${T("krok.wiecej")}</button>`}
+      ${k.przyciete && k.wiecej && html`<p class="j-krok-sz-n">${T("krok.sufit")}</p>`}`}
+  </div>`;
+}
+
+// Krok z adresem (`ref`) w wątku rozwija się sam (każdy osobno), reszta zostaje zwykłą linią.
+function KrokiLista({ kroki, szczegoly, watek }) {
   const [wszystkie, setWszystkie] = useState(false);
+  const [rozwiniete, setRozwiniete] = useState(() => new Set());
+  const id = useIdJarvo();
+  const przelacz = (ref) => setRozwiniete((s) => {
+    const n = new Set(s);
+    if (n.has(ref)) n.delete(ref); else n.add(ref);
+    return n;
+  });
   const widoczne = wszystkie ? kroki : kroki.slice(-KROKI_NAJPIERW);
   return html`<div class="j-kroki-l">
     ${widoczne.length < kroki.length && html`<button type="button" class="j-link" onClick=${() => setWszystkie(true)}>
       ${T("kroki.wczesniejsze", { n: kroki.length - widoczne.length })}</button>`}
-    <ol>${widoczne.map((k, i) => (k.komentarz != null
-      ? html`<li key=${i} class="is-komentarz"><time>${Czas.godzina(k.ts)}</time><div class="j-kroki-kom"><${TrescMd} tekst=${bezZnacznika(k.komentarz)}/></div></li>`
-      : html`<li key=${i} class=${cx(k.blad && "is-blad")}>
+    <ol>${widoczne.map((k, i) => {
+      if (k.komentarz != null) {
+        return html`<li key=${i} class="is-komentarz"><time>${Czas.godzina(k.ts)}</time><div class="j-kroki-kom"><${TrescMd} tekst=${bezZnacznika(k.komentarz)}/></div></li>`;
+      }
+      const moze = !!(watek && k.ref);
+      const otwarty = moze && rozwiniete.has(k.ref);
+      const opis = html`<b>${czasownik(k)}</b>${k.detail ? ` ${k.detail}` : ""}${k.blad ? html` <span class="j-kroki-blad">· ${T("kroki.blad")}</span>` : null}
+        ${szczegoly && k.czas_ms > 0 && html` <span class="j-kroki-czas">${Czas.trwanie(k.czas_ms / 1000)}</span>`}`;
+      return html`<li key=${i} class=${cx(k.blad && "is-blad")}>
       <time>${Czas.godzina(k.ts)}</time>
-      <span class="j-kroki-o"><b>${czasownik(k)}</b>${k.detail ? ` ${k.detail}` : ""}${k.blad ? html` <span class="j-kroki-blad">· ${T("kroki.blad")}</span>` : null}
-        ${szczegoly && k.czas_ms > 0 && html` <span class="j-kroki-czas">${Czas.trwanie(k.czas_ms / 1000)}</span>`}</span>
-      ${szczegoly && k.podglad && html`<pre class="j-kroki-podglad">${k.podglad}</pre>`}</li>`))}</ol></div>`;
+      ${moze ? html`<button type="button" class="j-kroki-o j-kroki-k" aria-expanded=${String(otwarty)} aria-controls=${`${id}-${i}`}
+          onClick=${() => przelacz(k.ref)}><span>${opis}</span><${Ikona} n="right" r=${12}/></button>`
+        : html`<span class="j-kroki-o">${opis}</span>`}
+      ${szczegoly && k.podglad && !otwarty && html`<pre class="j-kroki-podglad">${k.podglad}</pre>`}
+      ${otwarty && html`<${KrokSzczegoly} id=${`${id}-${i}`} watek=${watek} krokRef=${k.ref}/>`}</li>`;
+    })}</ol></div>`;
 }
 
 // Prosty: zwinięta linia „12 kroków · 2:05” (przy trwającej pracy też ostatni krok), bez licznika błędów narzędzi
 // (zwykle odzyskane potknięcia, a czerwone „2 błędy” pod odpowiedzią wyglądało jak awaria; błąd widać na liście kroków);
-// Szczegóły: rozwinięte, z licznikiem błędów
-function Kroki({ kroki, szczegoly, zywe }) {
+// Szczegóły: rozwinięte, z licznikiem błędów. Każdy krok z adresem rozwija się dalej sam (KrokSzczegoly).
+function Kroki({ kroki, szczegoly, zywe, watek }) {
   const [otwarte, setOtwarte] = useState(!!szczegoly);
   useEffect(() => setOtwarte(!!szczegoly), [szczegoly]);
   const id = useIdJarvo();
@@ -203,7 +272,7 @@ function Kroki({ kroki, szczegoly, zywe }) {
       ${szczegoly && s.bledy > 0 && html`<span class="j-kroki-blad">· ${T("kroki.bledy", { n: s.bledy })}</span>`}
       ${zywe && s.ostatni && html`<span class="j-kroki-teraz">· ${czasownik(s.ostatni)}</span>`}
     </button>
-    <div id=${id} hidden=${!otwarte}>${otwarte && html`<${KrokiLista} kroki=${kroki} szczegoly=${szczegoly}/>`}</div>
+    <div id=${id} hidden=${!otwarte}>${otwarte && html`<${KrokiLista} kroki=${kroki} szczegoly=${szczegoly} watek=${watek}/>`}</div>
   </div>`;
 }
 
@@ -318,7 +387,7 @@ function ZywyDymek({ p, ctx }) {
   return html`<article class="j-msg j-msg-ag is-zywy" data-przebieg=${p.id} data-agent=${p.agent} aria-busy=${String(trwa)}>
     <h3 class="j-sr">${nazwaAgenta(p.agent)}, ${Czas.godzina(od)}</h3>
     <${NaglowekAgenta} agent=${p.agent} ts=${od} bezposrednio=${bezposrednio}/>
-    ${p.kroki && p.kroki.length > 0 && html`<${Kroki} kroki=${p.kroki} szczegoly=${ctx.szczegoly} zywe=${trwa}/>`}
+    ${p.kroki && p.kroki.length > 0 && html`<${Kroki} kroki=${p.kroki} szczegoly=${ctx.szczegoly} zywe=${trwa} watek=${ctx.watek}/>`}
     ${p.tekst ? html`<${TrescMd} tekst=${bezZnacznika(p.tekst)} zywy=${trwa} klasa="j-msg-t"/>`
       : trwa && !zgoda && p.stan !== "kolejka" ? html`<${Pisze}/>` : null}
     ${zgoda && html`<${Zgoda} key=${z.request_id} p=${p}/>`}
@@ -371,11 +440,12 @@ const ElementOsi = React.memo(function ElementOsiW({ x, ctx, ostatniaPrzebiegu, 
     case "agent": return html`<${WiadomoscAgenta} x=${x} ctx=${ctx} ostatniaPrzebiegu=${ostatniaPrzebiegu} tak=${tak}/>`;
     case "rutyna": return html`<${WiadomoscAgenta} x=${x} ctx=${ctx}/>`;
     case "zywy": return html`<${ZywyDymek} p=${x.przebieg} ctx=${ctx}/>`;
-    case "kroki": return html`<div class="j-msg-kroki"><${Kroki} kroki=${x.kroki || []} szczegoly=${ctx.szczegoly}/></div>`;
+    case "kroki": return html`<div class="j-msg-kroki"><${Kroki} kroki=${x.kroki || []} szczegoly=${ctx.szczegoly} watek=${ctx.watek}/></div>`;
     case "obca": return html`<${WiadomoscObca} x=${x}/>`;
     case "blad_tury": return html`<${BladTury} x=${x}/>`;
     case "przekazanie": return x.karta && x.karta.task_id ? html`<${KartaPracy} x=${x} ctx=${ctx}/>` : html`<${PozycjaSystemowa} x=${x}/>`;
     case "koniec": return html`<${KoniecPracy} x=${x} ctx=${ctx}/>`;
+    case "system": return Komendy.zWpisu(x) ? html`<${WynikKomendy} x=${x} watek=${ctx.watek}/>` : html`<${PozycjaSystemowa} x=${x}/>`;
     default: return html`<${PozycjaSystemowa} x=${x}/>`;
   }
 });

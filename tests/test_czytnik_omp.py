@@ -1,5 +1,5 @@
-"""hq/plugin/czytnik_omp.py: aktywna gałąź, obwiednie skrzynki, kompresja kroków, brak wyników i argumentów narzędzi,
-nieznany format, odczyt przyrostowy."""
+"""hq/plugin/czytnik_omp.py: aktywna gałąź, obwiednie skrzynki, kompresja kroków, brak wyników i argumentów narzędzi
+na osi, szczegóły kroku na żądanie (z offsetów, przyrostowo), nieznany format, odczyt przyrostowy."""
 from __future__ import annotations
 
 import json
@@ -57,7 +57,8 @@ def test_os_aktywnej_galezi_bez_wynikow_narzedzi(tmp_path):
     assert [w["typ"] for w in o["wpisy"]] == ["uzytkownik", "kroki", "streszczenie", "asystent", "uzytkownik"]
     u, kroki, _s, a, t = o["wpisy"]
     assert u["zrodlo"] == "panel" and u["tekst"] == "sprawdź GPU\n\nlink"
-    assert kroki["kroki"] == [{"nazwa": "bash", "intencja": "Sprawdzam GPU"}, {"nazwa": "read", "intencja": "Czytam log"}]
+    assert kroki["kroki"] == [{"nazwa": "bash", "intencja": "Sprawdzam GPU", "id": "c1", "wpis": "a1"},
+                              {"nazwa": "read", "intencja": "Czytam log", "id": "c2", "wpis": "a2"}]
     assert a["czeka_na_tak"] is True and a["tekst"] == "Plan: restart bramy."
     assert t["zrodlo"] == "terminal"
     calosc = json.dumps(o, ensure_ascii=False)
@@ -119,3 +120,61 @@ def test_tresc_linkow_nie_w_dymku_wlasciciela():
              f"\n\n{cz.ZNACZNIK_LINKOW}\n{{\"error\": \"pobieranie linków: brak pliku\"}}\n(załącznik: /tmp/a.jpg)")
     (blok,) = cz.bloki_obwiedni(tekst)
     assert blok["tekst"] == "https://x.com/a/status/1 o co w tym chodzi sprawdz dokladnie\n(załącznik: /tmp/a.jpg)"
+
+
+def zapisz_zwarte(plik, wpisy):
+    """Jak omp: JSON bez spacji (wyniki narzędzi idą szybką ścieżką, bez parsowania treści)."""
+    with plik.open("a", encoding="utf-8") as f:
+        for w in wpisy:
+            f.write(json.dumps(w, ensure_ascii=False, separators=(",", ":")) + "\n")
+
+
+def wpis(i, rodzic, rola, tresc, czas, **reszta):
+    return {"type": "message", "id": i, "parentId": rodzic, "timestamp": czas,
+            "message": {"role": rola, "content": tresc, **reszta}}
+
+
+@pytest.mark.parametrize("zwarte", [False, True])
+def test_szczegoly_kroku_na_zadanie_i_przyrostowo(tmp_path, monkeypatch, zwarte):
+    """Rozwinięty krok: argumenty, myśl od poprzedniego wywołania, wynik dopiero, gdy dojdzie (przyrostowo, z offsetów);
+    oś dalej bez argumentów i wyników, a linie wyników w zapisie omp nie są parsowane."""
+    p = tmp_path / "2026_s3.jsonl"
+    z = zapisz_zwarte if zwarte else zapisz
+    z(p, [
+        {"type": "session", "version": 3, "id": "s3", "timestamp": "2026-11-20T10:00:00Z", "cwd": "/tmp"},
+        wpis("u1", None, "user", [{"type": "text", "text": "napraw"}], "2026-11-20T10:00:00Z"),
+        wpis("a1", "u1", "assistant", [
+            {"type": "thinking", "thinking": "Najpierw sprawdzę log."},
+            {"type": "toolCall", "id": "c1", "name": "bash", "intent": "Czytam log",
+             "arguments": {"command": "tail -n 5 log", "i": "Czytam log"}},
+            {"type": "text", "text": "I jeszcze plik."},
+            {"type": "toolCall", "id": "c2", "name": "edit", "intent": "Poprawiam", "arguments": {"path": "a.py"}}],
+            "2026-11-20T10:00:01Z"),
+    ])
+    kroki = cz.os_sesji(p)["wpisy"][-1]["kroki"]
+    assert [(k["id"], k["wpis"]) for k in kroki] == [("c1", "a1"), ("c2", "a1")]
+    k1 = cz.szczegoly(p, "a1", "c1")
+    assert (k1["argumenty"]["command"], k1["mysl"], k1["wynik"]) == ("tail -n 5 log", "Najpierw sprawdzę log.", None)
+    k2 = cz.szczegoly(p, "a1", "c2")
+    assert (k2["narzedzie"], k2["mysl"], k2["wynik"]) == ("edit", "I jeszcze plik.", None)
+
+    parsowane = []
+    skrot = cz._skrot
+    monkeypatch.setattr(cz, "_skrot", lambda e: parsowane.append(e["id"]) or skrot(e))
+    od = cz._PAMIEC[str(p)]["od"]
+    z(p, [
+        wpis("r1", "a1", "toolResult", [{"type": "text", "text": "linia 1\nlinia 2"}], "2026-11-20T10:00:03Z",
+             toolCallId="c1", toolName="bash", details={"exitCode": 0, "wallTimeMs": 120}, isError=False),
+        wpis("r2", "r1", "toolResult", [{"type": "text", "text": "Edit rejected"}], "2026-11-20T10:00:04Z",
+             toolCallId="c2", toolName="edit", details={"diff": "-a\n+b"}, isError=True),
+    ])
+    k1 = cz.szczegoly(p, "a1", "c1")
+    assert (k1["wynik"], k1["kod"], k1["czas_ms"], k1["blad"]) == ("linia 1\nlinia 2", 0, 120, False)
+    k2 = cz.szczegoly(p, "a1", "c2")
+    assert (k2["wynik"], k2["zmiana"], k2["blad"], k2["czas_ms"]) == ("Edit rejected", "-a\n+b", True, 3000)
+    assert cz._PAMIEC[str(p)]["od"] > od                   # dopisane linie czytane od offsetu
+    assert parsowane == ([] if zwarte else ["r1", "r2"])  # zapis omp: wyników nie parsujemy przy czytaniu osi
+    assert cz.szczegoly(p, "a1", "c1") is k1               # gotowy krok z pamięci
+    assert cz.szczegoly(p, "a1", "c9") is None and cz.szczegoly(p, "u1", "c1") is None
+    assert cz.szczegoly(p, "brak", "c1") is None and cz.szczegoly(tmp_path / "brak.jsonl", "a1", "c1") is None
+    assert "linia 1" not in json.dumps(cz.os_sesji(p))     # oś nadal bez wyników

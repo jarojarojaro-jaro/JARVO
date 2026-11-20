@@ -33,7 +33,7 @@ from conftest import load_script  # noqa: E402
 M = SimpleNamespace(**{n: load_script(f"hq/plugin/{n}.py", f"jarvo_test_cs_{n}") for n in (
     "hq_core", "ochrona", "agenci", "rozmowy", "czytnik", "kontekst", "wzmianki", "budzenia", "scalanie", "brama",
     "strumien", "przebiegi", "prace", "karty", "obserwator", "tematy", "lustro", "omp_sesje", "czytnik_omp", "rozmowcy",
-    "silnik")})
+    "silnik", "komendy")})
 trasy = load_script("hq/plugin/trasy_rozmow.py", "jarvo_test_cs_trasy")
 P = "/api/plugins/jarvo-hq"
 CZAT = "-1001234567890"
@@ -319,6 +319,47 @@ def test_omp_panel_do_telegrama_i_telegram_do_panelu(c):
     assert len(_agent(c.os("s:op"), "Gotowe, zrobione.")) == 2 and len(_wlasciciel(c.os("s:op"), "sprawdź dysk")) == 1
     # Telegram omp nie idzie przez lustro panelu (Bot API atrapy pusty)
     assert c.tg_api.wyslane == []
+
+
+def test_omp_szczegoly_kroku(c):
+    """Rozwinięty krok sesji omp (GET /rozmowy/{id}/krok): argumenty i wynik z pliku sesji na żądanie (oś ich nie
+    niesie), sekrety ukryte, odczyt tylko z panelu, krok z obcego wątku i zły adres = 404."""
+    pid = c.wyslij("s:op", "sprawdź dysk")["przebiegi"][0]["id"]
+    c.do_stanu(pid, "gotowe")
+    os_ = czekaj(lambda: (lambda o: o if _agent(o, "Gotowe, zrobione.") else None)(c.os("s:op")), opis="oś omp")
+    (krok,) = [k for x in os_ if x["rodzaj"] == "kroki" for k in x["kroki"]]
+    assert krok["ref"].startswith("o:") and krok["ref"].endswith(":c1") and "SEKRET" not in json.dumps(os_)
+    url = f"{P}/rozmowy/{c.wid('s:op')}/krok"
+    r = c.k.get(url, params={"ref": krok["ref"]})
+    assert r.status_code == 200, r.text
+    k = r.json()["krok"]
+    assert (k["narzedzie"], k["intencja"], k["argumenty"]) == ("bash", "Sprawdzam GPU",
+                                                              [{"klucz": "command", "wartosc": "cat SEKRET"}])
+    assert k["wynik"] == "SEKRET" and k["gotowy"] and not k["blad"] and not k["przyciete"]
+    assert c.k.get(url, params={"ref": krok["ref"]}, headers={"sec-fetch-site": "cross-site"}).status_code == 403
+    for wid, ref in ((c.wid("s:gpu"), krok["ref"]), (c.wid("s:op"), "o:brak:c1"), (c.wid("s:op"), "o:../x:c1"),
+                     (c.wid("s:op"), "h:jarvo:rozmowa:c1")):
+        r = c.k.get(f"{P}/rozmowy/{wid}/krok", params={"ref": ref})
+        assert r.status_code == 404 and r.json()["blad"]["kod"] == "brak", (ref, r.status_code)
+    # krok z sekretami dopisany do pliku sesji tak jak zapisuje omp (JSON bez spacji): w panelu ukryte
+    plik = c.home.parent / "op" / "sesje" / f"2026_{SESJA_OP}.jsonl"
+    lisc = (c.atrapa_omp / f"lisc_{SESJA_OP}").read_text()
+    token, haslo = "ghp_" + "Q" * 36, "Tajne123haslo"
+    with plik.open("a") as f:
+        for e in ({"type": "message", "id": "s1a", "parentId": lisc, "timestamp": "2026-11-20T10:00:00Z", "message": {
+                      "role": "assistant", "content": [
+                          {"type": "thinking", "thinking": f"Użyję {token}"},
+                          {"type": "toolCall", "id": "c7", "name": "bash", "intent": "Pobieram",
+                           "arguments": {"command": f"curl -H 'Authorization: Bearer {haslo}' https://x"}}]}},
+                  {"type": "message", "id": "s1r", "parentId": "s1a", "timestamp": "2026-11-20T10:00:02Z", "message": {
+                      "role": "toolResult", "toolCallId": "c7", "toolName": "bash",
+                      "content": [{"type": "text", "text": f"PASSWORD={haslo}\nGH_TOKEN={token}"}], "isError": False}}):
+            f.write(json.dumps(e, separators=(",", ":")) + "\n")
+    (krok,) = [k for x in c.os("s:op") if x["rodzaj"] == "kroki" for k in x["kroki"] if k["ref"].endswith(":c7")]
+    r = c.k.get(url, params={"ref": krok["ref"]})
+    assert r.status_code == 200 and token not in r.text and haslo not in r.text, r.text
+    k = r.json()["krok"]
+    assert k["wynik"] == "PASSWORD=[ukryte]\nGH_TOKEN=[ukryte]" and k["mysl"] == "Użyję [ukryte]" and k["czas_ms"] == 2000
 
 
 def test_omp_terminal_kolejka_i_potwierdzenie(c):

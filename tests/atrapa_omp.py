@@ -61,7 +61,8 @@ if "--session-dir" in a and "--resume" in a:
                         ("toolResult", [{"type": "text", "text": "SEKRET"}]),
                         ("assistant", [{"type": "text", "text": odp}])):
         i = uuid.uuid4().hex[:8]
-        linie.append(dict(type="message", id=i, parentId=rodzic, timestamp=teraz, message=dict(role=rola, content=tresc)))
+        wiad = dict(role=rola, content=tresc, **({"toolCallId": "c1", "toolName": "bash"} if rola == "toolResult" else {}))
+        linie.append(dict(type="message", id=i, parentId=rodzic, timestamp=teraz, message=wiad))
         rodzic = i
     sd.mkdir(parents=True, exist_ok=True)
     with plik.open("a") as f:
