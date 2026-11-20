@@ -2042,13 +2042,18 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-rozm-skrot { font: 10px var(--j-font-mono); color: var(--j-tekst-3); border: 1px solid var(--j-linia); border-radius: 3px; padding: 0 4px; }
 .j-rozmowcy.is-duza .j-rozm { min-height: 60px; grid-template-columns: 40px 1fr auto; }
 .j-rk { position: absolute; right: -4px; bottom: -4px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--j-tlo-2); background: var(--j-tekst-3); }
-.j-rk.is-pracuje { background: var(--j-akcent); animation: j-rk-puls 1.4s ease-in-out infinite; }
+/* puls pracy: pierścień w ::after z samą opacity (kompozytor); box-shadow, a nawet transform tu, liczył styl co klatkę */
+.j-rk.is-pracuje { background: var(--j-akcent); }
+.j-rk.is-pracuje::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 4px solid color-mix(in srgb, var(--j-akcent) 25%, transparent);
+  opacity: 0; animation: j-rk-puls 1.4s ease-in-out infinite; }
 .j-rk.is-czeka { background: var(--j-uwaga); }
 .j-rk.is-wolny { background: var(--j-tlo-2); box-shadow: inset 0 0 0 2px var(--j-tekst-3); }
 .j-rk.is-terminal { background: var(--j-terminal); }
 .j-rk.is-kolejka { background: var(--j-terminal); opacity: .7; }
 .j-rk.is-offline { background: var(--j-linia-mocna); }
-@keyframes j-rk-puls { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--j-akcent) 25%, transparent); } }
+@keyframes j-rk-puls { 50% { opacity: 1; } }
+/* mruganie figurek (opacity w SVG liczy styl co klatkę) tylko przy żywym dymku, w historii osi figurki stoją */
+.j-os .thq-px-lid { animation: none; } .j-os .is-zywy .thq-px-lid { animation: thq-px-lid 4.3s steps(1) infinite; }
 .j-nawig, .j-inne { list-style: none; margin: 6px 8px 0; padding: 8px 0 0; border-top: 1px solid var(--j-linia); }
 .j-nawig a, .j-nawig button, .j-inne a { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; border-radius: 6px; color: var(--j-tekst); text-decoration: none; background: none; border: 0; font: inherit; cursor: pointer; }
 .j-nawig a:hover, .j-nawig button:hover, .j-inne a:hover { background: var(--j-tlo-hover); }

@@ -63,6 +63,18 @@ function Zrodlo({ zrodlo, ts }) {
   return html`<span class="j-zrodlo" data-zrodlo=${z}><span aria-hidden="true">${ZRODLA[z]} </span>${T(`zrodlo.${z}`)}${ts ? ` · ${Czas.godzina(ts)}` : ""}</span>`;
 }
 
+// stan przebiegu wiadomości właściciela (wpis_id → stan): jedna mapa na stan sklepu zamiast przeglądu wszystkich
+// przebiegów przez każdy dymek przy każdym zdarzeniu strumienia (pierwszy przebieg wpisu wygrywa, jak wcześniej)
+let stanyWpisow = { p: null, m: null };
+function stanWpisu(przebiegi, id) {
+  if (stanyWpisow.p !== przebiegi) {
+    const m = new Map();
+    for (const p of Object.values(przebiegi)) if (p.wpis_id && !m.has(p.wpis_id)) m.set(p.wpis_id, p.stan);
+    stanyWpisow = { p: przebiegi, m };
+  }
+  return stanyWpisow.m.get(id) || null;
+}
+
 function WiadomoscWlasciciela({ x, k, rozmowca }) {
   const o = x.oczekuje, w = x.wpis || {};
   const adresaci = (o ? o.adresaci : w.adresaci) || [];
@@ -76,11 +88,7 @@ function WiadomoscWlasciciela({ x, k, rozmowca }) {
   // dopisana do trwającej tury (Enter w trakcie pracy, „Wyślij teraz do trwającej pracy” albo sama z kolejki):
   // „Dopisuję…”, potem „Dopisana”; wróciła do kolejki albo poszła jako własna tura = pokazuje to jej żywy dymek
   const dop = !!(w.dane && w.dane.dopisane_do);
-  const stanDop = useSklep((s) => {
-    if (o) return null;
-    for (const p of Object.values(s.przebiegi)) if (p.wpis_id === x.id) return p.stan;
-    return null;
-  });
+  const stanDop = useSklep((s) => (o ? null : stanWpisu(s.przebiegi, x.id)));
   return html`<article class="j-msg j-msg-ja" data-wpis=${o ? undefined : x.id} data-zrodlo=${rozmowca ? x.zrodlo || "panel" : undefined}>
     <h3 class="j-sr">${T("os.ty")}, ${Czas.godzina(x.ts)}</h3>
     ${bezposrednio && adresaci.length > 0 && html`<p class="j-msg-tag"><${Ikona} n="turn" r=${14}/>

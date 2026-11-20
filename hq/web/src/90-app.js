@@ -335,6 +335,13 @@ function AplikacjaJarvo() {
     m.setAttribute("role", "none");
     return () => m.removeAttribute("role");
   }, []);
+  // Hermes na każdy „selectstart” zmienia --selection-bg na <html>, co liczy na nowo styl całej strony (~30 ms, przy
+  // 4× wolniejszym CPU ~250 ms przyciecia); aplikacja ma własny kolor zaznaczenia, więc zdarzenie zostaje w niej
+  React.useLayoutEffect(() => {
+    const el = korzen.current, stop = (e) => e.stopPropagation();
+    if (el) el.addEventListener("selectstart", stop);
+    return () => el && el.removeEventListener("selectstart", stop);
+  }, []);
 
   // pierwsze spotkanie na całym ekranie: same pytania, bez paska rozmów i górnej belki
   if (!["watek", "sesja", "ustawienia", "rozmowca", "aktualizacje"].includes(trasa.widok) && (poznanie === "trwa" || poznanie === "mozg" || poznanieOtwarte(got))) {

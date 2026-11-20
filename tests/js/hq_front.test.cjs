@@ -377,6 +377,33 @@ test("Os.widok: tura z Telegrama to jedna wiadomość, komentarze między narzę
   eq(Os.widok([wl, a(1, 10, "x"), a(2, 20, "Zrobić?", { czeka_na_tak: true })], []).map((x) => x.id), ["w1", "a1", "a2"]);
 });
 
+test("Os.stabilny i rowneAktywne: delta strumienia nie podmienia niezmienionych pozycji (memo osi, 20.11 „laguje”)", () => {
+  const wl = { id: "w1", rodzaj: "wlasciciel", ts: 0 };
+  const k = (n, ts) => ({ id: `k${n}`, rodzaj: "kroki", ts, agent: "jarvo", kroki: [{ ts, narzedzie: `n${n}` }] });
+  const a = (n, ts, tekst, extra = {}) => ({ id: `a${n}`, rodzaj: "agent", ts, agent: "jarvo", tekst, ...extra });
+  const poz = [wl, k(1, 10), a(1, 10, "Sprawdzam."), a(2, 20, "Wynik", { pliki: [{ path: "/r.md" }] }), { id: "w2", rodzaj: "wlasciciel", ts: 40 }];
+  const zywy = { id: "p1", wpis_id: "w2", stan: "pracuje", tekst: "pi" };
+  const v1 = Os.stabilny(Os.widok(poz, [zywy]), null);
+  const mapa = new Map(v1.map((x) => [x.id, x]));
+  // nowa delta: sklejona tura liczona od nowa (nowe obiekty kroków z komentarzem) wraca jako ten sam obiekt, dymek nowy
+  const v2 = Os.stabilny(Os.widok(poz, [{ ...zywy, tekst: "pisze" }]), mapa);
+  eq(v2.map((x) => x.id), ["w1", "a2", "w2", "z:p1"]);
+  assert.ok(v2[1] === v1[1] && v2[0] === v1[0] && v2[2] === v1[2]);
+  assert.ok(v2[3] !== v1[3]);
+  eq(v2[3].przebieg.tekst, "pisze");
+  // zmieniona pozycja (nowy tekst albo nowy krok w turze) dostaje nowy obiekt
+  const v3 = Os.stabilny(Os.widok(poz.map((x) => (x.id === "a2" ? { ...x, tekst: "Wynik 2" } : x)), [zywy]), mapa);
+  assert.ok(v3[1] !== v1[1] && v3[0] === v1[0]);
+  const v4 = Os.stabilny(Os.widok([...poz.slice(0, 3), k(2, 15), ...poz.slice(3)], [zywy]), mapa);
+  assert.ok(v4[1] !== v1[1]);
+  eq(v4[1].kroki.map((x) => x.komentarz || x.narzedzie), ["Sprawdzam.", "n1", "n2"]);
+  // pasek pracy: delta tekstu nie zmienia aktywnych przebiegów, zmiana stanu tak
+  const p = { id: "p1", stan: "pracuje", agent: "jarvo", tekst: "a" };
+  assert.ok(Os.rowneAktywne([p], [{ ...p, tekst: "ab" }]));
+  assert.ok(!Os.rowneAktywne([p], [{ ...p, stan: "zatrzymywanie" }]));
+  assert.ok(!Os.rowneAktywne([p], []));
+});
+
 test("Os.widok: żywy dymek za wpisem, schowane pozycje w toku, koniec po odpowiedzi", () => {
   const poz = [p("m1", { rodzaj: "wlasciciel" }), p("t1", { rodzaj: "agent", przebieg_id: "p1", w_toku: true }), p("m2", { rodzaj: "wlasciciel" })];
   const zywy = { id: "p1", wpis_id: "m1", stan: "pracuje", tekst: "pi" };

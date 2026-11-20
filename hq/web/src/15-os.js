@@ -404,6 +404,15 @@ const Os = (() => {
     }
   }
 
+  // Widok liczony na nowo przy każdym zdarzeniu (delta, krok, watek.os) skleja tury w nowe obiekty, więc memo pozycji
+  // osi nic nie dawało: cała historia rysowała się i parsowała Markdown co zdarzenie. Pozycja równa poprzedniej
+  // (pola, tablice i ich obiekty płytko) wraca jako ten sam obiekt; `stare`: poprzedni wynik (id → pozycja).
+  const rowne = (a, b, g) => Object.is(a, b) || (g > 0 && a && b && typeof a === "object" && typeof b === "object"
+    && Array.isArray(a) === Array.isArray(b) && Object.keys(a).length === Object.keys(b).length
+    && Object.keys(a).every((k) => rowne(a[k], b[k], g - 1)));
+  const stabilny = (nowe, stare) => nowe.map((x) => (stare && stare.has(x.id) && rowne(x, stare.get(x.id), 3) ? stare.get(x.id) : x));
+  // przebiegi do zatrzymania: równe, gdy te same id i stany (pasek pracy, Esc Esc); tekst z delt ich nie zmienia
+  const rowneAktywne = (a, b) => a.length === b.length && a.every((p, i) => ["id", "stan", "powod", "agent", "przyjety_at"].every((k) => p[k] === b[i][k]));
   // przebiegi wątku, które Stop (i Esc Esc) zatrzymuje: także nadzór i wysyłane
   const doZatrzymania = (przebiegiWatku) => (przebiegiWatku || []).filter((p) => DO_ZATRZYMANIA.has(p.stan));
 
@@ -417,8 +426,8 @@ const Os = (() => {
   }
 
   return { KONCOWE, PONOWIALNE, DO_ZATRZYMANIA, porownaj, FILTRY, listaStrona, listaZmiana, listaUsun, osStrona, osWpis,
-    zWpisu, zMigawki, przebieg, dodajPrzebiegi, scalPrzebieg, zastosujZdarzenie, widok, kartyWatku, noweOdTad, ryzyko,
-    wyboryZgody, krokiPodsumowanie, doZatrzymania, klasaBledu, agenciRozmowcow, rozmowcaWatku };
+    zWpisu, zMigawki, przebieg, dodajPrzebiegi, scalPrzebieg, zastosujZdarzenie, widok, stabilny, rowneAktywne, kartyWatku,
+    noweOdTad, ryzyko, wyboryZgody, krokiPodsumowanie, doZatrzymania, klasaBledu, agenciRozmowcow, rozmowcaWatku };
 })();
 
 // ------------------------------------------------------------------------------------------------- kompozytor

@@ -1310,6 +1310,15 @@ innych kanałów etap 6.
   skanowania `body::after`, poświata `text-shadow`, kwadratowe przyciski, tła pól, krój nagłówka) działa tylko przy
   `data-jarvo-app`. Ruch krótki (`--j-ease`), przy `prefers-reduced-motion` bez animacji i bez płynnego
   przewijania (`Ruch.zachowanie()`).
+- **Płynność** (20.11, pomiar w headless Chrome na żywym panelu, także przy CPU 4× wolniejszym): bez pracy nic nie
+  liczy się co klatkę. Animacje nieskończone tylko na właściwościach kompozytora (puls kropki pracy `.j-rk` to
+  `opacity` pierścienia w `::after`; `box-shadow` i nawet `transform` tu liczyły styl i malowały co klatkę, ~20%
+  wątku głównego), mruganie figurek (opacity w SVG) w osi tylko przy żywym dymku. Zdarzenie strumienia (delta,
+  krok, `watek.os`) rysuje tylko zmienione pozycje: `Os.stabilny` oddaje ten sam obiekt dla pozycji równej
+  poprzedniej (sklejone tury są liczone od nowa przy każdym zdarzeniu), `ElementOsi` i `Kompozytor` są memo, pasek
+  pracy patrzy na id i stany przebiegów (`Os.rowneAktywne`), a nie na ich tekst. Markdown zapamiętuje sparsowane
+  bloki (300 ostatnich tekstów), stopka nie rysuje się na nowo przy tej samej odpowiedzi licznika, a `selectstart`
+  nie wychodzi z aplikacji (Hermes zmienia wtedy `--selection-bg` na `<html>`, co liczy styl całej strony).
 - **Fokus** (`Fokus` w `20-ui.js`): `Fokus.odloz(cel)` ustawia fokus po zmianie widoku (kompozytor albo selektor,
   ponawia do 1,5 s; element bez fokusu dostaje `tabindex=-1`). Zamknięta warstwa (szuflada, okno, menu) oddaje
   fokus temu, co ją otworzyło, tylko gdy fokus był w warstwie albo spadł na `<body>`. Usunięcie wątku z listy

@@ -123,12 +123,13 @@ const stanPracy = (p) => (p.stan === "przyjety" && (p.powod === "terminal" || p.
   ? T(p.powod === "terminal" ? "zywo.terminal" : "zywo.kolejka") : T(`przebieg.${p.stan}`));
 
 // ------------------------------------------------------------------------------------------------- kompozytor
-function Kompozytor({ watek = null, panel = 0, koordynator = "jarvo", start = false }) {
+// memo: wątek rysuje się przy każdej delcie strumienia, a pole z paskiem pracy nie ma po co (jego dane to props i sklep)
+const Kompozytor = React.memo(function KompozytorW({ watek = null, panel = 0, koordynator = "jarvo", start = false }) {
   const k = watek || "nowa";
   const kluczA = `${panel}:${k}`;
   const wybrany = useSklep((s) => s.adresaci[kluczA] || null);
   const brama = useSklep((s) => (s.gotowosc && s.gotowosc.brama) || null);
-  const aktywne = useSklep((s) => (watek ? Os.doZatrzymania(Object.values(s.przebiegi).filter((p) => p.watek_id === watek)) : []), plytko);
+  const aktywne = useSklep((s) => (watek ? Os.doZatrzymania(Object.values(s.przebiegi).filter((p) => p.watek_id === watek)) : []), Os.rowneAktywne);
   const agenci = useAgenciFloty(koordynator);
   const aliasy = useMemo(() => Wzmianki.mapaAliasow(agenci), [agenci]);
   const nazwy = useMemo(() => Wzmianki.nazwyAgentow(agenci), [agenci]);
@@ -391,4 +392,4 @@ function Kompozytor({ watek = null, panel = 0, koordynator = "jarvo", start = fa
    </div>
     <p class=${cx("j-komp-pod", pod && pod.zle && "is-zle")} id=${`${id}-pod`} aria-live="polite">${pod ? pod.t : ""}</p>
   </div>`;
-}
+});

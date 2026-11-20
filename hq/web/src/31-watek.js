@@ -71,8 +71,13 @@ function Watek({ id, panel = 0, rozmowca = null }) {
     if (granica === undefined && os && !os.laduje) setGranica(Os.noweOdTad(os.pozycje, nieprzeczytane0.current || 0));
   }, [os, granica]);
 
-  const pozycje = useMemo(() => Os.widok(os ? os.pozycje : [], przebiegi, { szczegoly, oczekujace }),
-    [os, przebiegi, szczegoly, oczekujace]);
+  // ten sam obiekt dla niezmienionej pozycji (Os.stabilny): ElementOsi (memo) rysuje tylko to, co się zmieniło
+  const poprzednie = useRef(null);
+  const pozycje = useMemo(() => {
+    const p = Os.stabilny(Os.widok(os ? os.pozycje : [], przebiegi, { szczegoly, oczekujace }), poprzednie.current);
+    poprzednie.current = new Map(p.map((x) => [x.id, x]));
+    return p;
+  }, [os, przebiegi, szczegoly, oczekujace]);
   // karty pracy przekazane w wątku: stan z tablicy na żywo (35-karty.js)
   const idsKart = useMemo(() => [...Os.kartyWatku(os ? os.pozycje : [])], [os]);
   useKartyWatku(id, idsKart);

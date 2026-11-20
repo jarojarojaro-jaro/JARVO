@@ -468,7 +468,17 @@ function BlokKodu({ jezyk, kod }) {
 
 // tekst wiadomości jako Markdown. Strumień: stały początek (do ostatniej pustej linii poza kodem) parsowany raz,
 // ogon na nowo co klatkę animacji (delty przychodzą co ≤ 50 ms, rysujemy najwyżej raz na klatkę)
-const BlokiMd = React.memo ? React.memo(({ tekst, pomin }) => renderujBloki(Md.parsuj(tekst), { pomin })) : null;
+// sparsowane bloki po tekście (ostatnie 300): wiadomość montowana znowu (powrót do rozmowy, przełączanie) nie parsuje
+// się od nowa; ogon strumienia (`ogon`, inny co klatkę) parsuje się bez pamięci
+const mdPamiec = new Map();
+function blokiZPamieci(tekst) {
+  let b = mdPamiec.get(tekst);
+  if (b) mdPamiec.delete(tekst);
+  else { b = Md.parsuj(tekst); if (mdPamiec.size >= 300) mdPamiec.delete(mdPamiec.keys().next().value); }
+  mdPamiec.set(tekst, b);
+  return b;
+}
+const BlokiMd = React.memo ? React.memo(({ tekst, pomin, ogon }) => renderujBloki(ogon ? Md.parsuj(tekst) : blokiZPamieci(tekst), { pomin })) : null;
 
 // Jedno rysowanie naraz, z najnowszym tekstem: kolejna delta nie anuluje czekającej klatki (inaczej przy deltach
 // częstszych niż klatki, np. w karcie w tle, gdzie klatek nie ma, tekst stałby do końca odpowiedzi); gdy klatki
@@ -498,5 +508,5 @@ function TrescMd({ tekst, zywy = false, pomin = null, klasa }) {
   const t = useKlatka(String(tekst || ""), zywy);
   if (!zywy) return html`<div class=${cx("j-md", klasa)}><${BlokiMd} tekst=${t} pomin=${pomin}/></div>`;
   const g = Md.granica(t);
-  return html`<div class=${cx("j-md", klasa)}><${BlokiMd} tekst=${t.slice(0, g)} pomin=${pomin}/><${BlokiMd} tekst=${t.slice(g)} pomin=${pomin}/></div>`;
+  return html`<div class=${cx("j-md", klasa)}><${BlokiMd} tekst=${t.slice(0, g)} pomin=${pomin}/><${BlokiMd} tekst=${t.slice(g)} pomin=${pomin} ogon/></div>`;
 }

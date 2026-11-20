@@ -28,7 +28,8 @@ function Stopka({ watek }) {
     let zywy = true, t = 0;
     const tik = async () => {
       if (!document.hidden) {
-        try { const r = await api.rozmowy.licznik(watek); if (zywy) setD(r.licznik); } catch (_) { /* bez stopki */ }
+        // ta sama odpowiedź co 2 s nie rysuje stopki na nowo
+        try { const r = await api.rozmowy.licznik(watek); if (zywy) setD((s) => (JSON.stringify(s) === JSON.stringify(r.licznik) ? s : r.licznik)); } catch (_) { /* bez stopki */ }
       }
       if (zywy) t = setTimeout(tik, praca ? 2000 : 30000);
     };
