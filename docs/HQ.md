@@ -1183,12 +1183,16 @@ innych kanałów etap 6.
   sesję trzyma terminal, tura starej skrzynki omp, brama odmówiła). Wiadomość w kolejce ma **Wyślij teraz do trwającej
   pracy** (obok Anuluj, także po Stopie: `POST /przebiegi/<id>/dopisz` z pustym tekstem, odmowa = powód w dymku),
   a dyspozytor sam dopisuje czekające wiadomości właściciela do tury, gdy tylko ta pracuje (`Rejestr._auto_dopisz`;
-  `wstrzymane` i `misja` tylko ręcznie). Pod polem **stopka rozmowy** (`Licznik`, `GET /rozmowy/<id>/licznik` co 2 s
-  w trakcie pracy, inaczej co 30 s, nie w ukrytej karcie), jedna linia jak stopka terminala omp i Hermesa: model,
-  myślenie, tryb szybki, kontekst w tokenach z oknem i % (≈ = szacunek, od 80% w kolorze uwagi), ↑ wejście,
-  ↓ wyjście, cache odczyt/zapis, koszt (omp: z dzisiaj; dymek mówi, że to równoważnik cen API, a cała sesja ile).
-  Model, myślenie i tryb szybki są klikalne (menu z `GET /rozmowy/<id>/opcje`, wybór idzie komendą `/model`,
-  `/effort`, `/fast`, więc zostaje w rozmowie), w sesji omp kontekst też (Skompresuj teraz: `/compact`).
+  `wstrzymane` i `misja` tylko ręcznie). **Stopka w bloczku** (`Stopka` w pakiecie `app-stopka`, `33-stopka.js`,
+  ładowanym przy pierwszej otwartej rozmowie; do tego czasu dolny rząd ma tylko „Do:”, spinacz i wysyłanie, ta sama
+  wysokość): w dolnym rzędzie białego bloczka, jak w czatach z agentami. Obok „Do:” pigułki model (skrót nazwy, np.
+  `opus-5-5`), myślenie (poziom) i ⚡ (wyciszony, gdy tryb szybki wyłączony); klik w model albo myślenie otwiera menu
+  z `GET /rozmowy/<id>/opcje`, ⚡ przełącza, wybór idzie komendą `/model`, `/effort`, `/fast` (zostaje w rozmowie).
+  Przy spinaczu pierścień kontekstu z % okna (kolor uwagi od 80%): najechanie pokazuje szczegóły, klik otwiera je
+  w menu (kontekst z oknem, ↑ wejście ↓ wyjście, cache, koszt dziś i całej sesji z dopiskiem, że to równoważnik cen
+  API) ze „Skompresuj teraz” (omp: `/compact`) albo „Szczegóły” (Hermes: `/context`). Dane: `GET
+  /rozmowy/<id>/licznik` co 2 s w trakcie pracy, inaczej co 30 s, nie w ukrytej karcie. Na wąskim ekranie (poniżej
+  640 px) zostają model (skracany wielokropkiem) i pierścień, bez napisu „Do:”.
 - <a id="komendy"></a>**Komendy** (`33-komendy.js`, serwer `hq/plugin/komendy.py`): tekst `/nazwa …` nigdy nie idzie do
   agenta (brama Hermesa nie wykonuje komend: `input` `/v1/runs` trafia prosto do modelu, a obsługa `/…` żyje tylko
   w kanałach gatewaya; trasa wiadomości odpowiada 409 `komenda`). Po wpisaniu „/” menu komend rozmowy (`GET /komendy`:
@@ -1391,7 +1395,8 @@ innych kanałów etap 6.
 - **Rozmiar i pakiety (centrum, krok 1a).** Build dzieli aplikację na pakiety (`scripts/hqbuild.py` `PAKIETY`):
   rdzeń `app-rdzen-<h>.js` (powłoka, pasek, wątek, kompozytor, Markdown, strumień, API, i18n PL, figurki, okna
   plików) i na żądanie `app-baza` (Stara Baza), `app-edytor` (edytor filmów, animacja, konwerter; ładowane razem
-  z Bazą), `app-poznajmy` (pierwsze spotkanie z lektorem), `app-ustawienia`, `app-en` (angielski słownik, tylko przy
+  z Bazą), `app-poznajmy` (pierwsze spotkanie z lektorem), `app-ustawienia`, `app-stopka` (stopka bloczka
+  wpisywania), `app-en` (angielski słownik, tylko przy
   angielskim dashboardzie) i `mozg-<h>.js`. CSS dzielą znaczniki `/* @@pakiet <nazwa> */` w `style.css`; Google
   Fonts i biblioteka krojów edytora (`@import`) idą z pakietem Bazy i edytora, nie z pierwszym wejściem. Rdzeń zna
   pakiety z mapy, którą build wstawia w miejsce `"@@PAKIETY@@"` (`00-base.js` `Zasoby.wczytaj`, `usePakiet`,
@@ -1402,7 +1407,8 @@ innych kanałów etap 6.
   (`BUDZET_GZIP`: rdzeń JS ≤ 100 KB, CSS ≤ 18 KB, Mózg ≤ 14 KB; przekroczenie zatrzymuje build). 17.11: rdzeń JS
   ok. 278 KB (86,6 KB gzip), CSS 80 KB (16,1 KB gzip); wcześniej jeden pakiet 262 KB gzip. 20.11: rdzeń 97,2 KB gzip
   (rozwijane kroki i komendy po „/” w kompozytorze), budżet 95 → 100 KB; potem 97,8 KB JS i 17,4 KB CSS (licznik
-  rozmowy, dopisek Enterem, pasek z przewijanym środkiem). Pliki rdzenia nie mogą
+  rozmowy, dopisek Enterem, pasek z przewijanym środkiem), a po wydzieleniu stopki do `app-stopka` (2,3 KB JS,
+  0,5 KB CSS gzip) rdzeń ok. 98,1 KB JS i 17,4 KB CSS. Pliki rdzenia nie mogą
   sięgać do nazw z pakietów inaczej niż przez `Zasoby.wez`, a pakiety nie zmieniają `let` rdzenia (język ustawia
   `ustawJezyk`).
 

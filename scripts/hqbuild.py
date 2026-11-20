@@ -98,6 +98,9 @@ PAKIETY = {
     "mozg": {"pliki": ("63-mozg.js",), "wspolne": ("shared/web/graf.js",), "zalezy": ()},
     # Aktualizacje (#/aktualizacje): archiwum raportów rutyn, poza pierwszym wyświetleniem rozmowy
     "raporty": {"pliki": ("64-raporty.js",), "zalezy": ()},
+    # stopka kompozytora (model, myślenie, tryb szybki, pierścień kontekstu z dymkiem): przy pierwszej otwartej
+    # rozmowie, do tej pory rząd bloczka ma tylko „Do:”, spinacz i wysyłanie (ta sama wysokość)
+    "stopka": {"pliki": ("33-stopka.js",), "zalezy": ()},
 }
 # budżet gzip (bajty) z projektu etapu 1 §7: przekroczenie zatrzymuje build. Mózg 14 KB (19.11, było 6 KB): części,
 # grupy, szukanie w treści, [[linki]] w notatce i skupiska w grafie; pakiet idzie tylko po wejściu w Mózg. Rdzeń 100 KB

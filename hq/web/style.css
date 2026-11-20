@@ -1854,11 +1854,6 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-komp-pasek { display: flex; align-items: center; gap: 6px; padding: 6px 8px 8px 10px; min-width: 0; }
 .j-komp-pod { min-height: 18px; margin: 6px 4px 0; font-size: 12.5px; color: var(--j-tekst-3); line-height: 1.4; }
 .j-komp-pod.is-zle { color: var(--j-blad); }
-.j-licznik { margin: 0 6px; font: 11.5px/1.4 var(--j-font-mono); color: var(--j-tekst-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.j-licznik .is-duzo { color: var(--j-uwaga); }
-.j-licznik-b { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; border-radius: 3px; }
-.j-licznik-b:hover, .j-licznik-b:focus-visible { color: var(--j-tekst); text-decoration: underline dotted; outline: none; }
-.j-licznik-b.is-wl { color: var(--j-akcent); }
 .j-msg-stan.is-dop { gap: 4px; }
 .j-komp-w.is-start { margin-top: 26px; }
 .j-komp-w.is-start .j-komp { border-radius: 22px; }
@@ -2301,3 +2296,24 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   .j-kal-d { aspect-ratio: auto; height: 40px; }
 }
 /* @@pakiet rdzen */
+/* @@pakiet stopka */
+/* stopka kompozytora (33-stopka.js): pigułki obok „Do:” jak .j-do, pierścień kontekstu przy spinaczu; wysokość jak
+   .j-do (30 px), więc rząd bloczka nie skacze, gdy stopka dojdzie */
+.j-pig-w { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+.j-pig { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px; flex: none; border-radius: 999px; --j-r: 999px;
+  border: 1px solid var(--j-linia-2); background: none; font: 12.5px var(--j-font-mono); color: var(--j-tekst-2); white-space: nowrap; cursor: pointer; }
+.j-pig:hover, .j-pig:focus-visible { border-color: var(--j-linia-mocna); color: var(--j-tekst); }
+.j-pig.is-wyc { color: var(--j-tekst-3); opacity: .6; }
+.j-pig-k { gap: 6px; padding: 0 8px; border-color: transparent; }
+.j-pier-t, .j-pier-w { fill: none; stroke-width: 2.4; }
+.j-pier-t { stroke: var(--j-linia-2); }
+.j-pier-w { stroke: var(--j-tekst-2); stroke-linecap: round; }
+.j-pig-k.is-duzo { color: var(--j-uwaga); }
+.j-pig-k.is-duzo .j-pier-w { stroke: var(--j-uwaga); }
+.j-menu-p:disabled { cursor: default; color: var(--j-tekst-2); font-size: 13px; }
+.j-menu-p:disabled:hover { background: none; }
+@container app (max-width: 639px) {
+  .j-pig-w .j-pig.is-zb, .j-komp-pasek .j-do-l { display: none; }
+  .j-pig { padding: 0 8px; }
+  .j-pig-w .j-pig { display: inline-block; line-height: 28px; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+}
