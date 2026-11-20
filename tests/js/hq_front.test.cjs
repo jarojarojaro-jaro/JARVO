@@ -404,6 +404,25 @@ test("Os.stabilny i rowneAktywne: delta strumienia nie podmienia niezmienionych 
   assert.ok(!Os.rowneAktywne([p], []));
 });
 
+test("Os.widok: tura omp w toku tylko w dymku, po końcu na osi (20.11: dymek „Kernel 17:21” i ta sama odpowiedź na osi)", () => {
+  // oś pliku sesji omp nie zna `w_toku`: pozycje tury niosą tylko przebieg_id/przebiegi partii z panelu
+  const wl = { id: "e1", rodzaj: "wlasciciel", ts: 100 };
+  const kroki = (id, ts, n) => ({ id, rodzaj: "kroki", ts, agent: "s:gpu", przebieg_id: "p1", przebiegi: ["p1"], kroki: Array.from({ length: n }, (_, i) => ({ ts: ts + i, narzedzie: "bash" })) });
+  const poz = [{ id: "o:a0", rodzaj: "agent", ts: 90, agent: "s:gpu", tekst: "Poprzednia tura" }, wl, kroki("o:k1", 101, 60),
+    { id: "o:a1", rodzaj: "agent", ts: 200, agent: "s:gpu", tekst: "Move the helper", przebieg_id: "p1", przebiegi: ["p1"] }, kroki("o:a1:k", 200, 12)];
+  const p = { id: "p1", wpis_id: "e1", agent: "s:gpu", stan: "pracuje", tekst: "Move the helper", kroki: [{ ts: 101, narzedzie: "bash" }] };
+  const v = Os.widok(poz, [p]);
+  eq(v.map((x) => x.id), ["o:a0", "e1", "z:p1"]);
+  eq(v.filter((x) => String(x.tekst || (x.przebieg && x.przebieg.tekst) || "").includes("Move the helper")).length, 1);
+  // koniec przebiegu: dymek znika, cała tura (72 kroki i odpowiedź) stoi na osi raz
+  const po = Os.widok(poz, [{ ...p, stan: "gotowe" }]);
+  eq(po.map((x) => x.id), ["o:a0", "e1", "o:a1"]);
+  eq(po[2].kroki.length, 72);
+  // karta pracy z trwającej tury dalej stoi pod dymkiem
+  const karta = { id: "o:a1:p1", rodzaj: "przekazanie", ts: 150, agent: "s:gpu", przebieg_id: "p1", przebiegi: ["p1"], karta: { task_id: "t1" } };
+  eq(Os.widok([...poz.slice(0, 3), karta, ...poz.slice(3)], [p]).map((x) => x.id), ["o:a0", "e1", "z:p1", "o:a1:p1"]);
+});
+
 test("Os.widok: żywy dymek za wpisem, schowane pozycje w toku, koniec po odpowiedzi", () => {
   const poz = [p("m1", { rodzaj: "wlasciciel" }), p("t1", { rodzaj: "agent", przebieg_id: "p1", w_toku: true }), p("m2", { rodzaj: "wlasciciel" })];
   const zywy = { id: "p1", wpis_id: "m1", stan: "pracuje", tekst: "pi" };

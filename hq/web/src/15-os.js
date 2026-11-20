@@ -243,6 +243,10 @@ const Os = (() => {
       && (!KONCOWE.has(p.stan) || ((p.tekst || p.blad || (PONOWIALNE.has(p.stan) && (p.stan !== "zatrzymane" || !maSlad(p))))
         && !maOdpowiedz(p))));
     const ukryte = new Set(zywe.map((p) => p.id));
+    // trwająca tura z dymkiem: jej pozycje pokazuje dymek. Hermes znaczy je `w_toku`, oś sesji omp nie (plik sesji nie
+    // wie o przebiegu), więc tura omp w toku stała dwa razy: dymek „Kernel 17:21” i ta sama odpowiedź na osi (20.11)
+    const trwajace = zywe.filter((p) => !KONCOWE.has(p.stan));
+    const wDymku = (x) => (x.w_toku && ukryte.has(x.przebieg_id)) || trwajace.some((p) => jego(x, p));
     const stop = new Map(lista.filter((p) => p.stan === "zatrzymane" && !ponowione.has(p.id) && !ukryte.has(p.id)).map((p) => [p.id, p]));
     // budzenia kart z tego wątku: stan pokazuje karta pracy, więc pośrednie (oddana do oceny, ponowienia) znikają,
     // a ostatnie „completed” każdej karty to wiadomość „<agent> · skończone” (rodzaj `koniec`)
@@ -255,7 +259,7 @@ const Os = (() => {
     const out = [];
     for (const x of pozycje) {
       // karta pracy z trwającej tury stoi od razu pod żywym dymkiem; reszta tury jest w dymku
-      if (x.w_toku && ukryte.has(x.przebieg_id) && !(x.rodzaj === "przekazanie" && x.karta && x.karta.task_id)) continue;
+      if (wDymku(x) && !(x.rodzaj === "przekazanie" && x.karta && x.karta.task_id)) continue;
       if (x.rodzaj === "budzenie" && x.budzenie && karty.has(x.budzenie.task_id)) {
         if (ostatniKoniec.get(x.budzenie.task_id) === x.id) out.push({ ...x, rodzaj: "koniec" });
         continue;

@@ -44,6 +44,13 @@ from typing import Any, Callable, Iterable, Mapping
 LIMIT = 80
 LIMIT_MAKS = 200
 PODGLAD_KROKU = 300
+# Podgląd wyniku kroku liczony tylko dla pozycji zwracanej strony (_podglady_strony), z redakcją samego początku wyniku
+# (PRZED_PODGLADEM znaków; sekret zaczęty w pokazanych 300 znakach mieści się w nim cały, klucz prywatny wzorzec łapie
+# do końca tekstu) i pamięcią gotowych podglądów po skrócie tego początku. 20.11: oś wątku Jarva (~500 pozycji, ~700
+# wyników narzędzi) liczyła ~1,3 s na każde zapytanie, z czego ~1,2 s to redakcja wyników całej historii.
+PRZED_PODGLADEM = 4096
+PODGLADY_MAKS = 8192
+_podglady: dict[tuple[Callable, str], str] = {}
 OKNO_SHA = 2.0
 BLAD_NARZEDZIA = re.compile(r'^\s*(?:\{\s*"(?:error|blad)"|Error\b|ERROR\b|Traceback\b)')
 SYSTEMOWE = {"auto_continue": "Automatyczna kontynuacja", "model_switch": "Zmiana modelu",
@@ -61,6 +68,23 @@ def bez_ciszy(tekst: str) -> str:
 
 def _sha(tekst: str) -> str:
     return hashlib.sha256(str(tekst or "").encode("utf-8", "surrogatepass")).hexdigest()
+
+
+def _podglad(tresc: str, utajnij: Callable[[str], str] | None) -> str:
+    """Początek wyniku narzędzia po redakcji (PODGLAD_KROKU znaków); ten sam początek liczony raz na proces."""
+    poczatek = tresc[:PRZED_PODGLADEM]
+    if utajnij is None:
+        return poczatek[:PODGLAD_KROKU]
+    klucz = (utajnij, _sha(poczatek))
+    gotowy = _podglady.get(klucz)
+    if gotowy is None:
+        if len(_podglady) >= PODGLADY_MAKS:      # najstarszy wypada; trasy liczą oś w kilku wątkach naraz
+            try:
+                _podglady.pop(next(iter(_podglady)), None)
+            except (StopIteration, RuntimeError):
+                pass
+        gotowy = _podglady[klucz] = utajnij(poczatek)[:PODGLAD_KROKU]
+    return gotowy
 
 
 def _etykieta_domyslna(nazwa: str | None, args: Any = None) -> dict:
@@ -188,7 +212,7 @@ def _czlonek(agent: str, rola: str, linia: list[dict], przebiegi: list[dict], wp
                 k = kroki_wywolan.get(m.get("tool_call_id") or "")
                 if k is not None:
                     k["blad"] = bool(BLAD_NARZEDZIA.match(tresc))
-                    k["podglad"] = (utajnij(tresc) if utajnij else tresc)[:PODGLAD_KROKU]
+                    k["_wynik"] = tresc[:PRZED_PODGLADEM]   # podgląd (redakcja) dopiero dla strony osi: _podglady_strony
                     p = przekazania.get(m.get("tool_call_id") or "")
                     if p is not None:
                         try:
@@ -555,6 +579,15 @@ def _czyste(p: dict) -> dict:
     return {k: v for k, v in p.items() if not k.startswith("_")}
 
 
+def _podglady_strony(strona: list[tuple[str, dict]], utajnij: Callable[[str], str] | None) -> None:
+    """Podglądy wyników kroków tylko w pozycjach tej strony: oś czyta całą historię, a redakcja wszystkich wyników
+    była większością czasu zapytania."""
+    for _s, p in strona:
+        for k in p.get("kroki") or ():
+            if "_wynik" in k:
+                k["podglad"] = _podglad(k.pop("_wynik"), utajnij)
+
+
 def os_watku(db, czytnik, wid: str, *, przed: str | None = None, po: str | None = None, limit: int = LIMIT,
              **kw) -> dict:
     """Strona osi czasu: najnowsza (domyślnie), starsza (`przed`) albo nowsza (`po`)."""
@@ -583,6 +616,7 @@ def os_watku(db, czytnik, wid: str, *, przed: str | None = None, po: str | None 
             nowe[s][1] = max(nowe[s][0], min(nowe[s][1], inf["od_ponownie"]))
     ma_starsze = any(p["_i"] < nowe.get(s, [0, 0])[0] for s, p in scalone)
     kursor = koduj_kursor(g, nowe)
+    _podglady_strony(strona, kw.get("utajnij"))
     wynik = {"pozycje": [_czyste(p) for _s, p in strona], "przed": kursor if ma_starsze else None, "po": kursor}
     if pelny:
         wynik["pelny"] = True

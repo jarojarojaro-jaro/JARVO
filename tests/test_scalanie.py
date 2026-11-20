@@ -81,6 +81,36 @@ def test_kursor_w_obie_strony_i_zly():
             sc.dekoduj_kursor(zly)
 
 
+def test_podglad_krokow_tylko_na_stronie_z_redakcja_poczatku_i_pamiecia():
+    """20.11: oś Jarva liczyła ~1,3 s, bo redagowała wszystkie wyniki narzędzi całej historii; teraz tylko strona,
+    tylko początek wyniku (sekret w pokazanym fragmencie dalej zamaskowany) i raz na ten sam początek."""
+    wiersze = []
+    for n in range(6):                    # 6 tur: krok + wynik + odpowiedź; strona (limit 3) bierze dwie ostatnie
+        wiersze += [wiersz(10 * n + 1, "assistant", "", tool_calls=[{"id": f"c{n}", "function": {
+                        "name": "terminal", "arguments": '{"command": "env"}'}}]),
+                    wiersz(10 * n + 2, "tool", f"wynik {n} token=sk-proj-{'A' * 40} " + "x" * 50_000, tool_call_id=f"c{n}"),
+                    wiersz(10 * n + 3, "assistant", f"tura {n}")]
+    wejscia = []
+
+    def utajnij(t):
+        wejscia.append(len(t))
+        return och.utajnij(t)
+
+    czyt = Czytnik({"web": [{"sesja_id": "s1", "stan": "ok", "wiersze": wiersze}]})
+    db = Baza([], [], {"web": ["s1"]})
+    wynik = sc.os_watku(db, czyt, WID, limit=3, budzenia=bz, utajnij=utajnij)
+    kroki = [k for p in wynik["pozycje"] for k in p.get("kroki") or []]
+    assert [k["podglad"][:7] for k in kroki] == ["wynik 5"]
+    assert "sk-proj-" + "A" * 40 not in kroki[0]["podglad"] and len(kroki[0]["podglad"]) <= sc.PODGLAD_KROKU
+    assert wejscia == [sc.PRZED_PODGLADEM]                     # jeden wynik ze strony, sam początek
+    assert all("_wynik" not in k for k in kroki)
+    starsza = sc.os_watku(db, czyt, WID, przed=wynik["przed"], limit=3, budzenia=bz, utajnij=utajnij)
+    assert [k["podglad"][:7] for p in starsza["pozycje"] for k in p.get("kroki") or []] == ["wynik 3", "wynik 4"]
+    assert len(wejscia) == 3
+    sc.os_watku(db, czyt, WID, limit=3, budzenia=bz, utajnij=utajnij)
+    assert len(wejscia) == 3                                   # ten sam wynik drugi raz: z pamięci
+
+
 def test_rodzaje_pozycji_i_ukrywanie_naszych():
     w1 = wpis(1, tekst="@web zrób stopkę", ts=100.9, tryb="bezposrednio")
     p1 = przebieg("p_1", payload_sha=hashlib.sha256(BLOK.encode()).hexdigest(), wyslany_at=101.0, wpis_id=w1["id"],
