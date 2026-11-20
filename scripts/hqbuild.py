@@ -102,10 +102,12 @@ PAKIETY = {
     # rozmowie, do tej pory rząd bloczka ma tylko „Do:”, spinacz i wysyłanie (ta sama wysokość)
     "stopka": {"pliki": ("33-stopka.js",), "zalezy": ()},
 }
-# budżet gzip (bajty) z projektu etapu 1 §7: przekroczenie zatrzymuje build. Mózg 14 KB (19.11, było 6 KB): części,
-# grupy, szukanie w treści, [[linki]] w notatce i skupiska w grafie; pakiet idzie tylko po wejściu w Mózg. Rdzeń 100 KB
-# (20.11, było 95 KB): rozwijane kroki i komendy po „/” w kompozytorze (oba muszą działać od pierwszej rozmowy)
-BUDZET_GZIP = {"app-rdzen.js": 100 * 1024, "app-rdzen.css": 18 * 1024, "mozg.js": 14 * 1024}
+# budżet gzip (bajty) z projektu etapu 1 §7: przekroczenie zatrzymuje build. Mózg 20 KB (20.11, było 14 KB, przedtem
+# 6 KB): części, grupy, szukanie w treści, [[linki]] i skupiska w grafie, a od 20.11 tożsamość Jarva, edytor pamięci
+# (GET/PUT /pamiec), „Wstecz”, „Najważniejsze” ze streszczeń hubów i spis sekcji, wszystko PL i EN (ok. 18 KB); pakiet
+# idzie tylko po wejściu w Mózg. Rdzeń 100 KB (20.11, było 95 KB): rozwijane kroki i komendy po „/” w kompozytorze
+# (oba muszą działać od pierwszej rozmowy)
+BUDZET_GZIP = {"app-rdzen.js": 100 * 1024, "app-rdzen.css": 18 * 1024, "mozg.js": 20 * 1024}
 ZNACZNIK_PAKIETOW = '"@@PAKIETY@@"'
 ZNACZNIK_CSS = re.compile(r"^/\* @@pakiet (\w+) \*/$", re.M)
 DEKLARACJA = re.compile(r"^(?:async\s+)?(?:function\*?\s+([A-Za-z_$][\w$]*)|class\s+([A-Za-z_$][\w$]*)"

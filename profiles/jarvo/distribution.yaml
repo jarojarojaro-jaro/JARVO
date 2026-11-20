@@ -1,6 +1,6 @@
 name: jarvo
 version: 0.1.0
-description: "Jarvo Main Judge: przyjmuje zlecenia, prowadzi misje, rozdziela pracę na kanbanie, ocenia i raportuje."
+description: "Jarvo, szef floty: przyjmuje zlecenia, prowadzi misje, rozdziela pracę na kanbanie, ocenia i raportuje."
 author: "Jarvo fleet"
 license: MIT
 env_requires:

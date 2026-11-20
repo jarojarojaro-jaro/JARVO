@@ -417,3 +417,25 @@ def test_modul_jako_skrypt(inst):
     assert r.returncode in (0, 1), r.stderr.decode("utf-8", "replace")
     d = json.loads(r.stdout.decode("utf-8"))
     assert d["root"] == str(u.root) and any(x["nazwa"] == "skarbiec" for x in d["wyniki"])
+
+
+def test_porzadki_przez_jarvo_wiedza(inst, capsys):
+    """`jarvo wiedza przenies|archiwizuj|streszczenie|pamiec` to wiedza.py tej wersji na skarbcu i profilu instalacji."""
+    u, ot = inst
+    sk = w.Skarbiec(wc.skarbiec(u), wc.stan_skarbca(u))
+    sk.zapisz_plik("agenci/jarvo/fakt o firmie", w.sklej({"typ": "fakt", "utworzono": "2026-10-25", "zmieniono": "2026-10-25",
+                                                          "status": "aktualna", "zrodlo": "test"}, "# Fakt o firmie\n\n**Firma.**\n"))
+    assert wc.polecenie_wiedza_porzadki(u, _a(wiedza_polecenie="przenies", sciezka="agenci/jarvo/fakt o firmie",
+                                              folder="podmioty"), [], ot) == 0
+    assert sk.istnieje("podmioty/fakt o firmie")
+    assert wc.polecenie_wiedza_porzadki(u, _a(wiedza_polecenie="archiwizuj", sciezki=["podmioty/fakt o firmie"], powod="stary",
+                                              zastapiona_przez=""), [], ot) == 0
+    assert sk.wczytaj("archiwum/podmioty/fakt o firmie").fm["status"] == "wycofana"
+    assert wc.polecenie_wiedza_porzadki(u, _a(wiedza_polecenie="streszczenie", hub="user", plik=None, tekst="Najważniejsze."),
+                                        [], ot) == 0
+    assert sk.wczytaj("user/_hub-ty").fm["streszczono"] == "2026-10-25"
+    (wc.profil(u) / "memories").mkdir(parents=True, exist_ok=True)
+    (wc.profil(u) / "memories" / "USER.md").write_text("JARO pisze krótko", encoding="utf-8")
+    assert wc.polecenie_wiedza_porzadki(u, _a(wiedza_polecenie="pamiec"), [], ot) == 0
+    assert "JARO pisze krótko" in sk.wczytaj("user/pamięć jarva o tobie").tresc
+    assert "pamięć jarvo: zmienione" in capsys.readouterr().out

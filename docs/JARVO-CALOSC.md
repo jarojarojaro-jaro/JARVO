@@ -1,8 +1,11 @@
-# Jarvo — całość od A do Z
+# Jarvo: całość od A do Z
 
 > Jeden opis wszystkiego. Do wklejenia na start nowej sesji, żeby mieć pełny kontekst
-> bez czytania całego repo. Repo: `jarojarojaro-jaro/JARVO`, w piaskownicy Claude Code `/home/user/JARVO`.
-> Gałąź robocza: `claude/epic-allen-qfjd0s`. Język pracy: polski.
+> bez czytania całego repo. Repo: `jarojarojaro-jaro/JARVO`, gałąź `main`. Język pracy: polski.
+>
+> **Co Jarvo robi, może i czego nie robi bez zgody, opisuje [profiles/jarvo/MAPA.md](../profiles/jarvo/MAPA.md)
+> („Jarvo od A do Z”, ta sama mapa jest w jego prompcie).** Przy sprzeczności wygrywa mapa; ten plik opisuje
+> całą flotę i repo.
 
 ---
 
@@ -10,24 +13,24 @@
 
 Jarvo to **prywatny asystent AI zbudowany na Hermes Agent (Nous Research)**: na zewnątrz jeden
 asystent, a w środku **flota wyspecjalizowanych agentów („snajperów”)** prowadzona przez **Jarva**
-(Main Judge). Ty gadasz z Jarvem (albo z konkretnym specjalistą), a on rozdziela pracę, ocenia
-wyniki i oddaje jeden sprawdzony rezultat. Wszystko działa na jednym VPS-ie i niczego nie zapomina.
+(szef floty). Ty gadasz z Jarvem (albo z konkretnym specjalistą), a on rozdziela pracę, ocenia
+wyniki i oddaje jeden sprawdzony rezultat. Działa natywnie na Twoim komputerze (bez Dockera) i niczego nie zapomina.
 
-**Kluczowa zasada:** nie forkujemy Hermesa. Repo jest jedynym źródłem prawdy — na serwerze nic
-nie edytujemy ręcznie. Działania nieodwracalne (publikacja, wdrożenie, płatności, wysyłka) tylko
+**Kluczowa zasada:** nie forkujemy Hermesa. Repo jest jedynym źródłem prawdy: w instalacji (`~/.local/share/jarvo`)
+nic nie edytujemy ręcznie. Działania nieodwracalne (publikacja, wdrożenie, płatności, wysyłka) tylko
 za zgodą człowieka. Jarvo jest zawsze nadrzędny: z innych projektów bierzemy tylko gotowe rozwiązania
 i wzorce do kodu JARVO, nigdy system sterujący nad Jarvem.
 
 ---
 
-## 1. Model działania: jeden Main Judge + flota snajperów
+## 1. Model działania: jeden szef floty + flota snajperów
 
 Inspiracja: firstmate. Rozmawiasz z jednym agentem, a on prowadzi załogę.
 
 - **Snajper = specjalista.** Jedna dziedzina, własne skille, własna wiedza, własna pamięć.
   Dystrybucja snajpera ma znacznik `.no-bundled-skills` (bez katalogu skilli Hermesa) — dostaje tylko to,
   co mu damy (wyjątek: generalista `jarvo-reka`). Czego nie umie, tego nie robi: oddaje zadanie szefowi.
-- **Jarvo = Main Judge (orkiestrator).** Sam nie robi pracy dziedzinowej. Robi cztery rzeczy:
+- **Jarvo = szef floty (orkiestrator).** Sam nie robi pracy dziedzinowej. Robi cztery rzeczy:
   1. **intake** — rozumie, czego chcesz, dopytuje tylko o prawdziwe decyzje,
   2. **dispatch** — rozbija cel na karty kanbana i przypisuje snajperom,
   3. **judge** — każdy wynik wraca w statusie `review`; Jarvo ocenia go według rubryki agenta:
@@ -52,10 +55,14 @@ Poziomy autonomii: **A0** odczyt · **A1** szkice we własnym workspace · **A2*
 
 ---
 
-## 2. Flota agentów (9 profili)
+## 2. Flota agentów (9 profili w repo)
 
 Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady), `config.yaml`
-(model, toolset, deny), skille, skrypty, rubryka jakości, toolbox, dystrybucja.
+(model, toolset, deny), skille, skrypty, rubryka jakości, toolbox, dystrybucja. Rejestr: `fleet.yaml` (9 agentów:
+Jarvo, 7 specjalistów, generalista Ręka) i profil hosta `profiles/_host/`. Prywatna nakładka właściciela
+(`<root>/nakladka`, §2a°°) dokłada swoich agentów; na komputerze właściciela to `jarvo-jarodev` i `jarvo-translator`,
+razem 11 profili w `<dane>/profiles/`. Liczba skilli w tabeli = pliki `SKILL.md` w `profiles/<agent>/skills/`
+(Jarvo: 17 `fleet/` + 5 `ekran/` + 1 `social/`; roster i skille zewnętrzne dochodzą przy buildzie).
 
 | Agent | Rola | Uchwyt | Pokój HQ | Temat Telegram | Skille |
 |---|---|---|---|---|---|
@@ -69,8 +76,19 @@ Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady)
 | 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go, bramka jakości (Android, iOS w CI), pakiet do sklepów z listą 44 punktów, wydanie za zgodą i nauka z odrzuceń, aplikacja ze strony firmy, utrzymanie (terminy, opinie, SDK, poprawki OTA za zgodą), kontrola paczek npm; konta zawsze właściciela | `@mobile` | Pracownia aplikacji (`apps`) | — (przez Jarva) | 10 |
 | 🦾 `jarvo-reka` | **Prawa ręka** — generalista, składa pakiety misji, dokumenty, prototypy; zna skille wszystkich (read-only) | `@reka` | Warsztat (`workshop`) | — (przez Jarva) | 4 |
 
+**Telegram** (`jarvo telegram status`): jeden bot, grupa **JARVO HQ** z tematami: **JARVO** (General: Jarvo, jego dom:
+rutyny, karty, powiadomienia), **JARODEV** (agent `jarvo-jarodev`), **TRANSLATOR** (agent `jarvo-translator`),
+**KERNEL** (sesja omp Kernel przez skrzynkę), **OPERATOR** (sesja omp Operator przez skrzynkę), **UPDATES** (kopia
+raportów rutyn; rozmowa z Jarvem zostaje w JARVO). Specjaliści z repo nie mają tematów od 16.11: pracują przez Jarva.
+DM właściciela to wejście zapasowe do Jarva; wiadomość zakończona „gpu” idzie do Kernela. Tematy z agentami i sesjami
+zapisuje `jarvo telegram tematy` w `<dane>/jarvo/konfig/sesje.json` (wpis z `profil` = agent floty, wpis ze
+`skrzynka` = sesja zewnętrzna, sesje/plugin); wiadomość, której brama nie oddała sesji, wrzuca ręcznie
+`profiles/jarvo/scripts/wrzuc_do_kernel.py <id>:<tekst>` (domyślnie Kernel, `--sesja <klucz>` inna).
+
 ### 2a°. Jarvo przy ekranie i telefonie — szczegóły (najnowszy)
-Od 2026-11-14 Jarvo sam pracuje na ekranie (etap K3 z [KOMPUTER.md](KOMPUTER.md)); osobnego agenta ekranu nie ma.
+Od 2026-11-14 Jarvo sam pracuje na ekranie (etap K3 z [KOMPUTER.md](KOMPUTER.md)); osobnego agenta ekranu nie ma:
+agent `jarvo-operator` wycofany 14.11 (decyzja właściciela), jego narzędzia i zasady ma Jarvo. Temat OPERATOR to
+dziś osobna sesja omp właściciela, nie agent floty.
 Narzędzie `computer_use` Hermesa idzie przez bramkę `komputer/jarvo_cua.py` do wejścia Komputera Jarva (twarde
 zasady, ukrywanie sekretów, dziennik); wtyczka `jarvo-komputer` daje narzędzie `komputer` (`stan`, `dziennik`,
 `oddaj`: prośba do właściciela jako pauza z powodem; natywnie także `idz`, `patrz`, `kroki`, `czekaj`).
@@ -212,16 +230,17 @@ z osi filmu, efekty w tych samych chwilach, −14 LUFS i kontrola słyszalności
 ## 3. Jak to jest spięte (przepływ)
 
 ```
-Ty (Telegram DM / aplikacja Jarvo / CLI / Desktop)
- └─ gateway Hermesa (multipleks profili)
-      ├─ DM + wątek "general" → jarvo (Main Judge)
-      └─ wątki sherlock/web/studio/wideo/ads/reka → dany snajper
+Ty (Telegram: grupa JARVO HQ i DM / panel Jarvo / `jarvo chat`)
+ └─ brama Hermesa (multipleks profili, wtyczka jarvo-sesje)
+      ├─ temat JARVO (General) + DM → jarvo (szef floty)
+      ├─ tematy JARODEV, TRANSLATOR → agenci z nakładki
+      └─ tematy KERNEL, OPERATOR, „… gpu” w DM → skrzynka sesji omp (sesje.json), nie Jarvo
 jarvo: intake → MISSION.md → karty kanban (CEL, DoD, GRANICE, WYJŚCIA)
      → snajperzy pracują w swoich workspace'ach
      → kanban_request_review → jarvo sędziuje (rubryka agenta)
      → poprawki albo akceptacja → raport efektów
 patrol co 30 min (skrypt bez modelu; budzi Jarva tylko przy anomaliach)
-brief rano, przegląd tygodnia
+nowe wersje 07:15, brief 07:50, przegląd tygodnia niedziela 18:50 (cron/jobs.yaml, `jarvo telegram status`)
 ```
 
 **Kontrakt zlecenia** (`shared/protocol/kontrakt-zlecenia.md`) jest wstrzykiwany do każdego SOUL (Jarvo dostaje
@@ -236,33 +255,31 @@ odrzuconą stronę publiczną zapasową przeglądarką Camoufox, skill `ostrozna
 
 ---
 
-## 4. Infrastruktura (VPS)
+## 4. Infrastruktura (natywnie)
 
-Cała flota mieści się na **1 VPS: 4 vCPU / 8 GB RAM / 80 GB**. Obraz ~2,5 GB do pobrania, ~7,3 GB po rozpakowaniu; w spoczynku ~0,7 GB RAM.
+Od etapu E13 ([NATYWNIE.md](NATYWNIE.md)) Jarvo działa **natywnie, bez Dockera**, na komputerze właściciela
+(stan z `jarvo status`): katalog `~/.local/share/jarvo` z `program/` (wersje kodu, Hermes z przypiętego commitu,
+narzędzia z sumą sha256, venvy), `dane/` (HERMES_HOME: profile, skarbiec, misje, kanban), `build/` (build floty),
+`nakladka/` (prywatna nakładka) i `stan/`. Usługa `systemd --user` `jarvo.service` (autostart z linger, także bez
+logowania) uruchamia nadzorcę `jarvo serwis` z procesami: brama, panel, Komputer Jarva, aktualizacje, wektory.
+Porty: 9119 panel, 8642 API bramy, 9120 podgląd HQ, 9122 ekran telefonu (gdy włączony). Panel z Maca albo telefonu
+przez Tailscale (`jarvo panel siec on`, logowanie kluczem `jarvo panel klucz`).
 
-**Obraz `jarvo-hermes`** = Hermes Agent + dobrane narzędzia. **Sidecary (docker compose):**
-- `hermes` — silnik agentów,
-- `searxng` — własna metawyszukiwarka (70+ silników, bez kluczy), AGPL,
-- `valkey` — magazyn SearXNG (cache, limiter),
-- `uptime-kuma` — monitoring dostępności (opcjonalnie: profil compose `monitoring`, `deploy.sh --monitoring`),
-- `beszel` + `beszel-agent` — monitoring zasobów (jw.),
-- `jarvo-net` — sieć.
+**Narzędzia** (`vendor/natywne.yaml`, wersje w `jarvo status`): agent-browser, Chrome Komputera Jarva,
+chrome-headless-shell, Lightpanda, Camoufox (zapasowa przeglądarka Łowcy i Sherlocka po odmowie strony), FFmpeg,
+Node.js z paczkami floty, Python 3.12 i 3.13, uv, pandoc, qpdf, exiftool, jq, ripgrep, Tesseract (pixi), platform-tools
+(Android), modele lokalne: e5-small (wektory skarbca), Indra OCR, lektor Matcha PL i Paradee EN, fonty Noto.
 
-**Narzędzia w obrazie:** Lightpanda (lekka przeglądarka headless ~30 MB/sesję) + jedna Chromium z obrazu
-Hermesa (`/usr/local/bin/chromium`: render, PDF, zrzuty, Lighthouse), Parakeet przez `jarvo-stt` (onnx-asr;
-model ~0,65 GB pobierany przy pierwszym użyciu), FFmpeg (z obrazu Hermesa), lektor przez `jarvo-tts`: polski Matcha-TTS-PL v2 (dwa głosy syntetyczne,
-2 × 140 MB w obrazie, CC BY-SA 4.0) i angielski Paradee (9 MB), bez sieci, Camoufox (`/opt/jarvo/camoufox`, Firefox z odciskiem zwykłej przeglądarki,
-~0,35 GB): zapasowa przeglądarka Łowcy i Sherlocka tylko po odmowie strony (`ostrozna.py`, jedna naraz, ~0,8 GB RAM
-na czas jednej strony). Edge TTS (lektor PL do wyboru i zapas) doinstalowuje Hermes przy pierwszym użyciu. Odchudzone: usunięto Gotenberg i Crawl4AI. (W piaskownicy Claude Code osobno:
-Playwright/Chromium w `/opt/pw-browsers`, poza obrazem.)
+**Serwer (VPS)** zostaje na obrazie `jarvo-hermes` (`infra/Dockerfile`, docker compose z SearXNG, Valkey i opcjonalnym
+monitoringiem); opis w [VPS.md](VPS.md) i [RUNBOOK.md](RUNBOOK.md). Instalacja na komputerze go nie używa.
 
 **Modele:** domyślnie provider `openai-codex` (jeden model `gpt-6-luna`, głębia myślenia per agent
-przez `reasoning_effort`). Presety alternatywne: `openrouter` (Claude Opus 5.5 / Sonnet 5 / Haiku 4.5),
-`commandcode` (DeepSeek/Kimi), `commandcode-anthropic`. Fallback, gdy główny model odmówi.
-Model zmienia się przez `JARVO_MODEL_PROVIDER` w `compose/jarvo.env`, bez edycji repo.
-**Modele testowe lokalnie: GLM 5.3 flash** — nie jest zestawem w `fleet.yaml`; ustawiany w `compose/jarvo.env`
-przez `JARVO_MODEL_PROVIDER` + `JARVO_MODEL_FRONTIER/STRONG/FAST` (i `JARVO_MODEL_FALLBACK`), np. `commandcode`
-+ `z-ai/glm-5.3-flash` (tak jak w `tests/test_model_provider.py`).
+przez `reasoning_effort`). Presety alternatywne w `fleet.yaml` (`models.presets`): `openrouter` (Claude Opus 5.5 / Sonnet 5 /
+Haiku 4.5), `commandcode` (DeepSeek/Kimi), `commandcode-anthropic` i inne. Fallback, gdy główny model odmówi.
+Dostawcę zmienia karta „Mózg” w panelu (`hq/plugin/mozg.py`: klucz albo logowanie ChatGPT, wybór w
+`<dane>/jarvo/state/dostawca-modeli.json`, build stosuje go przy każdej aktualizacji) albo `JARVO_MODEL_PROVIDER`
+(na VPS w `compose/jarvo.env`); modele pojedynczo `JARVO_MODEL_FRONTIER/STRONG/FAST` i `JARVO_MODEL_FALLBACK`
+(np. `commandcode` + `z-ai/glm-5.3-flash`, jak w `tests/test_model_provider.py`).
 
 ---
 
@@ -422,7 +439,7 @@ nagłówki `curl -sI https://jarvo.pl | grep -i -E "strict-transport|content-sec
 | `requirements-dev.txt` | zależności testów/walidacji (`make dev-deps`: pytest, pyyaml, shellcheck) |
 | `tests/`, `docs/` | testy pytest (w `tests/live/` test aplikacji w przeglądarce dla `scripts/jarvo-e2e.sh`), dokumentacja |
 
-**Dokumenty:** PLAN (wizja/architektura/roadmapa), BOSS (mechanika Main Judge'a), FLEET (specyfikacja
+**Dokumenty:** PLAN (wizja/architektura/roadmapa), BOSS (mechanika szefa floty), FLEET (specyfikacja
 agentów), PROFILE-SPEC (anatomia agenta: 10 warstw), TOOLBOX (narzędzia open-source), VPS (infra),
 HQ (dashboard), ADS (projekt agenta reklam + Skarbiec), LEADY (Łowca leadów), KLIPY (clipmaker),
 WIEDZA (skarbiec wiedzy: drugi mózg floty, projekt do akceptacji), RUNBOOK (wdrożenie krok po kroku), INSTALER (plan instalatora jednym poleceniem na trzy systemy), NATYWNIE (plan przejścia na instalację natywną bez Dockera i WSL), ROZWOJ-FLOTY (plan dopracowania agentów), MOBILE (projekt Twórcy aplikacji),

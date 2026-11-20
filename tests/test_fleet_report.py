@@ -101,7 +101,7 @@ TERAZ = report.dt.datetime(2026, 11, 15, 7, 50)
 def test_agenci_biznesowi_pelne_dane(tmp_path, monkeypatch):
     dane = _uklad(tmp_path, monkeypatch)
     _zapisz(dane / "jarvo" / "state" / "wiedza-agenci.json",
-            {"jarvo": {"title": "Main Judge"}, "jarvo-sklep": {"marka": "sklep"}, "jarvo-x": {"marka": "xmarka"}})
+            {"jarvo": {"title": "Jarvo: szef floty"}, "jarvo-sklep": {"marka": "sklep"}, "jarvo-x": {"marka": "xmarka"}})
     wpisy = [{"id": "L-0001", "status": "nowy", "utworzono": "2026-11-15T06:00:00"},
              {"id": "L-0002", "status": "szkic", "utworzono": "2026-11-12T10:00:00"},
              {"id": "L-0003", "status": "szkic", "utworzono": "2026-10-01T10:00:00"},

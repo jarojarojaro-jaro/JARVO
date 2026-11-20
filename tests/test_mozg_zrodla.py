@@ -4,6 +4,7 @@ na atrapie canvasa), lista Notatek w 63-mozg.js (filtr bez ogonków) i oba build
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 
@@ -234,9 +235,10 @@ def test_czesci_grupy_szukanie_i_adresy(tmp_path):
     assert w["glowne"] == [["ty", 1], ["zespol", 7], ["f-inne", 1], ["f-Łódź", 1]]
     assert w["boczne"] == [["zrodla", "_hub-skarbiec"]]
     # grupy: podkatalog z hubem zostaje (nazwa z huba bez „(jarvo-web)”), mały bez huba wraca do folderu;
-    # agent `jarvo` to dla właściciela „Jarvo”, nie tytuł roli z huba („Main Judge”)
+    # agent `jarvo` to dla właściciela „Jarvo”, nie tytuł roli z huba („Main Judge”); `fleet` w całości jedną grupą
+    # „Umiejętności”, ostatnią w Zespole
     assert w["zespol"] == ["agenci/_hub-agenci", [["agenci/jarvo-web", "🌐 Web Senior Dev", 2], ["agenci", "Agenci", 1],
-                                                  ["agenci/jarvo", "Jarvo", 1], ["fleet/skille", "Umiejętności", 3]]]
+                                                  ["agenci/jarvo", "Jarvo", 1], ["fleet", "Umiejętności", 3]]]
     assert w["ty"] == "user/_hub-ty" and w["samotna"] == {"kat": "zespol", "grupa": "agenci"}
     assert w["sekcje"] == [["Lekcje", ["lekcja a"]], ["Fakty", ["fakt b"]]]
     assert w["szukaj"] == [["Zażółć gęślą"], ["agenci/jarvo-web/_hub-web", "agenci/jarvo-web/fakt b", "agenci/jarvo-web/lekcja a"], 3, 0,
@@ -247,6 +249,24 @@ def test_czesci_grupy_szukanie_i_adresy(tmp_path):
     assert w["wiki"] == "x [Lekcja A](#h) i N \n## Dalej\nz"
     # graf: wejście = skupiska części, część = skupiska grup (link między nimi zostaje), grupa = same notatki
     assert w["grafy"][0][0] == ["@ty", "@zespol", "@f-inne", "@f-Łódź"] and w["grafy"][0][2] == 1
-    assert w["grafy"][1][0] == ["@agenci/jarvo-web", "@agenci", "@agenci/jarvo", "@fleet/skille"] and w["grafy"][1][1] == 14
+    assert w["grafy"][1][0] == ["@agenci/jarvo-web", "@agenci", "@agenci/jarvo", "@fleet"] and w["grafy"][1][1] == 14
     assert w["grafy"][2] == [[], 3, 0]
     assert w["url"] == "https://h/a%20b/c.html"
+
+
+def test_czesci_mozgu_zgodne_z_folderami_skarbca():
+    """Jedna definicja folderów (wiedza.py FOLDERY_SKARBCA): każdy folder skarbca ma dokładnie jedną część w Mózgu
+    (MOZG_KATEGORIE w 63-mozg.js), Mózg nie zna folderów spoza niej; tożsamość to pierwsza część, archiwum drugorzędna."""
+    wiedza = load_script("wiedza/wiedza.py", "jarvo_test_wiedza_foldery_mozgu")
+    src = (REPO / "hq" / "web" / "src" / "63-mozg.js").read_text(encoding="utf-8")
+    blok = re.search(r"^const MOZG_KATEGORIE = \[\n(.*?)^\];", src, re.M | re.S).group(1)
+    czesci = re.findall(r'\{ k: "([a-z]+)".*?foldery: \[([^\]]*)\](.*?)\},?\n', blok, re.S)
+    foldery = [f for _k, lista, _r in czesci for f in re.findall(r'"([^"]*)"', lista)]
+    assert len(foldery) == len(set(foldery)), foldery
+    assert set(foldery) == set(wiedza.FOLDERY_SKARBCA)
+    gdzie = {f: (k, "drugorzedna: true" in reszta) for k, lista, reszta in czesci for f in re.findall(r'"([^"]*)"', lista)}
+    assert czesci[0][0] == "jarvo" and gdzie[wiedza.TOZSAMOSC] == ("jarvo", False)
+    assert gdzie[wiedza.ARCHIWUM] == ("archiwum", True) and gdzie["zrodla"][1] and gdzie["skrzynka"][1]
+    # tożsamość w tej samej kolejności co w INDEX-ie i hubach (wiedza.KOLEJNOSC_TOZSAMOSCI; Mózg porównuje nazwy plików)
+    kolejnosc = re.search(r"^const MOZG_TOZSAMOSC = \[([^\]]*)\];", src, re.M).group(1)
+    assert re.findall(r'"([^"]*)"', kolejnosc) == [p.split("/")[-1] for p in wiedza.KOLEJNOSC_TOZSAMOSCI]

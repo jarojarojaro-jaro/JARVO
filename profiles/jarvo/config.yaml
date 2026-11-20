@@ -1,4 +1,4 @@
-# Jarvo: Main Judge, który sam pracuje na ekranie Komputera Jarva, na telefonie i w terminalu (docs/KOMPUTER.md).
+# Jarvo: szef floty, który sam pracuje na ekranie Komputera Jarva, na telefonie i w terminalu (docs/KOMPUTER.md).
 # Tokeny @@...@@ podstawia scripts/build.py z fleet.yaml. Ekran Komputera tylko przez wejście z twardymi zasadami:
 # strony natywnie narzędziem `komputer` (idz → patrz → kroki → czekaj), zrzut, canvas i Komputer w kontenerze przez
 # computer_use (bramka komputer/jarvo_cua.py); oba dzielą ekran (grupa ekranu procesu, docs/KOMPUTER.md §6).

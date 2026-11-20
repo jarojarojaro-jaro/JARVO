@@ -83,6 +83,9 @@ knowledge/                       # = skarbiec (vault Obsidiana): same pliki Mark
 ├── LOG.md                       # dziennik tylko-dopisywany: `## [2026-09-30] kompilacja | 4 szkice → 3 notatki, 1 aktualizacja`
 ├── LINT.md                      # ostatni raport lintu (§6): martwe linki, sieroty, sprzeczności, brak źródła, przeterminowane
 ├── _hub-skarbiec.md             # strona główna: linki do hubów folderów, liczby, ostatnie zmiany
+├── jarvo/_hub-jarvo.md          # TOŻSAMOŚĆ JARVA (§2a), generowana: „Jarvo od A do Z”, kim jest, zasady pracy, zasady
+│                                #   krytyczne, pamięć Jarva; kompilacja tu nie pisze, lint jej nie zgłasza
+├── archiwum/_hub-archiwum.md    # WYCOFANE I ZASTĄPIONE w układzie dawnej ścieżki (archiwum/agenci/jarvo-operator/…), §6a
 ├── zrodla/                      # SUROWE, tylko do odczytu: nigdy edytowane, nigdy usuwane
 │   ├── rozmowy/                 #   eksporty rozmów (wyciąg z sesji zapisany przy jej końcu, patrz §5)
 │   ├── karty/                   #   raporty z kart (kopia out/RAPORT.md, KLIPY.md, LEADY.md… po zamknięciu karty)
@@ -101,7 +104,7 @@ knowledge/                       # = skarbiec (vault Obsidiana): same pliki Mark
 │   └── <marka>/_hub-<marka>.md  #   hub marki agenta biznesowego (fleet.yaml `marka`, §4a): brand kit i notatki z jego szkiców
 ├── inspiracje/_hub-inspiracje.md # strony referencyjne branż słabo pokrytych w Inspo (skill Weba `inspiracje-stron`):
 │   └── strony/<branża>/<domena>.md  #   karta strony + katalog <domena>/ (DESIGN.md i tokeny z dembrandta, zrzuty 375/1440)
-├── user/_hub-ty.md              # USER.md (bez zmian) + notatki „firma”, „oferta”, „klienci”, „głos marki” (hub „Ty”)
+├── user/_hub-ty.md              # USER.md (bez zmian), `pamięć jarva o tobie` (lustro USER.md Hermesa, §2a) i fakty o Tobie
 ├── podmioty/_hub-podmioty.md    # firmy, ludzie (tylko publiczne role), narzędzia, konkurenci, dostawcy: jedna notatka na rzecz
 ├── pojecia/_hub-pojecia.md      # metody, wzorce, definicje, lekcje ogólne („bramka jakości”, „test A/B/C bayesowski”)
 ├── orzeczenia/_hub-orzeczenia.md # `wszyscy.md`, `<agent>.md`, `marki/<marka>.md`: jedna datowana linia na korektę
@@ -127,6 +130,71 @@ Poza skarbcem: indeks wyszukiwarki `state/wiedza.db` (SQLite FTS5, odtwarzalny z
 | `bledy/` (księga błędów, §4b) | kompilacja (szkice `typ: blad`), `zasiej` (tylko nowe notatki z `wiedza/bledy/` repo); licznik przypomnień wtyczka w `state/bledy-licznik.json` | po rozwiązaniu nowego błędu, wdrożenie |
 | `INDEX.md`, listy notatek w hubach (bloki `Jarvo:GEN`), indeks FTS5 | `wiedza.py indeksuj` (0 tokenów, deterministycznie z plików) | po każdej kompilacji, zasiewie, na żądanie |
 | `LINT.md` | lint (0 tokenów) | co tydzień i przed kompilacją |
+| `jarvo/`, `user/pamięć jarva o tobie` (§2a) | tylko `zasiej` (tożsamość z buildu, mapa z MAPA.md i danych instalacji) i lustro pamięci (zasiew, wtyczka, zapis z Mózgu) | wdrożenie, każda zmiana pliku pamięci |
+| `archiwum/` (§6a) | `wiedza.py archiwizuj` (człowiek, Jarvo przez `jarvo wiedza`), `zasiej` (agent wycofany z floty) | porządki, wdrożenie |
+
+**Jedna definicja folderów:** `wiedza.FOLDERY_SKARBCA` (folder → tytuł huba, plik huba, kto pisze, czy kompilator kładzie
+tu nowe notatki, czy notatki wracają w wyszukiwaniu i przypomnieniach, opis). Z niej biorą: zasiew (katalogi i huby),
+kompilator (`FOLDERY_NOTATEK`: user, projekty, podmioty, pojecia, bledy, rozmowy; plus `agenci/<agent>/` i `brands/<marka>/`),
+wyszukiwanie, przypomnienia i wektory (`POZA_WYSZUKIWANIEM`: zrodla, skrzynka, archiwum), INDEX, drzewo zakładki Wiedza,
+lint i `jarvo doctor`; Mózg (`hq/web/src/63-mozg.js`) ma test zgodności części z tą listą i z `KOLEJNOSC_TOZSAMOSCI`.
+Statusy: `wiedza.STATUSY` (doszło `wycofana`), typy: `wiedza.TYPY` (doszło `tozsamosc`).
+
+### 2a. Tożsamość Jarva i pamięć Hermesa w skarbcu
+
+Notatki `typ: tozsamosc` (frontmatter: `status: aktualna`, `zmieniono` = data zmiany źródła, `zrodlo: wiedza.py zasiej`,
+`plik` = ścieżka źródła, `edycja: repo` albo `edycja: pamiec` + `pamiec: memory|user`):
+
+| Notatka | Źródło | Edycja w Mózgu |
+|---|---|---|
+| `jarvo/jak działa jarvo` („Jarvo od A do Z”, §2b) | `profiles/jarvo/MAPA.md` repo + nakładki, bloki GEN | „Poproś o zmianę” (repo) |
+| `jarvo/kim jest jarvo` | `profiles/jarvo/SOUL.md` (postać) | „Poproś o zmianę” |
+| `jarvo/zasady pracy` | `profiles/jarvo/ZASADY.md` bez zamykającego bloku `<critical>`; roster wstawiony, protokół i rdzeń mapy jednym zdaniem | „Poproś o zmianę” |
+| `jarvo/zasady krytyczne` | ten zamykający blok (`KRYTYCZNE.md` profilu: stoi na samym końcu promptu) | „Poproś o zmianę” |
+| `jarvo/pamięć jarva` | `profiles/jarvo/memories/MEMORY.md` Hermesa, wpisy jako lista | „Zmień” (PUT /pamiec/memory) |
+| `user/pamięć jarva o tobie` | `profiles/jarvo/memories/USER.md`, wpisy jako lista | „Zmień” (PUT /pamiec/user) |
+
+Pliki tożsamości przygotowuje build (`scripts/build.py tozsamosc_do_skarbca` → `build/wiedza/tozsamosc/`: tokeny @@…@@
+podstawione, `zrodla.json` z datą ostatniego commitu pliku); `wiedza.py zasiej` bierze katalog `tozsamosc` obok `--repo`
+(albo `--tozsamosc`). Kompilator ich nie pisze ani nie bierze jako kandydatów, lint ich nie zgłasza, a przypomnienie Jarva
+ich nie wstrzykuje (są w jego prompcie: SOUL, ZASADY, KRYTYCZNE, MEMORY, USER; wyjątek: sekcje mapy, bo w prompcie jest
+tylko jej rdzeń). Inni agenci dostają je w przypomnieniach jak każdą notatkę.
+
+**Lustro pamięci po treści pliku** (`wiedza.synchronizuj_pamiec`): `state/wiedza-pamiec.json` pamięta wersję (sha256) i wpisy
+MEMORY.md i USER.md każdego profilu. Nowa wersja pliku = wpisy, których wcześniej nie było (pierwszy raz: wszystkie), idą
+do szkicu `skrzynka/pamiec-<agent>.md` (MEMORY.md) albo `pamiec-<agent>-user.md` (USER.md: kompilator kładzie fakty
+w `user/`), a dla Jarva odświeżona notatka-lustro. Sprawdzają to: hak `on_memory_write` (każde zapisane wywołanie narzędzia
+memory, także remove), start sesji i każda tura wtyczki (dwa `stat`, skrót tylko przy zmianie), `zasiej` (wszystkie profile
+floty), `wiedza.py pamiec` i zapis z Mózgu. Dlatego plik zmieniony poza narzędziem (20.11: przepisany przy prompcie v2; wpisy
+z 19 i 20.11 nie dotarły do skarbca) też trafia do skarbca.
+
+**Zapis pamięci z Mózgu** (`GET /pamiec`, `PUT /pamiec/{memory|user}` wtyczki `jarvo-wiedza`, `wiedza.zapisz_pamiec`) jest
+zgodny co do bajtu z narzędziem memory Hermesa (`tools/memory_tool_store.py`): wpisy obcięte, połączone separatorem
+`\n§\n`, bez znaku na końcu, UTF-8, zapis atomowy (`.mem_*.tmp`, fsync, zamiana), pod tą samą blokadą (`MEMORY.md.lock`
+obok pliku, `flock` LOCK_EX, na Windows `msvcrt`; czekamy najwyżej 10 s, potem 503 `zajeta`). Limit znaków z `config.yaml`
+profilu (`memory.memory_char_limit`, `memory.user_char_limit`; domyślnie 2200 i 1375 jak w Hermesie, Jarvo: 3000 i 2000)
+liczony jak w Hermesie (wpisy ze separatorami). `wersja` = sha256 pliku z odczytu: inna na dysku = 409 `zmieniona` z aktualnym
+stanem (nic nie zapisane). Wpis pusty = 400 `pusty_wpis`; powtórzony, z sekretem, z linią „§” rozbijającą separator albo
+zatrzymany przez skaner zagrożeń Hermesa (`tools/threat_patterns`, gdy dashboard go ma) = 400 `zly_wpis`; ponad limit = 400
+`limit`. Po zapisie lustro, szkic nowych wpisów, indeks, wpis w LOG i punkt zapisu (gdy skarbiec wolny). Jarvo widzi zmianę
+od następnej rozmowy (Hermes czyta pamięć na starcie sesji). Test `tests/test_wiedza_mozg.py` sprawdza to z prawdziwym
+`MemoryStore` Hermesa (gdy jest zainstalowany): plik z PUT czyta się bez dryfu, a zapis Hermesa ma te same bajty co nasz.
+
+### 2b. Mapa Jarva: jedno źródło, dwie postacie
+
+`profiles/jarvo/MAPA.md` (repo: mechanizmy) i ten sam plik w nakładce (konkret właściciela) mają 11 sekcji `## ` w stałej
+kolejności (`wiedza/mapa.py SEKCJE`). W sekcji: bloki `<!-- Jarvo:RDZEN -->…<!-- /Jarvo:RDZEN -->` (gęste linie do promptu)
+i puste znaczniki bloków generowanych `<!-- Jarvo:GEN agenci|skille|arsenal|sciezki|harmonogram -->`.
+- **Rdzeń w prompcie**: `scripts/build.py` podmienia `<!-- Jarvo:MAPA -->` w ZASADY.md Jarva na `fleetlib.rdzen_mapy`
+  (bloki RDZEN repo i nakładki, zwarte ścieżki i harmonogram, bez dat i liczników, ≤ 1200 tok., `mapa.MAX_TOKENOW_RDZENIA`).
+  W SOUL, czyli w tierze „stable” promptu Hermesa (`agent/system_prompt.py`: stable → context → volatile; bloki wtyczek
+  pamięci stoją w volatile za MEMORY/USER), więc jest częścią wspólnego prefiksu nowych sesji (cache dostawcy). Zespół
+  rdzenia to roster (`fleetlib.render_roster_summary`: linia na agenta z „oddaję, gdy”). Pomiar 20.11: rdzeń z nakładką
+  ~2 700 zn., ~770 tok.; SOUL Jarva ~4 100 → ~5 300 tok. (budżet validate.py 5 600).
+- **Notatka w skarbcu** `jarvo/jak działa jarvo` (`wiedza.zasiej_mape`): wszystko, bloki GEN pełne, z datą źródła: agenci
+  i skille (fleet.json), arsenał (`fleet/arsenal`), ścieżki tej instalacji, harmonogram (cron/jobs.json wszystkich profili, także
+  wstrzymane, czas po polsku, wątki Telegrama jak `jarvo telegram status`, timery systemd usera z `~/.config/systemd/user`).
+  `sekcje: true`: każda sekcja to osobny wpis indeksu (§7), a `wiedza_czytaj "jarvo/jak działa jarvo#<Sekcja>"` czyta samą sekcję.
 
 ---
 
@@ -273,7 +341,7 @@ not callable” i nie działały (karta t_8a8a79ab: odmowa Komputera bez dopisku
 ```
   rozmowa (HQ / Telegram / CLI)  ──koniec sesji, kompresja──►  zrodla/rozmowy/… (wyciąg)  +  skrzynka/rozmowa-….md
   karta kanbana                   ──kanban_task_completed────►  zrodla/karty/… (raport)     +  skrzynka/karta-….md
-  wpis w pamięci (memory)         ──on_memory_write──────────►  skrzynka/pamiec-<agent>.md
+  plik pamięci (MEMORY/USER.md)    ──treść pliku (§2a)─────────►  skrzynka/pamiec-<agent>[-user].md + lustro jarvo/ i user/
   agent w trakcie pracy           ──wiedza_zapisz─────────────►  skrzynka/<agent>-<data>-<slug>.md
   Twoja korekta                   ──wiedza_orzeczenie / HQ────►  orzeczenia/<kto>.md          (od razu, bez kompilacji)
   plik / link od Ciebie           ──„zapisz to w wiedzy”──────►  zrodla/pliki/… (kopia, defuddle dla stron) + szkic
@@ -358,6 +426,30 @@ i po każdym orzeczeniu z HQ. Backup restic (`scripts/backup.sh`) obejmuje cały
 **żadnej synchronizacji chmurowej folderu** (iCloud/Dysk/OneDrive na tym samym folderze robi „konflikty kopii”, o czym
 ostrzegają zarówno Karpathy, jak i second-brain-os); Obsidian otwiera folder bezpośrednio (§8).
 
+### 6a. Porządki: archiwum, przeniesienie, streszczenie, routing kompilatora
+
+Każda operacja (`wiedza.py …` i `jarvo wiedza …`): blokada skarbca (jak kompilacja), punkt zapisu git przed (`cofnij` = ta
+operacja) i po, wpis w LOG, indeks, INDEX i listy hubów od nowa (`wiedza.porzadki`).
+- `archiwizuj <ścieżka>... --powod "…" [--zastapiona-przez <ścieżka>]`: notatki albo całe katalogi do `archiwum/<dawna
+  ścieżka>` (frontmatter `status: wycofana`, `wycofano`, `powod`, `zastapiona_przez`); linki we wszystkich notatkach i hubach
+  (poza kopią repo i LOG.md) wskazują następcę albo nową ścieżkę w archiwum; sama nazwa pliku, która dalej trafia, zostaje.
+  Archiwum jest poza wyszukiwaniem, przypomnieniami, wektorami, kandydatami kompilacji i lintem (sieroty, duplikaty);
+  szukanie z `folder=archiwum` je widzi. Stara ścieżka (pamięć agenta, stara sesja) prowadzi do następcy:
+  `Skarbiec.wczytaj` i `przekierowanie`, więc także `wiedza_czytaj` i notatka w Mózgu.
+- `zasiej`: agent spoza fleet.yaml → cały `agenci/<agent>/` i jego `orzeczenia/<krótka nazwa>.md` do archiwum, powód
+  „agent wycofany z floty” (14.11 jarvo-operator). Tytuł huba agenta z fleet.yaml: emoji, `hq_short`, profil („🛰️ Jarvo (jarvo)”).
+- `przenies <ścieżka> <folder>`: ten sam tytuł w innym folderze (FOLDERY_SKARBCA z notatkami albo istniejący podkatalog),
+  linki przepisane, wektor idzie za notatką. Hubów, tożsamości i archiwum nie przenosi.
+- `streszczenie <hub> (--plik P | --tekst T)`: blok `<!-- Jarvo:STRESZCZENIE -->…<!-- /Jarvo:STRESZCZENIE -->` pod tytułem
+  huba (Markdown, do 1500 znaków) i `streszczono: RRRR-MM-DD`; zasiew i indeksuj go nie ruszają. Streszczenie huba jest jego
+  streszczeniem w indeksie i Mózgu (`/graph`: `podsumowanie`, `streszczono`), a hub ze streszczeniem wraca w przypomnieniach.
+- Routing kompilatora (przyczyna 1 z 20.11: 88 notatek o firmach, właścicielu i lekcjach ogólnych w `agenci/jarvo/`): prompt
+  ma tabelę „o czym jest notatka → folder”, a kod ją pilnuje (`sciezka_nowej`): `agenci/<agent>/` tylko z `o_agencie: true`,
+  fakt o właścicielu (`o_wlascicielu: true`, a w szkicu z USER.md zawsze) → `user/`, folder spoza `FOLDERY_NOTATEK` → według
+  typu (lekcja → `pojecia/`), fakt z aliasami → `podmioty/`. Fakt, który nazywa podmiot z kandydatów (alias od 4 znaków
+  albo pierwsze słowo nazwy pliku), dopisuje się z datą do notatki podmiotu zamiast nowej notatki. Kandydaci: cały skarbiec
+  plus po 2 najbliższe z `podmioty/` i `user/`; bez archiwum, tożsamości i orzeczeń. Tabela przypadków: `tests/test_wiedza_mozg.py`.
+
 ---
 
 ## 7. Wyszukiwanie i koszt
@@ -414,6 +506,23 @@ oszczędności; na planie OpenAI z logowaniem ChatGPT to ten sam model co dotąd
 `fast`, nadal mało przy pracy samych agentów); kontekst agentów rośnie o ≤ 800 tokenów na turę.
 
 ---
+
+**Sekcje w indeksie i pomiar 20.11.** Notatka z `sekcje: true` (mapa Jarva) albo długa (≥ 300 słów, ≥ 3 sekcje `## `, np.
+`user/USER`) ma w indeksie (FTS5 i wektory, tabela `sekcje`, widok `wpisy`) osobny wpis na sekcję `ścieżka#Sekcja` zamiast
+całości: wektor e5 widzi tytuł, streszczenie i 1200 znaków treści, więc z długiej notatki znał tylko początek. Wynik
+szukania to najwyżej jeden wpis na notatkę. Indeks przeglądu plików idzie jednym `os.walk` ze stanem pliku (zamiast rglob
+i osobnego stat). Pomiar na kopii żywego skarbca (35 pytań właściciela, `~/jarvo-testy/pomiary-wiedzy/ocena-mozg.json`,
+k=5; samowiedza: 30 pytań Jarva o sobie, `samowiedza.json`, wzorzec = sekcja mapy):
+
+| | hit@5 przed → po | MRR przed → po | przypomnienie p50 / p95 ms przed → po |
+|---|---|---|---|
+| wektory (domyślnie) | 28 → 29 / 35 | 0,615 → 0,630 | 77,5 / 82,1 → 37,8 / 44,0 |
+| hybryda | 28 → 29 / 35 | 0,657 → 0,688 | 75,1 / 82,6 → 37,8 / 46,3 |
+| słowa (BM25) | 26 → 26 / 35 | 0,563 → 0,562 | 58,4 / 60,7 → 17,8 / 22,5 |
+| samowiedza, wektory | 1 → 13 / 30 | 0,017 → 0,311 | |
+
+Odświeżenie indeksu bez zmian 52,9 → 9,7 ms, `wiedza czytaj` 0,25 ms. Mapa jako jedna notatka (bez sekcji) trafia w 6 z 30
+pytań o Jarva (wektory, trafienie = cała mapa), w sekcjach w 17 z 30: stąd podział.
 
 ## 8. Zakładka „Wiedza” w dashboardzie i Obsidian
 
@@ -590,6 +699,9 @@ Wpisy do [SOURCES.md](SOURCES.md) i [TOOLBOX.md](TOOLBOX.md) dojdą z etapem, w 
 |---|---|
 | `wiedza/wiedza.py` | narzędzie skarbca (zasiew, indeks, szukanie, szkice, orzeczenia, lint, graf, punkty zapisu, pomiar przypomnień `ocena`); importowane przez wtyczkę |
 | `wiedza/SCHEMA.md` | zasady skarbca kopiowane do `knowledge/SCHEMA.md` |
+| `wiedza/mapa.py` | mapa Jarva (§2b): rdzeń do promptu (build, validate) i notatka `jarvo/jak działa jarvo` (zasiew) |
+| `scripts/build.py` → `build/wiedza/tozsamosc/` | tożsamość Jarva dla skarbca (§2a): SOUL, ZASADY, KRYTYCZNE, MAPA repo i nakładki, `zrodla.json` |
+| `tests/test_wiedza_mozg.py` | tożsamość i mapa, lustro pamięci po treści, GET/PUT /pamiec (zgodność z Hermesem), archiwum, przeniesienie, streszczenia, routing kompilatora, obieg end to end |
 | `wiedza/bledy/*.md` | zasiew księgi błędów (§4b): notatki `blad` z błędów floty, `zasiej --bledy` dokłada tylko nowe |
 | `scripts/build.py` → `build/wiedza/fleet.json` | dane do hubów agentów (rola, skille z opisami, skille zewnętrzne, skrypty, serwery MCP, `marka` agenta biznesowego) |
 | `scripts/install-fleet.sh` (krok „Skarbiec wiedzy”) | `zasiej` przy każdym wdrożeniu |

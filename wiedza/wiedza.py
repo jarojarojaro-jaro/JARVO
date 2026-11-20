@@ -2,9 +2,12 @@
 """Skarbiec wiedzy floty Jarvo (drugi mózg): narzędzie bez zależności poza biblioteką standardową.
 
 Skarbiec to katalog zwykłych plików Markdown (projekt: docs/WIEDZA.md). Ten skrypt:
-  zasiej      katalogi, SCHEMA.md, huby (z fleet.json), INDEX, LOG, orzeczenia, docs repo i pliki profili (SOUL, README,
-              CHANGELOG, rubryka, materiały skilli, spis źródeł) → zrodla/jarvo-repo, księga błędów z wiedza/bledy (tylko
-              nowe notatki), git init, indeks i wektory
+  zasiej      katalogi i huby (FOLDERY_SKARBCA), SCHEMA.md, huby agentów (z fleet.json; agent spoza floty do archiwum/),
+              INDEX, LOG, orzeczenia, docs repo i pliki profili → zrodla/jarvo-repo, tożsamość Jarva i mapa → jarvo/
+              (build/wiedza/tozsamosc), lustra pamięci profili, księga błędów z wiedza/bledy (tylko nowe notatki), git
+              init, indeks i wektory
+  archiwizuj  notatki albo katalogi do archiwum/ (linki do następcy albo do archiwum); przenies: inny folder, linki
+              przepisane; streszczenie: blok „najważniejsze” huba; pamiec: lustro pamięci Hermesa po treści plików
   indeksuj    indeks FTS5 (state/wiedza.db), INDEX.md i listy w hubach z plików (0 tokenów, deterministycznie), wektory
               nowych i zmienionych notatek (gdy działa usługa wiedza/wektory.py)
   szukaj      wyszukiwanie po polsku (ogonki bez znaczenia, aliasy notatek): wektory (albo hybryda z BM25, --silnik),
@@ -51,6 +54,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import tempfile
 import time
 import unicodedata
 from dataclasses import dataclass, field
@@ -84,40 +88,76 @@ def _domyslny_skarbiec() -> str:
 
 DOMYSLNY_SKARBIEC = _domyslny_skarbiec()
 
-FOLDERY = ("zrodla/rozmowy", "zrodla/karty", "zrodla/pliki", "zrodla/jarvo-repo", "skrzynka/zrobione", "agenci",
-           "projekty", "brands", "inspiracje/strony", "user", "podmioty", "pojecia", "orzeczenia/marki", "rozmowy", "fleet",
-           "briefy", "bledy")
-# folder → (nazwa pliku huba, tytuł)
-HUBY = {"": ("_hub-skarbiec", "Skarbiec wiedzy"), "agenci": ("_hub-agenci", "Agenci"), "projekty": ("_hub-projekty", "Projekty"),
-        "brands": ("_hub-marki", "Marki"), "inspiracje": ("_hub-inspiracje", "Inspiracje"), "user": ("_hub-ty", "Ty"),
-        "podmioty": ("_hub-podmioty", "Podmioty"), "pojecia": ("_hub-pojecia", "Pojęcia"), "orzeczenia": ("_hub-orzeczenia", "Orzeczenia"),
-        "rozmowy": ("_hub-rozmowy", "Rozmowy"), "briefy": ("_hub-briefy", "Briefy"), "bledy": ("_hub-bledy", "Księga błędów")}
-OPISY_FOLDEROW = {
-    "agenci": "Jeden katalog na agenta: hub (rola, skille, skrypty z `fleet.yaml`) i notatki o tym, czego się nauczył.",
-    "projekty": "Jedna notatka na misję albo projekt: stan, decyzje, wyniki (linki do plików), marka, agenci.",
-    "brands": "Brand kity (`brands/<marka>/`): kolory, fonty, ton. Orzeczenia marki: `orzeczenia/marki/<marka>.md`.",
-    "inspiracje": ("Strony referencyjne branż słabo pokrytych w katalogu Inspo (`inspiracje/strony/<branża>/<domena>`): układ, "
-                   "paleta, fonty, zrzuty; pisze Web skillem `inspiracje-stron`. Inspiracja, nie wzór do kopiowania."),
-    "user": "Kim jesteś, czym się zajmujesz, oferta, klienci, głos marki (`user/USER.md` z wywiadu Jarva).",
-    "podmioty": "Firmy, ludzie w rolach publicznych, narzędzia, konkurenci, dostawcy: jedna notatka na rzecz.",
-    "pojecia": "Metody, wzorce, definicje, lekcje ogólne: jedna notatka na pojęcie.",
-    "orzeczenia": "Korekty od człowieka, jedna datowana linia każda. Agent dostaje swoje orzeczenia przed każdą turą.",
-    "rozmowy": "Skompilowane ustalenia z rozmów i kart: decyzje, fakty, pliki. Surowe wyciągi leżą w `zrodla/rozmowy/`.",
-    "briefy": ("Poranne briefy (`B-RRRR-MM-DD`) i przeglądy tygodnia (`T-RRRR-Wtt`) z treścią i tabelą decyzji: odpowiedź "
-               "właściciela, kiedy, co z nią zrobiono. Pisze skrypt `briefy.py`, odpowiedzi dopisuje Jarvo."),
-    "bledy": ("Księga błędów: jedna notatka na rodzaj błędu narzędzia albo pracy, z sygnaturami (dosłowne fragmenty "
-              "komunikatu), objawem, przyczyną, krokiem „jak poprawnie” i licznikiem wystąpień. Gdy wynik narzędzia ma "
-              "sygnaturę, wtyczka dopisuje pod nim „To już było” z tym krokiem."),
+# Jedna definicja folderów skarbca (docs/WIEDZA.md §2): z niej huby i opisy (zasiew), foldery nowych notatek kompilatora,
+# zakres wyszukiwania, przypomnień i wektorów, sekcje INDEX-u, drzewo zakładki Wiedza i lint; Mózg (hq/web/src/63-mozg.js,
+# `MOZG_KATEGORIE`) ma test zgodności z tą listą. Kolejność = kolejność w hubie skarbca, INDEX-ie i drzewie.
+# `tytul`: tytuł huba (i sekcji INDEX-u), `hub`: nazwa pliku huba albo "" (folder bez huba), `pisze`: kto kładzie tu notatki
+# (zasiew: generowane z repo, floty i pamięci; kompilator: ze szkiców; czlowiek: orzeczenia; skrypt: brand kit, briefy,
+# inspiracje; surowe: źródła i szkice; archiwizacja: `wiedza.py archiwizuj` i zasiew), `kompilator`: folder nowych notatek
+# kompilatora (poza tym `agenci/<agent>/` i `brands/<marka>/`), `recall`: notatki wracają w wyszukiwaniu i przypomnieniach.
+FOLDERY_SKARBCA: dict[str, dict] = {
+    "": {"tytul": "Skarbiec wiedzy", "hub": "_hub-skarbiec", "pisze": "zasiew", "kompilator": False, "recall": True,
+         "opis": "Strona główna skarbca: huby folderów, liczby, ostatnie zmiany."},
+    "jarvo": {"tytul": "Jarvo", "hub": "_hub-jarvo", "pisze": "zasiew", "kompilator": False, "recall": True,
+              "opis": ("Tożsamość Jarva: kim jest (SOUL), zasady pracy, zasady krytyczne i jego pamięć. Notatki generowane "
+                       "z repo i z pamięci Hermesa (zasiew i każda zmiana pamięci); poprawki właściciela w `orzeczenia/`.")},
+    "orzeczenia": {"tytul": "Orzeczenia", "hub": "_hub-orzeczenia", "pisze": "czlowiek", "kompilator": False, "recall": True,
+                   "opis": "Korekty od człowieka, jedna datowana linia każda. Agent dostaje swoje orzeczenia przed każdą turą."},
+    "user": {"tytul": "Ty", "hub": "_hub-ty", "pisze": "kompilator", "kompilator": True, "recall": True,
+             "opis": ("Kim jesteś, czym się zajmujesz, Twoja firma, decyzje i preferencje (`user/USER.md` z wywiadu Jarva, "
+                      "`user/pamięć jarva o tobie` z pamięci Hermesa, fakty z rozmów).")},
+    "projekty": {"tytul": "Projekty", "hub": "_hub-projekty", "pisze": "kompilator", "kompilator": True, "recall": True,
+                 "opis": "Jedna notatka na misję albo projekt: stan, decyzje, wyniki (linki do plików), marka, agenci."},
+    "brands": {"tytul": "Marki", "hub": "_hub-marki", "pisze": "skrypt", "kompilator": False, "recall": True,
+               "opis": "Brand kity (`brands/<marka>/`): kolory, fonty, ton. Orzeczenia marki: `orzeczenia/marki/<marka>.md`."},
+    "inspiracje": {"tytul": "Inspiracje", "hub": "_hub-inspiracje", "pisze": "skrypt", "kompilator": False, "recall": True,
+                   "opis": ("Strony referencyjne branż słabo pokrytych w katalogu Inspo (`inspiracje/strony/<branża>/<domena>`): "
+                            "układ, paleta, fonty, zrzuty; pisze Web skillem `inspiracje-stron`. Inspiracja, nie wzór do kopiowania.")},
+    "agenci": {"tytul": "Agenci", "hub": "_hub-agenci", "pisze": "kompilator", "kompilator": False, "recall": True,
+               "opis": ("Jeden katalog na aktywnego agenta: hub (rola, skille, skrypty z `fleet.yaml`) i notatki o jego pracy "
+                        "(narzędzia, skille, ograniczenia). Agenci wycofani z floty leżą w `archiwum/agenci/`.")},
+    "fleet": {"tytul": "Flota", "hub": "", "pisze": "zasiew", "kompilator": False, "recall": True,
+              "opis": "Arsenał floty, księga lekcji i węzły skilli (`fleet/skille/`, generowane z repo)."},
+    "podmioty": {"tytul": "Podmioty", "hub": "_hub-podmioty", "pisze": "kompilator", "kompilator": True, "recall": True,
+                 "opis": "Firmy, ludzie w rolach publicznych, narzędzia, usługi, konta: jedna notatka na podmiot, aktualizowana."},
+    "pojecia": {"tytul": "Pojęcia", "hub": "_hub-pojecia", "pisze": "kompilator", "kompilator": True, "recall": True,
+                "opis": "Metody, wzorce, definicje, lekcje ogólne: jedna notatka na pojęcie."},
+    "bledy": {"tytul": "Księga błędów", "hub": "_hub-bledy", "pisze": "kompilator", "kompilator": True, "recall": True,
+              "opis": ("Księga błędów: jedna notatka na rodzaj błędu narzędzia albo pracy, z sygnaturami (dosłowne fragmenty "
+                       "komunikatu), objawem, przyczyną, krokiem „jak poprawnie” i licznikiem wystąpień. Gdy wynik narzędzia ma "
+                       "sygnaturę, wtyczka dopisuje pod nim „To już było” z tym krokiem.")},
+    "rozmowy": {"tytul": "Rozmowy", "hub": "_hub-rozmowy", "pisze": "kompilator", "kompilator": True, "recall": True,
+                "opis": "Skompilowane ustalenia z rozmów i kart: decyzje, fakty, pliki. Surowe wyciągi leżą w `zrodla/rozmowy/`."},
+    "briefy": {"tytul": "Briefy", "hub": "_hub-briefy", "pisze": "skrypt", "kompilator": False, "recall": True,
+               "opis": ("Poranne briefy (`B-RRRR-MM-DD`) i przeglądy tygodnia (`T-RRRR-Wtt`) z treścią i tabelą decyzji: "
+                        "odpowiedź właściciela, kiedy, co z nią zrobiono. Pisze skrypt `briefy.py`, odpowiedzi dopisuje Jarvo.")},
+    "zrodla": {"tytul": "Źródła", "hub": "", "pisze": "surowe", "kompilator": False, "recall": False,
+               "opis": "Surowe wyciągi rozmów, raporty kart, pliki i kopia repo (`zrodla/jarvo-repo/`): materiał, nie wiedza."},
+    "skrzynka": {"tytul": "Skrzynka", "hub": "", "pisze": "surowe", "kompilator": False, "recall": False,
+                 "opis": "Szkice czekające na kompilację (`skrzynka/zrobione/`: już skompilowane)."},
+    "archiwum": {"tytul": "Archiwum", "hub": "_hub-archiwum", "pisze": "archiwizacja", "kompilator": False, "recall": False,
+                 "opis": ("Notatki wycofane i zastąpione, w układzie dawnej ścieżki (`archiwum/agenci/<agent>/…`). Poza "
+                          "przypomnieniami i kompilacją; link do notatki zastąpionej prowadzi do następcy (`zastapiona_przez`).")},
 }
-POZA_WYSZUKIWANIEM = ("zrodla/", "skrzynka/")          # domyślnie nie wracają w wynikach (surowe i szkice)
+TOZSAMOSC = "jarvo"                  # folder tożsamości Jarva (notatki generowane, kompilator ich nie pisze)
+ARCHIWUM = "archiwum"
+PROFIL_TOZSAMOSCI = "jarvo"          # profil, którego tożsamość i pamięć ma skarbiec (orkiestrator floty)
 LUSTRO_REPO = "zrodla/jarvo-repo"                     # kopia repo przy wdrożeniu: poza wyszukiwaniem, ale w grafie
+FOLDERY = (*(f for f in FOLDERY_SKARBCA if f), "zrodla/rozmowy", "zrodla/karty", "zrodla/pliki", LUSTRO_REPO, "skrzynka/zrobione",
+           "inspiracje/strony", "orzeczenia/marki")
+# folder → (nazwa pliku huba, tytuł): foldery z hubem
+HUBY = {f: (d["hub"], d["tytul"]) for f, d in FOLDERY_SKARBCA.items() if d["hub"]}
+OPISY_FOLDEROW = {f: d["opis"] for f, d in FOLDERY_SKARBCA.items() if f}
+FOLDERY_NOTATEK = tuple(f for f, d in FOLDERY_SKARBCA.items() if d["kompilator"])   # + agenci/<agent>, brands/<marka>
+SUROWE = ("zrodla/", "skrzynka/")                      # materiał, nie wiedza: poza grafem (bez lustra repo) i INDEX-em
+POZA_WYSZUKIWANIEM = tuple(f"{f}/" for f, d in FOLDERY_SKARBCA.items() if f and not d["recall"])   # + archiwum/
 LUSTRO_KATALOGI = ("profiles", "shared", "vendor")     # podkatalogi z `--repo` (płaskie *.md obok to docs/)
 PLIKI_SPECJALNE = {"INDEX.md", "LOG.md", "LINT.md", "SCHEMA.md"}
 # własne formaty (brand kit, karta strony referencyjnej z DESIGN.md dembrandta, USER.md, źródła, szkice, archiwum briefów)
 BEZ_FRONTMATTERU = ("brands/", "inspiracje/", "user/", "zrodla/", "skrzynka/", "briefy/")
 TYPY = {"hub", "agent", "projekt", "podmiot", "pojecie", "fakt", "decyzja", "lekcja", "zrodlo", "rozmowa", "orzeczenia", "skill",
-        "blad"}
-STATUSY = {"aktualna", "do-sprawdzenia", "sprzeczna", "przestarzala", "generowane"}
+        "blad", "tozsamosc"}
+STATUSY = {"aktualna", "do-sprawdzenia", "sprzeczna", "przestarzala", "generowane", "wycofana"}
 WYMAGANE = ("typ", "utworzono", "zmieniono", "status")
 BEZ_ZRODLA = {"hub", "agent", "orzeczenia", "skill"}         # generowane z repo i floty (linki robi zasiew)
 SKILLE = "fleet/skille"                                       # skill floty = węzeł grafu (zasiew z fleet.json)
@@ -126,6 +166,30 @@ O_FLOCIE = ("agenci/", "pojecia/", "fleet/", "orzeczenia/")
 SKRYPT_RE = re.compile(r"`(?:[^`\s]*/)?([\w-]+\.(?:py|sh|js|cjs|mjs))\b[^`]*`")
 MAX_SLOW = {"hub": 400, "agent": 600, "projekt": 400}
 DOMYSLNY_MAX_SLOW = 250
+# tożsamość Jarva w skarbcu (docs/WIEDZA.md §2a): notatki `jarvo/*` z plików tożsamości buildu (build/wiedza/tozsamosc:
+# SOUL, ZASADY, KRYTYCZNE i MAPA z podstawionymi tokenami) i z pamięci Hermesa (memories/MEMORY.md, USER.md profilu)
+# (ścieżka notatki, plik w tozsamosc/, plik źródła w repo dla `plik:`, tytuł, streszczenie)
+NOTATKI_TOZSAMOSCI = (
+    (f"{TOZSAMOSC}/kim jest jarvo", "SOUL.md", "profiles/jarvo/SOUL.md", "Kim jest Jarvo",
+     "Postać Jarva z `profiles/jarvo/SOUL.md`: kim jest, charakter i głos. Jarvo ma ten tekst w prompcie każdej rozmowy"),
+    (f"{TOZSAMOSC}/zasady pracy", "ZASADY.md", "profiles/jarvo/ZASADY.md", "Zasady pracy",
+     "Jak Jarvo pracuje (`profiles/jarvo/ZASADY.md`): zasady, mapa skilli, formaty raportów. W prompcie każdej rozmowy, po postaci"),
+    (f"{TOZSAMOSC}/zasady krytyczne", "KRYTYCZNE.md", "profiles/jarvo/ZASADY.md", "Zasady krytyczne",
+     "Najważniejsze zasady na samym końcu promptu Jarva (ostatni blok `<critical>` z `profiles/jarvo/ZASADY.md`), "
+     "powtórka zasad z początku, żeby model ich nie zgubił"),
+)
+PLIKI_PAMIECI = {"memory": "MEMORY.md", "user": "USER.md"}       # memories/ profilu (tools/memory_tool.py Hermesa)
+NOTATKI_PAMIECI = {"memory": (f"{TOZSAMOSC}/pamięć jarva", "Pamięć Jarva", "Notatki Jarva z narzędzia memory"),
+                   "user": ("user/pamięć jarva o tobie", "Pamięć Jarva o Tobie", "Co Jarvo pamięta o Tobie z narzędzia memory")}
+MAPA_NOTATKA = f"{TOZSAMOSC}/jak działa jarvo"   # „Jarvo od A do Z”: MAPA.md repo + nakładki + bloki GEN (wiedza/mapa.py)
+# kolejność tożsamości w hubie Jarva, INDEX-ie i Mózgu: mapa, postać, zasady, zasady krytyczne, pamięć
+KOLEJNOSC_TOZSAMOSCI = [MAPA_NOTATKA, *(t[0] for t in NOTATKI_TOZSAMOSCI), *(n[0] for n in NOTATKI_PAMIECI.values())]
+SEPARATOR_PAMIECI = "\n§\n"           # tools/memory_tool_store.py Hermesa: ENTRY_DELIMITER (cały, z końcami linii)
+LIMITY_PAMIECI = {"memory": 2200, "user": 1375}   # domyślne Hermesa (memory.memory_char_limit, memory.user_char_limit)
+STAN_PAMIECI = "wiedza-pamiec.json"   # state/: wersja (sha256) i wpisy pamięci każdego profilu z ostatniego lustra
+ZAMEK_PAMIECI = "wiedza-pamiec.zamek"
+MAX_STRESZCZENIA_HUBA = 1500          # znaków bloku STRESZCZENIE huba (`wiedza.py streszczenie`)
+STRESZCZENIE_RE = re.compile(r"<!-- Jarvo:STRESZCZENIE -->\n?(.*?)\n?<!-- /Jarvo:STRESZCZENIE -->", re.S)
 GEN_RE = re.compile(r"<!-- Jarvo:GEN (\w+) -->.*?<!-- /Jarvo:GEN \1 -->", re.S)
 LISTA_RE = re.compile(r"<!-- Jarvo:GEN lista -->.*?<!-- /Jarvo:GEN lista -->", re.S)   # same linki: poza indeksem
 # limit długości (lint) liczy tylko treść pisaną: bloki GEN (lista notatek, rejestr floty) robi zasiew, nie autor
@@ -156,7 +220,7 @@ SILNIKI = ("wektory", "hybryda", "slowa")
 SILNIK = "wektory"
 MAX_ALIASOW = 8                   # aliasów jednej notatki (frontmatter `aliasy:`)
 MAX_DOPISKOW_ALIASOW = 5          # tytułów dopisanych do jednego zapytania
-WERSJA_INDEKSU = "2"              # 2: aliasy i wektory; inna wersja w bazie = jedno pełne odświeżenie indeksu
+WERSJA_INDEKSU = "3"              # 2: aliasy i wektory, 3: sekcje i streszczenia hubów; inna wersja = jedno pełne odświeżenie
 HUB_AGENTA_RE = re.compile(r"^agenci/[^/]+/_hub-[^/]+$")
 SEKRETY = [
     ("klucz Stripe", re.compile(r"\bsk_(live|test)_[A-Za-z0-9]{8,}")),
@@ -587,6 +651,86 @@ def zastap_blok(text: str, nazwa: str, tresc: str) -> str:
     return text.rstrip("\n") + "\n\n" + blok + "\n"
 
 
+def podsumowanie_huba(tresc: str) -> str:
+    """Tekst bloku STRESZCZENIE huba (`wiedza.py streszczenie`: „wszystko zebrane w jednej”) albo pusto."""
+    m = STRESZCZENIE_RE.search(tresc or "")
+    return m.group(1).strip() if m else ""
+
+
+def wstaw_streszczenie(tresc: str, streszczenie: str) -> str:
+    """Treść huba (bez frontmatteru) z blokiem STRESZCZENIE: istniejący wymieniony, nowy zaraz pod tytułem i pogrubionym
+    opisem (przed częścią ręczną, listą i „Powiązanymi”). Zasiew i indeksuj ruszają tylko bloki GEN, więc blok zostaje."""
+    blok = f"<!-- Jarvo:STRESZCZENIE -->\n{streszczenie.strip()}\n<!-- /Jarvo:STRESZCZENIE -->"
+    if STRESZCZENIE_RE.search(tresc):
+        return STRESZCZENIE_RE.sub(lambda _m: blok, tresc, count=1)
+    m = re.search(r"\A\s*# [^\n]*\n(?:\s*\n\*\*[^\n]*\*\*[ \t]*\n)?", tresc)
+    if not m:
+        return blok + "\n\n" + tresc.lstrip("\n")
+    return tresc[:m.end()].rstrip("\n") + "\n\n" + blok + "\n\n" + tresc[m.end():].lstrip("\n")
+
+
+_METADANA_RE = re.compile(r"^(updated|zaktualizowano|zmieniono|utworzono|status|data)\s*:", re.I)
+
+
+def streszczenie_tresci(tresc: str, od: int = 0) -> str:
+    """Streszczenie notatki (indeks, przypomnienie, Mózg): tekst bloku STRESZCZENIE huba (pierwszy akapit), inaczej
+    pierwszy akapit po tytule (od pozycji `od`), bez komentarzy i linii metadanych („updated: …” w user/USER.md), a w
+    notatce z samych list pierwsze punkty; na końcu pierwsza linia tekstu w całej treści."""
+    podsumowanie = podsumowanie_huba(tresc)
+    if podsumowanie:
+        akapit = re.split(r"\n\s*\n", podsumowanie, maxsplit=1)[0]
+        return " ".join(bez_markdown(l.strip().lstrip("-*• ").strip()) for l in akapit.splitlines() if l.strip())
+    out, punkty = "", []
+    if od:
+        for linia in re.sub(r"<!--.*?-->", "", tresc[od:], flags=re.S).splitlines():
+            s = linia.strip()
+            if (not s and out) or (s.startswith("#") and punkty and not out):    # akapit skończony albo sekcja z samych list
+                break
+            if s.startswith("- ") and not out and len(punkty) < 3:
+                punkty.append(bez_markdown(s[2:]))
+            if s and not s.startswith(("#", "<!--", "|", "-", "```")) and not _METADANA_RE.match(s):
+                out = (out + " " + bez_markdown(s)).strip()
+        if not out and punkty:
+            return "; ".join(p for p in punkty if p)
+    if not out:
+        for linia in tresc.splitlines():
+            s = linia.strip()
+            if s and not s.startswith(("#", "<!--", "|", "-", "```", "---")) and not _METADANA_RE.match(s):
+                return bez_markdown(s)
+    return out
+
+
+MIN_SLOW_SEKCJI_NOTATKI = 300       # notatka dłuższa, z co najmniej MIN_SEKCJI sekcjami `## `: sekcje w indeksie osobno
+MIN_SEKCJI = 3
+BEZ_SEKCJI = ("Powiązane", "Notatki (lista automatyczna)")
+
+
+def sekcje_notatki(n: "Notatka") -> list[tuple[str, str]]:
+    """[(nazwa sekcji, treść z nagłówkiem)] notatki dzielonej w indeksie (Indeks._dodaj_sekcje): `sekcje: true` we
+    frontmatterze (mapa Jarva) albo długa notatka (≥ MIN_SLOW_SEKCJI_NOTATKI słów) z ≥ MIN_SEKCJI sekcjami `## `
+    (np. user/USER.md z wywiadu); bez hubów, archiwum, źródeł i szkiców, bez „Powiązanych” i list generowanych."""
+    if n.hub or n.sciezka.startswith(POZA_WYSZUKIWANIEM):
+        return []
+    tresc = GEN_RE.sub(lambda m: m.group(0) if "GEN lista" not in m.group(0) else "", n.tresc)
+    sekcje = [(m.group(1).strip(), m.group(0).strip()) for m in re.finditer(r"^## (.+?)[ \t]*\n.*?(?=^## |\Z)", tresc, re.M | re.S)]
+    sekcje = [(nazwa, t) for nazwa, t in sekcje if nazwa not in BEZ_SEKCJI and len(t.split("\n", 1)[-1].strip()) > 0]
+    if n.fm.get("sekcje") is True or (len(sekcje) >= MIN_SEKCJI and n.slowa >= MIN_SLOW_SEKCJI_NOTATKI):
+        return sekcje
+    return []
+
+
+def wytnij_sekcje(n: "Notatka", sekcja: str) -> "Notatka | None":
+    """Sama sekcja `## <sekcja>` notatki (wielkość liter i ogonki bez znaczenia) jako Notatka `ścieżka#Sekcja` albo None."""
+    klucz = bez_ogonkow(sekcja).strip().lower()
+    for m in re.finditer(r"^## (.+?)[ \t]*\n.*?(?=^## |\Z)", n.tresc, re.M | re.S):
+        if bez_ogonkow(m.group(1)).strip().lower() == klucz:
+            nazwa, tekst = m.group(1).strip(), m.group(0).strip()
+            return Notatka(sciezka=f"{n.sciezka}#{nazwa}", tytul=f"{n.tytul}: {nazwa}", streszczenie=streszczenie_tresci(tekst)[:240],
+                           fm=n.fm, tresc=tekst + "\n", linki=[l for l in n.linki if f"[[{l[0]}" in tekst],
+                           slowa=len(re.findall(r"\w+", tekst)), mtime=n.mtime, rozmiar=n.rozmiar)
+    return None
+
+
 # ------------------------------------------------------------------------------------------------ notatka
 
 def zakres_marki(marka: str, agent: str = "", orzeczenia: str = "") -> tuple[str, ...]:
@@ -693,19 +837,31 @@ class Skarbiec:
     def rel(self, p: Path) -> str:
         return _nfc(p.relative_to(self.root).as_posix()[:-3])
 
+    def pliki_ze_stanem(self) -> dict[str, tuple[float, int]]:
+        """Notatki (ścieżka bez `.md`) → (mtime, rozmiar) jednym przejściem os.walk: bez katalogów z kropką i szablonów
+        (brands/_szablon), bez plików specjalnych w korzeniu. Odświeżenie indeksu przed każdą turą: rglob ze stat-em
+        osobno to ok. 55 ms na 1 200 plików, os.walk ok. 7 ms (pomiar 20.11)."""
+        out: dict[str, tuple[float, int]] = {}
+        korzen = str(self.root)
+        for katalog, podkatalogi, nazwy in os.walk(korzen):
+            podkatalogi[:] = [d for d in podkatalogi if not d.startswith(".") and d != "_szablon"]
+            rel_kat = os.path.relpath(katalog, korzen).replace(os.sep, "/")
+            for nazwa in nazwy:
+                if not nazwa.endswith(".md") or nazwa.startswith(".") or (rel_kat == "." and nazwa in PLIKI_SPECJALNE):
+                    continue
+                rel = nazwa[:-3] if rel_kat == "." else f"{rel_kat}/{nazwa[:-3]}"
+                if WINDOWS and any(urzadzenie_windows(c) for c in f"{rel}.md".split("/")):   # „nul.md” ze skarbca z Linuksa:
+                    continue                                                                  # Win32 go nie otworzy (K07)
+                try:
+                    st = os.stat(os.path.join(katalog, nazwa))
+                except OSError:
+                    continue
+                out[_nfc(rel)] = (st.st_mtime, st.st_size)
+        return dict(sorted(out.items()))
+
     def pliki(self) -> list[str]:
-        """Wszystkie notatki (bez katalogów z kropką i plików specjalnych), ścieżki bez `.md`."""
-        out = []
-        for p in self.root.rglob("*.md"):
-            r = p.relative_to(self.root)
-            if any(part.startswith(".") or part == "_szablon" for part in r.parts):   # katalogi z kropką i szablony (brands/_szablon)
-                continue
-            if len(r.parts) == 1 and r.name in PLIKI_SPECJALNE:
-                continue
-            if WINDOWS and any(urzadzenie_windows(part) for part in r.parts):   # „nul.md” ze skarbca z Linuksa: Win32
-                continue                                                       # go nie otworzy; lint go zgłasza (K07)
-            out.append(_nfc(r.as_posix()[:-3]))
-        return sorted(out)
+        """Wszystkie notatki (bez katalogów z kropką i plików specjalnych), ścieżki bez `.md`, posortowane."""
+        return list(self.pliki_ze_stanem())
 
     def istnieje(self, rel: str) -> bool:
         try:
@@ -713,32 +869,44 @@ class Skarbiec:
         except ValueError:
             return False
 
+    def przekierowanie(self, rel: str) -> str | None:
+        """Notatka przeniesiona do archiwum (`archiwum/<dawna ścieżka>`): jej następca (`zastapiona_przez`, gdy istnieje
+        i sam nie jest w archiwum) albo wpis w archiwum; None, gdy pod dawną ścieżką nic nie leżało. Stara ścieżka
+        z pamięci agenta, starej sesji albo notatki sprzed przeniesienia prowadzi tak do aktualnej wiedzy."""
+        rel = rel.strip().strip("/").removesuffix(".md")
+        if not rel or rel.startswith(ARCHIWUM + "/"):
+            return None
+        stara = f"{ARCHIWUM}/{rel}"
+        if not self.istnieje(stara):
+            return None
+        try:
+            fm, _ = podziel(self.plik(stara).read_text(encoding="utf-8", errors="replace"))
+        except (OSError, ValueError):
+            return stara
+        nastepca = str(fm.get("zastapiona_przez") or "").strip().strip("/").removesuffix(".md")
+        return nastepca if nastepca and not nastepca.startswith(ARCHIWUM + "/") and self.istnieje(nastepca) else stara
+
     # ---- czytanie
     def wczytaj(self, rel: str) -> Notatka:
+        """Notatka (z frontmatterem, tytułem, streszczeniem, linkami). `ścieżka#Sekcja` (wpis sekcji z indeksu) = sama ta
+        sekcja; ścieżka przeniesiona do archiwum = następca albo wpis w archiwum (przekierowanie)."""
+        if "#" in rel:
+            baza, _, sekcja = rel.partition("#")
+            n = self.wczytaj(baza)
+            return (wytnij_sekcje(n, sekcja) if sekcja.strip() else None) or n
         p = self.plik(rel)
         if not p.exists():
             # model pisze ścieżkę bez polskich znaków („przegladarce”); 12.11 dwa nieudane wiedza_czytaj z rzędu
             klucz = bez_ogonkow(p.name).lower()
             p = next((q for q in sorted(p.parent.glob("*.md")) if bez_ogonkow(q.name).lower() == klucz), p) \
                 if p.parent.is_dir() else p
+        if not p.exists() and (nowa := self.przekierowanie(rel)):     # przeniesiona do archiwum: następca albo archiwum
+            p = self.plik(nowa)
         text = p.read_text(encoding="utf-8", errors="replace")
         fm, tresc = podziel(text)
         m = re.search(r"^# (.+)$", tresc, re.M)
         tytul = bez_markdown(m.group(1)) if m else self.rel(p).rsplit("/", 1)[-1]
-        streszczenie = ""
-        if m:
-            for linia in tresc[m.end():].splitlines():
-                s = linia.strip()
-                if not s and streszczenie:
-                    break
-                if s and not s.startswith(("#", "<!--", "|", "-", "```")):
-                    streszczenie = (streszczenie + " " + bez_markdown(s)).strip()
-        if not streszczenie:
-            for linia in tresc.splitlines():
-                s = linia.strip()
-                if s and not s.startswith(("#", "<!--", "|", "-", "```", "---")):
-                    streszczenie = bez_markdown(s)
-                    break
+        streszczenie = streszczenie_tresci(tresc, m.end() if m else 0)
         n = Notatka(sciezka=self.rel(p), tytul=tytul, streszczenie=streszczenie[:240], fm=fm, tresc=tresc,
                     slowa=len(re.findall(r"\w+", GEN_RE.sub("", tresc))), mtime=p.stat().st_mtime, rozmiar=p.stat().st_size)
         n.linki = self._linki(tresc)
@@ -872,6 +1040,12 @@ class Indeks:
             CREATE INDEX IF NOT EXISTS aliasy_sciezka ON aliasy(sciezka);
             CREATE TABLE IF NOT EXISTS wektory(sciezka TEXT PRIMARY KEY, hash TEXT, model TEXT, wektor BLOB, mtime REAL,
                 rozmiar INTEGER);
+            CREATE TABLE IF NOT EXISTS sekcje(sciezka TEXT PRIMARY KEY, rodzic TEXT, mtime REAL, rozmiar INTEGER, tytul TEXT,
+                streszczenie TEXT, typ TEXT, status TEXT, agent TEXT, folder TEXT, zmieniono TEXT);
+            CREATE INDEX IF NOT EXISTS sekcje_rodzic ON sekcje(rodzic);
+            CREATE VIEW IF NOT EXISTS wpisy AS
+                SELECT sciezka, mtime, rozmiar, tytul, streszczenie, typ, status, agent, folder, zmieniono FROM pliki
+                UNION ALL SELECT sciezka, mtime, rozmiar, tytul, streszczenie, typ, status, agent, folder, zmieniono FROM sekcje;
         """)
         wersja = self.db.execute("SELECT wartosc FROM meta WHERE klucz = 'wersja'").fetchone()
         self._przebuduj = wersja is None or wersja[0] != WERSJA_INDEKSU      # indeks sprzed aliasów: raz od nowa
@@ -885,7 +1059,8 @@ class Indeks:
         (notatka, lista plików specjalnych) albo przy `pelny`; bez zmian odświeżenie to sam przegląd katalogów.
         Wektorów nie liczy (to robi odswiez_wektory przy indeksuj, kompilacji i zasiewie, poza turą rozmowy)."""
         pelny = pelny or self._przebuduj
-        pliki = self.sk.pliki()
+        stan_plikow = self.sk.pliki_ze_stanem()
+        pliki = list(stan_plikow)
         zbior = set(pliki)
         specjalne = ",".join(sorted(n for n in PLIKI_SPECJALNE if (self.sk.root / n).is_file()))
         stare = {r["sciezka"]: (r["mtime"], r["rozmiar"]) for r in self.db.execute("SELECT sciezka, mtime, rozmiar FROM pliki")}
@@ -896,9 +1071,7 @@ class Indeks:
                 self.db.execute("DELETE FROM fts")
                 self.db.execute("DELETE FROM aliasy")
             for rel in pliki:
-                p = self.sk.root / f"{rel}.md"           # z pliki(), więc w skarbcu: bez resolve() (na Windows otwiera plik)
-                st = p.stat()
-                if not pelny and rel in stare and stare[rel] == (st.st_mtime, st.st_size):
+                if not pelny and rel in stare and stare[rel] == stan_plikow[rel]:
                     continue
                 n = self.sk.wczytaj(rel)
                 notatki[rel] = n
@@ -906,6 +1079,10 @@ class Indeks:
                 zmienione += rel in stare
                 if rel in stare and not pelny:           # nowa notatka nie ma wiersza w FTS (pliki i fts w jednej transakcji)
                     self.db.execute("DELETE FROM fts WHERE sciezka = ?", (rel,))
+                    self._usun_sekcje(rel)
+                elif pelny:
+                    self.db.execute("DELETE FROM sekcje WHERE rodzic = ?", (rel,))
+                self._dodaj_sekcje(n)
                 self.db.execute("INSERT INTO fts(sciezka, tytul, streszczenie, tresc, tagi) VALUES (?,?,?,?,?)",
                                 (rel, n.tytul, n.streszczenie, LISTA_RE.sub("", n.tresc), " ".join(n.fm.get("tagi") or []) if isinstance(n.fm.get("tagi"), list) else str(n.fm.get("tagi") or "")))
                 self.db.execute("INSERT OR REPLACE INTO pliki VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -918,6 +1095,7 @@ class Indeks:
                     self.db.execute("INSERT INTO aliasy VALUES (?,?,?)", (rel, alias, n.tytul))
             usuniete = [s for s in stare if s not in zbior]
             for s in usuniete:
+                self._usun_sekcje(s)
                 self.db.execute("DELETE FROM fts WHERE sciezka = ?", (s,))
                 self.db.execute("DELETE FROM pliki WHERE sciezka = ?", (s,))
                 self.db.execute("DELETE FROM aliasy WHERE sciezka = ?", (s,))
@@ -939,6 +1117,24 @@ class Indeks:
                 self.db.execute("INSERT OR REPLACE INTO meta VALUES ('wersja', ?)", (WERSJA_INDEKSU,))
         self._przebuduj = False
         return {"pliki": len(pliki), "nowe": nowe, "zmienione": zmienione, "usuniete": len(usuniete)}
+
+    def _dodaj_sekcje(self, n: Notatka) -> None:
+        """Sekcje `## ` długiej notatki jako osobne wpisy indeksu (`ścieżka#Sekcja`: FTS, wektory, wyniki szukania):
+        przypomnienie trafia w sekcję z odpowiedzią, a wektor całej notatki widzi tylko jej początek (MAX_ZNAKOW_WEKTORA)."""
+        for nazwa, tekst in sekcje_notatki(n):
+            s = f"{n.sciezka}#{nazwa}"
+            stresz = streszczenie_tresci(tekst)[:240]
+            self.db.execute("INSERT OR REPLACE INTO sekcje VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                            (s, n.sciezka, n.mtime, n.rozmiar, f"{n.tytul}: {nazwa}", stresz, n.typ, str(n.fm.get("status") or ""),
+                             str(n.fm.get("agent") or ""), n.folder, str(n.fm.get("zmieniono") or "")))
+            self.db.execute("INSERT INTO fts(sciezka, tytul, streszczenie, tresc, tagi) VALUES (?,?,?,?,?)",
+                            (s, f"{n.tytul}: {nazwa}", stresz, tekst, ""))
+
+    def _usun_sekcje(self, rodzic: str) -> None:
+        for (s,) in self.db.execute("SELECT sciezka FROM sekcje WHERE rodzic = ?", (rodzic,)).fetchall():
+            self.db.execute("DELETE FROM fts WHERE sciezka = ?", (s,))
+            self.db.execute("DELETE FROM wektory WHERE sciezka = ?", (s,))
+        self.db.execute("DELETE FROM sekcje WHERE rodzic = ?", (rodzic,))
 
     @staticmethod
     def slowa(q: str) -> list[str]:
@@ -1014,14 +1210,20 @@ class Indeks:
         osadzania, zrodla/ przy `zrodla`) wchodzą z miejscem z listy BM25; hybryda = fuzja RRF listy BM25 i listy
         wektorów; slowa = BM25. Bez wektorów (brak usługi, modelu, czasu) zawsze BM25; użyty silnik zostaje
         w `self.silnik`. Zapytanie rozszerzają aliasy notatek (rozszerz). `zakres` (zakres_marki, agent biznesowy): tylko
-        notatki z zakresu, już w zapytaniu (BM25 z warunkiem SQL, wektory przefiltrowane), więc wyników jest do `limit`."""
+        notatki z zakresu, już w zapytaniu (BM25 z warunkiem SQL, wektory przefiltrowane), więc wyników jest do `limit`.
+        Archiwum (notatki wycofane i zastąpione) tylko z `folder="archiwum"`: link i stara ścieżka prowadzą do następcy."""
         silnik = silnik if silnik in SILNIKI else SILNIK
         wek = self.szukaj_wektorami(wektory, q, zakres=zakres) if wektory is not None and silnik != "slowa" else None
         self.silnik = silnik if wek is not None else "slowa"
         kolumny = "p.sciezka, p.tytul, p.streszczenie, p.typ, p.status, p.folder, p.agent, p.zmieniono"
+        podzielone = {r[0] for r in self.db.execute("SELECT DISTINCT rodzic FROM sekcje")}
 
         def dopuszczona(r) -> bool:
             s = r["sciezka"]
+            if s in podzielone:                           # notatka podzielona na sekcje: wracają jej sekcje, nie całość
+                return False
+            if s.startswith(ARCHIWUM + "/"):
+                return bool(folder) and folder.strip("/").split("/", 1)[0] == ARCHIWUM and s.startswith(folder.rstrip("/") + "/")
             if not zrodla and s.startswith(POZA_WYSZUKIWANIEM):
                 return False
             if r["typ"] == "skill" and not folder:            # węzły grafu o flocie: tylko z folder="fleet"
@@ -1037,7 +1239,7 @@ class Indeks:
         if zap:
             warunek, arg = _warunek_zakresu(zakres) if zakres else ("", [])
             bm = [r for r in self.db.execute(
-                f"SELECT {kolumny}, bm25(fts, 0, 3.0, 2.0, 1.0, 1.5) AS w FROM fts f JOIN pliki p ON p.sciezka = f.sciezka "
+                f"SELECT {kolumny}, bm25(fts, 0, 3.0, 2.0, 1.0, 1.5) AS w FROM fts f JOIN wpisy p ON p.sciezka = f.sciezka "
                 f"WHERE fts MATCH ?{' AND ' + warunek if warunek else ''} ORDER BY w LIMIT ?", (zap, *arg, limit * 6)).fetchall()
                   if dopuszczona(r)]
         if wek is None:
@@ -1047,7 +1249,7 @@ class Indeks:
             brak = [s for s, _w in wek if s not in meta]
             for i in range(0, len(brak), 500):
                 czesc = brak[i:i + 500]
-                for r in self.db.execute(f"SELECT {kolumny} FROM pliki p WHERE p.sciezka IN ({','.join('?' * len(czesc))})", czesc):
+                for r in self.db.execute(f"SELECT {kolumny} FROM wpisy p WHERE p.sciezka IN ({','.join('?' * len(czesc))})", czesc):
                     meta[r["sciezka"]] = r
             lista_wek = [s for s, _w in wek if s in meta and dopuszczona(meta[s])]
             wynik: dict[str, float] = {}
@@ -1064,9 +1266,10 @@ class Indeks:
         out, widziane = [], set()
         for r, punkty in ranking:
             s = r["sciezka"]
-            if s in widziane:
+            baza = s.split("#", 1)[0]                    # notatka albo jej sekcja: jedno miejsce, wyżej oceniony wpis
+            if s in widziane or baza in widziane:
                 continue
-            widziane.add(s)
+            widziane.update((s, baza))
             out.append({"sciezka": s, "tytul": r["tytul"], "streszczenie": r["streszczenie"], "typ": r["typ"],
                         "status": r["status"], "zmieniono": r["zmieniono"], "wynik": punkty})
             if len(out) >= limit:
@@ -1094,10 +1297,10 @@ class Indeks:
         if not model:
             return wynik
         with self.db:
-            wynik["usuniete"] = self.db.execute("DELETE FROM wektory WHERE model != ? OR sciezka NOT IN (SELECT sciezka FROM pliki)",
+            wynik["usuniete"] = self.db.execute("DELETE FROM wektory WHERE model != ? OR sciezka NOT IN (SELECT sciezka FROM wpisy)",
                                                 (model,)).rowcount
         stare = {r[0]: (r[1], r[2], r[3]) for r in self.db.execute("SELECT sciezka, mtime, rozmiar, hash FROM wektory")}
-        szukane = [(r[0], r[1], r[2]) for r in self.db.execute("SELECT sciezka, mtime, rozmiar FROM pliki")
+        szukane = [(r[0], r[1], r[2]) for r in self.db.execute("SELECT sciezka, mtime, rozmiar FROM wpisy")
                    if not r[0].startswith(POZA_WYSZUKIWANIEM)]
         wynik["notatek"] = len(szukane)
         zmienione = {s: (m, n) for s, m, n in szukane if stare.get(s, (None, None, None))[:2] != (m, n)}
@@ -1146,11 +1349,30 @@ class Indeks:
             wy[l["z"]] = wy.get(l["z"], 0) + 1
             linki.append({"z": l["z"], "do": l["do_"], "auto": bool(l["auto"])})
         def w_grafie(s: str) -> bool:                  # kopia repo (docs, zasady agentów, materiały skilli) też jest w grafie
-            return not s.startswith(POZA_WYSZUKIWANIEM) or s.startswith(LUSTRO_REPO + "/")
-        wezly = [{"id": r["sciezka"], "tytul": r["tytul"], "folder": r["folder"], "typ": r["typ"], "status": r["status"],
-                  "hub": bool(r["hub"]), "agent": r["agent"], "zmieniono": r["zmieniono"], "we": we.get(r["sciezka"], 0),
-                  "wy": wy.get(r["sciezka"], 0)} for r in self.notatki() if w_grafie(r["sciezka"])]
+            return not s.startswith(SUROWE) or s.startswith(LUSTRO_REPO + "/")
+        wezly = []
+        for r in self.notatki():
+            if not w_grafie(r["sciezka"]):
+                continue
+            w = {"id": r["sciezka"], "tytul": r["tytul"], "folder": r["folder"], "typ": r["typ"], "status": r["status"],
+                 "hub": bool(r["hub"]), "agent": r["agent"], "zmieniono": r["zmieniono"], "we": we.get(r["sciezka"], 0),
+                 "wy": wy.get(r["sciezka"], 0)}
+            if r["hub"] or r["typ"] == "tozsamosc" or r["sciezka"].startswith(ARCHIWUM + "/"):
+                w.update(self._pola_mozgu(r["sciezka"], bool(r["hub"])))
+            wezly.append(w)
         return {"wezly": wezly, "linki": [l for l in linki if w_grafie(l["z"])]}
+
+    def _pola_mozgu(self, rel: str, hub: bool) -> dict:
+        """Pola węzła dla Mózgu z pliku (huby, tożsamość, archiwum: kilkadziesiąt plików): `edycja`, `pamiec`, `plik`
+        (tożsamość), `podsumowanie` i `streszczono` (hub ze streszczeniem), `zastapiona_przez` i `wycofano` (archiwum)."""
+        try:
+            fm, tresc = podziel(self.sk.plik(rel).read_text(encoding="utf-8", errors="replace"))
+        except (OSError, ValueError):
+            return {}
+        out = {k: str(fm[k]) for k in ("edycja", "pamiec", "plik", "zastapiona_przez", "wycofano", "streszczono") if fm.get(k)}
+        if hub and (p := podsumowanie_huba(tresc)):
+            out["podsumowanie"] = p[:MAX_STRESZCZENIA_HUBA]
+        return out
 
 
 # ------------------------------------------------------------------------------------------------ wektory i aliasy
@@ -1302,17 +1524,24 @@ def hub_agenta_nazwany(sciezka: str, slowa_pytania: set[str]) -> bool:
     return any(n and n <= slowa_pytania for n in nazwy)
 
 
-def notatki_przypomnienia(ix: Indeks, q: str, limit: int = 5, wektory=None, silnik: str | None = None, zakres=()) -> list[dict]:
+def notatki_przypomnienia(ix: Indeks, q: str, limit: int = 5, wektory=None, silnik: str | None = None, zakres=(),
+                          pomin_tozsamosc: bool = False) -> list[dict]:
     """Notatki „może się przydać” przed turą (wtyczka jarvo-wiedza) i w `ocena`: wyszukiwanie (Indeks.szukaj: wektory,
-    gdy usługa odpowie w czasie, inaczej słowa) bez hubów folderów, orzeczeń (idą osobno) i hubów agentów
+    gdy usługa odpowie w czasie, inaczej słowa) bez orzeczeń (idą osobno), hubów bez streszczenia i hubów agentów
     `agenci/<agent>/_hub-*`, chyba że pytanie nazywa tego agenta (hub ma ogólne słowa o całej dziedzinie, więc bez
-    tego zajmuje miejsca przy każdym pytaniu o pracę). Użyty silnik: `ix.silnik`. `zakres`: agent biznesowy (zakres_marki)."""
+    tego zajmuje miejsca przy każdym pytaniu o pracę). Hub ze streszczeniem (`streszczono`, blok STRESZCZENIE) to
+    notatka zbiorcza części i wraca jak każda inna. `pomin_tozsamosc`: agent, który ma tożsamość i pamięć ze skarbca
+    już w prompcie (Jarvo: SOUL, ZASADY, KRYTYCZNE, MEMORY, USER), nie dostaje ich drugi raz (notatki `typ: tozsamosc`).
+    Archiwum nie wraca (Indeks.szukaj). Użyty silnik: `ix.silnik`. `zakres`: agent biznesowy (zakres_marki)."""
     slowa = _slowa_ascii(q)
     out = []
     for t in ix.szukaj(q, limit=limit + 8, wektory=wektory, silnik=silnik, zakres=zakres):
-        if t["typ"] in ("orzeczenia", "hub"):
+        if t["typ"] == "orzeczenia" or (pomin_tozsamosc and t["typ"] == "tozsamosc" and t["sciezka"].split("#")[0] != MAPA_NOTATKA):
             continue
-        if HUB_AGENTA_RE.match(t["sciezka"]) and not hub_agenta_nazwany(t["sciezka"], slowa):
+        if HUB_AGENTA_RE.match(t["sciezka"]):
+            if not hub_agenta_nazwany(t["sciezka"], slowa):
+                continue
+        elif t["typ"] == "hub" and not _ze_streszczeniem(ix.sk, t["sciezka"]):
             continue
         out.append(t)
         if len(out) >= limit:
@@ -1320,7 +1549,20 @@ def notatki_przypomnienia(ix: Indeks, q: str, limit: int = 5, wektory=None, siln
     return out
 
 
-def ocena(ix: Indeks, zestaw: list, limit: int = 5, wektory=None, silnik: str | None = None) -> dict:
+def _ze_streszczeniem(sk: "Skarbiec", rel: str) -> bool:
+    try:
+        return bool(podsumowanie_huba(sk.plik(rel).read_text(encoding="utf-8", errors="replace")))
+    except (OSError, ValueError):
+        return False
+
+
+def trafia(sciezka: str, wzor: list[str]) -> bool:
+    """Wynik pasuje do wzorca: ta sama ścieżka; sekcja `notatka#Sekcja` pasuje też do wzorca całej notatki (wzorzec
+    z sekcją wymaga tej sekcji)."""
+    return sciezka in wzor or ("#" in sciezka and sciezka.split("#", 1)[0] in wzor)
+
+
+def ocena(ix: Indeks, zestaw: list, limit: int = 5, wektory=None, silnik: str | None = None, pomin_tozsamosc: bool = False) -> dict:
     """Pomiar przypomnień na zestawie `[{"pytanie": ..., "wzor": [ścieżki]}]` (zestaw właściciela leży poza repo):
     to samo wyszukiwanie co wtyczka przed turą (odświeżenie indeksu + notatki_przypomnienia, te same wektory i czas
     na nie). hit@k = jakakolwiek ścieżka wzorcowa w pierwszych k, MRR = średnia 1/pozycja pierwszej wzorcowej (0 bez
@@ -1332,11 +1574,13 @@ def ocena(ix: Indeks, zestaw: list, limit: int = 5, wektory=None, silnik: str | 
     pytania, czasy = [], []
     for p in zestaw:
         wzor = [str(s).strip().strip("/").removesuffix(".md") for s in p["wzor"]]
+        wzor += [n for s in wzor if not ix.sk.istnieje(s) and (n := ix.sk.przekierowanie(s)) and n not in wzor]   # po archiwizacji
         start = time.perf_counter()
         ix.odswiez()
-        sciezki = [t["sciezka"] for t in notatki_przypomnienia(ix, str(p["pytanie"]), limit=limit, wektory=wektory, silnik=silnik)]
+        sciezki = [t["sciezka"] for t in notatki_przypomnienia(ix, str(p["pytanie"]), limit=limit, wektory=wektory, silnik=silnik,
+                                                               pomin_tozsamosc=pomin_tozsamosc)]
         ms = round((time.perf_counter() - start) * 1000, 1)
-        pozycja = next((i + 1 for i, s in enumerate(sciezki) if s in wzor), 0)
+        pozycja = next((i + 1 for i, s in enumerate(sciezki) if trafia(s, wzor)), 0)
         czasy.append(ms)
         pytania.append({"pytanie": p["pytanie"], "wzor": wzor, "wyniki": sciezki, "pozycja": pozycja, "ms": ms,
                         "silnik": ix.silnik})
@@ -1349,7 +1593,8 @@ def ocena(ix: Indeks, zestaw: list, limit: int = 5, wektory=None, silnik: str | 
         silniki[p["silnik"]] = silniki.get(p["silnik"], 0) + 1
     return {"pytan": n, "k": limit, "trafione": trafione, "hit_at_k": round(trafione / n, 3) if n else 0.0,
             "mrr": round(sum(1 / p["pozycja"] for p in pytania if p["pozycja"]) / n, 3) if n else 0.0,
-            "ms_mediana": round(mediana, 1), "ms_max": max(czasy, default=0.0), "silniki": silniki, "pytania": pytania}
+            "ms_mediana": round(mediana, 1), "ms_p95": posortowane[min(n - 1, round(0.95 * (n - 1)))] if n else 0.0,
+            "ms_max": max(czasy, default=0.0), "silniki": silniki, "pytania": pytania}
 
 
 # ------------------------------------------------------------------------------------------------ księga błędów
@@ -1507,24 +1752,32 @@ def zasiej_bledy(sk: Skarbiec, katalog: Path | None) -> int:
 
 # ------------------------------------------------------------------------------------------------ INDEX.md i listy hubów
 
+def _klucz_notatki(r) -> tuple:
+    """Kolejność notatek w INDEX-ie i listach hubów: huby, tożsamość w stałej kolejności (KOLEJNOSC_TOZSAMOSCI), reszta po ścieżce."""
+    s = r["sciezka"]
+    return (not r["hub"], KOLEJNOSC_TOZSAMOSCI.index(s) if s in KOLEJNOSC_TOZSAMOSCI else len(KOLEJNOSC_TOZSAMOSCI), s)
+
+
 def zbuduj_index(sk: Skarbiec, ix: Indeks) -> int:
-    """INDEX.md z plików (deterministycznie): każda notatka jedną linią, sekcje po folderach."""
+    """INDEX.md z plików (deterministycznie): każda notatka jedną linią, sekcje po folderach w kolejności FOLDERY_SKARBCA;
+    źródła, skrzynka i archiwum tylko liczbą."""
     grupy: dict[str, list] = {}
     for r in ix.notatki():
         grupy.setdefault(r["folder"], []).append(r)
     linie = ["# Indeks skarbca", "", f"Generowany przez `wiedza.py indeksuj` ({dzis()}). Jedna linia = jedna notatka: link · streszczenie · typ · zmieniono.", ""]
     n = 0
-    for folder in sorted(grupy, key=lambda f: (f != "", f)):
+    kolejnosc = list(FOLDERY_SKARBCA)
+    for folder in sorted(grupy, key=lambda f: (kolejnosc.index(f) if f in kolejnosc else len(kolejnosc), f)):
         wiersze = grupy[folder]
-        nazwa = HUBY.get(folder, (None, folder or "Skarbiec"))[1]
-        if folder in ("zrodla", "skrzynka"):
+        nazwa = FOLDERY_SKARBCA[folder]["tytul"] if folder in FOLDERY_SKARBCA else folder
+        if f"{folder}/" in POZA_WYSZUKIWANIEM:
             linie += [f"## {nazwa} ({len(wiersze)} plików, poza wyszukiwaniem)", ""]
             continue
         linie += [f"## {nazwa}", ""]
         skille = [r for r in wiersze if r["typ"] == "skill"]
         if skille:
             linie.append(f"- skille floty: {len(skille)} notatek w `{SKILLE}/` (węzły grafu; szukanie z `folder=fleet`)")
-        for r in sorted((r for r in wiersze if r["typ"] != "skill"), key=lambda r: (not r["hub"], r["sciezka"])):
+        for r in sorted((r for r in wiersze if r["typ"] != "skill"), key=_klucz_notatki):
             s = (r["streszczenie"] or "").replace("\n", " ")
             s = s[:120].rstrip() + ("…" if len(s) > 120 else "")
             czesci = [f"[[{r['sciezka']}|{r['tytul']}]]"] + ([s] if s else []) + [r["typ"] or "?"] + ([r["zmieniono"]] if r["zmieniono"] else [])
@@ -1548,8 +1801,10 @@ def _wiersz_bledu(sk: Skarbiec, r: dict, licznik: dict) -> str:
 
 def odswiez_listy_hubow(sk: Skarbiec, ix: Indeks) -> int:
     """Blok `lista` w hubie folderu (i w hubie agenta albo marki agenta biznesowego, `brands/<marka>/_hub-<marka>`):
-    linki do wszystkich notatek folderu, 0 tokenów. Hub księgi błędów ma przy notatce liczniki zamiast streszczenia."""
-    notatki = [r for r in ix.notatki() if not r["hub"]]
+    linki do wszystkich notatek folderu, 0 tokenów. Hub księgi błędów ma przy notatce liczniki zamiast streszczenia,
+    hub archiwum wymienia też huby zarchiwizowanych agentów, hub Jarva tożsamość w stałej kolejności."""
+    wszystkie = sorted(ix.notatki(), key=_klucz_notatki)
+    notatki = [r for r in wszystkie if not r["hub"]]
     ile = 0
     for folder, (hub, _t) in HUBY.items():
         if folder == "":
@@ -1563,8 +1818,9 @@ def odswiez_listy_hubow(sk: Skarbiec, ix: Indeks) -> int:
             licznik = licznik_bledow(sk.stan)
             wiersze = [_wiersz_bledu(sk, r, licznik) for r in notatki if r["sciezka"].startswith(folder + "/")]
         else:
+            zrodlo = [r for r in wszystkie if r["sciezka"] != rel] if folder == ARCHIWUM else notatki
             wiersze = [f"- [[{r['sciezka']}|{r['tytul']}]]" + (f" · {r['streszczenie'][:90]}" if r["streszczenie"] else "")
-                       for r in notatki if r["sciezka"].startswith(folder + "/")]
+                       for r in zrodlo if r["sciezka"].startswith(folder + "/")]
         ile += _wpisz_liste(sk, rel, wiersze)
     for r in ix.notatki():
         if r["hub"] and r["sciezka"].startswith(("agenci/", "brands/")) and r["sciezka"].count("/") == 2:
@@ -1576,11 +1832,17 @@ def odswiez_listy_hubow(sk: Skarbiec, ix: Indeks) -> int:
 
 
 def _wpisz_liste(sk: Skarbiec, rel: str, wiersze: list[str]) -> int:
+    """Blok `lista` huba; zmieniona lista = `zmieniono: dziś` huba (20.11: hub „Ty” pokazywał 7.11, choć jego notatki się
+    zmieniały)."""
     p = sk.plik(rel)
     stary = p.read_text(encoding="utf-8")
     tresc = "## Notatki (lista automatyczna)\n" + ("\n".join(wiersze) if wiersze else "_jeszcze pusto_")
     nowy = zastap_blok(stary, "lista", tresc)
     if nowy != stary:
+        fm, body = podziel(nowy)
+        if fm.get("zmieniono") and str(fm["zmieniono"]) != dzis():
+            fm["zmieniono"] = dzis()
+            nowy = sklej(fm, body)
         sk.zapisz_plik(rel, nowy)
         return 1
     return 0
@@ -1704,26 +1966,728 @@ def zasiej_marke(sk: Skarbiec, marka: str, a: dict, hub_agenta_rel: str) -> None
                                   f"## Powiązane\n- hub: [[orzeczenia/_hub-orzeczenia|Orzeczenia]]\n- [[{hub}|Marka {marka}]]\n\n## Linie\n"))
 
 
+# ------------------------------------------------------------------------------------------------ pamięć Hermesa
+
+class BladPamieci(ValueError):
+    """Zapis pamięci odrzucony: `kod` (zmieniona, limit, pusty_wpis, zly_wpis, zajeta), status HTTP i dane dla panelu."""
+
+    def __init__(self, kod: str, opis: str, status: int = 400, **dane):
+        super().__init__(opis)
+        self.kod, self.status, self.dane = kod, status, dane
+
+    def jako_json(self) -> dict:
+        return {"blad": {"kod": self.kod, "opis": str(self), **self.dane}}
+
+
+def plik_pamieci(profil: str | Path, cel: str) -> Path:
+    """memories/MEMORY.md (`memory`) albo memories/USER.md (`user`) profilu Hermesa (tools/memory_tool.get_memory_dir)."""
+    if cel not in PLIKI_PAMIECI:
+        raise ValueError(f"nieznana pamięć `{cel}` (memory albo user)")
+    return Path(profil) / "memories" / PLIKI_PAMIECI[cel]
+
+
+def wpisy_z_pamieci(surowy: str) -> list[str]:
+    """Wpisy pliku pamięci jak MemoryStore._parse_entries Hermesa: podział po całym separatorze, obcięte, bez pustych."""
+    return [e for e in (x.strip() for x in surowy.split(SEPARATOR_PAMIECI)) if e]
+
+
+def czytaj_pamiec(plik: Path) -> dict:
+    """{"wpisy", "wersja", "zmieniono", "uzyte"}: wpisy jak po wczytaniu w Hermesie (UTF-8 z BOM-em albo bez, bez
+    powtórzeń), wersja = sha256 bajtów pliku (brak pliku = skrót pustego), zmieniono = czas pliku ISO (albo ""), uzyte =
+    znaki wpisów ze separatorami (tak liczy limit Hermes). Plik, którego nie da się przeczytać jako UTF-8: ValueError
+    (Hermes też odmawia wtedy zapisu, żeby nie skasować pamięci)."""
+    try:
+        dane, mtime = plik.read_bytes(), plik.stat().st_mtime
+    except FileNotFoundError:
+        dane, mtime = b"", 0.0
+    except OSError as e:
+        raise ValueError(f"nie czytam {plik.name}: {e.strerror or e}") from e
+    try:
+        surowy = dane.decode("utf-8-sig")
+    except UnicodeDecodeError as e:
+        raise ValueError(f"{plik.name} nie jest poprawnym UTF-8 (Hermes też go nie zapisze)") from e
+    wpisy = list(dict.fromkeys(wpisy_z_pamieci(surowy)))
+    return {"wpisy": wpisy, "wersja": hashlib.sha256(dane).hexdigest(), "uzyte": len(SEPARATOR_PAMIECI.join(wpisy)),
+            "zmieniono": dt.datetime.fromtimestamp(mtime).astimezone().isoformat(timespec="seconds") if mtime else ""}
+
+
+def limity_pamieci(profil: str | Path) -> dict[str, int]:
+    """`memory.memory_char_limit` i `memory.user_char_limit` z config.yaml profilu (sekcja `memory:` czytana bez PyYAML,
+    jak w Hermesie: tools/memory_tool.load_on_disk_store), bez nich domyślne Hermesa (LIMITY_PAMIECI)."""
+    out = dict(LIMITY_PAMIECI)
+    try:
+        tekst = (Path(profil) / "config.yaml").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return out
+    m = re.search(r"^memory:[ \t]*(?:#.*)?\n((?:[ \t]+.*(?:\n|$)|[ \t]*\n)*)", tekst, re.M)
+    for cel, klucz in (("memory", "memory_char_limit"), ("user", "user_char_limit")):
+        k = re.search(rf"^[ \t]+{klucz}:[ \t]*['\"]?(\d+)", m.group(1), re.M) if m else None
+        if k and int(k.group(1)) > 0:
+            out[cel] = int(k.group(1))
+    return out
+
+
+def _zwolnij_zamek_pliku(f) -> None:
+    if WINDOWS:
+        import msvcrt
+        with contextlib.suppress(OSError):
+            f.seek(0)
+            msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+    # POSIX: zamknięcie pliku zwalnia flock
+
+
+def _czekaj_na_zamek(f, czekaj_s: float) -> bool:
+    """Blokada systemu na otwartym pliku z czekaniem do `czekaj_s`; system plików bez blokad = jak wzięta."""
+    koniec = time.monotonic() + czekaj_s
+    wynik = _sprobuj_zamek(f)
+    while wynik is False and time.monotonic() < koniec:
+        time.sleep(0.05)
+        wynik = _sprobuj_zamek(f)
+    return wynik is not False
+
+
+@contextlib.contextmanager
+def zamek_pliku(p: Path, czekaj_s: float = 5.0):
+    """Krótka blokada systemu na pliku-zamku (stan lustra pamięci: hak w bramie, panel i zasiew piszą ten sam stan);
+    daje True (wzięta) albo False (zajęta po `czekaj_s`)."""
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "a+b") as f:
+        wzieta = _czekaj_na_zamek(f, czekaj_s)
+        try:
+            yield wzieta
+        finally:
+            if wzieta:
+                _zwolnij_zamek_pliku(f)
+
+
+@contextlib.contextmanager
+def zamek_pamieci(plik: Path, czekaj_s: float = 10.0):
+    """Ta sama blokada co narzędzie memory Hermesa (MemoryStore._file_lock): osobny plik `<plik>.lock` (O_NOFOLLOW,
+    0600), flock LOCK_EX na POSIX, msvcrt na pierwszym bajcie na Windows; Hermes czeka bez końca, tu najwyżej
+    `czekaj_s`, potem BladPamieci `zajeta` (503)."""
+    plik.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(plik.with_name(plik.name + ".lock"), os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    try:
+        if hasattr(os, "fchmod"):
+            os.fchmod(fd, 0o600)
+        f = os.fdopen(fd, "r+", encoding="utf-8")
+    except Exception:
+        os.close(fd)
+        raise
+    with f:
+        if not _czekaj_na_zamek(f, czekaj_s):
+            raise BladPamieci("zajeta", f"{plik.name} zapisuje teraz Jarvo; spróbuj za chwilę", 503)
+        try:
+            yield
+        finally:
+            _zwolnij_zamek_pliku(f)
+
+
+def _zapisz_jak_hermes(plik: Path, tresc: str) -> None:
+    """Zapis atomowy jak utils.atomic_write_text Hermesa (MemoryStore._write_file): plik tymczasowy `.mem_*.tmp` obok
+    (mkstemp, 0600), tekst w UTF-8 z domyślnymi końcami linii, fsync, zamiana na miejscu celu dowiązania. Nowy plik
+    zostaje 0600 (Hermes daje mu maskę procesu; istniejący i tak ma 0600 z mkstemp)."""
+    cel = Path(os.path.realpath(plik))
+    fd, tmp = tempfile.mkstemp(dir=str(cel.parent), prefix=".mem_", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(tresc)
+            f.flush()
+            os.fsync(f.fileno())
+        zamien_plik(tmp, cel)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
+
+
+def sprawdz_wpisy(wpisy, limit: int, skaner=None) -> list[str]:
+    """Wpisy z panelu gotowe do zapisu (obcięte jak w Hermesie) albo BladPamieci: `pusty_wpis`, `zly_wpis` (nie tekst,
+    powtórzony, z sekretem, rozbijający separator „§” albo odrzucony przez skaner zagrożeń Hermesa `skaner(tekst)` →
+    komunikat), `limit` (znaki wpisów ze separatorami ponad limit profilu)."""
+    if not isinstance(wpisy, list):
+        raise BladPamieci("zly_wpis", "`wpisy` to lista tekstów")
+    czyste: list[str] = []
+    for i, w in enumerate(wpisy):
+        if not isinstance(w, str):
+            raise BladPamieci("zly_wpis", f"wpis {i + 1} nie jest tekstem", indeks=i)
+        w = w.replace("\r\n", "\n").strip()
+        if not w:
+            raise BladPamieci("pusty_wpis", f"wpis {i + 1} jest pusty (usuń go albo wpisz treść)", indeks=i)
+        if wpisy_z_pamieci(f"a{SEPARATOR_PAMIECI}{w}{SEPARATOR_PAMIECI}b") != ["a", w, "b"]:
+            raise BladPamieci("zly_wpis", f"wpis {i + 1} ma znak „§” w osobnej linii (to separator wpisów)", indeks=i)
+        if w in czyste:
+            raise BladPamieci("zly_wpis", f"wpis {i + 1} powtarza wpis {czyste.index(w) + 1}", indeks=i)
+        if (sekret := zawiera_sekret(w)):
+            raise BladPamieci("zly_wpis", f"wpis {i + 1} zawiera sekret ({sekret}); sekrety tylko w sejfie", indeks=i)
+        if skaner is not None and (powod := skaner(w)):
+            raise BladPamieci("zly_wpis", f"wpis {i + 1}: {powod}", indeks=i)
+        czyste.append(w)
+    uzyte = len(SEPARATOR_PAMIECI.join(czyste))
+    if uzyte > limit:
+        raise BladPamieci("limit", f"{uzyte} znaków z {limit}: skróć albo usuń wpisy", limit=limit, uzyte=uzyte)
+    return czyste
+
+
+def stan_pamieci(profil: str | Path, cel: str) -> dict:
+    """Jedna pamięć dla panelu (GET /pamiec): wpisy, limit, uzyte, wersja, zmieniono, plik (względem danych), notatka."""
+    p = czytaj_pamiec(plik_pamieci(profil, cel))
+    return {**p, "limit": limity_pamieci(profil)[cel], "plik": f"profiles/{Path(profil).name}/memories/{PLIKI_PAMIECI[cel]}",
+            "notatka": NOTATKI_PAMIECI[cel][0]}
+
+
+def zapisz_pamiec(profil: str | Path, cel: str, wpisy, wersja: str, skaner=None) -> dict:
+    """Zapis całej listy wpisów pamięci (Mózg, PUT /pamiec) tym samym formatem i blokadą co narzędzie memory Hermesa:
+    wpisy połączone ENTRY_DELIMITER („\\n§\\n”), bez znaku na końcu, UTF-8, atomowo pod `<plik>.lock`. `wersja` (sha256
+    z odczytu) inna niż teraz na dysku = BladPamieci `zmieniona` (409) z aktualnym stanem; nic nie jest zapisane.
+    Ta sama treść = bez zapisu. Zwraca stan_pamieci po zapisie."""
+    plik = plik_pamieci(profil, cel)
+    czyste = sprawdz_wpisy(wpisy, limity_pamieci(profil)[cel], skaner)
+    with zamek_pamieci(plik):
+        teraz = czytaj_pamiec(plik)
+        if str(wersja or "") != teraz["wersja"]:
+            raise BladPamieci("zmieniona", "pamięć zmieniła się w międzyczasie (Jarvo albo inne okno); wczytaj ponownie",
+                              409, aktualna=stan_pamieci(profil, cel))
+        tresc = SEPARATOR_PAMIECI.join(czyste)
+        if plik.read_bytes() != tresc.encode("utf-8") if plik.exists() else True:
+            _zapisz_jak_hermes(plik, tresc)
+    return stan_pamieci(profil, cel)
+
+
+def _liczba(n: int, jeden: str, kilka: str, wiele: str) -> str:
+    return f"{n} " + (jeden if n == 1 else kilka if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14) else wiele)
+
+
+def _zapisz_tozsamosc(sk: "Skarbiec", rel: str, body: str, zmieniono: str, plik: str, edycja: str, pamiec: str = "",
+                      sekcje: bool = False) -> bool:
+    """Notatka tożsamości (`typ: tozsamosc`, generowana): frontmatter z kontraktu Mózgu (plik źródła, edycja: repo albo
+    pamiec), zapis tylko przy zmianie treści. True = zapisana."""
+    zmieniono = zmieniono if DATA_RE.match(zmieniono or "") else dzis()
+    stary = sk.plik(rel).read_text(encoding="utf-8", errors="replace") if sk.istnieje(rel) else ""
+    stare_fm = podziel(stary)[0] if stary else {}
+    utworzono = str(stare_fm.get("utworzono") or "")
+    fm = {"typ": "tozsamosc", "tagi": ["tozsamosc"], "utworzono": utworzono if DATA_RE.match(utworzono) else min(zmieniono, dzis()),
+          "zmieniono": zmieniono, "status": "aktualna", "zrodlo": "wiedza.py zasiej", "plik": plik, "edycja": edycja}
+    if pamiec:
+        fm["pamiec"] = pamiec
+    if sekcje:
+        fm["sekcje"] = True
+    tekst = sklej(fm, body)
+    if tekst == stary:
+        return False
+    zapewnij_hub(sk, TOZSAMOSC)
+    sk.zapisz_plik(rel, tekst)
+    return True
+
+
+def zapewnij_hub(sk: "Skarbiec", folder: str) -> bool:
+    """Hub folderu z FOLDERY_SKARBCA, gdy go nie ma (część ręczna pisana raz; bloki GEN odświeża zasiew). True = nowy."""
+    if folder not in HUBY:
+        return False
+    hub, tytul = HUBY[folder]
+    rel = f"{folder}/{hub}" if folder else hub
+    if sk.istnieje(rel):
+        return False
+    body = (f"# {tytul}\n\n**{OPISY_FOLDEROW.get(folder) or FOLDERY_SKARBCA[''].get('opis')}**\n\n## Powiązane\n"
+            + ("- hub: [[_hub-skarbiec|Skarbiec wiedzy]]\n" if folder else ""))
+    sk.zapisz_plik(rel, sklej(_hub_frontmatter("hub"), body))
+    return True
+
+
+def zapisz_notatke_pamieci(sk: "Skarbiec", profil: str | Path, cel: str, p: dict | None = None) -> bool:
+    """Lustro pliku pamięci Jarva w skarbcu: `jarvo/pamięć jarva` (MEMORY.md) albo `user/pamięć jarva o tobie` (USER.md),
+    wpisy jako lista (wpis z sekretem jako dopisek), `zmieniono` = data pliku. True = zapisana."""
+    rel, tytul, opis = NOTATKI_PAMIECI[cel]
+    p = p or czytaj_pamiec(plik_pamieci(profil, cel))
+    limit = limity_pamieci(profil)[cel]
+    plik = f"profiles/{Path(profil).name}/memories/{PLIKI_PAMIECI[cel]}"
+    wpisy = ["(wpis z sekretem: pominięty w skarbcu)" if zawiera_sekret(w) else w for w in p["wpisy"]]
+    lista = "\n".join("- " + w.replace("\n", "\n  ") for w in wpisy) or "_Pusto._"
+    body = (f"# {tytul}\n\n**{opis} (`{plik}`): {_liczba(len(wpisy), 'wpis', 'wpisy', 'wpisów')}, {p['uzyte']} z {limit} znaków. "
+            "Jarvo czyta je na starcie każdej rozmowy; zmiana w Mózgu (Zmień) działa od następnej rozmowy.**\n\n"
+            f"## Wpisy\n{lista}\n\n## Powiązane\n- hub: [[{TOZSAMOSC}/{HUBY[TOZSAMOSC][0]}|Jarvo]]\n"
+            + (f"- [[user/{HUBY['user'][0]}|Ty]]\n" if cel == "user" else ""))
+    return _zapisz_tozsamosc(sk, rel, body, p["zmieniono"][:10], plik, "pamiec", cel)
+
+
+def _dopisz_szkic_pamieci(sk: "Skarbiec", agent: str, cel: str, wpisy: list[str], marka: str = "") -> str:
+    """Nowe wpisy pamięci agenta do szkicu w skrzynce: `pamiec-<agent>` (MEMORY.md) albo `pamiec-<agent>-user` (USER.md,
+    o właścicielu: kompilacja kładzie fakty w user/). Linia „- data · add cel: wpis” (kompilacja szuka kandydatów osobno
+    dla każdej linii)."""
+    rel = f"skrzynka/pamiec-{agent}" + ("-user" if cel == "user" else "")
+    if not sk.istnieje(rel):
+        tytul = f"Pamięć agenta {agent}" + (" o właścicielu" if cel == "user" else "") + ": wpisy"
+        fm = {"szkic": True, "typ": "fakt", "tytul": tytul, "agent": agent,
+              "zrodlo": f"pamięć (memory) agenta {agent}, {PLIKI_PAMIECI[cel]}", "utworzono": dzis(), "skad": "lustro memory",
+              "tagi": ["pamiec"], "linki": [], "pamiec": cel}
+        if marka:
+            fm["marka"] = marka
+        sk.zapisz_plik(rel, sklej(fm, f"# {tytul}\n\nWpisy `memory` ({PLIKI_PAMIECI[cel]}) w kolejności zapisu; kompilacja "
+                                      "robi z nich notatki.\n"))
+    with sk.plik(rel).open("a", encoding="utf-8", newline="\n") as f:
+        for w in wpisy:
+            f.write(f"- {dzis()} · add {cel}: {' '.join(w.split())[:500]}\n")
+    return rel
+
+
+def synchronizuj_pamiec(sk: "Skarbiec", profil: str | Path, agent: str, marka: str = "") -> dict:
+    """Lustro pamięci Hermesa po TREŚCI pliku, nie po wywołaniu narzędzia (20.11: wpisy USER.md z 19 i 20.11 nie dotarły
+    do skarbca, bo plik zmienił się poza narzędziem memory). state/wiedza-pamiec.json pamięta wersję (sha256) i wpisy
+    każdego pliku każdego profilu; nowa wersja = wpisy, których wcześniej nie było (pierwszy raz: wszystkie), idą do
+    szkicu w skrzynce (_dopisz_szkic_pamieci), a dla Jarva (PROFIL_TOZSAMOSCI) odświeżona notatka-lustro. Woła to hak
+    zapisu pamięci, start sesji i tura wtyczki, zasiew i zapis z Mózgu; ta sama wersja = nic (dwa odczyty i skrót).
+    Zwraca {"zmienione": [cele], "wpisow": n, "notatki": [ścieżki]} (+ "zajete", gdy stan trzyma inny proces)."""
+    wynik: dict = {"zmienione": [], "wpisow": 0, "notatki": []}
+    profil = Path(profil)
+    if not (profil / "memories").is_dir() or not agent:
+        return wynik
+    with zamek_pliku(sk.stan / ZAMEK_PAMIECI) as wzieta:
+        if not wzieta:
+            wynik["zajete"] = True
+            return wynik
+        plik_stanu = sk.stan / STAN_PAMIECI
+        try:
+            stan = json.loads(plik_stanu.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            stan = {}
+        stan = stan if isinstance(stan, dict) else {}
+        if not isinstance(stan.get(agent), dict):
+            stan[agent] = {}
+        moj = stan[agent]
+        for cel in PLIKI_PAMIECI:
+            try:
+                p = czytaj_pamiec(plik_pamieci(profil, cel))
+            except ValueError:
+                continue
+            stary = moj.get(cel) if isinstance(moj.get(cel), dict) else {}
+            if stary.get("wersja") != p["wersja"]:
+                znane = set(stary.get("wpisy") or [])
+                nowe = [w for w in p["wpisy"] if w not in znane and not zawiera_sekret(w)]
+                if nowe:
+                    _dopisz_szkic_pamieci(sk, agent, cel, nowe, marka)
+                    wynik["wpisow"] += len(nowe)
+                wynik["zmienione"].append(cel)
+                moj[cel] = {"wersja": p["wersja"], "wpisy": p["wpisy"]}
+            if agent == PROFIL_TOZSAMOSCI and zapisz_notatke_pamieci(sk, profil, cel, p):
+                wynik["notatki"].append(NOTATKI_PAMIECI[cel][0])
+        if wynik["zmienione"]:
+            tmp = plik_stanu.with_name(f"{plik_stanu.name}.{os.getpid()}.tmp")
+            tmp.write_text(json.dumps(stan, ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n")
+            zamien_plik(tmp, plik_stanu)
+    return wynik
+
+
+# ------------------------------------------------------------------------------------------------ tożsamość Jarva
+
+_NAGLOWEK_RE = re.compile(r"^(#{1,5}) ", re.M)
+
+
+def dla_czytelnika(tekst: str) -> str:
+    """Plik promptu jako treść notatki: nagłówki o poziom niżej (tytuł notatki jest jedynym `# `, poza blokami kodu),
+    bloki `<critical>…</critical>` jako cytat (znacznik promptu, w Mózgu i Obsidianie byłby surowym HTML-em)."""
+    out, w_kodzie, w_krytycznym = [], False, False
+    for linia in tekst.strip("\n").splitlines():
+        s = linia.strip()
+        if s.startswith("```"):
+            w_kodzie = not w_kodzie
+        if not w_kodzie and s in ("<critical>", "</critical>"):
+            w_krytycznym = s == "<critical>"
+            continue
+        if not w_kodzie and _NAGLOWEK_RE.match(linia):
+            linia = "#" + linia
+        out.append(("> " + linia if linia else ">") if w_krytycznym else linia)
+    return "\n".join(out)
+
+
+def _data_pliku(p: Path) -> str:
+    try:
+        return dt.date.fromtimestamp(p.stat().st_mtime).isoformat()
+    except OSError:
+        return dzis()
+
+
+def zasiej_tozsamosc(sk: "Skarbiec", katalog: Path | None) -> list[str]:
+    """Notatki `jarvo/*` z plików tożsamości buildu (scripts/build.py → build/wiedza/tozsamosc/: tokeny podstawione,
+    bez znaczników protokołu i rostera): SOUL → `kim jest jarvo`, ZASADY bez zamykającego bloku → `zasady pracy`,
+    KRYTYCZNE (ten blok) → `zasady krytyczne`. `zmieniono` = data zmiany pliku w repo (tozsamosc/zrodla.json: data
+    ostatniego commitu pliku), bez niej data pliku. Brak katalogu albo pliku = notatka zostaje, jaka była. Zwraca
+    zapisane ścieżki."""
+    if not katalog or not Path(katalog).is_dir():
+        return []
+    katalog = Path(katalog)
+    try:
+        daty = json.loads((katalog / "zrodla.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        daty = {}
+    daty = daty if isinstance(daty, dict) else {}
+    out = []
+    for rel, nazwa, plik_repo, tytul, opis in NOTATKI_TOZSAMOSCI:
+        src = katalog / nazwa
+        if not src.is_file():
+            continue
+        info = daty.get(nazwa) if isinstance(daty.get(nazwa), dict) else {}
+        zmieniono = str(info.get("zmieniono") or "")
+        body = (f"# {tytul}\n\n**{opis}. Zmiana przez repo: w Mózgu „Poproś o zmianę”.**\n\n"
+                f"{dla_czytelnika(src.read_text(encoding='utf-8', errors='replace'))}\n\n"
+                f"## Powiązane\n- hub: [[{TOZSAMOSC}/{HUBY[TOZSAMOSC][0]}|Jarvo]]\n")
+        if _zapisz_tozsamosc(sk, rel, body, zmieniono if DATA_RE.match(zmieniono) else _data_pliku(src),
+                             str(info.get("plik") or plik_repo), "repo"):
+            out.append(rel)
+    return out
+
+
+def _modul_mapy():
+    """wiedza/mapa.py obok tego pliku (zasiew działa z repo); bez niego (kopia w katalogu wtyczki) None."""
+    mod = sys.modules.get("jarvo_wiedza_mapa")
+    if mod is not None:
+        return mod
+    plik = Path(__file__).with_name("mapa.py")
+    if not plik.is_file():
+        return None
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("jarvo_wiedza_mapa", plik)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["jarvo_wiedza_mapa"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def sciezki_jarva(sk: "Skarbiec", profil: Path | None) -> dict[str, str]:
+    """Ścieżki dla bloku GEN `sciezki` mapy (istniejące katalogi tej instalacji): dane Jarva, skarbiec, misje, robocze,
+    od właściciela, stan, profil Jarva i jego pamięć, skrypty, rutyny."""
+    dane = sk.root.parent
+    kandydaci = {"dane Jarva": dane, "skarbiec": sk.root, "misje": dane / "missions", "robocze": dane / "workspaces",
+                 "od właściciela": dane / "inbox", "stan (indeks, rozmowy panelu, raporty)": sk.stan}
+    if profil:
+        kandydaci.update({"mój profil": profil, "pamięć (MEMORY.md, USER.md)": profil / "memories",
+                          "skrypty": profil / "scripts", "rutyny (jobs.json, raporty)": profil / "cron"})
+    return {k: p.as_posix() for k, p in kandydaci.items() if p.is_dir()}
+
+
+def tematy_telegrama(sk: "Skarbiec") -> dict[str, str]:
+    """Numery tematów grupy Jarvo HQ (TELEGRAM_TOPIC_<KLUCZ>) jak w `jarvo telegram status`: trasy z `<dane>/jarvo/konfig/
+    jarvo.env` (z tego pliku tylko te klucze, żadnych innych wartości), nadpisane zmiennymi procesu (brama)."""
+    out: dict[str, str] = {}
+    try:
+        for linia in (sk.root.parent / "konfig" / "jarvo.env").read_text(encoding="utf-8", errors="replace").splitlines():
+            klucz, sep, wartosc = linia.strip().removeprefix("export ").partition("=")
+            if sep and klucz.strip().startswith("TELEGRAM_TOPIC_"):
+                out[klucz.strip()] = wartosc.strip().strip("'\"")
+    except OSError:
+        pass
+    out.update({k: v for k, v in os.environ.items() if k.startswith("TELEGRAM_TOPIC_")})
+    return out
+
+
+def zasiej_mape(sk: "Skarbiec", katalog: Path | None, fleet: dict | None, profile: Path | None,
+                agenci_meta: dict | None = None) -> bool:
+    """Notatka `jarvo/jak działa jarvo` („Jarvo od A do Z”, docs/WIEDZA.md §2b): MAPA.md repo i nakładki z buildu
+    (tozsamosc/MAPA.md, MAPA-nakladka.md, tokeny podstawione) i bloki GEN z danych tej instalacji (wiedza/mapa.py):
+    agenci i skille (fleet.json), arsenał (`fleet/arsenal`), ścieżki, harmonogram (zadania cron wszystkich profili,
+    także wstrzymane, wątki Telegrama, timery systemd usera). `sekcje: true`: każda sekcja to osobny wpis indeksu
+    (przypomnienie trafia w sekcję, nie w całą mapę). True = zapisana."""
+    mapa = _modul_mapy()
+    if mapa is None or not katalog or not (Path(katalog) / "MAPA.md").is_file():
+        return False
+    katalog = Path(katalog)
+    repo = (katalog / "MAPA.md").read_text(encoding="utf-8", errors="replace")
+    nakl = (katalog / "MAPA-nakladka.md").read_text(encoding="utf-8", errors="replace") if (katalog / "MAPA-nakladka.md").is_file() else ""
+    agenci = [{**a, "hub": (agenci_meta or {}).get(a["name"], {}).get("hub", "")} for a in (fleet or {}).get("agents", [])]
+    profil = Path(profile) / PROFIL_TOZSAMOSCI if profile else None
+    cron = mapa.zadania_cron_profili(Path(profile)) if profile and Path(profile).is_dir() else []
+    arsenal = sk.plik("fleet/arsenal").read_text(encoding="utf-8", errors="replace") if sk.istnieje("fleet/arsenal") else ""
+    d = dzis()
+    gen = {"agenci": mapa.render_agenci(agenci), "skille": mapa.render_skille(agenci), "arsenal": mapa.render_arsenal(arsenal),
+           "sciezki": mapa.render_sciezki(sciezki_jarva(sk, profil if profil and profil.is_dir() else None)),
+           "harmonogram": mapa.render_harmonogram(cron, mapa.timery_systemd(),
+                                                  mapa.watki_telegrama(sk.stan / "telegram-grupy.json", tematy_telegrama(sk)))}
+    zrodla = {"agenci": f"fleet.yaml, {d}", "skille": f"fleet.yaml i skille profili, {d}", "arsenal": f"`fleet/arsenal`, {d}",
+              "sciezki": f"tej instalacji, {d}", "harmonogram": f"rutyn Hermesa (cron/jobs.json) i timerów systemd, {d}"}
+    try:
+        daty = json.loads((katalog / "zrodla.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        daty = {}
+    zmiany = [str((daty.get(n) or {}).get("zmieniono") or "") for n in ("MAPA.md", "MAPA-nakladka.md") if isinstance(daty, dict)]
+    zmieniono = max([z for z in zmiany if DATA_RE.match(z)] or [_data_pliku(katalog / "MAPA.md")])
+    body = mapa.notatka(repo, nakl, gen, zrodla) + f"\n## Powiązane\n- hub: [[{TOZSAMOSC}/{HUBY[TOZSAMOSC][0]}|Jarvo]]\n"
+    return _zapisz_tozsamosc(sk, MAPA_NOTATKA, body, zmieniono, "profiles/jarvo/MAPA.md", "repo", sekcje=True)
+
+
+def odswiez_hub_jarva(sk: "Skarbiec", orzeczenia_jarva: str = "") -> None:
+    """Blok GEN `tozsamosc` w hubie `jarvo/_hub-jarvo`: tożsamość w stałej kolejności (istniejące notatki), pamięć
+    o Tobie (user/) i orzeczenia (poprawki właściciela dla Jarva i dla wszystkich)."""
+    zapewnij_hub(sk, TOZSAMOSC)
+    rel = f"{TOZSAMOSC}/{HUBY[TOZSAMOSC][0]}"
+    linie = []
+    for s in KOLEJNOSC_TOZSAMOSCI:
+        if sk.istnieje(s):
+            n = sk.wczytaj(s)
+            linie.append(f"- [[{s}|{n.tytul}]]" + (f" · {n.streszczenie[:110]}" if n.streszczenie else ""))
+    for s, etykieta in ((orzeczenia_jarva, "Twoje poprawki dla Jarva (orzeczenia)"),
+                        ("orzeczenia/wszyscy", "Poprawki dla całej floty (orzeczenia)")):
+        if s and sk.istnieje(s):
+            linie.append(f"- [[{s}|{etykieta}]]")
+    tekst = sk.plik(rel).read_text(encoding="utf-8")
+    nowy = zastap_blok(tekst, "tozsamosc", "## Tożsamość i pamięć\n" + ("\n".join(linie) or "_jeszcze pusto_"))
+    if nowy != tekst:
+        sk.zapisz_plik(rel, nowy)
+
+
+# ------------------------------------------------------------------------------------------------ porządki: archiwum, przeniesienie, streszczenie
+
+def _norm(rel: str) -> str:
+    return unicodedata.normalize("NFC", str(rel or "").strip().strip("/").removesuffix(".md"))
+
+
+def przepisz_linki(text: str, cele: dict[str, str], rozwiaz, znane_po: dict[str, str]) -> tuple[str, int]:
+    """Linki `[[cel#kotwica|etykieta]]`, których cel (`rozwiaz(cel)` przed przeniesieniem) jest w `cele`, wskazują nową
+    ścieżkę; kotwica i etykieta zostają. Sama nazwa pliku, która po przeniesieniu dalej jednoznacznie trafia w nowe miejsce,
+    zostaje bez zmian. Zwraca (tekst, liczba przepisanych linków)."""
+    ile = 0
+
+    def zamien(m: re.Match) -> str:
+        nonlocal ile
+        cel = m.group(1).strip()
+        cel = cel[:-3] if cel.endswith(".md") else cel
+        stara = rozwiaz(cel)
+        if stara not in cele:
+            return m.group(0)
+        nowa = cele[stara]
+        if "/" not in cel and znane_po.get(cel) == nowa:
+            return m.group(0)
+        ile += 1
+        return f"[[{nowa}{m.group(2) or ''}{'|' + m.group(3) if m.group(3) is not None else ''}]]"
+
+    return LINK_RE.sub(zamien, text), ile
+
+
+def przenies_notatki(sk: "Skarbiec", mapa: dict[str, str], fm_dodaj: dict[str, dict] | None = None,
+                     przekieruj: dict[str, str] | None = None, pliki: dict[str, str] | None = None) -> dict:
+    """Przenosi notatki (`mapa`: stara ścieżka → nowa, bez `.md`) i przepisuje linki do nich we wszystkich notatkach
+    skarbca (bez kopii repo `zrodla/jarvo-repo/`, którą nadpisuje wdrożenie, i bez LOG.md, który jest historią):
+    link do starej ścieżki wskazuje potem `przekieruj[stara]` (następca) albo nową ścieżkę. Pole `zastapiona_przez`
+    w archiwum też idzie za przeniesieniem. `fm_dodaj[stara]` dopisuje klucze frontmatteru przeniesionej notatki,
+    `pliki` (względne ścieżki z rozszerzeniem) to załączniki przenoszone bez zmian. Puste katalogi po starych ścieżkach
+    znikają. Zwraca {"przeniesione", "notatek_z_linkami", "linkow", "_mapa" (stara → nowa)}."""
+    zbior, znane = sk.mapa()
+    for stara, nowa in mapa.items():
+        if stara not in zbior:
+            raise ValueError(f"nie ma notatki `{stara}`")
+        if sk.istnieje(nowa) or list(mapa.values()).count(nowa) > 1:
+            raise ValueError(f"`{nowa}` już istnieje")
+        sk.plik(nowa)                                       # ścieżka poza skarbcem = ValueError przed jakąkolwiek zmianą
+    cele = {s: (przekieruj or {}).get(s) or n for s, n in mapa.items()}
+    for stara, nowa in mapa.items():
+        tekst = sk.plik(stara).read_text(encoding="utf-8", errors="replace")
+        if fm_dodaj and fm_dodaj.get(stara):
+            fm, body = podziel(tekst)
+            fm.update(fm_dodaj[stara])
+            tekst = sklej(fm, body)
+        sk.zapisz_plik(nowa, tekst)
+    for stara, nowa in (pliki or {}).items():
+        cel = sk.root / nowa
+        cel.parent.mkdir(parents=True, exist_ok=True)
+        zamien_plik(sk.root / stara, cel)
+    katalogi = set()
+    for stara in [*mapa, *(s.removesuffix(".md") for s in pliki or {})]:
+        p = sk.root / f"{stara}.md"
+        if p.is_file():
+            p.unlink()
+        katalogi.add(p.parent)
+    for d in sorted(katalogi, key=lambda d: len(d.parts), reverse=True):
+        while d != sk.root and d.is_dir() and not any(d.iterdir()):
+            d.rmdir()
+            d = d.parent
+    po = (zbior - set(mapa)) | set(mapa.values())
+    znane_po: dict[str, str] = {}
+    for rel in sorted(po):
+        znane_po.setdefault(rel.rsplit("/", 1)[-1], rel)
+    rozwiaz = lambda c: sk.rozwiaz(c, znane, zbior) if c not in mapa else c            # noqa: E731
+    wynik = {"przeniesione": len(mapa) + len(pliki or {}), "notatek_z_linkami": 0, "linkow": 0, "_mapa": dict(mapa)}
+    for rel in sorted(po):
+        if rel.startswith(LUSTRO_REPO + "/"):
+            continue
+        p = sk.plik(rel)
+        tekst = p.read_text(encoding="utf-8", errors="replace")
+        nowy, ile = przepisz_linki(tekst, cele, rozwiaz, znane_po)
+        fm, body = podziel(nowy)
+        zast = _norm(str(fm.get("zastapiona_przez") or ""))
+        if zast in cele:
+            fm["zastapiona_przez"] = cele[zast]
+            nowy, ile = sklej(fm, body), ile + 1
+        if nowy != tekst:
+            sk.zapisz_plik(rel, nowy)
+            wynik["notatek_z_linkami"] += 1
+            wynik["linkow"] += ile
+    return wynik
+
+
+def _chronione(rel: str) -> str:
+    """Powód, dla którego tej ścieżki nie archiwizujemy ani nie przenosimy, albo pusto."""
+    gora = rel.split("/", 1)[0]
+    if rel in FOLDERY_SKARBCA or (gora in HUBY and rel == f"{gora}/{HUBY[gora][0]}") or rel == HUBY[""][0]:
+        return "folderu skarbca ani jego huba nie ruszam (zmień FOLDERY_SKARBCA w wiedza.py)"
+    if rel.startswith(("zrodla/", "skrzynka/")) or gora in ("zrodla", "skrzynka"):
+        return "źródła i szkice nie są wiedzą (archiwizuję notatki)"
+    if gora == TOZSAMOSC:
+        return "tożsamość Jarva generuje zasiew (zmiana przez repo albo pamięć)"
+    if gora == ARCHIWUM:
+        return "już w archiwum"
+    return ""
+
+
+def archiwizuj(sk: "Skarbiec", sciezki: list[str], powod: str, zastapiona_przez: str = "") -> dict:
+    """Notatki (albo całe katalogi, np. `agenci/jarvo-operator`) do `archiwum/<dawna ścieżka>` z frontmatterem
+    `status: wycofana`, `wycofano`, `powod` i opcjonalnie `zastapiona_przez`. Linki do nich wszędzie wskazują następcę
+    (gdy podany), inaczej nową ścieżkę w archiwum. Bez blokady i punktu zapisu (robi je CLI albo zasiew)."""
+    powod = " ".join(str(powod or "").split())
+    if not powod:
+        raise ValueError("podaj powód (--powod)")
+    nastepca = _norm(zastapiona_przez)
+    notatki: list[str] = []
+    zalaczniki: dict[str, str] = {}
+    wszystkie = sk.pliki()
+    for s in (_norm(x) for x in sciezki):
+        if (blad := _chronione(s)):
+            raise ValueError(f"`{s}`: {blad}")
+        katalog = sk.root / s
+        if katalog.is_dir():
+            notatki += [r for r in wszystkie if r.startswith(s + "/")]
+            for p in sorted(katalog.rglob("*")):
+                if p.is_file() and p.suffix != ".md":
+                    r = p.relative_to(sk.root).as_posix()
+                    zalaczniki[r] = f"{ARCHIWUM}/{r}"
+        elif sk.istnieje(s):
+            notatki.append(s)
+        else:
+            raise ValueError(f"nie ma notatki ani katalogu `{s}`")
+    notatki = list(dict.fromkeys(notatki))
+    if not notatki:
+        raise ValueError("nic do archiwizacji")
+    if nastepca:
+        if nastepca in notatki or nastepca.startswith(ARCHIWUM + "/") or not sk.istnieje(nastepca):
+            raise ValueError(f"następca `{nastepca}` musi być istniejącą notatką spoza archiwum i spoza archiwizowanych")
+    fm = {"status": "wycofana", "wycofano": dzis(), "powod": powod, **({"zastapiona_przez": nastepca} if nastepca else {})}
+    return przenies_notatki(sk, {s: f"{ARCHIWUM}/{s}" for s in notatki}, {s: fm for s in notatki},
+                            {s: nastepca for s in notatki} if nastepca else None, zalaczniki)
+
+
+def przenies(sk: "Skarbiec", sciezka: str, folder: str) -> dict:
+    """Notatka do innego folderu skarbca pod tym samym tytułem (nazwą pliku), linki przepisane wszędzie. Folder: klucz
+    FOLDERY_SKARBCA z notatkami albo istniejący podkatalog (`agenci/jarvo-web`, `brands/acme`); bez archiwum (do tego
+    `archiwizuj`), tożsamości, źródeł i skrzynki. Bez blokady i punktu zapisu (robi je CLI)."""
+    s, folder = _norm(sciezka), _norm(folder)
+    if (blad := _chronione(s)):
+        raise ValueError(f"`{s}`: {blad}")
+    if not sk.istnieje(s):
+        raise ValueError(f"nie ma notatki `{s}`")
+    if s.rsplit("/", 1)[-1].startswith("_hub-"):
+        raise ValueError("hubów nie przenoszę (hub agenta przenosi zasiew razem z jego katalogiem)")
+    gora = folder.split("/", 1)[0]
+    if gora not in FOLDERY_SKARBCA or not gora or gora in (ARCHIWUM, TOZSAMOSC, "zrodla", "skrzynka") \
+            or ("/" in folder and not (sk.root / folder).is_dir()):
+        raise ValueError(f"`{folder}` nie jest folderem notatek (dozwolone: "
+                         + ", ".join(f for f in FOLDERY_SKARBCA if f and f not in (ARCHIWUM, TOZSAMOSC, "zrodla", "skrzynka"))
+                         + " albo istniejący podkatalog, np. agenci/jarvo-web)")
+    nowa = f"{folder}/{s.rsplit('/', 1)[-1]}"
+    if nowa == s:
+        raise ValueError(f"`{s}` już jest w `{folder}/`")
+    return przenies_notatki(sk, {s: nowa})
+
+
+def hub_do_streszczenia(sk: "Skarbiec", hub: str) -> str:
+    """Ścieżka huba z argumentu: ścieżka huba, nazwa pliku `_hub-…`, folder z FOLDERY_SKARBCA albo katalog z jednym hubem
+    (`agenci/jarvo-web`)."""
+    s = _norm(hub)
+    if s in HUBY:
+        return f"{s}/{HUBY[s][0]}" if s else HUBY[""][0]
+    if sk.istnieje(s) and s.rsplit("/", 1)[-1].startswith("_hub-"):
+        return s
+    if s and (sk.root / s).is_dir():
+        huby = sorted(sk.rel(p) for p in (sk.root / s).glob("_hub-*.md"))
+        if len(huby) == 1:
+            return huby[0]
+    if "/" not in s and s.startswith("_hub-") and (r := sk.mapa()[1].get(s)):
+        return r
+    raise ValueError(f"nie znam huba `{hub}` (podaj ścieżkę huba albo folder: {', '.join(f for f in HUBY if f)})")
+
+
+def streszczenie(sk: "Skarbiec", hub: str, tekst: str) -> str:
+    """Blok STRESZCZENIE w hubie (najważniejsze z części jednym tekstem, Markdown do MAX_STRESZCZENIA_HUBA znaków)
+    i `streszczono: dziś` we frontmatterze. Zasiew i indeksuj go nie nadpisują. Zwraca ścieżkę huba."""
+    rel = hub_do_streszczenia(sk, hub)
+    tekst = "\n".join(l.rstrip() for l in str(tekst or "").replace("\r\n", "\n").strip().splitlines())
+    if not tekst:
+        raise ValueError("streszczenie jest puste")
+    if len(tekst) > MAX_STRESZCZENIA_HUBA:
+        raise ValueError(f"streszczenie ma {len(tekst)} znaków, limit {MAX_STRESZCZENIA_HUBA}: skróć do najważniejszego")
+    if "<!--" in tekst:
+        raise ValueError("streszczenie bez komentarzy HTML (znaczniki bloków skarbca)")
+    if (sekret := zawiera_sekret(tekst)):
+        raise ValueError(f"streszczenie zawiera sekret ({sekret})")
+    fm, body = podziel(sk.plik(rel).read_text(encoding="utf-8"))
+    fm["streszczono"] = dzis()
+    sk.zapisz_plik(rel, sklej(fm, wstaw_streszczenie(body, tekst)))
+    return rel
+
+
+def porzadki(sk: Skarbiec, rodzaj: str, opis: str, operacja, czekaj_s: float = 60.0) -> dict:
+    """Operacja porządkowa skarbca (archiwizuj, przenies, streszczenie; CLI i `jarvo wiedza …`): blokada skarbca (jeden
+    piszący z kompilacją i zasiewem), punkt zapisu przed (cofnij = dokładnie ta operacja) i po, wpis w LOG, indeks,
+    INDEX i listy hubów od nowa. Wektory przeniesionych notatek idą za nimi (ta sama treść, bez ponownego osadzania)."""
+    blok = Blokada(sk.stan, czekaj_s)
+    if not blok.wez():
+        raise RuntimeError(f"skarbiec zajęty: {blok.powod}")
+    try:
+        sk.punkt_zapisu(f"przed: {opis}")
+        wynik = operacja()
+        mapa = wynik.pop("_mapa", {}) if isinstance(wynik, dict) else {}
+        ix = Indeks(sk)
+        try:
+            with ix.db:
+                for stara, nowa in mapa.items():
+                    if not nowa.startswith(POZA_WYSZUKIWANIEM):
+                        ix.db.execute("UPDATE OR REPLACE wektory SET sciezka = ? WHERE sciezka = ?", (nowa, stara))
+            ix.odswiez()
+            zbuduj_index(sk, ix)
+            odswiez_listy_hubow(sk, ix)
+            ix.odswiez()
+            if mapa:
+                ix.odswiez_wektory(KlientWektorow(sk.stan, WEKTORY_CZAS_ZAPISU_S))
+        finally:
+            ix.zamknij()
+        sk.dopisz_log(rodzaj, opis + "".join(f"\n- {s} → {n}" for s, n in mapa.items()))
+        wynik["git"] = sk.punkt_zapisu(opis)
+        return wynik
+    finally:
+        blok.zwolnij()
+
+
+def tytul_huba_agenta(a: dict) -> str:
+    """Tytuł huba agenta z fleet.yaml: emoji, krótka nazwa z HQ (`hq_short`, jak mówi właściciel: „Jarvo”, a nie tytuł
+    roli „Main Judge”) i profil."""
+    return " ".join(x for x in (a.get("emoji", ""), a.get("short") or a.get("title") or a["name"], f"({a['name']})") if x)
+
+
 def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | None, repo: Path | None = None,
-           bledy: Path | None = None) -> dict:
+           bledy: Path | None = None, tozsamosc: Path | None = None, profile: Path | None = None) -> dict:
+    """Zasiew (wdrożenie, `jarvo wiedza zasiej`): foldery i huby z FOLDERY_SKARBCA, huby agentów z fleet.json (agent
+    spoza floty: cały katalog i jego orzeczenia do archiwum), skille, kopia repo, księga błędów, tożsamość Jarva
+    (`tozsamosc`: build/wiedza/tozsamosc) i lustra pamięci profili floty (`profile`: <dane>/profiles), LOG i punkt
+    zapisu git. Część ręczna hubów i bloki STRESZCZENIE zostają; bloki GEN odświeżane zawsze."""
     sk.root.mkdir(parents=True, exist_ok=True)
     for f in FOLDERY:
         (sk.root / f).mkdir(parents=True, exist_ok=True)
-    raport = {"huby": 0, "agenci": 0, "skille": 0, "docs": 0, "repo": 0, "bledy": 0, "git": False}
+    raport = {"huby": 0, "agenci": 0, "skille": 0, "docs": 0, "repo": 0, "bledy": 0, "archiwum": [], "tozsamosc": 0,
+              "pamiec": 0, "git": False}
     w_lustrze: set[str] = set()
     if repo and repo.is_dir():
         raport["repo"], w_lustrze = zasiej_lustro(sk, repo)
     if schema and schema.exists():
         shutil.copy2(schema, sk.root / "SCHEMA.md")
     # huby folderów (część ręczna zostaje: piszemy tylko, gdy pliku nie ma; bloki GEN odświeżane zawsze)
-    for folder, (hub, tytul) in HUBY.items():
-        rel = f"{folder}/{hub}" if folder else hub
-        if not sk.istnieje(rel):
-            opis = OPISY_FOLDEROW.get(folder, "Strona główna skarbca: huby folderów, liczby, ostatnie zmiany.")
-            body = f"# {tytul}\n\n**{opis}**\n\n## Powiązane\n" + (f"- hub: [[_hub-skarbiec|Skarbiec wiedzy]]\n" if folder else "")
-            sk.zapisz_plik(rel, sklej(_hub_frontmatter("hub"), body))
-            raport["huby"] += 1
-    # hub główny: linki do hubów folderów (blok GEN)
+    for folder in HUBY:
+        raport["huby"] += zapewnij_hub(sk, folder)
     linie = [f"- [[{f}/{h}|{t}]] · {OPISY_FOLDEROW.get(f, '')}" for f, (h, t) in HUBY.items() if f]
     linie += ["- [[INDEX|Indeks]] · każda notatka jedną linią", "- [[LOG|Dziennik]] · co się działo ze skarbcem", "- [[LINT|Lint]] · ostatni raport zdrowia",
               "- [[SCHEMA|Schemat]] · zasady skarbca"]
@@ -1748,9 +2712,9 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
             if marka:                          # agent biznesowy: zakres skarbca (zakres_marki) czytają wtyczka i kompilacja
                 agenci_meta[a["name"]]["marka"] = marka
             if not sk.istnieje(rel):
-                body = (f"# {a.get('emoji', '')} {a.get('title', a['name'])} ({a['name']})\n\n**{a.get('description', '').strip()}**\n\n"
+                body = (f"# {tytul_huba_agenta(a)}\n\n**{a.get('description', '').strip()}**\n\n"
                         f"## Powiązane\n- hub: [[agenci/_hub-agenci|Agenci]]\n- [[{orz}|Orzeczenia: {a.get('short') or krotki}]]\n"
-                        f"- [[fleet/lekcje|Księga lekcji floty]]\n").replace("#  ", "# ")
+                        f"- [[fleet/lekcje|Księga lekcji floty]]\n")
                 sk.zapisz_plik(rel, sklej(_hub_frontmatter("agent", "fleet.yaml", agent=a["name"]), body))
                 raport["agenci"] += 1
             skille = "\n".join(f"- [[{SKILLE}/{s['name']}|{s['name']}]]: {s.get('description', '').strip()}"
@@ -1797,6 +2761,9 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
             stary = (poprzednie.get(a["name"]) or {}).get("opis")
             if m and opis and m.group(2) != opis and (stary is None or m.group(2) == stary):
                 tekst = tekst[:m.start(2) - 2] + f"**{opis}**" + tekst[m.end(2) + 2:]
+            # tytuł z fleet.yaml (dawne huby: „🛰️ Main Judge (jarvo)”); tytuł zmieniony ręcznie (bez „(profil)”) zostaje
+            tekst = re.sub(rf"^# .*\({re.escape(a['name'])}\)[ \t]*$", lambda _m: f"# {tytul_huba_agenta(a)}", tekst, count=1,
+                           flags=re.M)
             sk.zapisz_plik(rel, zastap_blok(tekst, "fleet", gen))
             if not sk.istnieje(orz):
                 sk.zapisz_plik(orz, sklej(_hub_frontmatter("orzeczenia", "człowiek", agent=a["name"]),
@@ -1804,18 +2771,21 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
                                           f"## Powiązane\n- hub: [[orzeczenia/_hub-orzeczenia|Orzeczenia]]\n- [[{rel}|{a.get('short') or krotki}]]\n\n## Linie\n"))
             if marka:
                 zasiej_marke(sk, marka, a, rel)
-        # huby agentów usuniętych z floty (14.11 jarvo-operator): blok z rejestru bez linków do lustra repo, którego
-        # już nie ma (4 martwe linki w lincie od 14.11); hub i notatki agenta zostają jako historia
+        # agent usunięty z floty (14.11 jarvo-operator): cały katalog `agenci/<agent>/` i plik jego orzeczeń do archiwum
+        # (Zespół to tylko aktywni), linki z notatek i hubów wskazują archiwum; blok z rejestru mówi, kiedy i czemu
         w_flocie = {a["name"] for a in fleet.get("agents", [])}
         for hub in sorted((sk.root / "agenci").glob("*/_hub-*.md")):
             rel_h = sk.rel(hub)
             agent = str(sk.wczytaj(rel_h).fm.get("agent") or "")
-            if agent and agent not in w_flocie:
-                tekst = hub.read_text(encoding="utf-8")
-                nowy = zastap_blok(tekst, "fleet", f"## Z rejestru floty (fleet.yaml)\n- `{agent}` nie ma już we flocie: "
-                                                    "hub i notatki zostają jako historia")
-                if nowy != tekst:
-                    sk.zapisz_plik(rel_h, nowy)
+            if not agent or agent in w_flocie or rel_h.split("/")[1] != agent:
+                continue
+            tekst = hub.read_text(encoding="utf-8")
+            sk.zapisz_plik(rel_h, zastap_blok(tekst, "fleet", f"## Z rejestru floty (fleet.yaml)\n- `{agent}` nie ma już we "
+                                                               f"flocie (zasiew {dzis()}): hub i notatki to historia w archiwum"))
+            orz = "orzeczenia/" + hub.stem.removeprefix("_hub-")
+            sciezki = [f"agenci/{agent}", *([orz] if sk.istnieje(orz) and orz != "orzeczenia/wszyscy" else [])]
+            archiwizuj(sk, sciezki, "agent wycofany z floty")
+            raport["archiwum"] += sciezki
         (sk.stan).mkdir(parents=True, exist_ok=True)
         (sk.stan / "wiedza-agenci.json").write_text(json.dumps(agenci_meta, ensure_ascii=False, indent=1), encoding="utf-8",
                                                     newline="\n")
@@ -1852,6 +2822,15 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
         p = sk.plik(HUBY[""][0])
         sk.zapisz_plik(HUBY[""][0], zastap_blok(p.read_text(encoding="utf-8"), "repo",
                                                 "## Z repo (kopia przy wdrożeniu)\n" + "\n".join(linie_repo)))
+    # tożsamość Jarva (jarvo/*) z plików buildu i lustra pamięci profili floty (po treści pliku: synchronizuj_pamiec)
+    raport["tozsamosc"] = len(zasiej_tozsamosc(sk, tozsamosc)) + zasiej_mape(sk, tozsamosc, fleet, profile, agenci_meta)
+    if profile and Path(profile).is_dir():
+        agenci = [a["name"] for a in (fleet or {}).get("agents", [])] or [PROFIL_TOZSAMOSCI]
+        for agent in agenci:
+            s = synchronizuj_pamiec(sk, Path(profile) / agent, agent, (agenci_meta.get(agent) or {}).get("marka", ""))
+            raport["pamiec"] += s["wpisow"]
+            raport["tozsamosc"] += len(s["notatki"])
+    odswiez_hub_jarva(sk, (agenci_meta.get(PROFIL_TOZSAMOSCI) or {}).get("orzeczenia", ""))
     if not (sk.root / "INDEX.md").exists():
         (sk.root / "INDEX.md").write_text("# Indeks skarbca\n\n_Pusty do pierwszego `wiedza.py indeksuj`._\n", encoding="utf-8",
                                           newline="\n")
@@ -1860,7 +2839,9 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
                                          newline="\n")
     sk.dopisz_log("zasiew", f"huby: {raport['huby']} folderów, {raport['agenci']} agentów; skille: {raport['skille']} zmienionych; "
                             f"docs repo: {raport['docs']} plików; pliki profili: {raport['repo']} zmienionych; "
-                            f"księga błędów: {raport['bledy']} nowych albo wymienionych")
+                            f"księga błędów: {raport['bledy']} nowych albo wymienionych; tożsamość: {raport['tozsamosc']} notatek "
+                            f"zmienionych; pamięć: {raport['pamiec']} nowych wpisów do kompilacji"
+                            + (f"; do archiwum (agent wycofany z floty): {', '.join(raport['archiwum'])}" if raport["archiwum"] else ""))
     raport["git"] = sk.git_init() and sk.punkt_zapisu("zasiew skarbca")
     return raport
 
@@ -1976,6 +2957,8 @@ def lint(sk: Skarbiec, ix: Indeks) -> dict:
         zly = zly_naglowek(sk.plik(rel).read_text(encoding="utf-8", errors="replace")) if sk.plik(rel).exists() else ""
         if zly:
             bledy.append(f"frontmatter nie jest poprawnym YAML (wartość w cudzysłów): `{zly[:80]}` w [[{rel}]]")
+        if rel.startswith(ARCHIWUM + "/") or n.typ == "tozsamosc":
+            continue          # archiwum (historia) i tożsamość generowana z repo i pamięci: tylko nazwa, sekrety, YAML i martwe linki
         if skrypty_repo is not None and rel.startswith(O_FLOCIE) and not r["hub"]:
             for nazwa_s in sorted({m.group(1) for m in SKRYPT_RE.finditer(n.tresc)} - skrypty_repo):
                 ostrz.append(f"nieaktualna wobec repo: skryptu `{nazwa_s}` nie ma we flocie: [[{rel}]]")
@@ -2047,7 +3030,7 @@ def lint(sk: Skarbiec, ix: Indeks) -> dict:
     for k, k2 in sorted(pary):
         ostrz.append(f"podobne tytuły: [[{tytuly[k][0]}]] i [[{tytuly[k2][0]}]]")
     for folder, (hub, tytul) in HUBY.items():
-        if folder and folder not in ("orzeczenia",):
+        if folder and folder not in ("orzeczenia", TOZSAMOSC, ARCHIWUM):
             ile = sum(1 for rel in notatki if rel.startswith(folder + "/") and not notatki[rel]["hub"])
             if ile < 3:
                 info.append(f"cienki folder `{folder}/` ({ile} notatek)")
@@ -2164,6 +3147,24 @@ def main(argv: list[str] | None = None) -> int:
     z.add_argument("--schema", default=str(Path(__file__).with_name("SCHEMA.md")), help="SCHEMA.md do skopiowania")
     z.add_argument("--bledy", help="wiedza/bledy z repo: notatki księgi błędów do bledy/ (tylko nowe, istniejących nie "
                                    "rusza, usunięta nie wraca)")
+    z.add_argument("--tozsamosc", help="tożsamość Jarva z buildu (build/wiedza/tozsamosc: SOUL, ZASADY, KRYTYCZNE, MAPA) → "
+                                       "jarvo/; domyślnie katalog `tozsamosc` obok --repo")
+    z.add_argument("--profile", help="katalog profili Hermesa (<dane>/profiles): lustra pamięci; domyślnie <skarbiec>/../../profiles")
+    ar = sub.add_parser("archiwizuj", help="notatki albo katalogi do archiwum/ (linki do następcy albo do archiwum)")
+    ar.add_argument("sciezki", nargs="+")
+    ar.add_argument("--powod", required=True)
+    ar.add_argument("--zastapiona-przez", default="", help="notatka-następca: linki i stara ścieżka prowadzą do niej")
+    pr = sub.add_parser("przenies", help="notatka do innego folderu (ten sam tytuł), linki przepisane")
+    pr.add_argument("sciezka")
+    pr.add_argument("folder")
+    sz = sub.add_parser("streszczenie", help=f"blok STRESZCZENIE huba (do {MAX_STRESZCZENIA_HUBA} znaków)")
+    sz.add_argument("hub", help="ścieżka huba albo folder (user, agenci/jarvo-web)")
+    zr = sz.add_mutually_exclusive_group(required=True)
+    zr.add_argument("--plik")
+    zr.add_argument("--tekst")
+    pm = sub.add_parser("pamiec", help="lustro pamięci Hermesa (po treści plików): notatki Jarva i szkice nowych wpisów")
+    pm.add_argument("--profil", default=None, help="katalog profilu (domyślnie <skarbiec>/../../profiles/jarvo)")
+    pm.add_argument("--agent", default=PROFIL_TOZSAMOSCI)
     i = sub.add_parser("indeksuj", help="indeks FTS5 + INDEX.md + listy hubów")
     i.add_argument("--pelny", action="store_true")
     s = sub.add_parser("szukaj", help="wyszukiwanie")
@@ -2204,14 +3205,18 @@ def main(argv: list[str] | None = None) -> int:
     oc.add_argument("--limit", type=int, default=5, help="ile notatek przypomnienia (k w hit@k)")
     oc.add_argument("--silnik", choices=SILNIKI, default=SILNIK,
                     help="wektory (domyślnie), hybryda (RRF słów i wektorów), slowa (BM25); bez usługi wektorów zawsze slowa")
+    oc.add_argument("--pomin-tozsamosc", action="store_true",
+                    help="jak przypomnienie Jarva: bez notatek tożsamości (ma je w prompcie)")
     oc.add_argument("--json", action="store_true")
     a = ap.parse_args(argv)
 
     sk = Skarbiec(a.skarbiec, a.stan)
     if a.cmd == "zasiej":
         fleet = json.loads(Path(a.fleet).read_text(encoding="utf-8")) if a.fleet else None
+        toz = Path(a.tozsamosc) if a.tozsamosc else (Path(a.repo).parent / "tozsamosc" if a.repo else None)
+        profile = Path(a.profile) if a.profile else sk.root.parent.parent / "profiles"
         r = zasiej(sk, fleet, Path(a.docs) if a.docs else None, Path(a.schema) if a.schema else None,
-                   Path(a.repo) if a.repo else None, Path(a.bledy) if a.bledy else None)
+                   Path(a.repo) if a.repo else None, Path(a.bledy) if a.bledy else None, toz, profile)
         ix = Indeks(sk)
         ix.odswiez(pelny=True)
         n = zbuduj_index(sk, ix)
@@ -2219,13 +3224,37 @@ def main(argv: list[str] | None = None) -> int:
         ix.odswiez()
         sk.punkt_zapisu("zasiew skarbca: indeks")
         print(f"✓ zasiew: {r['huby']} hubów folderów, {r['agenci']} hubów agentów, {r['skille']} skilli zmienionych, {r['docs']} docs, "
-              f"księga błędów {r['bledy']} nowych albo wymienionych, indeks {n} notatek, git: {'tak' if r['git'] else 'nie'}")
+              f"księga błędów {r['bledy']} nowych albo wymienionych, tożsamość {r['tozsamosc']} notatek, pamięć {r['pamiec']} "
+              f"nowych wpisów, do archiwum: {', '.join(r['archiwum']) or 'nic'}, indeks {n} notatek, git: {'tak' if r['git'] else 'nie'}")
         print(opis_wektorow(ix.odswiez_wektory(KlientWektorow(sk.stan, WEKTORY_CZAS_ZAPISU_S))))
         ix.zamknij()
         return 0
     if not sk.root.is_dir():
         print(f"✗ brak skarbca {sk.root} (najpierw `zasiej`)", file=sys.stderr)
         return 2
+    if a.cmd in ("archiwizuj", "przenies", "streszczenie"):
+        try:
+            if a.cmd == "archiwizuj":
+                opis = f"archiwum: {', '.join(a.sciezki)} ({' '.join(a.powod.split())[:120]})"
+                r = porzadki(sk, "archiwum", opis, lambda: archiwizuj(sk, a.sciezki, a.powod, a.zastapiona_przez))
+            elif a.cmd == "przenies":
+                opis = f"przeniesienie: {a.sciezka} → {a.folder}/"
+                r = porzadki(sk, "przeniesienie", opis, lambda: przenies(sk, a.sciezka, a.folder))
+            else:
+                tekst = Path(a.plik).read_text(encoding="utf-8") if a.plik else a.tekst
+                r = porzadki(sk, "streszczenie", f"streszczenie huba {a.hub}",
+                             lambda: {"hub": streszczenie(sk, a.hub, tekst)})
+        except (ValueError, OSError, RuntimeError) as e:
+            print(f"✗ {e}", file=sys.stderr)
+            return 3
+        print("✓ " + " · ".join(f"{k}: {v}" for k, v in r.items()))
+        return 0
+    if a.cmd == "pamiec":
+        profil = Path(a.profil) if a.profil else sk.root.parent.parent / "profiles" / a.agent
+        r = synchronizuj_pamiec(sk, profil, a.agent)
+        print(f"✓ pamięć {a.agent}: zmienione {', '.join(r['zmienione']) or 'nic'}, {r['wpisow']} nowych wpisów do kompilacji, "
+              f"notatki: {', '.join(r['notatki']) or 'bez zmian'}" + (" (stan zajęty, spróbuj za chwilę)" if r.get("zajete") else ""))
+        return 0
     ix = Indeks(sk)
     try:
         if a.cmd == "indeksuj":
@@ -2301,7 +3330,7 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 wektory = None if a.silnik == "slowa" else KlientWektorow(sk.stan)
                 r = ocena(ix, json.loads(Path(a.plik).read_text(encoding="utf-8")), limit=a.limit, wektory=wektory,
-                          silnik=a.silnik)
+                          silnik=a.silnik, pomin_tozsamosc=a.pomin_tozsamosc)
             except (OSError, ValueError) as e:
                 print(f"✗ {e}", file=sys.stderr)
                 return 2

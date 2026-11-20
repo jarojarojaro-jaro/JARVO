@@ -846,4 +846,126 @@ test("WERSJA_PAKIETU: skrót rdzenia app-rdzen-<12 hex>.js (20.11: „Wersja Jar
   assert.strictEqual(wersja("/api/plugins/jarvo-hq/zasoby/app-baza-6c89e67a1ab9.js"), null);
 });
 
+// ------------------------------------------------------------------------------------------------ Mózg (63-mozg.js)
+// czyste funkcje pakietu „mozg” w osobnym kontekście (atrapy Reacta, sklepu i trasy); dane jak z /graph po zmianach 20.11
+const MOZG = (() => {
+  const slad = { szkic: null, fokus: null, trasa: null };
+  let stan = { szkice: { nowa: { tekst: "", pliki: [] } }, adresaci: { "0:nowa": "jarvo-web" } };
+  const ctx = vm.createContext({ React: {}, Zasoby: { daj() {} }, html: () => null, cx: (...x) => x.filter(Boolean).join(" "),
+    useState: (v) => [v, () => {}], useMemo: (f) => f(), useRef: (v) => ({ current: v }), useEffect: () => {}, zadanie: () => null,
+    sklep: { ustaw: (f) => { stan = f(stan); slad.szkic = stan; } }, Fokus: { odloz: (c) => { slad.fokus = c; } }, Trasa: { idz: (t) => { slad.trasa = t; } },
+    URLSearchParams, Date, Math, JSON, Map, Set, String, Number, Array, Object, RegExp, Infinity, encodeURIComponent });
+  vm.runInContext("const isPL = () => globalThis.PL !== false; const L = (pl, en) => (isPL() ? pl : en);\n" + fs.readFileSync(path.join(SRC, "63-mozg.js"), "utf8")
+    + "\n;globalThis.M = { MOZG_KATEGORIE, MOZG_BLEDY_PAMIECI, mozgMapa, mozgSekcje, mozgSzukaj, mozgTytul, mozgProste, mozgWycofana, mozgWyzej, mozgWstecz,"
+    + " mozgPamiec, mozgBladPamieci, mozgProsba, mozgPopros, mozgWiki, mozgSpis, mozgSciezkaSekcji, mozgHash, mozgStan };", ctx, { filename: "63-mozg.js" });
+  return { ...ctx.M, ctx, slad };
+})();
+const mozgWezel = (id, o = {}) => {
+  const t = MOZG.mozgTytul({ id, tytul: o.tytul || id.split("/").pop() });
+  return { id, hub: false, typ: "", zmieniono: "", ...o, _t: t, _p: MOZG.mozgProste(t), _s: MOZG.mozgProste(`${t} ${o.tytul || ""} ${id}`) };
+};
+const MOZG_WEZLY = [
+  mozgWezel("_hub-skarbiec", { hub: true, tytul: "Skarbiec", podsumowanie: "Całość w skrócie.", streszczono: "2026-11-20" }),
+  mozgWezel("archiwum/agenci/jarvo-operator/_hub-operator", { hub: true, tytul: "Operator", status: "wycofana" }),
+  mozgWezel("jarvo/_hub-jarvo", { hub: true, tytul: "Jarvo", podsumowanie: "Jarvo prowadzi flotę. Zasady: [[jarvo/zasady pracy]].", streszczono: "2026-11-20" }),
+  ...["pamięć jarva", "zasady krytyczne", "kim jest jarvo", "zasady pracy", "jak działa jarvo"].map((t, i) =>
+    mozgWezel(`jarvo/${t}`, { typ: "tozsamosc", zmieniono: `2026-11-1${i}`, edycja: t === "pamięć jarva" ? "pamiec" : "repo" })),
+  mozgWezel("orzeczenia/_hub-orzeczenia", { hub: true, tytul: "Orzeczenia" }), mozgWezel("orzeczenia/jarvo", { typ: "orzeczenia" }),
+  mozgWezel("orzeczenia/wszyscy", { typ: "orzeczenia" }),
+  mozgWezel("user/_hub-ty", { hub: true, tytul: "Ty" }), mozgWezel("user/firma", { typ: "fakt", zmieniono: "2026-11-19" }),
+  mozgWezel("user/pamięć jarva o tobie", { typ: "tozsamosc", edycja: "pamiec", pamiec: "user", zmieniono: "2026-11-01" }),
+  mozgWezel("agenci/_hub-agenci", { hub: true, tytul: "Agenci" }), mozgWezel("agenci/jarvo-web/_hub-web", { hub: true, tytul: "🌐 Web (jarvo-web)" }),
+  mozgWezel("agenci/jarvo-web/lekcja a", { typ: "lekcja" }), mozgWezel("agenci/jarvo-web/lekcja b", { typ: "lekcja" }),
+  mozgWezel("fleet/arsenal", { tytul: "Arsenał" }), mozgWezel("fleet/skille/s1", { typ: "skill" }), mozgWezel("fleet/skille/s2", { typ: "skill" }),
+  mozgWezel("fleet/skille/s3", { typ: "skill" }), mozgWezel("fleet/skille/s4", { typ: "skill" }),
+  mozgWezel("podmioty/instabox", { typ: "podmiot", zmieniono: "2026-11-02" }),
+  mozgWezel("podmioty/instabox stary", { typ: "podmiot", status: "wycofana", zmieniono: "2026-11-20" }),
+  mozgWezel("archiwum/agenci/jarvo-operator/lekcja o", { typ: "lekcja", status: "wycofana" }),
+  mozgWezel("archiwum/podmioty/instabox 2", { typ: "podmiot", status: "wycofana" }),
+  mozgWezel("zrodla/jarvo-repo/HQ"),
+];
+test("Mózg: części w kolejności planu, Jarvo pierwsze, archiwum i źródła z boku, umiejętności ostatnie w Zespole", () => {
+  const m = MOZG.mozgMapa(MOZG_WEZLY, MOZG.MOZG_KATEGORIE);
+  eq(MOZG.MOZG_KATEGORIE.map((d) => d.k), ["jarvo", "ty", "projekty", "zespol", "swiat", "lekcje", "rozmowy", "zrodla", "archiwum"]);
+  eq(MOZG.MOZG_KATEGORIE.map((d) => d.foldery), [["jarvo", "orzeczenia"], ["user"], ["projekty", "brands", "inspiracje"], ["agenci", "fleet"],
+    ["podmioty"], ["pojecia", "bledy"], ["rozmowy", "briefy"], ["zrodla", "skrzynka", ""], ["archiwum"]]);
+  eq(m.glowne.map((d) => [d.k, d.ile]), [["jarvo", 7], ["ty", 2], ["zespol", 7], ["swiat", 2]]);
+  eq(m.kat.filter((d) => d.drugorzedna).map((d) => [d.k, d.ile]), [["zrodla", 1], ["archiwum", 2]]);
+  const jarvo = m.kat.find((d) => d.k === "jarvo"), zespol = m.kat.find((d) => d.k === "zespol");
+  eq(jarvo.grupy.map((g) => [g.k, g.nazwa, g.ile]), [["jarvo", "Tożsamość", 5], ["orzeczenia", "Twoje poprawki", 2]]);
+  assert.strictEqual(jarvo.hub.id, "jarvo/_hub-jarvo");
+  // fleet w całości jedną grupą „Umiejętności”, po agentach
+  eq(zespol.grupy.map((g) => [g.k, g.nazwa, g.ile]), [["agenci/jarvo-web", "🌐 Web", 2], ["fleet", "Umiejętności", 5]]);
+  eq(m.gdzie.get("fleet/skille/s1"), { kat: "zespol", grupa: "fleet" });
+  // archiwum: grupy w układzie dawnej ścieżki, poza głównymi częściami i poza „Ostatnio zmienione”
+  eq(m.kat.find((d) => d.k === "archiwum").grupy.map((g) => [g.k, g.nazwa]), [["archiwum/agenci", "Agenci"], ["archiwum", "Archiwum"]]);
+  assert.ok(!m.glowne.some((d) => d.wezly.some((n) => n.id.startsWith("archiwum/"))));
+});
+test("Mózg: tożsamość pierwsza i w stałej kolejności (Jarvo od A do Z, kim jest, zasady, krytyczne, pamięć), wycofane szare i na końcu", () => {
+  const m = MOZG.mozgMapa(MOZG_WEZLY, MOZG.MOZG_KATEGORIE);
+  const jarvo = m.kat.find((d) => d.k === "jarvo"), ty = m.kat.find((d) => d.k === "ty"), swiat = m.kat.find((d) => d.k === "swiat");
+  eq(MOZG.mozgSekcje(jarvo.grupy[0].wezly).map((s) => [s.nazwa, s.wezly.map((n) => n._t)]),
+    [["Tożsamość i pamięć", ["jak działa jarvo", "kim jest jarvo", "zasady pracy", "zasady krytyczne", "pamięć jarva"]]]);
+  eq(MOZG.mozgSekcje(ty.grupy[0].wezly).map((s) => s.t), ["tozsamosc", "fakt"]);   // pamięć o Tobie przed faktami
+  const wyc = MOZG_WEZLY.find((n) => n.id === "podmioty/instabox stary");
+  assert.ok(MOZG.mozgWycofana(wyc) && !MOZG.mozgWycofana(MOZG_WEZLY.find((n) => n.id === "archiwum/podmioty/instabox 2")));
+  eq(MOZG.mozgSekcje(swiat.grupy[0].wezly)[0].wezly.map((n) => n.id), ["podmioty/instabox", "podmioty/instabox stary"]);   // nowsza, ale wycofana
+  eq(MOZG.mozgSzukaj(MOZG_WEZLY, "instabox")[0].map((n) => n.id), ["podmioty/instabox", "podmioty/instabox stary", "archiwum/podmioty/instabox 2"]);
+});
+test("Mózg: „Najważniejsze” z podsumowania huba części i całego skarbca, [[linki]] w nim jako linki Mózgu", () => {
+  const m = MOZG.mozgMapa(MOZG_WEZLY, MOZG.MOZG_KATEGORIE), jarvo = m.kat.find((d) => d.k === "jarvo");
+  eq([jarvo.hub.podsumowanie, jarvo.hub.streszczono], ["Jarvo prowadzi flotę. Zasady: [[jarvo/zasady pracy]].", "2026-11-20"]);
+  assert.strictEqual(m.korzen.id, "_hub-skarbiec");
+  const cel = (t) => (t === "jarvo/zasady pracy" ? ["#/mozg?o=x", "Zasady pracy"] : null);
+  assert.strictEqual(MOZG.mozgWiki(jarvo.hub.podsumowanie, cel), "Jarvo prowadzi flotę. Zasady: [Zasady pracy](#/mozg?o=x).");
+  // spis sekcji długiej notatki: tylko „## ” poza kodem, bez znaczników
+  eq(MOZG.mozgSpis("# T\n## Kim jestem\ntekst\n```\n## nie\n```\n### pod\n## **Co mogę** ##\n## Gdzie co jest"), ["Kim jestem", "Co mogę", "Gdzie co jest"]);
+  // wynik szukania z sekcją (GET /search: `notatka#Sekcja`) otwiera notatkę i przewija do sekcji ze spisu
+  eq(MOZG.mozgSciezkaSekcji("jarvo/jak działa jarvo#Gdzie co jest"), ["jarvo/jak działa jarvo", "Gdzie co jest"]);
+  eq(MOZG.mozgSciezkaSekcji("user/USER"), ["user/USER", ""]);
+  eq(MOZG.mozgSciezkaSekcji("a#b#c"), ["a", "b#c"]);
+});
+test("Mózg: Wstecz = poprzedni widok Mózgu z historii, inaczej poziom wyżej", () => {
+  const s = (o) => ({ z: "", k: "", g: "", o: "", ...o });
+  eq(MOZG.mozgWstecz("#/mozg?k=jarvo", s({ k: "jarvo", g: "orzeczenia", o: "orzeczenia/jarvo" }), true), { stan: s({ k: "jarvo" }), historia: true });
+  eq(MOZG.mozgWstecz("#/mozg", s({ k: "ty" }), false), { stan: s({}), historia: true });
+  // poprzedni wpis spoza Mózgu (rozmowa) albo brak: poziom wyżej
+  eq(MOZG.mozgWstecz("#/r/w_0123456789abcdef01234", s({ k: "jarvo", g: "orzeczenia", o: "orzeczenia/jarvo" }), true),
+    { stan: s({ k: "jarvo", g: "orzeczenia" }), historia: false });
+  eq(MOZG.mozgWstecz("", s({ k: "jarvo", g: "orzeczenia" }), true), { stan: s({ k: "jarvo" }), historia: false });
+  eq(MOZG.mozgWstecz("", s({ k: "ty", g: "user" }), false), { stan: s({}), historia: false });   // jedna grupa = część
+  assert.strictEqual(MOZG.mozgWstecz("", s({}), false), null);                                     // wejście: nic wyżej
+  assert.strictEqual(MOZG.mozgWstecz("#/mozgx", s({}), false), null);
+});
+test("Mózg: edytor pamięci liczy znaki jak Hermes (wpisy złączone „\\n§\\n”), pilnuje limitu, 409 = zmieniona", () => {
+  eq(MOZG.mozgPamiec([" a ", "", "  ", "bż"], 10), { wpisy: ["a", "bż"], uzyte: 6, ponad: 0, zly: -1 });
+  eq(MOZG.mozgPamiec(["x".repeat(8), "yy"], 10), { wpisy: ["xxxxxxxx", "yy"], uzyte: 13, ponad: 3, zly: -1 });
+  assert.strictEqual(MOZG.mozgPamiec(["😀"], 5).uzyte, 1);                  // znaki Unicode, nie jednostki UTF-16
+  assert.strictEqual(MOZG.mozgPamiec(["ok", "a\n§\nb"], 99).zly, 1);
+  assert.strictEqual(MOZG.mozgPamiec([], 10).uzyte, 0);
+  assert.strictEqual(MOZG.mozgBladPamieci({ status: 409, kod: "zmieniona" }), "zmieniona");
+  assert.strictEqual(MOZG.mozgBladPamieci({ status: 409, kod: "http_409" }), "zmieniona");
+  assert.strictEqual(MOZG.mozgBladPamieci({ status: 400, kod: "limit" }), "limit");
+  assert.strictEqual(MOZG.mozgBladPamieci({ status: 400, kod: "pusty_wpis" }), "pusty_wpis");
+  assert.strictEqual(MOZG.mozgBladPamieci({ status: 500, kod: "http_500" }), "inny");
+  assert.strictEqual(MOZG.mozgBladPamieci({ status: 503, kod: "zajeta" }), "zajeta");
+  assert.strictEqual(MOZG.mozgBladPamieci({ status: 400, kod: "zly_wpis" }), "zly_wpis");
+  assert.strictEqual(MOZG.mozgBladPamieci({ status: 0, kod: "siec" }), "inny");
+  for (const [k, [pl, en]] of Object.entries(MOZG.MOZG_BLEDY_PAMIECI)) assert.ok(pl && en && !/[—–]/.test(pl + en), k);
+});
+test("Mózg: „Poproś o zmianę” = szkic nowej rozmowy do Jarva (bez wysyłania, bez dubla), ekran startu z kursorem", () => {
+  assert.strictEqual(MOZG.mozgProsba("profiles/jarvo/SOUL.md", ""), "Zmiana w profiles/jarvo/SOUL.md: ");
+  assert.strictEqual(MOZG.mozgProsba("profiles/jarvo/SOUL.md", "Zmiana w profiles/jarvo/SOUL.md: dopisz"), "Zmiana w profiles/jarvo/SOUL.md: dopisz");
+  assert.strictEqual(MOZG.mozgProsba("a.md", "stary szkic"), "Zmiana w a.md: stary szkic");
+  MOZG.mozgPopros("profiles/jarvo/ZASADY.md");
+  eq([MOZG.slad.szkic.szkice.nowa.tekst, MOZG.slad.szkic.adresaci["0:nowa"], MOZG.slad.fokus, MOZG.slad.trasa],
+    ["Zmiana w profiles/jarvo/ZASADY.md: ", null, "kompozytor", { widok: "start" }]);
+  MOZG.ctx.PL = false;
+  assert.strictEqual(MOZG.mozgProsba("x.md", ""), "Change in x.md: ");
+  MOZG.ctx.PL = true;
+});
+test("Mózg: teksty interfejsu bez myślników „—” i „–”", () => {
+  assert.ok(!/[—–]/.test(fs.readFileSync(path.join(SRC, "63-mozg.js"), "utf8")));
+});
+
 console.log(`ok ${ile}`);

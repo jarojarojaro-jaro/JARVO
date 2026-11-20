@@ -35,10 +35,14 @@ SOUL_POSTAC_REQUIRED = ["## Charakter"]
 SOUL_POSTAC_BUDZET = 1600            # sama postać: tożsamość, charakter, głos, przykłady
 # Jarvo: postać + zasady szefa floty, ekranu i telefonu (po usuniętym Operatorze, 14.11) + roster. 19.11 (SOUL v2):
 # budżet liczony na złożonym prompcie z prawdziwymi długościami ścieżek; wzrost o ~500 tok. wobec v1 kompensuje
-# wyłączenie sprzecznych bloków Hermesa (~1 000 tok.) i orzeczeń doklejanych do każdej wiadomości (~2 000 tok./turę)
-SOUL_BUDZET_ORKIESTRATORA = 4400
+# wyłączenie sprzecznych bloków Hermesa (~1 000 tok.) i orzeczeń doklejanych do każdej wiadomości (~2 000 tok./turę).
+# 20.11 (mapa Jarva, właściciel: „wszystko ma być wiadome od razu, bez zastanowienia”): liczony jest prawdziwy roster
+# (linia z profilem, `@uchwytem` i `oddaj_gdy` na agenta) i rdzeń mapy (fl.rdzen_mapy, sam ≤ 1 200 tok.). Pomiar
+# z nakładką właściciela: reszta promptu ~4 180 tok. (jak przed mapą), roster 10 agentów ~516 (stała dawniej ~200),
+# rdzeń ~843 = ~5 539 tok. (bez nakładki ~5 079); zapas ~60 tok., kolejny agent wymaga świadomej decyzji o budżecie.
+SOUL_BUDZET_ORKIESTRATORA = 5600
 DLUGOSC_SCIEZKI = 60                 # średnia długość podstawionej ścieżki @@…@@ w zbudowanym SOUL
-DLUGOSC_ROSTERU = 700                # skrót floty w SOUL orkiestratora (render_roster_summary, 9 agentów)
+SCIEZKI_MAPY = ("DATA_DIR", "JARVO_DIR", "KNOWLEDGE_DIR", "MISSIONS_DIR", "WORKSPACES_DIR", "INBOX_DIR")   # fl.sciezki_mapy
 # zasada bloku kontekstu (protokół floty, zasada 8; docs/HQ.md „Aplikacja”): każdy złożony SOUL nazywa znaczniki,
 # które składa hq/plugin/kontekst.py
 SOUL_KONTEKST = ["[Jarvo · kontekst rozmowy <kod>]", "[koniec kontekstu <kod>]", "[Wiadomość właściciela <kod>]"]
@@ -242,18 +246,24 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
     for znacznik in SOUL_KONTEKST:
         if znacznik not in zlozony:
             r.err(f"{a.name}: SOUL z protokołem bez zasady bloku kontekstu (brak {znacznik!r}; protokół, zasada 8)")
-    if a.name == fleet.orchestrator and fl.ROSTER_MARKER not in soul:
-        r.err(f"{a.name}: SOUL.md orkiestratora bez {fl.ROSTER_MARKER}")
+    if a.name == fleet.orchestrator:
+        for znacznik in (fl.ROSTER_MARKER, fl.MAPA_MARKER):
+            if znacznik not in soul:
+                r.err(f"{a.name}: SOUL.md orkiestratora bez {znacznik}")
     # budżet z najdłuższą kalibracją, jaką agent może dostać (zmiana dostawcy albo modelu w panelu), na tekście
-    # takim, jaki dostaje model: ścieżki @@…@@ i roster podstawione (19.11 źródło miało 3 400 tok., build 3 673)
+    # takim, jaki dostaje model: ścieżki @@…@@, roster i rdzeń mapy podstawione (19.11 źródło miało 3 400 tok., build 3 673)
     orch = a.name == fleet.orchestrator
     calib = max((fl.calibration_section(f"{fam}-x", orch) for fam in CALIBRATION_FAMILIES), key=len)
     _, pominiete = fl.available_skills(d / "skills")        # sekcja „Czego nie zrobisz” z buildu też jest w prefiksie
     dopisek = "\n\n" + fl.missing_section(pominiete, fleet) if pominiete else ""
     zbudowany = soul.replace(fl.PROTOCOL_MARKER, f"{fl.protocol_for(protocol, orch)}\n\n{calib}") + dopisek
+    if orch:
+        sciezki = fl.sciezki_mapy({k: "x" * DLUGOSC_SCIEZKI for k in SCIEZKI_MAPY}, a.name)
+        zbudowany = zbudowany.replace(fl.ROSTER_MARKER, fl.render_roster_summary(fleet)).replace(
+            fl.MAPA_MARKER, fl.rdzen_mapy(fleet, sciezki))
     for token, wartosc in fl.tokeny_wlasciciela(fleet).items():
         zbudowany = zbudowany.replace(f"@@{token}@@", wartosc)
-    zbudowany = re.sub(r"@@[A-Z_]+@@", "x" * DLUGOSC_SCIEZKI, zbudowany.replace(fl.ROSTER_MARKER, "x" * DLUGOSC_ROSTERU))
+    zbudowany = re.sub(r"@@[A-Z_]+@@", "x" * DLUGOSC_SCIEZKI, zbudowany)
     tokens = fl.approx_tokens(zbudowany)
     budzet = SOUL_BUDZET_ORKIESTRATORA if orch else fl.SOUL_TOKEN_BUDGET
     if tokens > budzet:

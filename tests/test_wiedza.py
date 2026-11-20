@@ -56,8 +56,9 @@ def test_zasiew_huby_orzeczenia_docs_git(skarbiec, tmp_path):
     huby = {p.name for p in sk.root.rglob("_hub-*.md")}
     assert huby == {"_hub-skarbiec.md", "_hub-agenci.md", "_hub-projekty.md", "_hub-marki.md", "_hub-inspiracje.md", "_hub-ty.md",
                     "_hub-podmioty.md", "_hub-pojecia.md", "_hub-orzeczenia.md", "_hub-rozmowy.md", "_hub-briefy.md", "_hub-bledy.md",
-                    "_hub-jarvo.md", "_hub-web.md", "_hub-łowca.md"}
-    assert len(huby) == len({h for h in huby})                       # nazwy unikalne w całym skarbcu (etykiety w grafie)
+                    "_hub-jarvo.md", "_hub-archiwum.md", "_hub-web.md", "_hub-łowca.md"}
+    # dwa `_hub-jarvo` (hub tożsamości `jarvo/` i hub agenta `agenci/jarvo/`): linki zawsze pełną ścieżką
+    assert (sk.root / "jarvo/_hub-jarvo.md").is_file() and (sk.root / "agenci/jarvo/_hub-jarvo.md").is_file()
     hub = (sk.root / "agenci/jarvo-web/_hub-web.md").read_text(encoding="utf-8")
     assert "[[fleet/skille/nowa-strona|nowa-strona]]: Nowa strona: od briefu do wdrożenia." in hub
     assert "skille zewnętrzne (2): `gsap`, `seo-audit`" in hub
@@ -69,7 +70,7 @@ def test_zasiew_huby_orzeczenia_docs_git(skarbiec, tmp_path):
     assert meta["jarvo-lowca"] == {"hub": "agenci/jarvo-lowca/_hub-łowca", "orzeczenia": "orzeczenia/łowca", "short": "Łowca",
                                    "title": "Łowca leadów", "opis": "Leady B2B."}
     index = (sk.root / "INDEX.md").read_text(encoding="utf-8")
-    assert "[[agenci/jarvo-web/_hub-web|🌐 Web Senior Dev (jarvo-web)]]" in index and "[[user/USER|Użytkownik]]" in index
+    assert "[[agenci/jarvo-web/_hub-web|🌐 Web (jarvo-web)]]" in index and "[[user/USER|Użytkownik]]" in index
     assert "## [2026-09-30] zasiew |" in (sk.root / "LOG.md").read_text(encoding="utf-8")
     assert (sk.root / ".git").exists() == GIT
 
@@ -398,22 +399,48 @@ def test_frontmatter_zawsze_poprawny_yaml_i_lint_lapie_reczny(skarbiec):
     assert w.zly_naglowek("---\naliasy: [@Numes_ai, Numes.ai]\n---\n") and not w.zly_naglowek("---\naliasy: [\"@x\"]\n---\n")
 
 
-def test_hub_agenta_usunietego_z_floty_bez_martwych_linkow(skarbiec):
-    """14.11 jarvo-operator wypadł z floty: zasiew nie odświeżał już jego huba, a lustro repo zniknęło, więc blok
-    z rejestru linkował do 4 nieistniejących plików (błędy lintu). Teraz blok mówi, że agenta nie ma; notatki zostają."""
+def test_agent_usuniety_z_floty_idzie_do_archiwum(skarbiec):
+    """14.11 jarvo-operator wypadł z floty, a do 20.11 jego katalog dalej stał w Zespole (Mózg), z martwymi linkami do
+    lustra repo. Teraz zasiew przenosi cały `agenci/<agent>/` i plik jego orzeczeń do `archiwum/` (status wycofana),
+    linki w notatkach i hubach wskazują archiwum, hub agentów i hub orzeczeń już go nie wymieniają, lint bez błędów."""
     sk = skarbiec
     martwy = "zrodla/jarvo-repo/profiles/jarvo-stary/SOUL"
     sk.zapisz_plik("agenci/jarvo-stary/_hub-stary", w.sklej(w._hub_frontmatter("agent", "fleet.yaml", agent="jarvo-stary"),
-                   "# Stary (jarvo-stary)\n\n**Był agent.**\n\nRęczny opis zostaje.\n\n## Powiązane\n- hub: [[agenci/_hub-agenci|Agenci]]\n\n"
+                   "# Stary (jarvo-stary)\n\n**Był agent.**\n\nRęczny opis zostaje.\n\n## Powiązane\n- hub: [[agenci/_hub-agenci|Agenci]]\n"
+                   "- [[orzeczenia/stary|Orzeczenia: Stary]]\n\n"
                    f"<!-- Jarvo:GEN fleet -->\n## Z rejestru floty (fleet.yaml)\n- z repo: [[{martwy}|zasady (SOUL)]]\n"
                    "<!-- /Jarvo:GEN fleet -->\n"))
-    w.zasiej(sk, FLEET, None, None)
-    tekst = sk.plik("agenci/jarvo-stary/_hub-stary").read_text(encoding="utf-8")
-    assert martwy not in tekst and "`jarvo-stary` nie ma już we flocie" in tekst and "Ręczny opis zostaje." in tekst
+    notatka(sk, "agenci/jarvo-stary/stary na serwerze", "Stary na serwerze", "Stary pracował na serwerze.",
+            linki=["agenci/jarvo-stary/_hub-stary"])
+    sk.zapisz_plik("orzeczenia/stary", w.sklej(w._hub_frontmatter("orzeczenia", "człowiek"),
+                   "# Orzeczenia: stary\n\n**Korekty.**\n\n## Powiązane\n- [[agenci/jarvo-stary/_hub-stary|Stary]]\n\n## Linie\n"))
+    notatka(sk, "agenci/jarvo/token telefonu", "Token telefonu", "Token ustawia Stary.",
+            linki=["agenci/jarvo/_hub-jarvo", "agenci/jarvo-stary/stary na serwerze", "stary na serwerze"])
+    r = w.zasiej(sk, FLEET, None, None)
+    assert r["archiwum"] == ["agenci/jarvo-stary", "orzeczenia/stary"]
+    assert not (sk.root / "agenci/jarvo-stary").exists() and not sk.istnieje("orzeczenia/stary")
+    hub = sk.wczytaj("archiwum/agenci/jarvo-stary/_hub-stary")
+    assert hub.fm["status"] == "wycofana" and hub.fm["powod"] == "agent wycofany z floty" and hub.fm["wycofano"] == "2026-09-30"
+    assert martwy not in hub.tresc and "nie ma już we flocie" in hub.tresc and "Ręczny opis zostaje." in hub.tresc
+    assert "[[archiwum/orzeczenia/stary|Orzeczenia: Stary]]" in hub.tresc
+    tekst = sk.wczytaj("agenci/jarvo/token telefonu").tresc
+    assert "[[archiwum/agenci/jarvo-stary/stary na serwerze]]" in tekst and "[[stary na serwerze]]" in tekst   # nazwa dalej jednoznaczna
+    assert sk.wczytaj("agenci/jarvo-stary/stary na serwerze").sciezka == "archiwum/agenci/jarvo-stary/stary na serwerze"
     ix = w.Indeks(sk)
-    assert not [b for b in w.lint(sk, ix)["bledy"] if "jarvo-stary" in b]
+    ix.odswiez()
+    w.odswiez_listy_hubow(sk, ix)
+    ix.odswiez()
+    assert "jarvo-stary" not in sk.plik("agenci/_hub-agenci").read_text(encoding="utf-8")
+    assert "orzeczenia/stary" not in sk.plik("orzeczenia/_hub-orzeczenia").read_text(encoding="utf-8")
+    assert "[[archiwum/agenci/jarvo-stary/_hub-stary|" in sk.plik("archiwum/_hub-archiwum").read_text(encoding="utf-8")
+    raport = w.lint(sk, ix)
+    assert not [b for b in raport["bledy"] if "stary" in b], raport["bledy"]
+    assert not [o for o in raport["ostrzezenia"] if "archiwum/" in o]                  # archiwum bez sierot i duplikatów
+    assert not [x for x in ix.szukaj("stary serwer", limit=20) if x["sciezka"].startswith("archiwum/")]   # poza wyszukiwaniem
+    assert ix.szukaj("stary serwer", folder="archiwum")[0]["sciezka"] == "archiwum/agenci/jarvo-stary/stary na serwerze"
     ix.zamknij()
     assert "nie ma już we flocie" not in sk.plik("agenci/jarvo-web/_hub-web").read_text(encoding="utf-8")
+    assert w.zasiej(sk, FLEET, None, None)["archiwum"] == []                            # drugi zasiew: nic do przeniesienia
 
 
 def test_skille_floty_to_wezly_grafu(skarbiec, tmp_path):

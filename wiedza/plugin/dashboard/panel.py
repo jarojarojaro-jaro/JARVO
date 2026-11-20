@@ -115,14 +115,15 @@ class Panel:
             folder = r["folder"] or ""
             if folder in ("zrodla", "skrzynka"):
                 continue
-            f = foldery.setdefault(folder, {"folder": folder, "nazwa": self.lib.HUBY.get(folder, (None, folder or "Skarbiec"))[1], "hub": None, "notatki": []})
+            f = foldery.setdefault(folder, {"folder": folder, "nazwa": (self.lib.FOLDERY_SKARBCA.get(folder) or {}).get("tytul") or folder or "Skarbiec",
+                                            "hub": None, "notatki": []})
             wpis = {"sciezka": r["sciezka"], "tytul": r["tytul"], "typ": r["typ"], "status": r["status"], "zmieniono": r["zmieniono"],
                     "agent": r["agent"], "hub": bool(r["hub"]), "streszczenie": (r["streszczenie"] or "")[:160]}
             if r["hub"] and r["sciezka"].count("/") <= 1:
                 f["hub"] = wpis
             else:
                 f["notatki"].append(wpis)
-        kolejnosc = [""] + [k for k in self.lib.HUBY if k] + sorted(k for k in foldery if k and k not in self.lib.HUBY)
+        kolejnosc = [k for k in self.lib.FOLDERY_SKARBCA] + sorted(k for k in foldery if k not in self.lib.FOLDERY_SKARBCA)
         return {"foldery": [foldery[k] for k in kolejnosc if k in foldery]}
 
     def note(self, sciezka: str) -> dict:
@@ -256,6 +257,53 @@ class Panel:
             ix.zamknij()
         self._lint_cache = (0.0, {})
         return {**r, "index": n, "huby": h}
+
+    # ---- pamięć Jarva (Mózg: edytor wpisów; docs/WIEDZA.md §2a): ten sam plik i format, który czyta Hermes
+    def _profil_pamieci(self) -> Path:
+        if self.dane is None:
+            raise FileNotFoundError("brak katalogu danych (profil Jarva nieznany)")
+        return self.dane / "profiles" / self.lib.PROFIL_TOZSAMOSCI
+
+    @staticmethod
+    def _skaner():
+        """Skaner zagrożeń Hermesa (tools/threat_patterns.first_threat_message, zakres strict jak przy zapisie memory):
+        wpis, który Hermes przy wczytaniu i tak zablokowałby w prompcie, odrzucamy od razu. Bez Hermesa (testy) brak skanera."""
+        try:
+            from tools.threat_patterns import first_threat_message
+        except Exception:
+            return None
+        return lambda tekst: first_threat_message(tekst, scope="strict")
+
+    def pamiec(self) -> dict:
+        """GET /pamiec: {"memory": {...}, "user": {...}} (wiedza.stan_pamieci: wpisy, limit, uzyte, wersja, zmieniono, plik, notatka)."""
+        profil = self._profil_pamieci()
+        return {cel: self.lib.stan_pamieci(profil, cel) for cel in self.lib.PLIKI_PAMIECI}
+
+    def zapisz_pamiec(self, cel: str, wpisy, wersja: str) -> dict:
+        """PUT /pamiec/{cel}: zapis listy wpisów (format i blokada Hermesa, wersja = sha256 z odczytu), potem lustro w skarbcu
+        (notatka pamięci i szkic nowych wpisów do kompilacji), indeks, a gdy skarbiec wolny: wpis w LOG i punkt zapisu.
+        Błędy: wiedza.BladPamieci (409 zmieniona, 400 limit, pusty_wpis, zly_wpis, 503 zajeta). Jarvo widzi zmianę od
+        następnej rozmowy (Hermes czyta pamięć na starcie sesji)."""
+        profil = self._profil_pamieci()
+        if cel not in self.lib.PLIKI_PAMIECI:
+            raise FileNotFoundError(f"nieznana pamięć `{cel}` (memory albo user)")
+        przed = self.lib.czytaj_pamiec(self.lib.plik_pamieci(profil, cel))["wpisy"]
+        wynik = self.lib.zapisz_pamiec(profil, cel, wpisy, wersja, self._skaner())
+        self.lib.synchronizuj_pamiec(self.sk, profil, self.lib.PROFIL_TOZSAMOSCI)
+        blok = self.lib.Blokada(self.sk.stan, 2.0)
+        if blok.wez():
+            try:
+                self.sk.dopisz_log("pamiec", f"zmiana z Mózgu: {self.lib.PLIKI_PAMIECI[cel]} Jarva, wpisów {len(przed)} → "
+                                             f"{len(wynik['wpisy'])} (lustro: {wynik['notatka']})")
+                self.sk.punkt_zapisu(f"pamięć z Mózgu: {self.lib.PLIKI_PAMIECI[cel]}")
+            finally:
+                blok.zwolnij()
+        ix = self.lib.Indeks(self.sk)
+        try:
+            ix.odswiez()
+        finally:
+            ix.zamknij()
+        return wynik
 
     # ---- kompilacja jako osobny proces (model z profilu `jarvo`: kompilacja.py Pythonem dashboardu)
     def _kompilacja_py(self) -> Optional[Path]:

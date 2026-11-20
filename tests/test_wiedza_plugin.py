@@ -274,12 +274,18 @@ def test_orzeczenie_tylko_ze_slowami_uzytkownika(srodowisko):
 
 def test_lustro_pamieci_i_wyciag(srodowisko, monkeypatch):
     root, home, sk, p = srodowisko
+    # lustro idzie po treści plików pamięci (wiedza.synchronizuj_pamiec), hak tylko je wyzwala
+    (home / "memories").mkdir()
+    (home / "memories" / "USER.md").write_text("Użytkownik prowadzi agencję marketingową (źródło: rozmowa, 2026-09-30)", encoding="utf-8")
     p.on_memory_write("add", "user", "Użytkownik prowadzi agencję marketingową (źródło: rozmowa, 2026-09-30)")
+    (home / "memories" / "MEMORY.md").write_text("hasło: tajne123", encoding="utf-8")
     p.on_memory_write("add", "memory", "hasło: tajne123")
     p.on_memory_write("remove", "memory", "cokolwiek")
-    lustro = (sk.root / "skrzynka/pamiec-jarvo-web.md").read_text(encoding="utf-8")
-    assert "- 2026-09-30 · add user: Użytkownik prowadzi agencję" in lustro and "tajne123" not in lustro and "remove" not in lustro
-    assert b"\r" not in (sk.root / "skrzynka/pamiec-jarvo-web.md").read_bytes()
+    lustro = (sk.root / "skrzynka/pamiec-jarvo-web-user.md").read_text(encoding="utf-8")
+    assert lustro.count("- 2026-09-30 · add user: Użytkownik prowadzi agencję") == 1
+    assert not (sk.root / "skrzynka/pamiec-jarvo-web.md").exists()          # jedyny wpis MEMORY.md to sekret: bez szkicu
+    assert b"\r" not in (sk.root / "skrzynka/pamiec-jarvo-web-user.md").read_bytes()
+    assert not (sk.root / "user/pamięć jarva o tobie.md").exists()          # lustro-notatka tylko dla Jarva
     wywolania = []
 
     def falszywy_model(system, user, max_tokens=1200):

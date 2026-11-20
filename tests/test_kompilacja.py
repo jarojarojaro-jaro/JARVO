@@ -133,7 +133,7 @@ def test_nowsza_wersja_szkicu_zastepuje_starsza_w_jednej_fali(sk, monkeypatch):
     stary = szkic(sk, "fakt", "Ton strony klienta", "Zdania mają od 3 do 11 słów.", zrodlo="karta t_50")
     szkic(sk, "fakt", "Ton strony klienta", "Zdania mają od 2 do 11 słów.", zrodlo="karta t_50")
     szkic(sk, "fakt", "Ton strony klienta", "Inne źródło: zdania są długie.", zrodlo="karta t_51")
-    model = model_z([{"wyniki": [{"decyzja": "nowa", "sciezka": "agenci/jarvo-web/ton strony klienta", "typ": "fakt",
+    model = model_z([{"wyniki": [{"decyzja": "nowa", "sciezka": "agenci/jarvo-web/ton strony klienta", "typ": "fakt", "o_agencie": True,
                                   "tytul": "Ton strony klienta", "streszczenie": "Zdania mają od 2 do 11 słów.",
                                   "tresc": "Zdania mają od 2 do 11 słów.", "powod": "nowy fakt"}]},
                      {"wyniki": [{"decyzja": "odrzuc", "powod": "inne źródło, osobno"}]}])
@@ -173,7 +173,7 @@ def test_nowa_aktualizacja_sprzecznosc_odrzucenie(sk):
     szkic(sk, "fakt", "Audyt strony: linkinator", "Linkinator sprawdza także obrazy.", zrodlo="karta t_11")
     szkic(sk, "fakt", "Szum", "Dzisiaj jest ładna pogoda.", zrodlo="rozmowa x")
     model = model_z([
-        {"wyniki": [{"decyzja": "nowa", "sciezka": "agenci/jarvo-web/zrzuty mobile: zawsze przed oddaniem", "typ": "lekcja", "tytul": "Zrzuty mobile zawsze przed oddaniem",
+        {"wyniki": [{"decyzja": "nowa", "sciezka": "agenci/jarvo-web/zrzuty mobile: zawsze przed oddaniem", "typ": "lekcja", "o_agencie": True, "tytul": "Zrzuty mobile zawsze przed oddaniem",
                      "streszczenie": "Strona bez zrzutów mobile wraca od sędziego", "tresc": "Przed oddaniem robimy zrzuty 375 i 768 px. " * 4,
                      "tagi": ["web", "qa"], "linki": ["pojecia/audyt strony", "nie/istnieje", "agenci/jarvo-web/_hub-web"], "wazne_do": None, "powod": "nowa lekcja"}]},
         {"wyniki": [{"decyzja": "sprzecznosc", "sciezka": "agenci/jarvo-web/lightpanda nie renderuje three.js", "typ": "fakt", "tytul": "Lightpanda a WebGL",

@@ -1,4 +1,4 @@
-# Rubryka: jarvo (Main Judge)
+# Rubryka: jarvo (szef floty)
 
 Używana w evals i przy przeglądzie tygodnia. Jarvo nie oddaje kart do recenzji; oceniamy jego zachowanie.
 

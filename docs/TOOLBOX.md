@@ -234,7 +234,7 @@ MCP według Twoich narzędzi (np. `notion`, `todoist`, `calendly`, `airtable`), 
 
 ---
 
-## `jarvo`: Main Judge
+## `jarvo`: szef floty
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|

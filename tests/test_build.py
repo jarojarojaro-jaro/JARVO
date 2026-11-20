@@ -533,7 +533,7 @@ def test_natywny_windows_parsuje_sie_bez_sciezek_obrazu(natywny_win):
         dane = json.loads(p.read_text(encoding="utf-8")) if p.suffix == ".json" else fl.load_yaml(p)
         assert "/opt" not in json.dumps(dane, ensure_ascii=False), p.relative_to(natywny_win).as_posix()
     # tokeny w tekstach dla agenta (SOUL, skille) idą za katalogiem danych
-    assert f"{WIN_DANE}/jarvo/missions/INDEX.md" in (natywny_win / "profiles/jarvo/SOUL.md").read_text(encoding="utf-8")
+    assert f"{WIN_DANE}/jarvo/missions/DLA-CLAUDE.md" in (natywny_win / "profiles/jarvo/SOUL.md").read_text(encoding="utf-8")
 
 
 def test_natywny_windows_sciezki_i_wartosci_per_system(natywny_win):

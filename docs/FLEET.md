@@ -1,6 +1,6 @@
 # Flota Jarvo: specyfikacja agentów v1
 
-Flota: **Main Judge + 8 agentów**. Każdy agent to osobny profil Hermesa
+Flota: **Jarvo (szef floty) + 8 agentów**. Każdy agent to osobny profil Hermesa
 (osobna dystrybucja w `profiles/<nazwa>/`). Rejestr maszynowy jest w [`fleet.yaml`](../fleet.yaml).
 
 Każdy agent jest budowany według [PROFILE-SPEC.md](PROFILE-SPEC.md) (main prompt, workflowy,
@@ -30,7 +30,7 @@ Legenda przy skillach:
 
 | Profil | Rola | Typ | Maks. autonomia bez zgody |
 |---|---|---|---|
-| `jarvo` | Main Judge: przyjmuje zlecenia, rozdziela, ocenia, raportuje; sam pracuje na ekranie Komputera Jarva i na telefonie właściciela | orkiestrator | A1 (tworzy karty, ocenia, klika w tle i pisze w aktywnym oknie; wgranie strony na hosting = A2; płatność, wysyłka, publikacja i usunięcie konta tylko z `ZGODA WŁAŚCICIELA` w karcie; okno na wierzch = człowiek) |
+| `jarvo` | Jarvo, szef floty: przyjmuje zlecenia, rozdziela, ocenia, raportuje; sam pracuje na ekranie Komputera Jarva i na telefonie właściciela | orkiestrator | A1 (tworzy karty, ocenia, klika w tle i pisze w aktywnym oknie; wgranie strony na hosting = A2; płatność, wysyłka, publikacja i usunięcie konta tylko z `ZGODA WŁAŚCICIELA` w karcie; okno na wierzch = człowiek) |
 | `jarvo-web` | Web Senior Dev: strony od faviconu po SEO | snajper | A1 (buduje lokalnie; wdrożenie = A2) |
 | `jarvo-sherlock` | Researcher-detektyw: znajduje i weryfikuje | snajper | A1 (czyta, pisze raporty) |
 | `jarvo-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media | snajper | A1 (tworzy; publikacja = A2) |
@@ -159,7 +159,7 @@ składnia skryptów i sekrety w nakładce). `jarvo status` pokazuje nakładkę o
 
 ---
 
-## `jarvo`: Main Judge
+## `jarvo`: szef floty
 
 **Misja:** jedyny punkt kontaktu do większych zadań. Rozumie, czego chcesz, rozdziela
 pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.

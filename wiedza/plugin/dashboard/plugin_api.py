@@ -1,8 +1,9 @@
-"""Zakładka „Wiedza”: trasy backendu wtyczki dashboardu Hermesa (montowane pod /api/plugins/jarvo-wiedza/).
+"""Zakładka „Wiedza” i Mózg: trasy backendu wtyczki dashboardu Hermesa (montowane pod /api/plugins/jarvo-wiedza/).
 
 Działa w procesie dashboardu (za jego logowaniem). Logika w panel.py (bez FastAPI), skarbiec przez wiedza.py obok.
-Odczyt: overview, tree, note, graph, search, inbox, log, lint, rulings. Zapis tylko: POST rulings (orzeczenie od człowieka),
-POST remark (uwaga do notatki = szkic), POST compile (kompilacja jako osobny proces), POST reindex. Każdy zapis przechodzi
+Odczyt: overview, tree, note, graph, search, inbox, log, lint, rulings, pamiec. Zapis tylko: POST rulings (orzeczenie od
+człowieka), POST remark (uwaga do notatki = szkic), POST compile (kompilacja jako osobny proces), POST reindex, PUT
+pamiec/{memory|user} (wpisy pamięci Jarva: plik Hermesa, potem lustro w skarbcu). Każdy zapis przechodzi
 ochrona.wymagaj_zapisu (ten sam plik co w jarvo-hq): tylko z panelu albo z nagłówkiem X-Jarvo-Request: 1.
 """
 from __future__ import annotations
@@ -14,6 +15,7 @@ import sys
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 _HERE = Path(__file__).resolve().parent
 
@@ -155,3 +157,26 @@ async def compile_status():
 @router.post("/reindex")
 async def reindex():
     return await _w(PANEL.reindex)
+
+
+@router.get("/pamiec")
+async def pamiec():
+    return await _w(PANEL.pamiec)
+
+
+@router.put("/pamiec/{cel}")
+async def zapisz_pamiec(cel: str, request: Request):
+    """Wpisy pamięci Jarva z Mózgu: {"wpisy": [str], "wersja": sha256 z GET}. 409 {"blad": {"kod": "zmieniona", "aktualna"}}
+    gdy plik zmienił się od odczytu, 400 {"blad": {"kod": "limit" | "pusty_wpis" | "zly_wpis"}}, 503 `zajeta`."""
+    try:
+        body = await request.json()
+    except ValueError:
+        body = None
+    if not isinstance(body, dict):
+        return JSONResponse({"blad": {"kod": "zly_wpis", "opis": "ciało to JSON {\"wpisy\": [...], \"wersja\": \"...\"}"}}, 400)
+    try:
+        return await asyncio.to_thread(PANEL.zapisz_pamiec, cel, body.get("wpisy"), str(body.get("wersja") or ""))
+    except PANEL.lib.BladPamieci as e:
+        return JSONResponse(e.jako_json(), e.status)
+    except Exception as e:
+        raise _blad(e)

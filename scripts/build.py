@@ -957,6 +957,58 @@ def repo_do_skarbca(fleet: fl.Fleet, out: Path, dane: dict) -> int:
     return pliki
 
 
+def data_zmiany_w_repo(plik: Path) -> str:
+    """Data ostatniego commitu pliku (RRRR-MM-DD) w jego repo (publicznym albo nakładce); bez gita albo poza repo pusto."""
+    try:
+        r = subprocess.run(["git", "-C", str(plik.parent), "log", "-1", "--format=%cs", "--", plik.name],
+                           capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    data = r.stdout.strip() if r.returncode == 0 else ""
+    return data if re.fullmatch(r"\d{4}-\d{2}-\d{2}", data) else ""
+
+
+def tozsamosc_do_skarbca(fleet: fl.Fleet, out: Path, tokens: dict[str, str]) -> int:
+    """Tożsamość orkiestratora dla skarbca (`wiedza.py zasiej` → notatki `jarvo/*`, docs/WIEDZA.md §2a), tokeny
+    podstawione: SOUL.md (postać), ZASADY.md (bez zamykającego bloku <critical>; w miejscu rostera zwarty roster, protokołu
+    i rdzenia mapy jedno zdanie, bo to osobne notatki), KRYTYCZNE.md (ten blok), MAPA.md i MAPA-nakladka.md (pełna mapa:
+    zasiew dokłada bloki GEN) oraz zrodla.json: plik → {"plik": ścieżka w repo, "zmieniono": data ostatniego commitu}."""
+    if out.exists():
+        shutil.rmtree(out)
+    out.mkdir(parents=True)
+    a = fleet.agent(fleet.orchestrator)
+    soul_p, zasady_p = a.dir / "SOUL.md", a.dir / fl.ZASADY_FILE
+    soul = soul_p.read_text(encoding="utf-8") if soul_p.is_file() else ""
+    zasady = zasady_p.read_text(encoding="utf-8") if zasady_p.is_file() else ""
+    _bez, koniec = fl.wydziel_koniec(fl.soul_zrodlo(a.dir))
+    zrodlo_konca = zasady_p if zasady and zasady.rstrip().endswith(koniec.strip()) else soul_p
+    if koniec and zrodlo_konca == zasady_p:
+        zasady = zasady.rstrip()[: -len(koniec.strip())].rstrip() + "\n"
+    elif koniec:
+        soul = soul.rstrip()[: -len(koniec.strip())].rstrip() + "\n"
+    zastepcze = {fl.PROTOCOL_MARKER: "_W prompcie stoi tu protokół floty (`shared/`) i kalibracja pod model._",
+                 fl.MAPA_MARKER: "_W prompcie stoi tu rdzeń mapy; całość: notatka „Jarvo od A do Z” (`jarvo/jak działa jarvo`)._",
+                 fl.ROSTER_MARKER: fl.render_roster_summary(fleet)}
+    pliki = {"SOUL.md": soul, "ZASADY.md": zasady, "KRYTYCZNE.md": koniec}
+    for nazwa in ("SOUL.md", "ZASADY.md"):
+        for znacznik, tekst in zastepcze.items():
+            pliki[nazwa] = pliki[nazwa].replace(znacznik, tekst)
+    repo_mapy, nakl_mapy = fl.mapa_zrodla(fleet)
+    pliki.update({"MAPA.md": repo_mapy, "MAPA-nakladka.md": nakl_mapy})
+    n = fleet.nakladka
+    zrodla = {"SOUL.md": soul_p, "ZASADY.md": zasady_p, "KRYTYCZNE.md": zrodlo_konca, "MAPA.md": a.dir / fl.MAPA_FILE,
+              "MAPA-nakladka.md": n / "profiles" / a.name / fl.MAPA_FILE if n else None}
+    spis = {}
+    for nazwa, tekst in pliki.items():
+        if not tekst.strip():
+            continue
+        zapisz(out / nazwa, render_tokens(tekst, tokens).strip() + "\n")
+        src = zrodla[nazwa]
+        spis[nazwa] = {"plik": f"profiles/{a.name}/{src.name}" if src else "", "zmieniono": data_zmiany_w_repo(src) if src else ""}
+    fl.write_json(out / "zrodla.json", spis)
+    return len(spis)
+
+
 def wiedza_fleet(fleet: fl.Fleet, profiles_out: Path) -> dict:
     """fleet.json dla skarbca wiedzy: hub każdego agenta (wiedza/wiedza.py zasiej) dostaje rolę, skille własne i wspólne
     (shared/skills) z opisami, powiązaniami i skryptami (każdy skill to węzeł grafu), nazwy skilli zewnętrznych
@@ -1000,15 +1052,6 @@ def render_handoff_table(fleet: fl.Fleet, agent: fl.Agent) -> str:
             continue
         rows.append(f"| {a.oddaj_gdy or a.description} | `{a.name}` ({a.emoji} {a.title}) |")
     rows.append(f"| kilka etapów, kilku agentów, decyzje po drodze | `{fleet.orchestrator}` (misja) |")
-    return "\n".join(rows)
-
-
-def render_roster_summary(fleet: fl.Fleet) -> str:
-    rows = ["| Agent | Rola |", "|---|---|"]
-    for a in fleet.active():
-        if a.name == fleet.orchestrator:
-            continue
-        rows.append(f"| `{a.name}` | {a.emoji} {a.title} |")
     return "\n".join(rows)
 
 
@@ -1184,13 +1227,16 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
     soul_path = dest / "SOUL.md"
     soul = fl.soul_zrodlo(dest)
     (dest / fl.ZASADY_FILE).unlink(missing_ok=True)
+    (dest / fl.MAPA_FILE).unlink(missing_ok=True)          # pełna mapa idzie do skarbca (tozsamosc_do_skarbca), w SOUL jej rdzeń
     if fl.PROTOCOL_MARKER not in soul:
         raise SystemExit(f"[{agent.name}] SOUL.md ani {fl.ZASADY_FILE} nie ma znacznika {fl.PROTOCOL_MARKER}")
     # kalibracja pod rodzinę modelu agenta (shared/calibration/, za oh-my-hermes): tuż po protokole floty
     calibration = fl.calibration_section(fleet.model_for(agent.model_tier), agent.name == fleet.orchestrator)
     soul = soul.replace(fl.PROTOCOL_MARKER, f"{fl.protocol_for(protocol, agent.name == fleet.orchestrator).strip()}\n\n{calibration}")
     if agent.name == fleet.orchestrator:
-        soul = soul.replace(fl.ROSTER_MARKER, render_roster_summary(fleet))
+        soul = soul.replace(fl.ROSTER_MARKER, fl.render_roster_summary(fleet))
+        # rdzeń mapy Jarva (wiedza/mapa.py): stała, cache'owalna część promptu; szczegóły w skarbcu (`jarvo/jak działa jarvo`)
+        soul = soul.replace(fl.MAPA_MARKER, fl.rdzen_mapy(fleet, fl.sciezki_mapy(tokens, agent.name)))
     # zamykający blok <critical> (powtórka najważniejszych zasad) stoi na samym końcu promptu: dokleja go wtyczka
     # jarvo-wiedza za swoim blokiem (ostatnim przed datą i środowiskiem Hermesa); w SOUL byłby drugą kopią w środku
     soul, koniec = fl.wydziel_koniec(soul)
@@ -1407,8 +1453,11 @@ def main(argv: list[str] | None = None) -> int:
     dane_wiedzy = wiedza_fleet(fleet, profiles_out)
     fl.write_json(out / "wiedza" / "fleet.json", dane_wiedzy)
     n_repo = repo_do_skarbca(fleet, out / "wiedza" / "repo", dane_wiedzy)
+    n_toz = tozsamosc_do_skarbca(fleet, out / "wiedza" / "tozsamosc",
+                                 base_tokens(fleet, fleet.agent(fleet.orchestrator), uklad.build, env, uklad))
     build_wiedza_plugin(out / "plugins" / WIEDZA_PLUGIN, fleet.reviewer)
-    print(f"✓ skarbiec wiedzy: wiedza/fleet.json, wiedza/repo ({n_repo} plików), plugins/{WIEDZA_PLUGIN}")
+    print(f"✓ skarbiec wiedzy: wiedza/fleet.json, wiedza/repo ({n_repo} plików), wiedza/tozsamosc ({n_toz} plików), "
+          f"plugins/{WIEDZA_PLUGIN}")
     # Komputer Jarva (docs/KOMPUTER.md §7): wtyczka z narzędziem `komputer`; install-fleet.sh dowiązuje ją tam, gdzie włączona
     kp = out / "plugins" / KOMPUTER_PLUGIN
     if kp.exists():

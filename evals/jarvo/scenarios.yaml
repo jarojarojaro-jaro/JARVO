@@ -1,4 +1,4 @@
-# Evals Jarva (Main Judge). Uruchamiane w środowisku STAGING (bez działającego dispatchera!),
+# Evals Jarva (szef floty). Uruchamiane w środowisku STAGING (bez działającego dispatchera!),
 # bo scenariusze routingu tworzą karty. Runner: scripts/run-evals.py.
 # check.cards: deterministyczne sprawdzenie kart utworzonych w trakcie scenariusza (assignee).
 agent: jarvo

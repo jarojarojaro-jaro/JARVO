@@ -238,6 +238,9 @@ def test_szkic_i_lustro_pamieci_niosa_marke(skarbiec):
                                                         "zrodlo": "grupa FB"}))
     fm, _ = w.podziel((sk.root / f"{z['szkic']}.md").read_text(encoding="utf-8"))
     assert fm["marka"] == "sklep" and fm["agent"] == "jarvo-sklep"
+    (root / "profiles" / "jarvo-sklep" / "memories").mkdir(parents=True, exist_ok=True)
+    (root / "profiles" / "jarvo-sklep" / "memories" / "MEMORY.md").write_text("Właściciel odpowiada klientom wieczorem (rozmowa 2026-11-14)",
+                                                                             encoding="utf-8")
     p.on_memory_write("add", "memory", "Właściciel odpowiada klientom wieczorem (rozmowa 2026-11-14)")
     fm, _ = w.podziel((sk.root / "skrzynka/pamiec-jarvo-sklep.md").read_text(encoding="utf-8"))
     assert fm["marka"] == "sklep"

@@ -315,6 +315,25 @@ def polecenie_wiedza_lint(u: Uklad, a, _reszta, _ot) -> int:
     return 1 if a.strict and r["bledy"] else 0
 
 
+def polecenie_wiedza_porzadki(u: Uklad, a, _reszta, _ot) -> int:
+    """`jarvo wiedza archiwizuj|przenies|streszczenie|pamiec`: to samo co `wiedza.py` tej wersji Jarva na skarbcu tej
+    instalacji (blokada, punkt zapisu, LOG, indeks i huby robi wiedza.porzadki; pamięć: profil Jarva tej instalacji)."""
+    if not skarbiec(u).is_dir():
+        print(f"Brak skarbca {skarbiec(u)} (zasiew robi instalacja floty).", file=sys.stderr)
+        return 1
+    lib = wiedza_lib(_app(u))
+    argv = ["--skarbiec", str(skarbiec(u)), "--stan", str(stan_skarbca(u)), a.wiedza_polecenie]
+    if a.wiedza_polecenie == "archiwizuj":
+        argv += [*a.sciezki, "--powod", a.powod] + (["--zastapiona-przez", a.zastapiona_przez] if a.zastapiona_przez else [])
+    elif a.wiedza_polecenie == "przenies":
+        argv += [a.sciezka, a.folder]
+    elif a.wiedza_polecenie == "streszczenie":
+        argv += [a.hub, *(["--plik", a.plik] if a.plik else ["--tekst", a.tekst])]
+    else:
+        argv += ["--profil", str(profil(u))]
+    return lib.main(argv)
+
+
 def polecenie_wiedza_indeksuj(u: Uklad, a, _reszta, _ot) -> int:
     """Indeks FTS5, INDEX.md i listy w hubach (bloki GEN w notatkach), więc pod blokadą jednego piszącego; potem,
     już bez blokady (to tylko state/wiedza.db), wektory nowych i zmienionych notatek z usługi `wektory`."""
@@ -609,14 +628,15 @@ def sprawdz_brame(u: Uklad, ot) -> dict:
                   "jarvo status; jarvo logs brama")
 
 
-def _liczby_wektorow(stan: Path, model: str) -> tuple[int, int]:
-    """(wektorów modelu `model`, notatek w wyszukiwaniu) z state/wiedza.db, tylko do odczytu; (0, 0) bez bazy."""
+def _liczby_wektorow(stan: Path, model: str, poza: tuple[str, ...]) -> tuple[int, int]:
+    """(wektorów modelu `model`, notatek w wyszukiwaniu) z state/wiedza.db, tylko do odczytu; (0, 0) bez bazy. `poza`:
+    foldery bez wektorów (wiedza.POZA_WYSZUKIWANIEM: źródła, szkice, archiwum)."""
     try:
         db = sqlite3.connect((stan / "wiedza.db").as_uri() + "?mode=ro", uri=True, timeout=2)
     except sqlite3.Error:
         return 0, 0
     try:
-        notatek = sum(1 for (s,) in db.execute("SELECT sciezka FROM pliki") if not s.startswith(("zrodla/", "skrzynka/")))
+        notatek = sum(1 for (s,) in db.execute("SELECT sciezka FROM pliki") if not s.startswith(poza))
         wektorow = db.execute("SELECT count(*) FROM wektory WHERE model = ?", (model,)).fetchone()[0] if model else 0
         return wektorow, notatek
     except sqlite3.Error:                                # indeks sprzed wektorów albo pusty
@@ -645,13 +665,14 @@ def sprawdz_wektory(u: Uklad, ot) -> dict:
     if not usluga:
         return _wynik(nazwa, "uwaga", "nadzorca nie prowadzi usługi wektorów (serwis sprzed tej wersji)",
                       "jarvo down, potem jarvo up")
-    klient = wiedza_lib(_app(u)).KlientWektorow(stan_skarbca(u), 2.0)
+    lib = wiedza_lib(_app(u))
+    klient = lib.KlientWektorow(stan_skarbca(u), 2.0)
     zdrowie = klient.zdrowie() if klient.dostepny else None
     if usluga.get("stan") != "dziala" or zdrowie is None:
         opis = f"usługa {usluga.get('stan') or 'nie działa'}" + (f" ({usluga['powod']})" if usluga.get("powod") else "")
         return _wynik(nazwa, "uwaga", f"{opis}; {klient.blad or 'brak odpowiedzi'}: przypomnienia szukają słowami",
                       "jarvo logs wektory; jarvo status")
-    wektorow, notatek = _liczby_wektorow(stan_skarbca(u), klient.model)
+    wektorow, notatek = _liczby_wektorow(stan_skarbca(u), klient.model, lib.POZA_WYSZUKIWANIEM)
     opis = f"{klient.model}, usługa działa (PID {zdrowie.get('pid')}), wektory: {wektorow}/{notatek} notatek"
     if wektorow < notatek:
         return _wynik(nazwa, "uwaga", opis + " (część notatek szukana tylko słowami)",
@@ -1711,6 +1732,23 @@ def dodaj_polecenia(sub) -> None:
     k = w.add_parser("status", help="liczby, ostatnia kompilacja i lint")
     k.add_argument("--json", action="store_true")
     k.set_defaults(funkcja=polecenie_wiedza_status)
+    k = w.add_parser("archiwizuj", help="notatki albo katalogi do archiwum/ (linki do następcy albo do archiwum)")
+    k.add_argument("sciezki", nargs="+")
+    k.add_argument("--powod", required=True)
+    k.add_argument("--zastapiona-przez", default="", help="notatka-następca: linki i stara ścieżka prowadzą do niej")
+    k.set_defaults(funkcja=polecenie_wiedza_porzadki)
+    k = w.add_parser("przenies", help="notatka do innego folderu (ten sam tytuł), linki przepisane wszędzie")
+    k.add_argument("sciezka")
+    k.add_argument("folder")
+    k.set_defaults(funkcja=polecenie_wiedza_porzadki)
+    k = w.add_parser("streszczenie", help="blok „najważniejsze” huba (do 1500 znaków), zasiew go nie rusza")
+    k.add_argument("hub", help="ścieżka huba albo folder (user, agenci/jarvo-web)")
+    g = k.add_mutually_exclusive_group(required=True)
+    g.add_argument("--plik")
+    g.add_argument("--tekst")
+    k.set_defaults(funkcja=polecenie_wiedza_porzadki)
+    k = w.add_parser("pamiec", help="lustro pamięci Jarva (MEMORY.md, USER.md) w skarbcu i szkic nowych wpisów")
+    k.set_defaults(funkcja=polecenie_wiedza_porzadki)
     k = w.add_parser("doctor", help="diagnoza skarbca, rutyn i Telegrama (część jarvo doctor)")
     k.add_argument("--json", action="store_true")
     k.set_defaults(funkcja=polecenie_wiedza_doctor)

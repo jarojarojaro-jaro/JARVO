@@ -16,7 +16,7 @@ Stan: **v0.3 (2026-09-26): flota v1 zakodowana i przetestowana lokalnie, gotowa 
 | [FLEET.md](FLEET.md) | specyfikacja agentów floty v1 |
 | [PROFILE-SPEC.md](PROFILE-SPEC.md) | anatomia agenta: 10 warstw, kontrakt zlecenia, Definition of Ready |
 | [TOOLBOX.md](TOOLBOX.md) | zweryfikowane narzędzia open-source per agent + polityka licencji |
-| [BOSS.md](BOSS.md) | mechanika Main Judge'a: misje, kolejka decyzji, patrol, sędziowanie, eskalacje |
+| [BOSS.md](BOSS.md) | mechanika szefa floty (Jarva): misje, kolejka decyzji, patrol, sędziowanie, eskalacje |
 | [HQ.md](HQ.md) | aplikacja Jarvo (czat z flotą na `/jarvo`) i Stara Baza: GUI floty (pokoje agentów, praca na żywo, czat) |
 | [ADS.md](ADS.md) | projekt agenta reklam płatnych `jarvo-ads` i Skarbca (strażnik budżetu) |
 | [LEADY.md](LEADY.md) | projekt Łowcy leadów: sygnały zakupowe z oficjalnych źródeł → lista firm z „dlaczego teraz” |
@@ -57,7 +57,7 @@ wie jednak coraz więcej o Tobie.
 
 ---
 
-## 2. Model: jeden Main Judge, flota snajperów (w stylu firstmate)
+## 2. Model: jeden szef floty, flota snajperów (w stylu firstmate)
 
 Inspiracja: [firstmate](https://github.com/kunchenguid/firstmate), w którym *rozmawiasz z jednym
 agentem, a on prowadzi załogę*: rozdziela zadania, nadzoruje je do końca i eskaluje
@@ -67,7 +67,7 @@ Zasady:
 1. **Specjalista = snajper.** Jedna dziedzina, własne skille, własna wiedza, własna pamięć.
    Bez katalogu skilli Hermesa: dystrybucja snajpera ma znacznik `.no-bundled-skills` (wyjątek: generalista
    `jarvo-reka`), a toolsety ograniczone do tego, czego dziedzina potrzebuje. Czego nie umie, tego nie robi. Oddaje zadanie szefowi.
-2. **Jarvo = Main Judge (orkiestrator).** Sam nie wykonuje pracy dziedzinowej. Robi cztery rzeczy:
+2. **Jarvo = szef floty (orkiestrator).** Sam nie wykonuje pracy dziedzinowej. Robi cztery rzeczy:
    - **intake:** rozumie, czego chcesz, dopytuje tylko o prawdziwe decyzje,
    - **dispatch:** rozbija cel na karty kanbana i przypisuje je właściwym snajperom,
    - **judge:** każdy wynik wraca w statusie `review`, a Jarvo go ocenia według kryteriów
@@ -343,7 +343,7 @@ Osiem profili. Pełna specyfikacja (zakres, skille, narzędzia, rubryki sędzieg
 
 | Profil | Rola |
 |---|---|
-| `jarvo` | Main Judge: przyjmuje zlecenia, rozdziela, ocenia, raportuje |
+| `jarvo` | Jarvo, szef floty: przyjmuje zlecenia, rozdziela, ocenia, raportuje |
 | `jarvo-web` | Web Senior Dev: strony od faviconu po SEO, uczy się marki |
 | `jarvo-sherlock` | Researcher-detektyw: wiele źródeł, weryfikacja faktów |
 | `jarvo-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media |

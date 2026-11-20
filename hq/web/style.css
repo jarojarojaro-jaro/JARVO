@@ -2197,7 +2197,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-mozg-stan { display: grid; place-items: center; min-height: 160px; padding: 20px; color: var(--j-tekst-3); text-align: center; }
 .j-mozg-karta { grid-row: 2; grid-column: 3; position: relative; z-index: 2; min-height: 0; overflow: auto; padding: 10px 22px 32px; background: var(--j-tlo-karta); border-left: 1px solid var(--j-linia); }
 .j-mozg-karta-gora { position: sticky; top: -10px; z-index: 1; display: flex; align-items: center; gap: 8px; margin: -10px -22px 4px; padding: 4px 6px 4px 22px; background: var(--j-tlo-karta); }
-.j-mozg-karta-gora .j-mozg-wg { flex: 1; }
+.j-mozg-karta-gora .j-mozg-wstecz { margin-left: -14px; }
 .j-mozg-karta h2 { margin: 6px 0 2px; font-size: 22px; font-weight: 650; line-height: 1.25; }
 .j-mozg-karta > .j-mozg-wd { margin: 0 0 14px; }
 .j-mozg-karta .j-md { font-size: 15px; line-height: 1.6; }
@@ -2205,8 +2205,42 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-mozg-karta .j-md h3 { font-size: 15px; }
 .j-mozg-karta .j-md a { color: var(--j-akcent); }
 .j-mozg-karta .j-mozg-sekcja { margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--j-linia); }
-.j-mozg-x { min-width: 44px; min-height: 44px; border: 0; border-radius: var(--j-promien-1); background: none; color: var(--j-tekst-2); font-size: 22px; cursor: pointer; }
+.j-mozg-x { min-width: 44px; min-height: 44px; margin-left: auto; border: 0; border-radius: var(--j-promien-1); background: none; color: var(--j-tekst-2); font-size: 22px; cursor: pointer; }
 .j-mozg-x:hover { color: var(--j-tekst); background: var(--j-tlo-hover); }
+/* „Wstecz” (← z podpisem miejsca), „Najważniejsze” (streszczenie huba), wycofane, akcje notatki i edytor pamięci */
+.j-mozg-wstecz { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; min-height: 40px; padding: 0 10px 0 6px; margin-left: -6px; border-radius: var(--j-promien-1); color: var(--j-tekst-2); font-size: 13.5px; }
+.j-mozg-wstecz span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.j-mozg-wstecz svg { flex: none; }
+.j-mozg-wstecz:hover { color: var(--j-tekst); background: var(--j-tlo-hover); }
+.j-mozg-naj { margin: 0 0 6px; padding: 12px 14px; border: 1px solid var(--j-linia); border-left: 3px solid var(--j-akcent); border-radius: var(--j-promien-2); background: var(--j-tlo-2); }
+.j-mozg-naj h3 { display: flex; gap: 8px; align-items: baseline; margin: 0 0 6px; color: var(--j-tekst-3); font: 600 11px var(--j-font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.j-mozg-naj h3 span { font-weight: 500; letter-spacing: 0; text-transform: none; }
+.j-mozg-naj .j-md { font-size: 14px; line-height: 1.55; }
+.j-mozg-naj .j-md a { color: var(--j-akcent); }
+.j-mozg-naj.is-zwiniety .j-md { max-height: 230px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
+.j-mozg-naj .j-mozg-wiecej { margin: 4px 0 0; padding: 0; }
+.j-mozg-wiersz.is-wycofana .j-mozg-wt { color: var(--j-tekst-3); }
+.j-mozg-tag { margin-right: 6px; padding: 1px 6px; border: 1px solid var(--j-linia-2); border-radius: 999px; color: var(--j-tekst-3); font: 500 11px var(--j-font-mono); }
+.j-mozg-info { margin: 0 0 12px; padding: 8px 12px; border-radius: var(--j-promien-1); background: var(--j-tlo-2); color: var(--j-tekst-2); font-size: 13.5px; line-height: 1.45; }
+.j-mozg-info.is-wycofana { border-left: 3px solid var(--j-tekst-3); }
+.j-mozg-info a { color: var(--j-akcent); }
+.j-mozg-akcje { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 14px; }
+.j-mozg-akcje .j-mozg-wd { white-space: normal; }
+.j-mozg-pam ol { display: grid; gap: 8px; margin: 10px 0 4px; padding: 0; list-style: none; }
+.j-mozg-pam li { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: start; }
+.j-mozg-pam textarea { box-sizing: border-box; width: 100%; min-height: 64px; max-height: 320px; padding: 8px 10px; resize: vertical; field-sizing: content; border: 1px solid var(--j-linia-2); border-radius: var(--j-promien-1); background: var(--j-tlo-2); color: inherit; font: inherit; font-size: 14px; line-height: 1.5; }
+.j-mozg-pam textarea[aria-invalid="true"] { border-color: var(--j-uwaga); }
+.j-mozg-pam-licz { margin: 8px 0; color: var(--j-tekst-3); font: 500 12px var(--j-font-mono); }
+.j-mozg-pam-licz.is-ponad { color: var(--j-uwaga); }
+.j-mozg-pam-blad { margin: 8px 0; padding: 8px 12px; border-radius: var(--j-promien-1); background: color-mix(in srgb, var(--j-uwaga) 12%, transparent); color: var(--j-tekst); font-size: 13.5px; line-height: 1.45; }
+.j-mozg-pam .j-mozg-akcje { margin: 12px 0 0; }
+.j-mozg-spis { margin: 0 0 16px; padding: 10px 14px; border: 1px solid var(--j-linia); border-radius: var(--j-promien-2); }
+.j-mozg-spis h3 { margin: 0 0 4px; color: var(--j-tekst-3); font: 600 11px var(--j-font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.j-mozg-spis ol { margin: 0; padding-left: 20px; columns: 2 200px; column-gap: 24px; color: var(--j-tekst-3); font-size: 13.5px; }
+.j-mozg-spis li { break-inside: avoid; }
+.j-mozg-spis button { min-height: 32px; padding: 2px 0; border: 0; background: none; color: var(--j-akcent); font: inherit; text-align: left; cursor: pointer; }
+.j-mozg-spis button:hover { text-decoration: underline; text-underline-offset: 3px; }
+.j-mozg-karta .j-md-h2 { scroll-margin-top: 60px; }
 @container app (max-width: 1000px) {
   .j-mozg.is-notatka { grid-template-columns: minmax(270px, 330px) 1fr; }
   .j-mozg-karta { grid-area: 2 / 2; }

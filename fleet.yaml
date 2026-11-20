@@ -71,10 +71,10 @@ evals:
 agents:
   - name: jarvo
     kind: orchestrator
-    title: "Main Judge"
+    title: "Jarvo: szef floty"
     emoji: "🛰️"
     description: >-
-      Main Judge floty. Przyjmuje zlecenia, zakłada misje, rozbija je na karty kanbana dla
+      Szef floty. Przyjmuje zlecenia, zakłada misje, rozbija je na karty kanbana dla
       specjalistów, ocenia wyniki według Definition of Done i raportuje. Wgrywa strony właściciela
       na hosting tylko za jego zgodą. Pracę na ekranie (Komputer Jarva), na telefonie właściciela,
       konta i terminal robi sam; pracy dziedzinowej specjalistów nie wykonuje.
@@ -88,11 +88,11 @@ agents:
     rola: "prowadzi rozmowę i pilnuje wyników"        # krótka rola (do 8 słów) w aplikacji: wybór adresata, zespół, wiadomości
     handle: jarvo            # @uchwyt w rozmowie aplikacji: ASCII, unikalny (aliasy: nazwa profilu, hq_short bez polskich znaków)
     en:
-      title: "Main Judge"
+      title: "Jarvo: fleet lead"
       rola: "runs the conversation and checks results"
       hq_label: "Command bridge"
       description: >-
-        The fleet's Main Judge. Takes requests, opens missions, splits them into kanban cards for the specialists, reviews results against the Definition of Done and reports. Does screen work (Jarvo's Computer), the owner's phone, accounts and the terminal himself; does no domain work of the specialists.
+        The fleet lead. Takes requests, opens missions, splits them into kanban cards for the specialists, reviews results against the Definition of Done and reports. Does screen work (Jarvo's Computer), the owner's phone, accounts and the terminal himself; does no domain work of the specialists.
     komputer: true      # computer_use i narzędzie `komputer` na Komputerze Jarva, wtyczka jarvo-komputer (docs/KOMPUTER.md)
     status: active
 

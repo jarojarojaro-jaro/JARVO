@@ -156,7 +156,7 @@ def test_kazda_trasa_zapisu_hq(monkeypatch):
 def test_kazda_trasa_zapisu_wiedza(tmp_path, monkeypatch):
     api = _api_wiedza(tmp_path, monkeypatch)
     zapis = _sprawdz_router(api, "jarvo-wiedza")
-    assert {t.path for t in zapis} == {"/rulings", "/remark", "/compile", "/reindex"}
+    assert {t.path for t in zapis} == {"/rulings", "/remark", "/compile", "/reindex", "/pamiec/{cel}"}
 
 
 def test_odczyty_hq_bez_skutkow(monkeypatch):
@@ -200,11 +200,12 @@ def test_odczyty_hq_bez_skutkow(monkeypatch):
 
 def test_odczyty_wiedzy_bez_skutkow(tmp_path, monkeypatch):
     """Audyt Wiedzy: trasy GET czytają skarbiec; najwyżej odświeżają pliki pochodne z jego treści (indeks wyszukiwania,
-    raport LINT.md), nic z treści żądania. Zapis (orzeczenia, uwagi, kompilacja, reindeks) to POST."""
+    raport LINT.md), nic z treści żądania; /pamiec czyta pliki pamięci Jarva. Zapis (orzeczenia, uwagi, kompilacja,
+    reindeks) to POST, a pamięć z Mózgu to PUT."""
     api = _api_wiedza(tmp_path, monkeypatch)
     get = {t.path for t in _trasy(api.router) if "GET" in t.methods}
     assert get == {"/overview", "/tree", "/note", "/graph", "/search", "/inbox", "/log", "/recall", "/lint",
-                   "/rulings", "/compile"}
+                   "/rulings", "/compile", "/pamiec"}
 
 
 def test_ochrona_przezywa_include_router(monkeypatch):
@@ -268,6 +269,23 @@ def test_wiedza_403_bez_zapisu(tmp_path, monkeypatch):
     r = k.post("/api/plugins/jarvo-wiedza/remark", json={"path": "a.md", "uwaga": "dobra uwaga"},
                headers={"X-Jarvo-Request": "1"})
     assert r.status_code == 200 and wywolane == [("a.md", "dobra uwaga")]
+
+
+def test_wiedza_put_pamieci_403_bez_naglowka(tmp_path, monkeypatch):
+    """PUT /pamiec/{cel} (edytor pamięci w Mózgu) bez X-Jarvo-Request z innej witryny: 403 i plik pamięci bez zmian;
+    z nagłówkiem zapis idzie do panelu."""
+    api = _api_wiedza(tmp_path, monkeypatch)
+    wywolane = []
+    monkeypatch.setattr(api.PANEL, "zapisz_pamiec", lambda *a: wywolane.append(a) or {"wpisy": list(a[1])})
+    k = _klient(api, "/api/plugins/jarvo-wiedza")
+    u = "/api/plugins/jarvo-wiedza/pamiec/user"
+    r = k.put(u, content='{"wpisy":["zly"],"wersja":"x"}', headers={"Content-Type": "text/plain", "Origin": "null",
+                                                                     "Sec-Fetch-Site": "cross-site"})
+    assert r.status_code == 403 and r.json()["blad"]["kod"] == "csrf" and not wywolane
+    r = k.put(u, json={"wpisy": ["zły"], "wersja": "x"}, headers={"Sec-Fetch-Site": "same-site", "Origin": "http://localhost:9120"})
+    assert r.status_code == 403 and not wywolane
+    r = k.put(u, json={"wpisy": ["dobry"], "wersja": "x"}, headers={"X-Jarvo-Request": "1"})
+    assert r.status_code == 200 and wywolane == [("user", ["dobry"], "x")]
 
 
 def test_front_wysyla_naglowek():

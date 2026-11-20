@@ -2,12 +2,12 @@
 
 Prywatny asystent AI zbudowany na [Hermes Agent](https://github.com/NousResearch/hermes-agent)
 (Nous Research). Na zewnątrz jeden agent, a w środku flota wyspecjalizowanych profili („snajperów”)
-prowadzona przez **Jarva**, czyli Main Judge'a. Jarvo przyjmuje zlecenia, rozdziela je, ocenia wyniki,
+prowadzona przez **Jarva**, szefa floty. Jarvo przyjmuje zlecenia, rozdziela je, ocenia wyniki,
 pilnuje terminów i niczego nie zapomina. Z każdym specjalistą można też rozmawiać bezpośrednio.
 
 | Agent | Rola |
 |---|---|
-| 🛰️ `jarvo` | Main Judge: przyjmuje zlecenia, planuje misje, rozdziela karty, ocenia, raportuje, patroluje; sam pracuje na ekranie Komputera Jarva i na Twoim telefonie (klik, formularze, konta), płatność i wysyłka tylko z Twoją zgodą |
+| 🛰️ `jarvo` | Jarvo, szef floty: przyjmuje zlecenia, planuje misje, rozdziela karty, ocenia, raportuje, patroluje; sam pracuje na ekranie Komputera Jarva i na Twoim telefonie (klik, formularze, konta), płatność i wysyłka tylko z Twoją zgodą |
 | 🔎 `jarvo-sherlock` | detektyw researchu: wiele źródeł, weryfikacja faktów, raporty z cytatami |
 | 🌐 `jarvo-web` | Web Senior Dev: brand z URL, inspiracje z branży (Inspo), audyty, strony i landingi, SEO, favicony, obrazy |
 | 🎬 `jarvo-studio` | marketing i kreacja: grafiki social, obrazy AI (OpenRouter), copy PL, kampanie |
@@ -148,7 +148,7 @@ sekrety, `scripts/deploy.sh --first-run`, test, rutyny, backupy). Cała flota mi
 
 ```
 Ty (Telegram DM / aplikacja Jarvo)
- └─ gateway Hermesa (multipleks profili) ─┬─ DM, wątek General → jarvo (Main Judge)
+ └─ gateway Hermesa (multipleks profili) ─┬─ DM, wątek General → jarvo (szef floty)
                                           └─ wątki Sherlock / Web / Studio / Wideo / Ads / Łowca / Ręka → snajper
 jarvo: intake → MISSION.md → karty kanban (CEL, DoD, GRANICE) → snajperzy pracują w swoich katalogach
     → kanban_request_review → jarvo sędziuje (rubryka agenta) → poprawki albo akceptacja → raport efektów

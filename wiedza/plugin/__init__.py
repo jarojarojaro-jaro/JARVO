@@ -561,6 +561,7 @@ class SkarbiecProvider(MemoryProvider):
         self._lock = threading.Lock()
         self._watek: Optional[threading.Thread] = None
         self._stop = threading.Event()
+        self._odcisk_pamieci: Optional[tuple] = None        # (mtime_ns, rozmiar) MEMORY.md i USER.md z ostatniego lustra
 
     # ---- identyfikacja i cykl życia
     @property
@@ -581,6 +582,7 @@ class SkarbiecProvider(MemoryProvider):
         self._session_id = session_id or ""
         self._skarbiec, self._stan = _sciezki(self._home)
         self._meta = _meta_agentow(self._stan)
+        self._sprawdz_pamiec()                              # start sesji: plik pamięci mógł się zmienić poza narzędziem
         if self._kontekst == "primary" and self._watek is None and CISZA_S > 0:
             try:
                 self._watek = spawn_context_thread(self._petla_ciszy, name="jarvo-wiedza-cisza")
@@ -794,7 +796,7 @@ class SkarbiecProvider(MemoryProvider):
             ix.odswiez()
             klient = lib.KlientWektorow(sk.stan)
             notatki = lib.notatki_przypomnienia(ix, query, limit=LIMIT_NOTATEK, wektory=klient if klient.dostepny else None,
-                                                zakres=self._zakres())
+                                                zakres=self._zakres(), pomin_tozsamosc=self._agent == lib.PROFIL_TOZSAMOSCI)
             silnik = ix.silnik
         finally:
             ix.zamknij()
@@ -977,31 +979,34 @@ class SkarbiecProvider(MemoryProvider):
         return {"orzeczenie": linia, "info": "zapisane; obowiązuje od następnej tury w każdej rozmowie"}
 
     # ---- zbieranie: lustro pamięci, tury, wyciągi
-    def on_memory_write(self, action: str, target: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> None:
-        if action not in ("add", "replace") or not content or self._kontekst not in ("primary", "cron"):
+    def _sprawdz_pamiec(self, wymus: bool = False) -> None:
+        """Lustro pamięci po TREŚCI plików profilu (wiedza.synchronizuj_pamiec): nowe wpisy do szkicu w skrzynce, a dla
+        Jarva notatki `jarvo/pamięć jarva` i `user/pamięć jarva o tobie`. Plik zmieniony inną drogą niż narzędzie memory
+        (ręcznie, przy wdrożeniu promptu, z Mózgu, w innym procesie) też trafia do skarbca (20.11: wpisy USER.md z 19
+        i 20.11 nie dotarły). Bez `wymus` tylko gdy czas albo rozmiar któregoś pliku pamięci się zmienił (2 × stat)."""
+        if not self._home or self._agent == "host":
             return
         sk = self._sk()
         if sk is None:
             return
         lib = _lib()
-        if lib.zawiera_sekret(content):
-            return
-        rel = f"skrzynka/pamiec-{self._agent}"
         try:
-            with self._lock:
-                if not sk.istnieje(rel):
-                    fm = {"szkic": True, "typ": "fakt", "tytul": f"Pamięć agenta {self._agent}: wpisy", "agent": self._agent,
-                          "zrodlo": f"pamięć (memory) agenta {self._agent}", "utworzono": lib.dzis(), "skad": "lustro memory", "tagi": ["pamiec"], "linki": []}
-                    if self._moja_marka():
-                        fm["marka"] = self._moja_marka()
-                    sk.zapisz_plik(rel, lib.sklej(fm, f"# Pamięć agenta {self._agent}: wpisy\n\nWpisy `memory` (MEMORY.md/USER.md) w kolejności zapisu; kompilacja robi z nich notatki.\n"))
-                p = sk.plik(rel)
-                with p.open("a", encoding="utf-8", newline="\n") as f:
-                    f.write(f"- {lib.dzis()} · {action} {target}: {' '.join(content.split())[:500]}\n")
+            odcisk = tuple((p.stat().st_mtime_ns, p.stat().st_size) if p.exists() else None
+                           for p in (lib.plik_pamieci(self._home, c) for c in lib.PLIKI_PAMIECI))
+            if not wymus and odcisk == self._odcisk_pamieci:
+                return
+            wynik = lib.synchronizuj_pamiec(sk, self._home, self._agent, self._moja_marka())
+            if not wynik.get("zajete"):
+                self._odcisk_pamieci = odcisk
         except Exception as e:
             logger.debug("jarvo-wiedza: lustro pamięci: %s", e)
 
+    def on_memory_write(self, action: str, target: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+        """Hermes woła to po zapisanym wywołaniu narzędzia memory (add, replace, remove): lustro po treści pliku."""
+        self._sprawdz_pamiec(wymus=True)
+
     def sync_turn(self, user_content: str, assistant_content: str, *, session_id: str = "", messages: Optional[List[Dict[str, Any]]] = None, **kwargs) -> None:
+        self._sprawdz_pamiec()
         if self._kontekst != "primary":
             return
         sid = session_id or self._session_id

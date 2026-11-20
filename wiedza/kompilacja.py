@@ -68,9 +68,10 @@ PELNA_TRESC_KANDYDATOW = 2
 MAX_ORZECZEN = 20                   # ostatnie orzeczenia z pliku (wszyscy, agent) w prompcie kompilacji
 PODOBNY_TYTUL = 0.75                # Jaccard rdzeni słów tytułu: od tyle „nowa” obok istniejącej notatki to ta sama notatka
 MAX_LINKOW = 8
-FOLDERY_NOTATEK = ("projekty", "podmioty", "pojecia", "rozmowy", "user", "bledy")   # + agenci/<agent>, brands/<marka>
-TYP_DO_FOLDERU = {"podmiot": "podmioty", "pojecie": "pojecia", "projekt": "projekty", "decyzja": "projekty", "rozmowa": "rozmowy",
-                  "blad": "bledy"}
+KANDYDATOW_FOLDERU = 2             # dodatkowo najbliższe z podmioty/ i user/: fakt o podmiocie aktualizuje jego notatkę
+MIN_ALIASU = 4                     # znaków aliasu podmiotu, który rozpoznaje podmiot w szkicu („K2” za krótkie)
+TYP_DO_FOLDERU = {"podmiot": "podmioty", "pojecie": "pojecia", "lekcja": "pojecia", "projekt": "projekty", "decyzja": "projekty",
+                  "rozmowa": "rozmowy", "blad": "bledy"}
 
 SYSTEM = """Jesteś kompilatorem skarbca wiedzy floty agentów Jarvo: jedynym, kto pisze notatki. Dostajesz jeden szkic i istniejące
 notatki-kandydatów. Zasady skarbca:
@@ -92,8 +93,15 @@ notatki-kandydatów. Zasady skarbca:
   daty przy danych zmiennych w czasie; bez nagłówków w polu "tresc".
 Szkic typu "rozmowa" (wyciąg z rozmowy albo karty) → jedna notatka w folderze rozmowy/ (co ustalono, z linkami) plus najwyżej 3
 osobne notatki dla trwałych faktów, decyzji albo lekcji, które przydadzą się poza tą rozmową. Inne szkice → zwykle 1 wynik.
-Foldery: agenci/<agent>/ (o agencie: lekcje, narzędzia), projekty/, podmioty/ (firmy, ludzie w rolach publicznych, narzędzia),
-pojecia/ (metody, definicje), rozmowy/, user/ (o użytkowniku i jego firmie), brands/<marka>/ (o marce), bledy/ (księga błędów).
+O CZYM JEST NOTATKA → FOLDER (zawsze według tematu, nie według agenta, który pisze szkic):
+- właściciel, jego firma, decyzje, preferencje, styl pracy, sprzęt, kontakty → user/ (pole "o_wlascicielu": true);
+- firma, usługa, narzędzie, konto w serwisie, ludzie w rolach publicznych → podmioty/ (JEDNA notatka na podmiot: kandydat
+  z podmioty/ o tym podmiocie = "aktualizacja" tej notatki, nowy fakt dopisany z datą, nigdy druga notatka o tym samym);
+- ogólna lekcja, metoda, definicja, wzorzec → pojecia/; błąd narzędzia albo pracy → bledy/;
+- projekt, misja, decyzja dotycząca projektu → projekty/; ustalenia z rozmowy → rozmowy/; marka agenta biznesowego → brands/<marka>/;
+- agenci/<agent>/ TYLKO o pracy tego agenta (jego narzędzia, jego skille, jego ograniczenia) i wtedy "o_agencie": true; fakt
+  o firmie, właścicielu albo ogólna lekcja nie idą do agenci/, nawet gdy szkic pisał agent. Przy wątpliwości nie agenci/.
+- jarvo/ (tożsamość), archiwum/, fleet/, orzeczenia/, briefy/ nie są dla kompilatora: tam nie piszesz.
 Podmiot albo notatka w user/: pole "aliasy" = inne nazwy, jak ludzie o nim mówią (np. „szef”, skrót firmy), najwyżej 8;
 przy aktualizacji tylko nowe aliasy; inne typy bez aliasów.
 Szkic typu "blad" (błąd narzędzia albo pracy agenta) → typ "blad" w folderze bledy/: jedna notatka na rodzaj błędu; "tresc" w
@@ -105,7 +113,7 @@ Odpowiadasz WYŁĄCZNIE JSON bez komentarzy:
 {"wyniki": [{"decyzja": "nowa|aktualizacja|sprzecznosc|odrzuc", "sciezka": "folder/tytuł jak się mówi (nowa) albo ścieżka kandydata",
   "typ": "fakt|decyzja|lekcja|podmiot|pojecie|projekt|rozmowa|blad", "tytul": "…", "streszczenie": "jedno zdanie",
   "tresc": "50–150 słów", "tagi": ["…"], "linki": ["ścieżka z listy", "…"], "wazne_do": "RRRR-MM-DD albo null", "aliasy": ["…"],
-  "sygnatury": ["tylko typ blad"], "powod": "jedno zdanie"}]}"""
+  "o_wlascicielu": false, "o_agencie": false, "sygnatury": ["tylko typ blad"], "powod": "jedno zdanie"}]}"""
 
 
 def _json_z_odpowiedzi(text: str) -> Optional[dict]:
@@ -218,22 +226,32 @@ class Kompilacja:
 
     @staticmethod
     def lustro_pamieci(szkic: dict) -> bool:
-        """Szkic z lustra wpisów `memory` agenta (wtyczka: skrzynka/pamiec-<agent>.md)."""
+        """Szkic z lustra wpisów `memory` agenta (wiedza.synchronizuj_pamiec: skrzynka/pamiec-<agent>.md z MEMORY.md
+        i pamiec-<agent>-user.md z USER.md, pole `pamiec`)."""
         return szkic["plik"].startswith("pamiec-") or szkic.get("skad") == "lustro memory"
 
     def kandydaci(self, ix, szkic: dict) -> List[dict]:
+        """Istniejące notatki do porównania: z całego skarbca (bez archiwum, tożsamości i orzeczeń), a dodatkowo najbliższe
+        z podmioty/ i user/ (KANDYDATOW_FOLDERU), żeby fakt o podmiocie albo właścicielu trafił w jego notatkę, choćby
+        szesnaście notatek o tym samym w innym folderze zajęło całą pierwszą szóstkę (20.11: InstaBox w agenci/jarvo/)."""
         zakres = self.zakres(szkic)            # agent marki: kandydaci (więc i linki) tylko z jego zakresu
+        dobry = lambda r: r["typ"] not in ("orzeczenia", "tozsamosc")                       # noqa: E731
         if self.lustro_pamieci(szkic):        # każdy wpis pamięci to inny temat: kandydaci osobno dla każdego wpisu
             wpisy = [re.sub(r"^- [\d-]+ · \w+ \w+: ", "", l) for l in szkic["tresc"].splitlines() if l.startswith("- ")]
             out: List[dict] = []
             for w in wpisy[-KANDYDATOW_LUSTRA:]:
                 for r in ix.szukaj(w, limit=2, wektory=self.wektory, zakres=zakres):
-                    if r["typ"] != "orzeczenia" and all(r["sciezka"] != o["sciezka"] for o in out):
+                    if dobry(r) and all(r["sciezka"] != o["sciezka"] for o in out):
                         out.append(r)
             return out[:KANDYDATOW_LUSTRA]
         zap = f"{szkic['tytul']} {szkic['tresc'][:400]}"
-        wyn = ix.szukaj(zap, limit=KANDYDATOW, wektory=self.wektory, zakres=zakres)
-        return [r for r in wyn if r["typ"] not in ("orzeczenia",)]
+        out = [r for r in ix.szukaj(zap, limit=KANDYDATOW, wektory=self.wektory, zakres=zakres) if dobry(r)]
+        if not zakres:
+            for folder in ("podmioty", "user"):
+                for r in ix.szukaj(zap, limit=KANDYDATOW_FOLDERU, folder=folder, wektory=self.wektory):
+                    if dobry(r) and r["typ"] != "hub" and all(r["sciezka"] != o["sciezka"] for o in out):
+                        out.append(r)
+        return out
 
     def orzeczenia(self, szkic: dict) -> List[str]:
         """Orzeczenia właściciela dla promptu: `orzeczenia/wszyscy`, plik agenta szkicu (z wiedza-agenci.json) oraz
@@ -331,6 +349,11 @@ class Kompilacja:
 
     # ---- ścieżki i linki
     def sciezka_nowej(self, wynik: dict, szkic: dict) -> str:
+        """Folder nowej notatki według tematu (prompt SYSTEM: „o czym jest notatka → folder”), nie według autora szkicu:
+        błąd → bledy/; o właścicielu (`o_wlascicielu`, a w szkicu z USER.md każdy fakt, decyzja i lekcja) → user/;
+        agenci/<agent>/ tylko z `o_agencie: true` (20.11: 88 notatek o firmach, właścicielu i lekcjach ogólnych
+        w agenci/jarvo/); folder spoza FOLDERY_NOTATEK → według typu (lekcja → pojecia/), fakt z aliasami → podmioty/,
+        reszta → pojecia/. Agent marki: tylko brands/<marka>/ albo agenci/<agent>/."""
         lib = self.lib
         typ = str(wynik.get("typ") or szkic["typ"])
         prop = str(wynik.get("sciezka") or "").strip().strip("/")
@@ -343,16 +366,42 @@ class Kompilacja:
             return f"{folder if folder in wlasne else wlasne[0]}/{lib.nazwa_pliku(tytul)}"
         if typ == "blad":             # błąd zawsze w księdze błędów: tam szuka go wtyczka (sygnatury pod wynikiem narzędzia)
             return f"{lib.KSIEGA}/{lib.nazwa_pliku(tytul)}"
-        dozwolony = folder in FOLDERY_NOTATEK or (folder.startswith("agenci/") and folder.count("/") == 1 and (self.sk.root / folder).is_dir()) \
-            or (folder.startswith("brands/") and folder.count("/") == 1 and (self.sk.root / folder).is_dir())
+        o_agencie = wynik.get("o_agencie") is True
+        o_wlascicielu = wynik.get("o_wlascicielu") is True or szkic.get("pamiec") == "user"
+        if o_wlascicielu and typ in ("fakt", "decyzja", "lekcja") and not o_agencie:
+            return f"user/{lib.nazwa_pliku(tytul)}"
+        istnieje = lambda f: f.count("/") == 1 and (self.sk.root / f).is_dir()             # noqa: E731
+        dozwolony = (folder in lib.FOLDERY_NOTATEK or (folder.startswith("agenci/") and o_agencie and istnieje(folder))
+                     or (folder.startswith("brands/") and istnieje(folder)))
         if not dozwolony:
-            if typ in TYP_DO_FOLDERU:
-                folder = TYP_DO_FOLDERU[typ]
-            elif agent and (self.sk.root / "agenci" / agent).is_dir():
+            if o_agencie and agent and istnieje(f"agenci/{agent}"):
                 folder = f"agenci/{agent}"
+            elif typ in TYP_DO_FOLDERU:
+                folder = TYP_DO_FOLDERU[typ]
+            elif typ == "fakt" and wynik.get("aliasy"):
+                folder = "podmioty"
             else:
                 folder = "pojecia"
         return f"{folder}/{lib.nazwa_pliku(tytul)}"
+
+    def podmiot_nazwany(self, tekst: str, kandydaci: List[dict]) -> Optional[str]:
+        """Notatka z podmioty/ (wśród kandydatów), którą tekst nazywa: alias z frontmattera (od MIN_ALIASU znaków), a bez
+        aliasów pierwsze słowo nazwy pliku; słowa w odmianie jak przy aliasach wyszukiwania (wiedza._ma_fraze)."""
+        lib = self.lib
+        slowa = lib._slowa_lista(tekst)
+        for k in kandydaci:
+            s = k["sciezka"]
+            if not s.startswith("podmioty/") or s.rsplit("/", 1)[-1].startswith("_hub-"):
+                continue
+            try:
+                n = self.sk.wczytaj(s)
+            except (OSError, ValueError):
+                continue
+            aliasy = n.fm.get("aliasy") if isinstance(n.fm.get("aliasy"), list) else []
+            nazwy = [str(a) for a in aliasy if len(str(a).strip()) >= MIN_ALIASU] or [s.rsplit("/", 1)[-1].split()[0]]
+            if any(f and lib._ma_fraze(slowa, f) for f in (lib._slowa_lista(x) for x in nazwy)):
+                return s
+        return None
 
     def linki(self, wynik: dict, sciezka: str, kandydaci: List[dict], stare: List[str] = (), zakres=()) -> List[str]:
         """Linki notatki: stare, od modelu (istniejące), hub katalogu albo folderu, sąsiad, notatka z innego folderu.
@@ -469,7 +518,8 @@ class Kompilacja:
         nazwa, wlasne = self.lib.nazwa_pliku(szkic["tytul"]), self.foldery_marki(szkic)
         for p in sorted(self.sk.root.rglob(f"{nazwa}.md") if "[" not in nazwa and "*" not in nazwa and "?" not in nazwa else []):
             rel = self.sk.rel(p)
-            if rel.startswith(("zrodla/", "skrzynka/", "briefy/")) or p.stem.startswith("_hub-") or self.wlasny_format(rel):
+            if rel.startswith((*self.lib.POZA_WYSZUKIWANIEM, "briefy/", self.lib.TOZSAMOSC + "/")) or p.stem.startswith("_hub-") \
+                    or self.wlasny_format(rel):
                 continue
             if wlasne and not any(rel.startswith(f + "/") for f in wlasne):
                 continue
@@ -546,7 +596,10 @@ class Kompilacja:
         wazne_do = wazne_do if lib.DATA_RE.match(wazne_do) else ""
         cel = str(wynik.get("sciezka") or "").strip().strip("/")
         cel = cel[:-3] if cel.endswith(".md") else cel
-        cel_istnieje = bool(cel) and self.sk.istnieje(cel) and not cel.startswith(("zrodla/", "skrzynka/"))
+        # źródła, szkice, archiwum (POZA_WYSZUKIWANIEM) i tożsamość (jarvo/, user/pamięć jarva o tobie: generuje zasiew
+        # z repo i pamięci Hermesa) to nie cele kompilacji
+        cel_istnieje = bool(cel) and self.sk.istnieje(cel) and not cel.startswith((*lib.POZA_WYSZUKIWANIEM, lib.TOZSAMOSC + "/")) \
+            and cel not in lib.KOLEJNOSC_TOZSAMOSCI
         # hubów, archiwum briefów (`briefy/`, pisze skrypt briefy.py i Jarvo w tabeli decyzji) i plików własnego formatu
         # (brand kit) nie nadpisujemy; szkic agenta marki zmienia tylko notatki w swoich folderach (foldery_marki)
         cel_hub = cel_istnieje and (cel.rsplit("/", 1)[-1].startswith("_hub-") or cel.startswith("briefy/") or self.wlasny_format(cel)
@@ -561,6 +614,17 @@ class Kompilacja:
                 sciezka += " (notatka)"
             if self.sk.istnieje(sciezka):
                 decyzja, cel = "aktualizacja", sciezka
+            elif (typ in ("fakt", "podmiot") and not wlasne and wynik.get("o_agencie") is not True
+                  and not sciezka.startswith("user/") and (podmiot := self.podmiot_nazwany(f"{tytul} {tresc}", kandydaci))):
+                stara_p = self.sk.wczytaj(podmiot)                    # jedna notatka na podmiot: nowy fakt dopisany do niej
+                nowe_zdania = self.nowe_zdania(stara_p, tresc)
+                if not nowe_zdania:
+                    self.raport["odrzucone"] += 1
+                    return f"odrzucony (już w notatce podmiotu [[{podmiot}]])"
+                decyzja, cel = "aktualizacja", podmiot
+                tytul, streszczenie, typ = stara_p.tytul, stara_p.streszczenie or stara_p.tytul, stara_p.typ or "podmiot"
+                tresc = self.tresc_wlasciwa(stara_p) + "\n\n" + f"{lib.dzis()}: " + " ".join(nowe_zdania)
+                powod = f"fakt o podmiocie dopisany do jego notatki; {powod}".rstrip("; ")
             elif not sciezka.startswith("rozmowy/") and (bliska := self.bliska_notatka(sciezka)):
                 stara_b = self.sk.wczytaj(bliska)                     # prawie ten sam tytuł w tym folderze: bez drugiej notatki
                 nowe_zdania = self.nowe_zdania(stara_b, tresc)
@@ -643,6 +707,7 @@ class Kompilacja:
         return {"plik": p.name, "typ": str(fm.get("typ") or "fakt"), "tytul": str(fm.get("tytul") or p.stem), "tresc": tresc,
                 "zrodlo": str(fm.get("zrodlo") or ""), "agent": str(fm.get("agent") or ""), "skad": str(fm.get("skad") or ""),
                 "utworzono": str(fm.get("utworzono") or ""), "marka": str(fm.get("marka") or ""),
+                "pamiec": str(fm.get("pamiec") or ""),
                 "sygnatury": self.lib.sygnatury(fm),
                 "tagi": list(fm.get("tagi") or []) if isinstance(fm.get("tagi"), list) else [], "proby": int(fm.get("proby") or 0), "fm": fm, "body": body}
 

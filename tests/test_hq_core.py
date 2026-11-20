@@ -22,7 +22,7 @@ NOW = 1_800_000_000.0
 MIN = 60
 
 FLEET = [
-    {"name": "jarvo", "kind": "orchestrator", "title": "Main Judge", "emoji": "🛰️", "room": "bridge", "short": "Jarvo"},
+    {"name": "jarvo", "kind": "orchestrator", "title": "Jarvo: szef floty", "emoji": "🛰️", "room": "bridge", "short": "Jarvo"},
     {"name": "jarvo-sherlock", "kind": "specialist", "title": "Detektyw", "emoji": "🔎", "room": "study", "short": "Sherlock"},
     {"name": "jarvo-web", "kind": "specialist", "title": "Web", "emoji": "🌐", "room": "devlab", "short": "Web"},
     {"name": "jarvo-studio", "kind": "specialist", "title": "Studio", "emoji": "🎬", "room": "atelier", "short": "Studio"},

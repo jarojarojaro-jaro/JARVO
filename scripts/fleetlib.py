@@ -67,6 +67,86 @@ def wydziel_koniec(soul: str) -> tuple[str, str]:
     return tekst[:start].rstrip() + "\n", tekst[start:]
 
 
+# Mapa Jarva (docs/WIEDZA.md §2b, wiedza/mapa.py): profiles/<orkiestrator>/MAPA.md z repo i nakładki. Rdzeń mapy (bloki
+# RDZEN, zwarte ścieżki i harmonogram) build wstawia w miejsce znacznika w ZASADY.md orkiestratora; pełna mapa idzie do
+# skarbca (build/wiedza/tozsamosc → `wiedza.py zasiej` → notatka `jarvo/jak działa jarvo`), nie do profilu Hermesa.
+MAPA_MARKER = "<!-- Jarvo:MAPA -->"
+MAPA_FILE = "MAPA.md"
+
+
+def _modul_mapy():
+    """wiedza/mapa.py (biblioteka standardowa): ten sam generator dla buildu, walidatora i zasiewu. Kod obok tego pliku,
+    nie z REPO_ROOT (to katalog danych floty: testy i build z kopii podmieniają go na kopię bez `wiedza/`); nieudany
+    import nie zostaje w sys.modules jako pół-moduł."""
+    import importlib.util
+    import sys
+    mod = sys.modules.get("jarvo_wiedza_mapa")
+    if mod is None:
+        sciezka = Path(__file__).resolve().parent.parent / "wiedza" / "mapa.py"
+        spec = importlib.util.spec_from_file_location("jarvo_wiedza_mapa", sciezka)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["jarvo_wiedza_mapa"] = mod
+        try:
+            spec.loader.exec_module(mod)
+        except BaseException:
+            sys.modules.pop("jarvo_wiedza_mapa", None)
+            raise
+    return mod
+
+
+def render_roster_summary(fleet: "Fleet") -> str:
+    """Zespół w SOUL orkiestratora (znacznik ROSTER_MARKER, zarazem „Zespół” rdzenia mapy): linia na specjalistę, emoji,
+    nazwa profilu (assignee karty), @uchwyt, krótka nazwa, tytuł i kiedy mu oddaję (`oddaj_gdy` z fleet.yaml)."""
+    linie = []
+    for a in fleet.active():
+        if a.name == fleet.orchestrator:
+            continue
+        linia = " ".join(x for x in (f"- {a.emoji}", f"`{a.name}`", f"@{a.handle}" if a.handle else "",
+                                     f"{a.hq_short or a.name}: {a.title}") if x)
+        linie.append(linia + (f"; oddaję, gdy: {a.oddaj_gdy}" if a.oddaj_gdy else ""))
+    return "\n".join(linie)
+
+
+def mapa_zrodla(fleet: "Fleet") -> tuple[str, str]:
+    """(MAPA.md orkiestratora z repo, ten sam plik z nakładki floty albo "")."""
+    orkiestrator = fleet.agent(fleet.orchestrator)
+    repo = orkiestrator.dir / MAPA_FILE
+    n = fleet.nakladka                                       # ta sama nakładka, z którą wczytano flotę (load_fleet)
+    nakl = n / "profiles" / orkiestrator.name / MAPA_FILE if n else None
+    return (repo.read_text(encoding="utf-8") if repo.is_file() else "",
+            nakl.read_text(encoding="utf-8") if nakl and nakl.is_file() else "")
+
+
+def zadania_cron_floty(fleet: "Fleet") -> list[dict]:
+    """Rutyny aktywnych agentów z ich cron/jobs.yaml (repo albo nakładka) w kształcie wiedza/mapa.py: agent biznesowy
+    instaluje je wstrzymane (docs/FLEET.md), więc u niego `wlaczona` = False; `enabled: false` w pliku tak samo."""
+    out = []
+    for a in fleet.active():
+        dane = load_yaml(a.dir / "cron" / "jobs.yaml") if (a.dir / "cron" / "jobs.yaml").is_file() else {}
+        for z in (dane or {}).get("jobs") or []:
+            if isinstance(z, dict) and z.get("schedule"):
+                out.append({"nazwa": str(z.get("name") or z.get("id") or ""), "kiedy": str(z["schedule"]), "agent": a.name,
+                            "wlaczona": z.get("enabled", True) is not False and not a.marka, "dostarczanie": ""})
+    return out
+
+
+def sciezki_mapy(tokeny: dict[str, str], agent: str) -> dict[str, str]:
+    """Ścieżki rdzenia mapy z tokenów ścieżek buildu (DATA_DIR, JARVO_DIR, KNOWLEDGE_DIR, MISSIONS_DIR, WORKSPACES_DIR,
+    INBOX_DIR); kolejność = kolejność w rdzeniu (baza raz, podkatalogi względnie: wiedza/mapa.render_sciezki)."""
+    profil = f"{tokeny['DATA_DIR'].rstrip('/')}/profiles/{agent}"
+    return {"dane Jarva": tokeny["JARVO_DIR"], "skarbiec": tokeny["KNOWLEDGE_DIR"], "misje": tokeny["MISSIONS_DIR"],
+            "robocze": tokeny["WORKSPACES_DIR"], "od właściciela": tokeny["INBOX_DIR"], "mój profil": profil,
+            "pamięć (MEMORY.md, USER.md)": f"{profil}/memories", "skrypty": f"{profil}/scripts"}
+
+
+def rdzen_mapy(fleet: "Fleet", sciezki: dict[str, str]) -> str:
+    """Rdzeń mapy Jarva do ZASADY.md (MAPA_MARKER): wiedza/mapa.rdzen z MAPA.md repo i nakładki, rutyn floty
+    i `sciezki` (sciezki_mapy; walidator podaje ścieżki zastępcze o średniej długości). Tokeny @@…@@ zostają (build
+    podstawia je w całym SOUL)."""
+    repo, nakl = mapa_zrodla(fleet)
+    return _modul_mapy().rdzen(repo, nakl, zadania_cron_floty(fleet), sciezki)
+
+
 # tabela „komu oddać” generowana z fleet.yaml (pole `oddaj_gdy` każdego specjalisty): Ręka i każdy, kto routuje
 ODDAJ_MARKER = "<!-- Jarvo:ODDAJ -->"
 COMPOSE_FILE = Path(__file__).resolve().parent.parent / "infra" / "docker-compose.yml"

@@ -40,12 +40,14 @@ i człowiek. Pełny projekt: `docs/WIEDZA.md` w repo (kopia w `zrodla/jarvo-repo
 |---|---|---|
 | `zrodla/` | surowe: `rozmowy/` (wyciągi z sesji), `karty/` (raporty z kart), `pliki/` (od człowieka), `jarvo-repo/` (kopia repo przy wdrożeniu: docs, pliki profili, materiały skilli, spis źródeł; w grafie) | brak (poza wyszukiwaniem) |
 | `skrzynka/` | szkice do kompilacji; `zrobione/` po kompilacji | brak |
-| `agenci/<agent>/` | hub agenta (z `fleet.yaml`) i jego notatki (lekcje, narzędzia, kruczki) | `agenci/_hub-agenci`, `agenci/<agent>/_hub-<krótka nazwa>` |
+| `jarvo/` | tożsamość Jarva, generowana przez zasiew (typ `tozsamosc`): „Jarvo od A do Z” (mapa, każda sekcja osobno w indeksie), kim jest (SOUL), zasady pracy, zasady krytyczne, pamięć Jarva (lustro `memories/MEMORY.md`); nie edytuj: zmiana przez repo albo w Mózgu („Zmień” przy pamięci); kompilacja tu nie pisze | `jarvo/_hub-jarvo` |
+| `agenci/<agent>/` | hub aktywnego agenta (z `fleet.yaml`) i notatki TYLKO o jego pracy (jego narzędzia, skille, ograniczenia); fakty o właścicielu idą do `user/`, o firmach i usługach do `podmioty/`, lekcje ogólne do `pojecia/`; agent wycofany z floty trafia do `archiwum/agenci/` | `agenci/_hub-agenci`, `agenci/<agent>/_hub-<krótka nazwa>` |
 | `projekty/` | jedna notatka na misję/projekt: stan, decyzje, wyniki (linki), marka, agenci | `projekty/_hub-projekty` |
 | `brands/<marka>/` | brand kity (własny format: `BRAND.md`, `DESIGN.md`; kompilacja ich nie nadpisuje); u agenta biznesowego (`marka` we `fleet.yaml`) także notatki z jego szkiców: taki agent widzi w skarbcu tylko swoją markę, siebie (`agenci/<agent>/`), `fleet/`, `inspiracje/` i orzeczenia swoje, marki i wszystkich | `brands/_hub-marki`, `brands/<marka>/_hub-<marka>` (agent biznesowy) |
 | `inspiracje/strony/<branża>/` | strony referencyjne branż słabo pokrytych w katalogu Inspo (własny format: karta `<domena>.md` + katalog `<domena>/` z `DESIGN.md`, tokenami i zrzutami); pisze Web skillem `inspiracje-stron`; inspiracja, nie wzór do kopiowania, zrzuty tylko do użytku wewnętrznego | `inspiracje/_hub-inspiracje` |
-| `user/` | `USER.md` (własny format) i notatki o firmie, ofercie, klientach, głosie marki | `user/_hub-ty` |
-| `podmioty/` | firmy, ludzie w rolach publicznych, narzędzia, konkurenci, dostawcy | `podmioty/_hub-podmioty` |
+| `user/` | `USER.md` (własny format), `pamięć jarva o tobie` (lustro `memories/USER.md`, typ `tozsamosc`) i notatki o Tobie: firma, oferta, klienci, głos marki, decyzje, preferencje | `user/_hub-ty` |
+| `podmioty/` | firmy, ludzie w rolach publicznych, narzędzia, usługi, konta: JEDNA notatka na podmiot, nowy fakt dopisywany do niej z datą | `podmioty/_hub-podmioty` |
+| `archiwum/` | notatki wycofane i zastąpione (`wiedza.py archiwizuj`, zasiew dla agenta spoza floty) w układzie dawnej ścieżki; frontmatter `status: wycofana`, `wycofano`, `powod`, opcjonalnie `zastapiona_przez`; poza wyszukiwaniem, przypomnieniami i kompilacją; link i stara ścieżka prowadzą do następcy | `archiwum/_hub-archiwum` |
 | `pojecia/` | metody, wzorce, definicje, lekcje ogólne | `pojecia/_hub-pojecia` |
 | `orzeczenia/` | `wszyscy.md`, `<agent>.md`, `marki/<marka>.md` | `orzeczenia/_hub-orzeczenia` |
 | `rozmowy/` | skompilowane ustalenia z rozmów i kart | `rozmowy/_hub-rozmowy` |
@@ -57,16 +59,19 @@ i człowiek. Pełny projekt: `docs/WIEDZA.md` w repo (kopia w `zrodla/jarvo-repo
 
 Pliki specjalne w korzeniu: `_hub-skarbiec.md` (strona główna), `INDEX.md` (generowany), `LOG.md` (tylko dopisywanie),
 `LINT.md` (ostatni raport), `SCHEMA.md` (ten plik). Bloki `<!-- Jarvo:GEN … -->` w hubach są generowane: nie edytuj ich ręcznie.
+Blok `<!-- Jarvo:STRESZCZENIE -->` pod tytułem huba („najważniejsze z tej części”, do 1500 znaków) pisze `wiedza.py
+streszczenie` (Jarvo przez `jarvo wiedza streszczenie`); zasiew go nie rusza. Notatki przenosi `wiedza.py przenies`,
+wycofuje `wiedza.py archiwizuj` (linki przepisane wszędzie): ręczne przenoszenie plików zostawia martwe linki.
 
 ## Notatka
 
 ```markdown
 ---
-typ: fakt              # hub | agent | projekt | podmiot | pojecie | fakt | decyzja | lekcja | blad | zrodlo | rozmowa | skill (tylko zasiew)
+typ: fakt              # hub | agent | projekt | podmiot | pojecie | fakt | decyzja | lekcja | blad | zrodlo | rozmowa | skill, tozsamosc (tylko zasiew)
 tagi: [web, wydajnosc]
 utworzono: 2026-09-30
 zmieniono: 2026-09-30
-status: aktualna       # aktualna | do-sprawdzenia | sprzeczna | przestarzala | generowane
+status: aktualna       # aktualna | do-sprawdzenia | sprzeczna | przestarzala | generowane | wycofana (archiwum)
 zrodlo: zrodla/karty/2026-09-30-t_8f2-audyt-mw.md   # ścieżka w skarbcu, adres, `karta t_…` albo `rozmowa 2026-09-30 jarvo-web`
 agent: jarvo-web       # opcjonalnie: kogo dotyczy / kto zgłosił
 wazne_do: 2027-03-31   # opcjonalnie
