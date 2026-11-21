@@ -416,14 +416,14 @@ narzedzia:
         rozmiar: 1717234
         format: zip
 
-  # Lightpanda 1.0.4: pliki z wydania (Linux = bajt w bajt binarka /usr/bin/lightpanda z obrazu
-  # lightpanda/browser:1.0.4, który przypina infra/Dockerfile; tu bez strip). Telemetria i raporty awarii domyślnie
+  # Lightpanda 1.0.5: pliki z wydania (Linux = bajt w bajt binarka /usr/bin/lightpanda z obrazu
+  # lightpanda/browser:1.0.5, który przypina infra/Dockerfile; tu bez strip). Telemetria i raporty awarii domyślnie
   # włączone: wyłączają je zmienne niżej. Windows: żadne wydanie nie ma plików, silnik chrome (C06). Binarka ląduje
   # jako `lightpanda` (nazwa_pliku), bo agent-browser szuka jej w PATH. macOS: LC_BUILD_VERSION minos 14.8.9, czyli
   # starszy macOS 14 jej nie uruchomi (minimum Jarva: macOS 15). Linux: glibc 2.35 (x64) i 2.38 (arm64).
   lightpanda:
     zrodlo: browser
-    wersja: "1.0.4"
+    wersja: "1.0.5"
     licencja: AGPL-3.0
     rola: "przeglądarka headless dla browser_* (agent-browser --engine lightpanda) i lightpanda fetch"
     pliki:
@@ -432,9 +432,9 @@ narzedzia:
         zamiast: chrome-headless-shell
       windows-arm64: *lp-brak
       macos-arm64:
-        url: https://github.com/lightpanda-io/browser/releases/download/1.0.4/lightpanda-aarch64-macos
-        sha256: 83b0ba5ae31086b675fb3ba50644bda075a13bebabe46dc5f7543952bc41ae46
-        rozmiar: 91609208
+        url: https://github.com/lightpanda-io/browser/releases/download/1.0.5/lightpanda-aarch64-macos
+        sha256: eec3781086ee512320a04b036f092806a8a959944ea78fc8f4fe7dfe215a84b4
+        rozmiar: 91999720
         format: plik
         nazwa_pliku: lightpanda
         bin: ["."]
@@ -442,17 +442,17 @@ narzedzia:
           LIGHTPANDA_DISABLE_TELEMETRY: "1"
           LIGHTPANDA_DISABLE_CORE_DUMP: "1"
       linux-x64:
-        url: https://github.com/lightpanda-io/browser/releases/download/1.0.4/lightpanda-x86_64-linux
-        sha256: 7d22651129901203abdb95c64f49069c49e88f5211f4d8c4c6828c123c4adab4
-        rozmiar: 77649224
+        url: https://github.com/lightpanda-io/browser/releases/download/1.0.5/lightpanda-x86_64-linux
+        sha256: 0ec21fa4867ab9e82b35285ff4ab0e7336c6c1d89f26fe991f27d73c8a678bd7
+        rozmiar: 78026056
         format: plik
         nazwa_pliku: lightpanda
         bin: ["."]
         env: *lp-env
       linux-arm64:
-        url: https://github.com/lightpanda-io/browser/releases/download/1.0.4/lightpanda-aarch64-linux
-        sha256: f021d49a0b66d07bf2633f8e00870b9075293516f872695b0ca4aeb5848b6ea8
-        rozmiar: 74747976
+        url: https://github.com/lightpanda-io/browser/releases/download/1.0.5/lightpanda-aarch64-linux
+        sha256: 7527391c479f323eb9111b834b012d91a89057528c28ef027741b21739b12299
+        rozmiar: 75206728
         format: plik
         nazwa_pliku: lightpanda
         bin: ["."]

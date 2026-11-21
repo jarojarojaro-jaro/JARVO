@@ -61,7 +61,8 @@ Pliki specjalne w korzeniu: `_hub-skarbiec.md` (strona główna), `INDEX.md` (ge
 `LINT.md` (ostatni raport), `SCHEMA.md` (ten plik). Bloki `<!-- Jarvo:GEN … -->` w hubach są generowane: nie edytuj ich ręcznie.
 Blok `<!-- Jarvo:STRESZCZENIE -->` pod tytułem huba („najważniejsze z tej części”, do 1500 znaków) pisze `wiedza.py
 streszczenie` (Jarvo przez `jarvo wiedza streszczenie`); zasiew go nie rusza. Notatki przenosi `wiedza.py przenies`,
-wycofuje `wiedza.py archiwizuj` (linki przepisane wszędzie): ręczne przenoszenie plików zostawia martwe linki.
+wycofuje `wiedza.py archiwizuj` (linki przepisane wszędzie, linia `- hub:` przeniesionej notatki wskazuje hub nowego
+folderu): ręczne przenoszenie plików zostawia martwe linki; po starych przenosinach `wiedza.py napraw-huby`.
 
 ## Notatka
 

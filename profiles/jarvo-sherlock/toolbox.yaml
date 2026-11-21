@@ -33,7 +33,7 @@ tools:
   - name: lightpanda
     source: https://github.com/lightpanda-io/browser
     license: AGPL-3.0 (niezmodyfikowana binarka, osobny program)
-    version: "1.0.4"
+    version: "1.0.5"
     install: {method: image, spec: "obraz: COPY z lightpanda/browser (infra/Dockerfile); natywnie: plik z wydania (vendor/natywne.yaml), na Windows brak wydania"}
     integration: hermes-browser-engine
     used_by_skills: [metoda-sherlocka, blocked-page-recovery]

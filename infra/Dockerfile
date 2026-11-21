@@ -16,7 +16,7 @@
 ARG HERMES_IMAGE=nousresearch/hermes-agent:v2026.9.24@sha256:fca358f12efd65bfaaca05884166f15c0e2788375ca30d77061ac1ebc96452b7
 # Lightpanda (AGPL-3.0, niezmodyfikowana binarka): przeglądarka headless dla narzędzi browser_* agentów.
 # Wersja przypięta digestem i przejrzana przed dodaniem (docs/SOURCES.md, „Przegląd przed dodaniem”).
-ARG LIGHTPANDA_IMAGE=lightpanda/browser:1.0.4@sha256:a9d899882899802bc3a6b82622a7ca394f8e1b828452869a0965d2e5097e6116
+ARG LIGHTPANDA_IMAGE=lightpanda/browser:1.0.5@sha256:c474699588315f2d5ba1574a0608feeaf29a31663b845b640d2dd87dd2781ce0
 
 FROM ${LIGHTPANDA_IMAGE} AS lightpanda
 
@@ -118,7 +118,7 @@ RUN set -e; cd /opt/jarvo/node && \
 ENV HYPERFRAMES_BROWSER_PATH=/usr/local/bin/chromium \
     HYPERFRAMES_NO_TELEMETRY=1 \
     HYPERFRAMES_NO_UPDATE_CHECK=1
-# Jedna kopia HyperFrames: ta z locka w /opt/jarvo/node (wyżej; wersja przejrzana, 0.9.69, z poleceniami skilli z
+# Jedna kopia HyperFrames: ta z locka w /opt/jarvo/node (wyżej; wersja przejrzana, 0.9.75, z poleceniami skilli z
 # vendor/skills.lock.yaml, tag v0.9.52). Skille HyperFrames wołają `npx hyperframes`, a npx szuka programu
 # w node_modules/.bin katalogu projektu i w globalnym bin npm, nie w PATH: bez wpisu tam ściągałby najnowszą wersję
 # przy pierwszym użyciu (a bez sieci healthcheck padał). Dlatego globalny bin dostaje dowiązania do tej kopii zamiast

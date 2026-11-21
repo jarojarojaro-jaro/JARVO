@@ -316,7 +316,7 @@ def polecenie_wiedza_lint(u: Uklad, a, _reszta, _ot) -> int:
 
 
 def polecenie_wiedza_porzadki(u: Uklad, a, _reszta, _ot) -> int:
-    """`jarvo wiedza archiwizuj|przenies|streszczenie|pamiec`: to samo co `wiedza.py` tej wersji Jarva na skarbcu tej
+    """`jarvo wiedza archiwizuj|przenies|streszczenie|napraw-huby|pamiec`: to samo co `wiedza.py` tej wersji Jarva na skarbcu tej
     instalacji (blokada, punkt zapisu, LOG, indeks i huby robi wiedza.porzadki; pamięć: profil Jarva tej instalacji)."""
     if not skarbiec(u).is_dir():
         print(f"Brak skarbca {skarbiec(u)} (zasiew robi instalacja floty).", file=sys.stderr)
@@ -329,7 +329,7 @@ def polecenie_wiedza_porzadki(u: Uklad, a, _reszta, _ot) -> int:
         argv += [a.sciezka, a.folder]
     elif a.wiedza_polecenie == "streszczenie":
         argv += [a.hub, *(["--plik", a.plik] if a.plik else ["--tekst", a.tekst])]
-    else:
+    elif a.wiedza_polecenie == "pamiec":
         argv += ["--profil", str(profil(u))]
     return lib.main(argv)
 
@@ -1746,6 +1746,8 @@ def dodaj_polecenia(sub) -> None:
     g = k.add_mutually_exclusive_group(required=True)
     g.add_argument("--plik")
     g.add_argument("--tekst")
+    k.set_defaults(funkcja=polecenie_wiedza_porzadki)
+    k = w.add_parser("napraw-huby", help="linia `- hub:` każdej notatki wskazuje hub jej folderu (naprawa po przenosinach)")
     k.set_defaults(funkcja=polecenie_wiedza_porzadki)
     k = w.add_parser("pamiec", help="lustro pamięci Jarva (MEMORY.md, USER.md) w skarbcu i szkic nowych wpisów")
     k.set_defaults(funkcja=polecenie_wiedza_porzadki)

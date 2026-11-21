@@ -28,7 +28,7 @@ Punkty:
   4. animacja HTML → wideo: html_wideo.py wideo (2 s, 30 kl./s, 2 przeglądarki naraz, zegar strony przez --seek) na
      chrome-headless-shell z instalacji: 60 klatek w MP4
   5. HyperFrames z node_modules/.bin narzędzi npm floty (wpis node-floty w narzedzia.json z kroku instalatora
-     „Narzędzia npm floty”, lock z infra/node; brak wpisu to błąd): wersja 0.9.69, ta sama przez `npx --yes=false
+     „Narzędzia npm floty”, lock z infra/node; brak wpisu to błąd): wersja 0.9.75, ta sama przez `npx --yes=false
      hyperframes` (globalny prefix npm procesów Jarva, bez pobierania najnowszej), przeglądarka instalacji, render
      krótkiej kompozycji CSS (bez sieci)
   6. edytor HQ przez panel: lektor (POST /edit/lektor, film.py lektor w procesie panelu), analiza mowy (/edit/speech:
@@ -79,7 +79,7 @@ POLSKI = "Próba Żółć"
 GLOSY = {"pl-PL-Matcha-Meski": ("Dzień dobry, tu Jarvo bez Dockera.", 22050),
          "pl-PL-Matcha-Damski": ("Napisy i lektor działają po polsku.", 22050),
          "en-US-Paradee": ("Jarvo works without Docker.", 24000)}
-HYPERFRAMES = "0.9.69"
+HYPERFRAMES = "0.9.75"
 TOKEN = re.compile(r'window\.__HERMES_SESSION_TOKEN__="([^"]+)"')
 API = "/api/plugins/jarvo-hq"
 STANY_KONCOWE = {"done", "error", "cancelled"}

@@ -2461,6 +2461,79 @@ def przepisz_linki(text: str, cele: dict[str, str], rozwiaz, znane_po: dict[str,
     return LINK_RE.sub(zamien, text), ile
 
 
+HUB_LINIA_RE = re.compile(r"^(- hub: )\[\[([^\]\|#]+)(#[^\]\|]*)?(?:\|([^\]]*))?\]\][ \t]*$", re.M)
+
+
+def hub_notatki(sk: "Skarbiec", rel: str) -> str | None:
+    """Właściwy hub notatki: hub w jej katalogu (folder skarbca, agent, marka, agent w archiwum), a bez niego hub jej
+    folderu najwyższego poziomu (`inspiracje/strony/…` → `inspiracje/_hub-inspiracje`, `archiwum/podmioty/…` →
+    `archiwum/_hub-archiwum`); None, gdy folder nie ma huba."""
+    if "/" not in rel:
+        return None
+    katalog, gora = rel.rsplit("/", 1)[0], rel.split("/", 1)[0]
+    d = sk.root / katalog
+    huby = sorted(p.stem for p in d.glob("_hub-*.md")) if d.is_dir() else []
+    if huby:
+        return f"{katalog}/{huby[0]}"
+    return f"{gora}/{HUBY[gora][0]}" if gora in HUBY and sk.istnieje(f"{gora}/{HUBY[gora][0]}") else None
+
+
+def popraw_hub(sk: "Skarbiec", rel: str, tekst: str, znane: dict | None = None, zbior: set | None = None,
+               stary_hub: str = "") -> str:
+    """Notatka `rel` bez linku do huba swojego folderu (21.11: po `przenies` zostawała linia `- hub:
+    [[agenci/jarvo/_hub-jarvo]]`, lint „bez linku do huba folderu”): linia hub dawnego folderu (`stary_hub`, bez niego
+    pierwsza linia `- hub:`, bo kompilator stawia hub własnego folderu pierwszy) wskazuje hub jej folderu (hub_notatki;
+    etykieta idzie za hubem). Gdy była to jedyna droga do innego folderu, dawny cel zostaje zwykłym linkiem w następnej
+    linii. Notatka bez linii hub, z sekcją „## Powiązane”, dostaje ją na początku sekcji. Notatka, która ma już link do
+    huba swojego folderu, zostaje bez zmian (dalsze linie `- hub:` do innych folderów to linki między folderami)."""
+    gora = rel.split("/", 1)[0]
+    if rel.rsplit("/", 1)[-1].startswith("_hub-") or rel.startswith((*SUROWE, TOZSAMOSC + "/")) or rel in KOLEJNOSC_TOZSAMOSCI:
+        return tekst
+    hub = hub_notatki(sk, rel)
+    if not hub:
+        return tekst
+    _fm, body = podziel(tekst)
+    naglowek = tekst[:len(tekst) - len(body)]
+    if zbior is None:
+        zbior, znane = sk.mapa()
+    rozw = lambda c: sk.rozwiaz(c.strip().removesuffix(".md"), znane, zbior) or c.strip()       # noqa: E731
+    reczne = [rozw(m.group(1)) for m in LINK_RE.finditer(GEN_RE.sub("", body))]
+    if any(c.startswith(gora + "/") and c.rsplit("/", 1)[-1].startswith("_hub-") for c in reczne):
+        return tekst
+    linie = list(HUB_LINIA_RE.finditer(body))
+    m = next((x for x in linie if rozw(x.group(2)) == stary_hub), None) if stary_hub else None
+    m = m or (linie[0] if linie else None)
+    if m is None:
+        pow_ = re.search(r"^## Powiązane[ \t]*\n", body, re.M)
+        return naglowek + body[:pow_.end()] + f"- hub: [[{hub}]]\n" + body[pow_.end():] if pow_ else tekst
+    dawny = rozw(m.group(2))
+    etykieta = f"|{sk.wczytaj(hub).tytul}" if m.group(4) is not None else ""
+    linia = f"{m.group(1)}[[{hub}{m.group(3) or ''}{etykieta}]]"
+    inne = [c for i, c in enumerate(reczne) if c.split("/", 1)[0] != gora and c != dawny]
+    if not inne and dawny.split("/", 1)[0] != gora:
+        linia += f"\n- [[{dawny}]]"                       # jedyny link do innego folderu zostaje
+    return naglowek + body[:m.start()] + linia + body[m.end():]
+
+
+def napraw_huby(sk: "Skarbiec") -> dict:
+    """Jednorazowa naprawa po przenosinach sprzed 21.11: popraw_hub we wszystkich notatkach (bez źródeł, szkiców, kopii
+    repo, hubów i tożsamości). Zwraca {"sprawdzone", "poprawione", "notatki": [ścieżki]}."""
+    zbior, znane = sk.mapa()
+    out: dict = {"sprawdzone": 0, "poprawione": 0, "notatki": []}
+    for rel in sorted(zbior):
+        if rel.startswith(SUROWE) or rel.rsplit("/", 1)[-1].startswith("_hub-"):
+            continue
+        p = sk.plik(rel)
+        tekst = p.read_text(encoding="utf-8", errors="replace")
+        out["sprawdzone"] += 1
+        nowy = popraw_hub(sk, rel, tekst, znane, zbior)
+        if nowy != tekst:
+            sk.zapisz_plik(rel, nowy)
+            out["poprawione"] += 1
+            out["notatki"].append(rel)
+    return out
+
+
 def przenies_notatki(sk: "Skarbiec", mapa: dict[str, str], fm_dodaj: dict[str, dict] | None = None,
                      przekieruj: dict[str, str] | None = None, pliki: dict[str, str] | None = None) -> dict:
     """Przenosi notatki (`mapa`: stara ścieżka → nowa, bez `.md`) i przepisuje linki do nich we wszystkich notatkach
@@ -2470,13 +2543,21 @@ def przenies_notatki(sk: "Skarbiec", mapa: dict[str, str], fm_dodaj: dict[str, d
     `pliki` (względne ścieżki z rozszerzeniem) to załączniki przenoszone bez zmian. Puste katalogi po starych ścieżkach
     znikają. Zwraca {"przeniesione", "notatek_z_linkami", "linkow", "_mapa" (stara → nowa)}."""
     zbior, znane = sk.mapa()
+    bledy = []                                              # wszystkie przed jakąkolwiek zmianą: nic nie przeniesione
     for stara, nowa in mapa.items():
         if stara not in zbior:
-            raise ValueError(f"nie ma notatki `{stara}`")
-        if sk.istnieje(nowa) or list(mapa.values()).count(nowa) > 1:
-            raise ValueError(f"`{nowa}` już istnieje")
-        sk.plik(nowa)                                       # ścieżka poza skarbcem = ValueError przed jakąkolwiek zmianą
+            bledy.append(f"nie ma notatki `{stara}`")
+        elif sk.istnieje(nowa) or list(mapa.values()).count(nowa) > 1:
+            bledy.append(f"`{nowa}` już istnieje")
+        else:
+            try:
+                sk.plik(nowa)                               # ścieżka poza skarbcem
+            except ValueError as e:
+                bledy.append(str(e))
+    if bledy:
+        raise ValueError("nic nie przeniesione: " + "; ".join(bledy))
     cele = {s: (przekieruj or {}).get(s) or n for s, n in mapa.items()}
+    stare_huby = {n: hub_notatki(sk, s) or "" for s, n in mapa.items()}      # hub dawnego folderu (przed przeniesieniem)
     for stara, nowa in mapa.items():
         tekst = sk.plik(stara).read_text(encoding="utf-8", errors="replace")
         if fm_dodaj and fm_dodaj.get(stara):
@@ -2503,13 +2584,19 @@ def przenies_notatki(sk: "Skarbiec", mapa: dict[str, str], fm_dodaj: dict[str, d
     for rel in sorted(po):
         znane_po.setdefault(rel.rsplit("/", 1)[-1], rel)
     rozwiaz = lambda c: sk.rozwiaz(c, znane, zbior) if c not in mapa else c            # noqa: E731
-    wynik = {"przeniesione": len(mapa) + len(pliki or {}), "notatek_z_linkami": 0, "linkow": 0, "_mapa": dict(mapa)}
+    wynik = {"przeniesione": len(mapa) + len(pliki or {}), "notatek_z_linkami": 0, "linkow": 0, "huby": 0, "_mapa": dict(mapa)}
+    przeniesione = set(mapa.values())
     for rel in sorted(po):
         if rel.startswith(LUSTRO_REPO + "/"):
             continue
         p = sk.plik(rel)
         tekst = p.read_text(encoding="utf-8", errors="replace")
         nowy, ile = przepisz_linki(tekst, cele, rozwiaz, znane_po)
+        if rel in przeniesione:                              # przeniesiona notatka: linia hub z jej nowego folderu
+            poprawiona = popraw_hub(sk, rel, nowy, znane_po, po, cele.get(stare_huby.get(rel, ""), stare_huby.get(rel, "")))
+            if poprawiona != nowy:
+                nowy, ile = poprawiona, ile + 1
+                wynik["huby"] += 1
         fm, body = podziel(nowy)
         zast = _norm(str(fm.get("zastapiona_przez") or ""))
         if zast in cele:
@@ -2547,9 +2634,11 @@ def archiwizuj(sk: "Skarbiec", sciezki: list[str], powod: str, zastapiona_przez:
     notatki: list[str] = []
     zalaczniki: dict[str, str] = {}
     wszystkie = sk.pliki()
+    bledy: list[str] = []                     # 21.11: jedna literówka na liście przerywała całość bez wskazania, która
     for s in (_norm(x) for x in sciezki):
         if (blad := _chronione(s)):
-            raise ValueError(f"`{s}`: {blad}")
+            bledy.append(f"`{s}`: {blad}")
+            continue
         katalog = sk.root / s
         if katalog.is_dir():
             notatki += [r for r in wszystkie if r.startswith(s + "/")]
@@ -2560,13 +2649,14 @@ def archiwizuj(sk: "Skarbiec", sciezki: list[str], powod: str, zastapiona_przez:
         elif sk.istnieje(s):
             notatki.append(s)
         else:
-            raise ValueError(f"nie ma notatki ani katalogu `{s}`")
+            bledy.append(f"`{s}`: nie ma takiej notatki ani katalogu")
     notatki = list(dict.fromkeys(notatki))
+    if nastepca and (nastepca in notatki or nastepca.startswith(ARCHIWUM + "/") or not sk.istnieje(nastepca)):
+        bledy.append(f"następca `{nastepca}` musi być istniejącą notatką spoza archiwum i spoza archiwizowanych")
+    if bledy:
+        raise ValueError(f"nic nie zarchiwizowane, popraw {len(bledy)} z {len(sciezki) + bool(nastepca)}: " + "; ".join(bledy))
     if not notatki:
-        raise ValueError("nic do archiwizacji")
-    if nastepca:
-        if nastepca in notatki or nastepca.startswith(ARCHIWUM + "/") or not sk.istnieje(nastepca):
-            raise ValueError(f"następca `{nastepca}` musi być istniejącą notatką spoza archiwum i spoza archiwizowanych")
+        raise ValueError("nic do archiwizacji (katalog bez notatek)")
     fm = {"status": "wycofana", "wycofano": dzis(), "powod": powod, **({"zastapiona_przez": nastepca} if nastepca else {})}
     return przenies_notatki(sk, {s: f"{ARCHIWUM}/{s}" for s in notatki}, {s: fm for s in notatki},
                             {s: nastepca for s in notatki} if nastepca else None, zalaczniki)
@@ -2656,7 +2746,10 @@ def porzadki(sk: Skarbiec, rodzaj: str, opis: str, operacja, czekaj_s: float = 6
                 ix.odswiez_wektory(KlientWektorow(sk.stan, WEKTORY_CZAS_ZAPISU_S))
         finally:
             ix.zamknij()
-        sk.dopisz_log(rodzaj, opis + "".join(f"\n- {s} → {n}" for s, n in mapa.items()))
+        if wynik.get("poprawione") == 0:                       # naprawa bez zmian: bez wpisu w LOG i punktu zapisu
+            return wynik
+        szczegoly = [f"{s} → {n}" for s, n in mapa.items()] or [str(n) for n in wynik.get("notatki") or []]
+        sk.dopisz_log(rodzaj, opis + "".join(f"\n- {x}" for x in szczegoly))
         wynik["git"] = sk.punkt_zapisu(opis)
         return wynik
     finally:
@@ -3162,6 +3255,7 @@ def main(argv: list[str] | None = None) -> int:
     zr = sz.add_mutually_exclusive_group(required=True)
     zr.add_argument("--plik")
     zr.add_argument("--tekst")
+    sub.add_parser("napraw-huby", help="linia `- hub:` każdej notatki wskazuje hub jej folderu (naprawa po przenosinach)")
     pm = sub.add_parser("pamiec", help="lustro pamięci Hermesa (po treści plików): notatki Jarva i szkice nowych wpisów")
     pm.add_argument("--profil", default=None, help="katalog profilu (domyślnie <skarbiec>/../../profiles/jarvo)")
     pm.add_argument("--agent", default=PROFIL_TOZSAMOSCI)
@@ -3232,9 +3326,12 @@ def main(argv: list[str] | None = None) -> int:
     if not sk.root.is_dir():
         print(f"✗ brak skarbca {sk.root} (najpierw `zasiej`)", file=sys.stderr)
         return 2
-    if a.cmd in ("archiwizuj", "przenies", "streszczenie"):
+    if a.cmd in ("archiwizuj", "przenies", "streszczenie", "napraw-huby"):
         try:
-            if a.cmd == "archiwizuj":
+            if a.cmd == "napraw-huby":
+                r = porzadki(sk, "naprawa", "naprawa linii hub w notatkach", lambda: napraw_huby(sk))
+                print("\n".join(f"  - {n}" for n in r.pop("notatki")))
+            elif a.cmd == "archiwizuj":
                 opis = f"archiwum: {', '.join(a.sciezki)} ({' '.join(a.powod.split())[:120]})"
                 r = porzadki(sk, "archiwum", opis, lambda: archiwizuj(sk, a.sciezki, a.powod, a.zastapiona_przez))
             elif a.cmd == "przenies":

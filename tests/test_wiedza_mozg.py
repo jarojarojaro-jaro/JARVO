@@ -475,3 +475,91 @@ def test_obieg_pamiec_kompilacja_przypomnienie_mozg(dane):
     (d / "profiles" / "jarvo-web").mkdir(parents=True)
     inny.initialize("s3", hermes_home=str(d / "profiles" / "jarvo-web"), platform="api_server", agent_context="primary")
     assert "`user/pamięć jarva o tobie`" in inny.prefetch("czy JARO woli raport w 3 punktach?", session_id="s3")
+
+
+# --------------------------------------------------------------- regresje 21.11 (porządki Jarva: 64 przeniesienia, 23 archiwizacje)
+
+def test_przenies_i_archiwizuj_poprawiaja_linie_hub(dane, capsys):
+    """21.11: po `przenies` w notatce zostawała linia `- hub: [[agenci/jarvo/_hub-jarvo]]` (lint 153 → 161 ostrzeżeń „bez
+    linku do huba folderu”, Jarvo poprawiał pythonem). Teraz przeniesiona notatka wskazuje hub nowego folderu, a notatka
+    w archiwum hub archiwum (etykieta idzie za hubem); inne linki bez zmian."""
+    sk = dane["sk"]
+    _notatka(sk, "agenci/jarvo/lekcja ogólna", "Lekcja ogólna", "Najpierw pomiar.", ["agenci/jarvo/_hub-jarvo", "user/_hub-ty"])
+    tekst = sk.plik("agenci/jarvo/lekcja ogólna").read_text(encoding="utf-8").replace(
+        "- [[agenci/jarvo/_hub-jarvo]]", "- hub: [[agenci/jarvo/_hub-jarvo|Jarvo]]")
+    sk.zapisz_plik("agenci/jarvo/lekcja ogólna", tekst)
+    _notatka(sk, "podmioty/stara firma", "Stara firma", "Firma zamknięta.", [])
+    sk.zapisz_plik("podmioty/stara firma", sk.plik("podmioty/stara firma").read_text(encoding="utf-8").replace(
+        "## Powiązane\n", "## Powiązane\n- hub: [[podmioty/_hub-podmioty]]\n"))
+    assert _cli(dane, "przenies", "agenci/jarvo/lekcja ogólna", "pojecia") == 0
+    t = sk.plik("pojecia/lekcja ogólna").read_text(encoding="utf-8")
+    assert "- hub: [[pojecia/_hub-pojecia|Pojęcia]]" in t and "_hub-jarvo" not in t and "- [[user/_hub-ty]]" in t
+    assert "huby: 1" in capsys.readouterr().out
+    assert _cli(dane, "archiwizuj", "podmioty/stara firma", "--powod", "zamknięta") == 0
+    assert "- hub: [[archiwum/_hub-archiwum]]" in sk.plik("archiwum/podmioty/stara firma").read_text(encoding="utf-8")
+    ix = w.Indeks(sk)
+    raport = w.lint(sk, ix)
+    ix.zamknij()
+    assert not [o for o in raport["ostrzezenia"] if "bez linku do huba folderu" in o and "lekcja ogólna" in o], raport
+
+
+def test_archiwizuj_sprawdza_wszystkie_sciezki_przed_zmiana(dane, capsys):
+    """21.11: jedna literówka na liście `archiwizuj` przerywała całość bez wskazania, która. Teraz wszystkie ścieżki są
+    sprawdzane przed zmianą, komunikat wymienia każdą złą, a skarbiec, LOG i git zostają bez zmian."""
+    sk = dane["sk"]
+    _notatka(sk, "pojecia/dobra", "Dobra", "Istnieje.", ["pojecia/_hub-pojecia"])
+    _notatka(sk, "pojecia/druga dobra", "Druga dobra", "Istnieje.", ["pojecia/_hub-pojecia"])
+    log = (sk.root / "LOG.md").read_text(encoding="utf-8")
+    kod = _cli(dane, "archiwizuj", "pojecia/dobra", "pojecia/literowka", "pojecia/druga dobra", "user/_hub-ty",
+               "pojecia/inna literowka", "--powod", "porządki")
+    err = capsys.readouterr().err
+    assert kod == 3 and "nic nie zarchiwizowane, popraw 3 z 5" in err
+    assert "`pojecia/literowka`: nie ma takiej notatki" in err and "`pojecia/inna literowka`" in err and "`user/_hub-ty`" in err
+    assert sk.istnieje("pojecia/dobra") and sk.istnieje("pojecia/druga dobra") and not (sk.root / "archiwum" / "pojecia").exists()
+    assert (sk.root / "LOG.md").read_text(encoding="utf-8") == log
+    with pytest.raises(ValueError, match="nic nie przeniesione: nie ma notatki `pojecia/brak`; `pojecia/druga dobra` już istnieje"):
+        w.przenies_notatki(sk, {"pojecia/brak": "user/brak", "pojecia/dobra": "pojecia/druga dobra"})
+    assert sk.istnieje("pojecia/dobra")
+
+
+def test_napraw_huby_po_starych_przenosinach(dane, capsys):
+    """Jednorazowa naprawa skarbca po przenosinach sprzed poprawki (`wiedza.py napraw-huby`, `jarvo wiedza napraw-huby`):
+    linia hub każdej notatki wskazuje hub jej folderu; notatka bez linii hub i bez linku do huba folderu dostaje ją;
+    notatki poprawne, huby i tożsamość bez zmian; drugi przebieg nic nie zmienia."""
+    sk = dane["sk"]
+    _notatka(sk, "pojecia/po przenosinach", "Po przenosinach", "Była w agenci/jarvo.", [])
+    sk.zapisz_plik("pojecia/po przenosinach", sk.plik("pojecia/po przenosinach").read_text(encoding="utf-8").replace(
+        "## Powiązane\n", "## Powiązane\n- hub: [[agenci/jarvo/_hub-jarvo]]\n- [[user/_hub-ty]]\n"))
+    _notatka(sk, "podmioty/bez huba", "Bez huba", "Nie ma linii hub.", ["pojecia/po przenosinach"])
+    _notatka(sk, "user/poprawna", "Poprawna", "Ma hub swojego folderu.", ["user/_hub-ty"])
+    # kompilator pisze „hub:” przy każdym hubie: dalsze linie hub do innych folderów to linki między folderami
+    sk.zapisz_plik("user/poprawna", sk.plik("user/poprawna").read_text(encoding="utf-8").replace(
+        "- [[user/_hub-ty]]", "- hub: [[user/_hub-ty]]\n- hub: [[agenci/jarvo/_hub-jarvo]]"))
+    _notatka(sk, "pojecia/jedyny link", "Jedyny link", "Jedyną drogą do innego folderu był dawny hub.", [])
+    sk.zapisz_plik("pojecia/jedyny link", sk.plik("pojecia/jedyny link").read_text(encoding="utf-8").replace(
+        "## Powiązane\n", "## Powiązane\n- hub: [[agenci/jarvo/_hub-jarvo|Jarvo]]\n- [[pojecia/po przenosinach]]\n"))
+    poprawna = sk.plik("user/poprawna").read_text(encoding="utf-8")
+    tozsamosc = sk.plik("jarvo/kim jest jarvo").read_text(encoding="utf-8")
+    ix = w.Indeks(sk)
+    przed = [o for o in w.lint(sk, ix)["ostrzezenia"] if "bez linku do huba folderu" in o]
+    ix.zamknij()
+    assert any("po przenosinach" in o for o in przed) and any("bez huba" in o for o in przed)
+    assert _cli(dane, "napraw-huby") == 0
+    out = capsys.readouterr().out
+    assert "- pojecia/po przenosinach" in out and "- podmioty/bez huba" in out and "user/poprawna" not in out
+    t = sk.plik("pojecia/po przenosinach").read_text(encoding="utf-8")
+    assert "- hub: [[pojecia/_hub-pojecia]]\n- [[user/_hub-ty]]" in t
+    assert "## Powiązane\n- hub: [[podmioty/_hub-podmioty]]\n- [[pojecia/po przenosinach]]" in sk.plik("podmioty/bez huba").read_text(encoding="utf-8")
+    assert sk.plik("user/poprawna").read_text(encoding="utf-8") == poprawna
+    assert ("- hub: [[pojecia/_hub-pojecia|Pojęcia]]\n- [[agenci/jarvo/_hub-jarvo]]\n- [[pojecia/po przenosinach]]"
+            in sk.plik("pojecia/jedyny link").read_text(encoding="utf-8"))          # jedyny link do innego folderu zostaje
+    assert sk.plik("jarvo/kim jest jarvo").read_text(encoding="utf-8") == tozsamosc
+    assert "naprawa | naprawa linii hub w notatkach\n- podmioty/bez huba\n- pojecia/jedyny link\n- pojecia/po przenosinach" in (sk.root / "LOG.md").read_text(encoding="utf-8")
+    ix = w.Indeks(sk)
+    po = w.lint(sk, ix)["ostrzezenia"]
+    ix.zamknij()
+    assert not [o for o in po if "bez linku do huba folderu" in o]
+    assert not [o for o in po if "bez linku do innego folderu" in o and ("jedyny link" in o or "poprawna" in o)]
+    log = (sk.root / "LOG.md").read_text(encoding="utf-8")
+    assert _cli(dane, "napraw-huby") == 0 and "poprawione: 0" in capsys.readouterr().out
+    assert (sk.root / "LOG.md").read_text(encoding="utf-8") == log                   # drugi przebieg: nic, bez wpisu w LOG

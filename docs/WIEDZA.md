@@ -440,6 +440,12 @@ operacja) i po, wpis w LOG, indeks, INDEX i listy hubów od nowa (`wiedza.porzad
   „agent wycofany z floty” (14.11 jarvo-operator). Tytuł huba agenta z fleet.yaml: emoji, `hq_short`, profil („🛰️ Jarvo (jarvo)”).
 - `przenies <ścieżka> <folder>`: ten sam tytuł w innym folderze (FOLDERY_SKARBCA z notatkami albo istniejący podkatalog),
   linki przepisane, wektor idzie za notatką. Hubów, tożsamości i archiwum nie przenosi.
+- Przeniesiona albo zarchiwizowana notatka dostaje w linii `- hub:` hub swojego nowego folderu (`popraw_hub`: linia huba
+  dawnego folderu wskazuje nowy hub, a gdy była jedyną drogą do innego folderu, dawny cel zostaje zwykłym linkiem; dalsze
+  linie `- hub:` do innych folderów to linki między folderami i zostają). Wszystkie ścieżki `archiwizuj` i `przenies` są
+  sprawdzane przed zmianą: zła ścieżka = komunikat z listą wszystkich złych, nic nie zmienione (21.11: jedna literówka
+  przerywała całość bez wskazania). `napraw-huby` (także `jarvo wiedza napraw-huby`): to samo dla całego skarbca po
+  przenosinach sprzed poprawki; drugi przebieg niczego nie zmienia i nie pisze w LOG.
 - `streszczenie <hub> (--plik P | --tekst T)`: blok `<!-- Jarvo:STRESZCZENIE -->…<!-- /Jarvo:STRESZCZENIE -->` pod tytułem
   huba (Markdown, do 1500 znaków) i `streszczono: RRRR-MM-DD`; zasiew i indeksuj go nie ruszają. Streszczenie huba jest jego
   streszczeniem w indeksie i Mózgu (`/graph`: `podsumowanie`, `streszczono`), a hub ze streszczeniem wraca w przypomnieniach.
