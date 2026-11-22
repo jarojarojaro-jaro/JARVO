@@ -106,6 +106,16 @@ def test_jedna_definicja_folderow():
     assert all("—" not in d["opis"] and "–" not in d["opis"] for d in w.FOLDERY_SKARBCA.values())
 
 
+def test_streszczenie_sekcji_z_sama_tabela():
+    """Sekcja z samą tabelą (REKORDY Kernela) ma w przypomnieniu liczby, nie pusty opis (22.11)."""
+    tekst = ("| metryka | rekord | data |\n|---|---|---|\n| sweep, mediana | **115.5 t/s** | 2026-10-15 |\n"
+             "| tg128 | 44.0 t/s | 2026-10-15 |\n| trzeci | 1 | 2 |\n\nPo tabeli.")
+    assert w.streszczenie_tresci(tekst) == "Po tabeli."
+    assert w.streszczenie_tresci(tekst.split("\n\n")[0]) == ("sweep, mediana, rekord: 115.5 t/s, data: 2026-10-15; "
+                                                              "tg128, rekord: 44.0 t/s, data: 2026-10-15")
+    assert w.streszczenie_tresci("") == ""
+
+
 # --------------------------------------------------------------- tożsamość i mapa
 
 def test_tozsamosc_i_lustra_pamieci_z_frontmatterem(dane):

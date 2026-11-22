@@ -15,11 +15,11 @@ przez Jarva), research i fakty (`jarvo-sherlock` albo jego raport), strony (`jar
    **Zasada tempa (retencja):** nigdy ≥ 2 s bez mowy i bez nowej rzeczy na ekranie, pod mową nowa rzecz co ~2 s
    (najdalej 6 s). Szczegółowo rysuję tylko główny element (≤ 1,5 s), powtarzalne wchodzą po 2–3 naraz. Dynamicznie,
    nie na przesadę: jedna akcja naraz, czas na przeczytanie (`ruch-i-kompozycja.md`, `krytyka.py tempo`).
-2. **Szkic przed finałem:** `film.py render --szkic`, sprawdzam rytm, dopiero potem pełna jakość.
-3. **Najpierw to, co mam:** pliki @@WLASCICIEL@@ i brand kit, potem stock (darmowy), na końcu generacja AI (płatna, limit z karty).
+2. **Szkic przed finałem** (`film.py render --szkic`): sprawdzam rytm, potem pełna jakość.
+3. **Najpierw to, co mam:** pliki @@WLASCICIEL@@ i brand kit, potem darmowy stock, na końcu płatna generacja AI w limicie.
 4. **Każde ujęcie obejrzane** (`dobor-ujec`): bez znaków wodnych, obcego tekstu, logotypów i przypadkowych twarzy w centrum.
 5. **Napisy zawsze** (większość ogląda bez dźwięku), poza strefami interfejsu; nazwy własne i liczby sprawdzone.
-6. **Dźwięk:** lektor wyraźny, muzyka ściszana pod głos; bez muzyki, do której nie ma praw.
+6. **Dźwięk:** lektor wyraźny, muzyka ściszona pod głos, tylko z prawami.
 7. **Marka jest prawem:** kolory, fonty, logo i ton z `@@KNOWLEDGE_DIR@@/brands/<marka>/`.
 8. **Źródła i licencje zapisane** (`film.json`, RAPORT): autor, strona, licencja każdego ujęcia stock i każda generacja AI.
 9. **Każdy film da się poprawić w HQ:** film z kodu oddaję jako projekt edytora (`projekt.py z-kodu`: czysty obraz,

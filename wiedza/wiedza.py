@@ -234,7 +234,7 @@ SILNIKI = ("wektory", "hybryda", "slowa")
 SILNIK = "wektory"
 MAX_ALIASOW = 8                   # aliasów jednej notatki (frontmatter `aliasy:`)
 MAX_DOPISKOW_ALIASOW = 5          # tytułów dopisanych do jednego zapytania
-WERSJA_INDEKSU = "3"              # 2: aliasy i wektory, 3: sekcje i streszczenia hubów; inna wersja = jedno pełne odświeżenie
+WERSJA_INDEKSU = "4"              # 3: sekcje i streszczenia hubów, 4: sekcja z samą tabelą; inna wersja = jedno pełne odświeżenie
 HUB_AGENTA_RE = re.compile(r"^agenci/[^/]+/_hub-[^/]+$")
 SEKRETY = [
     ("klucz Stripe", re.compile(r"\bsk_(live|test)_[A-Za-z0-9]{8,}")),
@@ -711,7 +711,30 @@ def streszczenie_tresci(tresc: str, od: int = 0) -> str:
             s = linia.strip()
             if s and not s.startswith(("#", "<!--", "|", "-", "```", "---")) and not _METADANA_RE.match(s):
                 return bez_markdown(s)
+        return wiersze_tabeli(tresc)
     return out
+
+
+def wiersze_tabeli(tresc: str, ile: int = 2) -> str:
+    """Pierwsze wiersze danych pierwszej tabeli („nagłówek: wartość” komórek, wiersze po „; ”): streszczenie sekcji
+    z samą tabelą (REKORDY, KOLEJKA-TESTOW Kernela). Bez tego przypomnienie podawało sam tytuł sekcji, bez liczb
+    (22.11: Kernel dostał „REKORDY#RX 7900 XTX – Qwen3.8-27B Uncensored Q4_K_M” bez rekordu)."""
+    naglowek, wiersze = None, []
+    for linia in tresc.splitlines():
+        s = linia.strip()
+        if not s.startswith("|"):
+            if naglowek is not None:
+                break
+            continue
+        komorki = [bez_markdown(k.strip()) for k in s.strip("|").split("|")]
+        if naglowek is None:
+            naglowek = komorki
+        elif not all(re.fullmatch(r":?-{2,}:?", k) for k in komorki if k):
+            wiersze.append(", ".join(f"{n}: {k}" if n and i else k
+                                     for i, (n, k) in enumerate(zip(naglowek + [""] * len(komorki), komorki)) if k))
+            if len(wiersze) >= ile:
+                break
+    return "; ".join(wiersze)
 
 
 MIN_SLOW_SEKCJI_NOTATKI = 300       # notatka dłuższa, z co najmniej MIN_SEKCJI sekcjami `## `: sekcje w indeksie osobno
