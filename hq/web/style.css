@@ -2396,18 +2396,18 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-siec-traf { fill: transparent; }
 .j-siec-w { fill: var(--j-tlo-pasek); stroke: var(--j-tekst-2); stroke-width: 1.5; vector-effect: non-scaling-stroke; transition: stroke .2s var(--j-ease); }
 .j-siec-k { fill: var(--c); }
-.j-siec-t { fill: var(--j-tekst); font: 600 14px var(--j-font-ui); }
-.j-siec-l { fill: var(--j-tekst-2); font: 500 12px var(--j-font-mono); }
-.j-siec-o { fill: var(--j-tekst-3); font: 400 11.5px var(--j-font-ui); }
+.j-siec-t { fill: var(--j-tekst); font: 600 17px var(--j-font-ui); }
+.j-siec-l { fill: var(--j-tekst-2); font: 500 14px var(--j-font-mono); }
+.j-siec-o { fill: var(--j-tekst-3); font: 400 13.5px var(--j-font-ui); }
 .j-siec-cz { cursor: pointer; outline: none; }
 .j-siec-cz.is-cicha { opacity: .6; }
-.j-siec.is-nad .j-siec-cz:not(.is-on) { opacity: .35; }
+.j-siec.is-nad .j-siec-cz:not(.is-on), .j-siec.is-nad .j-siec-luki path:not(.is-on) { opacity: .3; }
 .j-siec-cz.is-on .j-siec-os, .j-siec-luki path.is-on { stroke: var(--j-tekst-2) !important; }
 .j-siec-cz.is-on .j-siec-w { stroke: var(--j-tekst); }
 .j-siec-cz:focus-visible .j-siec-w { stroke: var(--j-fokus); stroke-width: 3; }
 .j-siec-srodek circle { fill: var(--j-tlo-3); stroke: var(--j-tekst); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-.j-siec-st { fill: var(--j-tekst); font: 700 20px var(--j-font-naglowek); font-stretch: 125%; letter-spacing: .08em; }
-.j-siec-sl { fill: var(--j-tekst-2); font: 500 11px var(--j-font-mono); }
+.j-siec-st { fill: var(--j-tekst); font: 700 24px var(--j-font-naglowek); font-stretch: 125%; letter-spacing: .08em; }
+.j-siec-sl { fill: var(--j-tekst-2); font: 500 13px var(--j-font-mono); }
 .j-mozg .j-siec-naj { position: absolute; right: 16px; top: 16px; padding: 8px 14px; background: var(--j-tlo-3); box-shadow: inset 0 0 0 1px var(--j-linia);
   color: var(--j-tekst); font: 500 13px var(--j-font-ui); }
 .j-mozg .j-siec-naj:hover { box-shadow: inset 0 0 0 1px var(--j-linia-mocna); }

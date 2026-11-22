@@ -445,8 +445,8 @@ function MozgSiec({ siec, centrum, ile, href, nazwa, opis }) {
   const { cx: sx, cy: sy, wezly, luki } = siec, { w, h } = MOZG_SIEC;
   // łuk między częściami wygięty lekko do środka (nie przez środek): czytelna sieć zamiast gwiazdy
   const luk = (a, b) => { const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2; return `M${a.x},${a.y} Q${sx + (mx - sx) * 0.62},${sy + (my - sy) * 0.62} ${b.x},${b.y}`; };
-  const podpis = (v) => { const c = Math.cos(v.a), s = Math.sin(v.a), d = v.r + 12, pion = Math.abs(c) < 0.12;
-    return { x: v.x + c * d, y: v.y + s * d + (pion ? (s > 0 ? 14 : -18) : -2), kotwica: pion ? "middle" : c > 0 ? "start" : "end" }; };
+  const podpis = (v) => { const c = Math.cos(v.a), s = Math.sin(v.a), d = v.r + 14, pion = Math.abs(c) < 0.12;
+    return { x: v.x + c * d, y: v.y + s * d + (pion ? (s > 0 ? 18 : -26) : -2), kotwica: pion ? "middle" : c > 0 ? "start" : "end" }; };
   return html`<svg class=${cx("j-siec", nad >= 0 && "is-nad")} viewBox=${`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" role="group"
       aria-label=${L(`Mapa mózgu: ${centrum} i ${wezly.length} części`, `Brain map: ${centrum} and ${wezly.length} parts`)}>
     <g class="j-siec-luki" aria-hidden="true">${luki.map((l) => html`<path key=${l.p + "-" + l.q} d=${luk(wezly[l.p], wezly[l.q])}
@@ -460,12 +460,12 @@ function MozgSiec({ siec, centrum, ile, href, nazwa, opis }) {
         <circle cx=${v.x} cy=${v.y} r=${v.r} class="j-siec-w"/>
         <circle cx=${v.x} cy=${v.y} r=${Math.max(2.5, v.r * 0.32)} class="j-siec-k"/>
         <text x=${p.x} y=${p.y} text-anchor=${p.kotwica} class="j-siec-t">${nazwa(v.d)}<tspan class="j-siec-l" dx="7">${v.d.ile}</tspan></text>
-        ${o && html`<text x=${p.x} y=${p.y + 17} text-anchor=${p.kotwica} class="j-siec-o">${o.length > 44 ? o.slice(0, 43).replace(/[\s,;:]+\S*$/, "") + "…" : o}</text>`}
+        ${o && html`<text x=${p.x} y=${p.y + 20} text-anchor=${p.kotwica} class="j-siec-o">${o.length > 42 ? o.slice(0, 41).replace(/[\s,;:]+\S*$/, "") + "…" : o}</text>`}
       </a>`; })}
     <g class="j-siec-srodek" aria-hidden="true">
-      <circle cx=${sx} cy=${sy} r="62"/>
-      <text x=${sx} y=${sy + 2} text-anchor="middle" class="j-siec-st">${centrum}</text>
-      <text x=${sx} y=${sy + 22} text-anchor="middle" class="j-siec-sl">${ile} ${L("notatek", "notes")}</text>
+      <circle cx=${sx} cy=${sy} r="70"/>
+      <text x=${sx} y=${sy + 4} text-anchor="middle" class="j-siec-st">${centrum}</text>
+      <text x=${sx} y=${sy + 27} text-anchor="middle" class="j-siec-sl">${ile} ${L("notatek", "notes")}</text>
     </g>
   </svg>`;
 }
