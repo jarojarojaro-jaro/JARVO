@@ -344,17 +344,19 @@ Do 18.11 tak było z hakiem księgi (`ksiega_bledow`) i ciszy tablicy (`cisza_ta
 not callable” i nie działały (karta t_8a8a79ab: odmowa Komputera bez dopisku, bez `state/bledy-licznik.json`). Dziś
 `przypomnienie_bledu` i `cisza_po_narzedziu`; test ładuje wtyczkę tak jak Hermes i sprawdza, że każdy hak to funkcja.
 
-### 4c. Sesje omp (Kernel): ten sam mózg w skrzynce sesji
+### 4c. Sesje omp (Kernel): ten sam mózg w skrzynce i w terminalu sesji
 
 Sesja omp (wpis `sesje.json` z `panel.zaplecze = "omp"`, wykonawca `jarvo/sesje_omp.py`) nie jest profilem Hermesa:
 nie ma haka `prefetch`, a jej baza to własny katalog notatek (Kernel: wiki w repo `~/dev/KERNEL`). Zamiast drugiego
 mechanizmu jest cienka warstwa `jarvo/mozg_sesji.py` nad tym samym silnikiem (`wiedza.py`: `Skarbiec`, `Indeks`,
 `notatki_przypomnienia`, `graf`, wektory z usługi wektorów instalacji) i tą samą mapą (`mapa.rdzen`, `mapa.notatka`).
-Pola wpisu i obieg: docstring modułu; polecenie `jarvo sesja <klucz> wiedza stan|przypomnij|ocena|indeksuj|tozsamosc`.
+Pola wpisu i obieg: docstring modułu; polecenie `jarvo sesja <klucz> wiedza stan|przypomnij|ocena|indeksuj|tozsamosc`
+(oraz `przed-tura`, `po-turze` dla wtyczki terminalu).
 
 | Jarvo (Hermes) | Sesja omp | Dlaczego inaczej |
 |---|---|---|
 | `prefetch` → `<memory-context>` w turze | skrzynka dokleja `<memory-context>` między wstępem a pierwszym nagłówkiem wiadomości (tura i dopisek); panel go nie pokazuje (czytnik_omp bierze tylko bloki z nagłówkami) | omp w trybie RPC nie ma haka; blok w wiadomości jest na końcu kontekstu, więc nie psuje cache stałej części promptu (zmiana `--append-system-prompt` = nowy proces omp i cały prefiks od nowa) |
+| ten sam `prefetch` w każdym wejściu | terminal właściciela (`jarvo sesja <klucz> terminal`, `kernel`): wpis z `panel.wiedza` startuje omp z `-e jarvo/omp/mozg_sesji.ts` (plik z kodu instalacji, `<program>/app/<wersja>`) i JARVO_SESJA_WIEDZA; wtyczka przed turą woła `wiedza przed-tura` (tekst na stdin, limit 6 s, błąd = tura bez bloku) i zwraca blok jako ukrytą wiadomość `jarvo-pamiec` (`display: false`: w kontekście i w pliku sesji, na ekranie tylko pasek stanu „pamięć: notatki N, linki M”), po biegu puszcza `wiedza po-turze` w tle; kanał `terminal` w rejestrze linków (domyślne `linki_z`) i w dzienniku przypomnień | interaktywny omp ma haki wtyczek (`before_agent_start`, `agent_end`), skrzynka RPC dokleja blok sama; rejestr i linki czekające pisze jeden proces naraz (`.linki.lock` w stanie), bo po_turze terminalu biegnie obok następnej tury |
 | indeks `state/wiedza.db` skarbca | indeks w `<skrzynka>/wiedza` nad katalogiem sesji, `pomin` zdejmuje z indeksu dziennik i audyt liczb | baza sesji to repo agenta: wiedza.py tylko czyta katalog (bez INDEX.md i list w hubach) |
 | ranking wiedza.py (hybryda) | RRF rankingu wiedza.py i rankingu bazy z `ranking` (Kernel: `kb search --mode bm25`, polska analiza po fragmentach) | pomiar 22.11 na 34 pytaniach z historii Kernela: wiedza.py sam hit@5 0,71, kb bm25 0,85, fuzja 0,91–0,94 przy p50 ok. 50 ms |
 | orzeczenia i pamięć w prompcie | `decyzje/` wiki są notatkami; `pierwszenstwo` dokłada jedną decyzję albo lekcję z dalszych miejsc | premia w RRF obniżała trafność (0,941 → 0,882 przy ×1,15) |
@@ -364,7 +366,10 @@ Pola wpisu i obieg: docstring modułu; polecenie `jarvo sesja <klucz> wiedza sta
 | build: SOUL + ZASADY z rdzeniem mapy | `panel.tozsamosc`: ten sam skład (znacznik `<!-- Jarvo:MAPA -->` w ZASADY.md), plik zapisywany tylko przy zmianie, pełna mapa jako notatka w katalogu wiedzy | ten sam mechanizm, inne miejsce zapisu (`--append-system-prompt`) |
 | Mózg: graf skarbca z wtyczki | graf z `Indeks.graf()` do pliku `graf` (+ `opis`, hub z `typ: hub`), źródło w `konfig/mozg.json` | `mozg_zrodla.py` czyta źródła z pliku |
 
-Testy: `tests/test_mozg_sesji.py`, `tests/test_sesje_omp.py::test_mozg_sesji_w_turze`.
+Testy: `tests/test_mozg_sesji.py`, `tests/test_sesje_omp.py::test_mozg_sesji_w_turze`,
+`::test_terminal_z_mozgiem_sesji`, `::test_wiedza_z_terminalu`. Wtyczka na żywo (22.11): `omp -p -e jarvo/omp/mozg_sesji.ts`
+z osobnym `--session-dir` w /tmp i kopią stanu wiedzy: wpis `custom_message` z `customType: jarvo-pamiec` w pliku
+sesji, wpis dziennika z `kanal: terminal`, wiersz linku `(terminal …)` w kopii rejestru z wyciągiem odpowiedzi po turze.
 
 ---
 
@@ -739,6 +744,7 @@ Wpisy do [SOURCES.md](SOURCES.md) i [TOOLBOX.md](TOOLBOX.md) dojdą z etapem, w 
 | `wiedza/SCHEMA.md` | zasady skarbca kopiowane do `knowledge/SCHEMA.md` |
 | `wiedza/mapa.py` | mapa Jarva (§2b): rdzeń do promptu (build, validate) i notatka `jarvo/jak działa jarvo` (zasiew) |
 | `jarvo/mozg_sesji.py`, `tests/test_mozg_sesji.py` | mózg sesji omp (§4c): przypomnienie przed turą w skrzynce, linki od właściciela w rejestrze, tożsamość z rdzeniem mapy, graf Mózgu, `ocena`; `jarvo sesja <klucz> wiedza …` |
+| `jarvo/omp/mozg_sesji.ts` | wtyczka omp terminalu sesji (§4c): `wiedza przed-tura` → ukryty `<memory-context>`, `wiedza po-turze` w tle; ładuje ją `jarvo sesja <klucz> terminal` dla wpisu z `panel.wiedza` |
 | `scripts/build.py` → `build/wiedza/tozsamosc/` | tożsamość Jarva dla skarbca (§2a): SOUL, ZASADY, KRYTYCZNE, MAPA repo i nakładki, `zrodla.json` |
 | `tests/test_wiedza_mozg.py` | tożsamość i mapa, lustro pamięci po treści, GET/PUT /pamiec (zgodność z Hermesem), archiwum, przeniesienie, streszczenia, routing kompilatora, obieg end to end |
 | `wiedza/bledy/*.md` | zasiew księgi błędów (§4b): notatki `blad` z błędów floty, `zasiej --bledy` dokłada tylko nowe |

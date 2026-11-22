@@ -22,7 +22,8 @@ Wpis `sesje.json` (panel):
              "powtorka_tur": 3,                        notatka z ostatnich N przypomnień nie wraca (jest w historii)
              "zrodla": "ZRODLA.md",                    rejestr źródeł w katalogu: link od właściciela = wiersz w sekcji
                                                        SEKCJA_LINKOW (bez pliku: linki tylko w przypomnieniu)
-             "linki_z": ["telegram", "panel"],         wiadomości, z których linki trafiają do rejestru
+             "linki_z": ["telegram", "panel", "terminal"],   wiadomości, z których linki trafiają do rejestru
+                                                       (terminal: wtyczka omp jarvo/omp/mozg_sesji.ts)
              "graf": "~/kernel/skrzynka/wiedza/graf.json"}   graf dla Mózgu (konfig/mozg.json), odświeżany po turze
   "tozsamosc": {"soul": "~/kernel/tozsamosc/SOUL.md", "zasady": "…/ZASADY.md", "mapa": "…/MAPA.md",
                 "plik": "~/kernel/system.md",          stała część promptu (`--append-system-prompt` z omp_arg)
@@ -31,13 +32,18 @@ Wpis `sesje.json` (panel):
 
 Obieg tury: `przypomnienie` (przed turą): linki z wiadomości właściciela → znane (gdzie już są) albo nowy wiersz
 w rejestrze z werdyktem CZEKA; indeks odświeżony; blok `<memory-context>` (notatki, linki, linki bez analizy z poprzednich
-tur) doklejany do wiadomości tury, wpis w dzienniku przypomnień (ms, notatki, znaki). `po_turze`: linki z dopisków do
+tur) doklejany do wiadomości tury, wpis w dzienniku przypomnień (kanał, ms, notatki, znaki). `po_turze`: linki z dopisków do
 rejestru; link bez śladu analizy w bazie (werdykt dalej CZEKA, URL nigdzie indziej) dostaje w werdykcie wyciąg
 odpowiedzi (wniosek zostaje w bazie, nawet gdy model zapomni) i wraca w przypomnieniu do POWTORZEN_LINKU tur; wiersz
 zastępczy znika, gdy analiza leży gdzie indziej. Potem wektory zmienionych notatek i graf Mózgu.
+
+Wejścia: skrzynka (jarvo/sesje_omp.py, wiadomości z Telegrama i panelu) i terminal właściciela (wtyczka omp
+jarvo/omp/mozg_sesji.ts woła `jarvo sesja <klucz> wiedza przed-tura|po-turze`, kanał `terminal`). W terminalu
+po_turze idzie w tle, więc rejestr i linki czekające zapisuje jeden proces naraz (blokada BLOKADA w stanie).
 """
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import importlib.util
 import json
@@ -68,6 +74,9 @@ NIEAKTUALNE = {"nieaktualne", "wycofana", "przestarzala"}   # statusy notatek po
 DZIENNIK = "przypomnienia.jsonl"
 CZEKAJACE = "linki-czekajace.json"
 DZIENNIK_MAX_B = 2_000_000
+BLOKADA = ".linki.lock"
+LINKI_Z = ("telegram", "panel", "terminal")
+KANALY = {"telegram": "Telegram", "panel": "panel", "terminal": "terminal"}   # kanał w wierszu rejestru
 TRACKING = re.compile(r"^(utm_\w+|s|t|a|si|ref|ref_src|fbclid|igshid|feature)$")
 
 
@@ -126,7 +135,7 @@ class Konfig:
     wektory_czas_s: float = 1.0
     powtorka_tur: int = 3
     zrodla: Path | None = None
-    linki_z: tuple[str, ...] = ("telegram", "panel")
+    linki_z: tuple[str, ...] = LINKI_Z
     graf: Path | None = None
     klucz: str = ""
 
@@ -149,7 +158,7 @@ class Konfig:
                    ranking_prefiks=str(d.get("ranking_prefiks") or ""), notatek=max(1, liczba("notatek", 5)),
                    znakow=max(300, liczba("znakow", 1500)), wektory_czas_s=liczba("wektory_czas_s", 1.0, float),
                    powtorka_tur=max(0, liczba("powtorka_tur", 3)), zrodla=_sciezka(d.get("zrodla"), katalog),
-                   linki_z=_lista(d.get("linki_z")) or ("telegram", "panel"), graf=_sciezka(d.get("graf")), klucz=klucz)
+                   linki_z=_lista(d.get("linki_z")) or LINKI_Z, graf=_sciezka(d.get("graf")), klucz=klucz)
 
 
 def konfig(w) -> Konfig | None:
@@ -392,7 +401,7 @@ def zarejestruj(cfg: Konfig, wiadomosci: list[dict]) -> list[dict]:
     for url, m in pary:
         s = stan_linku(cfg, url, pliki)
         if s["stan"] == "nowy" and cfg.zrodla is not None:
-            kanal = {"telegram": "Telegram", "panel": "panel"}.get(str(m.get("zrodlo") or "telegram"), "Telegram")
+            kanal = KANALY.get(str(m.get("zrodlo") or "telegram"), "Telegram")
             dopisz_wiersz(cfg, url, kanal, str(m.get("czas") or dt.date.today().isoformat())[:10])
             s["gdzie"] = _rel_rejestru(cfg)
         wynik.append(s)
@@ -414,11 +423,32 @@ def _zapisz_czekajace(cfg: Konfig, d: dict) -> None:
     os.replace(tmp, cfg.stan / CZEKAJACE)
 
 
+@contextlib.contextmanager
+def _blokada(cfg: Konfig):
+    """Jeden zapis rejestru i linków czekających naraz: terminal (jarvo/omp/mozg_sesji.ts) puszcza po_turze w tle,
+    a następna tura właściciela może ruszyć w jego trakcie. Bez fcntl (Windows) bez blokady: sesje omp z blokadą
+    działają tylko na Linuksie i macOS."""
+    try:
+        import fcntl
+    except ImportError:
+        yield
+        return
+    cfg.stan.mkdir(parents=True, exist_ok=True)
+    with (cfg.stan / BLOKADA).open("a") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        yield
+
+
 def sprawdz_linki(cfg: Konfig, wiadomosci: list[dict], odpowiedz: str) -> dict:
     """Po turze: linki tej tury (i czekające z poprzednich) z analizą gdzie indziej = wiersz zastępczy usunięty;
     werdykt zmieniony przez model = gotowe; bez śladu = wyciąg odpowiedzi w werdykcie i link czeka (przypomnienie)."""
     if cfg.zrodla is None:
         return {}
+    with _blokada(cfg):
+        return _sprawdz_linki(cfg, wiadomosci, odpowiedz)
+
+
+def _sprawdz_linki(cfg: Konfig, wiadomosci: list[dict], odpowiedz: str) -> dict:
     teraz = zarejestruj(cfg, wiadomosci) if wiadomosci else []          # linki z dopisków (w trakcie tury bez zapisu)
     czek = _czekajace(cfg)
     for l in teraz:
@@ -557,7 +587,8 @@ def przypomnienie(cfg: Konfig, wiadomosci: list[dict], linki_json: list[str] | N
     lib = W()
     linki = []
     if zapisz and rejestruj and cfg.zrodla is not None:
-        linki = zarejestruj(cfg, wiadomosci)
+        with _blokada(cfg):
+            linki = zarejestruj(cfg, wiadomosci)
     elif linki_wiadomosci(cfg, wiadomosci):
         pliki = _pliki_bazy(cfg)
         linki = [stan_linku(cfg, url, pliki) for url, _m in linki_wiadomosci(cfg, wiadomosci)]
@@ -576,19 +607,21 @@ def przypomnienie(cfg: Konfig, wiadomosci: list[dict], linki_json: list[str] | N
             ix.zamknij()
     czek = []
     if zapisz:
-        d = _czekajace(cfg)
-        teraz = {l["klucz"] for l in linki}
-        for k, v in d.items():
-            if k not in teraz and not v.get("swiezy"):
-                czek.append(v)
-                v["przypomnien"] = v.get("przypomnien", 0) + 1
-        if czek:
-            _zapisz_czekajace(cfg, d)
+        with _blokada(cfg):
+            d = _czekajace(cfg)
+            teraz = {l["klucz"] for l in linki}
+            for k, v in d.items():
+                if k not in teraz and not v.get("swiezy"):
+                    czek.append(v)
+                    v["przypomnien"] = v.get("przypomnien", 0) + 1
+            if czek:
+                _zapisz_czekajace(cfg, d)
     tekst = blok(cfg, notatki, linki, czek)
     ms = round((time.perf_counter() - start) * 1000, 1)
     if zapisz:
         cfg.stan.mkdir(parents=True, exist_ok=True)
         _dziennik(cfg, {"ts": round(time.time(), 1), "data": time.strftime("%Y-%m-%d %H:%M:%S"), "sesja": cfg.klucz,
+                        "kanal": ",".join(sorted({str(m.get("zrodlo") or "telegram") for m in wiadomosci})),
                         "zapytanie": " ".join(q.split())[:120], "notatki": [t["sciezka"] for t in notatki],
                         "linki": [{"klucz": l["klucz"], "stan": l["stan"]} for l in linki], "czekajace": len(czek),
                         "znakow": len(tekst), "silnik": silnik, "ms": ms})
@@ -746,4 +779,5 @@ def stan(cfg: Konfig) -> dict:
     except (OSError, ValueError, IndexError):
         pass
     return {"notatek": notatek, "wektorow": wektorow, "wpisow": wpisow, "czekajace": len(_czekajace(cfg)),
-            "ostatnie": {k: ostatnie.get(k) for k in ("data", "ms", "znakow", "silnik", "notatki")} if ostatnie else None}
+            "ostatnie": {k: ostatnie.get(k) for k in ("data", "kanal", "ms", "znakow", "silnik", "notatki")}
+            if ostatnie else None}

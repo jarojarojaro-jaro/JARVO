@@ -6,7 +6,10 @@ albo terminal. Oba biorą tę samą blokadę (`<skrzynka>/sesja.lock`) i przed s
 
   stan       jedna linia JSON: stan rozmówcy jak w panelu (pracuje, terminal, kolejka, wolny, offline)
   terminal   interaktywny omp w tej sesji (`omp --session-dir <sesje> --resume <sesja> <omp_arg…> [argumenty…]`)
-             z blokadą; skrzynka bez tury oddaje mu sesję (prośba `zwolnij`), po wyjściu skrzynka rusza sama
+             z blokadą; skrzynka bez tury oddaje mu sesję (prośba `zwolnij`), po wyjściu skrzynka rusza sama.
+             Wpis z `panel.wiedza`: `-e jarvo/omp/mozg_sesji.ts` (wtyczka omp z tego kodu) i JARVO_SESJA_WIEDZA,
+             więc tura terminala ma ten sam mózg co skrzynka (`wiedza przed-tura` → ukryty `<memory-context>`,
+             `wiedza po-turze` w tle, kanał `terminal`)
   skrzynka   jeden proces `omp … --mode rpc --no-ui` (omp://rpc.md) jak sesja terminala: wiadomości z `nowe/`
              (Telegram, panel, skrypty) partiami po 6 na jedno miejsce odpowiedzi → tura (`prompt`); wiadomość
              panelu z `steer` (omp_sesje.dopisz) i wiadomość z Telegrama w trakcie tury idą do niej jako `steer`
@@ -57,6 +60,7 @@ ZATRZYMAJ_S = 15.0           # abort bez końca tury przez tyle sekund → SIGTE
 OBRAZ_MAKS = 700_000         # większy obraz idzie tylko ścieżką w tekście (ramka RPC ≤ 1 MiB po base64)
 MIME = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
 DIALOGI = ("select", "confirm", "input", "editor", "ask")   # pytania rozszerzeń: skrzynka nie ma kogo zapytać
+ROZSZERZENIE = _REPO / "jarvo" / "omp" / "mozg_sesji.ts"     # mózg sesji w terminalu (omp -e), z kodem instalacji
 URL = re.compile(r"https?://[^\s<>\"')\]]+")
 OBRAZY = tuple(MIME)
 POTWIERDZENIA = ("Zasada potwierdzeń: wdrożenie (jarvo update, restart bramy), publikacja na żywe strony, sudo, "
@@ -247,10 +251,10 @@ def tozsamosc(w) -> None:
         log(w, f"tożsamość: {type(e).__name__}: {str(e)[:300]}")
 
 
-def po_turze_mozg(w, wiadomosci: list[dict], odpowiedz: str) -> None:
+def po_turze_mozg(w, wiadomosci: list[dict], odpowiedz: str) -> dict:
     """Po udanej turze: linki od właściciela (rejestr, analiza), wektory zmienionych notatek, graf Mózgu."""
     if not getattr(w, "wiedza", None):
-        return
+        return {}
     try:
         from . import mozg_sesji
         cfg = mozg_sesji.konfig(w)
@@ -260,8 +264,10 @@ def po_turze_mozg(w, wiadomosci: list[dict], odpowiedz: str) -> None:
             if any(l.values()):
                 log(w, f"wiedza po turze: linki gotowe {len(l.get('gotowe', []))}, czeka {len(l.get('czeka', []))}, "
                        f"porzucone {len(l.get('porzucone', []))}")
+            return r
     except Exception as e:                       # noqa: BLE001
         log(w, f"wiedza po turze: {type(e).__name__}: {str(e)[:300]}")
+    return {}
 
 
 def przed_tura(w) -> None:
@@ -973,6 +979,18 @@ def uruchom_skrzynke_w_tle(w, korzen: Path | None = None) -> None:
                      start_new_session=True)
 
 
+def mozg_terminalu(w, korzen: Path | None = None) -> tuple[list[str], dict[str, str]]:
+    """Argumenty omp i zmienne terminalu dla mózgu sesji: wpis z `panel.wiedza` dostaje wtyczkę omp ROZSZERZENIE
+    (`-e`, ładowana także przy `--no-extensions`), która przed turą i po niej woła `jarvo sesja <klucz> wiedza
+    przed-tura|po-turze` tym samym Pythonem i kodem co ten proces (JARVO_SESJA_WIEDZA: lista JSON). Skrzynka ma
+    własną drogę (prompt, po_turze_mozg), więc tylko terminal. Bez `panel.wiedza` albo bez pliku wtyczki: nic."""
+    if not getattr(w, "wiedza", None) or not ROZSZERZENIE.is_file():
+        return [], {}
+    pocz = ["--korzen", str(korzen)] if korzen else []
+    cli = [sys.executable, "-I", "-X", "utf8", str(_REPO / "jarvo" / "start.py"), *pocz, "sesja", w.klucz, "wiedza"]
+    return ["-e", str(ROZSZERZENIE)], {"JARVO_SESJA_KLUCZ": w.klucz, "JARVO_SESJA_WIEDZA": json.dumps(cli)}
+
+
 def terminal(w, reszta: list[str], po_wyjsciu=uruchom_skrzynke_w_tle, korzen: Path | None = None) -> int:
     import fcntl
     w.katalogi()
@@ -993,7 +1011,9 @@ def terminal(w, reszta: list[str], po_wyjsciu=uruchom_skrzynke_w_tle, korzen: Pa
             print(f"W skrzynce czeka {n} wiadomość(i): ruszą same po wyjściu z sesji (albo napisz tu „skrzynka”).")
         cwd = w.cwd if w.cwd and w.cwd.is_dir() else Path.home()
         tozsamosc(w)                               # ta sama stała część promptu co w skrzynce (bez nowego procesu)
-        proc = subprocess.Popen(polecenie(w, *reszta), cwd=cwd)
+        mozg_arg, mozg_env = mozg_terminalu(w, korzen)
+        proc = subprocess.Popen(polecenie(w, *mozg_arg, *reszta), cwd=cwd,
+                                env={**os.environ, **mozg_env} if mozg_env else None)
         rdzen.zapisz_stan(w, terminal={"pid": os.getpid(), "omp": proc.pid, "od": time.time()})
         try:
             while True:
@@ -1029,9 +1049,19 @@ def koniec_uslugi(_sygnal, _ramka) -> None:
     raise SystemExit(128 + signal.SIGTERM)
 
 
+def wiadomosci_terminalu(teksty: list) -> list[dict]:
+    """Tekst właściciela z terminalu jako wiadomość mózgu sesji (kanał `terminal`, jak `zrodlo` skrzynki)."""
+    czas = time.strftime("%Y-%m-%d %H:%M:%S")
+    return [{"tekst": str(t or ""), "zrodlo": "terminal", "czas": czas} for t in teksty]
+
+
 def polecenie_wiedzy(w, reszta: list[str]) -> int:
     """`jarvo sesja <klucz> wiedza [stan | przypomnij <tekst…> | ocena <zestaw.json> [--szczegoly] | indeksuj |
-    tozsamosc]`: mózg sesji z wiersza poleceń (sprawdzenie na żywo, pomiar, pierwsze wektory)."""
+    tozsamosc | przed-tura [--dopisek] | po-turze]`: mózg sesji z wiersza poleceń (sprawdzenie na żywo, pomiar,
+    pierwsze wektory). `przed-tura` i `po-turze` woła wtyczka omp terminalu (jarvo/omp/mozg_sesji.ts): przed turą
+    tekst właściciela na stdin → blok `<memory-context>` na stdout (jak tura skrzynki: rejestr linków, dziennik
+    przypomnień z kanałem `terminal`; `--dopisek` = wiadomość w trakcie tury, bez zapisu do rejestru), po turze JSON
+    `{"wiadomosci": [tekst…], "odpowiedz": tekst}` na stdin → po_turze (linki bez analizy, wektory, graf)."""
     from . import mozg_sesji
     co = reszta[0] if reszta else "stan"
     if co == "tozsamosc":
@@ -1056,9 +1086,20 @@ def polecenie_wiedzy(w, reszta: list[str]) -> int:
         print(json.dumps(r, ensure_ascii=False, indent=1))
     elif co == "indeksuj":
         print(json.dumps(mozg_sesji.odswiez_po_turze(cfg, czas_s=3600.0), ensure_ascii=False))
+    elif co == "przed-tura":
+        print(pamiec_tury(w, wiadomosci_terminalu([sys.stdin.read()]), [], rejestruj="--dopisek" not in reszta), end="")
+    elif co == "po-turze":
+        try:
+            d = json.loads(sys.stdin.read() or "{}")
+            teksty = [t for t in d.get("wiadomosci") or [] if str(t or "").strip()]
+            odpowiedz = str(d.get("odpowiedz") or "")
+        except (ValueError, AttributeError, TypeError):
+            print("po-turze: na stdin JSON {\"wiadomosci\": [tekst…], \"odpowiedz\": tekst}", file=sys.stderr)
+            return 2
+        print(json.dumps(po_turze_mozg(w, wiadomosci_terminalu(teksty), odpowiedz), ensure_ascii=False))
     else:
-        print("wiedza: stan | przypomnij <tekst…> | ocena <zestaw.json> [--szczegoly] | indeksuj | tozsamosc",
-              file=sys.stderr)
+        print("wiedza: stan | przypomnij <tekst…> | ocena <zestaw.json> [--szczegoly] | indeksuj | tozsamosc | "
+              "przed-tura [--dopisek] | po-turze", file=sys.stderr)
         return 2
     return 0
 
@@ -1091,7 +1132,8 @@ def dodaj_polecenia(sub) -> None:
                                    "tę samą blokadę, skrzynka prowadzi sesję w jednym procesie `omp --mode rpc` "
                                    "(tury z panelu i Telegrama, dopiski w trakcie tury, /compact, licznik). "
                                    "Argumenty po `terminal` idą do omp. `wiedza` (mózg sesji z panel.wiedza): "
-                                   "stan, przypomnij <tekst>, ocena <zestaw.json>, indeksuj, tozsamosc.")
+                                   "stan, przypomnij <tekst>, ocena <zestaw.json>, indeksuj, tozsamosc; "
+                                   "przed-tura i po-turze (stdin) woła wtyczka omp terminalu.")
     s.add_argument("klucz", help="klucz wpisu w sesje.json (np. gpu)")
     s.add_argument("akcja", nargs="?", choices=("stan", "terminal", "skrzynka", "wiedza"), help="domyślnie stan")
     s.set_defaults(funkcja=polecenie_sesja)

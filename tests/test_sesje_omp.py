@@ -4,6 +4,7 @@ steer wraca, /compact, licznik, bezczynny proces się zamyka, terminal prosi o s
 skrzynki w trakcie tury, polecenie `jarvo sesja`."""
 from __future__ import annotations
 
+import io
 import json
 import os
 import signal
@@ -442,12 +443,71 @@ def test_terminal(w, at):
     assert so.terminal(w, ["--model", "opus"], po_wyjsciu=lambda *a: po.append(a)) == 0
     argv = wywolania(at)[-1]
     assert argv[:4] == ["--session-dir", str(w.sesje), "--resume", w.sesja] and argv[-2:] == ["--model", "opus"]
+    assert "-e" not in argv                        # bez panel.wiedza: bez wtyczki mózgu
     assert len(po) == 1 and om.czytaj_stan(w)["terminal"] is None and not om.blokada_zajeta(w)
     (at / "held.json").write_text(json.dumps([w.sesja]))
     om._dzierzawy.clear()
     n = len(wywolania(at))
     assert so.terminal(w, [], po_wyjsciu=lambda *a: None) == 1
     assert all(a[:2] == ["session", "lease"] for a in wywolania(at)[n:])
+
+
+def test_terminal_z_mozgiem_sesji(tmp_path, at, monkeypatch):
+    """Wpis z `panel.wiedza`: terminal ładuje wtyczkę omp mózgu (`-e jarvo/omp/mozg_sesji.ts` przed argumentami
+    właściciela) i daje jej polecenie `jarvo sesja <klucz> wiedza` tym samym Pythonem i kodem (JARVO_SESJA_WIEDZA)."""
+    wpis = om.wpis_z("gpu", surowy_wpis(tmp_path, wiedza={"katalog": str(tmp_path / "wiki")}), tmp_path)
+    (tmp_path / "k" / "sesje").mkdir(parents=True)
+    wpis.katalogi()
+    srodowiska, prawdziwy = [], subprocess.Popen
+
+    def popen(*a, **k):
+        srodowiska.append(k.get("env") or {})
+        return prawdziwy(*a, **k)
+    monkeypatch.setattr(so.subprocess, "Popen", popen)
+    assert so.terminal(wpis, ["--model", "opus"], po_wyjsciu=lambda *a: None, korzen=tmp_path / "root") == 0
+    assert wywolania(at)[-1][-4:] == ["-e", str(so.ROZSZERZENIE), "--model", "opus"] and so.ROZSZERZENIE.is_file()
+    (env,) = [e for e in srodowiska if "JARVO_SESJA_WIEDZA" in e]
+    assert env["JARVO_SESJA_KLUCZ"] == "gpu" and json.loads(env["JARVO_SESJA_WIEDZA"]) == [
+        sys.executable, "-I", "-X", "utf8", str(REPO / "jarvo" / "start.py"), "--korzen", str(tmp_path / "root"),
+        "sesja", "gpu", "wiedza"]
+
+
+def test_wiedza_z_terminalu(tmp_path, at, monkeypatch, capsys):
+    """`wiedza przed-tura` i `po-turze` (wtyczka omp terminalu) robią to co tura skrzynki, z kanałem `terminal`:
+    blok z notatką i linkiem, wiersz rejestru z kanałem (domyślne `linki_z` mają terminal), wpis dziennika z kanałem;
+    `--dopisek` bez zapisu do rejestru; po turze wyciąg odpowiedzi w werdykcie; zły JSON = kod 2."""
+    from jarvo import mozg_sesji
+    monkeypatch.setattr(mozg_sesji, "stan_wektorow_instalacji", lambda: tmp_path / "brak-uslugi")
+    wiki = tmp_path / "wiki"
+    (wiki / "llm").mkdir(parents=True)
+    (wiki / "llm" / "inkling-2-mini.md").write_text("---\ntyp: llm\n---\n# Inkling 2 Mini\n\n**Inkling na XTX: 33,9 t/s, "
+                                                    "limit to kernele MoE.**\n", encoding="utf-8")
+    (wiki / "ZRODLA.md").write_text("# Rejestr\n\n## Powiązane\n- [[index]]\n", encoding="utf-8")
+    wpis = om.wpis_z("gpu", surowy_wpis(tmp_path, wiedza={"katalog": str(wiki), "zrodla": "ZRODLA.md"}), tmp_path)
+    wpis.katalogi()
+
+    def wiedza(*arg, wejscie=""):
+        monkeypatch.setattr(sys, "stdin", io.StringIO(wejscie))
+        kod = so.polecenie_wiedzy(wpis, list(arg))
+        return kod, capsys.readouterr().out
+
+    kod, out = wiedza("przed-tura", wejscie="https://x.com/unslothai/status/2123873656069877899 inkling MoE na xtx?")
+    assert kod == 0 and out.startswith("<memory-context>") and "`llm/inkling-2-mini` · Inkling 2 Mini" in out
+    assert "nowy, wiersz w `ZRODLA.md`" in out
+    assert "https://x.com/unslothai/status/2123873656069877899 (terminal " in (wiki / "ZRODLA.md").read_text()
+    dziennik = wpis.skrzynka / "wiedza" / "przypomnienia.jsonl"
+    ostatni = json.loads(dziennik.read_text().splitlines()[-1])
+    assert ostatni["kanal"] == "terminal" and "llm/inkling-2-mini" in ostatni["notatki"]
+    kod, out = wiedza("przed-tura", "--dopisek", wejscie="a ten? https://example.com/dopisek")
+    assert kod == 0 and "example.com/dopisek: nowy" in out
+    assert "example.com/dopisek" not in (wiki / "ZRODLA.md").read_text()
+    kod, out = wiedza("po-turze", wejscie=json.dumps({
+        "wiadomosci": ["https://x.com/unslothai/status/2123873656069877899 inkling MoE na xtx?",
+                       "a ten? https://example.com/dopisek"], "odpowiedz": "Gotowe, zrobione."}))
+    assert kod == 0 and len(json.loads(out)["linki"]["czeka"]) == 2
+    z = (wiki / "ZRODLA.md").read_text()
+    assert "https://example.com/dopisek (terminal " in z and z.count("bez analizy w wiki; odpowiedź ") == 2
+    assert wiedza("po-turze", wejscie="nie json")[0] == 2
 
 
 def test_polecenie_w_parserze():
