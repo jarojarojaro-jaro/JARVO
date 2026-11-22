@@ -1778,8 +1778,8 @@ brutalistyczny minimalizm). Jedno miejsce prawdy to blok tokenów na początku s
   Bazy (silnik pikseli w pakiecie `app-baza`), robot CRT Jarva na starcie i w pierwszym spotkaniu (marka, antena
   idzie za głosem).
 - **Komponenty.** Pasek: rozmówca jako wiersz 48 px z etykietą stanu mono (WOLNY, PRACUJE, W TERMINALU, CZEKA NA
-  CIEBIE), licznik w bursztynie, aktywny segment wysunięty do sceny; na dole stałe mikroteksty TARS „szczerość 90%,
-  humor 75%” (charakter, nie dane: `aria-hidden`) i stan połączenia. Rozmowa: oś czasu z godzinami w lewej kolumnie
+  CIEBIE), licznik w bursztynie, aktywny segment wysunięty do sceny; na dole za rowkiem stan połączenia (mierniki
+  „szczerość, humor” usunięte 22.11: właściciel chce profesjonalnie). Rozmowa: oś czasu z godzinami w lewej kolumnie
   i znacznikiem każdej pozycji, właściciel na jasnej płycie z białą krawędzią i etykietą źródła („Z TELEGRAMA”),
   agent z nagłówkiem w kroju nagłówków, kroki we wnęce, żywy moduł pracy (znak z czerwoną krawędzią, kto, co robi,
   czas, Zatrzymaj) nad kompozytorem, który jest płytą o poziom jaśniejszą ze sterami zrośniętymi w jeden segmentowy

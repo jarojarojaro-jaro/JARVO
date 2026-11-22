@@ -1250,15 +1250,9 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-wiersz-st { display: grid; place-items: center; min-width: 16px; }
 .j-pasek-pusto { font-size: 12.5px; color: var(--j-tekst-3); padding: 12px 8px; line-height: 1.5; display: grid; gap: 8px; justify-items: start; }
 .j-wiecej { margin: 8px 8px 0; }
-/* mierniki TARS (mikroteksty charakteru, nie dane) i stan połączenia na dole paska, za rowkiem */
-.j-tars { margin: 0 -8px; padding: 10px 16px 4px; box-shadow: inset 0 2px 0 var(--j-rowek), inset 0 3px 0 var(--j-linia); flex: none;
-  font: 400 10.5px/16px var(--j-font-mono); color: var(--j-tekst-3); }
-.j-tars div { display: flex; align-items: center; gap: 8px; height: 16px; }
-.j-tars span { width: 68px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.j-tars i { flex: 1; max-width: 118px; height: 6px; background: linear-gradient(90deg, var(--j-tekst-2) calc(var(--v) * 1%), var(--j-linia) 0);
-  -webkit-mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 6px); mask: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 6px); }
-.j-tars em { font-style: normal; font-weight: 500; color: var(--j-tresc); margin-left: auto; }
-.j-stopka { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 8px 8px; flex: none; }
+/* stan połączenia na dole paska, za rowkiem */
+.j-stopka { display: flex; align-items: center; gap: 8px; min-height: 40px; margin: 0 -8px; padding: 8px 16px; flex: none;
+  box-shadow: inset 0 2px 0 var(--j-rowek), inset 0 3px 0 var(--j-linia); }
 .j-odznaka { position: relative; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; flex: none;
   font: 600 11px var(--j-font-mono); color: var(--j-akcent-na); background: var(--j-uwaga); border: 0; margin-right: 2px; }
 .j-odznaka.is-zle { color: var(--j-akcent-na); background: var(--j-blad); }
@@ -2492,8 +2486,6 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-rap-r-t .j-md > ol > li em { font-style: normal; font-weight: 500; color: var(--j-uwaga); }
 .j-rap-r-s { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; min-height: 52px; margin: 0 -24px; padding: 0 16px 0 24px; box-shadow: inset 0 2px 0 var(--j-rowek), inset 0 3px 0 var(--j-linia); }
 .j-rap-kopiuj { margin-left: auto; }
-.j-rap-tars { margin-left: auto; font: 400 10.5px/16px var(--j-font-mono); color: var(--j-tekst-3); }
-.j-rap-tars + .j-rap-kopiuj { margin-left: 0; }
 /* kalendarz (moduł 04): dzień z raportem jasny, bez raportu szary, poza miesiącem przygaszony, wybrany = biały blok */
 .j-kal { position: relative; padding: 0 8px 8px; background: var(--j-stal), var(--j-tlo-pasek); box-shadow: var(--j-cien-1); --j-nr: "04"; }
 .j-kal::after { position: absolute; right: 16px; top: 16px; }

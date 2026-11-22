@@ -141,7 +141,6 @@ function Raport({ r, rozmowca, kolor }) {
         etykieta=${T("rap.odpowiedz_tip", { kto })} onClick=${() => odpowiedzNaRaport(r, rozmowca)}>${T("rap.odpowiedz")}</${Przycisk}>`}
       ${dlugi && html`<button type="button" class="j-link" aria-expanded=${String(caly)} onClick=${() => setCaly(!caly)}>
         ${T(caly ? "rap.zwin" : "rap.calosc")}</button>`}
-      ${/Rekomenduj/.test(r.tekst || "") && html`<small class="j-rap-tars" aria-hidden="true">${T("tars.rekomendacje")}</small>`}
       <${Przycisk} rodzaj="cichy" maly ikona=${ok ? "check" : "copy"} etykieta=${T(ok ? "md.skopiowano" : "msg.kopiuj")} klasa="j-rap-kopiuj" onClick=${kopiuj}/>
     </footer>
   </article>`;

@@ -271,16 +271,10 @@ function StanPolaczenia({ klasa }) {
     <i aria-hidden="true">${ok ? "" : "⚠"}</i><span>${ok ? T("polaczenie.krotko") : T(`polaczenie.${stan}`)}</span></p>`;
 }
 
-// Mikroteksty TARS (motyw, docs/HQ.md §5a): stałe „szczerość 90%, humor 75%” jak ustawienia robota z filmu; to ozdoba
-// charakteru, nie dane, więc czytnik ekranu ich nie czyta
-const TARS_USTAWIENIA = [["tars.szczerosc", 90], ["tars.humor", 75]];
-const MiernikiTars = () => html`<div class="j-tars" aria-hidden="true">${TARS_USTAWIENIA.map(([k, v]) => html`<div key=${k}>
-  <span>${T(k)}</span><i style=${{ "--v": v }}></i><em>${v}%</em></div>`)}</div>`;
-
-// Stopka paska: bez drugiego wejścia do Ustawień (jest pozycja „Ustawienia” w nawigacji, ⌘,), mierniki TARS, stan
-// połączenia i odznaka aktualizacji
+// Stopka paska: bez drugiego wejścia do Ustawień (jest pozycja „Ustawienia” w nawigacji, ⌘,), stan połączenia
+// i odznaka aktualizacji (22.11 właściciel: bez mierników „szczerość, humor”, ma być profesjonalnie)
 function StopkaPaska() {
-  return html`<${MiernikiTars}/><div class="j-stopka">
+  return html`<div class="j-stopka">
     <${StanPolaczenia}/>
     <${OdznakaAktualizacji} otworz=${(sekcja) => Trasa.idz({ widok: "ustawienia", sekcja })}/>
   </div>`;
