@@ -416,21 +416,16 @@ function MozgNotatka({ z, id, dane, mapa, href, cel, nazwaMiejsca, wstecz, sekcj
 }
 
 // Wejście Mózgu (22.11 właściciel: „ma być prosty, czytelny, lekki zarys; na środku Jarvo, wokół wszystko jako sieć,
-// bez animacji”): statyczna sieć w SVG. Środek = źródło (JARVO, KERNEL), pierwszy pierścień = części (wielkość węzła
-// z liczby notatek), drugi = grupy części (kropki, nazwa w podpowiedzi), cienkie łuki między częściami = linki między
-// ich notatkami (grubość z liczby). Najechanie rozjaśnia część i jej połączenia; kliknięcie wchodzi do części.
-const MOZG_SIEC = { w: 1000, h: 660, r1: 205, r2: 292, maxGrup: 9 };
+// bez animacji”): statyczna sieć w SVG. Środek = źródło (JARVO, KERNEL), pierścień = części (wielkość węzła z liczby
+// notatek, pod nazwą jedno zdanie opisu), cienkie łuki między częściami = najmocniejsze powiązania ich notatek
+// (grubość z liczby linków). Najechanie rozjaśnia część i jej łuki; kliknięcie wchodzi do części.
+const MOZG_SIEC = { w: 1000, h: 660, r1: 225, luki: 14 };
 function mozgSiec(mapa, linki) {
-  const { w, h, r1, r2, maxGrup } = MOZG_SIEC, cx = w / 2, cy = h / 2;
+  const { w, h, r1 } = MOZG_SIEC, cx = w / 2, cy = h / 2;
   const czesci = mapa.kat.filter((d) => d.ile > 0), n = czesci.length, maks = Math.max(1, ...czesci.map((d) => d.ile));
-  const kat = (i) => -Math.PI / 2 + (i * 2 * Math.PI) / Math.max(1, n);
   const wezly = czesci.map((d, i) => {
-    const a = kat(i), x = cx + r1 * Math.cos(a), y = cy + r1 * Math.sin(a), sektor = (2 * Math.PI) / Math.max(1, n) * 0.72;
-    const grupy = d.grupy.length > 1 ? d.grupy.slice().sort((p, q) => q.ile - p.ile).slice(0, maxGrup) : [];
-    const krok = grupy.length > 1 ? Math.min(0.13, sektor / (grupy.length - 1)) : 0;
-    return { d, i, a, x, y, r: 7 + 12 * Math.sqrt(d.ile / maks),
-      grupy: grupy.map((g, j) => { const b = a + (j - (grupy.length - 1) / 2) * krok;
-        return { g, x: cx + r2 * Math.cos(b), y: cy + r2 * Math.sin(b), r: 2.5 + 3.5 * Math.sqrt(g.ile / maks) }; }) };
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / Math.max(1, n);
+    return { d, i, a, x: cx + r1 * Math.cos(a), y: cy + r1 * Math.sin(a), r: 7 + 11 * Math.sqrt(d.ile / maks) };
   });
   const nr = new Map(czesci.map((d, i) => [d.k, i])), pary = new Map();
   for (const l of linki) {
@@ -440,31 +435,32 @@ function mozgSiec(mapa, linki) {
     pary.set(k, (pary.get(k) || 0) + 1);
   }
   const najw = Math.max(1, ...pary.values());
-  const luki = [...pary].filter(([, c]) => c >= 2).map(([k, c]) => { const [p, q] = k.split(":").map(Number); return { p, q, c, s: 0.6 + 2 * Math.sqrt(c / najw) }; });
+  const luki = [...pary].filter(([, c]) => c >= 3).sort((x, y) => y[1] - x[1]).slice(0, MOZG_SIEC.luki)
+    .map(([k, c]) => { const [p, q] = k.split(":").map(Number); return { p, q, c, s: 0.8 + 1.8 * Math.sqrt(c / najw) }; });
   return { cx, cy, wezly, luki };
 }
 
-function MozgSiec({ siec, centrum, ile, href, nazwa }) {
+function MozgSiec({ siec, centrum, ile, href, nazwa, opis }) {
   const [nad, setNad] = useState(-1);
   const { cx: sx, cy: sy, wezly, luki } = siec, { w, h } = MOZG_SIEC;
-  const luk = (a, b) => { const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2; return `M${a.x},${a.y} Q${sx + (mx - sx) * 0.35},${sy + (my - sy) * 0.35} ${b.x},${b.y}`; };
-  const podpis = (v) => { const c = Math.cos(v.a), s = Math.sin(v.a), d = v.r + 10;
-    return { x: v.x + c * d, y: v.y + s * d + (Math.abs(s) > 0.8 ? (s > 0 ? 10 : -4) : 4), kotwica: Math.abs(c) < 0.3 ? "middle" : c > 0 ? "start" : "end" }; };
+  // łuk między częściami wygięty lekko do środka (nie przez środek): czytelna sieć zamiast gwiazdy
+  const luk = (a, b) => { const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2; return `M${a.x},${a.y} Q${sx + (mx - sx) * 0.62},${sy + (my - sy) * 0.62} ${b.x},${b.y}`; };
+  const podpis = (v) => { const c = Math.cos(v.a), s = Math.sin(v.a), d = v.r + 12, pion = Math.abs(c) < 0.35;
+    return { x: v.x + c * d, y: v.y + s * d + (pion ? (s > 0 ? 14 : -18) : -2), kotwica: pion ? "middle" : c > 0 ? "start" : "end" }; };
   return html`<svg class=${cx("j-siec", nad >= 0 && "is-nad")} viewBox=${`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" role="group"
       aria-label=${L(`Mapa mózgu: ${centrum} i ${wezly.length} części`, `Brain map: ${centrum} and ${wezly.length} parts`)}>
     <g class="j-siec-luki" aria-hidden="true">${luki.map((l) => html`<path key=${l.p + "-" + l.q} d=${luk(wezly[l.p], wezly[l.q])}
       class=${cx(nad >= 0 && (l.p === nad || l.q === nad) && "is-on")} style=${{ strokeWidth: l.s }}/>`)}</g>
-    ${wezly.map((v) => { const p = podpis(v);
+    ${wezly.map((v) => { const p = podpis(v), o = opis(v.d);
       return html`<a key=${v.d.k} href=${href(v.d)} class=${cx("j-siec-cz", v.i === nad && "is-on", v.d.drugorzedna && "is-cicha")}
           style=${{ "--c": `var(--j-barwa-${v.i % 10})` }} onMouseEnter=${() => setNad(v.i)} onMouseLeave=${() => setNad(-1)}
           onFocus=${() => setNad(v.i)} onBlur=${() => setNad(-1)} aria-label=${`${nazwa(v.d)}: ${v.d.ile} ${L("notatek", "notes")}`}>
         <line x1=${sx} y1=${sy} x2=${v.x} y2=${v.y} class="j-siec-os"/>
-        ${v.grupy.map((gr) => html`<line key=${"l" + gr.g.k} x1=${v.x} y1=${v.y} x2=${gr.x} y2=${gr.y} class="j-siec-gl"/>`)}
-        ${v.grupy.map((gr) => html`<circle key=${"c" + gr.g.k} cx=${gr.x} cy=${gr.y} r=${gr.r} class="j-siec-gr"><title>${`${gr.g.nazwa}: ${gr.g.ile}`}</title></circle>`)}
-        <circle cx=${v.x} cy=${v.y} r=${v.r + 9} class="j-siec-traf"/>
+        <circle cx=${v.x} cy=${v.y} r=${v.r + 12} class="j-siec-traf"/>
         <circle cx=${v.x} cy=${v.y} r=${v.r} class="j-siec-w"/>
         <circle cx=${v.x} cy=${v.y} r=${Math.max(2.5, v.r * 0.32)} class="j-siec-k"/>
         <text x=${p.x} y=${p.y} text-anchor=${p.kotwica} class="j-siec-t">${nazwa(v.d)}<tspan class="j-siec-l" dx="7">${v.d.ile}</tspan></text>
+        ${o && html`<text x=${p.x} y=${p.y + 17} text-anchor=${p.kotwica} class="j-siec-o">${o.length > 44 ? o.slice(0, 43).replace(/[\s,;:]+\S*$/, "") + "…" : o}</text>`}
       </a>`; })}
     <g class="j-siec-srodek" aria-hidden="true">
       <circle cx=${sx} cy=${sy} r="62"/>
@@ -677,7 +673,8 @@ function MozgWidok() {
     <div class="j-mozg-plotno">
       <canvas ref=${plotno} role="img" aria-label=${L("Mapa wiedzy tego poziomu; to samo jest na liście obok", "Knowledge map of this level; the list shows the same")}></canvas>
       ${siec && html`<${MozgSiec} siec=${siec} centrum=${z.klucz === "jarvo" ? "JARVO" : z.klucz.toUpperCase()}
-        ile=${mapa.kat.reduce((a, d) => a + d.ile, 0)} href=${(d) => href({ k: d.k, g: "", o: "" })} nazwa=${nazwaKat}/>`}
+        ile=${mapa.kat.reduce((a, d) => a + d.ile, 0)} href=${(d) => href({ k: d.k, g: "", o: "" })} nazwa=${nazwaKat}
+        opis=${(d) => (d.opis ? L(d.opis, d.opis_en || d.opis) : d.grupy.length > 1 ? d.grupy.slice(0, 3).map((x) => x.nazwa).join(" · ") : "")}/>`}
       ${siec && mapa.korzen && html`<a class="j-siec-naj" href=${hrefNotatki(mapa.korzen.id)}>${L("Najważniejsze", "Key points")} →</a>`}
       ${graf && !siecW && html`<p class="j-mozg-podpowiedz" aria-hidden="true">${grupa ? L("Kropka = notatka. Kółko myszy przybliża.", "Dot = note. Scroll to zoom.")
         : L("Kliknij skupisko, żeby wejść.", "Click a cluster to go in.")}</p>`}

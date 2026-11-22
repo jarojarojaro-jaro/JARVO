@@ -2391,20 +2391,19 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-mozg.is-siec .j-mozg-plotno { grid-area: 2 / 1; background: var(--j-stal), var(--j-tlo-pasek); }
 .j-siec { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .j-siec line, .j-siec path { fill: none; stroke: var(--j-linia-2); stroke-width: 1; vector-effect: non-scaling-stroke; transition: stroke .2s var(--j-ease), opacity .2s var(--j-ease); }
-.j-siec-luki path { stroke: var(--j-linia); }
-.j-siec-gl { stroke: var(--j-linia) !important; }
-.j-siec-gr { fill: var(--j-tekst-3); }
+.j-siec-luki path { stroke: var(--j-linia-2); }
+.j-siec-os { stroke: var(--j-linia) !important; }
 .j-siec-traf { fill: transparent; }
 .j-siec-w { fill: var(--j-tlo-pasek); stroke: var(--j-tekst-2); stroke-width: 1.5; vector-effect: non-scaling-stroke; transition: stroke .2s var(--j-ease); }
 .j-siec-k { fill: var(--c); }
 .j-siec-t { fill: var(--j-tekst); font: 600 14px var(--j-font-ui); }
 .j-siec-l { fill: var(--j-tekst-2); font: 500 12px var(--j-font-mono); }
+.j-siec-o { fill: var(--j-tekst-3); font: 400 11.5px var(--j-font-ui); }
 .j-siec-cz { cursor: pointer; outline: none; }
 .j-siec-cz.is-cicha { opacity: .6; }
 .j-siec.is-nad .j-siec-cz:not(.is-on) { opacity: .35; }
-.j-siec-cz.is-on .j-siec-os, .j-siec-cz.is-on .j-siec-gl, .j-siec-luki path.is-on { stroke: var(--j-tekst-2) !important; }
+.j-siec-cz.is-on .j-siec-os, .j-siec-luki path.is-on { stroke: var(--j-tekst-2) !important; }
 .j-siec-cz.is-on .j-siec-w { stroke: var(--j-tekst); }
-.j-siec-cz.is-on .j-siec-gr { fill: var(--j-tekst-2); }
 .j-siec-cz:focus-visible .j-siec-w { stroke: var(--j-fokus); stroke-width: 3; }
 .j-siec-srodek circle { fill: var(--j-tlo-3); stroke: var(--j-tekst); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .j-siec-st { fill: var(--j-tekst); font: 700 20px var(--j-font-naglowek); font-stretch: 125%; letter-spacing: .08em; }
