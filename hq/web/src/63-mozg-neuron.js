@@ -472,7 +472,8 @@ function utworzNeuron(pudlo, o) {
       }
       const tk = trafKropke(p[0], p[1]), k = tk && dostepna(tk) ? tk : null, n = k ? null : trafNapis(p[0], p[1]);
       const cz = k || n ? null : tk ? { cz: u.czesci[tk.p] } : trafCzesc(p[0], p[1]);
-      const nad = k ? k.id : null, nadP = k ? -1 : n && n.cel && n.cel.czesc != null ? n.cel.czesc : cz ? cz.cz.p : -1;
+      // w przybliżonej części ruch myszy nie zapala wszystkich jej włókien (spokój), tylko kropka pod ręką
+      const nad = k ? k.id : null, nadC = k ? -1 : n && n.cel && n.cel.czesc != null ? n.cel.czesc : cz ? cz.cz.p : -1, nadP = nadC === stan.fok ? -1 : nadC;
       c2.style.cursor = k || n || cz ? "pointer" : "grab";
       if (nad !== stan.nad || nadP !== stan.nadP) { stan.nad = nad; stan.nadP = nadP; zamow(); }
     },
