@@ -105,7 +105,7 @@ function neuronTrasa(u, a, b) {
 // najedzie”); impuls biegnie tylko po widocznych włóknach
 const NEURON_VS_LINIA = `precision highp float;
 attribute vec2 p; attribute vec3 c; attribute vec3 m;
-uniform vec4 uKam; uniform vec2 uWid; uniform float uFok, uNad, uWsz;
+uniform vec4 uKam; uniform vec2 uWid; uniform float uFok, uNad; uniform mediump float uWsz;   // uWsz też we fragmentach: ta sama precyzja
 varying vec3 vC; varying float vT, vF, vD;
 void main() {
   float pa = floor(m.z / 64.0), pb = m.z - pa * 64.0;
@@ -143,13 +143,15 @@ varying vec3 vC; varying float vD;
 void main() {
   float d = length(gl_PointCoord - 0.5) * 2.0;
   float rdzen = smoothstep(0.36, 0.26, d), blask = exp(-d * d * 7.0) * 0.5;
-  gl_FragColor = vec4((vC * (rdzen * 1.1 + blask) + vec3(rdzen * 0.06)) * vD, 1.0);
+  gl_FragColor = vec4((vC * (rdzen * 0.95 + blask)) * vD, 1.0);
 }`;
 
+// kolor części z motywu (pastele panelu) mocniej nasycony na czerni, żeby małe kropki nie bielały
 const neuronRgb = (hex) => {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(hex).trim());
-  const v = m ? parseInt(m[1], 16) : 0x999999;
-  return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255];
+  const v = m ? parseInt(m[1], 16) : 0x999999, c = [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255];
+  const s = (c[0] + c[1] + c[2]) / 3;
+  return c.map((x) => Math.max(0, Math.min(1, s + (x - s) * 2.1)));
 };
 
 function utworzNeuron(pudlo, o) {
@@ -171,6 +173,7 @@ function utworzNeuron(pudlo, o) {
       const sh = gl.createShader(t); gl.shaderSource(sh, s); gl.compileShader(sh); gl.attachShader(p, sh);
     }
     gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) console.error("Mózg: program WebGL", gl.getProgramInfoLog(p));
     const atr = {}, uni = {};
     for (let i = 0; i < gl.getProgramParameter(p, gl.ACTIVE_ATTRIBUTES); i++) { const a = gl.getActiveAttrib(p, i); atr[a.name] = gl.getAttribLocation(p, a.name); }
     for (let i = 0; i < gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS); i++) { const a = gl.getActiveUniform(p, i); uni[a.name] = gl.getUniformLocation(p, a.name); }
@@ -310,7 +313,7 @@ function utworzNeuron(pudlo, o) {
       const z = bufory.zakresy.get(jasne);
       for (let i = 0; i < z.length; i += 2) gl.drawArrays(gl.LINES, z[i], z[i + 1]);
     } else if (nadP >= 0) {
-      gl.uniform1f(L.uni.uWsz, 0); gl.uniform1f(L.uni.uA, Math.min(0.32, 10 / Math.sqrt(u.linki.length + 1)));
+      gl.uniform1f(L.uni.uWsz, 0); gl.uniform1f(L.uni.uA, Math.min(0.2, 7 / Math.sqrt(u.linki.length + 1)));
       gl.drawArrays(gl.LINES, 0, bufory.nLinie);
     }
     const K = prog.kropka;
