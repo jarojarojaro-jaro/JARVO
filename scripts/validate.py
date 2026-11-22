@@ -40,7 +40,10 @@ SOUL_POSTAC_BUDZET = 1600            # sama postać: tożsamość, charakter, g�
 # (linia z profilem, `@uchwytem` i `oddaj_gdy` na agenta) i rdzeń mapy (fl.rdzen_mapy, sam ≤ 1 200 tok.). Pomiar
 # z nakładką właściciela: reszta promptu ~4 180 tok. (jak przed mapą), roster 10 agentów ~516 (stała dawniej ~200),
 # rdzeń ~843 = ~5 539 tok. (bez nakładki ~5 079); zapas ~60 tok., kolejny agent wymaga świadomej decyzji o budżecie.
-SOUL_BUDZET_ORKIESTRATORA = 5600
+# 22.11 (właściciel: „JARO jest szefem z wieloma biznesami, Jarvo ma mieć charakter, kozak”): postać z charakterem
+# (~+120 tok.) i sekcja „Biznesy” w rdzeniu (każdy biznes z opiekunem, ~+215 tok.) = ~5 874 tok. z nakładką;
+# stała część promptu, trafia w cache dostawcy. Zapas ~125 tok.
+SOUL_BUDZET_ORKIESTRATORA = 6000
 DLUGOSC_SCIEZKI = 60                 # średnia długość podstawionej ścieżki @@…@@ w zbudowanym SOUL
 SCIEZKI_MAPY = ("DATA_DIR", "JARVO_DIR", "KNOWLEDGE_DIR", "MISSIONS_DIR", "WORKSPACES_DIR", "INBOX_DIR")   # fl.sciezki_mapy
 # zasada bloku kontekstu (protokół floty, zasada 8; docs/HQ.md „Aplikacja”): każdy złożony SOUL nazywa znaczniki,

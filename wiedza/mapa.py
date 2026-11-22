@@ -23,8 +23,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
-SEKCJE = ("Kim jestem", "Dla kogo pracuję i po co", "Co robię na co dzień", "Co mogę", "Czego nie robię bez zgody", "Zespół",
-          "Gdzie co jest", "Kiedy", "Jak działa mój mózg", "Jak się poprawiam", "Słownik")
+SEKCJE = ("Kim jestem", "Dla kogo pracuję i po co", "Biznesy", "Co robię na co dzień", "Co mogę", "Czego nie robię bez zgody",
+          "Zespół", "Gdzie co jest", "Kiedy", "Jak działa mój mózg", "Jak się poprawiam", "Słownik")
 TYTUL = "Jarvo od A do Z"
 # blok GEN bez znacznika w pliku idzie na koniec swojej sekcji
 SEKCJA_GEN = {"agenci": "Zespół", "skille": "Zespół", "arsenal": "Co mogę", "sciezki": "Gdzie co jest", "harmonogram": "Kiedy"}
