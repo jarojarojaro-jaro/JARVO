@@ -102,16 +102,14 @@ PAKIETY = {
     # stopka kompozytora (model, myślenie, tryb szybki, pierścień kontekstu z dymkiem): przy pierwszej otwartej
     # rozmowie, do tej pory rząd bloczka ma tylko „Do:”, spinacz i wysyłanie (ta sama wysokość)
     "stopka": {"pliki": ("33-stopka.js",), "zalezy": ()},
-    # mapa wejścia Mózgu w motywie TARS (czarna dziura z orbitami części, shader WebGL): dopiero na wejściu Mózgu,
-    # poza budżetem mozg.js
-    "kosmos": {"pliki": ("65-kosmos.js",), "zalezy": ()},
 }
 # budżet gzip (bajty) z projektu etapu 1 §7: przekroczenie zatrzymuje build. Mózg 20 KB (20.11, było 14 KB, przedtem
 # 6 KB): części, grupy, szukanie w treści, [[linki]] i skupiska w grafie, a od 20.11 tożsamość Jarva, edytor pamięci
-# (GET/PUT /pamiec), „Wstecz”, „Najważniejsze” ze streszczeń hubów i spis sekcji, wszystko PL i EN (ok. 18 KB); pakiet
+# (GET/PUT /pamiec), „Wstecz”, „Najważniejsze” ze streszczeń hubów i spis sekcji, wszystko PL i EN (ok. 18 KB); 21 KB
+# od 22.11: wejście jako sieć SVG (MozgSiec) zamiast osobnego pakietu „kosmos” (−4,2 KB gzip w sumie); pakiet
 # idzie tylko po wejściu w Mózg. Rdzeń 100 KB (20.11, było 95 KB): rozwijane kroki i komendy po „/” w kompozytorze
 # (oba muszą działać od pierwszej rozmowy)
-BUDZET_GZIP = {"app-rdzen.js": 100 * 1024, "app-rdzen.css": 18 * 1024, "mozg.js": 20 * 1024}
+BUDZET_GZIP = {"app-rdzen.js": 100 * 1024, "app-rdzen.css": 18 * 1024, "mozg.js": 21 * 1024}
 ZNACZNIK_PAKIETOW = '"@@PAKIETY@@"'
 ZNACZNIK_CSS = re.compile(r"^/\* @@pakiet (\w+) \*/$", re.M)
 DEKLARACJA = re.compile(r"^(?:async\s+)?(?:function\*?\s+([A-Za-z_$][\w$]*)|class\s+([A-Za-z_$][\w$]*)"

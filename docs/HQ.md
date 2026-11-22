@@ -1420,8 +1420,8 @@ innych kanałów etap 6.
   (rozwijane kroki i komendy po „/” w kompozytorze), budżet 95 → 100 KB; potem 97,8 KB JS i 17,4 KB CSS (licznik
   rozmowy, dopisek Enterem, pasek z przewijanym środkiem), a po wydzieleniu stopki do `app-stopka` (2,3 KB JS,
   0,5 KB CSS gzip) rdzeń ok. 98,1 KB JS i 17,4 KB CSS. 22.11 (motyw TARS): silnik pikseli `19-piksele.js` przeszedł
-  do `app-baza` (aplikacja ma znaki TARS zamiast figurek), styl pierwszego spotkania do `app-poznajmy`, a czarna
-  dziura wejścia Mózgu to osobny pakiet `app-kosmos` (shader WebGL, poza budżetem `mozg.js`). Pliki rdzenia nie mogą
+  do `app-baza` (aplikacja ma znaki TARS zamiast figurek), a styl pierwszego spotkania do `app-poznajmy`. Wejście
+  Mózgu to od 22.11 prosta sieć SVG w `mozg.js` (budżet 21 KB; pakiet `app-kosmos` z czarną dziurą usunięty, właściciel: „ma być prosty i czytelny”). Pliki rdzenia nie mogą
   sięgać do nazw z pakietów inaczej niż przez `Zasoby.wez`, a pakiety nie zmieniają `let` rdzenia (język ustawia
   `ustawJezyk`).
 
@@ -1786,8 +1786,8 @@ brutalistyczny minimalizm). Jedno miejsce prawdy to blok tokenów na początku s
   pasek (Do:, model, wysiłek, tryb szybki). Aktualizacje: raport jako moduł z sekcjami, `ukladRaportu` (`64-raporty.js`)
   tylko układa treść (linia „Etykieta: treść” = sekcja z etykietą w lewej kolumnie, sama etykieta = mały nagłówek,
   w decyzjach pogrubione pytanie i bursztynowe „Rekomenduję …”), tekst zostaje ten sam (test w `hq_front.test.cjs`).
-  Mózg: części jako wiersze z numerem, wskaźnikiem i liczbą, Najważniejsze w bursztynie, notatka jako moduł; na
-  wejściu czarna dziura z częściami na orbitach (`65-kosmos.js`, pakiet `app-kosmos`).
+  Mózg: na wejściu prosta sieć bez animacji (środek JARVO albo KERNEL, wokół części z liczbą notatek, grupy jako
+  kropki, łuki = linki między częściami; najechanie rozjaśnia część), w części grupy i notatki, notatka jako moduł.
 - **Ruch tylko celowy.** Segmenty wjeżdżają i zatrzaskują się (serwo `--j-serwo`, 160 do 400 ms), sygnał pracy
   oddycha samą przezroczystością (kompozytor, bez przerysowania), pasek postępu karty nie przesuwa tła co klatkę.
   Czarna dziura płynie ok. 9 klatek na sekundę przez 8 s po wejściu i chwilę po ruchu myszy nad mapą, potem stoi

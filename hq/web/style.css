@@ -2258,9 +2258,9 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 /* === koniec Ustawień === */
 
 /* @@pakiet mozg */
-/* Mózg (#/mozg, hq/web/src/63-mozg.js), TARS: nagłówek (moduł 02) z okruszkami, po lewej moduł 03 z wyszukiwarką we
-   wnęce i poziomem (części jako wiersze z numerem, nazwą, wskaźnikiem i liczbą; grupy, notatki w sekcjach) albo wyniki
-   szukania; w środku próżnia: na wejściu czarna dziura z częściami na orbitach (pakiet „kosmos”), niżej graf poziomu;
+/* Mózg (#/mozg, hq/web/src/63-mozg.js), TARS: nagłówek (moduł 02) z okruszkami; na wejściu cały obszar to prosta
+   sieć (MozgSiec: środek JARVO albo KERNEL, części, grupy, łuki linków) z pływającą wyszukiwarką; w części po lewej
+   moduł 03 z wyszukiwarką we wnęce i poziomem (grupy, notatki w sekcjach) albo wynikami szukania, w środku graf poziomu,
    po prawej notatka jako moduł. Kolor części/grupy (--c) = kolor jej skupiska w grafie, tylko jako cienka krawędź.
    Do 1000 px notatka zasłania graf; telefon: lista na cały ekran, mapa pod „Mapa”, notatka na cały ekran. */
 .j-mozg { position: relative; display: grid; grid-template-columns: minmax(300px, 416px) 1fr; grid-template-rows: auto 1fr; gap: 8px; height: 100%; min-height: 0; color: var(--j-tekst); }
@@ -2288,20 +2288,10 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-mozg-poziom h2 span, .j-mozg-sekcja h3 span { color: var(--j-tekst-2); font: 500 13px var(--j-font-mono); font-stretch: 100%; }
 .j-mozg-opis { margin: 4px 0 0; color: var(--j-tekst-2); font-size: 12.5px; line-height: 1.5; }
 .j-mozg .j-mozg-przeglad { display: inline-block; margin-top: 8px; color: var(--j-link); font-size: 12.5px; }
-.j-mozg-kafle, .j-mozg-grupy, .j-mozg-sekcja ul, .j-mozg-wyniki { list-style: none; margin: 0; padding: 0; }
-/* części: numer (mono, cicho) · nazwa (jasno) · wskaźnik wielkości · liczba (mono) · opis (szaro), wiersze za włosem */
-.j-mozg-kafle { display: grid; margin: 12px -8px 0; }
-.j-mozg-kafel { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr) 72px 44px; align-items: center; row-gap: 0; padding: 8px; box-shadow: inset 0 1px 0 var(--j-linia);
-  transition: background .24s var(--j-ease); }
-.j-mozg-kafel:hover { background: var(--j-tlo-hover); }
-.j-mozg-kafel:hover .j-mozg-ki { color: var(--j-tekst); }
-.j-mozg-kafel:hover .j-mozg-ku::after { background: var(--j-tekst); }
-.j-mozg-ki { font: 400 10.5px/20px var(--j-font-mono); color: var(--j-tekst-3); transition: color .24s var(--j-ease); }
+.j-mozg-grupy, .j-mozg-sekcja ul, .j-mozg-wyniki { list-style: none; margin: 0; padding: 0; }
+/* grupy części: nazwa (jasno) · liczba (mono) */
 .j-mozg-kn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 14px/20px var(--j-font-ui); color: var(--j-tekst); }
-.j-mozg-ku { display: block; height: 2px; background: var(--j-linia-2); position: relative; text-decoration: none; }
-.j-mozg-ku::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--u, 0) * 100%); background: var(--j-tekst-3); transition: background .24s var(--j-ease); }
 .j-mozg-kl { font: 500 13px/20px var(--j-font-mono); color: var(--j-tekst); text-align: right; font-variant-numeric: tabular-nums; }
-.j-mozg-ko { grid-column: 2 / 5; color: var(--j-tekst-2); font-size: 12px; line-height: 16px; }
 .j-mozg-grupy { display: grid; margin: 12px -8px 0; }
 .j-mozg-grupa { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; min-height: 40px; padding: 8px 8px 8px 16px;
   box-shadow: inset 0 1px 0 var(--j-linia), inset 2px 0 0 var(--c); transition: background .24s var(--j-ease); }
@@ -2321,10 +2311,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-mozg-wo { grid-column: 1 / -1; display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--j-tresc); font-size: 12.5px; line-height: 1.45; }
 .j-mozg-wr { grid-column: 1 / -1; margin: 10px 0 4px; color: var(--j-tekst-3); font: 500 10.5px var(--j-font-mono); letter-spacing: .14em; text-transform: uppercase; }
 .j-mozg-wiecej { min-height: 32px; margin: 2px 0; padding: 0; border: 0; background: none; color: var(--j-link); font: inherit; font-size: 12.5px; cursor: pointer; }
-.j-mozg-boczna { display: flex; gap: 10px; align-items: flex-start; margin-top: 20px; padding: 10px 12px; box-shadow: inset 0 0 0 1px var(--j-linia); color: var(--j-tresc); font-size: 13px; }
-.j-mozg-boczna:hover { color: var(--j-tekst); box-shadow: inset 0 0 0 1px var(--j-linia-mocna); }
-.j-mozg-boczna small { color: var(--j-tekst-2); }
-/* próżnia z mapą: czerń, cienkie włosy i podpisy (graf poziomu albo czarna dziura na wejściu) */
+/* próżnia z mapą: czerń, cienkie włosy i podpisy (graf poziomu; wejście to sieć MozgSiec niżej) */
 .j-mozg-plotno { position: relative; min-height: 0; min-width: 0; overflow: hidden; background: #000; box-shadow: inset 0 0 0 1px var(--j-linia); }
 .j-mozg-plotno canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
 .j-mozg-podpowiedz { position: absolute; left: 0; bottom: 12px; margin: 0; padding: 4px 16px; background: #000; color: #A9A9B1; font-size: 12px; pointer-events: none; }
@@ -2393,33 +2380,44 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   .j-mozg-karta { z-index: 3; padding: 8px 16px 32px; }
   .j-mozg-karta-gora { margin: -8px -16px 4px; padding-left: 16px; }
 }
-/* @@pakiet kosmos */
-/* Mapa wejścia Mózgu (65-kosmos.js): Gargantua na canvasie WebGL, orbity jako włosy SVG, części jako białe punkty
-   z podpisami (nazwa jasno, liczba mono); bez WebGL Gargantua z samego CSS (koła tylko tu: .j-okr) */
-.j-kos { position: absolute; inset: 0; overflow: hidden; background: #000; }
-.j-kos canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: default; }
-.j-kos-siatka { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; fill: none; stroke: rgba(255, 255, 255, .085); stroke-width: 1; }
-.j-kos-p { position: absolute; left: 0; top: 0; width: 0; height: 0; color: #F5F4F0; z-index: 1; }
-.j-kos-p i { position: absolute; left: 0; top: 0; width: var(--b); height: var(--b); transform: translate(-50%, -50%); background: #F5F4F0; transition: box-shadow .28s var(--j-serwo); }
-.j-kos-p i::before { content: ""; position: absolute; inset: -12px; }
-.j-kos-p span { position: absolute; left: 0; top: 0; transform: translate(-50%, 12px); white-space: nowrap; font: 600 12.5px/16px var(--j-font-ui);
-  text-shadow: 0 0 2px #000, 0 0 6px #000, 0 0 12px #000; transition: transform .4s var(--j-serwo), opacity .28s var(--j-ease); }
-.j-kos-p.is-gora span { transform: translate(-50%, -28px); }
-.j-kos-p em { margin-left: 7px; font: 500 11.5px/16px var(--j-font-mono); font-style: normal; color: #A9A9B1; font-variant-numeric: tabular-nums; }
-.j-kos-p:hover i, .j-kos-p:focus-visible i { box-shadow: 0 0 0 3px #000, 0 0 0 4px #F5F4F0; }
-.j-kos:has(.j-kos-p:hover) .j-kos-p:not(:hover) span { opacity: .5; }
-.j-kos-podp { position: absolute; bottom: 12px; margin: 0; padding: 4px 16px; background: #000; pointer-events: none; }
-.j-kos-podp.is-l { left: 0; font: 400 12px/16px var(--j-font-ui); color: #A9A9B1; }
-.j-kos-podp.is-p { right: 0; font: 400 10.5px/16px var(--j-font-mono); color: #93939C; }
-.j-kos-dz { display: none; position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
-.j-kos.is-css .j-kos-dz { display: block; }
-.jarvo-app .j-kos-dz .j-okr { position: absolute; border-radius: 50% !important; }
-.j-kos-dz .is-h { width: 236px; height: 236px; margin: -124px -118px; background: radial-gradient(closest-side, transparent 74%, #F3DCB8 77%, #E2B98A 82%, rgba(170, 110, 70, .5) 90%, transparent 99%); }
-.j-kos-dz .is-c { width: 176px; height: 176px; margin: -88px; background: #000; box-shadow: 0 0 0 1px #F8ECD8; }
-.j-kos-dz .is-d { width: 452px; height: 22px; margin: -9px -226px; background: radial-gradient(closest-side, #FFF6E6 0, #F5D7A8 40%, #C98F5C 64%, rgba(120, 70, 40, .4) 82%, transparent 100%); }
+/* Wejście Mózgu: prosta sieć (MozgSiec w 63-mozg.js, 22.11 właściciel: „prosty, czytelny, lekki zarys, bez animacji”).
+   Cały obszar pod nagłówkiem to jeden moduł z siecią; wyszukiwarka pływa w lewym górnym rogu (wyniki pod nią);
+   kreski włosowe, węzły z obrysem, kolor części tylko w małym środku węzła; najechanie rozjaśnia część i jej łuki. */
+.j-mozg.is-siec { grid-template-columns: 1fr; }
+.j-mozg.is-siec.is-notatka { grid-template-columns: 1fr minmax(380px, 480px); }
+.j-mozg.is-siec .j-mozg-nav { grid-area: 2 / 1; z-index: 2; align-self: start; justify-self: start; width: min(380px, calc(100% - 32px));
+  margin: 16px; padding: 12px; max-height: calc(100% - 32px); }
+.j-mozg.is-siec.is-szuka .j-mozg-nav { height: calc(100% - 32px); }
+.j-mozg.is-siec .j-mozg-plotno { grid-area: 2 / 1; background: var(--j-stal), var(--j-tlo-pasek); }
+.j-siec { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.j-siec line, .j-siec path { fill: none; stroke: var(--j-linia-2); stroke-width: 1; vector-effect: non-scaling-stroke; transition: stroke .2s var(--j-ease), opacity .2s var(--j-ease); }
+.j-siec-luki path { stroke: var(--j-linia); }
+.j-siec-gl { stroke: var(--j-linia) !important; }
+.j-siec-gr { fill: var(--j-tekst-3); }
+.j-siec-traf { fill: transparent; }
+.j-siec-w { fill: var(--j-tlo-pasek); stroke: var(--j-tekst-2); stroke-width: 1.5; vector-effect: non-scaling-stroke; transition: stroke .2s var(--j-ease); }
+.j-siec-k { fill: var(--c); }
+.j-siec-t { fill: var(--j-tekst); font: 600 14px var(--j-font-ui); }
+.j-siec-l { fill: var(--j-tekst-2); font: 500 12px var(--j-font-mono); }
+.j-siec-cz { cursor: pointer; outline: none; }
+.j-siec-cz.is-cicha { opacity: .6; }
+.j-siec.is-nad .j-siec-cz:not(.is-on) { opacity: .35; }
+.j-siec-cz.is-on .j-siec-os, .j-siec-cz.is-on .j-siec-gl, .j-siec-luki path.is-on { stroke: var(--j-tekst-2) !important; }
+.j-siec-cz.is-on .j-siec-w { stroke: var(--j-tekst); }
+.j-siec-cz.is-on .j-siec-gr { fill: var(--j-tekst-2); }
+.j-siec-cz:focus-visible .j-siec-w { stroke: var(--j-fokus); stroke-width: 3; }
+.j-siec-srodek circle { fill: var(--j-tlo-3); stroke: var(--j-tekst); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.j-siec-st { fill: var(--j-tekst); font: 700 20px var(--j-font-naglowek); font-stretch: 125%; letter-spacing: .08em; }
+.j-siec-sl { fill: var(--j-tekst-2); font: 500 11px var(--j-font-mono); }
+.j-mozg .j-siec-naj { position: absolute; right: 16px; top: 16px; padding: 8px 14px; background: var(--j-tlo-3); box-shadow: inset 0 0 0 1px var(--j-linia);
+  color: var(--j-tekst); font: 500 13px var(--j-font-ui); }
+.j-mozg .j-siec-naj:hover { box-shadow: inset 0 0 0 1px var(--j-linia-mocna); }
+@media (prefers-reduced-motion: reduce) { .j-siec line, .j-siec path, .j-siec-w { transition: none; } }
 @container app (max-width: 700px) {
-  .j-kos-p span { font-size: 11.5px; }
-  .j-kos-podp.is-p { display: none; }
+  .j-mozg.is-siec .j-mozg-plotno { display: block; }
+  .j-mozg.is-siec .j-mozg-nav { display: flex; }
+  .j-siec-t { font-size: 18px; }
+  .j-siec-l { font-size: 15px; }
 }
 /* @@pakiet rdzen */
 /* Aktualizacje w rdzeniu: znacznik rutyny przy raporcie w rozmowie (licznik pozycji pod rozmówcami: .j-rozm-licz) */

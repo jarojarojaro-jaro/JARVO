@@ -415,6 +415,65 @@ function MozgNotatka({ z, id, dane, mapa, href, cel, nazwaMiejsca, wstecz, sekcj
   </aside>`;
 }
 
+// Wejście Mózgu (22.11 właściciel: „ma być prosty, czytelny, lekki zarys; na środku Jarvo, wokół wszystko jako sieć,
+// bez animacji”): statyczna sieć w SVG. Środek = źródło (JARVO, KERNEL), pierwszy pierścień = części (wielkość węzła
+// z liczby notatek), drugi = grupy części (kropki, nazwa w podpowiedzi), cienkie łuki między częściami = linki między
+// ich notatkami (grubość z liczby). Najechanie rozjaśnia część i jej połączenia; kliknięcie wchodzi do części.
+const MOZG_SIEC = { w: 1000, h: 660, r1: 205, r2: 292, maxGrup: 9 };
+function mozgSiec(mapa, linki) {
+  const { w, h, r1, r2, maxGrup } = MOZG_SIEC, cx = w / 2, cy = h / 2;
+  const czesci = mapa.kat.filter((d) => d.ile > 0), n = czesci.length, maks = Math.max(1, ...czesci.map((d) => d.ile));
+  const kat = (i) => -Math.PI / 2 + (i * 2 * Math.PI) / Math.max(1, n);
+  const wezly = czesci.map((d, i) => {
+    const a = kat(i), x = cx + r1 * Math.cos(a), y = cy + r1 * Math.sin(a), sektor = (2 * Math.PI) / Math.max(1, n) * 0.72;
+    const grupy = d.grupy.length > 1 ? d.grupy.slice().sort((p, q) => q.ile - p.ile).slice(0, maxGrup) : [];
+    const krok = grupy.length > 1 ? Math.min(0.13, sektor / (grupy.length - 1)) : 0;
+    return { d, i, a, x, y, r: 7 + 12 * Math.sqrt(d.ile / maks),
+      grupy: grupy.map((g, j) => { const b = a + (j - (grupy.length - 1) / 2) * krok;
+        return { g, x: cx + r2 * Math.cos(b), y: cy + r2 * Math.sin(b), r: 2.5 + 3.5 * Math.sqrt(g.ile / maks) }; }) };
+  });
+  const nr = new Map(czesci.map((d, i) => [d.k, i])), pary = new Map();
+  for (const l of linki) {
+    const a = mapa.gdzie.get(l.z), b = mapa.gdzie.get(l.do);
+    if (!a || !b || a.kat === b.kat || !nr.has(a.kat) || !nr.has(b.kat)) continue;
+    const [p, q] = [nr.get(a.kat), nr.get(b.kat)].sort((x, y) => x - y), k = p + ":" + q;
+    pary.set(k, (pary.get(k) || 0) + 1);
+  }
+  const najw = Math.max(1, ...pary.values());
+  const luki = [...pary].filter(([, c]) => c >= 2).map(([k, c]) => { const [p, q] = k.split(":").map(Number); return { p, q, c, s: 0.6 + 2 * Math.sqrt(c / najw) }; });
+  return { cx, cy, wezly, luki };
+}
+
+function MozgSiec({ siec, centrum, ile, href, nazwa }) {
+  const [nad, setNad] = useState(-1);
+  const { cx: sx, cy: sy, wezly, luki } = siec, { w, h } = MOZG_SIEC;
+  const luk = (a, b) => { const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2; return `M${a.x},${a.y} Q${sx + (mx - sx) * 0.35},${sy + (my - sy) * 0.35} ${b.x},${b.y}`; };
+  const podpis = (v) => { const c = Math.cos(v.a), s = Math.sin(v.a), d = v.r + 10;
+    return { x: v.x + c * d, y: v.y + s * d + (Math.abs(s) > 0.8 ? (s > 0 ? 10 : -4) : 4), kotwica: Math.abs(c) < 0.3 ? "middle" : c > 0 ? "start" : "end" }; };
+  return html`<svg class=${cx("j-siec", nad >= 0 && "is-nad")} viewBox=${`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" role="group"
+      aria-label=${L(`Mapa mózgu: ${centrum} i ${wezly.length} części`, `Brain map: ${centrum} and ${wezly.length} parts`)}>
+    <g class="j-siec-luki" aria-hidden="true">${luki.map((l) => html`<path key=${l.p + "-" + l.q} d=${luk(wezly[l.p], wezly[l.q])}
+      class=${cx(nad >= 0 && (l.p === nad || l.q === nad) && "is-on")} style=${{ strokeWidth: l.s }}/>`)}</g>
+    ${wezly.map((v) => { const p = podpis(v);
+      return html`<a key=${v.d.k} href=${href(v.d)} class=${cx("j-siec-cz", v.i === nad && "is-on", v.d.drugorzedna && "is-cicha")}
+          style=${{ "--c": `var(--j-barwa-${v.i % 10})` }} onMouseEnter=${() => setNad(v.i)} onMouseLeave=${() => setNad(-1)}
+          onFocus=${() => setNad(v.i)} onBlur=${() => setNad(-1)} aria-label=${`${nazwa(v.d)}: ${v.d.ile} ${L("notatek", "notes")}`}>
+        <line x1=${sx} y1=${sy} x2=${v.x} y2=${v.y} class="j-siec-os"/>
+        ${v.grupy.map((gr) => html`<line key=${"l" + gr.g.k} x1=${v.x} y1=${v.y} x2=${gr.x} y2=${gr.y} class="j-siec-gl"/>`)}
+        ${v.grupy.map((gr) => html`<circle key=${"c" + gr.g.k} cx=${gr.x} cy=${gr.y} r=${gr.r} class="j-siec-gr"><title>${`${gr.g.nazwa}: ${gr.g.ile}`}</title></circle>`)}
+        <circle cx=${v.x} cy=${v.y} r=${v.r + 9} class="j-siec-traf"/>
+        <circle cx=${v.x} cy=${v.y} r=${v.r} class="j-siec-w"/>
+        <circle cx=${v.x} cy=${v.y} r=${Math.max(2.5, v.r * 0.32)} class="j-siec-k"/>
+        <text x=${p.x} y=${p.y} text-anchor=${p.kotwica} class="j-siec-t">${nazwa(v.d)}<tspan class="j-siec-l" dx="7">${v.d.ile}</tspan></text>
+      </a>`; })}
+    <g class="j-siec-srodek" aria-hidden="true">
+      <circle cx=${sx} cy=${sy} r="62"/>
+      <text x=${sx} y=${sy + 2} text-anchor="middle" class="j-siec-st">${centrum}</text>
+      <text x=${sx} y=${sy + 22} text-anchor="middle" class="j-siec-sl">${ile} ${L("notatek", "notes")}</text>
+    </g>
+  </svg>`;
+}
+
 function MozgWidok() {
   const korzen = useRef(null), plotno = useRef(null), g = useRef(null), naglowek = useRef(null), pierwszy = useRef(true), klik = useRef(null);
   const hash = React.useSyncExternalStore(Trasa.sluchaj, () => location.hash);
@@ -511,10 +570,11 @@ function MozgWidok() {
     else idz({ g: id.slice(1), o: "" });
   };
 
-  // wejście Mózgu (motyw TARS): zamiast grafu czarna dziura z częściami na orbitach (pakiet „kosmos”); graf wtedy pusty,
-  // więc nie liczy układu w tle
-  const kosmos = !!mapa && !kat && !q.trim() && mapa.glowne.length > 0;
-  useEffect(() => { g.current.dane(kosmos ? null : graf); }, [graf, kosmos]);
+  // wejście Mózgu: prosta sieć (MozgSiec) zamiast grafu i listy; lista wraca po wejściu do części, szukanie działa
+  // na wejściu w pływającym polu nad siecią. Graf canvas wtedy pusty, więc nie liczy układu w tle
+  const siecW = !!mapa && !kat && mapa.kat.some((d) => d.ile > 0);
+  const siec = useMemo(() => (siecW ? mozgSiec(mapa, dane.linki) : null), [siecW, mapa]);
+  useEffect(() => { g.current.dane(siecW ? null : graf); }, [graf, siecW]);
   useEffect(() => { g.current.zaznacz(s.o || null); if (s.o) g.current.wysrodkuj(s.o); else g.current.calosc(); }, [s.o, graf]);
   // po przejściu na inny poziom fokus na jego nagłówku (czytnik ekranu czyta, gdzie jesteśmy); szukanie się czyści
   useEffect(() => {
@@ -564,18 +624,8 @@ function MozgWidok() {
   let poziom = null;
   if (mapa && !szukam) {
     if (!kat) {
-      poziom = html`
-        ${!mapa.kat.length && html`<p class="j-mozg-opis">${L("Mózg jeszcze nic nie zapisał.", "The brain has not saved anything yet.")}</p>`}
-        <ul class="j-mozg-kafle">${mapa.glowne.map((d, ci) => html`<li key=${d.k}><a class="j-mozg-kafel" href=${href({ k: d.k, g: "", o: "" })}
-            style=${{ "--c": `var(--j-barwa-${ci % 10})`, "--u": d.ile / Math.max(1, ...mapa.glowne.map((x) => x.ile)) }}>
-          <span class="j-mozg-ki" aria-hidden="true">${String(ci + 1).padStart(2, "0")}</span>
-          <span class="j-mozg-kn">${nazwaKat(d)}</span><u class="j-mozg-ku" aria-hidden="true"></u><span class="j-mozg-kl">${d.ile}</span>
-          ${(d.opis || d.grupy.length > 1) && html`<span class="j-mozg-ko">${d.opis ? L(d.opis, d.opis_en || d.opis) : d.grupy.map((x) => x.nazwa).join(" · ")}</span>`}
-        </a></li>`)}</ul>
-        ${mapa.glowne.length > 0 && html`<section class="j-mozg-sekcja"><h3>${L("Ostatnio zmienione", "Recently changed")}</h3>
-          <ul>${ostatnie(mapa.glowne.flatMap((d) => d.wezly)).map((n) => html`<${MozgWiersz} key=${n.id} n=${n} href=${hrefNotatki} gdzie=${nazwaMiejsca(mapa.gdzie.get(n.id))}/>`)}</ul></section>`}
-        ${mapa.kat.filter((d) => d.drugorzedna).map((d) => html`<a key=${d.k} class="j-mozg-boczna" href=${href({ k: d.k, g: "", o: "" })}>
-          <${Ikona} n=${d.ikona || "book"} r=${16}/><span><b>${nazwaKat(d)}</b> · ${d.ile}${d.opis && html`<br/><small>${L(d.opis, d.opis_en || d.opis)}</small>`}</span></a>`)}`;
+      // wejście z notatkami to sieć (MozgSiec); lista tylko przy pustym mózgu
+      poziom = html`<p class="j-mozg-opis">${L("Mózg jeszcze nic nie zapisał.", "The brain has not saved anything yet.")}</p>`;
     } else if (!grupa) {
       // grupa samej tożsamości (Jarvo: kim jest, zasady, pamięć) od razu jako lista, przed kaflami pozostałych grup
       const wprost = kat.grupy.filter((x) => x.wezly.every((n) => n.hub || n.typ === "tozsamosc")), kafle = kat.grupy.filter((x) => !wprost.includes(x));
@@ -592,7 +642,7 @@ function MozgWidok() {
   }
   const hub = grupa && kat.grupy.length > 1 ? grupa.hub : kat && kat.hub, hubNaj = kat ? hub : mapa && mapa.korzen;
 
-  return html`<div ref=${korzen} class=${cx("j-mozg", s.o && dane && "is-notatka", naMapie && "is-mapa", kosmos && "is-kosmos")} onKeyDown=${esc} data-mozg>
+  return html`<div ref=${korzen} class=${cx("j-mozg", s.o && dane && "is-notatka", naMapie && "is-mapa", siecW && "is-siec", siecW && szukam && "is-szuka")} onKeyDown=${esc} data-mozg>
     <${NaglowekWidoku} klasa="j-mozg-gora" ikona=${IKONY_WIDOKOW.mozg}
       tytul=${html`<span class="j-mozg-okruszki">${okruszki.map(([t, h], k) => html`<span key=${k} class="j-mozg-ok">${k > 0 && html`<span class="j-mozg-ok-sep" aria-hidden="true">›</span>`}${k === okruszki.length - 1 && !s.o
         ? html`<span aria-current="page">${t}</span>` : html`<a href=${h}>${t}</a>`}</span>`)}</span>`}
@@ -606,7 +656,7 @@ function MozgWidok() {
       <input type="search" value=${q} placeholder=${L("Szukaj w całym mózgu…", "Search the whole brain…")} aria-label=${L("Szukaj notatki", "Search notes")} role="combobox"
         aria-expanded=${szukam} aria-controls="j-mozg-wyniki" aria-autocomplete="list" aria-activedescendant=${szukam && opcje[i] ? `j-mozg-${i}` : undefined}
         onInput=${(e) => setQ(e.target.value)} onKeyDown=${szukajKlawisz}/>
-      <div class="j-mozg-przewin">
+      ${(!siecW || szukam || !dane) && html`<div class="j-mozg-przewin">
         ${szukam ? html`<p class="j-mozg-opis" role="status">${ileTytulow + ileTresci ? L(`Znalezione: ${ileTytulow + ileTresci}`, `Found: ${ileTytulow + ileTresci}`) : L("Nic nie pasuje.", "Nothing matches.")}</p>
           <ul id="j-mozg-wyniki" role="listbox" aria-label=${L("Wyniki", "Results")} class="j-mozg-wyniki">${opcje.map((o, k) => html`<li key=${o.n.id + "#" + o.sek + (o.wTresci ? "+" : "")} id=${`j-mozg-${k}`} role="option"
             aria-selected=${k === i} onClick=${() => otworz(o)}>
@@ -622,13 +672,14 @@ function MozgWidok() {
             ${hub && html`<a class="j-mozg-przeglad" href=${hrefNotatki(hub.id)}>${L("Przegląd tej części", "Overview of this part")} →</a>`}
           </header>${hubNaj && html`<${MozgNajwazniejsze} key=${hubNaj.id} hub=${hubNaj} wiki=${wiki}/>`}${poziom}`}
         ${!dane && html`<div class="j-mozg-stan" role="status">${blad ? L("Nie udało się wczytać mózgu.", "Could not load the brain.") : html`<${Spinner}/>`}</div>`}
-      </div>
+      </div>`}
     </div>
     <div class="j-mozg-plotno">
       <canvas ref=${plotno} role="img" aria-label=${L("Mapa wiedzy tego poziomu; to samo jest na liście obok", "Knowledge map of this level; the list shows the same")}></canvas>
-      ${kosmos && html`<${Leniwy} pakiet="kosmos" nazwa="MozgKosmos"
-        czesci=${mapa.glowne.map((d) => ({ k: d.k, nazwa: nazwaKat(d), ile: d.ile, href: href({ k: d.k, g: "", o: "" }) }))}/>`}
-      ${graf && !kosmos && html`<p class="j-mozg-podpowiedz" aria-hidden="true">${grupa ? L("Kropka = notatka. Kółko myszy przybliża.", "Dot = note. Scroll to zoom.")
+      ${siec && html`<${MozgSiec} siec=${siec} centrum=${z.klucz === "jarvo" ? "JARVO" : z.klucz.toUpperCase()}
+        ile=${mapa.kat.reduce((a, d) => a + d.ile, 0)} href=${(d) => href({ k: d.k, g: "", o: "" })} nazwa=${nazwaKat}/>`}
+      ${siec && mapa.korzen && html`<a class="j-siec-naj" href=${hrefNotatki(mapa.korzen.id)}>${L("Najważniejsze", "Key points")} →</a>`}
+      ${graf && !siecW && html`<p class="j-mozg-podpowiedz" aria-hidden="true">${grupa ? L("Kropka = notatka. Kółko myszy przybliża.", "Dot = note. Scroll to zoom.")
         : L("Kliknij skupisko, żeby wejść.", "Click a cluster to go in.")}</p>`}
     </div>
     ${s.o && dane && mapa && html`<${MozgNotatka} key=${z.klucz + s.o} z=${z} id=${s.o} dane=${dane} mapa=${mapa} href=${hrefNotatki} cel=${celLinku}
