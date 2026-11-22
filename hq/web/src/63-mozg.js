@@ -218,7 +218,7 @@ const MOZG_BLEDY_PAMIECI = {
 const mozgBladPamieci = (e) => (e && (e.status === 409 || e.kod === "zmieniona") ? "zmieniona"
   : e && ["limit", "pusty_wpis", "zly_wpis", "zajeta"].includes(e.kod) ? e.kod : "inny");
 
-// „Poproś o zmianę” (notatka z `edycja: repo`): początek wiadomości do Jarva w szkicu nowej rozmowy (bez dubla przy
+// „Edytuj” w pliku Jarva (notatka z `edycja: repo`): początek wiadomości do Jarva w szkicu nowej rozmowy (bez dubla przy
 // drugim kliknięciu, jak „Odpowiedz” w Aktualizacjach), adresat domyślny (Jarvo), ekran startu z kursorem na końcu
 const mozgProsba = (plik, byl) => { const p = L(`Zmiana w ${plik}: `, `Change in ${plik}: `), t = String(byl || ""); return t.startsWith(p) ? t : p + t; };
 function mozgPopros(plik) {

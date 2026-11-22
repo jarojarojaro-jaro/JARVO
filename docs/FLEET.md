@@ -119,7 +119,7 @@ Mechanizm:
   (szefem jest właściciel, szefem floty Jarvo, marka), `ZASADY.md` procedury z zasadą pamięci, `MAPA.md` mapa „od A do Z”
   (do promptu tylko bloki RDZEN); w skarbcu notatki `agenci/<profil>/kim jest <k>`, `zasady pracy <k>`, `jak działa <k>`
   i lustro pamięci `pamięć <k>`, `pamięć <k> o tobie`. Instalacja zakłada puste `memories/MEMORY.md` i `USER.md` profilu;
-  właściciel zmienia pamięć agenta w Mózgu („Zmień”, `PUT /pamiec/{memory,user}?profil=<profil>`), a nowe wpisy idą przez
+  właściciel zmienia pamięć agenta w Mózgu („Edytuj” na stronie notatki, `PUT /pamiec/{memory,user}?profil=<profil>`), a nowe wpisy idą przez
   skrzynkę do kompilacji w `agenci/<profil>/` albo `brands/<marka>/`. Pomiar samowiedzy: `wiedza.py ocena <zestaw> --agent <profil>`
   (zakres marki, bez własnej tożsamości z promptu).
 

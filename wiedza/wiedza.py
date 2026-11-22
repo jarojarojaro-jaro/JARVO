@@ -2442,7 +2442,7 @@ def zasiej_tozsamosc(sk: "Skarbiec", katalog: Path | None) -> list[str]:
             continue
         info = daty.get(nazwa) if isinstance(daty.get(nazwa), dict) else {}
         zmieniono = str(info.get("zmieniono") or "")
-        body = (f"# {tytul}\n\n**{opis}. Zmiana przez repo: w Mózgu „Poproś o zmianę”.**\n\n"
+        body = (f"# {tytul}\n\n**{opis}. Zmiana przez repo: w Mózgu „Edytuj”.**\n\n"
                 f"{dla_czytelnika(src.read_text(encoding='utf-8', errors='replace'))}\n\n"
                 f"## Powiązane\n- hub: [[{TOZSAMOSC}/{HUBY[TOZSAMOSC][0]}|Jarvo]]\n")
         if _zapisz_tozsamosc(sk, rel, body, zmieniono if DATA_RE.match(zmieniono) else _data_pliku(src),
@@ -2563,7 +2563,7 @@ def zasiej_tozsamosc_agentow(sk: "Skarbiec", katalog: Path | None, profile: Path
             if not (kat / nazwa).is_file():
                 continue
             zmieniono, plik = zmiana(nazwa)
-            body = (f"# {tytul.format(s=s)}\n\n**{opis.format(s=s, plik=plik)}. Zmiana przez repo: w Mózgu „Poproś o zmianę”.**\n\n"
+            body = (f"# {tytul.format(s=s)}\n\n**{opis.format(s=s, plik=plik)}. Zmiana przez repo: w Mózgu „Edytuj”.**\n\n"
                     f"{dla_czytelnika((kat / nazwa).read_text(encoding='utf-8', errors='replace'))}\n" + powiazane)
             rel = f"{folder}/{wzor.format(k=k)}"
             if _zapisz_tozsamosc(sk, rel, body, zmieniono, plik, "repo"):

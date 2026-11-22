@@ -130,7 +130,7 @@ void main() {
   float jas = (uFok < 0.0 || abs(m.y - uFok) < 0.5) ? 1.0 : 0.3;
   if (uNad >= 0.0) jas *= abs(m.y - uNad) < 0.5 ? 1.35 : 0.55;
   vC = c * (0.92 + 0.08 * uPuls * sin(uCzas * 1.7 + p.x * 0.07 + p.y * 0.05)); vD = jas;
-  gl_PointSize = clamp(m.x * uKam.z, 1.7, 13.0) * 3.0 * uDpr;
+  gl_PointSize = clamp(m.x * uKam.z, 1.7, 7.5) * 3.0 * uDpr;
   gl_Position = vec4((p.x - uKam.x) * uKam.z * 2.0 / uWid.x, -(p.y - uKam.y) * uKam.z * 2.0 / uWid.y, 0.0, 1.0);
 }`;
 const NEURON_FS_KROPKA = `precision mediump float;
@@ -138,7 +138,7 @@ varying vec3 vC; varying float vD;
 void main() {
   float d = length(gl_PointCoord - 0.5) * 2.0;
   float rdzen = smoothstep(0.36, 0.26, d), blask = exp(-d * d * 7.0) * 0.5;
-  gl_FragColor = vec4((vC * (rdzen * 1.05 + blask) + vec3(rdzen * 0.18)) * vD, 1.0);
+  gl_FragColor = vec4((vC * (rdzen * 1.1 + blask) + vec3(rdzen * 0.06)) * vD, 1.0);
 }`;
 
 const neuronRgb = (hex) => {
@@ -289,7 +289,7 @@ function utworzNeuron(pudlo, o) {
     };
     // dendryty, potem włókna (jasność włókna maleje z ich liczbą, żeby gęsty mózg nie był białą plamą)
     wiaz(bufory.den); gl.uniform1f(L.uni.uA, 0.3); gl.uniform1f(L.uni.uMocne, 0); gl.drawArrays(gl.TRIANGLES, 0, bufory.nDen);
-    wiaz(bufory.linie); gl.uniform1f(L.uni.uA, Math.min(0.16, 6 / Math.sqrt(u.linki.length + 1)) * Math.min(1.8, 0.8 + kam.k / k0 * 0.12));
+    wiaz(bufory.linie); gl.uniform1f(L.uni.uA, Math.min(0.15, 5.5 / Math.sqrt(u.linki.length + 1)) * Math.min(1.25, 0.9 + kam.k / k0 * 0.05));
     gl.drawArrays(gl.LINES, 0, bufory.nLinie);
     const jasne = stan.nad || stan.wybrana;
     if (jasne && bufory.zakresy.has(jasne)) {

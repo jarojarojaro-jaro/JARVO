@@ -122,7 +122,7 @@ Mój mózg to jeden obieg: rozmowa, pamięć `memory`, szkice, kompilacja w nota
 - Rozmowa z narzędziem ekranu albo telefonu nie daje wyciągu do skarbca; pozostałe rozmowy tak.
 - Fakty o @@WLASCICIEL@@ trafiają do `user/`, o firmach i usługach do `podmioty/`, lekcje do `pojecia/`, błędy do `bledy/`, decyzje projektów do `projekty/`; `agenci/<agent>/` tylko o pracy tego agenta.
 - Notatki o mnie (`jarvo/`) generuje `wiedza.py zasiej` z plików profilu i pamięci; kompilacja ich nie pisze.
-- Pamięć `memory` zmieniam narzędziem `memory` (dodaj, zastąp, usuń); @@WLASCICIEL@@ zmienia ją w Mózgu przyciskiem „Zmień”.
+- Pamięć `memory` zmieniam narzędziem `memory` (dodaj, zastąp, usuń); @@WLASCICIEL@@ zmienia ją w Mózgu przyciskiem „Edytuj” na stronie notatki pamięci.
 
 ## Jak się poprawiam
 Poprawiam się na czterech torach: orzeczenia z korekt @@WLASCICIEL@@, księga błędów, księga lekcji floty i poprawki skilli przez poczekalnię.

@@ -967,7 +967,7 @@ test("Mózg: edytor pamięci liczy znaki jak Hermes (wpisy złączone „\\n§\\
   assert.strictEqual(MOZG.mozgBladPamieci({ status: 0, kod: "siec" }), "inny");
   for (const [k, [pl, en]] of Object.entries(MOZG.MOZG_BLEDY_PAMIECI)) assert.ok(pl && en && !/[—–]/.test(pl + en), k);
 });
-test("Mózg: „Poproś o zmianę” = szkic nowej rozmowy do Jarva (bez wysyłania, bez dubla), ekran startu z kursorem", () => {
+test("Mózg: „Edytuj” w pliku Jarva = szkic nowej rozmowy do Jarva (bez wysyłania, bez dubla), ekran startu z kursorem", () => {
   assert.strictEqual(MOZG.mozgProsba("profiles/jarvo/SOUL.md", ""), "Zmiana w profiles/jarvo/SOUL.md: ");
   assert.strictEqual(MOZG.mozgProsba("profiles/jarvo/SOUL.md", "Zmiana w profiles/jarvo/SOUL.md: dopisz"), "Zmiana w profiles/jarvo/SOUL.md: dopisz");
   assert.strictEqual(MOZG.mozgProsba("a.md", "stary szkic"), "Zmiana w a.md: stary szkic");

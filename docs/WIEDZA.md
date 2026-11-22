@@ -147,12 +147,12 @@ Notatki `typ: tozsamosc` (frontmatter: `status: aktualna`, `zmieniono` = data zm
 
 | Notatka | Źródło | Edycja w Mózgu |
 |---|---|---|
-| `jarvo/jak działa jarvo` („Jarvo od A do Z”, §2b) | `profiles/jarvo/MAPA.md` repo + nakładki, bloki GEN | „Poproś o zmianę” (repo) |
-| `jarvo/kim jest jarvo` | `profiles/jarvo/SOUL.md` (postać) | „Poproś o zmianę” |
-| `jarvo/zasady pracy` | `profiles/jarvo/ZASADY.md` bez zamykającego bloku `<critical>`; roster wstawiony, protokół i rdzeń mapy jednym zdaniem | „Poproś o zmianę” |
-| `jarvo/zasady krytyczne` | ten zamykający blok (`KRYTYCZNE.md` profilu: stoi na samym końcu promptu) | „Poproś o zmianę” |
-| `jarvo/pamięć jarva` | `profiles/jarvo/memories/MEMORY.md` Hermesa, wpisy jako lista | „Zmień” (PUT /pamiec/memory) |
-| `user/pamięć jarva o tobie` | `profiles/jarvo/memories/USER.md`, wpisy jako lista | „Zmień” (PUT /pamiec/user) |
+| `jarvo/jak działa jarvo` („Jarvo od A do Z”, §2b) | `profiles/jarvo/MAPA.md` repo + nakładki, bloki GEN | „Edytuj” = prośba w rozmowie (repo) |
+| `jarvo/kim jest jarvo` | `profiles/jarvo/SOUL.md` (postać) | „Edytuj” = prośba w rozmowie |
+| `jarvo/zasady pracy` | `profiles/jarvo/ZASADY.md` bez zamykającego bloku `<critical>`; roster wstawiony, protokół i rdzeń mapy jednym zdaniem | „Edytuj” = prośba w rozmowie |
+| `jarvo/zasady krytyczne` | ten zamykający blok (`KRYTYCZNE.md` profilu: stoi na samym końcu promptu) | „Edytuj” = prośba w rozmowie |
+| `jarvo/pamięć jarva` | `profiles/jarvo/memories/MEMORY.md` Hermesa, wpisy jako lista | „Edytuj” = edytor wpisów (PUT /pamiec/memory) |
+| `user/pamięć jarva o tobie` | `profiles/jarvo/memories/USER.md`, wpisy jako lista | „Edytuj” = edytor wpisów (PUT /pamiec/user) |
 
 Pliki tożsamości przygotowuje build (`scripts/build.py tozsamosc_do_skarbca` → `build/wiedza/tozsamosc/`: tokeny @@…@@
 podstawione, `zrodla.json` z datą ostatniego commitu pliku); `wiedza.py zasiej` bierze katalog `tozsamosc` obok `--repo`
