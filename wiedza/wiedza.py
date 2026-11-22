@@ -1549,6 +1549,28 @@ def tozsamosc_w_prompcie(sciezka: str, agent: str) -> bool:
     return rel.startswith(f"agenci/{agent}/") and not rel.rsplit("/", 1)[-1].startswith(MAPA_AGENTA[0].format(k=""))
 
 
+IMIE_W_TOZSAMOSCI = re.compile(r"^(?:kim jest|jak działa|zasady pracy|zasady krytyczne) (\S+)")
+
+
+def tozsamosc_obca(sciezka: str, agent: str, slowa_pytania: set[str]) -> bool:
+    """Postać, zasady albo mapa INNEGO agenta niż `agent` (`agenci/<inny>/kim jest…`, `jak działa…`, `zasady…`; dla
+    specjalisty też `jarvo/*`), a pytanie go nie nazywa. Pamięci (także `user/pamięć jarva o tobie`) zostają wspólne:
+    to wiedza o JARO i pracy. Bez tej reguły pytanie „dla kogo pracujesz?” u Sherlocka zwracało sekcje „Dla kogo
+    pracuję” dziewięciu innych agentów zamiast jego własnej (22.11, hit@5 0,2)."""
+    rel = sciezka.split("#")[0]
+    if rel in KOLEJNOSC_TOZSAMOSCI:
+        return (rel not in {n[0] for n in NOTATKI_PAMIECI.values()} and agent != PROFIL_TOZSAMOSCI
+                and not _slowa_ascii(PROFIL_TOZSAMOSCI) <= slowa_pytania)
+    if not rel.startswith("agenci/") or rel.startswith(f"agenci/{agent}/"):
+        return False
+    katalog, _, plik = rel.rpartition("/")
+    m = IMIE_W_TOZSAMOSCI.match(plik)
+    if not m or katalog.count("/") != 1:
+        return False
+    nazwy = [_slowa_ascii(katalog.split("/", 1)[-1].removeprefix("jarvo-")), _slowa_ascii(m.group(1))]
+    return not any(n and n <= slowa_pytania for n in nazwy)
+
+
 def notatki_przypomnienia(ix: Indeks, q: str, limit: int = 5, wektory=None, silnik: str | None = None, zakres=(),
                           pomin_tozsamosc: bool | str = False) -> list[dict]:
     """Notatki „może się przydać” przed turą (wtyczka jarvo-wiedza) i w `ocena`: wyszukiwanie (Indeks.szukaj: wektory,
@@ -1562,8 +1584,10 @@ def notatki_przypomnienia(ix: Indeks, q: str, limit: int = 5, wektory=None, siln
     slowa = _slowa_ascii(q)
     agent = PROFIL_TOZSAMOSCI if pomin_tozsamosc is True else str(pomin_tozsamosc or "")
     out = []
-    for t in ix.szukaj(q, limit=limit + 8, wektory=wektory, silnik=silnik, zakres=zakres):
+    for t in ix.szukaj(q, limit=limit + 16, wektory=wektory, silnik=silnik, zakres=zakres):
         if t["typ"] == "orzeczenia" or (agent and t["typ"] == "tozsamosc" and tozsamosc_w_prompcie(t["sciezka"], agent)):
+            continue
+        if agent and tozsamosc_obca(t["sciezka"], agent, slowa):
             continue
         if HUB_AGENTA_RE.match(t["sciezka"]):
             if not hub_agenta_nazwany(t["sciezka"], slowa):

@@ -343,6 +343,16 @@ def test_tozsamosc_i_pamiec_kazdego_agenta(dane, monkeypatch):
     assert not w.tozsamosc_w_prompcie("agenci/jarvo-web/jak działa web#Gdzie co jest", "jarvo-web")
     assert not w.tozsamosc_w_prompcie("agenci/jarvo-web/kim jest web", "jarvo")
     assert w.tozsamosc_w_prompcie("jarvo/kim jest jarvo", "jarvo") and not w.tozsamosc_w_prompcie("jarvo/jak działa jarvo", "jarvo")
+    # cudza tożsamość tylko, gdy pytanie nazywa agenta (22.11: Sherlock na „dla kogo pracujesz?” dostawał 5 cudzych
+    # sekcji „Dla kogo pracuję”, hit@5 0,2); zwykłe notatki z katalogu innego agenta wracają jak zawsze
+    dla_kogo = w._slowa_ascii("dla kogo pracujesz")
+    assert w.tozsamosc_obca("agenci/jarvo-web/jak działa web#Dla kogo pracuję i po co", "jarvo-sherlock", dla_kogo)
+    assert w.tozsamosc_obca("jarvo/jak działa jarvo#Dla kogo pracuję i po co", "jarvo-sherlock", dla_kogo)
+    assert not w.tozsamosc_obca("agenci/jarvo-sherlock/jak działa sherlock#Dla kogo pracuję i po co", "jarvo-sherlock", dla_kogo)
+    assert not w.tozsamosc_obca("agenci/jarvo-web/jak działa web#Dla kogo pracuję i po co", "jarvo",
+                                w._slowa_ascii("dla kogo pracuje web"))
+    assert not w.tozsamosc_obca("agenci/jarvo-wideo/pamięć wideograf", "jarvo", w._slowa_ascii("co pamięta wideograf"))
+    assert not w.tozsamosc_obca("agenci/jarvo-web/hosting enigmy na seohost", "jarvo-sherlock", dla_kogo)
     ix = w.Indeks(sk)
     ix.odswiez()
     assert "agenci/jarvo-web/kim jest web" not in [r["sciezka"] for r in w.notatki_przypomnienia(
