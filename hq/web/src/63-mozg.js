@@ -615,14 +615,13 @@ function MozgWidok() {
           ${ileTytulow > tytuly.length && html`<p class="j-mozg-opis">${L(`i ${ileTytulow - tytuly.length} więcej: dopisz słowo, żeby zawęzić`, `and ${ileTytulow - tytuly.length} more: add a word to narrow down`)}</p>`}
         </div>`}
       </div>
-      ${mapa && html`<div class="j-mozg-poziom" style=${{ "--c": kat ? barwaCzesci(kat.k) : "var(--j-tekst-2)" }}>
-        ${kat && html`<${MozgWstecz} w=${wstecz}/>`}
-        <h2 ref=${naglowek} tabIndex="-1">${wGrupie ? grupa.nazwa : kat ? nazwaKat(kat) : L(`Co wie ${z.klucz === "jarvo" ? "Jarvo" : z.nazwa}`, `What ${z.klucz === "jarvo" ? "Jarvo" : z.nazwa_en || z.nazwa} knows`)}
-          <span>${wGrupie ? grupa.ile : kat ? kat.ile : mapa.kat.reduce((a, d) => a + d.ile, 0)}</span></h2>
-        ${kat && kat.opis && !wGrupie ? html`<p class="j-mozg-opis">${L(kat.opis, kat.opis_en || kat.opis)}</p>`
-          : !kat && html`<p class="j-mozg-opis">${L("Kliknij część, żeby ją przybliżyć, kropkę, żeby otworzyć notatkę. Kółko przybliża, przeciąganie przesuwa.", "Click a part to zoom in, a dot to open the note. Scroll zooms, drag moves.")}</p>`}
-        ${hub && html`<a class="j-mozg-przeglad" href=${hrefNotatki(hub.id)}>${kat ? L("Przegląd tej części", "Overview of this part") : L("Najważniejsze", "Key points")} →</a>`}
+      ${kat && html`<div class="j-mozg-poziom" style=${{ "--c": barwaCzesci(kat.k) }}>
+        <${MozgWstecz} w=${wstecz}/>
+        <h2 ref=${naglowek} tabIndex="-1">${wGrupie ? grupa.nazwa : nazwaKat(kat)} <span>${wGrupie ? grupa.ile : kat.ile}</span></h2>
+        ${kat.opis && !wGrupie && html`<p class="j-mozg-opis">${L(kat.opis, kat.opis_en || kat.opis)}</p>`}
+        ${hub && html`<a class="j-mozg-przeglad" href=${hrefNotatki(hub.id)}>${L("Przegląd tej części", "Overview of this part")} →</a>`}
       </div>`}
+      ${!kat && hub && html`<a class="j-mozg-naj" href=${hrefNotatki(hub.id)}>${L("Najważniejsze", "Key points")} →</a>`}
       ${mapa && html`<nav class="j-sr" aria-label=${L("Części mózgu", "Brain parts")}><ul>${mapa.kat.filter((d) => d.ile > 0).map((d) => html`<li key=${d.k}>
         <a href=${href({ k: d.k, g: "", o: "" })}>${nazwaKat(d)} (${d.ile})</a>
         ${d === kat && d.grupy.length > 1 && html`<ul>${d.grupy.map((g) => html`<li key=${g.k}><a href=${href({ g: g.k, o: "" })}>${g.nazwa} (${g.ile})</a>

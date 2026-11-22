@@ -253,12 +253,12 @@ function utworzNeuron(pudlo, o) {
   const dopasuj = (bb, mx, my, kmaks) => ({ x: (bb[0] + bb[2]) / 2, y: (bb[1] + bb[3]) / 2, k: Math.min((W - 2 * mx) / (bb[2] - bb[0]), (H - 2 * my) / (bb[3] - bb[1]), kmaks) });
   function cel() {
     if (!u) return kam;
-    k0 = dopasuj(u.bb, Math.min(190, W * 0.16), 46, 6).k;
+    k0 = dopasuj(u.bb, Math.min(240, W * 0.2), 70, 6).k;
     if (stan.wybrana) { const k = u.byId.get(stan.wybrana); if (k) return { x: k.x, y: k.y, k: Math.max(k0 * 5, kam.k) }; }
     const cz = stan.fok >= 0 && u.czesci[stan.fok];
     if (cz && stan.grupa >= 0 && cz.grupy[stan.grupa]) return dopasuj(cz.grupy[stan.grupa].bb, 120, 90, k0 * 14);
     if (cz) return dopasuj(cz.bb, 150, 80, k0 * 9);
-    return dopasuj(u.bb, Math.min(190, W * 0.16), 46, 6);
+    return dopasuj(u.bb, Math.min(240, W * 0.2), 70, 6);
   }
   function lec(c, ms = 900) {
     if (bezRuchu.matches || !ms) { Object.assign(kam, c); lot = null; } else lot = { z: { ...kam }, c, t: performance.now(), ms };

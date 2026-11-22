@@ -1511,8 +1511,8 @@ z tekstem i jakieś edytuj”). Pakiet `mozg` ładuje się dopiero po wejściu w
   przygasają, nad skupiskami nazwy grup; klik w grupę albo jej nazwę: lot na grupę; od przybliżenia ×3 tytuły
   najważniejszych notatek w kadrze (do 18, bez nachodzenia, z obwódką dla czytelności). Klik w tło albo Esc: poziom
   wyżej, klik w środek: cały mózg. Kółko przybliża wokół kursora, przeciąganie przesuwa, dwa palce przybliżają.
-  Okruszki u góry (Mózg › część › grupa), w lewym dolnym rogu karta poziomu: „Wstecz”, nazwa i liczba, jedno zdanie,
-  „Przegląd tej części →” (hub części albo grupy) albo na wejściu „Najważniejsze →” (hub skarbca). Stan w hashu
+  Okruszki u góry (Mózg › część › grupa). Na wejściu nad mapą tylko szukanie i „Najważniejsze →” (hub skarbca) w prawym
+  górnym rogu; w części i grupie w lewym dolnym rogu karta poziomu: „Wstecz”, nazwa i liczba, jedno zdanie i „Przegląd tej części →” (hub części albo grupy). Stan w hashu
   `#/mozg?k=<część>&g=<grupa>&o=<notatka>&z=<źródło>` (trasa aplikacji widzi `#/mozg`, parametry czyta tylko Mózg).
   Ukryta lista części, grup i notatek grupy (`.j-sr`) dla czytnika ekranu; po zmianie poziomu fokus na nazwie w karcie.
 - **„Wstecz”** (← z podpisem miejsca, do którego wraca) w nagłówku notatki i na poziomie części/grupy: poprzedni
