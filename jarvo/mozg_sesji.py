@@ -64,6 +64,7 @@ ZAPYTANIE = 1500                     # znaków tekstu, po którym szukamy (wiado
 TRESC_LINKU = 300                    # znaków pobranej treści jednego linku w zapytaniu
 RRF_K = 60
 PIERWSZENSTWO_DO = 12                # notatka z `pierwszenstwo` z miejsc notatek+1…12 dochodzi jako jedna linia ponad limit
+NIEAKTUALNE = {"nieaktualne", "wycofana", "przestarzala"}   # statusy notatek poza przypomnieniem (Kernel, skarbiec Jarva)
 DZIENNIK = "przypomnienia.jsonl"
 CZEKAJACE = "linki-czekajace.json"
 DZIENNIK_MAX_B = 2_000_000
@@ -192,7 +193,8 @@ def szukaj(cfg: Konfig, ix, q: str, wektory=None, pomijaj: set[str] | None = Non
     (`ranking`, np. kb: BM25 z polską analizą po fragmentach), łączone RRF; bez notatek spoza indeksu (`pomin`),
     z `w_prompcie` i z `pomijaj` (ostatnie przypomnienia). Pierwszeństwo (decyzje, lekcje) nie przestawia rankingu
     (premia w RRF obniżała trafność: pomiar 22.11, hit@5 0,941 → 0,882 przy ×1,15), tylko dokłada jedną notatkę
-    z tych folderów z dalszych miejsc (do PIERWSZENSTWO_DO), gdy nie ma jej w pierwszych `notatek`."""
+    z tych folderów z dalszych miejsc (do PIERWSZENSTWO_DO), gdy nie ma jej w pierwszych `notatek`. Notatka ze statusem
+    z NIEAKTUALNE (np. zastąpiona decyzja w wiki Kernela) nie wraca: 22.11 żywa tura dostała uchyloną decyzję."""
     lib = W()
     zewn: list[str] = []
     watek = None
@@ -215,10 +217,13 @@ def szukaj(cfg: Konfig, ix, q: str, wektory=None, pomijaj: set[str] | None = Non
             continue
         t = znane.get(s)
         if t is None:
-            r = ix.db.execute("SELECT sciezka, tytul, streszczenie, typ FROM pliki WHERE sciezka = ?", (s,)).fetchone()
+            r = ix.db.execute("SELECT sciezka, tytul, streszczenie, typ, status FROM pliki WHERE sciezka = ?", (s,)).fetchone()
             if r is None or r["typ"] == "hub":
                 continue
-            t = {"sciezka": r["sciezka"], "tytul": r["tytul"], "streszczenie": r["streszczenie"], "typ": r["typ"]}
+            t = {"sciezka": r["sciezka"], "tytul": r["tytul"], "streszczenie": r["streszczenie"], "typ": r["typ"],
+                 "status": r["status"]}
+        if str(t.get("status") or "") in NIEAKTUALNE:
+            continue
         kolejne.append(t)
         if len(kolejne) >= PIERWSZENSTWO_DO:
             break

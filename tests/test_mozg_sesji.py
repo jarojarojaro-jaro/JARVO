@@ -18,10 +18,11 @@ import czytnik_omp  # noqa: E402
 import mozg_zrodla  # noqa: E402
 
 
-def notatka(katalog: Path, rel: str, tytul: str, streszczenie: str, tresc: str = "", typ: str = "fakt") -> Path:
+def notatka(katalog: Path, rel: str, tytul: str, streszczenie: str, tresc: str = "", typ: str = "fakt",
+            status: str = "aktualne") -> Path:
     p = katalog / f"{rel}.md"
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(f"---\ntyp: {typ}\ntags: [x]\naktualizacja: 2026-11-20\nzrodlo: test\nstatus: aktualne\n---\n"
+    p.write_text(f"---\ntyp: {typ}\ntags: [x]\naktualizacja: 2026-11-20\nzrodlo: test\nstatus: {status}\n---\n"
                  f"# {tytul}\n\n**{streszczenie}**\n\n{tresc}\n\n## Powiązane\n- [[index]]\n", encoding="utf-8")
     return p
 
@@ -86,6 +87,17 @@ def test_drugi_ranking_rrf(tmp_path, wiki):
                       "{'path': 'raporty/x.md'}]}))\n")
     cfg = cfg_z(tmp_path, wiki, ranking=[sys.executable, str(skrypt)], ranking_prefiks="wiki/", powtorka_tur=0)
     assert "repo/strata" in M.notatki_bloku(M.przypomnienie(cfg, [{"tekst": "zupełnie inne słowa"}], zapisz=False))
+
+
+def test_nieaktualna_nie_wraca(tmp_path, wiki):
+    """Zastąpiona decyzja (status nieaktualne) nie wraca ani z wiedza.py, ani z drugiego rankingu."""
+    notatka(wiki, "decyzje/2026-10-16-bez-lokalnego-gpu", "2026-10-16: nie testujemy na naszym XTX",
+            "Nie testujemy na XTX (uchylone: XTX na polecenie właściciela).", typ="decyzja", status="nieaktualne")
+    skrypt = tmp_path / "ranking.py"
+    skrypt.write_text("import json; print(json.dumps({'results': [{'path': 'wiki/decyzje/2026-10-16-bez-lokalnego-gpu.md'}]}))\n")
+    cfg = cfg_z(tmp_path, wiki, ranking=[sys.executable, str(skrypt)], ranking_prefiks="wiki/", powtorka_tur=0)
+    sciezki = M.notatki_bloku(M.przypomnienie(cfg, [{"tekst": "testujemy na naszym XTX?"}], zapisz=False))
+    assert sciezki and "decyzje/2026-10-16-bez-lokalnego-gpu" not in sciezki
 
 
 def test_klucz_linku():
