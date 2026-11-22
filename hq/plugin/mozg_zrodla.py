@@ -13,6 +13,10 @@
 - **`GET /mozg/{klucz}`**: graf źródła z pliku w kształcie skarbca `{wezly, linki}`. Plik może mieć kształt skarbca
   albo `{nodes, links}` (`source/target`, `stopien`), jak dane mózgu 3D. Ścieżka pliku nie wychodzi do przeglądarki.
   Plik > 16 MB, brak pliku albo zły JSON = 404/422 w kształcie błędów aplikacji. Wynik w pamięci do zmiany mtime.
+- **`GET /mozg/{klucz}/notatka?id=<id>`**: pełna treść notatki (Markdown bez frontmattera) ze źródła, które ma
+  `"notatki": "<katalog z plikami <id>.md>"` (wtedy wpis dostaje `tresc: true`; katalog nie wychodzi do przeglądarki,
+  identyfikator nie wyjdzie poza niego). `"rozmowca": "s:gpu"` = kto prowadzi te notatki: „Edytuj” w Mózgu otwiera
+  jego rozmowę ze szkicem prośby o zmianę.
 - Adresy (`notatka_url`, `widok_3d`) tylko http(s); `notatka_url` z `{id}` (identyfikator notatki, kodowany w URL).
 - Odczyt tylko z karty panelu (`Sec-Fetch-Site` same-origin/none), jak trasy rozmów.
 Testy: tests/test_mozg_zrodla.py.
@@ -28,6 +32,8 @@ from typing import Callable
 
 GRAF_MAKS = 16 * 1024 * 1024
 KLUCZ = re.compile(r"^[a-z0-9-]{1,40}$")
+NOTATKA_MAKS = 2 * 1024 * 1024
+ROZMOWCA = re.compile(r"^s:[a-z0-9_-]{1,40}$")
 ODCZYT_ZRODLA = ("same-origin", "none")
 SKARBIEC = {"klucz": "jarvo", "nazwa": "Skarbiec Jarva", "nazwa_en": "Jarvo's vault", "rodzaj": "skarbiec"}
 _POLA_WEZLA = ("tytul", "krotki", "folder", "typ", "status", "zmieniono", "opis")
@@ -103,9 +109,14 @@ def wczytaj_konfig(plik: Path) -> list[dict]:
         k = k if KLUCZ.match(k) and k not in zajete and k not in ("jarvo", "zrodla") else _klucz(nazwa, zajete)
         zajete.add(k)
         notatka = _adres(w.get("notatka_url"))
+        rozmowca = str(w.get("rozmowca") or "").strip()
         wpis = {"klucz": k, "nazwa": nazwa, "nazwa_en": str(w.get("nazwa_en") or nazwa).strip()[:60], "rodzaj": "plik",
                 "notatka_url": notatka if "{id}" in notatka else "",
                 "widok_3d": _adres(w.get("widok_3d")) or _start(notatka), "_graf": Path(str(w["graf"])).expanduser()}
+        if str(w.get("notatki") or "").strip():
+            wpis["_notatki"], wpis["tresc"] = Path(str(w["notatki"])).expanduser(), True
+        if ROZMOWCA.match(rozmowca):
+            wpis["rozmowca"] = rozmowca
         ks = kategorie(w.get("kategorie"))
         if ks:
             wpis["kategorie"] = ks
@@ -181,6 +192,26 @@ class Zrodla:
         self._pamiec[klucz] = (znak, graf)
         return graf
 
+    def notatka(self, klucz: str, nid: str) -> dict | None:
+        """Pełna treść notatki źródła z katalogiem `notatki` (`<katalog>/<id>.md`, bez frontmattera); None = nie ma
+        źródła, katalogu albo pliku. Identyfikator nie wychodzi poza katalog (`..`, ścieżka bezwzględna, dowiązanie)."""
+        wpis = next((w for w in wczytaj_konfig(self.konfig) if w["klucz"] == klucz), None)
+        if wpis is None or "_notatki" not in wpis or not nid or len(nid) > 300 or nid.startswith("/") or "\\" in nid \
+                or any(c in ("", ".", "..") for c in nid.split("/")):
+            return None
+        try:
+            kat = wpis["_notatki"].resolve()
+            p = (kat / f"{nid}.md").resolve()
+            if not p.is_relative_to(kat) or not p.is_file() or p.stat().st_size > NOTATKA_MAKS:
+                return None
+            t = p.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return None
+        if t.startswith("---\n"):
+            koniec = t.find("\n---\n", 4)
+            t = t[koniec + 5:] if koniec >= 0 else t
+        return {"id": nid, "tresc": t}
+
 
 def dolacz(router, *, konfig: Path, log: Callable[[str], None] | None = None) -> Zrodla:
     # import tutaj (bez `from __future__ import annotations`): adnotacja trasy to klasa z FastAPI w chwili
@@ -221,5 +252,14 @@ def dolacz(router, *, konfig: Path, log: Callable[[str], None] | None = None) ->
         if graf is None:
             return _blad(404, "brak", "Nie ma takiego źródła albo jego pliku.", "No such source or its file is missing.")
         return graf
+
+    @router.get("/mozg/{klucz}/notatka")
+    async def mozg_notatka(klucz: str, request: Request, id: str = ""):
+        if obca(request):
+            return csrf()
+        n = await asyncio.to_thread(zrodla.notatka, klucz, id) if KLUCZ.match(klucz or "") else None
+        if n is None:
+            return _blad(404, "brak", "Nie ma takiej notatki.", "No such note.")
+        return n
 
     return zrodla

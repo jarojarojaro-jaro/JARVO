@@ -55,16 +55,15 @@ PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "ochrona.py", "e
                 "mozg_zrodla.py",
                 # kanał Aktualizacje (docs/HQ.md „Aktualizacje”): archiwum raportów rutyn z cron/output profili
                 "raporty.py")
-# wspólny graf wiedzy (canvas, układ sił): zakładka Wiedza i Mózg aplikacji HQ
+# wspólny graf wiedzy (canvas, układ sił): zakładka Wiedza (Mózg aplikacji HQ ma od 22.11 własną mapę-neuron)
 GRAF_WSPOLNY = fl.REPO_ROOT / "shared" / "web" / "graf.js"
 
 
 def bundle_js(src_dir: Path | None = None, naglowek: str = "Jarvo HQ: plugin dashboardu Hermesa. Plik generowany przez scripts/hqbuild.py z hq/web/src/.",
               wspolne: tuple[Path, ...] | None = None) -> str:
     """Jedno IIFE z htm, plikami `wspolne` (np. shared/web/graf.js) i src/*.js (w kolejności nazw); ten sam pakowacz
-    służy zakładce „Wiedza” (wiedza/web/src). Bez `src_dir` = aplikacja HQ, która dostaje wspólny graf."""
-    if wspolne is None:
-        wspolne = () if src_dir else (GRAF_WSPOLNY,)
+    służy zakładce „Wiedza” (wiedza/web/src, z grafem wspólnym). Bez `src_dir` = aplikacja HQ."""
+    wspolne = wspolne or ()
     src_dir = src_dir or HQ / "web" / "src"
     htm = (HQ / "web" / "vendor" / "htm.umd.js").read_text(encoding="utf-8").strip()
     parts = [
@@ -85,7 +84,7 @@ def bundle_js(src_dir: Path | None = None, naglowek: str = "Jarvo HQ: plugin das
 # ------------------------------------------------------------------ podział pakietu (docs/HQ.md §2f „Pakiety”)
 # Plugin dostaje rdzeń (app-rdzen-<h>.js: powłoka, rozmówcy, wątek, kompozytor, Markdown, strumień, API, i18n PL)
 # i pakiety na żądanie, które 00-base.js wczytuje przez Zasoby.wczytaj(nazwa). Pliki pakietów to wzorce nazw w
-# hq/web/src; `wspolne` to pliki spoza src dołączane na początek (graf wspólny z wtyczką Wiedzy). `zalezy`: pakiety
+# hq/web/src; `wspolne` to pliki spoza src dołączane na początek (dziś żaden pakiet ich nie ma). `zalezy`: pakiety
 # wczytywane razem (Stara Baza otwiera edytor, edytor używa okien Bazy). Demo i testy biorą pełny pakiet (bundle_js).
 PAKIETY = {
     # 19-piksele.js (silnik pikseli: pokoje, figurki): tylko wieża Starej Bazy; aplikacja ma znaki TARS (22-figurka.js)
@@ -96,7 +95,7 @@ PAKIETY = {
     # pierwsze spotkanie z lektorem (nowa instalacja) i Ustawienia: poza pierwszym wyświetleniem rozmowy
     "poznajmy": {"pliki": ("36-glos.js", "37-poznajmy.js"), "zalezy": ()},
     "ustawienia": {"pliki": ("62-ustawienia.js",), "zalezy": ()},
-    "mozg": {"pliki": ("63-mozg.js",), "wspolne": ("shared/web/graf.js",), "zalezy": ()},
+    "mozg": {"pliki": ("63-mozg-neuron.js", "63-mozg.js"), "zalezy": ()},
     # Aktualizacje (#/aktualizacje): archiwum raportów rutyn, poza pierwszym wyświetleniem rozmowy
     "raporty": {"pliki": ("64-raporty.js",), "zalezy": ()},
     # stopka kompozytora (model, myślenie, tryb szybki, pierścień kontekstu z dymkiem): przy pierwszej otwartej
@@ -106,10 +105,13 @@ PAKIETY = {
 # budżet gzip (bajty) z projektu etapu 1 §7: przekroczenie zatrzymuje build. Mózg 20 KB (20.11, było 14 KB, przedtem
 # 6 KB): części, grupy, szukanie w treści, [[linki]] i skupiska w grafie, a od 20.11 tożsamość Jarva, edytor pamięci
 # (GET/PUT /pamiec), „Wstecz”, „Najważniejsze” ze streszczeń hubów i spis sekcji, wszystko PL i EN (ok. 18 KB); 21 KB
-# od 22.11: wejście jako sieć SVG (MozgSiec) zamiast osobnego pakietu „kosmos” (−4,2 KB gzip w sumie); pakiet
-# idzie tylko po wejściu w Mózg. Rdzeń 100 KB (20.11, było 95 KB): rozwijane kroki i komendy po „/” w kompozytorze
+# od 22.11: wejście jako sieć SVG (MozgSiec) zamiast osobnego pakietu „kosmos” (−4,2 KB gzip w sumie); od 22.11
+# wieczorem cały Mózg to jedna mapa-neuron w WebGL (63-mozg-neuron.js) i strona notatki zamiast listy i grafu canvas
+# (shared/web/graf.js, 6,5 KB gzip, został tylko w zakładce Wiedza): 25 KB (ok. 24 KB: renderer WebGL z układem,
+# włóknami, impulsami i kamerą ok. 6 KB, strona notatki z „Edytuj”); pakiet idzie tylko po wejściu w Mózg. Rdzeń
+# 100 KB (20.11, było 95 KB): rozwijane kroki i komendy po „/” w kompozytorze
 # (oba muszą działać od pierwszej rozmowy)
-BUDZET_GZIP = {"app-rdzen.js": 100 * 1024, "app-rdzen.css": 18 * 1024, "mozg.js": 21 * 1024}
+BUDZET_GZIP = {"app-rdzen.js": 100 * 1024, "app-rdzen.css": 18 * 1024, "mozg.js": 25 * 1024}
 ZNACZNIK_PAKIETOW = '"@@PAKIETY@@"'
 ZNACZNIK_CSS = re.compile(r"^/\* @@pakiet (\w+) \*/$", re.M)
 DEKLARACJA = re.compile(r"^(?:async\s+)?(?:function\*?\s+([A-Za-z_$][\w$]*)|class\s+([A-Za-z_$][\w$]*)"

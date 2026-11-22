@@ -1466,17 +1466,19 @@ otwiera ostatni dzień z raportami (tego rodzaju przy filtrze).
 
 ### Mózg (`#/mozg`)
 
-Wiedza Jarva w aplikacji, poukładana w kilka głównych części, w które wchodzi się krok po kroku (19.11 właściciel:
-„musi być posegregowana… główne punkty, w które wchodzą wszystkie notatki… a nie scroll na 10 minut”). Pakiet `mozg`
-ładuje się dopiero po wejściu w widok.
+Wiedza Jarva w aplikacji, poukładana w kilka głównych części (19.11 właściciel: „musi być posegregowana… główne punkty,
+w które wchodzą wszystkie notatki”), od 22.11 jako jedna mapa-neuron (właściciel: „widać od razu wszystkie kropki
+i jak się klika, to przybliża na te kropki”, „niech będzie neural, to wszystko połączone… każda sekcja swój kolor…
+jak się łączą, to gradientowo… smooth”, „jak się kliknie na pojedynczą notatkę, to niech się otworzy jej page już
+z tekstem i jakieś edytuj”). Pakiet `mozg` ładuje się dopiero po wejściu w widok.
 
-- **Kod.** `hq/web/src/63-mozg.js` (widok `MozgWidok`, części, grupy, notatka, szukanie, edytor pamięci; czyste funkcje
-  `mozgMapa`, `mozgSekcje`, `mozgSzukaj`, `mozgGraf`, `mozgWiki`, `mozgStan`/`mozgHash`, `mozgWstecz`, `mozgPamiec`,
-  `mozgBladPamieci`, `mozgProsba`, `mozgSpis` testowane w `tests/js/hq_front.test.cjs` i `tests/test_mozg_zrodla.py`)
-  i wspólny graf `shared/web/graf.js` (canvas, własny układ sił z drzewem czwórkowym Barnes-Hut, bez bibliotek). Ten
-  sam `graf.js` rysuje graf zakładki Wiedza (`scripts/build.py` dołącza go przez `bundle_js(..., wspolne=...)`). Style
-  w `hq/web/style.css` w bloku `/* @@pakiet mozg */`. Budżet: kod pakietu ≤ 20 KB gzip po minifikacji (20.11: ok.
-  18 KB po tożsamości, edytorze pamięci, „Wstecz”, „Najważniejsze” i spisie sekcji; 19.11: 13 KB; na początku 6 KB).
+- **Kod.** `hq/web/src/63-mozg.js` (widok `MozgWidok`, części, grupy, strona notatki `MozgStrona`, „Edytuj”
+  (`MozgUwaga`, `MozgPamiec`), szukanie; czyste funkcje `mozgMapa`, `mozgSekcje`, `mozgKolejnosc`, `mozgSzukaj`,
+  `mozgWiki`, `mozgStan`/`mozgHash`, `mozgWstecz`, `mozgPamiec`, `mozgBladPamieci`, `mozgProsba`, `mozgSpis`)
+  i `hq/web/src/63-mozg-neuron.js` (układ `neuronUklad`, trasy włókien `neuronTrasa`, rysowanie `utworzNeuron`:
+  WebGL bez bibliotek, napisy w Canvas 2D). Testy: `tests/js/hq_front.test.cjs` i `tests/test_mozg_zrodla.py` (układ
+  w node albo bun). Style w `hq/web/style.css` w bloku `/* @@pakiet mozg */`. Budżet pakietu: 25 KB gzip po
+  minifikacji (22.11: ok. 24 KB; wspólny graf `shared/web/graf.js` został tylko w zakładce Wiedza).
 - **Części** (główne punkty wejścia, w tej kolejności): **Jarvo** (`jarvo`, `orzeczenia`: kim jest, zasady pracy,
   pamięć i Twoje poprawki), **Ty** (`user`: profil, decyzje i to, co Jarvo o Tobie pamięta), **Projekty i marki**
   (`projekty`, `brands`, `inspiracje`), **Zespół** (`agenci`, a cały `fleet` jedną ostatnią grupą **Umiejętności**),
@@ -1491,77 +1493,87 @@ Wiedza Jarva w aplikacji, poukładana w kilka głównych części, w które wcho
   folderu, a grupa z samym hubem nie jest grupą (hub zostaje „Przeglądem tej części”). Nazwa grupy: nazwa z definicji
   części (`nazwy`: folder `jarvo` w części Jarvo to „Tożsamość”), słownik folderów, tytuł huba bez „(klucz)” albo
   nazwa katalogu. Agent `jarvo` to w całym Mózgu „Jarvo” (grupa, okruszki, „Przegląd”, graf, nagłówek notatki;
-  `MOZG_AGENCI` w 63-mozg.js), także gdy hub w skarbcu ma jeszcze dawny tytuł roli („Main Judge”); szukanie zna obie nazwy. W grupie
-  notatki w **sekcjach rodzaju** (Lekcje, Fakty, Decyzje…, od najnowszej, wycofane na końcu), każda zwinięta do 6
-  (jedna sekcja: 15) z „Pokaż wszystkie (N)”.
-- **Tożsamość** (`typ: tozsamosc`, notatki generowane przez `wiedza.py zasiej`): zawsze pierwsza sekcja i w stałej
-  kolejności: „Jarvo od A do Z” (`jarvo/jak działa jarvo`, mapa Jarva), kim jest, zasady pracy, zasady krytyczne,
-  pamięć Jarva (w części Ty: „pamięć Jarva o Tobie” przed faktami). W części Jarvo grupa samej tożsamości stoi od razu
-  listą nad kaflami pozostałych grup (Twoje poprawki).
-- **Poziomy i adres.** Wejście: kafle części (ikona, liczba notatek, jedno zdanie), „Ostatnio zmienione” (5, bez
-  archiwum) i linki do części drugorzędnych. Część: opis, „Przegląd tej części”, grupy z liczbami, „Ostatnio zmienione
-  tutaj”. Grupa: sekcje notatek. Okruszki u góry (Mózg › część › grupa). Stan w hashu
-  `#/mozg?k=<część>&g=<grupa>&o=<notatka>&z=<źródło>` (trasa aplikacji widzi `#/mozg`, parametry czyta tylko Mózg),
-  więc linki są zwykłymi `<a href>`. Po zmianie poziomu fokus idzie na jego nagłówek (czytnik ekranu czyta, gdzie
-  jesteś), a szukanie się czyści.
-- **„Najważniejsze”** na wejściu Mózgu (hub skarbca), części i grupy: `podsumowanie` huba z `/graph` (blok
-  `STRESZCZENIE`, który pisze `wiedza.py streszczenie`) w Markdown z [[linkami]] Mózgu i dopiskiem „stan na <data>”
-  (`streszczono`); dłuższe niż 700 znaków zwinięte z „Pokaż całość”. Hub bez streszczenia: bloku nie ma.
+  `MOZG_AGENCI` w 63-mozg.js), także gdy hub w skarbcu ma jeszcze dawny tytuł roli („Main Judge”); szukanie zna obie nazwy.
+- **Kolejność w skupisku grupy** (`mozgKolejnosc`, pierwsza w środku słonecznika): huby, potem sekcje rodzaju jak
+  `mozgSekcje` (tożsamość zawsze pierwsza i w stałej kolejności: „Jarvo od A do Z”, kim jest, zasady pracy, zasady
+  krytyczne, pamięć Jarva; dalej rodzaje od najliczniejszego, w rodzaju od najnowszej, wycofane na końcu).
+- **Mapa-neuron** (jeden obraz na wszystkich poziomach). Środek: ciało komórki z nazwą źródła (JARVO, KERNEL)
+  i liczbą notatek, obwódka w kolorach części. Każda część to dendryt we własnym kolorze (`--j-barwa-<nr części>`, ten
+  sam w karcie poziomu, w wynikach szukania i na stronie notatki): zwężający się pień od środka do węzła J, z J gałęzie
+  do grup, grupa to skupisko kropek (słonecznik). Wycinek części rośnie z pierwiastkiem liczby notatek; grupy w łukach
+  za J (największa w środku, kolejne rzędy dalej), bez nachodzenia (test). Kropka = notatka (wielkość z liczby
+  linków), wycofana poza archiwum szara. Włókna = linki bez kierunku (raz na parę) z gradientem od koloru części
+  jednej notatki do drugiej: w grupie łukiem przez jej środek, między grupami przez J, między częściami przez J obu
+  części i pnie przy środku (wiązka, ściśnięcie 0,82, wygładzenie Chaikina). Po włóknach i dendrytach biegną impulsy
+  (część włókien naraz, w shaderze), kropki lekko oddychają. Najechanie na część rozjaśnia ją i jej włókna, reszta
+  przygasa; na kropkę: obwódka, jej włókna w pełnym impulsie, podpis z tytułem i miejscem.
+- **Poziomy to kamera.** Klik w część albo jej nazwę: lot (0,9 s, wykładniczo w skali) na jej skupiska, inne części
+  przygasają, nad skupiskami nazwy grup; klik w grupę albo jej nazwę: lot na grupę; od przybliżenia ×3 tytuły
+  najważniejszych notatek w kadrze (do 18, bez nachodzenia, z obwódką dla czytelności). Klik w tło albo Esc: poziom
+  wyżej, klik w środek: cały mózg. Kółko przybliża wokół kursora, przeciąganie przesuwa, dwa palce przybliżają.
+  Okruszki u góry (Mózg › część › grupa), w lewym dolnym rogu karta poziomu: „Wstecz”, nazwa i liczba, jedno zdanie,
+  „Przegląd tej części →” (hub części albo grupy) albo na wejściu „Najważniejsze →” (hub skarbca). Stan w hashu
+  `#/mozg?k=<część>&g=<grupa>&o=<notatka>&z=<źródło>` (trasa aplikacji widzi `#/mozg`, parametry czyta tylko Mózg).
+  Ukryta lista części, grup i notatek grupy (`.j-sr`) dla czytnika ekranu; po zmianie poziomu fokus na nazwie w karcie.
 - **„Wstecz”** (← z podpisem miejsca, do którego wraca) w nagłówku notatki i na poziomie części/grupy: poprzedni
   widok Mózgu z historii przeglądarki (`history.back()`), a gdy poprzedni wpis był poza Mózgiem albo go nie ma, poziom
   wyżej (notatka → jej poziom, grupa → część, część → wejście). Każdy wpis historii w Mózgu dostaje przy pierwszym
   wejściu `history.state.mozgPoprz` (hash widoku, z którego przyszedł, "" spoza Mózgu), więc po powrocie przeglądarką
   strzałka dalej zgadza się z `history.back`. Esc zamyka notatkę jak dotąd.
-- **Szukaj w całym mózgu** (pole nad poziomem): od pierwszej litery po tytule i ścieżce, bez ogonków, każde słowo
-  musi pasować (tytuł od zapytania > tytuł z nim > ścieżka; wycofane i archiwum na końcu), do 40 wyników z miejscem
-  (część › grupa); skarbiec po 250 ms dokłada „W treści notatek” z `GET /search` wtyczki `jarvo-wiedza` (od 3 znaków,
-  ze streszczeniem). Wynik z treści bywa sekcją długiej notatki (`sciezka` = `notatka#Sekcja`, np. mapa Jarva): wiersz
-  „Tytuł: Sekcja”, wybór otwiera notatkę i przewija do tej sekcji (fokus na jej nagłówku). Combobox z
-  `aria-activedescendant`: strzałki, Enter otwiera, Esc czyści. Wybór otwiera notatkę w jej grupie.
-- **Notatka** (kolumna po prawej; do 1000 px zasłania graf; telefon: cały ekran): „Wstecz”, tytuł, miejsce, rodzaj
-  i data, treść skarbca w Markdown (`TrescMd`, bez `innerHTML`) z `[[linkami]]` jako linkami Mózgu (napis albo tytuł
-  celu), bez własnej sekcji „## Powiązane” i komentarzy generatora; dla źródła z pliku opis i „Otwórz notatkę ↗”. Od
-  4 sekcji „## ” (np. „Jarvo od A do Z”) nad treścią **spis sekcji**: klik przewija do nagłówka i daje mu fokus (hash
-  niesie widok, więc zamiast kotwic w adresie przewijanie). Pod spodem „Powiązane” (sąsiedzi w grafie z obu stron
-  linku, 10 + „Pokaż wszystkie”). Esc i × zamykają.
+- **Szukaj w całym mózgu** (pole w lewym górnym rogu mapy): od pierwszej litery po tytule i ścieżce, bez ogonków,
+  każde słowo musi pasować (tytuł od zapytania > tytuł z nim > ścieżka; wycofane i archiwum na końcu), do 40 wyników
+  z miejscem (część › grupa, pasek w kolorze części), trafienia mają na mapie bursztynowe obwódki; skarbiec po 250 ms
+  dokłada „W treści notatek” z `GET /search` wtyczki `jarvo-wiedza` (od 3 znaków, ze streszczeniem). Wynik z treści
+  bywa sekcją długiej notatki (`sciezka` = `notatka#Sekcja`, np. mapa Jarva): wiersz „Tytuł: Sekcja”, wybór otwiera
+  stronę notatki i przewija do tej sekcji (fokus na jej nagłówku). Combobox z `aria-activedescendant`: strzałki, Enter
+  otwiera, Esc czyści.
+- **Strona notatki** (klik w kropkę, w wynik szukania, w link): przykrywa mapę całą szerokością (mapa pod spodem
+  stoi, bez rysowania, i wraca w tym samym kadrze), pasek: „Wstecz”, miejsce z kropką w kolorze części, „Edytuj”, ×;
+  kolumna do czytania (820 px): tytuł, rodzaj, data i liczba powiązanych, pełna treść w Markdown (`TrescMd`, bez
+  `innerHTML`) z `[[linkami]]` jako linkami Mózgu (napis albo tytuł celu), bez własnej sekcji „## Powiązane”
+  i komentarzy generatora. Treść: skarbiec z `/note`, źródło z pliku z `GET /mozg/<klucz>/notatka` (gdy ma katalog
+  `notatki`), inaczej opis z grafu i „Otwórz w repozytorium ↗”. Od 4 sekcji „## ” nad treścią **spis sekcji** (klik
+  przewija do nagłówka i daje mu fokus). Pod spodem „Powiązane” (sąsiedzi z obu stron linku, 12 + „Pokaż wszystkie”).
+  Esc i × zamykają (wpis historii zastąpiony, jak „Wstecz”).
+- **„Edytuj”** zależy od notatki: zwykła notatka skarbca: pole „Co zmienić w tej notatce?” i „Wyślij do Jarva”
+  (`POST /remark` wtyczki `jarvo-wiedza`: szkic-uwaga w skrzynce, kompilacja wnosi go sama kilka minut później;
+  notatek skarbca nie pisze nikt poza kompilacją, docs/WIEDZA.md), Ctrl+Enter wysyła, Esc z pustym polem zamyka.
+  Notatka źródła z `rozmowca` (Kernel): szkic „Zmiana w <id>.md: ” w rozmowie tego agenta (bez dubla, kursor na
+  końcu; wysyła właściciel). Pamięć i pliki Jarva niżej.
 - **Zmiana tożsamości z notatki.** `edycja: pamiec` (`pamiec: memory|user`, lustra `jarvo/pamięć jarva` i
-  `user/pamięć jarva o tobie`): „Zmień” otwiera edytor wpisów z `GET /pamiec` (pole na wpis, usuń, „Dodaj wpis”,
+  `user/pamięć jarva o tobie`): „Edytuj” otwiera edytor wpisów z `GET /pamiec` (pole na wpis, usuń, „Dodaj wpis”,
   licznik „N z limitu znaków” liczony jak narzędzie memory Hermesa: wpisy złączone `\n§\n`, znaki Unicode, puste
   odpadają), Zapisz (`PUT /pamiec/<memory|user>` z `wersja`) i Anuluj; ponad limit albo wpis z linią samego „§” nie
   da się zapisać. 409 („zmieniona”: Jarvo albo inna karta zmieniła pamięć) mówi to wprost z „Wczytaj ponownie”, 400
   `limit`/`pusty_wpis`/`zly_wpis` (powtórzony, sekret, „§”, skaner Hermesa) swoim zdaniem, a gdy serwer poda `indeks`,
   zdanie zaczyna się od „Wpis N:” i to pole ma `aria-invalid`; 503 `zajeta` (Hermes akurat pisze): „spróbuj za
   chwilę”. Po zapisie: „Zapisano. Jarvo zobaczy zmianę od następnej rozmowy.”,
-  od nowa graf, notatka i wyniki szukania (indeks się zmienia). Esc w edytorze bez zmian zamyka edytor, ze zmianami
-  nic nie robi; Ctrl+Enter zapisuje. `edycja: repo` (SOUL, ZASADY, KRYTYCZNE, mapa): „Poproś o zmianę” wpisuje
+  od nowa mapa, notatka i wyniki szukania (indeks się zmienia). Esc w edytorze bez zmian zamyka edytor, ze zmianami
+  nic nie robi; Ctrl+Enter zapisuje. `edycja: repo` (SOUL, ZASADY, KRYTYCZNE, mapa): „Edytuj” wpisuje
   „Zmiana w <plik>: ” na początek szkicu nowej rozmowy (adresat domyślny, czyli Jarvo; bez dubla przy drugim
   kliknięciu, jak „Odpowiedz” w Aktualizacjach) i otwiera ekran startu z kursorem na końcu; nic się nie wysyła.
-- **Wycofane.** Notatka `status: wycofana` poza archiwum ma na liście szary tytuł z dopiskiem „wycofana” i szarą
-  kropkę w grafie; w notatce (także w archiwum) pas „Wycofana <data>: <powód>. Zastąpiona przez: <link>. Jarvo już
-  z niej nie korzysta.” (`wycofano`, `powod`, `zastapiona_przez` z frontmattera).
-- **Graf tylko bieżącego poziomu.** Wejście: skupiska głównych części w kolorach kafli (`--j-barwa-<i>`), etykieta
-  „Część · liczba” w środku skupiska; część: skupiska grup; grupa: jej notatki w kolorach rodzaju, 6 najważniejszych
-  z napisem. Skupiska (`grupa`, `stale` w `graf.js`): odpychanie i grawitacja w obrębie skupiska, kotwice na okręgu
-  na miarę skupisk (bez nachodzenia), linki między skupiskami jednym mostem na parę (łuk, grubość od liczby linków).
-  Klik w skupisko wchodzi głębiej, w kropkę otwiera notatkę; zaznaczona notatka ma linki w kolorze fokusu, a widok
-  trzyma ją w środku (mały graf, do 40 węzłów, zostaje cały). Napisy od najważniejszego bez nachodzenia, przy brzegu
-  przesunięte do środka; mysz nad węzłem pokazuje jego nazwę. Bez obwódki sierot (dla właściciela to szum).
+- **Wycofane.** Notatka `status: wycofana` poza archiwum ma szarą kropkę na mapie i szary tytuł z dopiskiem
+  „wycofana” w „Powiązanych”; na stronie notatki (także w archiwum) pas „Wycofana <data>: <powód>. Zastąpiona przez:
+  <link>. Jarvo już z niej nie korzysta.” (`wycofano`, `powod`, `zastapiona_przez` z frontmattera).
 - **Źródła** (`hq/plugin/mozg_zrodla.py`): `GET /mozg/zrodla` zawsze zaczyna od skarbca Jarva (graf i notatki
   z tras `jarvo-wiedza`: `/graph`, `/note`, `/search`), dalej źródła z `<dane>/jarvo/konfig/mozg.json` instalacji:
-  `{"nazwa", "nazwa_en"?, "graf": "<plik json>", "notatka_url"?: "https://…/{id}.html", "widok_3d"?, "kategorie"?}`
+  `{"nazwa", "nazwa_en"?, "graf": "<plik json>", "notatka_url"?: "https://…/{id}.md", "notatki"?: "<katalog .md>",
+  "rozmowca"?: "s:<sesja>", "kategorie"?}`
   (jeden obiekt, lista albo `{"zrodla": [...], "kategorie"?: [...]}`; `kategorie` na górze = części skarbca, we wpisie
   = części tego grafu: `[{"nazwa", "nazwa_en"?, "opis"?, "opis_en"?, "foldery": [...], "ikona"?, "drugorzedna"?}]`,
   najwyżej 12, sprawdzone, klucz `k` z nazwy). `GET /mozg/<klucz>` oddaje graf pliku w kształcie skarbca
   `{wezly, linki}`; plik może mieć też kształt `{nodes, links}` (`source/target`, `stopien`). Ścieżka pliku nie
   wychodzi do przeglądarki, adresy tylko http(s), plik do 16 MB, wynik w pamięci do zmiany mtime, odczyt tylko
-  z karty panelu. Bez `widok_3d` link „Widok 3D ↗” prowadzi na stronę główną serwisu z `notatka_url`.
-- **Wydajność:** układ liczony w budżecie 10 ms na klatkę, linki jedną ścieżką na styl, węzły poza ekranem
-  pominięte; uspokojony graf nie rysuje kolejnych klatek, a ukryty (telefon, lista) nic nie liczy. Graf poziomu ma
-  najwyżej tyle węzłów, ile główne części (skarbiec 19.11: ok. 460 zamiast 664 naraz). Test w node: 1200 węzłów
-  bez skupisk i w 7 skupiskach, najdłuższa klatka < 40 ms na atrapie canvasa, graf zasypia, skupiska rozłączne
-  (`tests/test_mozg_zrodla.py`).
-- **Telefon (≤ 700 px kontenera):** lista poziomu na cały ekran, graf tego poziomu pod przyciskiem „Mapa” (wraca
-  „Lista”), notatka na cały ekran; dwa palce przybliżają i przesuwają.
+  z karty panelu. `notatki`: katalog plików `<id>.md` (Kernel: jego wiki); wpis dostaje `tresc: true`, a `GET
+  /mozg/<klucz>/notatka?id=<id>` oddaje treść bez frontmattera (do 2 MB; `..`, ścieżka bezwzględna i dowiązanie poza
+  katalog = 404). `rozmowca`: klucz rozmówcy z terminala (`s:gpu`), do którego idzie „Edytuj”.
+- **Wydajność:** układ liczony raz na dane (Kernel: ok. 760 kropek, 4 500 włókien po 9 odcinków w jednym buforze),
+  klatka to kilka wywołań rysowania (dendryty, włókna, kropki) i napisy w 2D. Impulsy: pętla do 30 klatek/s tylko
+  przy widocznym Mózgu; ukryta karta, otwarta strona notatki i `prefers-reduced-motion` (wtedy też bez lotów kamery)
+  = rysowanie tylko na żądanie. Utrata kontekstu WebGL: bufory budują się od nowa po odzyskaniu; bez WebGL komunikat,
+  szukanie i strony notatek działają.
+- **Telefon (≤ 700 px kontenera):** mapa na cały ekran, szukanie i karta poziomu węższe, strona notatki na cały
+  ekran; przeciąganie przesuwa, dwa palce przybliżają.
 ## 2g. Panel w sieci (Tailscale)
 
 Instalacja natywna: panel słucha na `127.0.0.1:<port>` (domyślnie 9119) bez hasła. Żeby właściciel używał go

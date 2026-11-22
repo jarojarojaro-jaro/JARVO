@@ -1,6 +1,7 @@
-"""Mózg aplikacji (docs/HQ.md „Mózg”): źródła z konfig/mozg.json i graf z pliku (hq/plugin/mozg_zrodla.py), trasy
-GET /mozg/zrodla i /mozg/<klucz>, wspólny graf shared/web/graf.js w node (800+ węzłów płynnie, Barnes-Hut, sterownik
-na atrapie canvasa), lista Notatek w 63-mozg.js (filtr bez ogonków) i oba buildy z jednym kodem grafu."""
+"""Mózg aplikacji (docs/HQ.md „Mózg”): źródła z konfig/mozg.json, graf i pełna treść notatek z pliku
+(hq/plugin/mozg_zrodla.py), trasy GET /mozg/zrodla, /mozg/<klucz> i /mozg/<klucz>/notatka, wspólny graf zakładki Wiedza
+shared/web/graf.js w node albo bun (800+ węzłów płynnie, Barnes-Hut, sterownik na atrapie canvasa), części, szukanie
+i układ mapy-neuronu w 63-mozg.js / 63-mozg-neuron.js."""
 from __future__ import annotations
 
 import json
@@ -12,7 +13,7 @@ import pytest
 from conftest import REPO, load_script
 
 MZ = load_script("hq/plugin/mozg_zrodla.py", "jarvo_test_mozg_zrodla")
-NODE = shutil.which("node")
+NODE = shutil.which("node") or shutil.which("bun")
 GRAF_JS = REPO / "shared" / "web" / "graf.js"
 
 
@@ -112,19 +113,36 @@ def test_odczyt_tylko_z_panelu(klient):
     assert c.get("/mozg/zrodla", headers={"Sec-Fetch-Site": "same-origin"}).status_code == 200
 
 
+def test_pelna_tresc_notatki_tylko_z_katalogu_zrodla(klient, tmp_path):
+    c, konfig, _ = klient
+    wiki = tmp_path / "wiki"
+    (wiki / "modele").mkdir(parents=True)
+    (wiki / "modele" / "gemma 4.md").write_text("---\ntyp: model\n---\n# Gemma 4\nTreść z [[KOLEJKA]].\n", encoding="utf-8")
+    (tmp_path / "sekret.md").write_text("nie wolno", encoding="utf-8")
+    konfig.write_text(json.dumps([{"nazwa": "K", "klucz": "k", "graf": str(_graf_operatora(tmp_path)), "notatki": str(wiki), "rozmowca": "s:gpu"},
+                                  {"nazwa": "Z", "klucz": "z", "graf": "x.json", "rozmowca": "jarvo; rm"}]), encoding="utf-8")
+    k, z = c.get("/mozg/zrodla").json()["zrodla"][1:]
+    assert k["tresc"] is True and k["rozmowca"] == "s:gpu" and "notatki" not in k and "_notatki" not in k
+    assert "tresc" not in z and "rozmowca" not in z            # bez katalogu nie ma treści, zły rozmówca odpada
+    assert c.get("/mozg/k/notatka", params={"id": "modele/gemma 4"}).json() == {"id": "modele/gemma 4", "tresc": "# Gemma 4\nTreść z [[KOLEJKA]].\n"}
+    for zly in ("../sekret", "modele/../../sekret", "/etc/passwd", "", "modele/", "nie-ma"):
+        assert c.get("/mozg/k/notatka", params={"id": zly}).status_code == 404, zly
+    (wiki / "wyjscie.md").symlink_to(tmp_path / "sekret.md")
+    assert c.get("/mozg/k/notatka", params={"id": "wyjscie"}).status_code == 404
+    assert c.get("/mozg/z/notatka", params={"id": "a"}).status_code == 404
+    assert c.get("/mozg/k/notatka", params={"id": "modele/gemma 4"}, headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+
+
 def test_publiczny_kod_bez_prywatnych_sciezek():
-    for p in (REPO / "hq" / "plugin" / "mozg_zrodla.py", REPO / "hq" / "web" / "src" / "63-mozg.js", GRAF_JS):
+    for p in (REPO / "hq" / "plugin" / "mozg_zrodla.py", REPO / "hq" / "web" / "src" / "63-mozg.js", REPO / "hq" / "web" / "src" / "63-mozg-neuron.js", GRAF_JS):
         t = p.read_text(encoding="utf-8")
         assert "~/mozg" not in t and "/home/" not in t and ":8091" not in t
 
 
-def test_jeden_kod_grafu_w_obu_wtyczkach():
+def test_graf_wiedzy_raz_w_zakladce_wiedza():
     hqbuild = load_script("scripts/hqbuild.py", "jarvo_test_hqbuild_mozg")
     wiedza = hqbuild.bundle_js(REPO / "wiedza" / "web" / "src", "x", wspolne=(hqbuild.GRAF_WSPOLNY,))
-    hq = hqbuild.bundle_js()
-    for pakiet in (wiedza, hq):
-        assert pakiet.count("function utworzGraf(") == 1
-    assert "function Graph(" in wiedza and "function MozgWidok(" in hq
+    assert wiedza.count("function utworzGraf(") == 1 and "function Graph(" in wiedza
     assert "function stepLayout" not in wiedza       # stary graf zakładki Wiedza zniknął
 
 
@@ -209,23 +227,33 @@ const wezly = [n("_hub-skarbiec", { hub: true }), n("user/_hub-ty", { hub: true,
 const m = mozgMapa(wezly, MOZG_KATEGORIE), zespol = m.kat.find((d) => d.k === "zespol"), web = zespol.grupy[0];
 const hash = mozgHash({ z: "jarvo", k: "zespol", g: "agenci/jarvo-web", o: "a (b)" });
 const cel = (t) => (t === "agenci/jarvo-web/lekcja a" ? ["#h", "Lekcja A"] : null);
-const graf = (k, g) => { const d = mozgGraf(m, [{ z: "agenci/jarvo-web/lekcja a", do: "fleet/skille/s1" }], k, g); return [d.wezly.filter((q) => q.stale).map((q) => q.id), d.wezly.length, d.linki.length]; };
+const u = neuronUklad(m, [{ z: "agenci/jarvo-web/lekcja a", do: "fleet/skille/s1" }, { z: "fleet/skille/s1", do: "agenci/jarvo-web/lekcja a" },
+  { z: "user/kim jestem", do: "nie/ma" }, { z: "user/kim jestem", do: "user/kim jestem" }], mozgKolejnosc);
+const ids = u.kropki.map((k) => k.id), nachodza = [];
+for (const c of u.czesci) c.grupy.forEach((a, i) => c.grupy.forEach((b, j) => { if (i < j && Math.hypot(a.x - b.x, a.y - b.y) < a.r + b.r) nachodza.push([c.k, a.k, b.k]); }));
+for (let i = 0; i < u.czesci.length; i++) for (let j = i + 1; j < u.czesci.length; j++) {
+  const [a, b] = [u.czesci[i].bb, u.czesci[j].bb];
+  if (a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]) nachodza.push([u.czesci[i].k, u.czesci[j].k]);
+}
+const trasa = neuronTrasa(u, u.byId.get("agenci/jarvo-web/lekcja a"), u.byId.get("fleet/skille/s1"));
 console.log(JSON.stringify({
   glowne: m.glowne.map((d) => [d.k, d.ile]), boczne: m.kat.filter((d) => d.drugorzedna).map((d) => [d.k, d.hub && d.hub.id]),
   zespol: [zespol.hub.id, zespol.grupy.map((x) => [x.k, x.nazwa, x.ile])], ty: m.kat[0].hub.id, samotna: m.gdzie.get("agenci/jarvo-x/samotna"),
   sekcje: mozgSekcje(web.wezly).map((x) => [x.nazwa, x.wezly.map((q) => q._t)]),
   szukaj: [mozgSzukaj(wezly, "ZAZOL")[0].map((q) => q._t), mozgSzukaj(wezly, "web")[0].map((q) => q.id), mozgSzukaj(wezly, "web", 1)[1], mozgSzukaj(wezly, " ")[1],
     mozgSzukaj(wezly, "main judge")[0].map((q) => [q.id, q._t])],
-  pin: mozgGraf(m, [], zespol, null).wezly.find((q) => q.id === "@agenci/jarvo").etykieta,
+  uklad: { ile: ids.length, unikalne: new Set(ids).size, czesci: u.czesci.map((c) => c.k), linki: u.linki.length, nachodza,
+    skonczone: u.kropki.every((k) => Number.isFinite(k.x) && Number.isFinite(k.y)) && trasa.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y)),
+    trasa: [trasa[0], trasa[trasa.length - 1]], konce: [[u.byId.get("agenci/jarvo-web/lekcja a").x, u.byId.get("agenci/jarvo-web/lekcja a").y], [u.byId.get("fleet/skille/s1").x, u.byId.get("fleet/skille/s1").y]] },
   hash, stan: mozgStan(hash), pusty: mozgHash({ z: "", k: "", g: "", o: "" }),
   wiki: mozgWiki("x [[agenci/jarvo-web/lekcja a]] i [[nie ma|N]] <!-- c -->\n## Powiązane\n- [[y]]\n## Dalej\nz", cel),
-  grafy: [graf(null, null), graf(zespol, null), graf(zespol, web)], url: mozgUrl({ notatka_url: "https://h/{id}.html" }, "a b/c") }));
+  url: mozgUrl({ notatka_url: "https://h/{id}.html" }, "a b/c") }));
 """
 
 
 @pytest.mark.skipif(not NODE, reason="brak node")
 def test_czesci_grupy_szukanie_i_adresy(tmp_path):
-    src = (REPO / "hq" / "web" / "src" / "63-mozg.js").read_text(encoding="utf-8")
+    src = "\n".join((REPO / "hq" / "web" / "src" / p).read_text(encoding="utf-8") for p in ("63-mozg-neuron.js", "63-mozg.js"))
     skrypt = tmp_path / "w.js"
     skrypt.write_text(WIDOK % src, encoding="utf-8")
     r = subprocess.run([NODE, str(skrypt)], capture_output=True, text=True, encoding="utf-8", timeout=20)
@@ -243,14 +271,16 @@ def test_czesci_grupy_szukanie_i_adresy(tmp_path):
     assert w["sekcje"] == [["Lekcje", ["lekcja a"]], ["Fakty", ["fakt b"]]]
     assert w["szukaj"] == [["Zażółć gęślą"], ["agenci/jarvo-web/_hub-web", "agenci/jarvo-web/fakt b", "agenci/jarvo-web/lekcja a"], 3, 0,
                            [["agenci/jarvo/_hub-jarvo", "Jarvo"]]]
-    assert w["pin"] == "Jarvo · 1"
+    # mapa-neuron: każda notatka części z notatkami raz (także huby i hub korzenia w „Dokumentacji”), skupiska grup
+    # w części i części między sobą bez nachodzenia, link bez kierunku raz, do nieistniejącej notatki i do siebie wcale,
+    # włókno zaczyna się i kończy w kropkach
+    uk = w["uklad"]
+    assert uk["ile"] == uk["unikalne"] == 16 and uk["czesci"] == ["ty", "zespol", "zrodla", "f-inne", "f-Łódź"]
+    assert uk["linki"] == 1 and uk["nachodza"] == [] and uk["skonczone"]
+    assert uk["trasa"] == uk["konce"]
     assert w["hash"] == "#/mozg?k=zespol&g=agenci%2Fjarvo-web&o=a%20%28b%29" and w["pusty"] == "#/mozg"
     assert w["stan"] == {"z": "", "k": "zespol", "g": "agenci/jarvo-web", "o": "a (b)"}
     assert w["wiki"] == "x [Lekcja A](#h) i N \n## Dalej\nz"
-    # graf: wejście = skupiska części, część = skupiska grup (link między nimi zostaje), grupa = same notatki
-    assert w["grafy"][0][0] == ["@ty", "@zespol", "@f-inne", "@f-Łódź"] and w["grafy"][0][2] == 1
-    assert w["grafy"][1][0] == ["@agenci/jarvo-web", "@agenci", "@agenci/jarvo", "@fleet"] and w["grafy"][1][1] == 14
-    assert w["grafy"][2] == [[], 3, 0]
     assert w["url"] == "https://h/a%20b/c.html"
 
 

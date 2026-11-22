@@ -180,8 +180,9 @@ def test_odczyty_hq_bez_skutkow(monkeypatch):
         "/karty", "/karty/{tid}",
         # start aplikacji (trasy_aplikacji.py): USER.md, config i .env profilu Jarva tylko po nazwach, nawyki.db mode=ro
         "/app", "/podpowiedzi",
-        # Mózg (mozg_zrodla.py): konfig/mozg.json i pliki grafów tylko do odczytu (wynik w pamięci procesu)
-        "/mozg/zrodla", "/mozg/{klucz}",
+        # Mózg (mozg_zrodla.py): konfig/mozg.json, pliki grafów i notatki z katalogu źródła tylko do odczytu (wynik
+        # grafu w pamięci procesu)
+        "/mozg/zrodla", "/mozg/{klucz}", "/mozg/{klucz}/notatka",
         # rozmówcy centrum (rozmowcy.py lista): konfiguracja + odczyt rozmowy.db, bez zapisu
         "/rozmowcy",
         # komendy po „/” (komendy.py katalog): rejestr komend Hermesa, odczyt rozmowy.db i wpisów sesje.json, bez zapisu

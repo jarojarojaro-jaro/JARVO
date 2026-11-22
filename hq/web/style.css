@@ -2258,15 +2258,13 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 /* === koniec Ustawień === */
 
 /* @@pakiet mozg */
-/* Mózg (#/mozg, hq/web/src/63-mozg.js), TARS: nagłówek (moduł 02) z okruszkami; na wejściu cały obszar to prosta
-   sieć (MozgSiec: środek JARVO albo KERNEL, części, grupy, łuki linków) z pływającą wyszukiwarką; w części po lewej
-   moduł 03 z wyszukiwarką we wnęce i poziomem (grupy, notatki w sekcjach) albo wynikami szukania, w środku graf poziomu,
-   po prawej notatka jako moduł. Kolor części/grupy (--c) = kolor jej skupiska w grafie, tylko jako cienka krawędź.
-   Do 1000 px notatka zasłania graf; telefon: lista na cały ekran, mapa pod „Mapa”, notatka na cały ekran. */
-.j-mozg { position: relative; display: grid; grid-template-columns: minmax(300px, 416px) 1fr; grid-template-rows: auto 1fr; gap: 8px; height: 100%; min-height: 0; color: var(--j-tekst); }
-.j-mozg.is-notatka { grid-template-columns: minmax(300px, 380px) 1fr minmax(380px, 480px); }
+/* Mózg (#/mozg, hq/web/src/63-mozg.js i 63-mozg-neuron.js), TARS: nagłówek (moduł 02) z okruszkami i źródłami, pod nim
+   jeden obszar: mapa-neuron na czerni (WebGL + napisy w Canvas 2D), nad nią pływają wyszukiwarka (lewy górny róg)
+   i karta poziomu (lewy dolny: nazwa, liczba, zdanie, „Przegląd”). Kolor części (--c = --j-barwa-<nr części>) ten sam
+   na mapie, w karcie, w wynikach szukania i na stronie notatki. Strona notatki przykrywa mapę całą szerokością (kolumna
+   do czytania 820 px), mapa pod nią stoi; telefon: to samo na cały ekran. */
+.j-mozg { position: relative; display: grid; grid-template-columns: 1fr; grid-template-rows: auto 1fr; gap: 8px; height: 100%; min-height: 0; color: var(--j-tekst); }
 .j-mozg a { color: inherit; text-decoration: none; }
-.j-mozg-gora { grid-column: 1 / -1; }
 .j-mozg-okruszki { display: inline-flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; }
 .j-mozg-ok { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
 .j-mozg-ok a { color: var(--j-tekst-2); }
@@ -2275,77 +2273,84 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-mozg-zrodla { align-self: stretch; display: flex; gap: 1px; background: var(--j-rowek); padding-left: 2px; }
 .j-mozg-zrodla button { padding: 0 14px; border: 0; background: var(--j-tlo-pasek); color: var(--j-tekst-2); font: 500 12px var(--j-font-ui); cursor: pointer; }
 .j-mozg-zrodla button[aria-pressed="true"] { background: var(--j-tlo-3); color: var(--j-tekst); box-shadow: inset 0 -2px 0 var(--j-akcent); }
-.j-mozg .j-mozg-3d { color: var(--j-link); font-size: 13px; white-space: nowrap; padding: 0 12px; }
-.j-mozg-mapa-btn { display: none; min-width: 44px; min-height: 40px; padding: 0 14px; margin-left: auto; border: 0; background: var(--j-tlo-3); color: var(--j-tekst); font: 500 12px var(--j-font-mono); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
-.j-mozg-nav { display: flex; flex-direction: column; min-height: 0; padding: 16px 16px 0; background: var(--j-stal), var(--j-tlo-pasek); box-shadow: var(--j-cien-1); }
-.j-mozg-nav input { flex: none; height: 40px; padding: 0 12px; border: 0; background: var(--j-wneka) !important; box-shadow: inset 0 1px 3px #000, inset 0 0 0 1px var(--j-linia); color: var(--j-tekst); font: inherit; font-size: 14px;
-  transition: box-shadow .28s var(--j-ease); }
-.j-mozg-nav input:focus { box-shadow: inset 0 1px 3px #000, inset 0 0 0 1px var(--j-linia-mocna); }
-.j-mozg-przewin { position: relative; flex: 1; min-height: 0; overflow: auto; margin: 0 -16px; padding: 4px 16px 24px; }
-.j-mozg-poziom { position: relative; padding: 16px 0 12px; }
-.j-mozg-poziom h2 { display: flex; align-items: baseline; gap: 10px; margin: 0; font: 700 18px/28px var(--j-font-naglowek); font-stretch: 125%; color: var(--j-tekst); }
 .jarvo-app .j-mozg [tabindex="-1"]:focus-visible, .j-mozg [tabindex="-1"]:focus { outline: none !important; }   /* fokus z kodu (nagłówek poziomu, notatka) */
-.j-mozg-poziom h2 span, .j-mozg-sekcja h3 span { color: var(--j-tekst-2); font: 500 13px var(--j-font-mono); font-stretch: 100%; }
+/* obszar mapy: czerń z delikatną winietą, kursor rączki; napisy i kropki rysuje 63-mozg-neuron.js */
+.j-mozg-cialo { position: relative; min-height: 0; overflow: hidden; background: #000; box-shadow: inset 0 0 0 1px var(--j-linia); }
+.j-mozg-mapa { position: absolute; inset: 0; outline: none; touch-action: none; }
+.j-mozg-mapa canvas { position: absolute; inset: 0; display: block; }
+.j-neuron-2d { cursor: grab; }
+.j-mozg-cialo::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, .55) 100%); }
+.j-mozg-stan { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; padding: 20px; color: var(--j-tekst-2); text-align: center; pointer-events: none; }
+/* pływające: wyszukiwarka (wyniki pod polem), karta poziomu */
+.j-mozg-szukaj { position: absolute; z-index: 2; left: 16px; top: 16px; display: flex; flex-direction: column; width: min(380px, calc(100% - 32px)); max-height: calc(100% - 32px);
+  background: rgba(14, 15, 19, .82); backdrop-filter: blur(10px); box-shadow: inset 0 0 0 1px var(--j-linia), 0 12px 32px rgba(0, 0, 0, .45); }
+.j-mozg-szukaj input { flex: none; height: 42px; padding: 0 14px; border: 0; background: transparent !important; color: var(--j-tekst); font: inherit; font-size: 14px; }
+.j-mozg-szukaj input:focus { box-shadow: inset 0 -1px 0 var(--j-linia-mocna); }
+.j-mozg-przewin { position: relative; flex: 1; min-height: 0; overflow: auto; padding: 4px 8px 12px; box-shadow: inset 0 1px 0 var(--j-linia); }
+.j-mozg-poziom { position: absolute; z-index: 2; left: 16px; bottom: 16px; max-width: min(420px, calc(100% - 32px)); padding: 12px 16px 14px 18px;
+  background: rgba(14, 15, 19, .78); backdrop-filter: blur(10px); box-shadow: inset 2px 0 0 var(--c), inset 0 0 0 1px var(--j-linia), 0 12px 32px rgba(0, 0, 0, .45); }
+.j-mozg-poziom .j-mozg-wstecz { margin: -6px 0 2px -8px; }
+.j-mozg-poziom h2 { display: flex; align-items: baseline; gap: 10px; margin: 0; font: 700 18px/26px var(--j-font-naglowek); font-stretch: 125%; color: var(--j-tekst); }
+.j-mozg-poziom h2 span { color: var(--c); font: 500 13px var(--j-font-mono); font-stretch: 100%; }
 .j-mozg-opis { margin: 4px 0 0; color: var(--j-tekst-2); font-size: 12.5px; line-height: 1.5; }
 .j-mozg .j-mozg-przeglad { display: inline-block; margin-top: 8px; color: var(--j-link); font-size: 12.5px; }
-.j-mozg-grupy, .j-mozg-sekcja ul, .j-mozg-wyniki { list-style: none; margin: 0; padding: 0; }
-/* grupy części: nazwa (jasno) · liczba (mono) */
-.j-mozg-kn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 14px/20px var(--j-font-ui); color: var(--j-tekst); }
-.j-mozg-kl { font: 500 13px/20px var(--j-font-mono); color: var(--j-tekst); text-align: right; font-variant-numeric: tabular-nums; }
-.j-mozg-grupy { display: grid; margin: 12px -8px 0; }
-.j-mozg-grupa { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; min-height: 40px; padding: 8px 8px 8px 16px;
-  box-shadow: inset 0 1px 0 var(--j-linia), inset 2px 0 0 var(--c); transition: background .24s var(--j-ease); }
-.j-mozg-grupa:hover { background: var(--j-tlo-hover); }
-.j-mozg-grupa .j-mozg-kl { font-size: 12px; color: var(--j-tekst-2); }
-.j-mozg-sekcja { margin-top: 20px; }
-.j-mozg-sekcja h3 { display: flex; gap: 10px; align-items: center; margin: 0 0 6px; color: var(--j-tekst-3); font: 500 10.5px/16px var(--j-font-mono); letter-spacing: .14em; text-transform: uppercase; }
-.j-mozg-sekcja h3::after { content: ""; flex: 1; height: 1px; background: var(--j-linia); }
-.j-mozg-sekcja h3 span { font-size: 10.5px; letter-spacing: 0; }
+.j-mozg-wyniki, .j-mozg-obok ul { list-style: none; margin: 0; padding: 0; }
 .j-mozg-wiersz, .j-mozg-wyniki li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 10px; align-items: baseline; min-height: 36px; padding: 7px 8px; cursor: pointer;
   transition: background .24s var(--j-ease); }
+.j-mozg-wyniki li { box-shadow: inset 2px 0 0 var(--c); padding-left: 12px; }
 .j-mozg-wiersz:hover, .j-mozg-wyniki li:hover { background: var(--j-tlo-hover); }
-.j-mozg-wiersz[aria-current="true"], .j-mozg-wyniki li[aria-selected="true"] { background: var(--j-tlo-3); box-shadow: inset 2px 0 0 var(--j-akcent); }
+.j-mozg-wyniki li[aria-selected="true"] { background: var(--j-tlo-3); }
 .j-mozg-wt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; color: var(--j-tekst); }
 .j-mozg-wd { color: var(--j-tekst-3); font: 400 11px var(--j-font-mono); white-space: nowrap; }
 .j-mozg-wg { grid-column: 1 / -1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--j-tekst-2); font-size: 12px; }
 .j-mozg-wo { grid-column: 1 / -1; display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--j-tresc); font-size: 12.5px; line-height: 1.45; }
 .j-mozg-wr { grid-column: 1 / -1; margin: 10px 0 4px; color: var(--j-tekst-3); font: 500 10.5px var(--j-font-mono); letter-spacing: .14em; text-transform: uppercase; }
 .j-mozg-wiecej { min-height: 32px; margin: 2px 0; padding: 0; border: 0; background: none; color: var(--j-link); font: inherit; font-size: 12.5px; cursor: pointer; }
-/* próżnia z mapą: czerń, cienkie włosy i podpisy (graf poziomu; wejście to sieć MozgSiec niżej) */
-.j-mozg-plotno { position: relative; min-height: 0; min-width: 0; overflow: hidden; background: #000; box-shadow: inset 0 0 0 1px var(--j-linia); }
-.j-mozg-plotno canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
-.j-mozg-podpowiedz { position: absolute; left: 0; bottom: 12px; margin: 0; padding: 4px 16px; background: #000; color: #A9A9B1; font-size: 12px; pointer-events: none; }
-.j-mozg-stan { display: grid; place-items: center; min-height: 160px; padding: 20px; color: var(--j-tekst-2); text-align: center; }
-.j-mozg-karta { grid-row: 2; grid-column: 3; position: relative; z-index: 2; min-height: 0; overflow: auto; padding: 8px 24px 32px; background: var(--j-stal), var(--j-tlo-pasek); box-shadow: var(--j-cien-1); }
-.j-mozg-karta-gora { position: sticky; top: -8px; z-index: 1; display: flex; align-items: center; gap: 8px; margin: -8px -24px 4px; padding: 4px 6px 4px 24px; background: var(--j-tlo-pasek); box-shadow: inset 0 -1px 0 var(--j-linia); }
-.j-mozg-karta-gora .j-mozg-wstecz { margin-left: -14px; }
-.j-mozg-karta h2 { margin: 12px 0 4px; font: 700 20px/1.25 var(--j-font-naglowek); font-stretch: 125%; color: var(--j-tekst); }
-.j-mozg-karta > .j-mozg-wd { margin: 0 0 14px; }
-.j-mozg-karta .j-md { font-size: 14px; line-height: 1.65; color: var(--j-tresc); }
-.j-mozg-karta .j-md h1, .j-mozg-karta .j-md h2 { font-size: 16px; }
-.j-mozg-karta .j-md h3 { font-size: 14px; }
-.j-mozg-karta .j-mozg-sekcja { margin-top: 24px; padding-top: 14px; box-shadow: inset 0 1px 0 var(--j-linia); }
-.j-mozg-x { min-width: 44px; min-height: 44px; margin-left: auto; border: 0; background: none; color: var(--j-tekst-2); font-size: 22px; cursor: pointer; }
+/* strona notatki: pasek (Wstecz, miejsce w kolorze części, Edytuj, ×) i kolumna do czytania */
+.j-mozg-strona { position: absolute; inset: 0; z-index: 3; overflow: auto; background: var(--j-stal), var(--j-tlo-pasek); animation: j-mozg-strona .32s var(--j-ease) both; }
+@keyframes j-mozg-strona { from { opacity: 0; transform: translateY(8px); } }
+.j-mozg-strona-gora { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 4px 8px 4px 20px;
+  background: var(--j-tlo-pasek); box-shadow: inset 0 -1px 0 var(--j-linia), inset 0 2px 0 var(--c); }
+.j-mozg-miejsce { display: inline-flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; color: var(--j-tekst-2); font: 500 12px var(--j-font-mono); white-space: nowrap; text-overflow: ellipsis; }
+.j-mozg-miejsce i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px var(--c); }
+.j-mozg-edytuj { margin-left: auto; }
+.j-mozg-strona-gora .j-mozg-x { margin-left: 0; }
+.j-mozg-strona-gora .j-mozg-wstecz + .j-mozg-x, .j-mozg-strona-gora .j-mozg-miejsce + .j-mozg-x { margin-left: auto; }
+.j-mozg-kolumna { max-width: 820px; margin: 0 auto; padding: 28px 32px 64px; }
+.j-mozg-kolumna h1 { margin: 0 0 6px; font: 700 28px/1.2 var(--j-font-naglowek); font-stretch: 125%; color: var(--j-tekst); }
+.j-mozg-kolumna > .j-mozg-wd { display: block; margin: 0 0 18px; white-space: normal; }
+.j-mozg-kto { margin: -10px 0 18px !important; }
+.j-mozg-kolumna .j-md { font-size: 15px; line-height: 1.72; color: var(--j-tresc); }
+.j-mozg-kolumna .j-md h1, .j-mozg-kolumna .j-md h2 { font-size: 18px; margin-top: 28px; }
+.j-mozg-kolumna .j-md h3 { font-size: 15.5px; }
+.j-mozg-kolumna .j-md-h2 { scroll-margin-top: 72px; }
+.j-mozg-opis-n { font-size: 15px; line-height: 1.7; color: var(--j-tresc); }
+.j-mozg .j-mozg-zewn { color: var(--j-link); font-size: 13px; }
+.j-mozg-obok { margin-top: 36px; padding-top: 16px; box-shadow: inset 0 1px 0 var(--j-linia); }
+.j-mozg-obok h3 { display: flex; gap: 10px; align-items: center; margin: 0 0 8px; color: var(--j-tekst-3); font: 500 10.5px/16px var(--j-font-mono); letter-spacing: .14em; text-transform: uppercase; }
+.j-mozg-obok h3 span { letter-spacing: 0; }
+.j-mozg-obok ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 2px 12px; }
+.j-mozg-x { min-width: 44px; min-height: 44px; border: 0; background: none; color: var(--j-tekst-2); font-size: 22px; cursor: pointer; }
 .j-mozg-x:hover { color: var(--j-tekst); background: var(--j-tlo-hover); }
-/* „Wstecz” (← z podpisem miejsca), „Najważniejsze” (streszczenie huba, bursztyn = wyróżnienie), wycofane, akcje notatki
-   i edytor pamięci (wpisy we wnęce) */
+/* „Wstecz” (← z podpisem miejsca), wycofane, akcje notatki, uwaga do Jarva i edytor pamięci (wpisy we wnęce) */
 .j-mozg-wstecz { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; min-height: 36px; padding: 0 10px 0 6px; margin-left: -6px; color: var(--j-tekst-2); font-size: 12.5px; }
 .j-mozg-wstecz span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .j-mozg-wstecz svg { flex: none; }
 .j-mozg-wstecz:hover { color: var(--j-tekst); background: var(--j-tlo-hover); }
-.j-mozg-naj { margin: 4px 0 4px; padding: 12px 16px 12px 18px; background: var(--j-tlo-karta); box-shadow: inset 0 1px 0 var(--j-hi), inset 2px 0 0 var(--j-uwaga); }
-.j-mozg-naj h3 { display: flex; gap: 8px; align-items: baseline; margin: 0 0 8px; color: var(--j-uwaga); font: 500 10.5px/16px var(--j-font-mono); letter-spacing: .14em; text-transform: uppercase; }
-.j-mozg-naj h3 span { margin-left: auto; color: var(--j-tekst-3); font-weight: 400; letter-spacing: 0; text-transform: none; }
-.j-mozg-naj .j-md { font-size: 13px; line-height: 1.55; color: var(--j-tresc); }
-.j-mozg-naj.is-zwiniety .j-md { max-height: 230px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
-.j-mozg-naj .j-mozg-wiecej { margin: 4px 0 0; padding: 0; }
 .j-mozg-wiersz.is-wycofana .j-mozg-wt { color: var(--j-tekst-3); }
 .j-mozg-tag { margin-right: 6px; padding: 0 6px; box-shadow: inset 0 0 0 1px var(--j-linia-2); color: var(--j-tekst-2); font: 500 10.5px var(--j-font-mono); letter-spacing: .06em; text-transform: uppercase; }
-.j-mozg-info { margin: 0 0 12px; padding: 8px 12px 8px 14px; background: var(--j-tlo-karta); box-shadow: inset 2px 0 0 var(--j-link); color: var(--j-tresc); font-size: 13px; line-height: 1.45; }
+.j-mozg-info { margin: 0 0 16px; padding: 8px 12px 8px 14px; background: var(--j-tlo-karta); box-shadow: inset 2px 0 0 var(--j-link); color: var(--j-tresc); font-size: 13px; line-height: 1.45; }
 .j-mozg-info.is-wycofana { box-shadow: inset 2px 0 0 var(--j-tekst-3); }
 .j-mozg-info a { color: var(--j-link); }
+.j-mozg-info .j-mozg-wiecej { margin-left: 8px; }
 .j-mozg-akcje { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 14px; }
 .j-mozg-akcje .j-mozg-wd { white-space: normal; }
+.j-mozg-uwaga { margin: 0 0 24px; padding: 14px 16px; background: var(--j-tlo-karta); box-shadow: inset 2px 0 0 var(--c); }
+.j-mozg-uwaga label { display: block; margin: 0 0 8px; color: var(--j-tekst); font: 600 13.5px var(--j-font-ui); }
+.j-mozg-uwaga textarea { box-sizing: border-box; width: 100%; min-height: 96px; padding: 10px 12px; margin: 0 0 10px; resize: vertical; field-sizing: content; border: 0;
+  background: var(--j-wneka) !important; box-shadow: inset 0 0 0 1px var(--j-linia-2); color: var(--j-tekst); font: inherit; font-size: 14px; line-height: 1.5; }
+.j-mozg-uwaga textarea:focus { box-shadow: inset 0 0 0 1px var(--j-linia-mocna); }
+.j-mozg-uwaga .j-mozg-akcje { margin: 0; }
 .j-mozg-pam ol { display: grid; gap: 8px; margin: 10px 0 4px; padding: 0; list-style: none; counter-reset: pam; }
 .j-mozg-pam li { counter-increment: pam; display: grid; grid-template-columns: 24px 1fr auto; gap: 6px; align-items: start; }
 .j-mozg-pam li::before { content: counter(pam, decimal-leading-zero); padding-top: 9px; font: 400 10.5px var(--j-font-mono); color: var(--j-tekst-3); }
@@ -2357,66 +2362,23 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-mozg-pam-licz.is-ponad { color: var(--j-uwaga); }
 .j-mozg-pam-blad { margin: 8px 0; padding: 8px 12px; background: var(--j-uwaga-tlo); box-shadow: inset 2px 0 0 var(--j-uwaga); color: var(--j-tekst); font-size: 13px; line-height: 1.45; }
 .j-mozg-pam .j-mozg-akcje { margin: 12px 0 0; }
-.j-mozg-spis { margin: 0 0 16px; padding: 10px 14px; background: var(--j-wneka); box-shadow: inset 0 0 0 1px var(--j-linia); }
+.j-mozg-spis { margin: 0 0 20px; padding: 10px 14px; background: var(--j-wneka); box-shadow: inset 0 0 0 1px var(--j-linia); }
 .j-mozg-spis h3 { margin: 0 0 4px; color: var(--j-tekst-3); font: 500 10.5px var(--j-font-mono); letter-spacing: .14em; text-transform: uppercase; }
 .j-mozg-spis ol { margin: 0; padding-left: 22px; columns: 2 200px; column-gap: 24px; color: var(--j-tekst-3); font-size: 13px; }
 .j-mozg-spis li { break-inside: avoid; }
 .j-mozg-spis li::marker { font: 400 11px var(--j-font-mono); }
 .j-mozg-spis button { min-height: 30px; padding: 2px 0; border: 0; background: none; color: var(--j-link); font: inherit; text-align: left; cursor: pointer; }
 .j-mozg-spis button:hover { text-decoration: underline; text-underline-offset: 3px; }
-.j-mozg-karta .j-md-h2 { scroll-margin-top: 60px; }
-@container app (max-width: 1000px) {
-  .j-mozg.is-notatka { grid-template-columns: minmax(270px, 330px) 1fr; }
-  .j-mozg-karta { grid-area: 2 / 2; }
-  .j-mozg-plotno { grid-area: 2 / 2; }
-}
+@media (prefers-reduced-motion: reduce) { .j-mozg-strona { animation: none; } }
 @container app (max-width: 700px) {
-  .j-mozg, .j-mozg.is-notatka { grid-template-columns: 1fr; gap: 0; }
+  .j-mozg { gap: 0; }
   .j-mozg .j-gora-ikona, .j-mozg .j-gora-opis { display: none; }
-  .j-mozg-mapa-btn { display: inline-flex; align-items: center; }
-  .j-mozg-nav, .j-mozg-plotno, .j-mozg-karta { grid-area: 2 / 1; }
-  .j-mozg-plotno, .j-mozg.is-mapa .j-mozg-nav { display: none; }
-  .j-mozg.is-mapa .j-mozg-plotno { display: block; }
-  .j-mozg-karta { z-index: 3; padding: 8px 16px 32px; }
-  .j-mozg-karta-gora { margin: -8px -16px 4px; padding-left: 16px; }
-}
-/* Wejście Mózgu: prosta sieć (MozgSiec w 63-mozg.js, 22.11 właściciel: „prosty, czytelny, lekki zarys, bez animacji”).
-   Cały obszar pod nagłówkiem to jeden moduł z siecią; wyszukiwarka pływa w lewym górnym rogu (wyniki pod nią);
-   kreski włosowe, węzły z obrysem, kolor części tylko w małym środku węzła; najechanie rozjaśnia część i jej łuki. */
-.j-mozg.is-siec { grid-template-columns: 1fr; }
-.j-mozg.is-siec.is-notatka { grid-template-columns: 1fr minmax(380px, 480px); }
-.j-mozg.is-siec .j-mozg-nav { grid-area: 2 / 1; z-index: 2; align-self: start; justify-self: start; width: min(380px, calc(100% - 32px));
-  margin: 16px; padding: 12px; max-height: calc(100% - 32px); }
-.j-mozg.is-siec.is-szuka .j-mozg-nav { height: calc(100% - 32px); }
-.j-mozg.is-siec .j-mozg-plotno { grid-area: 2 / 1; background: var(--j-stal), var(--j-tlo-pasek); }
-.j-siec { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.j-siec line, .j-siec path { fill: none; stroke: var(--j-linia-2); stroke-width: 1; vector-effect: non-scaling-stroke; transition: stroke .2s var(--j-ease), opacity .2s var(--j-ease); }
-.j-siec-luki path { stroke: var(--j-linia-2); }
-.j-siec-os { stroke: var(--j-linia) !important; }
-.j-siec-traf { fill: transparent; }
-.j-siec-w { fill: var(--j-tlo-pasek); stroke: var(--j-tekst-2); stroke-width: 1.5; vector-effect: non-scaling-stroke; transition: stroke .2s var(--j-ease); }
-.j-siec-k { fill: var(--c); }
-.j-siec-t { fill: var(--j-tekst); font: 600 17px var(--j-font-ui); }
-.j-siec-l { fill: var(--j-tekst-2); font: 500 14px var(--j-font-mono); }
-.j-siec-o { fill: var(--j-tekst-3); font: 400 13.5px var(--j-font-ui); }
-.j-siec-cz { cursor: pointer; outline: none; }
-.j-siec-cz.is-cicha { opacity: .6; }
-.j-siec.is-nad .j-siec-cz:not(.is-on), .j-siec.is-nad .j-siec-luki path:not(.is-on) { opacity: .3; }
-.j-siec-cz.is-on .j-siec-os, .j-siec-luki path.is-on { stroke: var(--j-tekst-2) !important; }
-.j-siec-cz.is-on .j-siec-w { stroke: var(--j-tekst); }
-.j-siec-cz:focus-visible .j-siec-w { stroke: var(--j-fokus); stroke-width: 3; }
-.j-siec-srodek circle { fill: var(--j-tlo-3); stroke: var(--j-tekst); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-.j-siec-st { fill: var(--j-tekst); font: 700 24px var(--j-font-naglowek); font-stretch: 125%; letter-spacing: .08em; }
-.j-siec-sl { fill: var(--j-tekst-2); font: 500 13px var(--j-font-mono); }
-.j-mozg .j-siec-naj { position: absolute; right: 16px; top: 16px; padding: 8px 14px; background: var(--j-tlo-3); box-shadow: inset 0 0 0 1px var(--j-linia);
-  color: var(--j-tekst); font: 500 13px var(--j-font-ui); }
-.j-mozg .j-siec-naj:hover { box-shadow: inset 0 0 0 1px var(--j-linia-mocna); }
-@media (prefers-reduced-motion: reduce) { .j-siec line, .j-siec path, .j-siec-w { transition: none; } }
-@container app (max-width: 700px) {
-  .j-mozg.is-siec .j-mozg-plotno { display: block; }
-  .j-mozg.is-siec .j-mozg-nav { display: flex; }
-  .j-siec-t { font-size: 18px; }
-  .j-siec-l { font-size: 15px; }
+  .j-mozg-szukaj { left: 8px; top: 8px; width: calc(100% - 16px); }
+  .j-mozg-poziom { left: 8px; bottom: 8px; max-width: calc(100% - 16px); }
+  .j-mozg-kolumna { padding: 20px 16px 48px; }
+  .j-mozg-kolumna h1 { font-size: 22px; }
+  .j-mozg-strona-gora { padding-left: 12px; }
+  .j-mozg-miejsce { display: none; }
 }
 /* @@pakiet rdzen */
 /* Aktualizacje w rdzeniu: znacznik rutyny przy raporcie w rozmowie (licznik pozycji pod rozmówcami: .j-rozm-licz) */

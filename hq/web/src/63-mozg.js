@@ -1,17 +1,18 @@
 // Mózg Jarva (#/mozg, docs/HQ.md „Mózg”): wiedza poukładana w kilka głównych części (Jarvo, Ty, Projekty i marki, …),
-// w części grupy (agent, folder), w grupie notatki według rodzaju. Wejście = kafle części z liczbą i jednym zdaniem,
-// dalej krok po kroku z okruszkami i strzałką „Wstecz”; stan w adresie (#/mozg?k=<część>&g=<grupa>&o=<notatka>&z=<źródło>).
-// Na wejściu części i grupy „Najważniejsze” = streszczenie huba (`podsumowanie` z /graph). Graf (shared/web/graf.js)
-// pokazuje tylko bieżący poziom: na wejściu skupiska części w kolorach kafli, w części skupiska grup, w grupie same
-// notatki; klik w skupisko wchodzi głębiej, w kropkę otwiera notatkę. Szukaj działa na całym mózgu od razu (tytuły;
-// skarbiec dokłada wyniki z treści, GET /search). Notatka obok: Markdown z [[linkami]] jako linkami Mózgu i „Powiązane”;
-// notatka tożsamości z `edycja: pamiec` ma edytor wpisów (GET/PUT /pamiec, `profil` notatki agenta innego niż Jarvo:
-// ?profil=<agent>), z `edycja: repo` prośbę do Jarva w rozmowie.
-// Klawiatura: Tab po linkach, w polu szukania strzałki i Enter (combobox), Esc zamyka notatkę i czyści szukanie;
-// nagłówek poziomu dostaje fokus po przejściu. Telefon: lista na cały ekran, graf pod „Mapa”, notatka na cały ekran.
+// w części grupy (agent, folder). Cały widok to jedna mapa-neuron (63-mozg-neuron.js): JARVO (albo KERNEL) w środku,
+// części jako dendryty we własnych kolorach, grupy jako skupiska, kropka = notatka, włókna = linki. Poziomy to tylko
+// kamera: klik w część albo grupę przybliża ten sam obraz, klik w tło albo Esc oddala, klik w kropkę otwiera stronę
+// notatki (pełny tekst, „Edytuj”, powiązane). Stan w adresie (#/mozg?k=<część>&g=<grupa>&o=<notatka>&z=<źródło>);
+// w rogu karta poziomu (nazwa, liczba, jedno zdanie, „Przegląd”/„Najważniejsze” = hub). Szukaj działa na całym mózgu
+// od razu (tytuły; skarbiec dokłada wyniki z treści, GET /search), trafienia mają obwódki na mapie. Strona notatki:
+// Markdown z [[linkami]] jako linkami Mózgu; „Edytuj”: pamięć agenta (`edycja: pamiec`) = edytor wpisów (GET/PUT
+// /pamiec, `?profil=<agent>`), plik Jarva (`edycja: repo`) = prośba w nowej rozmowie, zwykła notatka skarbca = uwaga
+// do Jarva (POST /remark), notatka źródła z `rozmowca` (Kernel) = szkic prośby w jego rozmowie.
+// Klawiatura: w polu szukania strzałki i Enter (combobox), Esc zamyka notatkę, czyści szukanie i oddala; ukryta lista
+// części i grup (`.j-sr`) dla czytnika ekranu. Telefon: mapa na cały ekran (dotyk: przesuwanie, dwa palce przybliżają).
 // Części: MOZG_KATEGORIE (foldery skarbca, ta sama lista co wiedza.py FOLDERY_SKARBCA, pilnuje tego test) albo
 // `kategorie` źródła z konfig/mozg.json; źródło z pliku bez nich dostaje części z folderów. Pakiet `mozg` (ten plik +
-// graf.js) i style z bloku „@@pakiet mozg” ładują się po wejściu w widok. Budżet: scripts/hqbuild.py BUDZET_GZIP.
+// 63-mozg-neuron.js) i style z bloku „@@pakiet mozg” ładują się po wejściu w widok. Budżet: scripts/hqbuild.py BUDZET_GZIP.
 
 const MOZG_WIEDZA = { korzen: "/api/plugins/jarvo-wiedza" };
 const MOZG_SKARBIEC = { klucz: "jarvo", nazwa: "Skarbiec Jarva", nazwa_en: "Jarvo's vault", rodzaj: "skarbiec" };
@@ -49,7 +50,6 @@ const MOZG_TYPY = { projekt: ["Projekty", "Projects"], lekcja: ["Lekcje", "Lesso
   skill: ["Umiejętności", "Skills"], pojecie: ["Pojęcia", "Concepts"], blad: ["Błędy", "Mistakes"], podmiot: ["Firmy i narzędzia", "Companies and tools"],
   rozmowa: ["Rozmowy", "Talks"], brief: ["Briefy", "Briefs"], orzeczenia: ["Poprawki", "Corrections"], agent: ["Agenci", "Agents"],
   tozsamosc: ["Tożsamość i pamięć", "Identity and memory"] };
-const MOZG_RODZAJE = Object.keys(MOZG_TYPY);
 const mozgN = (p) => (p ? L(p[0], p[1]) : "");
 
 // agent → nazwa dla właściciela w całym Mózgu (grupa, okruszki, „Przegląd”, graf, notatka): koordynator floty to
@@ -60,12 +60,11 @@ const mozgTytul = (n) => {
   return m && MOZG_AGENCI[m[1]] ? MOZG_AGENCI[m[1]] : String(n.tytul || n.id);
 };
 
-// paleta z motywu: barwy kafli i skupisk (--j-barwa-*), reszta grafu z kolorów motywu
-function mozgMotyw(el) {
+// paleta z motywu: kolor części (--j-barwa-<nr części>, ten sam na mapie, w karcie poziomu i na stronie notatki), kroje
+function mozgBarwy(el) {
   const cs = getComputedStyle(el), v = (n) => cs.getPropertyValue(n).trim();
-  return { szary: v("--j-tekst-3") || "#888", barwy: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => v(`--j-barwa-${i}`) || "#888"), motyw: { hub: v("--j-tekst"), tekst: v("--j-tekst"),
-    sierota: "", sprzeczna: v("--j-uwaga"), zaznaczony: v("--j-fokus"), link: v("--j-linia-mocna"), linkAuto: v("--j-linia"),
-    font: v("--j-font-ui"), tlo: v("--j-tlo") } };
+  return { barwy: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => v(`--j-barwa-${i}`) || "#999999"), tekst: v("--j-tekst") || "#eee", tekst2: v("--j-tekst-2") || "#aaa",
+    uwaga: v("--j-uwaga") || "#E8B56D", font: v("--j-font-ui"), mono: v("--j-font-mono"), naglowek: v("--j-font-naglowek") };
 }
 
 const mozgProste = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ł/g, "l");
@@ -232,21 +231,23 @@ function mozgPopros(plik) {
   Trasa.idz({ widok: "start" });
 }
 
-// dane grafu dla poziomu: wejście = skupiska głównych części, część = skupiska grup, grupa = jej notatki
-function mozgGraf(mapa, linki, kat, grupa) {
-  const wezly = [], pin = (k, nazwa, ile, ci) => wezly.push({ id: "@" + k, grupa: k, stale: true, r: 15, etykieta: `${nazwa} · ${ile}`, _ci: ci });
-  if (grupa) {
-    for (const n of grupa.wezly) wezly.push({ ...n, _ci: MOZG_RODZAJE.indexOf(n.typ) + 1 });
-    [...wezly].filter((n) => !n.hub).sort((a, b) => (b.we || 0) - (a.we || 0)).slice(0, 6).forEach((n) => { n.napis = 1; });
-  } else if (kat) {
-    kat.grupy.forEach((g, i) => { for (const n of g.wezly) wezly.push({ ...n, grupa: g.k, _ci: i }); pin(g.k, g.nazwa, g.ile, i); });
-  } else {
-    mapa.glowne.forEach((d, i) => { for (const g of d.grupy) for (const n of g.wezly) wezly.push({ ...n, grupa: d.k, _ci: i }); pin(d.k, L(d.nazwa, d.nazwa_en || d.nazwa), d.ile, i); });
-  }
-  for (const n of wezly) if (!n.stale) n.etykieta = n._t;   // napis = tytuł, nie nazwa pliku („_hub-web”)
-  const ids = new Set(wezly.map((n) => n.id));
-  return { wezly, linki: linki.filter((l) => ids.has(l.z) && ids.has(l.do)) };
+// „Edytuj” w notatce źródła prowadzonego przez agenta w terminalu (Kernel: `rozmowca` w konfig/mozg.json): szkic
+// „Zmiana w <plik>: ” w jego rozmowie (bez dubla), rozmowa z kursorem na końcu; wysyła właściciel
+function mozgPoprosRozmowce(klucz, plik) {
+  const r = (sklep.stan().rozmowcy || []).find((x) => x.klucz === klucz);
+  if (!r) return mozgPopros(plik);
+  const k = r.watek_id || "nowa";
+  sklep.ustaw((s) => {
+    const byl = s.szkice[k] || {};
+    return { ...s, szkice: { ...s.szkice, [k]: { tekst: mozgProsba(plik, byl.tekst), pliki: byl.pliki || [], ts: Date.now() / 1000 } } };
+  });
+  Fokus.odloz("kompozytor");
+  Trasa.idz({ widok: "rozmowca", rozmowca: klucz });
 }
+
+// kolejność notatek w skupisku grupy (pierwsza w środku słonecznika): huby, potem jak sekcje grupy (tożsamość
+// w stałej kolejności, rodzaje od najliczniejszego, w rodzaju od najnowszej, wycofane na końcu)
+const mozgKolejnosc = (g) => [...g.wezly.filter((n) => n.hub), ...mozgSekcje(g.wezly).flatMap((s) => s.wezly)];
 
 function mozgData(s) {
   const d = new Date(String(s || "").slice(0, 10));
@@ -260,28 +261,6 @@ function MozgWiersz({ n, href, gdzie, otwarta, opis }) {
     <span class="j-mozg-wt">${stara && html`<span class="j-mozg-tag">${L("wycofana", "retired")}</span>`}${n.hub ? L("Przegląd: ", "Overview: ") : ""}${n._t}</span>
     ${gdzie && html`<span class="j-mozg-wg">${gdzie}</span>`}
     ${opis && html`<span class="j-mozg-wo">${opis}</span>`}${!gdzie && n.zmieniono && html`<span class="j-mozg-wd">${mozgData(n.zmieniono)}</span>`}</a></li>`;
-}
-
-// notatki grupy w sekcjach rodzajów, każda zwinięta do kilku; „Pokaż wszystkie” rozwija jedną sekcję
-function MozgSekcje({ wezly, href, otwarta }) {
-  const sekcje = useMemo(() => mozgSekcje(wezly), [wezly]), [wiecej, setWiecej] = useState(""), ile = sekcje.length > 1 ? 6 : 15;
-  return sekcje.map((s) => html`<section key=${s.t} class="j-mozg-sekcja">
-    ${sekcje.length > 1 && html`<h3>${s.nazwa} <span>${s.wezly.length}</span></h3>`}
-    <ul>${(wiecej === s.t ? s.wezly : s.wezly.slice(0, ile)).map((n) => html`<${MozgWiersz} key=${n.id} n=${n} href=${href} otwarta=${otwarta}/>`)}</ul>
-    ${s.wezly.length > ile && wiecej !== s.t && html`<button type="button" class="j-mozg-wiecej" onClick=${() => setWiecej(s.t)}>${L(`Pokaż wszystkie (${s.wezly.length})`, `Show all (${s.wezly.length})`)}</button>`}
-  </section>`);
-}
-
-// „Najważniejsze”: streszczenie huba (blok STRESZCZENIE, `podsumowanie` z /graph) ze „stan na …”; długie zwinięte
-function MozgNajwazniejsze({ hub, wiki }) {
-  const [caly, setCaly] = useState(false), t = hub ? String(hub.podsumowanie || "").trim() : "";
-  if (!t) return null;
-  const dlugi = t.length > 700;
-  return html`<section class=${cx("j-mozg-naj", dlugi && !caly && "is-zwiniety")} aria-label=${L("Najważniejsze", "Key points")}>
-    <h3>${L("Najważniejsze", "Key points")}${hub.streszczono && html` <span>${L("stan na ", "as of ")}${mozgData(hub.streszczono)}</span>`}</h3>
-    <${TrescMd} tekst=${wiki(t)}/>
-    ${dlugi && html`<button type="button" class="j-mozg-wiecej" aria-expanded=${String(caly)} onClick=${() => setCaly(!caly)}>${caly ? L("Zwiń", "Show less") : L("Pokaż całość", "Show all")}</button>`}
-  </section>`;
 }
 
 // ← z podpisem miejsca, do którego wraca (z historii: history.back, inaczej zwykły link poziom wyżej)
@@ -351,21 +330,50 @@ function MozgPamiec({ klucz, profil, onZapis, onKoniec }) {
   </div>`;
 }
 
-function MozgNotatka({ z, id, dane, mapa, href, cel, nazwaMiejsca, wstecz, sekcja, odsw, onZapis, onClose }) {
-  const [n, setN] = useState(null), [wszystkie, setWszystkie] = useState(false), [edytor, setEdytor] = useState(false), [zapisano, setZapisano] = useState(false);
+// „Edytuj” w zwykłej notatce skarbca: uwaga do notatki (POST /remark wtyczki jarvo-wiedza = szkic w skrzynce), którą
+// Jarvo wnosi przy najbliższym porządku wiedzy (kompilacja rusza sama kilka minut po szkicu). Notatek skarbca nie
+// pisze nikt poza kompilacją (docs/WIEDZA.md), więc edycja to polecenie zmiany, nie zapis pliku.
+function MozgUwaga({ id, onKoniec }) {
+  const [t, setT] = useState(""), [st, setSt] = useState(""), pole = useRef(null);
+  useEffect(() => { pole.current.focus(); }, []);
+  const wyslij = () => {
+    if (t.trim().length < 5 || st === "trwa") return;
+    setSt("trwa");
+    zadanie("POST", "/remark", { path: id, uwaga: t.trim() }, MOZG_WIEDZA).then(() => setSt("ok"), () => setSt("blad"));
+  };
+  if (st === "ok") return html`<p class="j-mozg-info" role="status" tabIndex="-1">${L("Przyjęte. Jarvo wniesie zmianę przy najbliższym porządku wiedzy (zwykle w kilka minut), potem zobaczysz ją tutaj.",
+    "Done. Jarvo will apply the change at the next knowledge pass (usually within minutes); you will see it here.")}
+    <button type="button" class="j-mozg-wiecej" onClick=${onKoniec}>${L("Zamknij", "Close")}</button></p>`;
+  return html`<div class="j-mozg-uwaga" onKeyDown=${(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) wyslij(); if (e.key === "Escape" && !t) { e.stopPropagation(); onKoniec(); } }}>
+    <label for="j-mozg-uwaga">${L("Co zmienić w tej notatce?", "What should change in this note?")}</label>
+    <textarea id="j-mozg-uwaga" ref=${pole} value=${t} onInput=${(e) => setT(e.target.value)} maxLength="2000"
+      placeholder=${L("Na przykład: popraw datę na 21.11, dopisz, że strona działa już na SSH.", "For example: change the date to 21 Nov, add that the site now runs on SSH.")}></textarea>
+    ${st === "blad" && html`<p class="j-mozg-pam-blad" role="alert">${L("Nie udało się wysłać. Spróbuj jeszcze raz.", "Could not send. Try again.")}</p>`}
+    <div class="j-mozg-akcje"><${Przycisk} rodzaj="glowny" maly disabled=${t.trim().length < 5 || st === "trwa"} onClick=${wyslij}>${L("Wyślij do Jarva", "Send to Jarvo")}</${Przycisk}>
+      <${Przycisk} maly onClick=${onKoniec}>${L("Anuluj", "Cancel")}</${Przycisk}>
+      <span class="j-mozg-wd">${L("Jarvo poprawi notatkę i dopisze to do historii", "Jarvo updates the note and records it")}</span></div>
+  </div>`;
+}
+
+// strona notatki (22.11 właściciel: „jak się kliknie na pojedynczą notatkę, to niech się otworzy jej page już z tekstem
+// i jakieś edytuj”): pełny tekst na całej szerokości Mózgu (kolumna do czytania), nad nią miejsce w kolorze części,
+// „Edytuj” i powiązane notatki; mapa pod spodem stoi (wstrzymana) i wraca w tym samym kadrze
+function MozgStrona({ z, id, dane, mapa, href, cel, nazwaMiejsca, barwa, wstecz, sekcja, odsw, onZapis, onClose }) {
+  const [n, setN] = useState(null), [wszystkie, setWszystkie] = useState(false), [edytor, setEdytor] = useState(""), [zapisano, setZapisano] = useState(false);
   const ref = useRef(null), info = useRef(null);
   const skarbiec = z.rodzaj === "skarbiec", w = dane.byId.get(id) || {}, url = mozgUrl(z, id);
-  useEffect(() => { ref.current.focus(); }, [id]);   // Esc i czytnik ekranu: fokus w notatce
+  useEffect(() => { ref.current.focus(); setEdytor(""); setZapisano(false); }, [id]);   // Esc i czytnik ekranu: fokus w notatce
   useEffect(() => {
     let zywy = true;
-    if (skarbiec) zadanie("GET", `/note?path=${encodeURIComponent(id)}`, undefined, MOZG_WIEDZA)
-      .then((d) => zywy && setN(d), () => zywy && setN({ blad: 1 }));
+    setN(null);
+    const p = skarbiec ? zadanie("GET", `/note?path=${encodeURIComponent(id)}`, undefined, MOZG_WIEDZA)
+      : z.tresc ? zadanie("GET", `/mozg/${encodeURIComponent(z.klucz)}/notatka?id=${encodeURIComponent(id)}`) : null;
+    if (p) p.then((d) => zywy && setN(d), () => zywy && setN({ blad: 1 }));
     return () => { zywy = false; };
-  }, [id, odsw]);
+  }, [id, odsw, z.klucz]);
   useEffect(() => { if (zapisano && info.current) info.current.focus(); }, [zapisano]);
   const tresc = useMemo(() => n && !n.blad && mozgWiki(String(n.tresc || "").replace(/^\s*#\s[^\n]*\n/, ""), cel), [n]);
   // długa notatka (od 4 sekcji „## ”, np. „Jarvo od A do Z”): spis sekcji; klik przewija do nagłówka i daje mu fokus
-  // (adres zostaje adresem Mózgu, bo hash niesie widok)
   const spis = useMemo(() => (tresc ? mozgSpis(tresc) : []), [tresc]);
   const skocz = (i) => {
     const h = ref.current.querySelectorAll(".j-md .j-md-h2")[i];
@@ -385,104 +393,60 @@ function MozgNotatka({ z, id, dane, mapa, href, cel, nazwaMiejsca, wstecz, sekcj
   const gd = mapa.gdzie.get(id), fm = (n && n.frontmatter) || {};
   const edycja = w.edycja || fm.edycja, pamiec = w.pamiec || fm.pamiec, profil = String(w.profil || fm.profil || ""), plik = String(fm.plik || "");
   const zast = fm.zastapiona_przez && String(fm.zastapiona_przez).replace(/^\[\[|\]\]$/g, "").replace(/\.md$/, ""), zc = zast && cel(zast);
-  return html`<aside ref=${ref} tabIndex="-1" class="j-mozg-karta" aria-labelledby="j-mozg-tytul">
-    <div class="j-mozg-karta-gora">
+  // „Edytuj”: pamięć agenta = edytor wpisów, plik Jarva (SOUL, ZASADY) = prośba w nowej rozmowie, zwykła notatka
+  // skarbca = uwaga do Jarva, notatka źródła z rozmówcą (Kernel) = szkic prośby w jego rozmowie
+  const pam = skarbiec && edycja === "pamiec" && (pamiec === "memory" || pamiec === "user");
+  const edytuj = !skarbiec ? (z.rozmowca ? () => mozgPoprosRozmowce(z.rozmowca, `${id}.md`) : null)
+    : pam ? () => { setZapisano(false); setEdytor("pamiec"); }
+    : edycja === "repo" ? () => mozgPopros(plik || id)
+    : () => setEdytor("uwaga");
+  const kto = !skarbiec ? L("Zmianę wnosi agent, który prowadzi te notatki", "The agent who keeps these notes applies the change")
+    : pam ? (profil ? L("Działa od następnej rozmowy agenta", "Works from the agent's next chat") : L("Działa od następnej rozmowy z Jarvem", "Works from Jarvo's next chat"))
+    : edycja === "repo" ? L("Plik Jarva: zmienia go Jarvo na Twoją prośbę", "Jarvo's file: he changes it when you ask") : "";
+  return html`<article ref=${ref} tabIndex="-1" class="j-mozg-strona" aria-labelledby="j-mozg-tytul" style=${{ "--c": barwa }}>
+    <div class="j-mozg-strona-gora">
       <${MozgWstecz} w=${wstecz}/>
+      ${gd && html`<span class="j-mozg-miejsce"><i aria-hidden="true"></i>${nazwaMiejsca(gd)}</span>`}
+      ${edytuj && !edytor && html`<${Przycisk} maly ikona="pen" klasa="j-mozg-edytuj" onClick=${edytuj}>${L("Edytuj", "Edit")}</${Przycisk}>`}
       <button type="button" class="j-mozg-x" aria-label=${L("Zamknij notatkę", "Close the note")} onClick=${onClose}>×</button>
     </div>
-    <h2 id="j-mozg-tytul">${w._t || id}</h2>
-    <p class="j-mozg-wd">${[...new Set([gd && nazwaMiejsca(gd), mozgN(MOZG_TYPY[w.typ]), mozgData(w.zmieniono)].filter(Boolean))].join(" · ")}</p>
-    ${(w.status || fm.status) === "wycofana" && html`<p class="j-mozg-info is-wycofana">${L("Wycofana", "Retired")}${fm.wycofano ? ` ${mozgData(fm.wycofano)}` : ""}${fm.powod ? `: ${String(fm.powod).replace(/[.\s]+$/, "")}` : ""}.
-      ${zast && html` ${L("Zastąpiona przez: ", "Replaced by: ")}${zc ? html`<a href=${zc[0]}>${zc[1]}</a>` : zast}.`} ${L("Jarvo już z niej nie korzysta.", "Jarvo no longer uses it.")}</p>`}
-    ${skarbiec && n && !n.blad && !edytor && (edycja === "pamiec" && (pamiec === "memory" || pamiec === "user")
-      ? html`<div class="j-mozg-akcje"><${Przycisk} maly ikona="pen" onClick=${() => { setZapisano(false); setEdytor(true); }}>${L("Zmień", "Edit")}</${Przycisk}>
-          <span class="j-mozg-wd">${profil ? L("Działa od następnej rozmowy agenta", "Works from the agent's next chat") : L("Działa od następnej rozmowy z Jarvem", "Works from Jarvo's next chat")}</span></div>`
-      : edycja === "repo" && html`<div class="j-mozg-akcje"><${Przycisk} maly ikona="msg" onClick=${() => mozgPopros(plik || id)}>${L("Poproś o zmianę", "Ask for a change")}</${Przycisk}>
-          <span class="j-mozg-wd">${id.startsWith("agenci/") ? L("Plik agenta, zmienia go Jarvo na Twoją prośbę", "The agent's file, Jarvo changes it when you ask")
-            : L("Plik Jarva, zmienia go Jarvo na Twoją prośbę", "Jarvo's file, he changes it when you ask")}</span></div>`)}
-    ${zapisano && html`<p ref=${info} tabIndex="-1" class="j-mozg-info" role="status">${profil ? L("Zapisano. Agent zobaczy zmianę od następnej rozmowy.", "Saved. The agent will see the change from its next chat.")
-      : L("Zapisano. Jarvo zobaczy zmianę od następnej rozmowy.", "Saved. Jarvo will see the change from his next chat.")}</p>`}
-    ${!edytor && spis.length >= 4 && html`<nav class="j-mozg-spis" aria-label=${L("Sekcje notatki", "Note sections")}>
-      <h3>${L("W tej notatce", "In this note")}</h3>
-      <ol>${spis.map((t, i) => html`<li key=${i}><button type="button" onClick=${() => skocz(i)}>${t}</button></li>`)}</ol></nav>`}
-    ${edytor ? html`<${MozgPamiec} klucz=${pamiec} profil=${profil} onKoniec=${() => setEdytor(false)} onZapis=${() => { setEdytor(false); setZapisano(true); onZapis(); }}/>`
-      : skarbiec && (!n ? html`<${Spinner}/>` : n.blad ? html`<p>${L("Nie udało się otworzyć notatki.", "Could not open the note.")}</p>` : html`<${TrescMd} tekst=${tresc}/>`)}
-    ${!skarbiec && w.opis && html`<p>${w.opis}</p>`}
-    ${url && html`<p><a href=${url} target="_blank" rel="noopener noreferrer">${L("Otwórz notatkę ↗", "Open the note ↗")}</a></p>`}
-    ${obok.length > 0 && !edytor && html`<section class="j-mozg-sekcja"><h3>${L("Powiązane", "Linked")} <span>${obok.length}</span></h3>
-      <ul>${(wszystkie ? obok : obok.slice(0, 10)).map((c) => html`<${MozgWiersz} key=${c.id} n=${c} href=${href} gdzie=${nazwaMiejsca(mapa.gdzie.get(c.id))}/>`)}</ul>
-      ${obok.length > 10 && !wszystkie && html`<button type="button" class="j-mozg-wiecej" onClick=${() => setWszystkie(true)}>${L(`Pokaż wszystkie (${obok.length})`, `Show all (${obok.length})`)}</button>`}</section>`}
-  </aside>`;
-}
-
-// Wejście Mózgu (22.11 właściciel: „ma być prosty, czytelny, lekki zarys; na środku Jarvo, wokół wszystko jako sieć,
-// bez animacji”): statyczna sieć w SVG. Środek = źródło (JARVO, KERNEL), pierścień = części (wielkość węzła z liczby
-// notatek, pod nazwą jedno zdanie opisu), cienkie łuki między częściami = najmocniejsze powiązania ich notatek
-// (grubość z liczby linków). Najechanie rozjaśnia część i jej łuki; kliknięcie wchodzi do części.
-const MOZG_SIEC = { w: 1240, h: 680, r1: 230, rx: 270, luki: 14 };   // szerokość: podpisy z boku (do ok. 270 j.) mieszczą się
-function mozgSiec(mapa, linki) {
-  const { w, h, r1 } = MOZG_SIEC, cx = w / 2, cy = h / 2;
-  const czesci = mapa.kat.filter((d) => d.ile > 0), n = czesci.length, maks = Math.max(1, ...czesci.map((d) => d.ile));
-  const wezly = czesci.map((d, i) => {
-    const a = -Math.PI / 2 + (i * 2 * Math.PI) / Math.max(1, n);
-    return { d, i, a, x: cx + MOZG_SIEC.rx * Math.cos(a), y: cy + r1 * Math.sin(a), r: 7 + 11 * Math.sqrt(d.ile / maks) };
-  });
-  const nr = new Map(czesci.map((d, i) => [d.k, i])), pary = new Map();
-  for (const l of linki) {
-    const a = mapa.gdzie.get(l.z), b = mapa.gdzie.get(l.do);
-    if (!a || !b || a.kat === b.kat || !nr.has(a.kat) || !nr.has(b.kat)) continue;
-    const [p, q] = [nr.get(a.kat), nr.get(b.kat)].sort((x, y) => x - y), k = p + ":" + q;
-    pary.set(k, (pary.get(k) || 0) + 1);
-  }
-  const najw = Math.max(1, ...pary.values());
-  const luki = [...pary].filter(([, c]) => c >= 3).sort((x, y) => y[1] - x[1]).slice(0, MOZG_SIEC.luki)
-    .map(([k, c]) => { const [p, q] = k.split(":").map(Number); return { p, q, c, s: 0.8 + 1.8 * Math.sqrt(c / najw) }; });
-  return { cx, cy, wezly, luki };
-}
-
-function MozgSiec({ siec, centrum, ile, href, nazwa, opis }) {
-  const [nad, setNad] = useState(-1);
-  const { cx: sx, cy: sy, wezly, luki } = siec, { w, h } = MOZG_SIEC;
-  // łuk między częściami wygięty lekko do środka (nie przez środek): czytelna sieć zamiast gwiazdy
-  const luk = (a, b) => { const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2; return `M${a.x},${a.y} Q${sx + (mx - sx) * 0.62},${sy + (my - sy) * 0.62} ${b.x},${b.y}`; };
-  const podpis = (v) => { const c = Math.cos(v.a), s = Math.sin(v.a), d = v.r + 14, pion = Math.abs(c) < 0.12;
-    return { x: v.x + c * d, y: v.y + s * d + (pion ? (s > 0 ? 18 : -26) : -2), kotwica: pion ? "middle" : c > 0 ? "start" : "end" }; };
-  return html`<svg class=${cx("j-siec", nad >= 0 && "is-nad")} viewBox=${`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" role="group"
-      aria-label=${L(`Mapa mózgu: ${centrum} i ${wezly.length} części`, `Brain map: ${centrum} and ${wezly.length} parts`)}>
-    <g class="j-siec-luki" aria-hidden="true">${luki.map((l) => html`<path key=${l.p + "-" + l.q} d=${luk(wezly[l.p], wezly[l.q])}
-      class=${cx(nad >= 0 && (l.p === nad || l.q === nad) && "is-on")} style=${{ strokeWidth: l.s }}/>`)}</g>
-    ${wezly.map((v) => { const p = podpis(v), o = opis(v.d);
-      return html`<a key=${v.d.k} href=${href(v.d)} class=${cx("j-siec-cz", v.i === nad && "is-on", v.d.drugorzedna && "is-cicha")}
-          style=${{ "--c": `var(--j-barwa-${v.i % 10})` }} onMouseEnter=${() => setNad(v.i)} onMouseLeave=${() => setNad(-1)}
-          onFocus=${() => setNad(v.i)} onBlur=${() => setNad(-1)} aria-label=${`${nazwa(v.d)}: ${v.d.ile} ${L("notatek", "notes")}`}>
-        <line x1=${sx} y1=${sy} x2=${v.x} y2=${v.y} class="j-siec-os"/>
-        <circle cx=${v.x} cy=${v.y} r=${v.r + 12} class="j-siec-traf"/>
-        <circle cx=${v.x} cy=${v.y} r=${v.r} class="j-siec-w"/>
-        <circle cx=${v.x} cy=${v.y} r=${Math.max(2.5, v.r * 0.32)} class="j-siec-k"/>
-        <text x=${p.x} y=${p.y} text-anchor=${p.kotwica} class="j-siec-t">${nazwa(v.d)}<tspan class="j-siec-l" dx="7">${v.d.ile}</tspan></text>
-        ${o && html`<text x=${p.x} y=${p.y + 20} text-anchor=${p.kotwica} class="j-siec-o">${o.length > 42 ? o.slice(0, 41).replace(/[\s,;:]+\S*$/, "") + "…" : o}</text>`}
-      </a>`; })}
-    <g class="j-siec-srodek" aria-hidden="true">
-      <circle cx=${sx} cy=${sy} r="70"/>
-      <text x=${sx} y=${sy + 4} text-anchor="middle" class="j-siec-st">${centrum}</text>
-      <text x=${sx} y=${sy + 27} text-anchor="middle" class="j-siec-sl">${ile} ${L("notatek", "notes")}</text>
-    </g>
-  </svg>`;
+    <div class="j-mozg-kolumna">
+      <h1 id="j-mozg-tytul">${w._t || id}</h1>
+      <p class="j-mozg-wd">${[mozgN(MOZG_TYPY[w.typ]), mozgData(w.zmieniono), obok.length ? L(`${obok.length} powiązanych`, `${obok.length} linked`) : ""].filter(Boolean).join(" · ")}</p>
+      ${(w.status || fm.status) === "wycofana" && html`<p class="j-mozg-info is-wycofana">${L("Wycofana", "Retired")}${fm.wycofano ? ` ${mozgData(fm.wycofano)}` : ""}${fm.powod ? `: ${String(fm.powod).replace(/[.\s]+$/, "")}` : ""}.
+        ${zast && html` ${L("Zastąpiona przez: ", "Replaced by: ")}${zc ? html`<a href=${zc[0]}>${zc[1]}</a>` : zast}.`} ${L("Jarvo już z niej nie korzysta.", "Jarvo no longer uses it.")}</p>`}
+      ${kto && !edytor && html`<p class="j-mozg-wd j-mozg-kto">${kto}</p>`}
+      ${zapisano && html`<p ref=${info} tabIndex="-1" class="j-mozg-info" role="status">${profil ? L("Zapisano. Agent zobaczy zmianę od następnej rozmowy.", "Saved. The agent will see the change from its next chat.")
+        : L("Zapisano. Jarvo zobaczy zmianę od następnej rozmowy.", "Saved. Jarvo will see the change from his next chat.")}</p>`}
+      ${edytor === "uwaga" && html`<${MozgUwaga} id=${id} onKoniec=${() => setEdytor("")}/>`}
+      ${edytor === "pamiec" ? html`<${MozgPamiec} klucz=${pamiec} profil=${profil} onKoniec=${() => setEdytor("")} onZapis=${() => { setEdytor(""); setZapisano(true); onZapis(); }}/>`
+        : html`
+        ${spis.length >= 4 && html`<nav class="j-mozg-spis" aria-label=${L("Sekcje notatki", "Note sections")}>
+          <h3>${L("W tej notatce", "In this note")}</h3>
+          <ol>${spis.map((t, i) => html`<li key=${i}><button type="button" onClick=${() => skocz(i)}>${t}</button></li>`)}</ol></nav>`}
+        ${skarbiec || z.tresc ? (!n ? html`<${Spinner}/>` : n.blad ? html`<p>${L("Nie udało się otworzyć notatki.", "Could not open the note.")}</p>` : html`<${TrescMd} tekst=${tresc}/>`)
+          : w.opis && html`<p class="j-mozg-opis-n">${w.opis}</p>`}
+        ${url && html`<p><a class="j-mozg-zewn" href=${url} target="_blank" rel="noopener noreferrer">${L("Otwórz w repozytorium ↗", "Open in the repository ↗")}</a></p>`}
+        ${obok.length > 0 && html`<section class="j-mozg-obok"><h3>${L("Powiązane", "Linked")} <span>${obok.length}</span></h3>
+          <ul>${(wszystkie ? obok : obok.slice(0, 12)).map((c) => html`<${MozgWiersz} key=${c.id} n=${c} href=${href} gdzie=${nazwaMiejsca(mapa.gdzie.get(c.id))}/>`)}</ul>
+          ${obok.length > 12 && !wszystkie && html`<button type="button" class="j-mozg-wiecej" onClick=${() => setWszystkie(true)}>${L(`Pokaż wszystkie (${obok.length})`, `Show all (${obok.length})`)}</button>`}</section>`}`}
+    </div>
+  </article>`;
 }
 
 function MozgWidok() {
-  const korzen = useRef(null), plotno = useRef(null), g = useRef(null), naglowek = useRef(null), pierwszy = useRef(true), klik = useRef(null);
+  const korzen = useRef(null), pudlo = useRef(null), neuron = useRef(null), klik = useRef({}), barwy = useRef(null), naglowek = useRef(null);
   const hash = React.useSyncExternalStore(Trasa.sluchaj, () => location.hash);
   const s = useMemo(() => mozgStan(hash), [hash]);
   const [zrodla, setZrodla] = useState([MOZG_SKARBIEC]);
   const [dane, setDane] = useState(null);
   const [blad, setBlad] = useState(false);
+  const [bezGl, setBezGl] = useState(false);
   const [q, setQ] = useState("");
   const [i, setI] = useState(0);
   const [tresc, setTresc] = useState([]);
-  const [naMapie, setNaMapie] = useState(false);
   const [sekcja, setSekcja] = useState(["", ""]);   // [notatka, sekcja] z wybranego wyniku szukania
-  const [odsw, setOdsw] = useState(0);        // po zapisie pamięci: graf, notatka i wyniki szukania od nowa
+  const [odsw, setOdsw] = useState(0);        // po zapisie pamięci: mapa, notatka i wyniki szukania od nowa
   const [poprz, setPoprz] = useState("");     // hash poprzedniego widoku Mózgu w historii przeglądarki („Wstecz”)
   const ostatni = useRef(""), wczytany = useRef(""), wGoreZ = useRef(null);
   const z = zrodla.find((x) => x.klucz === (s.z || "jarvo")) || zrodla[0];
@@ -491,14 +455,14 @@ function MozgWidok() {
 
   useEffect(() => {
     zadanie("GET", "/mozg/zrodla").then((d) => d.zrodla && setZrodla(d.zrodla), () => {});
-    // sterownik grafu raz na widok; motyw czytany co 120 klatek (zmiana motywu bez przeładowania)
-    let p = mozgMotyw(korzen.current), co = 0;
-    g.current = utworzGraf(plotno.current, {
-      motyw: () => { if (++co % 120 === 0) p = mozgMotyw(korzen.current); return p.motyw; },
-      kolor: (n) => (mozgWycofana(n) ? p.szary : p.barwy[(n._ci || 0) % 10]),
-      otworz: (id) => klik.current(id),
+    barwy.current = mozgBarwy(korzen.current);
+    neuron.current = utworzNeuron(pudlo.current, {
+      motyw: () => barwy.current, centrum: () => klik.current.centrum, podpis: () => klik.current.podpis,
+      nazwa: (d) => L(d.nazwa, d.nazwa_en || d.nazwa), tytul: (n) => n._t, miejsce: (id) => klik.current.miejsce(id),
+      notatka: (id) => klik.current.notatka(id), czesc: (k, g) => klik.current.czesc(k, g), wyzej: (calkiem) => klik.current.wyzej(calkiem),
     });
-    return () => g.current.zniszcz();
+    setBezGl(!neuron.current.gl);
+    return () => neuron.current.zniszcz();
   }, []);
 
   // każdy wpis historii w Mózgu dostaje przy pierwszym wejściu hash widoku, z którego przyszedł (history.state.mozgPoprz;
@@ -534,11 +498,11 @@ function MozgWidok() {
     return () => { zywy = false; };
   }, [z.klucz, odsw]);
 
-  // bez `z` w zależnościach: odpowiedź /mozg/zrodla daje nowy obiekt źródła, a graf nie powinien od tego ruszać od nowa
+  // bez `z` w zależnościach: odpowiedź /mozg/zrodla daje nowy obiekt źródła, a mapa nie powinna od tego ruszać od nowa
   const mapa = useMemo(() => dane && mozgMapa(dane.wezly, z.kategorie || (z.rodzaj === "skarbiec" ? MOZG_KATEGORIE : null)), [dane, z.kategorie, z.rodzaj]);
+  const uklad = useMemo(() => mapa && neuronUklad(mapa, dane.linki, mozgKolejnosc), [mapa]);
   const kat = (mapa && mapa.kat.find((d) => d.k === s.k)) || null;
   const grupa = (kat && (kat.grupy.find((x) => x.k === s.g) || (kat.grupy.length === 1 ? kat.grupy[0] : null))) || null;
-  const graf = useMemo(() => mapa && mozgGraf(mapa, dane.linki, kat, grupa), [mapa, kat, grupa]);
   const doNotatki = (id) => { const gd = mapa.gdzie.get(id) || {}; return { k: gd.kat || "", g: gd.grupa || "", o: id }; };
   const hrefNotatki = (id) => href(doNotatki(id));
   const nazwaKat = (d) => L(d.nazwa, d.nazwa_en || d.nazwa);
@@ -546,12 +510,13 @@ function MozgWidok() {
     const d = gd && mapa.kat.find((x) => x.k === gd.kat), gr = d && d.grupy.length > 1 && d.grupy.find((x) => x.k === gd.grupa);
     return d ? nazwaKat(d) + (gr ? ` › ${gr.nazwa}` : "") : "";
   };
-  // [[cel]] z treści skarbca → [adres w Mózgu, tytuł] (ścieżka albo sama nazwa pliku bez ogonków)
+  const nrCzesci = (k) => (uklad ? uklad.czesci.findIndex((c) => c.k === k) : -1);
+  const barwaCzesci = (k) => { const p = nrCzesci(k); return p < 0 ? "var(--j-tekst-3)" : `var(--j-barwa-${p % 10})`; };
+  // [[cel]] z treści → [adres w Mózgu, tytuł] (ścieżka albo sama nazwa pliku bez ogonków)
   const celLinku = (t) => {
     const c = dane.byId.has(t) ? t : dane.ogon.get(mozgProste(t.split("/").pop()));
     return c ? [hrefNotatki(c), dane.byId.get(c)._t] : null;
   };
-  const wiki = (t) => mozgWiki(t, celLinku);
   const nazwaStanu = (st) => {
     if (st.o) return (dane.byId.get(st.o) || {})._t || st.o.split("/").pop();
     const d = mapa.kat.find((x) => x.k === st.k), gr = d && d.grupy.length > 1 && d.grupy.find((x) => x.k === st.g);
@@ -560,25 +525,15 @@ function MozgWidok() {
   const cofnij = mapa && mozgWstecz(poprz, s, !!(kat && kat.grupy.length > 1));
   const wstecz = cofnij && { napis: nazwaStanu(cofnij.stan), href: cofnij.historia ? poprz : mozgHash(cofnij.stan),
     klik: (e) => { e.preventDefault(); if (cofnij.historia) history.back(); else wGore(cofnij.stan); } };
-  klik.current = (id) => {
-    if (id[0] !== "@") return idz(doNotatki(id));
-    if (!kat) idz({ k: id.slice(1), g: "", o: "" });
-    else idz({ g: id.slice(1), o: "" });
+  const centrum = z.klucz === "jarvo" ? "JARVO" : z.klucz.toUpperCase();
+  klik.current = {
+    centrum, podpis: mapa ? `${mapa.kat.reduce((a, d) => a + d.ile, 0)} ${L("notatek", "notes")}` : "",
+    miejsce: (id) => (mapa ? nazwaMiejsca(mapa.gdzie.get(id)) : ""),
+    notatka: (id) => idz(doNotatki(id)),
+    czesc: (k, g) => idz({ k, g: g || "", o: "" }),
+    // klik w tło: poziom wyżej (grupa → część → cały mózg); klik w ciało komórki: cały mózg
+    wyzej: (calkiem) => { const w = calkiem ? (s.k ? { ...s, k: "", g: "", o: "" } : null) : mozgWyzej({ ...s, o: "" }, !!(kat && kat.grupy.length > 1)); if (w) idz(w); },
   };
-
-  // wejście Mózgu: prosta sieć (MozgSiec) zamiast grafu i listy; lista wraca po wejściu do części, szukanie działa
-  // na wejściu w pływającym polu nad siecią. Graf canvas wtedy pusty, więc nie liczy układu w tle
-  const siecW = !!mapa && !kat && mapa.kat.some((d) => d.ile > 0);
-  const siec = useMemo(() => (siecW ? mozgSiec(mapa, dane.linki) : null), [siecW, mapa]);
-  useEffect(() => { g.current.dane(siecW ? null : graf); }, [graf, siecW]);
-  useEffect(() => { g.current.zaznacz(s.o || null); if (s.o) g.current.wysrodkuj(s.o); else g.current.calosc(); }, [s.o, graf]);
-  // po przejściu na inny poziom fokus na jego nagłówku (czytnik ekranu czyta, gdzie jesteśmy); szukanie się czyści
-  useEffect(() => {
-    if (pierwszy.current) { pierwszy.current = false; return; }
-    if (s.o) return;   // otwarta notatka sama bierze fokus
-    setQ("");
-    if (naglowek.current) naglowek.current.focus({ preventScroll: true });
-  }, [s.k, s.g, s.z]);
 
   const [tytuly, ileTytulow] = useMemo(() => (dane ? mozgSzukaj(dane.wezly, q) : [[], 0]), [dane, q]);
   useEffect(() => {
@@ -597,8 +552,22 @@ function MozgWidok() {
     return [...tytuly.map((n) => ({ n, sek: "" })), ...zt];
   }, [tytuly, tresc]);
   const ileTresci = opcje.length - tytuly.length;
-  const otworz = (o) => { setSekcja([o.n.id, o.sek]); idz(doNotatki(o.n.id)); };
+  const otworz = (o) => { setSekcja([o.n.id, o.sek]); setQ(""); idz(doNotatki(o.n.id)); };
   useEffect(() => setI(0), [opcje]);
+  const szukam = q.trim() !== "";
+
+  // mapa: dane raz na układ, potem tylko stan (lot kamery); otwarta notatka wstrzymuje rysowanie
+  useEffect(() => { if (uklad) { barwy.current = mozgBarwy(korzen.current); neuron.current.dane(uklad, barwy.current.barwy); } }, [uklad]);
+  useEffect(() => {
+    if (!uklad) return;
+    const p = nrCzesci(s.k), cz = p >= 0 && uklad.czesci[p];
+    const g = cz && cz.grupy.length > 1 ? cz.grupy.findIndex((x) => x.k === s.g) : -1;
+    neuron.current.ustaw({ fok: p, grupa: g, wybrana: s.o || null, traf: szukam ? new Set(opcje.map((o) => o.n.id)) : null });
+  }, [uklad, s.k, s.g, s.o, opcje, szukam]);
+  useEffect(() => { neuron.current.wstrzymaj(!!s.o); }, [s.o]);
+  // po przejściu na inny poziom fokus na nagłówku poziomu (czytnik ekranu czyta, gdzie jesteśmy)
+  const pierwszy = useRef(true);
+  useEffect(() => { if (pierwszy.current) { pierwszy.current = false; return; } if (!s.o && naglowek.current) naglowek.current.focus({ preventScroll: true }); }, [s.k, s.g]);
 
   const szukajKlawisz = (e) => {
     const d = { ArrowDown: 1, ArrowUp: -1 }[e.key];
@@ -607,80 +576,61 @@ function MozgWidok() {
     else if (e.key === "Escape" && q) { e.stopPropagation(); setQ(""); }
   };
   useEffect(() => { const el = document.getElementById(`j-mozg-${i}`); if (el && el.scrollIntoView) el.scrollIntoView({ block: "nearest" }); }, [i]);
-  const esc = (e) => { if (e.key === "Escape" && s.o) { e.stopPropagation(); wGore({ ...s, o: "" }); } };
+  const esc = (e) => {
+    if (e.key !== "Escape") return;
+    if (s.o) { e.stopPropagation(); wGore({ ...s, o: "" }); }
+    else if (s.k) { e.stopPropagation(); wGore(mozgWyzej(s, !!(kat && kat.grupy.length > 1))); }
+  };
 
   const okruszki = [[L("Mózg", "Brain"), href({ k: "", g: "", o: "" })]];
   if (kat) okruszki.push([nazwaKat(kat), href({ g: "", o: "" })]);
   if (kat && grupa && kat.grupy.length > 1) okruszki.push([grupa.nazwa, href({ o: "" })]);
-  const szukam = q.trim() !== "";
-  const tytulPoziomu = grupa && kat.grupy.length > 1 ? grupa.nazwa : kat ? nazwaKat(kat) : L("Co wie Jarvo", "What Jarvo knows");
-  const ilePoziomu = grupa ? grupa.ile : kat ? kat.ile : mapa ? mapa.glowne.reduce((a, d) => a + d.ile, 0) : 0;
-  const ostatnie = (lista) => lista.filter((n) => !n.hub).sort(mozgNowsze).slice(0, 5);
+  const wGrupie = grupa && kat.grupy.length > 1;
+  const hub = wGrupie ? grupa.hub : kat ? kat.hub : mapa && mapa.korzen;
 
-  let poziom = null;
-  if (mapa && !szukam) {
-    if (!kat) {
-      // wejście z notatkami to sieć (MozgSiec); lista tylko przy pustym mózgu
-      poziom = html`<p class="j-mozg-opis">${L("Mózg jeszcze nic nie zapisał.", "The brain has not saved anything yet.")}</p>`;
-    } else if (!grupa) {
-      // grupa samej tożsamości (Jarvo: kim jest, zasady, pamięć) od razu jako lista, przed kaflami pozostałych grup
-      const wprost = kat.grupy.filter((x) => x.wezly.every((n) => n.hub || n.typ === "tozsamosc")), kafle = kat.grupy.filter((x) => !wprost.includes(x));
-      poziom = html`
-        ${wprost.map((x) => html`<section key=${x.k} class="j-mozg-sekcja"><h3>${x.nazwa} <span>${x.ile}</span></h3>
-          <ul>${mozgSekcje(x.wezly).flatMap((sk) => sk.wezly).map((n) => html`<${MozgWiersz} key=${n.id} n=${n} href=${hrefNotatki} otwarta=${s.o}/>`)}</ul></section>`)}
-        ${kafle.length > 0 && html`<ul class="j-mozg-grupy">${kafle.map((x) => html`<li key=${x.k}><a class="j-mozg-grupa" href=${href({ g: x.k, o: "" })}
-          style=${{ "--c": `var(--j-barwa-${kat.grupy.indexOf(x) % 10})` }}><span class="j-mozg-kn">${x.nazwa}</span><span class="j-mozg-kl">${x.ile}</span></a></li>`)}</ul>`}
-        <section class="j-mozg-sekcja"><h3>${L("Ostatnio zmienione tutaj", "Recently changed here")}</h3>
-          <ul>${ostatnie(kat.wezly.filter((n) => !wprost.some((x) => x.wezly.includes(n)))).map((n) => html`<${MozgWiersz} key=${n.id} n=${n} href=${hrefNotatki} gdzie=${nazwaMiejsca(mapa.gdzie.get(n.id))}/>`)}</ul></section>`;
-    } else {
-      poziom = html`<${MozgSekcje} key=${kat.k + grupa.k} wezly=${grupa.wezly} href=${hrefNotatki} otwarta=${s.o}/>`;
-    }
-  }
-  const hub = grupa && kat.grupy.length > 1 ? grupa.hub : kat && kat.hub, hubNaj = kat ? hub : mapa && mapa.korzen;
-
-  return html`<div ref=${korzen} class=${cx("j-mozg", s.o && dane && "is-notatka", naMapie && "is-mapa", siecW && "is-siec", siecW && szukam && "is-szuka")} onKeyDown=${esc} data-mozg>
+  return html`<div ref=${korzen} class=${cx("j-mozg", s.o && dane && "is-strona", szukam && "is-szuka")} onKeyDown=${esc} data-mozg>
     <${NaglowekWidoku} klasa="j-mozg-gora" ikona=${IKONY_WIDOKOW.mozg}
       tytul=${html`<span class="j-mozg-okruszki">${okruszki.map(([t, h], k) => html`<span key=${k} class="j-mozg-ok">${k > 0 && html`<span class="j-mozg-ok-sep" aria-hidden="true">›</span>`}${k === okruszki.length - 1 && !s.o
         ? html`<span aria-current="page">${t}</span>` : html`<a href=${h}>${t}</a>`}</span>`)}</span>`}
       opis=${dane && `${dane.wezly.length} ${L("notatek", "notes")} · ${dane.linki.length} ${L("połączeń", "links")}`}>
       ${zrodla.length > 1 && html`<div class="j-mozg-zrodla">${zrodla.map((x) => html`<button key=${x.klucz} type="button"
         aria-pressed=${x === z} onClick=${() => { location.hash = mozgHash({ z: x.klucz }); }}>${L(x.nazwa, x.nazwa_en)}</button>`)}</div>`}
-      ${z.widok_3d && html`<a class="j-mozg-3d" href=${z.widok_3d} target="_blank" rel="noopener noreferrer">${L("Widok 3D ↗", "3D view ↗")}</a>`}
-      <button type="button" class="j-mozg-mapa-btn" onClick=${() => setNaMapie(!naMapie)}>${naMapie ? L("Lista", "List") : L("Mapa", "Map")}</button>
     </${NaglowekWidoku}>
-    <div class="j-mozg-nav">
-      <input type="search" value=${q} placeholder=${L("Szukaj w całym mózgu…", "Search the whole brain…")} aria-label=${L("Szukaj notatki", "Search notes")} role="combobox"
-        aria-expanded=${szukam} aria-controls="j-mozg-wyniki" aria-autocomplete="list" aria-activedescendant=${szukam && opcje[i] ? `j-mozg-${i}` : undefined}
-        onInput=${(e) => setQ(e.target.value)} onKeyDown=${szukajKlawisz}/>
-      ${(!siecW || szukam || !dane) && html`<div class="j-mozg-przewin">
-        ${szukam ? html`<p class="j-mozg-opis" role="status">${ileTytulow + ileTresci ? L(`Znalezione: ${ileTytulow + ileTresci}`, `Found: ${ileTytulow + ileTresci}`) : L("Nic nie pasuje.", "Nothing matches.")}</p>
+    <div class="j-mozg-cialo">
+      <div ref=${pudlo} class="j-mozg-mapa" tabIndex="0" role="img"
+        aria-label=${L(`Mapa mózgu: ${centrum} w środku, części wokół, kropka to notatka. Klik przybliża, Esc oddala.`, `Brain map: ${centrum} in the middle, parts around, a dot is a note. Click zooms in, Esc zooms out.`)}></div>
+      ${(bezGl || blad || !dane) && html`<div class="j-mozg-stan" role="status">${blad ? L("Nie udało się wczytać mózgu.", "Could not load the brain.")
+        : bezGl ? L("Ta przeglądarka nie rysuje mapy (brak WebGL). Szukanie działa.", "This browser cannot draw the map (no WebGL). Search works.") : html`<${Spinner}/>`}</div>`}
+      <div class="j-mozg-szukaj">
+        <input type="search" value=${q} placeholder=${L("Szukaj w całym mózgu…", "Search the whole brain…")} aria-label=${L("Szukaj notatki", "Search notes")} role="combobox"
+          aria-expanded=${szukam} aria-controls="j-mozg-wyniki" aria-autocomplete="list" aria-activedescendant=${szukam && opcje[i] ? `j-mozg-${i}` : undefined}
+          onInput=${(e) => setQ(e.target.value)} onKeyDown=${szukajKlawisz}/>
+        ${szukam && mapa && html`<div class="j-mozg-przewin">
+          <p class="j-mozg-opis" role="status">${ileTytulow + ileTresci ? L(`Znalezione: ${ileTytulow + ileTresci}`, `Found: ${ileTytulow + ileTresci}`) : L("Nic nie pasuje.", "Nothing matches.")}</p>
           <ul id="j-mozg-wyniki" role="listbox" aria-label=${L("Wyniki", "Results")} class="j-mozg-wyniki">${opcje.map((o, k) => html`<li key=${o.n.id + "#" + o.sek + (o.wTresci ? "+" : "")} id=${`j-mozg-${k}`} role="option"
-            aria-selected=${k === i} onClick=${() => otworz(o)}>
+            aria-selected=${k === i} onClick=${() => otworz(o)} style=${{ "--c": barwaCzesci((mapa.gdzie.get(o.n.id) || {}).kat) }}>
             ${k === tytuly.length && html`<span class="j-mozg-wr">${L("W treści notatek", "Inside notes")}</span>`}
             <span class="j-mozg-wt">${o.n._t}${o.sek && `: ${o.sek}`}</span><span class="j-mozg-wg">${nazwaMiejsca(mapa.gdzie.get(o.n.id))}</span>
             ${o.op && html`<span class="j-mozg-wo">${o.op}</span>`}</li>`)}</ul>
-          ${ileTytulow > tytuly.length && html`<p class="j-mozg-opis">${L(`i ${ileTytulow - tytuly.length} więcej: dopisz słowo, żeby zawęzić`, `and ${ileTytulow - tytuly.length} more: add a word to narrow down`)}</p>`}`
-        : html`<header class="j-mozg-poziom">
-            ${kat && !s.o && html`<${MozgWstecz} w=${wstecz}/>`}
-            <h2 ref=${naglowek} tabIndex="-1">${tytulPoziomu} ${mapa && html`<span>${ilePoziomu}</span>`}</h2>
-            ${kat && kat.opis && !(grupa && kat.grupy.length > 1) && html`<p class="j-mozg-opis">${L(kat.opis, kat.opis_en || kat.opis)}</p>`}
-            ${!kat && mapa && html`<p class="j-mozg-opis">${L("Wybierz część, żeby zajrzeć do środka.", "Pick a part to look inside.")}</p>`}
-            ${hub && html`<a class="j-mozg-przeglad" href=${hrefNotatki(hub.id)}>${L("Przegląd tej części", "Overview of this part")} →</a>`}
-          </header>${hubNaj && html`<${MozgNajwazniejsze} key=${hubNaj.id} hub=${hubNaj} wiki=${wiki}/>`}${poziom}`}
-        ${!dane && html`<div class="j-mozg-stan" role="status">${blad ? L("Nie udało się wczytać mózgu.", "Could not load the brain.") : html`<${Spinner}/>`}</div>`}
+          ${ileTytulow > tytuly.length && html`<p class="j-mozg-opis">${L(`i ${ileTytulow - tytuly.length} więcej: dopisz słowo, żeby zawęzić`, `and ${ileTytulow - tytuly.length} more: add a word to narrow down`)}</p>`}
+        </div>`}
+      </div>
+      ${mapa && html`<div class="j-mozg-poziom" style=${{ "--c": kat ? barwaCzesci(kat.k) : "var(--j-tekst-2)" }}>
+        ${kat && html`<${MozgWstecz} w=${wstecz}/>`}
+        <h2 ref=${naglowek} tabIndex="-1">${wGrupie ? grupa.nazwa : kat ? nazwaKat(kat) : L(`Co wie ${z.klucz === "jarvo" ? "Jarvo" : z.nazwa}`, `What ${z.klucz === "jarvo" ? "Jarvo" : z.nazwa_en || z.nazwa} knows`)}
+          <span>${wGrupie ? grupa.ile : kat ? kat.ile : mapa.kat.reduce((a, d) => a + d.ile, 0)}</span></h2>
+        ${kat && kat.opis && !wGrupie ? html`<p class="j-mozg-opis">${L(kat.opis, kat.opis_en || kat.opis)}</p>`
+          : !kat && html`<p class="j-mozg-opis">${L("Kliknij część, żeby ją przybliżyć, kropkę, żeby otworzyć notatkę. Kółko przybliża, przeciąganie przesuwa.", "Click a part to zoom in, a dot to open the note. Scroll zooms, drag moves.")}</p>`}
+        ${hub && html`<a class="j-mozg-przeglad" href=${hrefNotatki(hub.id)}>${kat ? L("Przegląd tej części", "Overview of this part") : L("Najważniejsze", "Key points")} →</a>`}
       </div>`}
+      ${mapa && html`<nav class="j-sr" aria-label=${L("Części mózgu", "Brain parts")}><ul>${mapa.kat.filter((d) => d.ile > 0).map((d) => html`<li key=${d.k}>
+        <a href=${href({ k: d.k, g: "", o: "" })}>${nazwaKat(d)} (${d.ile})</a>
+        ${d === kat && d.grupy.length > 1 && html`<ul>${d.grupy.map((g) => html`<li key=${g.k}><a href=${href({ g: g.k, o: "" })}>${g.nazwa} (${g.ile})</a>
+          ${g === grupa && html`<ul>${g.wezly.map((n) => html`<li key=${n.id}><a href=${hrefNotatki(n.id)}>${n._t}</a></li>`)}</ul>`}</li>`)}</ul>`}</li>`)}</ul></nav>`}
+      ${s.o && dane && mapa && html`<${MozgStrona} key=${z.klucz + s.o} z=${z} id=${s.o} dane=${dane} mapa=${mapa} href=${hrefNotatki} cel=${celLinku}
+        nazwaMiejsca=${nazwaMiejsca} barwa=${barwaCzesci((mapa.gdzie.get(s.o) || {}).kat)} wstecz=${wstecz} sekcja=${sekcja[0] === s.o ? sekcja[1] : ""} odsw=${odsw}
+        onZapis=${() => setOdsw((x) => x + 1)} onClose=${() => wGore({ ...s, o: "" })}/>`}
     </div>
-    <div class="j-mozg-plotno">
-      <canvas ref=${plotno} role="img" aria-label=${L("Mapa wiedzy tego poziomu; to samo jest na liście obok", "Knowledge map of this level; the list shows the same")}></canvas>
-      ${siec && html`<${MozgSiec} siec=${siec} centrum=${z.klucz === "jarvo" ? "JARVO" : z.klucz.toUpperCase()}
-        ile=${mapa.kat.reduce((a, d) => a + d.ile, 0)} href=${(d) => href({ k: d.k, g: "", o: "" })} nazwa=${nazwaKat}
-        opis=${(d) => (d.opis ? L(d.opis, d.opis_en || d.opis) : d.grupy.length > 1 ? d.grupy.slice(0, 3).map((x) => x.nazwa).join(" · ") : "")}/>`}
-      ${siec && mapa.korzen && html`<a class="j-siec-naj" href=${hrefNotatki(mapa.korzen.id)}>${L("Najważniejsze", "Key points")} →</a>`}
-      ${graf && !siecW && html`<p class="j-mozg-podpowiedz" aria-hidden="true">${grupa ? L("Kropka = notatka. Kółko myszy przybliża.", "Dot = note. Scroll to zoom.")
-        : L("Kliknij skupisko, żeby wejść.", "Click a cluster to go in.")}</p>`}
-    </div>
-    ${s.o && dane && mapa && html`<${MozgNotatka} key=${z.klucz + s.o} z=${z} id=${s.o} dane=${dane} mapa=${mapa} href=${hrefNotatki} cel=${celLinku}
-      nazwaMiejsca=${nazwaMiejsca} wstecz=${wstecz} sekcja=${sekcja[0] === s.o ? sekcja[1] : ""} odsw=${odsw} onZapis=${() => setOdsw((x) => x + 1)} onClose=${() => wGore({ ...s, o: "" })}/>`}
   </div>`;
 }
 
