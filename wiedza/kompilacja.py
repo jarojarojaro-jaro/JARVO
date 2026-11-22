@@ -458,13 +458,15 @@ class Kompilacja:
 
     def wlasny_format(self, rel: str) -> bool:
         """Plik własnego formatu skilla w `brands/` albo `inspiracje/` (brand kit `BRAND.md`, karta strony): bez `typ`
-        we frontmatterze. Pisze go skill skryptem (SCHEMA, zasada 9), więc kompilacja go nie nadpisuje ani nie scala."""
-        if not rel.startswith(("brands/", "inspiracje/")):
+        we frontmatterze. Pisze go skill skryptem (SCHEMA, zasada 9), więc kompilacja go nie nadpisuje ani nie scala.
+        Tak samo tożsamość agenta w `agenci/<agent>/` (`typ: tozsamosc`: kim jest, zasady, mapa, pamięć; pisze zasiew)."""
+        if not rel.startswith(("brands/", "inspiracje/", "agenci/")):
             return False
         try:
-            return not self.sk.wczytaj(rel).fm.get("typ")
+            typ = self.sk.wczytaj(rel).fm.get("typ")
         except (OSError, ValueError):
             return False
+        return typ == "tozsamosc" if rel.startswith("agenci/") else not typ
 
     def bliska_notatka(self, sciezka: str) -> Optional[str]:
         """Istniejąca notatka w tym samym folderze o prawie tym samym tytule (Jaccard rdzeni nazw plików ≥ PODOBNY_TYTUL),
@@ -597,7 +599,7 @@ class Kompilacja:
         cel = str(wynik.get("sciezka") or "").strip().strip("/")
         cel = cel[:-3] if cel.endswith(".md") else cel
         # źródła, szkice, archiwum (POZA_WYSZUKIWANIEM) i tożsamość (jarvo/, user/pamięć jarva o tobie: generuje zasiew
-        # z repo i pamięci Hermesa) to nie cele kompilacji
+        # z repo i pamięci Hermesa; tożsamość innych agentów chroni wlasny_format) to nie cele kompilacji
         cel_istnieje = bool(cel) and self.sk.istnieje(cel) and not cel.startswith((*lib.POZA_WYSZUKIWANIEM, lib.TOZSAMOSC + "/")) \
             and cel not in lib.KOLEJNOSC_TOZSAMOSCI
         # hubów, archiwum briefów (`briefy/`, pisze skrypt briefy.py i Jarvo w tabeli decyzji) i plików własnego formatu

@@ -35,9 +35,40 @@ def test_too_long_skill_description(repo_copy):
 
 
 def test_soul_without_protocol_marker(repo_copy):
-    soul = repo_copy / "profiles/jarvo-web/SOUL.md"
-    soul.write_text(soul.read_text(encoding="utf-8").replace(fl.PROTOCOL_MARKER, ""), encoding="utf-8")
-    assert errors_matching(validate.run(), r"jarvo-web: SOUL.md bez znacznika")
+    studio = repo_copy / "profiles/jarvo-studio"                       # profil w dawnym układzie (sam SOUL.md)
+    for plik in ("ZASADY.md", "MAPA.md"):
+        (studio / plik).unlink(missing_ok=True)
+    zasady = repo_copy / "profiles/jarvo-web/ZASADY.md"                 # profil w układzie Jarva (SOUL + ZASADY)
+    zasady.write_text(zasady.read_text(encoding="utf-8").replace(fl.PROTOCOL_MARKER, ""), encoding="utf-8")
+    report = validate.run()
+    assert errors_matching(report, r"jarvo-studio: SOUL.md bez znacznika")
+    assert errors_matching(report, r"jarvo-web: SOUL.md ani ZASADY.md bez znacznika")
+
+
+def test_mapa_specjalisty(repo_copy):
+    """22.11 właściciel: każdy agent jak Jarvo. Profil z ZASADY.md ma MAPA.md, znacznik mapy w ZASADY.md, sekcje z
+    wiedza/mapa.py SEKCJE i krótki rdzeń (validate.RDZEN_AGENTA); rdzeń trafia do zbudowanego promptu."""
+    fleet = fl.load_fleet(nakladka=None)
+    web = fleet.agent("jarvo-web")
+    protokol = (fl.REPO_ROOT / fleet.raw["shared"]["protocol"]).read_text(encoding="utf-8")
+    zbudowany = validate.zbudowany_prompt(fleet, web, protokol)
+    assert fl.MAPA_MARKER not in zbudowany and "### Kim jestem\n- Profil `jarvo-web` Hermesa" in zbudowany
+    assert "Jarvo:RDZEN" not in fl.rdzen_mapy(fleet, {}, "jarvo-web") and "### Gdzie co jest" not in fl.rdzen_mapy(fleet, {}, "jarvo-web")
+    mapa = repo_copy / "profiles/jarvo-web/MAPA.md"
+    tekst = mapa.read_text(encoding="utf-8")
+    mapa.write_text(tekst + "\n## Ciekawostki\nNic.\n"
+                    + "\n## Słownik\n<!-- Jarvo:RDZEN -->\n" + "- długa linia rdzenia, która nie jest potrzebna od razu\n" * 30
+                    + "<!-- /Jarvo:RDZEN -->\n", encoding="utf-8")
+    report = validate.run()
+    assert errors_matching(report, r"jarvo-web: MAPA.md ma sekcję 'Ciekawostki' spoza wiedza/mapa.py SEKCJE")
+    assert errors_matching(report, rf"jarvo-web: rdzeń mapy ~\d+ tokenów > {validate.RDZEN_AGENTA}")
+    mapa.unlink()
+    zasady = repo_copy / "profiles/jarvo-sherlock/ZASADY.md"
+    zasady.write_text(zasady.read_text(encoding="utf-8").replace(fl.MAPA_MARKER, ""), encoding="utf-8")
+    report = validate.run()
+    assert errors_matching(report, r"jarvo-web: brak MAPA.md \(agent w układzie SOUL \+ ZASADY ma mapę")
+    assert errors_matching(report, r"jarvo-web: <!-- Jarvo:MAPA --> bez MAPA.md")
+    assert errors_matching(report, r"jarvo-sherlock: MAPA.md jest, a SOUL.md ani ZASADY.md nie ma <!-- Jarvo:MAPA -->")
 
 
 def test_soul_postac_bez_procedur(repo_copy):

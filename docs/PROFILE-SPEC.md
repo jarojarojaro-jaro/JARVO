@@ -37,39 +37,32 @@ i 200 stron wiedzy, nie płacąc za to w każdej wiadomości.
 
 ---
 
-## 1. Tożsamość: `SOUL.md` (main prompt)
+## 1. Tożsamość: `SOUL.md` (postać), `ZASADY.md` (procedury), `MAPA.md` (mapa)
 
-Budżet: **~1500–3000 tokenów**. Walidator pilnuje twardego limitu ~3400 tokenów (Jarvo 4300), liczonego na tekście
-takim, jaki dostaje model: z protokołem floty (~1 500 tokenów u agentów, ~910 u Jarva), najdłuższą możliwą
-kalibracją i podstawionymi ścieżkami `@@…@@`. Wszystko dłuższe należy do skilli.
+Budżet: walidator pilnuje twardego limitu ~3400 tokenów (Jarvo 6000), liczonego na tekście takim, jaki dostaje model:
+postać, zasady, rdzeń mapy, protokół floty (~1 500 tokenów u agentów), najdłuższa możliwa kalibracja i podstawione ścieżki
+`@@…@@` (`validate.zbudowany_prompt`). Wszystko dłuższe należy do skilli albo do mapy w skarbcu.
 
-**Postać osobno od zasad (decyzja właściciela 19.11):** `SOUL.md` to sama postać: kim jestem, dla kogo, charakter
-opisany zachowaniami, głos i 3–5 przykładów `<example>` (budżet 1600 tokenów, sekcja `## Charakter`, bez znaczników
-rosteru i protokołu). Jak pracuję (zasady krytyczne, autonomia, trasa skilli, formaty, `<!-- Jarvo:ROSTER -->`,
-`<!-- Jarvo:PROTOCOL -->`) leży w `ZASADY.md` obok. Hermes czyta jeden plik, więc build skleja `SOUL.md` +
-`ZASADY.md` w `SOUL.md` profilu. Tak jest u Jarva; reszta floty przechodzi na ten układ po kolei.
+**Układ Jarva u każdego agenta (decyzje właściciela 19.11 i 22.11, wzorzec `profiles/jarvo/`):**
 
-Profil bez `ZASADY.md` (stary układ): walidator wymaga sekcji `## Misja` i `## Osobowość` oraz znacznika
-`<!-- Jarvo:PROTOCOL -->` (orkiestrator także `<!-- Jarvo:ROSTER -->`); bez znacznika build się zatrzymuje. Nowy
-profil zakłada `scripts/new-agent.py`, agenta
-biznesowego jednej firmy `scripts/new-agent.py --marka <slug> --title "…"` (wpis z `marka`, SOUL z zasadami zgody,
-art. 398 PKE, RODO i izolacji marki, config bez ekranu w rozmowie i cronie, wstrzymana rutyna dnia, evals z pytaniem
-o cudzą markę i odmową bez zgody; [FLEET.md](FLEET.md#agenci-biznesowi)).
-Zalecane sekcje (szablon: `shared/templates/SOUL.template.md`; Jarvo i prawa ręka mają własny układ):
+| Plik | Zawartość | W prompcie |
+|---|---|---|
+| `SOUL.md` | sama postać: kim jestem, szefem jest @@WLASCICIEL@@, szefem floty Jarvo, moja marka albo dziedzina, `## Charakter` (zachowania), `## Głos`; budżet 1600 tok., bez znaczników | tak, pierwszy |
+| `ZASADY.md` | procedury: `## Zakres` (z jednym zdaniem „Poza zakresem”), `## Zasady pracy` (ostatnia: **Pamięć**, kiedy `memory`), `## Mapa workflowów`, `## Standard jakości`, `## Autonomia`, `## Moja mapa (skrót)` ze znacznikiem `<!-- Jarvo:MAPA -->`, `<!-- Jarvo:PROTOCOL -->`, `## Formaty wyjścia` | tak, po postaci |
+| `MAPA.md` | „<Krótka nazwa> od A do Z”: sekcje tylko z `wiedza/mapa.py SEKCJE`, w tej kolejności; bloki `<!-- Jarvo:RDZEN -->` tylko z tym, co agent musi wiedzieć od razu | tylko bloki RDZEN (≤ `validate.RDZEN_AGENTA` = 250 tok.; Jarvo ≤ 1200 i zwarte ścieżki oraz rutyny) |
 
-| Sekcja | Zawartość |
-|---|---|
-| Misja | Jedno zdanie: po co istnieję |
-| Osobowość | Ton, styl, parametry Jarvo (np. szczerość 90%, humor 60%) |
-| Zakres | Co robię (lista kompetencji) |
-| Poza zakresem | Czego nie robię i komu to oddaję (zawsze przez Jarva) |
-| Zasady pracy | 5–10 zasad specyficznych dla dziedziny („najpierw pomiar, potem optymalizacja”) |
-| Mapa workflowów | Która sytuacja → który skill (routing wewnętrzny) |
-| Standard jakości | Moja Definition of Done w skrócie |
-| Autonomia i bezpieczeństwo | Co wolno bez pytania, co wymaga zgody, czego nigdy |
-| Protokół zleceń | Jak przyjmuję kartę i jak oddaję wynik (sekcja „Kontrakt zlecenia” niżej) |
-| Formaty wyjścia | Jak wyglądają moje raporty i pliki |
-| Język | Polski z Tobą; techniczne artefakty w języku dziedziny |
+Build skleja `SOUL.md` + `ZASADY.md` w `SOUL.md` profilu Hermesa i wstawia rdzeń mapy w miejsce znacznika; pełne pliki
+(tokeny podstawione) idą do `build/wiedza/tozsamosc/` (Jarvo) i `build/wiedza/tozsamosc/agenci/<agent>/`, z których zasiew
+robi notatki tożsamości w skarbcu ([WIEDZA.md §2a](WIEDZA.md)). Walidator (`check_mapa`): profil z `ZASADY.md` ma `MAPA.md`,
+znacznik mapy jest w ZASADY.md (nie w SOUL), sekcje z `SEKCJE`, rdzeń w budżecie. Treść nie dubluje się między SOUL, ZASADY
+i protokołem floty (zasady 8, 11, 16 protokołu już są w prompcie).
+
+Profil bez `ZASADY.md` (dawny układ, już nieużywany we flocie): walidator wymaga sekcji `## Misja` i `## Osobowość` oraz
+znacznika `<!-- Jarvo:PROTOCOL -->`; bez znacznika build się zatrzymuje. Nowy profil zakłada `scripts/new-agent.py`
+z szablonów `shared/templates/{SOUL,ZASADY,MAPA}.template.md`, agenta biznesowego jednej firmy
+`scripts/new-agent.py --marka <slug> --title "…"` (wpis z `marka`, SOUL, ZASADY z zasadami zgody, art. 398 PKE, RODO,
+izolacji marki i pamięci, MAPA z sekcją „Biznesy”, config bez ekranu w rozmowie i cronie, wstrzymana rutyna dnia, evals
+z pytaniem o cudzą markę i odmową bez zgody; [FLEET.md](FLEET.md#agenci-biznesowi)).
 
 ---
 
@@ -165,7 +158,7 @@ Pełna, zweryfikowana lista: [TOOLBOX.md](TOOLBOX.md). Instalacja na VPS: [VPS.m
 
 | Warstwa | Gdzie | Kto pisze |
 |---|---|---|
-| Pamięć własna agenta | `memories/MEMORY.md` profilu | agent (np. „ta strona używa Tailwind”) |
+| Pamięć własna agenta | `memories/MEMORY.md` i `USER.md` profilu (puste zakłada instalacja: `install_fleet.zasiej_pamiec`, `install-fleet.sh`) | agent narzędziem `memory` (zasada **Pamięć** w ZASADY.md); właściciel w Mózgu („Zmień” przy notatce `agenci/<profil>/pamięć <k>`, `PUT /pamiec/{memory,user}?profil=<profil>`); lustro po treści pliku do skarbca |
 | Wiedza o Tobie | MVP: `knowledge/user/USER.md` (onboarding) + pamięć użytkownika Jarva; później wspólny provider (np. Honcho) | Jarvo (onboarding), agenci czytają |
 | Brand kity | `knowledge/brands/<marka>/` | `jarvo-web` / `jarvo-studio` |
 | Wiedza agenta biznesowego | tylko `brands/<marka>/`, `agenci/<profil>/`, `fleet/`, `inspiracje/` (pole `marka` we `fleet.yaml`, [FLEET.md](FLEET.md#agenci-biznesowi)) | agent (szkice do swojej marki), kompilacja |
@@ -302,7 +295,9 @@ Agent wchodzi do floty (`status: active` w `fleet.yaml`) dopiero, gdy:
 ```
 profiles/jarvo-web/
 ├── distribution.yaml        # manifest dystrybucji Hermesa
-├── SOUL.md                  # main prompt
+├── SOUL.md                  # postać (kim jestem, szefowie, charakter, głos)
+├── ZASADY.md                # procedury, znaczniki <!-- Jarvo:MAPA --> i <!-- Jarvo:PROTOCOL --> (build skleja z SOUL)
+├── MAPA.md                  # mapa „od A do Z” (sekcje mapa.SEKCJE); do promptu tylko bloki RDZEN, całość do skarbca
 ├── config.yaml              # model (@@MODEL@@ z fleet.yaml), reasoning_effort, toolsety per platforma, zgody,
 │                            # terminal/przeglądarka/delegacja, mcp_servers (w repo tylko jarvo-web: inspo;
 │                            # phone dla jarvo dopisuje do instalacji `jarvo telefon on`, dla agenta

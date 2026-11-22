@@ -3,7 +3,7 @@
 Działa w procesie dashboardu (za jego logowaniem). Logika w panel.py (bez FastAPI), skarbiec przez wiedza.py obok.
 Odczyt: overview, tree, note, graph, search, inbox, log, lint, rulings, pamiec. Zapis tylko: POST rulings (orzeczenie od
 człowieka), POST remark (uwaga do notatki = szkic), POST compile (kompilacja jako osobny proces), POST reindex, PUT
-pamiec/{memory|user} (wpisy pamięci Jarva: plik Hermesa, potem lustro w skarbcu). Każdy zapis przechodzi
+pamiec/{memory|user}?profil= (wpisy pamięci agenta floty, domyślnie Jarva: plik Hermesa, potem lustro w skarbcu). Każdy zapis przechodzi
 ochrona.wymagaj_zapisu (ten sam plik co w jarvo-hq): tylko z panelu albo z nagłówkiem X-Jarvo-Request: 1.
 """
 from __future__ import annotations
@@ -160,14 +160,15 @@ async def reindex():
 
 
 @router.get("/pamiec")
-async def pamiec():
-    return await _w(PANEL.pamiec)
+async def pamiec(profil: str = ""):
+    return await _w(PANEL.pamiec, profil)
 
 
 @router.put("/pamiec/{cel}")
-async def zapisz_pamiec(cel: str, request: Request):
-    """Wpisy pamięci Jarva z Mózgu: {"wpisy": [str], "wersja": sha256 z GET}. 409 {"blad": {"kod": "zmieniona", "aktualna"}}
-    gdy plik zmienił się od odczytu, 400 {"blad": {"kod": "limit" | "pusty_wpis" | "zly_wpis"}}, 503 `zajeta`."""
+async def zapisz_pamiec(cel: str, request: Request, profil: str = ""):
+    """Wpisy pamięci agenta `profil` (agent floty z wiedza-agenci.json, domyślnie Jarvo) z Mózgu: {"wpisy": [str], "wersja":
+    sha256 z GET}. 409 {"blad": {"kod": "zmieniona", "aktualna"}} gdy plik zmienił się od odczytu, 400 {"blad": {"kod":
+    "limit" | "pusty_wpis" | "zly_wpis"}}, 503 `zajeta`; profil spoza floty 400, niezainstalowany 404."""
     try:
         body = await request.json()
     except ValueError:
@@ -175,7 +176,7 @@ async def zapisz_pamiec(cel: str, request: Request):
     if not isinstance(body, dict):
         return JSONResponse({"blad": {"kod": "zly_wpis", "opis": "ciało to JSON {\"wpisy\": [...], \"wersja\": \"...\"}"}}, 400)
     try:
-        return await asyncio.to_thread(PANEL.zapisz_pamiec, cel, body.get("wpisy"), str(body.get("wersja") or ""))
+        return await asyncio.to_thread(PANEL.zapisz_pamiec, cel, body.get("wpisy"), str(body.get("wersja") or ""), profil)
     except PANEL.lib.BladPamieci as e:
         return JSONResponse(e.jako_json(), e.status)
     except Exception as e:

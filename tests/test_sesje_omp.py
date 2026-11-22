@@ -454,3 +454,50 @@ def test_polecenie_w_parserze():
     a, reszta = cli._parser().parse_known_args(["sesja", "op", "terminal", "--model", "opus"])
     assert (a.klucz, a.akcja, reszta, a.funkcja) == ("op", "terminal", ["--model", "opus"], so.polecenie_sesja)
     assert "sesja" in cli.Z_RESZTA
+
+
+def test_mozg_sesji_w_turze(tmp_path, at, monkeypatch):
+    """Wpis z `panel.wiedza` i `panel.tozsamosc`: blok <memory-context> przed pierwszym nagłówkiem wiadomości (panel go
+    nie pokazuje), link z Telegrama w rejestrze przed turą, po turze wyciąg odpowiedzi w werdykcie, system.md złożony
+    przed procesem omp; dopisek w trakcie tury nie pisze do rejestru."""
+    from jarvo import mozg_sesji
+    monkeypatch.setattr(mozg_sesji, "stan_wektorow_instalacji", lambda: tmp_path / "brak-uslugi")
+    wiki = tmp_path / "wiki"
+    (wiki / "llm").mkdir(parents=True)
+    (wiki / "llm" / "inkling-2-mini.md").write_text("---\ntyp: llm\n---\n# Inkling 2 Mini\n\n**Inkling na XTX: 33,9 t/s, "
+                                                    "limit to kernele MoE.**\n", encoding="utf-8")
+    (wiki / "ZRODLA.md").write_text("# Rejestr\n\n## Powiązane\n- [[index]]\n", encoding="utf-8")
+    toz = tmp_path / "toz"
+    toz.mkdir()
+    (toz / "SOUL.md").write_text("# Kernel\n")
+    (toz / "ZASADY.md").write_text("# Zasady\n<!-- Jarvo:MAPA -->\n")
+    (toz / "MAPA.md").write_text("## Kim jestem\n<!-- Jarvo:RDZEN -->\n- sesja omp\n<!-- /Jarvo:RDZEN -->\n")
+    system = tmp_path / "system.md"
+    wpis = om.wpis_z("gpu", surowy_wpis(tmp_path, omp_arg=["--append-system-prompt", str(system)],
+                                        wiedza={"katalog": str(wiki), "zrodla": "ZRODLA.md"},
+                                        tozsamosc={"soul": str(toz / "SOUL.md"), "zasady": str(toz / "ZASADY.md"),
+                                                   "mapa": str(toz / "MAPA.md"), "plik": str(system)}), tmp_path)
+    (tmp_path / "k" / "sesje").mkdir(parents=True)
+    wpis.katalogi()
+    telegramowa(wpis, "1.json", "https://x.com/unslothai/status/2123873656069877899 inkling MoE na xtx?")
+    so.skrzynka(wpis, Telegram())
+    (p,) = tury(at)
+    m = p["message"]
+    assert m.index("<memory-context>") < m.index("[Telegram · gpu") and "`llm/inkling-2-mini` · Inkling 2 Mini" in m
+    assert "nowy, wiersz w `ZRODLA.md`" in m
+    assert czytnik_omp_bloki(m) == ["https://x.com/unslothai/status/2123873656069877899 inkling MoE na xtx?"]
+    assert system.read_text().startswith("# Kernel\n\n# Zasady\n### Kim jestem\n- sesja omp")
+    z = (wiki / "ZRODLA.md").read_text()
+    assert "## Linki od właściciela (wpisywane automatycznie)" in z and "bez analizy w wiki; odpowiedź " in z
+    assert "Gotowe, zrobione." in z
+    assert (wpis.skrzynka / "wiedza" / "przypomnienia.jsonl").exists()
+    tekst, _ = so.dopisek(wpis, {"tekst": "https://example.com/nowy", "czas": "2026-11-22 12:00:00"})
+    assert "example.com/nowy: nowy" in tekst and "example.com/nowy" not in (wiki / "ZRODLA.md").read_text()
+
+
+def czytnik_omp_bloki(tekst):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("czytnik_omp_t", REPO / "hq" / "plugin" / "czytnik_omp.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return [b["tekst"] for b in mod.bloki_obwiedni(tekst)]

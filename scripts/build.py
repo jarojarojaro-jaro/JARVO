@@ -968,15 +968,22 @@ def data_zmiany_w_repo(plik: Path) -> str:
     return data if re.fullmatch(r"\d{4}-\d{2}-\d{2}", data) else ""
 
 
-def tozsamosc_do_skarbca(fleet: fl.Fleet, out: Path, tokens: dict[str, str]) -> int:
-    """Tożsamość orkiestratora dla skarbca (`wiedza.py zasiej` → notatki `jarvo/*`, docs/WIEDZA.md §2a), tokeny
-    podstawione: SOUL.md (postać), ZASADY.md (bez zamykającego bloku <critical>; w miejscu rostera zwarty roster, protokołu
-    i rdzenia mapy jedno zdanie, bo to osobne notatki), KRYTYCZNE.md (ten blok), MAPA.md i MAPA-nakladka.md (pełna mapa:
-    zasiew dokłada bloki GEN) oraz zrodla.json: plik → {"plik": ścieżka w repo, "zmieniono": data ostatniego commitu}."""
+def tozsamosc_do_skarbca(fleet: fl.Fleet, out: Path, tokeny) -> int:
+    """Tożsamość każdego aktywnego agenta dla skarbca (`wiedza.py zasiej` → notatki `jarvo/*` orkiestratora w `out/`,
+    `agenci/<agent>/*` pozostałych z `out/agenci/<agent>/`, docs/WIEDZA.md §2a). `tokeny(agent)`: tokeny @@…@@ jego
+    profilu (base_tokens). Zwraca liczbę plików."""
     if out.exists():
         shutil.rmtree(out)
+    return sum(_tozsamosc_agenta(fleet, a, out if a.name == fleet.orchestrator else out / "agenci" / a.name, tokeny(a))
+               for a in fleet.active())
+
+
+def _tozsamosc_agenta(fleet: fl.Fleet, a: fl.Agent, out: Path, tokens: dict[str, str]) -> int:
+    """Pliki tożsamości jednego agenta, tokeny podstawione: SOUL.md (postać), ZASADY.md (bez zamykającego bloku
+    <critical>; w miejscu rostera zwarty roster, protokołu i rdzenia mapy jedno zdanie, bo to osobne notatki), KRYTYCZNE.md
+    (ten blok), MAPA.md i MAPA-nakladka.md (pełna mapa: zasiew dokłada bloki GEN) oraz zrodla.json: plik → {"plik":
+    ścieżka w repo albo nakładce, "zmieniono": data ostatniego commitu}."""
     out.mkdir(parents=True)
-    a = fleet.agent(fleet.orchestrator)
     soul_p, zasady_p = a.dir / "SOUL.md", a.dir / fl.ZASADY_FILE
     soul = soul_p.read_text(encoding="utf-8") if soul_p.is_file() else ""
     zasady = zasady_p.read_text(encoding="utf-8") if zasady_p.is_file() else ""
@@ -986,18 +993,20 @@ def tozsamosc_do_skarbca(fleet: fl.Fleet, out: Path, tokens: dict[str, str]) -> 
         zasady = zasady.rstrip()[: -len(koniec.strip())].rstrip() + "\n"
     elif koniec:
         soul = soul.rstrip()[: -len(koniec.strip())].rstrip() + "\n"
+    mapa = ("„Jarvo od A do Z” (`jarvo/jak działa jarvo`)" if a.name == fleet.orchestrator
+            else f"„{a.hq_short} od A do Z” w moim katalogu skarbca (`agenci/{a.name}/`)")
     zastepcze = {fl.PROTOCOL_MARKER: "_W prompcie stoi tu protokół floty (`shared/`) i kalibracja pod model._",
-                 fl.MAPA_MARKER: "_W prompcie stoi tu rdzeń mapy; całość: notatka „Jarvo od A do Z” (`jarvo/jak działa jarvo`)._",
+                 fl.MAPA_MARKER: f"_W prompcie stoi tu rdzeń mapy; całość: notatka {mapa}._",
                  fl.ROSTER_MARKER: fl.render_roster_summary(fleet)}
     pliki = {"SOUL.md": soul, "ZASADY.md": zasady, "KRYTYCZNE.md": koniec}
     for nazwa in ("SOUL.md", "ZASADY.md"):
         for znacznik, tekst in zastepcze.items():
             pliki[nazwa] = pliki[nazwa].replace(znacznik, tekst)
-    repo_mapy, nakl_mapy = fl.mapa_zrodla(fleet)
+    repo_mapy, nakl_mapy = fl.mapa_zrodla(fleet, a.name)
     pliki.update({"MAPA.md": repo_mapy, "MAPA-nakladka.md": nakl_mapy})
     n = fleet.nakladka
     zrodla = {"SOUL.md": soul_p, "ZASADY.md": zasady_p, "KRYTYCZNE.md": zrodlo_konca, "MAPA.md": a.dir / fl.MAPA_FILE,
-              "MAPA-nakladka.md": n / "profiles" / a.name / fl.MAPA_FILE if n else None}
+              "MAPA-nakladka.md": n / "profiles" / a.name / fl.MAPA_FILE if n and not a.root else None}
     spis = {}
     for nazwa, tekst in pliki.items():
         if not tekst.strip():
@@ -1235,8 +1244,10 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
     soul = soul.replace(fl.PROTOCOL_MARKER, f"{fl.protocol_for(protocol, agent.name == fleet.orchestrator).strip()}\n\n{calibration}")
     if agent.name == fleet.orchestrator:
         soul = soul.replace(fl.ROSTER_MARKER, fl.render_roster_summary(fleet))
-        # rdzeń mapy Jarva (wiedza/mapa.py): stała, cache'owalna część promptu; szczegóły w skarbcu (`jarvo/jak działa jarvo`)
-        soul = soul.replace(fl.MAPA_MARKER, fl.rdzen_mapy(fleet, fl.sciezki_mapy(tokens, agent.name)))
+    # rdzeń mapy agenta (wiedza/mapa.py): stała, cache'owalna część promptu; szczegóły w skarbcu (`jarvo/jak działa jarvo`,
+    # `agenci/<agent>/jak działa …`)
+    if fl.MAPA_MARKER in soul:
+        soul = soul.replace(fl.MAPA_MARKER, fl.rdzen_mapy(fleet, fl.sciezki_mapy(tokens, agent.name), agent.name))
     # zamykający blok <critical> (powtórka najważniejszych zasad) stoi na samym końcu promptu: dokleja go wtyczka
     # jarvo-wiedza za swoim blokiem (ostatnim przed datą i środowiskiem Hermesa); w SOUL byłby drugą kopią w środku
     soul, koniec = fl.wydziel_koniec(soul)
@@ -1453,8 +1464,7 @@ def main(argv: list[str] | None = None) -> int:
     dane_wiedzy = wiedza_fleet(fleet, profiles_out)
     fl.write_json(out / "wiedza" / "fleet.json", dane_wiedzy)
     n_repo = repo_do_skarbca(fleet, out / "wiedza" / "repo", dane_wiedzy)
-    n_toz = tozsamosc_do_skarbca(fleet, out / "wiedza" / "tozsamosc",
-                                 base_tokens(fleet, fleet.agent(fleet.orchestrator), uklad.build, env, uklad))
+    n_toz = tozsamosc_do_skarbca(fleet, out / "wiedza" / "tozsamosc", lambda a: base_tokens(fleet, a, uklad.build, env, uklad))
     build_wiedza_plugin(out / "plugins" / WIEDZA_PLUGIN, fleet.reviewer)
     print(f"✓ skarbiec wiedzy: wiedza/fleet.json, wiedza/repo ({n_repo} plików), wiedza/tozsamosc ({n_toz} plików), "
           f"plugins/{WIEDZA_PLUGIN}")

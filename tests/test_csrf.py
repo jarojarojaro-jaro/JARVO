@@ -285,7 +285,7 @@ def test_wiedza_put_pamieci_403_bez_naglowka(tmp_path, monkeypatch):
     r = k.put(u, json={"wpisy": ["zły"], "wersja": "x"}, headers={"Sec-Fetch-Site": "same-site", "Origin": "http://localhost:9120"})
     assert r.status_code == 403 and not wywolane
     r = k.put(u, json={"wpisy": ["dobry"], "wersja": "x"}, headers={"X-Jarvo-Request": "1"})
-    assert r.status_code == 200 and wywolane == [("user", ["dobry"], "x")]
+    assert r.status_code == 200 and wywolane == [("user", ["dobry"], "x", "")]      # bez ?profil= pamięć Jarva
 
 
 def test_front_wysyla_naglowek():

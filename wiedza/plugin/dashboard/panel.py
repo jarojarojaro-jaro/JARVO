@@ -258,11 +258,24 @@ class Panel:
         self._lint_cache = (0.0, {})
         return {**r, "index": n, "huby": h}
 
-    # ---- pamięć Jarva (Mózg: edytor wpisów; docs/WIEDZA.md §2a): ten sam plik i format, który czyta Hermes
-    def _profil_pamieci(self) -> Path:
+    # ---- pamięć agentów (Mózg: edytor wpisów; docs/WIEDZA.md §2a): ten sam plik i format, który czyta Hermes
+    def _profil_pamieci(self, profil: str = "") -> tuple[Path, str, Optional[dict]]:
+        """(katalog profilu, agent, wpis z wiedza-agenci.json) dla pamięci agenta `profil` (puste = Jarvo). Tylko agent
+        floty z ostatniego zasiewu (state/wiedza-agenci.json) z katalogiem w <dane>/profiles; inna nazwa = ValueError (400),
+        brak katalogu = FileNotFoundError (404). Nazwa nigdy nie staje się ścieżką, zanim nie trafi w listę floty."""
         if self.dane is None:
-            raise FileNotFoundError("brak katalogu danych (profil Jarva nieznany)")
-        return self.dane / "profiles" / self.lib.PROFIL_TOZSAMOSCI
+            raise FileNotFoundError("brak katalogu danych (profil agenta nieznany)")
+        agent = str(profil or "").strip() or self.lib.PROFIL_TOZSAMOSCI
+        meta = None
+        if agent != self.lib.PROFIL_TOZSAMOSCI:
+            flota = self.lib._agenci_meta(self.sk)
+            if agent not in flota or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", agent):
+                raise ValueError(f"`{agent[:64]}` nie jest agentem floty")
+            meta = flota[agent]
+        katalog = self.dane / "profiles" / agent
+        if not katalog.is_dir():
+            raise FileNotFoundError(f"profil `{agent}` nie jest zainstalowany")
+        return katalog, agent, meta
 
     @staticmethod
     def _skaner():
@@ -274,28 +287,30 @@ class Panel:
             return None
         return lambda tekst: first_threat_message(tekst, scope="strict")
 
-    def pamiec(self) -> dict:
-        """GET /pamiec: {"memory": {...}, "user": {...}} (wiedza.stan_pamieci: wpisy, limit, uzyte, wersja, zmieniono, plik, notatka)."""
-        profil = self._profil_pamieci()
-        return {cel: self.lib.stan_pamieci(profil, cel) for cel in self.lib.PLIKI_PAMIECI}
+    def pamiec(self, profil: str = "") -> dict:
+        """GET /pamiec?profil=: {"memory": {...}, "user": {...}} (wiedza.stan_pamieci: wpisy, limit, uzyte, wersja, zmieniono,
+        plik, notatka) agenta `profil` (puste = Jarvo)."""
+        katalog, _agent, meta = self._profil_pamieci(profil)
+        return {cel: self.lib.stan_pamieci(katalog, cel, meta) for cel in self.lib.PLIKI_PAMIECI}
 
-    def zapisz_pamiec(self, cel: str, wpisy, wersja: str) -> dict:
-        """PUT /pamiec/{cel}: zapis listy wpisów (format i blokada Hermesa, wersja = sha256 z odczytu), potem lustro w skarbcu
-        (notatka pamięci i szkic nowych wpisów do kompilacji), indeks, a gdy skarbiec wolny: wpis w LOG i punkt zapisu.
-        Błędy: wiedza.BladPamieci (409 zmieniona, 400 limit, pusty_wpis, zly_wpis, 503 zajeta). Jarvo widzi zmianę od
-        następnej rozmowy (Hermes czyta pamięć na starcie sesji)."""
-        profil = self._profil_pamieci()
+    def zapisz_pamiec(self, cel: str, wpisy, wersja: str, profil: str = "") -> dict:
+        """PUT /pamiec/{cel}?profil=: zapis listy wpisów (format i blokada Hermesa, wersja = sha256 z odczytu), potem lustro
+        w skarbcu (notatka pamięci agenta i szkic nowych wpisów do kompilacji), indeks, a gdy skarbiec wolny: wpis w LOG
+        i punkt zapisu. Błędy: wiedza.BladPamieci (409 zmieniona, 400 limit, pusty_wpis, zly_wpis, 503 zajeta). Agent
+        widzi zmianę od następnej rozmowy (Hermes czyta pamięć na starcie sesji)."""
+        katalog, agent, meta = self._profil_pamieci(profil)
         if cel not in self.lib.PLIKI_PAMIECI:
             raise FileNotFoundError(f"nieznana pamięć `{cel}` (memory albo user)")
-        przed = self.lib.czytaj_pamiec(self.lib.plik_pamieci(profil, cel))["wpisy"]
-        wynik = self.lib.zapisz_pamiec(profil, cel, wpisy, wersja, self._skaner())
-        self.lib.synchronizuj_pamiec(self.sk, profil, self.lib.PROFIL_TOZSAMOSCI)
+        przed = self.lib.czytaj_pamiec(self.lib.plik_pamieci(katalog, cel))["wpisy"]
+        wynik = self.lib.zapisz_pamiec(katalog, cel, wpisy, wersja, self._skaner(), meta)
+        self.lib.synchronizuj_pamiec(self.sk, katalog, agent, str((meta or {}).get("marka") or ""))
+        kto = "Jarva" if agent == self.lib.PROFIL_TOZSAMOSCI else agent
         blok = self.lib.Blokada(self.sk.stan, 2.0)
         if blok.wez():
             try:
-                self.sk.dopisz_log("pamiec", f"zmiana z Mózgu: {self.lib.PLIKI_PAMIECI[cel]} Jarva, wpisów {len(przed)} → "
+                self.sk.dopisz_log("pamiec", f"zmiana z Mózgu: {self.lib.PLIKI_PAMIECI[cel]} {kto}, wpisów {len(przed)} → "
                                              f"{len(wynik['wpisy'])} (lustro: {wynik['notatka']})")
-                self.sk.punkt_zapisu(f"pamięć z Mózgu: {self.lib.PLIKI_PAMIECI[cel]}")
+                self.sk.punkt_zapisu(f"pamięć z Mózgu: {self.lib.PLIKI_PAMIECI[cel]} {kto}")
             finally:
                 blok.zwolnij()
         ix = self.lib.Indeks(self.sk)

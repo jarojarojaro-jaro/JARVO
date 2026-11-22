@@ -237,10 +237,12 @@ def _blok_gen(nazwa: str, tresc: str, zrodlo: str) -> str:
     return f"<!-- Jarvo:GEN {nazwa} -->\n{naglowek}{tresc.strip() or '_brak danych_'}\n<!-- /Jarvo:GEN {nazwa} -->"
 
 
-def notatka(mapa_repo: str, mapa_nakladka: str | None, gen: dict[str, str], zrodla: dict[str, str] | None = None) -> str:
-    """Treść notatki `jarvo/jak działa jarvo` (bez frontmatteru): tytuł, streszczenie, sekcje `## ` w stałej kolejności
-    (bloki RDZEN bez znaczników, bloki GEN wypełnione: `gen` nazwa → treść, `zrodla` nazwa → „źródło, data”)."""
-    czesci = [f"# {TYTUL}\n",
+def notatka(mapa_repo: str, mapa_nakladka: str | None, gen: dict[str, str], zrodla: dict[str, str] | None = None,
+            tytul: str = TYTUL) -> str:
+    """Treść notatki „od A do Z” agenta (bez frontmatteru; Jarvo: `jarvo/jak działa jarvo`): tytuł, streszczenie, sekcje
+    `## ` w stałej kolejności (bloki RDZEN bez znaczników, bloki GEN wypełnione: `gen` nazwa → treść, `zrodla` nazwa →
+    „źródło, data”)."""
+    czesci = [f"# {tytul}\n",
               "**Jedno źródło prawdy o mnie: kim jestem, dla kogo i po co pracuję, co robię, co mogę, czego nie robię bez zgody, "
               "zespół, gdzie co jest, kiedy, jak działa mój mózg i jak się poprawiam. Skrót (rdzeń) mam w prompcie; tu "
               "szczegóły, sekcja po sekcji.**\n"]

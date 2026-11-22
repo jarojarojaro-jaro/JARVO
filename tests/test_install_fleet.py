@@ -223,6 +223,7 @@ def test_pierwszy_przebieg_instaluje_flote(dwa_przebiegi):
         home = dane / "profiles" / a
         assert (home / "skills" / "fleet" / f"praca-{a}" / "SKILL.md").is_file()
         assert (home / "home").is_dir()
+        assert all((home / "memories" / m).is_file() for m in ("MEMORY.md", "USER.md"))     # pamięć zasiana (22.11)
         assert (home / "skins" / "jarvo.yaml").is_file()
         link = home / "plugins" / "jarvo-wiedza"
         assert install_fleet._link(link) and (link / "plugin.yaml").is_file()
@@ -260,6 +261,28 @@ def test_pierwszy_przebieg_instaluje_flote(dwa_przebiegi):
     assert [x[:2] for x in wywolania] == [["-p", "default"]] * len(wywolania)
     assert len(instalacje) == 2 and not any("--alias" in x for x in instalacje)
     assert ["--force" in x for x in instalacje] == [False, True]
+
+
+def test_zasiej_pamiec_nie_rusza_istniejacej(tmp_path):
+    """22.11: Translator i Jarodev bez memories/, więc lustro i Mózg ich nie widziały. Instalacja zakłada puste
+    MEMORY.md i USER.md (format Hermesa: zero wpisów), a istniejącej pamięci nie zmienia ani o bajt."""
+    home = tmp_path / "jarvo-translator"
+    assert install_fleet.zasiej_pamiec(home) == ["MEMORY.md", "USER.md"]
+    assert (home / "memories" / "MEMORY.md").read_bytes() == b"" == (home / "memories" / "USER.md").read_bytes()
+    (home / "memories" / "USER.md").write_bytes("JARO pisze krótko\n§\nWysyłka tylko za tak".encode())
+    assert install_fleet.zasiej_pamiec(home) == []
+    assert (home / "memories" / "USER.md").read_bytes() == "JARO pisze krótko\n§\nWysyłka tylko za tak".encode()
+
+
+def test_zasiew_skarbca_po_profilach_w_obu_instalatorach():
+    """22.11: zasiew skarbca po instalacji profili (pamięć zasiana w profilu i rutyny trafiają do skarbca w tym samym
+    wdrożeniu), tak samo w instalacji natywnej (install_fleet.py) i kontenerowej (install-fleet.sh)."""
+    import inspect
+    py = inspect.getsource(install_fleet.Flota.uruchom_wszystko)
+    assert py.index("self.profil_agenta(agent)") < py.index("self.zasiej_skarbiec()")
+    sh = (REPO / "scripts" / "install-fleet.sh").read_text(encoding="utf-8")
+    assert sh.index('hermes profile install "$src"') < sh.index("memories/$m") < sh.index("zasiej --fleet")
+    assert sh.count("zasiej --fleet") == 1
 
 
 def test_klucze_api_wygenerowane_tylko_brakujace(dwa_przebiegi):

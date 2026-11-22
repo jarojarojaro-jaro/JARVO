@@ -67,9 +67,10 @@ def wydziel_koniec(soul: str) -> tuple[str, str]:
     return tekst[:start].rstrip() + "\n", tekst[start:]
 
 
-# Mapa Jarva (docs/WIEDZA.md §2b, wiedza/mapa.py): profiles/<orkiestrator>/MAPA.md z repo i nakładki. Rdzeń mapy (bloki
-# RDZEN, zwarte ścieżki i harmonogram) build wstawia w miejsce znacznika w ZASADY.md orkiestratora; pełna mapa idzie do
-# skarbca (build/wiedza/tozsamosc → `wiedza.py zasiej` → notatka `jarvo/jak działa jarvo`), nie do profilu Hermesa.
+# Mapa agenta (docs/WIEDZA.md §2b, wiedza/mapa.py): profiles/<agent>/MAPA.md z repo albo nakładki (orkiestrator repo ma
+# też drugi plik w nakładce). Rdzeń mapy (bloki RDZEN; u orkiestratora też zwarte ścieżki i harmonogram) build wstawia
+# w miejsce znacznika w ZASADY.md agenta; pełna mapa idzie do skarbca (build/wiedza/tozsamosc → `wiedza.py zasiej` →
+# notatka `jarvo/jak działa jarvo` albo `agenci/<agent>/jak działa <krótka nazwa>`), nie do profilu Hermesa.
 MAPA_MARKER = "<!-- Jarvo:MAPA -->"
 MAPA_FILE = "MAPA.md"
 
@@ -107,12 +108,13 @@ def render_roster_summary(fleet: "Fleet") -> str:
     return "\n".join(linie)
 
 
-def mapa_zrodla(fleet: "Fleet") -> tuple[str, str]:
-    """(MAPA.md orkiestratora z repo, ten sam plik z nakładki floty albo "")."""
-    orkiestrator = fleet.agent(fleet.orchestrator)
-    repo = orkiestrator.dir / MAPA_FILE
+def mapa_zrodla(fleet: "Fleet", agent: str = "") -> tuple[str, str]:
+    """(MAPA.md agenta, domyślnie orkiestratora, z jego katalogu; ten sam plik z nakładki floty albo ""). Agent nakładki
+    ma MAPA.md już w nakładce, więc drugiego pliku nie ma."""
+    a = fleet.agent(agent or fleet.orchestrator)
+    repo = a.dir / MAPA_FILE
     n = fleet.nakladka                                       # ta sama nakładka, z którą wczytano flotę (load_fleet)
-    nakl = n / "profiles" / orkiestrator.name / MAPA_FILE if n else None
+    nakl = n / "profiles" / a.name / MAPA_FILE if n and not a.root else None
     return (repo.read_text(encoding="utf-8") if repo.is_file() else "",
             nakl.read_text(encoding="utf-8") if nakl and nakl.is_file() else "")
 
@@ -139,11 +141,15 @@ def sciezki_mapy(tokeny: dict[str, str], agent: str) -> dict[str, str]:
             "pamięć (MEMORY.md, USER.md)": f"{profil}/memories", "skrypty": f"{profil}/scripts"}
 
 
-def rdzen_mapy(fleet: "Fleet", sciezki: dict[str, str]) -> str:
-    """Rdzeń mapy Jarva do ZASADY.md (MAPA_MARKER): wiedza/mapa.rdzen z MAPA.md repo i nakładki, rutyn floty
-    i `sciezki` (sciezki_mapy; walidator podaje ścieżki zastępcze o średniej długości). Tokeny @@…@@ zostają (build
-    podstawia je w całym SOUL)."""
-    repo, nakl = mapa_zrodla(fleet)
+def rdzen_mapy(fleet: "Fleet", sciezki: dict[str, str], agent: str = "") -> str:
+    """Rdzeń mapy do ZASADY.md agenta (MAPA_MARKER): wiedza/mapa.rdzen z MAPA.md repo i nakładki. Orkiestrator (domyślnie)
+    dostaje też zwarte rutyny floty i `sciezki` (sciezki_mapy; walidator podaje ścieżki zastępcze o średniej długości);
+    inny agent tylko swoje bloki RDZEN (krótki prompt: ścieżki, które musi znać od razu, pisze w RDZEN tokenami).
+    Tokeny @@…@@ zostają (build podstawia je w całym SOUL)."""
+    agent = agent or fleet.orchestrator
+    repo, nakl = mapa_zrodla(fleet, agent)
+    if agent != fleet.orchestrator:
+        return _modul_mapy().rdzen(repo, nakl, [], {})
     return _modul_mapy().rdzen(repo, nakl, zadania_cron_floty(fleet), sciezki)
 
 

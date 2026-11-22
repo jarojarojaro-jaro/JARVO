@@ -39,11 +39,6 @@ for a in $AGENTS; do mkdir -p "$DATA/jarvo/workspaces/$a"; done
 rm -rf "$DATA/jarvo/knowledge/brands/_szablon" && cp -r "$REPO/knowledge/brands/_szablon" "$DATA/jarvo/knowledge/brands/_szablon"
 [[ -f "$DATA/jarvo/knowledge/user/USER.md" ]] || cp "$BUILD/profiles/jarvo/skills/fleet/onboarding-interview/references/USER.template.md" "$DATA/jarvo/knowledge/user/USER.md"
 
-# 1b. skarbiec wiedzy (docs/WIEDZA.md): huby agentów z buildu, SCHEMA, INDEX, docs repo jako źródła, nowe notatki księgi
-# błędów z wiedza/bledy; 0 tokenów, git na punkty zapisu
-log "Skarbiec wiedzy"
-$PY "$REPO/wiedza/wiedza.py" --skarbiec "$DATA/jarvo/knowledge" --stan "$DATA/jarvo/state" zasiej --fleet "$BUILD/wiedza/fleet.json" --docs "$REPO/docs" --repo "$BUILD/wiedza/repo" --bledy "$REPO/wiedza/bledy"
-
 # 2. profil hosta: config (scalanie kluczy floty), SOUL, sekrety
 log "Profil hosta"
 # pierwsza instalacja: obraz zasiał config.yaml przykładowym modelem → wymuszamy model floty
@@ -72,12 +67,22 @@ for a in $AGENTS; do
   fi
   # usuń skille floty/vendorowane, których nie ma już w buildzie (skille utworzone przez agenta zostają)
   $PY "$REPO/scripts/prune_skills.py" "$src/skills" "$DATA/profiles/$a/skills"
+  # pamięć Hermesa (memories/, dystrybucja jej nie niesie): puste MEMORY.md i USER.md, gdy ich nie ma (install_fleet.py
+  # zasiej_pamiec), żeby lustro w skarbcu i edytor w Mózgu widziały agenta od instalacji; istniejących nie ruszamy
+  mkdir -p "$DATA/profiles/$a/memories"
+  for m in MEMORY.md USER.md; do [[ -e "$DATA/profiles/$a/memories/$m" ]] || : > "$DATA/profiles/$a/memories/$m"; done
   if [[ -f "$SECRETS/$a.env" ]]; then
     $PY "$REPO/scripts/merge_env.py" "$SECRETS/$a.env" "$DATA/profiles/$a/.env"
   else
     echo "  ! brak $SECRETS/$a.env (agent nie ma klucza OpenRouter)"
   fi
 done
+
+# 3a. skarbiec wiedzy (docs/WIEDZA.md): huby agentów z buildu, SCHEMA, INDEX, docs repo jako źródła, nowe notatki księgi
+# błędów z wiedza/bledy; 0 tokenów, git na punkty zapisu. Po profilach (jak install_fleet.py, 22.11): zasiew widzi ich
+# pamięć zasianą wyżej i rutyny w tym samym wdrożeniu
+log "Skarbiec wiedzy"
+$PY "$REPO/wiedza/wiedza.py" --skarbiec "$DATA/jarvo/knowledge" --stan "$DATA/jarvo/state" zasiej --fleet "$BUILD/wiedza/fleet.json" --docs "$REPO/docs" --repo "$BUILD/wiedza/repo" --bledy "$REPO/wiedza/bledy"
 
 # 3b. klucze API profili: multipleksowany gateway obsługuje /p/<profil>/ tylko z własnym API_SERVER_KEY
 #     profilu (z niego korzysta Jarvo HQ do rozmów z agentami). Generujemy brakujące, istniejących nie ruszamy.

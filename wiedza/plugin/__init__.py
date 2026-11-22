@@ -795,8 +795,9 @@ class SkarbiecProvider(MemoryProvider):
         try:
             ix.odswiez()
             klient = lib.KlientWektorow(sk.stan)
+            # swoja tożsamość i pamięć agent ma w prompcie (Jarvo `jarvo/*`, inny agent `agenci/<agent>/*`), mapę tylko w rdzeniu
             notatki = lib.notatki_przypomnienia(ix, query, limit=LIMIT_NOTATEK, wektory=klient if klient.dostepny else None,
-                                                zakres=self._zakres(), pomin_tozsamosc=self._agent == lib.PROFIL_TOZSAMOSCI)
+                                                zakres=self._zakres(), pomin_tozsamosc=self._agent)
             silnik = ix.silnik
         finally:
             ix.zamknij()
@@ -980,8 +981,8 @@ class SkarbiecProvider(MemoryProvider):
 
     # ---- zbieranie: lustro pamięci, tury, wyciągi
     def _sprawdz_pamiec(self, wymus: bool = False) -> None:
-        """Lustro pamięci po TREŚCI plików profilu (wiedza.synchronizuj_pamiec): nowe wpisy do szkicu w skrzynce, a dla
-        Jarva notatki `jarvo/pamięć jarva` i `user/pamięć jarva o tobie`. Plik zmieniony inną drogą niż narzędzie memory
+        """Lustro pamięci po TREŚCI plików profilu (wiedza.synchronizuj_pamiec): nowe wpisy do szkicu w skrzynce i notatki-
+        lustra (Jarvo `jarvo/pamięć jarva`, `user/pamięć jarva o tobie`, inny agent `agenci/<agent>/pamięć …`). Plik zmieniony inną drogą niż narzędzie memory
         (ręcznie, przy wdrożeniu promptu, z Mózgu, w innym procesie) też trafia do skarbca (20.11: wpisy USER.md z 19
         i 20.11 nie dotarły). Bez `wymus` tylko gdy czas albo rozmiar któregoś pliku pamięci się zmienił (2 × stat)."""
         if not self._home or self._agent == "host":

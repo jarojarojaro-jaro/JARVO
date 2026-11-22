@@ -265,6 +265,22 @@ def spis(korzen: Path, pomin: tuple[str, ...] = ("__pycache__",)) -> dict[str, s
     return wynik
 
 
+def zasiej_pamiec(home: Path) -> list[str]:
+    """memories/MEMORY.md i USER.md profilu Hermesa, gdy ich nie ma: puste pliki (format Hermesa, zero wpisów), żeby
+    lustro pamięci w skarbcu i edytor w Mózgu widziały każdego agenta od instalacji, a nie od jego pierwszego wpisu
+    (22.11: Translator i Jarodev bez memories/). Istniejącej pamięci nie ruszamy. Build tego nie zrobi: dystrybucja
+    Hermesa pomija memories/ (profile_distribution USER_OWNED_EXCLUDE). Zwraca nazwy założonych plików."""
+    katalog = home / "memories"
+    katalog.mkdir(parents=True, exist_ok=True)
+    nowe = []
+    for nazwa in ("MEMORY.md", "USER.md"):
+        plik = katalog / nazwa
+        if not plik.exists():
+            plik.write_bytes(b"")
+            nowe.append(nazwa)
+    return nowe
+
+
 def _odcisk(dane: object) -> str:
     return hashlib.sha256(json.dumps(dane, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
 
@@ -557,10 +573,11 @@ class Flota:
         self.migracja()
         self.usun_stare_profile()
         self.katalogi()
-        self.zasiej_skarbiec()
         self.profil_hosta()
         for agent in self.agenci:
             self.profil_agenta(agent)
+        # skarbiec po profilach: zasiew widzi ich pamięć (zasianą w profil_agenta) i rutyny w tym samym wdrożeniu (22.11)
+        self.zasiej_skarbiec()
         self.klucze_api()
         self.impeccable()
         self.wszystkie_wtyczki()
@@ -777,6 +794,7 @@ class Flota:
                 self.log(f"  ! brak {plik} (agent nie ma klucza OpenRouter)")
         if self.natywnie:
             (home / "home").mkdir(parents=True, exist_ok=True)   # terminal.home_mode: profile (H24)
+        zasiej_pamiec(home)
         self.ustaw_klucze_profilu(agent, home / "config.yaml")
         if self.odcisk_profilu(home) != przed:
             self.zmiana(f"profil {agent}")

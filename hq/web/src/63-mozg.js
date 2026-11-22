@@ -5,7 +5,8 @@
 // pokazuje tylko bieżący poziom: na wejściu skupiska części w kolorach kafli, w części skupiska grup, w grupie same
 // notatki; klik w skupisko wchodzi głębiej, w kropkę otwiera notatkę. Szukaj działa na całym mózgu od razu (tytuły;
 // skarbiec dokłada wyniki z treści, GET /search). Notatka obok: Markdown z [[linkami]] jako linkami Mózgu i „Powiązane”;
-// notatka tożsamości z `edycja: pamiec` ma edytor wpisów (GET/PUT /pamiec), z `edycja: repo` prośbę do Jarva w rozmowie.
+// notatka tożsamości z `edycja: pamiec` ma edytor wpisów (GET/PUT /pamiec, `profil` notatki agenta innego niż Jarvo:
+// ?profil=<agent>), z `edycja: repo` prośbę do Jarva w rozmowie.
 // Klawiatura: Tab po linkach, w polu szukania strzałki i Enter (combobox), Esc zamyka notatkę i czyści szukanie;
 // nagłówek poziomu dostaje fokus po przejściu. Telefon: lista na cały ekran, graf pod „Mapa”, notatka na cały ekran.
 // Części: MOZG_KATEGORIE (foldery skarbca, ta sama lista co wiedza.py FOLDERY_SKARBCA, pilnuje tego test) albo
@@ -127,9 +128,16 @@ function mozgMapa(wezly, defs) {
 }
 
 // notatki grupy według rodzaju (tożsamość pierwsza, potem najliczniejszy), w rodzaju od najnowszej, wycofane na końcu;
-// tożsamość w stałej kolejności: Jarvo od A do Z (mapa), kim jest, zasady pracy, zasady krytyczne, pamięć
+// tożsamość w stałej kolejności: Jarvo od A do Z (mapa), kim jest, zasady pracy, zasady krytyczne, pamięć; u innych
+// agentów te same notatki z ich krótką nazwą na końcu (`kim jest web`, `pamięć web o tobie`)
 const MOZG_TOZSAMOSC = ["jak działa jarvo", "kim jest jarvo", "zasady pracy", "zasady krytyczne", "pamięć jarva", "pamięć jarva o tobie"];
-const mozgMiejsceT = (n) => { const i = MOZG_TOZSAMOSC.indexOf(n.id.split("/").pop()); return i < 0 ? 99 : i; };
+const MOZG_TOZSAMOSC_AGENTA = ["jak działa ", "kim jest ", "zasady pracy ", "zasady krytyczne ", "pamięć "];
+const mozgMiejsceT = (n) => {
+  const s = n.id.split("/").pop(), i = MOZG_TOZSAMOSC.indexOf(s);
+  if (i >= 0) return i;
+  const j = MOZG_TOZSAMOSC_AGENTA.findIndex((p) => s.startsWith(p));
+  return j < 0 ? 99 : j + (j === 4 && s.endsWith(" o tobie") ? 1 : 0);
+};
 // notatka wycofana poza archiwum (w archiwum wycofane jest wszystko, więc tam bez wyszarzenia)
 const mozgWycofana = (n) => n.status === "wycofana" && !n.id.startsWith("archiwum/");
 function mozgSekcje(lista) {
@@ -280,21 +288,23 @@ function MozgNajwazniejsze({ hub, wiki }) {
 const MozgWstecz = ({ w }) => w && html`<a class="j-mozg-wstecz" href=${w.href} onClick=${w.klik} aria-label=${L(`Wstecz do: ${w.napis}`, `Back to: ${w.napis}`)}>
   <${Ikona} n="back" r=${16}/><span>${w.napis}</span></a>`;
 
-// edytor wpisów pamięci (`klucz`: memory|user): lista pól, dodaj/usuń, licznik z limitem, Zapisz/Anuluj, 409 = wczytaj
-// ponownie. Esc bez zmian zamyka edytor (ze zmianami nic nie robi, żeby nie zgubić tekstu), Ctrl+Enter zapisuje.
-function MozgPamiec({ klucz, onZapis, onKoniec }) {
+// edytor wpisów pamięci (`klucz`: memory|user, `profil`: agent floty, puste = Jarvo): lista pól, dodaj/usuń, licznik
+// z limitem, Zapisz/Anuluj, 409 = wczytaj ponownie. Esc bez zmian zamyka edytor (ze zmianami nic nie robi, żeby nie
+// zgubić tekstu), Ctrl+Enter zapisuje.
+function MozgPamiec({ klucz, profil, onZapis, onKoniec }) {
   const [st, setSt] = useState(null), [wpisy, setWpisy] = useState([]), [blad, setBlad] = useState(""), [trwa, setTrwa] = useState(false);
   const [wiersz, setWiersz] = useState(-1);   // pole wskazane przez serwer (400 z `indeks`)
   const lista = useRef(null), nr = useRef(0), dodano = useRef(false);
+  const q = profil ? `?profil=${encodeURIComponent(profil)}` : "";
   const wczytaj = () => {
     setSt(null); setBlad(""); setTrwa(false); setWiersz(-1);
-    zadanie("GET", "/pamiec", undefined, MOZG_WIEDZA).then((d) => {
+    zadanie("GET", `/pamiec${q}`, undefined, MOZG_WIEDZA).then((d) => {
       const p = d && d[klucz];
       if (!p || !Array.isArray(p.wpisy)) throw new Error(klucz);
       setSt(p); setWpisy((p.wpisy.length ? p.wpisy : [""]).map((t) => [++nr.current, t]));
     }).catch(() => setBlad("wczytaj"));
   };
-  useEffect(wczytaj, []);
+  useEffect(wczytaj, [profil, klucz]);
   useEffect(() => {
     if (!dodano.current) return;
     dodano.current = false;
@@ -309,7 +319,7 @@ function MozgPamiec({ klucz, onZapis, onKoniec }) {
   const zapisz = () => {
     if (!mozna) return;
     setTrwa(true); setBlad(""); setWiersz(-1);
-    zadanie("PUT", `/pamiec/${klucz}`, { wpisy: sp.wpisy, wersja: st.wersja }, MOZG_WIEDZA).then(() => onZapis(), (e) => {
+    zadanie("PUT", `/pamiec/${klucz}${q}`, { wpisy: sp.wpisy, wersja: st.wersja }, MOZG_WIEDZA).then(() => onZapis(), (e) => {
       const ix = e && e.dane && e.dane.indeks;
       setTrwa(false); setBlad(mozgBladPamieci(e)); setWiersz(Number.isInteger(ix) && niepuste[ix] !== undefined ? niepuste[ix] : -1);
     });
@@ -322,7 +332,9 @@ function MozgPamiec({ klucz, onZapis, onKoniec }) {
     ${(k === "zmieniona" || k === "wczytaj") && html` <button type="button" class="j-mozg-wiecej" onClick=${wczytaj}>${L("Wczytaj ponownie", "Reload")}</button>`}</p>`;
   if (!st) return html`<div class="j-mozg-pam">${blad ? komunikat(blad) : html`<${Spinner}/>`}</div>`;
   return html`<div class="j-mozg-pam" role="group" aria-label=${L("Zmiana pamięci", "Edit memory")} onKeyDown=${klawisz}>
-    <p class="j-mozg-opis">${L("Jeden wpis to jedna rzecz, którą Jarvo ma pamiętać. Zmiana działa od następnej rozmowy z Jarvem.",
+    <p class="j-mozg-opis">${profil ? L("Jeden wpis to jedna rzecz, którą agent ma pamiętać. Zmiana działa od następnej rozmowy z nim.",
+      "One entry is one thing for the agent to remember. The change works from its next chat.")
+      : L("Jeden wpis to jedna rzecz, którą Jarvo ma pamiętać. Zmiana działa od następnej rozmowy z Jarvem.",
       "One entry is one thing for Jarvo to remember. The change works from Jarvo's next chat.")}</p>
     <ol ref=${lista}>${wpisy.map(([k, t], i) => html`<li key=${k}>
       <textarea rows="2" value=${t} aria-label=${L(`Wpis ${i + 1}`, `Entry ${i + 1}`)} aria-invalid=${i === zlyWiersz ? "true" : undefined}
@@ -371,7 +383,7 @@ function MozgNotatka({ z, id, dane, mapa, href, cel, nazwaMiejsca, wstecz, sekcj
   }, [tresc, sekcja]);
   const obok = [...(dane.sasiedzi.get(id) || [])].map((c) => dane.byId.get(c)).filter(Boolean).sort((a, b) => b.hub - a.hub || (b.we || 0) - (a.we || 0));
   const gd = mapa.gdzie.get(id), fm = (n && n.frontmatter) || {};
-  const edycja = w.edycja || fm.edycja, pamiec = w.pamiec || fm.pamiec, plik = String(fm.plik || "");
+  const edycja = w.edycja || fm.edycja, pamiec = w.pamiec || fm.pamiec, profil = String(w.profil || fm.profil || ""), plik = String(fm.plik || "");
   const zast = fm.zastapiona_przez && String(fm.zastapiona_przez).replace(/^\[\[|\]\]$/g, "").replace(/\.md$/, ""), zc = zast && cel(zast);
   return html`<aside ref=${ref} tabIndex="-1" class="j-mozg-karta" aria-labelledby="j-mozg-tytul">
     <div class="j-mozg-karta-gora">
@@ -384,14 +396,16 @@ function MozgNotatka({ z, id, dane, mapa, href, cel, nazwaMiejsca, wstecz, sekcj
       ${zast && html` ${L("Zastąpiona przez: ", "Replaced by: ")}${zc ? html`<a href=${zc[0]}>${zc[1]}</a>` : zast}.`} ${L("Jarvo już z niej nie korzysta.", "Jarvo no longer uses it.")}</p>`}
     ${skarbiec && n && !n.blad && !edytor && (edycja === "pamiec" && (pamiec === "memory" || pamiec === "user")
       ? html`<div class="j-mozg-akcje"><${Przycisk} maly ikona="pen" onClick=${() => { setZapisano(false); setEdytor(true); }}>${L("Zmień", "Edit")}</${Przycisk}>
-          <span class="j-mozg-wd">${L("Działa od następnej rozmowy z Jarvem", "Works from Jarvo's next chat")}</span></div>`
+          <span class="j-mozg-wd">${profil ? L("Działa od następnej rozmowy agenta", "Works from the agent's next chat") : L("Działa od następnej rozmowy z Jarvem", "Works from Jarvo's next chat")}</span></div>`
       : edycja === "repo" && html`<div class="j-mozg-akcje"><${Przycisk} maly ikona="msg" onClick=${() => mozgPopros(plik || id)}>${L("Poproś o zmianę", "Ask for a change")}</${Przycisk}>
-          <span class="j-mozg-wd">${L("Plik Jarva, zmienia go Jarvo na Twoją prośbę", "Jarvo's file, he changes it when you ask")}</span></div>`)}
-    ${zapisano && html`<p ref=${info} tabIndex="-1" class="j-mozg-info" role="status">${L("Zapisano. Jarvo zobaczy zmianę od następnej rozmowy.", "Saved. Jarvo will see the change from his next chat.")}</p>`}
+          <span class="j-mozg-wd">${id.startsWith("agenci/") ? L("Plik agenta, zmienia go Jarvo na Twoją prośbę", "The agent's file, Jarvo changes it when you ask")
+            : L("Plik Jarva, zmienia go Jarvo na Twoją prośbę", "Jarvo's file, he changes it when you ask")}</span></div>`)}
+    ${zapisano && html`<p ref=${info} tabIndex="-1" class="j-mozg-info" role="status">${profil ? L("Zapisano. Agent zobaczy zmianę od następnej rozmowy.", "Saved. The agent will see the change from its next chat.")
+      : L("Zapisano. Jarvo zobaczy zmianę od następnej rozmowy.", "Saved. Jarvo will see the change from his next chat.")}</p>`}
     ${!edytor && spis.length >= 4 && html`<nav class="j-mozg-spis" aria-label=${L("Sekcje notatki", "Note sections")}>
       <h3>${L("W tej notatce", "In this note")}</h3>
       <ol>${spis.map((t, i) => html`<li key=${i}><button type="button" onClick=${() => skocz(i)}>${t}</button></li>`)}</ol></nav>`}
-    ${edytor ? html`<${MozgPamiec} klucz=${pamiec} onKoniec=${() => setEdytor(false)} onZapis=${() => { setEdytor(false); setZapisano(true); onZapis(); }}/>`
+    ${edytor ? html`<${MozgPamiec} klucz=${pamiec} profil=${profil} onKoniec=${() => setEdytor(false)} onZapis=${() => { setEdytor(false); setZapisano(true); onZapis(); }}/>`
       : skarbiec && (!n ? html`<${Spinner}/>` : n.blad ? html`<p>${L("Nie udało się otworzyć notatki.", "Could not open the note.")}</p>` : html`<${TrescMd} tekst=${tresc}/>`)}
     ${!skarbiec && w.opis && html`<p>${w.opis}</p>`}
     ${url && html`<p><a href=${url} target="_blank" rel="noopener noreferrer">${L("Otwórz notatkę ↗", "Open the note ↗")}</a></p>`}

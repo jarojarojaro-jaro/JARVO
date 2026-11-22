@@ -305,6 +305,95 @@ def test_zapis_pamieci_zgodny_z_hermesem_co_do_bajtu(tmp_path):
     assert (profil / "memories" / "MEMORY.md").read_bytes() == od_hermesa
 
 
+# --------------------------------------------------------------- tożsamość i pamięć każdego agenta (22.11)
+
+def test_tozsamosc_i_pamiec_kazdego_agenta(dane, monkeypatch):
+    """22.11 właściciel: każdy agent ma obieg mózgu Jarva. Zasiew robi z build/wiedza/tozsamosc/agenci/<agent>/ notatki
+    w jego katalogu (kim jest, zasady, mapa z sekcjami), lustro pamięci jego profilu (z `profil:` dla Mózgu), agent nie
+    dostaje w przypomnieniu swojej tożsamości (ma ją w prompcie), kompilacja jej nie nadpisuje, a Mózg edytuje jego
+    pamięć przez GET/PUT /pamiec?profil= tylko dla agenta floty z katalogiem profilu."""
+    sk, d, toz = dane["sk"], dane["dane"], dane["toz"]
+    web = toz / "agenci" / "jarvo-web"
+    web.mkdir(parents=True)
+    (web / "SOUL.md").write_text("# Web\n\nJestem Web, Web Senior Dev floty Jarva.\n\n## Charakter\n- Mówię liczbami.\n", encoding="utf-8")
+    (web / "ZASADY.md").write_text("## Zasady pracy\n1. Najpierw pomiar.\n", encoding="utf-8")
+    (web / "MAPA.md").write_text("## Kim jestem\nJestem Web.\n\n<!-- Jarvo:RDZEN -->\n- Profil `jarvo-web`.\n<!-- /Jarvo:RDZEN -->\n\n"
+                                 "## Gdzie co jest\nPracuję w katalogu roboczym.\n", encoding="utf-8")
+    (web / "zrodla.json").write_text(json.dumps({"MAPA.md": {"plik": "profiles/jarvo-web/MAPA.md", "zmieniono": "2026-11-22"}}),
+                                     encoding="utf-8")
+    profil = d / "profiles" / "jarvo-web"
+    (profil / "memories").mkdir(parents=True)
+    (profil / "memories" / "MEMORY.md").write_text("Hosting enigmy: SEOHost (22.11)", encoding="utf-8")
+    (profil / "memories" / "USER.md").write_text("", encoding="utf-8")
+    assert _cli(dane, "zasiej", "--fleet", str(dane["fleet"]), "--tozsamosc", str(toz), "--profile", str(d / "profiles")) == 0
+    for rel, edycja in (("kim jest web", "repo"), ("zasady pracy web", "repo"), ("jak działa web", "repo"),
+                        ("pamięć web", "pamiec"), ("pamięć web o tobie", "pamiec")):
+        n = sk.wczytaj(f"agenci/jarvo-web/{rel}")
+        assert n.fm["typ"] == "tozsamosc" and n.fm["edycja"] == edycja and "[[agenci/jarvo-web/_hub-web|Web]]" in n.tresc, rel
+    mapa_web = sk.wczytaj("agenci/jarvo-web/jak działa web")
+    assert mapa_web.tytul == "Web od A do Z" and mapa_web.fm["sekcje"] is True and mapa_web.fm["plik"] == "profiles/jarvo-web/MAPA.md"
+    assert "- skarbiec: `" in mapa_web.tresc and "<!-- Jarvo:RDZEN" not in mapa_web.tresc
+    pam = sk.wczytaj("agenci/jarvo-web/pamięć web")
+    assert pam.fm["profil"] == "jarvo-web" and pam.fm["pamiec"] == "memory" and "- Hosting enigmy: SEOHost (22.11)" in pam.tresc
+    assert "Web czyta je na starcie" in pam.tresc and "profil" not in sk.wczytaj("jarvo/pamięć jarva").fm
+    assert "add memory: Hosting enigmy" in (sk.root / "skrzynka" / "pamiec-jarvo-web.md").read_text(encoding="utf-8")
+    # przypomnienie: swojej tożsamości agent nie dostaje drugi raz (mapy tak), cudzą tak
+    assert w.tozsamosc_w_prompcie("agenci/jarvo-web/kim jest web", "jarvo-web")
+    assert w.tozsamosc_w_prompcie("agenci/jarvo-web/pamięć web o tobie", "jarvo-web")
+    assert not w.tozsamosc_w_prompcie("agenci/jarvo-web/jak działa web#Gdzie co jest", "jarvo-web")
+    assert not w.tozsamosc_w_prompcie("agenci/jarvo-web/kim jest web", "jarvo")
+    assert w.tozsamosc_w_prompcie("jarvo/kim jest jarvo", "jarvo") and not w.tozsamosc_w_prompcie("jarvo/jak działa jarvo", "jarvo")
+    ix = w.Indeks(sk)
+    ix.odswiez()
+    assert "agenci/jarvo-web/kim jest web" not in [r["sciezka"] for r in w.notatki_przypomnienia(
+        ix, "kim jest web charakter liczbami", limit=10, pomin_tozsamosc="jarvo-web")]
+    wezel = next(x for x in ix.graf()["wezly"] if x["id"] == "agenci/jarvo-web/pamięć web")
+    assert wezel["profil"] == "jarvo-web" and wezel["edycja"] == "pamiec"
+    ix.zamknij()
+    assert k.Kompilacja(sk, lambda s, u: "{}").wlasny_format("agenci/jarvo-web/kim jest web")   # kompilacja nie nadpisze
+    # Mózg: pamięć agenta floty przez panel (te same kody co u Jarva), obca nazwa = 400, brak profilu = 404
+    panel = pm.Panel(sk.root, sk.stan, repo=dane["tmp"] / "repo", dane=d)
+    g = panel.pamiec("jarvo-web")
+    assert g["memory"]["wpisy"] == ["Hosting enigmy: SEOHost (22.11)"] and g["memory"]["notatka"] == "agenci/jarvo-web/pamięć web"
+    assert g["user"]["wpisy"] == [] and g["memory"]["limit"] == w.LIMITY_PAMIECI["memory"]
+    r = panel.zapisz_pamiec("user", ["JARO chce Astro na stronach (22.11)"], g["user"]["wersja"], "jarvo-web")
+    assert (profil / "memories" / "USER.md").read_text(encoding="utf-8") == "JARO chce Astro na stronach (22.11)"
+    assert r["notatka"] == "agenci/jarvo-web/pamięć web o tobie"
+    assert "- JARO chce Astro" in sk.wczytaj("agenci/jarvo-web/pamięć web o tobie").tresc               # lustro od razu
+    assert "zmiana z Mózgu: USER.md jarvo-web" in (sk.root / "LOG.md").read_text(encoding="utf-8")
+    assert panel.pamiec("")["memory"]["wpisy"] == ["Patrol co 30 minut", "Brief o 07:50"]                 # bez profilu: Jarvo
+    for zly in ("jarvo-obcy", "../jarvo", "jarvo-web/../jarvo"):
+        with pytest.raises(ValueError):
+            panel.pamiec(zly)
+    meta = json.loads((sk.stan / "wiedza-agenci.json").read_text(encoding="utf-8"))
+    (sk.stan / "wiedza-agenci.json").write_text(json.dumps({**meta, "jarvo-ads": {"hub": "agenci/jarvo-ads/_hub-ads"}}),
+                                                encoding="utf-8")
+    with pytest.raises(FileNotFoundError):
+        panel.pamiec("jarvo-ads")                                                    # we flocie, ale bez profilu
+    # trasa FastAPI: ?profil= przy GET i PUT, nagłówek zapisu jak dotąd
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+    import fastapi
+    monkeypatch.setenv("JARVO_KNOWLEDGE_DIR", str(sk.root))
+    monkeypatch.setenv("JARVO_STATE_DIR", str(sk.stan))
+    monkeypatch.setenv("HERMES_HOME", str(d))
+    for nazwa in ("jarvo_wiedza_panel", "jarvo_wiedza_ochrona", "jarvo_wiedza_lib"):
+        monkeypatch.delitem(sys.modules, nazwa, raising=False)
+    s = importlib.util.spec_from_file_location("jarvo_test_mozg_api_agent", REPO / "wiedza" / "plugin" / "dashboard" / "plugin_api.py")
+    api = importlib.util.module_from_spec(s)
+    s.loader.exec_module(api)
+    app = fastapi.FastAPI()
+    app.include_router(api.router, prefix="/p")
+    c = TestClient(app)
+    g = c.get("/p/pamiec?profil=jarvo-web").json()
+    assert g["user"]["wpisy"] == ["JARO chce Astro na stronach (22.11)"]
+    assert c.get("/p/pamiec?profil=jarvo-obcy").status_code == 400
+    assert c.put("/p/pamiec/memory?profil=jarvo-web", json={"wpisy": ["x"], "wersja": g["memory"]["wersja"]}).status_code == 403
+    r = c.put("/p/pamiec/memory?profil=jarvo-web", json={"wpisy": ["Hosting: SEOHost"], "wersja": g["memory"]["wersja"]},
+              headers={"X-Jarvo-Request": "1"})
+    assert r.status_code == 200 and (profil / "memories" / "MEMORY.md").read_text(encoding="utf-8") == "Hosting: SEOHost"
+
+
 # --------------------------------------------------------------- archiwum, przeniesienie, streszczenie
 
 def _notatka(sk, rel, tytul, tresc, linki=(), typ="fakt", **fm):

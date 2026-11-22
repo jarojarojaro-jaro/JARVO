@@ -107,6 +107,30 @@ def test_soul_skladany_z_postaci_i_zasad(built):
     assert koniec.startswith("<critical>") and soul.count("<critical>") == 1 and koniec.strip() not in soul
 
 
+def test_specjalista_w_ukladzie_jarva(built, tmp_path):
+    """22.11 (właściciel: każdy agent jak Jarvo): specjalista z SOUL.md + ZASADY.md + MAPA.md dostaje w prompcie postać,
+    zasady i rdzeń swojej mapy (same bloki RDZEN, bez ścieżek i rutyn floty Jarva); MAPA.md nie zostaje w profilu,
+    a build/wiedza/tozsamosc ma pliki każdego agenta (`agenci/<agent>/`) z podstawionymi tokenami dla zasiewu."""
+    fleet, out = built
+    soul = (out / "jarvo-web" / "SOUL.md").read_text(encoding="utf-8")
+    assert fl.MAPA_MARKER not in soul and "### Kim jestem\n- Profil `jarvo-web` Hermesa" in soul
+    assert soul.index("## Charakter") < soul.index("## Zasady pracy") < soul.index("### Kim jestem") < soul.index("## Kontrakt zlecenia floty")
+    assert "### Gdzie co jest" not in soul and "### Kiedy" not in soul           # rdzeń Jarva (ścieżki, rutyny) tylko u Jarva
+    assert not (out / "jarvo-web" / fl.MAPA_FILE).exists() and not (out / "jarvo-web" / fl.ZASADY_FILE).exists()
+    toz = tmp_path / "tozsamosc"
+    n = build.tozsamosc_do_skarbca(fleet, toz, lambda a: build.base_tokens(fleet, a, "/opt/jarvo/build", ENV))
+    assert (toz / "SOUL.md").is_file() and (toz / "MAPA.md").is_file()                       # Jarvo jak dotąd
+    web = toz / "agenci" / "jarvo-web"
+    for plik in ("SOUL.md", "ZASADY.md", "MAPA.md", "zrodla.json"):
+        assert (web / plik).is_file(), plik
+    zasady = (web / "ZASADY.md").read_text(encoding="utf-8")
+    assert "agenci/jarvo-web/" in zasady and fl.MAPA_MARKER not in zasady and fl.PROTOCOL_MARKER not in zasady
+    assert "@@" not in (web / "MAPA.md").read_text(encoding="utf-8") + zasady
+    assert json.loads((web / "zrodla.json").read_text(encoding="utf-8"))["MAPA.md"]["plik"] == "profiles/jarvo-web/MAPA.md"
+    assert (toz / "agenci" / "jarvo-studio" / "SOUL.md").is_file()        # każdy aktywny agent
+    assert n == sum(1 for p in toz.rglob("*.md"))
+
+
 def test_protocol_by_role(built):
     """Jarvo pisze karty i ocenia wyniki: bez zasad pracy wykonawcy (1–7, 12, 14, 15), ze wspólnymi i kształtem
     wyniku. Agenci dostają protokół bez zmian (ten sam stały prefiks, ten sam cache)."""
@@ -390,7 +414,8 @@ def test_repo_do_skarbca_zasady_zmiany_materialy_zrodla(built, tmp_path):
     cel = tmp_path / "repo"
     assert build.repo_do_skarbca(fleet, cel, dane) > 50
     soul = (cel / "profiles/jarvo-wideo/SOUL.md").read_text(encoding="utf-8")
-    assert "Zasada tempa" in soul and fl.PROTOCOL_MARKER not in soul
+    zasady = (cel / "profiles/jarvo-wideo/ZASADY.md").read_text(encoding="utf-8")       # procedury w ZASADY.md (22.11)
+    assert "## Charakter" in soul and "Zasada tempa" in zasady and fl.PROTOCOL_MARKER not in soul + zasady
     for rel in ("profiles/jarvo-wideo/CHANGELOG.md", "profiles/jarvo-wideo/README.md", "profiles/jarvo-wideo/quality/rubric.md",
                 "profiles/jarvo-wideo/skills/wideo/rodzaje-filmu/references/ruch-i-kompozycja.md"):
         assert (cel / rel).is_file(), rel

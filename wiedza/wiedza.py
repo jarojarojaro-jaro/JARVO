@@ -184,6 +184,20 @@ NOTATKI_PAMIECI = {"memory": (f"{TOZSAMOSC}/pamięć jarva", "Pamięć Jarva", "
 MAPA_NOTATKA = f"{TOZSAMOSC}/jak działa jarvo"   # „Jarvo od A do Z”: MAPA.md repo + nakładki + bloki GEN (wiedza/mapa.py)
 # kolejność tożsamości w hubie Jarva, INDEX-ie i Mózgu: mapa, postać, zasady, zasady krytyczne, pamięć
 KOLEJNOSC_TOZSAMOSCI = [MAPA_NOTATKA, *(t[0] for t in NOTATKI_TOZSAMOSCI), *(n[0] for n in NOTATKI_PAMIECI.values())]
+# tożsamość i pamięć każdego innego agenta floty (docs/WIEDZA.md §2a): te same pliki buildu (build/wiedza/tozsamosc/agenci/
+# <agent>/) i ten sam plik pamięci jego profilu jako notatki w jego katalogu `agenci/<agent>/` (zakres agenta biznesowego
+# go obejmuje). `{k}`: krótka nazwa z huba (`_hub-web` → web), `{s}`: krótka nazwa z floty (Web), `{plik}`: źródło
+NOTATKI_TOZSAMOSCI_AGENTA = (
+    ("kim jest {k}", "SOUL.md", "Kim jest {s}",
+     "Postać agenta {s} (`{plik}`): kim jest, dla kogo pracuje, charakter i głos. {s} ma ten tekst w prompcie każdej rozmowy"),
+    ("zasady pracy {k}", "ZASADY.md", "Zasady pracy: {s}",
+     "Jak {s} pracuje (`{plik}`): zakres, zasady, mapa skilli, formaty. W prompcie każdej rozmowy, po postaci"),
+    ("zasady krytyczne {k}", "KRYTYCZNE.md", "Zasady krytyczne: {s}",
+     "Najważniejsze zasady na samym końcu promptu agenta {s} (zamykający blok `<critical>` z `{plik}`)"),
+)
+NOTATKI_PAMIECI_AGENTA = {"memory": ("pamięć {k}", "Pamięć: {s}", "Notatki agenta {s} z narzędzia memory"),
+                          "user": ("pamięć {k} o tobie", "Pamięć {s} o Tobie", "Co {s} pamięta o Tobie z narzędzia memory")}
+MAPA_AGENTA = ("jak działa {k}", "{s} od A do Z")   # MAPA.md agenta + bloki GEN jego profilu (ścieżki, rutyny)
 SEPARATOR_PAMIECI = "\n§\n"           # tools/memory_tool_store.py Hermesa: ENTRY_DELIMITER (cały, z końcami linii)
 LIMITY_PAMIECI = {"memory": 2200, "user": 1375}   # domyślne Hermesa (memory.memory_char_limit, memory.user_char_limit)
 STAN_PAMIECI = "wiedza-pamiec.json"   # state/: wersja (sha256) i wpisy pamięci każdego profilu z ostatniego lustra
@@ -1363,13 +1377,15 @@ class Indeks:
         return {"wezly": wezly, "linki": [l for l in linki if w_grafie(l["z"])]}
 
     def _pola_mozgu(self, rel: str, hub: bool) -> dict:
-        """Pola węzła dla Mózgu z pliku (huby, tożsamość, archiwum: kilkadziesiąt plików): `edycja`, `pamiec`, `plik`
-        (tożsamość), `podsumowanie` i `streszczono` (hub ze streszczeniem), `zastapiona_przez` i `wycofano` (archiwum)."""
+        """Pola węzła dla Mózgu z pliku (huby, tożsamość, archiwum: kilkadziesiąt plików): `edycja`, `pamiec`, `profil`
+        (pamięć agenta innego niż Jarvo), `plik` (tożsamość), `podsumowanie` i `streszczono` (hub ze streszczeniem),
+        `zastapiona_przez` i `wycofano` (archiwum)."""
         try:
             fm, tresc = podziel(self.sk.plik(rel).read_text(encoding="utf-8", errors="replace"))
         except (OSError, ValueError):
             return {}
-        out = {k: str(fm[k]) for k in ("edycja", "pamiec", "plik", "zastapiona_przez", "wycofano", "streszczono") if fm.get(k)}
+        out = {k: str(fm[k]) for k in ("edycja", "pamiec", "profil", "plik", "zastapiona_przez", "wycofano", "streszczono")
+               if fm.get(k)}
         if hub and (p := podsumowanie_huba(tresc)):
             out["podsumowanie"] = p[:MAX_STRESZCZENIA_HUBA]
         return out
@@ -1524,19 +1540,30 @@ def hub_agenta_nazwany(sciezka: str, slowa_pytania: set[str]) -> bool:
     return any(n and n <= slowa_pytania for n in nazwy)
 
 
+def tozsamosc_w_prompcie(sciezka: str, agent: str) -> bool:
+    """Notatka tożsamości, którą `agent` ma już w prompcie (postać, zasady, zasady krytyczne, pamięć): Jarvo swoje `jarvo/*`
+    i `user/pamięć jarva o tobie`, inny agent swoje `agenci/<agent>/*`. Mapa („od A do Z”) nie: w prompcie jest jej rdzeń."""
+    rel = sciezka.split("#")[0]
+    if agent == PROFIL_TOZSAMOSCI:
+        return rel in KOLEJNOSC_TOZSAMOSCI and rel != MAPA_NOTATKA
+    return rel.startswith(f"agenci/{agent}/") and not rel.rsplit("/", 1)[-1].startswith(MAPA_AGENTA[0].format(k=""))
+
+
 def notatki_przypomnienia(ix: Indeks, q: str, limit: int = 5, wektory=None, silnik: str | None = None, zakres=(),
-                          pomin_tozsamosc: bool = False) -> list[dict]:
+                          pomin_tozsamosc: bool | str = False) -> list[dict]:
     """Notatki „może się przydać” przed turą (wtyczka jarvo-wiedza) i w `ocena`: wyszukiwanie (Indeks.szukaj: wektory,
     gdy usługa odpowie w czasie, inaczej słowa) bez orzeczeń (idą osobno), hubów bez streszczenia i hubów agentów
     `agenci/<agent>/_hub-*`, chyba że pytanie nazywa tego agenta (hub ma ogólne słowa o całej dziedzinie, więc bez
     tego zajmuje miejsca przy każdym pytaniu o pracę). Hub ze streszczeniem (`streszczono`, blok STRESZCZENIE) to
-    notatka zbiorcza części i wraca jak każda inna. `pomin_tozsamosc`: agent, który ma tożsamość i pamięć ze skarbca
-    już w prompcie (Jarvo: SOUL, ZASADY, KRYTYCZNE, MEMORY, USER), nie dostaje ich drugi raz (notatki `typ: tozsamosc`).
+    notatka zbiorcza części i wraca jak każda inna. `pomin_tozsamosc`: nazwa agenta (True = Jarvo), który ma swoją
+    tożsamość i pamięć ze skarbca już w prompcie (SOUL, ZASADY, KRYTYCZNE, MEMORY, USER): nie dostaje ich drugi raz
+    (tozsamosc_w_prompcie); tożsamość innych agentów wraca jak każda notatka.
     Archiwum nie wraca (Indeks.szukaj). Użyty silnik: `ix.silnik`. `zakres`: agent biznesowy (zakres_marki)."""
     slowa = _slowa_ascii(q)
+    agent = PROFIL_TOZSAMOSCI if pomin_tozsamosc is True else str(pomin_tozsamosc or "")
     out = []
     for t in ix.szukaj(q, limit=limit + 8, wektory=wektory, silnik=silnik, zakres=zakres):
-        if t["typ"] == "orzeczenia" or (pomin_tozsamosc and t["typ"] == "tozsamosc" and t["sciezka"].split("#")[0] != MAPA_NOTATKA):
+        if t["typ"] == "orzeczenia" or (agent and t["typ"] == "tozsamosc" and tozsamosc_w_prompcie(t["sciezka"], agent)):
             continue
         if HUB_AGENTA_RE.match(t["sciezka"]):
             if not hub_agenta_nazwany(t["sciezka"], slowa):
@@ -1562,11 +1589,13 @@ def trafia(sciezka: str, wzor: list[str]) -> bool:
     return sciezka in wzor or ("#" in sciezka and sciezka.split("#", 1)[0] in wzor)
 
 
-def ocena(ix: Indeks, zestaw: list, limit: int = 5, wektory=None, silnik: str | None = None, pomin_tozsamosc: bool = False) -> dict:
+def ocena(ix: Indeks, zestaw: list, limit: int = 5, wektory=None, silnik: str | None = None, pomin_tozsamosc: bool | str = False,
+          zakres=()) -> dict:
     """Pomiar przypomnień na zestawie `[{"pytanie": ..., "wzor": [ścieżki]}]` (zestaw właściciela leży poza repo):
     to samo wyszukiwanie co wtyczka przed turą (odświeżenie indeksu + notatki_przypomnienia, te same wektory i czas
     na nie). hit@k = jakakolwiek ścieżka wzorcowa w pierwszych k, MRR = średnia 1/pozycja pierwszej wzorcowej (0 bez
-    trafienia), czas na pytanie w ms, silnik każdego pytania (hybryda, wektory albo slowa, gdy wektorów zabrakło)."""
+    trafienia), czas na pytanie w ms, silnik każdego pytania (hybryda, wektory albo slowa, gdy wektorów zabrakło).
+    `pomin_tozsamosc` i `zakres` jak u agenta, którego przypomnienia mierzymy (`wiedza.py ocena --agent`)."""
     if not isinstance(zestaw, list) or not all(isinstance(p, dict) and str(p.get("pytanie") or "").strip() and isinstance(p.get("wzor"), list)
                                                for p in zestaw):
         raise ValueError('zestaw to lista [{"pytanie": "...", "wzor": ["ścieżka notatki", ...]}]')
@@ -1578,7 +1607,7 @@ def ocena(ix: Indeks, zestaw: list, limit: int = 5, wektory=None, silnik: str | 
         start = time.perf_counter()
         ix.odswiez()
         sciezki = [t["sciezka"] for t in notatki_przypomnienia(ix, str(p["pytanie"]), limit=limit, wektory=wektory, silnik=silnik,
-                                                               pomin_tozsamosc=pomin_tozsamosc)]
+                                                               zakres=zakres, pomin_tozsamosc=pomin_tozsamosc)]
         ms = round((time.perf_counter() - start) * 1000, 1)
         pozycja = next((i + 1 for i, s in enumerate(sciezki) if trafia(s, wzor)), 0)
         czasy.append(ms)
@@ -2129,14 +2158,45 @@ def sprawdz_wpisy(wpisy, limit: int, skaner=None) -> list[str]:
     return czyste
 
 
-def stan_pamieci(profil: str | Path, cel: str) -> dict:
-    """Jedna pamięć dla panelu (GET /pamiec): wpisy, limit, uzyte, wersja, zmieniono, plik (względem danych), notatka."""
+def _agenci_meta(sk: "Skarbiec") -> dict:
+    """state/wiedza-agenci.json z ostatniego zasiewu (agent → hub, orzeczenia, short, marka); {} bez pliku."""
+    try:
+        dane = json.loads((sk.stan / "wiedza-agenci.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return dane if isinstance(dane, dict) else {}
+
+
+def nazwy_agenta(agent: str, meta: dict | None = None) -> tuple[str, str, str]:
+    """(hub, k, s) agenta floty: hub `agenci/<agent>/_hub-<k>` z zasiewu (wiedza-agenci.json) albo z nazwy profilu,
+    `k` z nazwy huba (nazwy notatek), `s` krótka nazwa z floty (tytuły)."""
+    m = meta or {}
+    hub = str(m.get("hub") or "")
+    if not HUB_AGENTA_RE.match(hub) or hub.split("/")[1] != agent:
+        hub = f"agenci/{agent}/_hub-" + nazwa_pliku(agent.removeprefix("jarvo-")).replace(" ", "-")
+    k = hub.rsplit("/_hub-", 1)[1]
+    return hub, k, str(m.get("short") or "") or k.capitalize()
+
+
+def notatka_pamieci(agent: str, cel: str, meta: dict | None = None) -> tuple[str, str, str, str]:
+    """(ścieżka, tytuł, opis, link huba) notatki-lustra pliku pamięci agenta: Jarvo `jarvo/pamięć jarva` i `user/pamięć
+    jarva o tobie`, inny agent w swoim katalogu `agenci/<agent>/pamięć <k>[ o tobie]` (NOTATKI_PAMIECI_AGENTA)."""
+    if agent == PROFIL_TOZSAMOSCI:
+        return (*NOTATKI_PAMIECI[cel], f"[[{TOZSAMOSC}/{HUBY[TOZSAMOSC][0]}|Jarvo]]")
+    hub, k, s = nazwy_agenta(agent, meta)
+    rel, tytul, opis = NOTATKI_PAMIECI_AGENTA[cel]
+    return f"{hub.rsplit('/', 1)[0]}/{rel.format(k=k)}", tytul.format(s=s), opis.format(s=s), f"[[{hub}|{s}]]"
+
+
+def stan_pamieci(profil: str | Path, cel: str, meta: dict | None = None) -> dict:
+    """Jedna pamięć dla panelu (GET /pamiec): wpisy, limit, uzyte, wersja, zmieniono, plik (względem danych), notatka
+    (lustro w skarbcu; `meta`: wpis agenta z wiedza-agenci.json)."""
     p = czytaj_pamiec(plik_pamieci(profil, cel))
     return {**p, "limit": limity_pamieci(profil)[cel], "plik": f"profiles/{Path(profil).name}/memories/{PLIKI_PAMIECI[cel]}",
-            "notatka": NOTATKI_PAMIECI[cel][0]}
+            "notatka": notatka_pamieci(Path(profil).name, cel, meta)[0]}
 
 
-def zapisz_pamiec(profil: str | Path, cel: str, wpisy, wersja: str, skaner=None) -> dict:
+def zapisz_pamiec(profil: str | Path, cel: str, wpisy, wersja: str, skaner=None, meta: dict | None = None) -> dict:
     """Zapis całej listy wpisów pamięci (Mózg, PUT /pamiec) tym samym formatem i blokadą co narzędzie memory Hermesa:
     wpisy połączone ENTRY_DELIMITER („\\n§\\n”), bez znaku na końcu, UTF-8, atomowo pod `<plik>.lock`. `wersja` (sha256
     z odczytu) inna niż teraz na dysku = BladPamieci `zmieniona` (409) z aktualnym stanem; nic nie jest zapisane.
@@ -2146,12 +2206,12 @@ def zapisz_pamiec(profil: str | Path, cel: str, wpisy, wersja: str, skaner=None)
     with zamek_pamieci(plik):
         teraz = czytaj_pamiec(plik)
         if str(wersja or "") != teraz["wersja"]:
-            raise BladPamieci("zmieniona", "pamięć zmieniła się w międzyczasie (Jarvo albo inne okno); wczytaj ponownie",
-                              409, aktualna=stan_pamieci(profil, cel))
+            raise BladPamieci("zmieniona", "pamięć zmieniła się w międzyczasie (agent albo inne okno); wczytaj ponownie",
+                              409, aktualna=stan_pamieci(profil, cel, meta))
         tresc = SEPARATOR_PAMIECI.join(czyste)
         if plik.read_bytes() != tresc.encode("utf-8") if plik.exists() else True:
             _zapisz_jak_hermes(plik, tresc)
-    return stan_pamieci(profil, cel)
+    return stan_pamieci(profil, cel, meta)
 
 
 def _liczba(n: int, jeden: str, kilka: str, wiele: str) -> str:
@@ -2159,9 +2219,9 @@ def _liczba(n: int, jeden: str, kilka: str, wiele: str) -> str:
 
 
 def _zapisz_tozsamosc(sk: "Skarbiec", rel: str, body: str, zmieniono: str, plik: str, edycja: str, pamiec: str = "",
-                      sekcje: bool = False) -> bool:
+                      sekcje: bool = False, profil: str = "") -> bool:
     """Notatka tożsamości (`typ: tozsamosc`, generowana): frontmatter z kontraktu Mózgu (plik źródła, edycja: repo albo
-    pamiec), zapis tylko przy zmianie treści. True = zapisana."""
+    pamiec, `profil`: agent innego niż Jarvo, którego pamięć Mózg edytuje), zapis tylko przy zmianie treści. True = zapisana."""
     zmieniono = zmieniono if DATA_RE.match(zmieniono or "") else dzis()
     stary = sk.plik(rel).read_text(encoding="utf-8", errors="replace") if sk.istnieje(rel) else ""
     stare_fm = podziel(stary)[0] if stary else {}
@@ -2170,6 +2230,8 @@ def _zapisz_tozsamosc(sk: "Skarbiec", rel: str, body: str, zmieniono: str, plik:
           "zmieniono": zmieniono, "status": "aktualna", "zrodlo": "wiedza.py zasiej", "plik": plik, "edycja": edycja}
     if pamiec:
         fm["pamiec"] = pamiec
+    if profil:
+        fm["profil"] = profil
     if sekcje:
         fm["sekcje"] = True
     tekst = sklej(fm, body)
@@ -2194,20 +2256,24 @@ def zapewnij_hub(sk: "Skarbiec", folder: str) -> bool:
     return True
 
 
-def zapisz_notatke_pamieci(sk: "Skarbiec", profil: str | Path, cel: str, p: dict | None = None) -> bool:
-    """Lustro pliku pamięci Jarva w skarbcu: `jarvo/pamięć jarva` (MEMORY.md) albo `user/pamięć jarva o tobie` (USER.md),
-    wpisy jako lista (wpis z sekretem jako dopisek), `zmieniono` = data pliku. True = zapisana."""
-    rel, tytul, opis = NOTATKI_PAMIECI[cel]
+def zapisz_notatke_pamieci(sk: "Skarbiec", profil: str | Path, cel: str, p: dict | None = None, agent: str = PROFIL_TOZSAMOSCI,
+                           meta: dict | None = None) -> bool:
+    """Lustro pliku pamięci agenta w skarbcu (notatka_pamieci: Jarvo `jarvo/pamięć jarva` i `user/pamięć jarva o tobie`,
+    inny agent `agenci/<agent>/pamięć <k>[ o tobie]` z `profil: <agent>`), wpisy jako lista (wpis z sekretem jako
+    dopisek), `zmieniono` = data pliku. True = zapisana."""
+    rel, tytul, opis, hub = notatka_pamieci(agent, cel, meta)
+    kto = "Jarvo" if agent == PROFIL_TOZSAMOSCI else nazwy_agenta(agent, meta)[2]
     p = p or czytaj_pamiec(plik_pamieci(profil, cel))
     limit = limity_pamieci(profil)[cel]
     plik = f"profiles/{Path(profil).name}/memories/{PLIKI_PAMIECI[cel]}"
     wpisy = ["(wpis z sekretem: pominięty w skarbcu)" if zawiera_sekret(w) else w for w in p["wpisy"]]
     lista = "\n".join("- " + w.replace("\n", "\n  ") for w in wpisy) or "_Pusto._"
     body = (f"# {tytul}\n\n**{opis} (`{plik}`): {_liczba(len(wpisy), 'wpis', 'wpisy', 'wpisów')}, {p['uzyte']} z {limit} znaków. "
-            "Jarvo czyta je na starcie każdej rozmowy; zmiana w Mózgu (Zmień) działa od następnej rozmowy.**\n\n"
-            f"## Wpisy\n{lista}\n\n## Powiązane\n- hub: [[{TOZSAMOSC}/{HUBY[TOZSAMOSC][0]}|Jarvo]]\n"
-            + (f"- [[user/{HUBY['user'][0]}|Ty]]\n" if cel == "user" else ""))
-    return _zapisz_tozsamosc(sk, rel, body, p["zmieniono"][:10], plik, "pamiec", cel)
+            f"{kto} czyta je na starcie każdej rozmowy; zmiana w Mózgu (Zmień) działa od następnej rozmowy.**\n\n"
+            f"## Wpisy\n{lista}\n\n## Powiązane\n- hub: {hub}\n"
+            + (f"- [[user/{HUBY['user'][0]}|Ty]]\n" if cel == "user" and agent == PROFIL_TOZSAMOSCI else ""))
+    return _zapisz_tozsamosc(sk, rel, body, p["zmieniono"][:10], plik, "pamiec", cel,
+                             profil="" if agent == PROFIL_TOZSAMOSCI else agent)
 
 
 def _dopisz_szkic_pamieci(sk: "Skarbiec", agent: str, cel: str, wpisy: list[str], marka: str = "") -> str:
@@ -2234,7 +2300,8 @@ def synchronizuj_pamiec(sk: "Skarbiec", profil: str | Path, agent: str, marka: s
     """Lustro pamięci Hermesa po TREŚCI pliku, nie po wywołaniu narzędzia (20.11: wpisy USER.md z 19 i 20.11 nie dotarły
     do skarbca, bo plik zmienił się poza narzędziem memory). state/wiedza-pamiec.json pamięta wersję (sha256) i wpisy
     każdego pliku każdego profilu; nowa wersja = wpisy, których wcześniej nie było (pierwszy raz: wszystkie), idą do
-    szkicu w skrzynce (_dopisz_szkic_pamieci), a dla Jarva (PROFIL_TOZSAMOSCI) odświeżona notatka-lustro. Woła to hak
+    szkicu w skrzynce (_dopisz_szkic_pamieci), a notatka-lustro agenta (notatka_pamieci: Jarvo `jarvo/`, `user/`, inny
+    agent swój katalog `agenci/<agent>/`) jest odświeżona. Woła to hak
     zapisu pamięci, start sesji i tura wtyczki, zasiew i zapis z Mózgu; ta sama wersja = nic (dwa odczyty i skrót).
     Zwraca {"zmienione": [cele], "wpisow": n, "notatki": [ścieżki]} (+ "zajete", gdy stan trzyma inny proces)."""
     wynik: dict = {"zmienione": [], "wpisow": 0, "notatki": []}
@@ -2254,6 +2321,7 @@ def synchronizuj_pamiec(sk: "Skarbiec", profil: str | Path, agent: str, marka: s
         if not isinstance(stan.get(agent), dict):
             stan[agent] = {}
         moj = stan[agent]
+        meta = None if agent == PROFIL_TOZSAMOSCI else _agenci_meta(sk).get(agent)
         for cel in PLIKI_PAMIECI:
             try:
                 p = czytaj_pamiec(plik_pamieci(profil, cel))
@@ -2268,8 +2336,8 @@ def synchronizuj_pamiec(sk: "Skarbiec", profil: str | Path, agent: str, marka: s
                     wynik["wpisow"] += len(nowe)
                 wynik["zmienione"].append(cel)
                 moj[cel] = {"wersja": p["wersja"], "wpisy": p["wpisy"]}
-            if agent == PROFIL_TOZSAMOSCI and zapisz_notatke_pamieci(sk, profil, cel, p):
-                wynik["notatki"].append(NOTATKI_PAMIECI[cel][0])
+            if zapisz_notatke_pamieci(sk, profil, cel, p, agent, meta):
+                wynik["notatki"].append(notatka_pamieci(agent, cel, meta)[0])
         if wynik["zmienione"]:
             tmp = plik_stanu.with_name(f"{plik_stanu.name}.{os.getpid()}.tmp")
             tmp.write_text(json.dumps(stan, ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n")
@@ -2411,6 +2479,63 @@ def zasiej_mape(sk: "Skarbiec", katalog: Path | None, fleet: dict | None, profil
     zmieniono = max([z for z in zmiany if DATA_RE.match(z)] or [_data_pliku(katalog / "MAPA.md")])
     body = mapa.notatka(repo, nakl, gen, zrodla) + f"\n## Powiązane\n- hub: [[{TOZSAMOSC}/{HUBY[TOZSAMOSC][0]}|Jarvo]]\n"
     return _zapisz_tozsamosc(sk, MAPA_NOTATKA, body, zmieniono, "profiles/jarvo/MAPA.md", "repo", sekcje=True)
+
+
+def zasiej_tozsamosc_agentow(sk: "Skarbiec", katalog: Path | None, profile: Path | None, agenci_meta: dict | None) -> list[str]:
+    """Tożsamość każdego agenta floty poza Jarvem (docs/WIEDZA.md §2a) w jego katalogu `agenci/<agent>/`, z plików buildu
+    build/wiedza/tozsamosc/agenci/<agent>/ (scripts/build.py, tokeny podstawione): SOUL → `kim jest <k>`, ZASADY bez
+    zamykającego bloku → `zasady pracy <k>`, KRYTYCZNE → `zasady krytyczne <k>`, MAPA.md (+ MAPA-nakladka.md) → `jak działa
+    <k>` („<Krótka nazwa> od A do Z”, sekcje w indeksie, bloki GEN: ścieżki jego profilu i jego rutyny, także wstrzymane).
+    Agent spoza `agenci_meta` (spoza floty) zostaje pominięty. Zwraca zapisane ścieżki."""
+    baza = Path(katalog) / "agenci" if katalog else None
+    if not baza or not baza.is_dir():
+        return []
+    mapa = _modul_mapy()
+    profile = Path(profile) if profile and Path(profile).is_dir() else None
+    cron = mapa.zadania_cron_profili(profile) if mapa and profile else []
+    watki = mapa.watki_telegrama(sk.stan / "telegram-grupy.json", tematy_telegrama(sk)) if mapa else {}
+    out = []
+    for kat in sorted(p for p in baza.iterdir() if p.is_dir()):
+        agent = kat.name
+        if agent == PROFIL_TOZSAMOSCI or agent not in (agenci_meta or {}):
+            continue
+        hub, k, s = nazwy_agenta(agent, agenci_meta[agent])
+        folder, powiazane = hub.rsplit("/", 1)[0], f"\n## Powiązane\n- hub: [[{hub}|{s}]]\n"
+        try:
+            daty = json.loads((kat / "zrodla.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            daty = {}
+        daty = daty if isinstance(daty, dict) else {}
+
+        def zmiana(nazwa: str) -> tuple[str, str]:
+            info = daty.get(nazwa) if isinstance(daty.get(nazwa), dict) else {}
+            data = str(info.get("zmieniono") or "")
+            return (data if DATA_RE.match(data) else _data_pliku(kat / nazwa)), str(info.get("plik") or f"profiles/{agent}/{nazwa}")
+
+        for wzor, nazwa, tytul, opis in NOTATKI_TOZSAMOSCI_AGENTA:
+            if not (kat / nazwa).is_file():
+                continue
+            zmieniono, plik = zmiana(nazwa)
+            body = (f"# {tytul.format(s=s)}\n\n**{opis.format(s=s, plik=plik)}. Zmiana przez repo: w Mózgu „Poproś o zmianę”.**\n\n"
+                    f"{dla_czytelnika((kat / nazwa).read_text(encoding='utf-8', errors='replace'))}\n" + powiazane)
+            rel = f"{folder}/{wzor.format(k=k)}"
+            if _zapisz_tozsamosc(sk, rel, body, zmieniono, plik, "repo"):
+                out.append(rel)
+        if mapa is None or not (kat / "MAPA.md").is_file():
+            continue
+        nakl = (kat / "MAPA-nakladka.md").read_text(encoding="utf-8", errors="replace") if (kat / "MAPA-nakladka.md").is_file() else ""
+        profil = profile / agent if profile and (profile / agent).is_dir() else None
+        d = dzis()
+        gen = {"sciezki": mapa.render_sciezki(sciezki_jarva(sk, profil)),
+               "harmonogram": mapa.render_harmonogram([z for z in cron if z["agent"] == agent], None, watki)}
+        zrodla = {"sciezki": f"tej instalacji, {d}", "harmonogram": f"rutyn Hermesa (cron/jobs.json), {d}"}
+        zmieniono, plik = zmiana("MAPA.md")
+        body = mapa.notatka((kat / "MAPA.md").read_text(encoding="utf-8", errors="replace"), nakl, gen, zrodla,
+                            tytul=MAPA_AGENTA[1].format(s=s)) + powiazane
+        rel = f"{folder}/{MAPA_AGENTA[0].format(k=k)}"
+        if _zapisz_tozsamosc(sk, rel, body, zmieniono, plik, "repo", sekcje=True):
+            out.append(rel)
+    return out
 
 
 def odswiez_hub_jarva(sk: "Skarbiec", orzeczenia_jarva: str = "") -> None:
@@ -2915,8 +3040,10 @@ def zasiej(sk: Skarbiec, fleet: dict | None, docs: Path | None, schema: Path | N
         p = sk.plik(HUBY[""][0])
         sk.zapisz_plik(HUBY[""][0], zastap_blok(p.read_text(encoding="utf-8"), "repo",
                                                 "## Z repo (kopia przy wdrożeniu)\n" + "\n".join(linie_repo)))
-    # tożsamość Jarva (jarvo/*) z plików buildu i lustra pamięci profili floty (po treści pliku: synchronizuj_pamiec)
-    raport["tozsamosc"] = len(zasiej_tozsamosc(sk, tozsamosc)) + zasiej_mape(sk, tozsamosc, fleet, profile, agenci_meta)
+    # tożsamość Jarva (jarvo/*) i pozostałych agentów (agenci/<agent>/*) z plików buildu i lustra pamięci profili floty
+    # (po treści pliku: synchronizuj_pamiec)
+    raport["tozsamosc"] = (len(zasiej_tozsamosc(sk, tozsamosc)) + zasiej_mape(sk, tozsamosc, fleet, profile, agenci_meta)
+                           + len(zasiej_tozsamosc_agentow(sk, tozsamosc, profile, agenci_meta)))
     if profile and Path(profile).is_dir():
         agenci = [a["name"] for a in (fleet or {}).get("agents", [])] or [PROFIL_TOZSAMOSCI]
         for agent in agenci:
@@ -3301,6 +3428,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="wektory (domyślnie), hybryda (RRF słów i wektorów), slowa (BM25); bez usługi wektorów zawsze slowa")
     oc.add_argument("--pomin-tozsamosc", action="store_true",
                     help="jak przypomnienie Jarva: bez notatek tożsamości (ma je w prompcie)")
+    oc.add_argument("--agent", default="",
+                    help="jak przypomnienie tego agenta: bez jego notatek tożsamości, w zakresie jego marki (zestaw samowiedzy)")
     oc.add_argument("--json", action="store_true")
     a = ap.parse_args(argv)
 
@@ -3426,8 +3555,10 @@ def main(argv: list[str] | None = None) -> int:
         elif a.cmd == "ocena":
             try:
                 wektory = None if a.silnik == "slowa" else KlientWektorow(sk.stan)
+                meta = _agenci_meta(sk).get(a.agent) or {}
                 r = ocena(ix, json.loads(Path(a.plik).read_text(encoding="utf-8")), limit=a.limit, wektory=wektory,
-                          silnik=a.silnik, pomin_tozsamosc=a.pomin_tozsamosc)
+                          silnik=a.silnik, pomin_tozsamosc=a.agent or a.pomin_tozsamosc,
+                          zakres=zakres_marki(str(meta.get("marka") or ""), a.agent, str(meta.get("orzeczenia") or "")) if a.agent else ())
             except (OSError, ValueError) as e:
                 print(f"✗ {e}", file=sys.stderr)
                 return 2

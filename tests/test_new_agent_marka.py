@@ -46,6 +46,8 @@ def kopia(tmp_path):
     shutil.copy2(REPO / "fleet.yaml", tmp_path / "fleet.yaml")
     (tmp_path / "infra").mkdir()
     shutil.copy2(REPO / "infra" / "docker-compose.yml", tmp_path / "infra" / "docker-compose.yml")
+    (tmp_path / "wiedza").mkdir()                       # wiedza/mapa.py: mapa agenta (fleetlib.rdzen_mapy, validate.check_mapa)
+    shutil.copy2(REPO / "wiedza" / "mapa.py", tmp_path / "wiedza" / "mapa.py")
     return tmp_path
 
 
@@ -66,18 +68,22 @@ def test_szkielet_agenta_biznesowego_w_nakladce(kopia, tmp_path):
     for rel in ("fleet.yaml", "wzorce.md", "security/redteam/testy.yaml", "README.md", ".gitignore"):
         assert (n / rel).is_file(), rel                                           # szkielet nakładki
     d = n / "profiles" / "jarvo-kwiaty"
-    for rel in ("SOUL.md", "config.yaml", "cron/jobs.yaml", "distribution.yaml", "toolbox.yaml", "quality/rubric.md",
-                "README.md", "CHANGELOG.md", ".no-bundled-skills", "skills/kwiaty/kwiaty-workflow/SKILL.md"):
+    for rel in ("SOUL.md", "ZASADY.md", "MAPA.md", "config.yaml", "cron/jobs.yaml", "distribution.yaml", "toolbox.yaml",
+                "quality/rubric.md", "README.md", "CHANGELOG.md", ".no-bundled-skills", "skills/kwiaty/kwiaty-workflow/SKILL.md"):
         assert (d / rel).is_file(), rel
 
     a = next(x for x in fl.load_fleet(kopia / "fleet.yaml", nakladka=n).agents if x.name == "jarvo-kwiaty")
     assert (a.marka, a.kind, a.status, a.handle, a.telegram_topic) == ("kwiaty", "specialist", "planned", "kwiaty", "kwiaty")
     assert a.root == n.resolve() and a.dir == n.resolve() / "profiles" / "jarvo-kwiaty"
 
-    soul = (d / "SOUL.md").read_text(encoding="utf-8")
-    for fraza in ("ZGODA WŁAŚCICIELA", "art. 398", "RODO", "brands/kwiaty/", "to nie mój obszar, zapytaj Jarva",
-                  fl.PROTOCOL_MARKER, "## Misja", "## Osobowość"):
-        assert fraza in soul, fraza
+    # układ Jarva: SOUL.md sama postać, ZASADY.md procedury ze znacznikami protokołu i mapy, MAPA.md w sekcjach mapa.SEKCJE
+    soul, zasady = (d / "SOUL.md").read_text(encoding="utf-8"), (d / "ZASADY.md").read_text(encoding="utf-8")
+    assert "## Charakter" in soul and "@@WLASCICIEL@@" in soul and "Jarvo" in soul and fl.PROTOCOL_MARKER not in soul
+    for fraza in ("ZGODA WŁAŚCICIELA", "art. 398", "RODO", "brands/kwiaty/", "to nie mój obszar, zapytaj Jarva", "**Pamięć**",
+                  fl.PROTOCOL_MARKER, fl.MAPA_MARKER, "agenci/jarvo-kwiaty/jak działa kwiaty#"):
+        assert fraza in zasady, fraza
+    sekcje = fl._modul_mapy().sekcje((d / "MAPA.md").read_text(encoding="utf-8"))
+    assert set(sekcje) <= set(fl._modul_mapy().SEKCJE) and "Biznesy" in sekcje and "Jarvo:RDZEN" in sekcje["Kim jestem"]
 
     cfg = fl.load_yaml(d / "config.yaml")
     for plat in ("telegram", "api_server", "cron"):

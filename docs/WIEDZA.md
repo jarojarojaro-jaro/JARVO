@@ -156,9 +156,19 @@ Notatki `typ: tozsamosc` (frontmatter: `status: aktualna`, `zmieniono` = data zm
 
 Pliki tożsamości przygotowuje build (`scripts/build.py tozsamosc_do_skarbca` → `build/wiedza/tozsamosc/`: tokeny @@…@@
 podstawione, `zrodla.json` z datą ostatniego commitu pliku); `wiedza.py zasiej` bierze katalog `tozsamosc` obok `--repo`
-(albo `--tozsamosc`). Kompilator ich nie pisze ani nie bierze jako kandydatów, lint ich nie zgłasza, a przypomnienie Jarva
-ich nie wstrzykuje (są w jego prompcie: SOUL, ZASADY, KRYTYCZNE, MEMORY, USER; wyjątek: sekcje mapy, bo w prompcie jest
-tylko jej rdzeń). Inni agenci dostają je w przypomnieniach jak każdą notatkę.
+(albo `--tozsamosc`). Kompilator ich nie pisze ani nie bierze jako kandydatów, lint ich nie zgłasza, a przypomnienie agenta
+nie wstrzykuje mu jego własnej tożsamości (`wiedza.tozsamosc_w_prompcie`: ma ją w prompcie, SOUL, ZASADY, KRYTYCZNE, MEMORY,
+USER; wyjątek: sekcje mapy, bo w prompcie jest tylko jej rdzeń). Cudzą tożsamość dostaje jak każdą notatkę.
+
+**Każdy agent jak Jarvo (22.11).** Ten sam obieg dla pozostałych agentów floty: build kładzie ich pliki w
+`build/wiedza/tozsamosc/agenci/<agent>/`, zasiew (`wiedza.zasiej_tozsamosc_agentow`) robi z nich notatki w katalogu agenta
+`agenci/<agent>/`: `kim jest <k>`, `zasady pracy <k>`, `zasady krytyczne <k>`, `jak działa <k>` („<Krótka nazwa> od A do Z”,
+sekcje w indeksie, bloki GEN `sciezki` i `harmonogram` jego profilu), a lustro pamięci `pamięć <k>` i `pamięć <k> o tobie`
+(frontmatter `profil: <agent>`; `<k>` = nazwa huba agenta). Mózg edytuje je przez `GET/PUT /pamiec?profil=<agent>` (tylko agent
+z `state/wiedza-agenci.json` z katalogiem profilu; obca nazwa 400, brak profilu 404, CSRF jak dotąd). Instalacja zakłada puste
+`memories/MEMORY.md` i `USER.md` każdego profilu (`install_fleet.zasiej_pamiec`; dystrybucja Hermesa pomija `memories/`), a
+skarbiec zasiewa po profilach. Specjalista z `ZASADY.md` ma `MAPA.md` (validate.py `check_mapa`: sekcje z `mapa.SEKCJE`,
+znacznik w ZASADY.md, rdzeń ≤ `RDZEN_AGENTA` tok.; w prompcie tylko jego bloki RDZEN). Szablony: `shared/templates/{SOUL,ZASADY,MAPA}.template.md`.
 
 **Lustro pamięci po treści pliku** (`wiedza.synchronizuj_pamiec`): `state/wiedza-pamiec.json` pamięta wersję (sha256) i wpisy
 MEMORY.md i USER.md każdego profilu. Nowa wersja pliku = wpisy, których wcześniej nie było (pierwszy raz: wszystkie), idą
@@ -333,6 +343,27 @@ sąsiedni `*.py` jako podmoduł i po `__init__` przypisuje go pakietowi pod nazw
 Do 18.11 tak było z hakiem księgi (`ksiega_bledow`) i ciszy tablicy (`cisza_tablicy`): oba rzucały „'module' object is
 not callable” i nie działały (karta t_8a8a79ab: odmowa Komputera bez dopisku, bez `state/bledy-licznik.json`). Dziś
 `przypomnienie_bledu` i `cisza_po_narzedziu`; test ładuje wtyczkę tak jak Hermes i sprawdza, że każdy hak to funkcja.
+
+### 4c. Sesje omp (Kernel): ten sam mózg w skrzynce sesji
+
+Sesja omp (wpis `sesje.json` z `panel.zaplecze = "omp"`, wykonawca `jarvo/sesje_omp.py`) nie jest profilem Hermesa:
+nie ma haka `prefetch`, a jej baza to własny katalog notatek (Kernel: wiki w repo `~/dev/KERNEL`). Zamiast drugiego
+mechanizmu jest cienka warstwa `jarvo/mozg_sesji.py` nad tym samym silnikiem (`wiedza.py`: `Skarbiec`, `Indeks`,
+`notatki_przypomnienia`, `graf`, wektory z usługi wektorów instalacji) i tą samą mapą (`mapa.rdzen`, `mapa.notatka`).
+Pola wpisu i obieg: docstring modułu; polecenie `jarvo sesja <klucz> wiedza stan|przypomnij|ocena|indeksuj|tozsamosc`.
+
+| Jarvo (Hermes) | Sesja omp | Dlaczego inaczej |
+|---|---|---|
+| `prefetch` → `<memory-context>` w turze | skrzynka dokleja `<memory-context>` między wstępem a pierwszym nagłówkiem wiadomości (tura i dopisek); panel go nie pokazuje (czytnik_omp bierze tylko bloki z nagłówkami) | omp w trybie RPC nie ma haka; blok w wiadomości jest na końcu kontekstu, więc nie psuje cache stałej części promptu (zmiana `--append-system-prompt` = nowy proces omp i cały prefiks od nowa) |
+| indeks `state/wiedza.db` skarbca | indeks w `<skrzynka>/wiedza` nad katalogiem sesji, `pomin` zdejmuje z indeksu dziennik i audyt liczb | baza sesji to repo agenta: wiedza.py tylko czyta katalog (bez INDEX.md i list w hubach) |
+| ranking wiedza.py (hybryda) | RRF rankingu wiedza.py i rankingu bazy z `ranking` (Kernel: `kb search --mode bm25`, polska analiza po fragmentach) | pomiar 22.11 na 34 pytaniach z historii Kernela: wiedza.py sam hit@5 0,71, kb bm25 0,85, fuzja 0,91–0,94 przy p50 ok. 50 ms |
+| orzeczenia i pamięć w prompcie | `decyzje/` wiki są notatkami; `pierwszenstwo` dokłada jedną decyzję albo lekcję z dalszych miejsc | premia w RRF obniżała trafność (0,941 → 0,882 przy ×1,15) |
+| `wiedza_zapisz` + kompilacja | link od właściciela: wiersz zastępczy w rejestrze źródeł (`zrodla`), po turze bez analizy wyciąg odpowiedzi w werdykcie i przypomnienie w kolejnych turach | agent sesji pisze notatki sam (konwencje jego repo); skrzynka pilnuje tylko, żeby nic od właściciela nie zginęło |
+| `wiedza_szukaj` (narzędzie) | polecenia bazy (`kb search`, `wiki.py search`) | omp ma terminal; narzędzie Hermesa nie istnieje w omp |
+| build: SOUL + ZASADY z rdzeniem mapy | `panel.tozsamosc`: ten sam skład (znacznik `<!-- Jarvo:MAPA -->` w ZASADY.md), plik zapisywany tylko przy zmianie, pełna mapa jako notatka w katalogu wiedzy | ten sam mechanizm, inne miejsce zapisu (`--append-system-prompt`) |
+| Mózg: graf skarbca z wtyczki | graf z `Indeks.graf()` do pliku `graf` (+ `opis`, hub z `typ: hub`), źródło w `konfig/mozg.json` | `mozg_zrodla.py` czyta źródła z pliku |
+
+Testy: `tests/test_mozg_sesji.py`, `tests/test_sesje_omp.py::test_mozg_sesji_w_turze`.
 
 ---
 
@@ -706,6 +737,7 @@ Wpisy do [SOURCES.md](SOURCES.md) i [TOOLBOX.md](TOOLBOX.md) dojdą z etapem, w 
 | `wiedza/wiedza.py` | narzędzie skarbca (zasiew, indeks, szukanie, szkice, orzeczenia, lint, graf, punkty zapisu, pomiar przypomnień `ocena`); importowane przez wtyczkę |
 | `wiedza/SCHEMA.md` | zasady skarbca kopiowane do `knowledge/SCHEMA.md` |
 | `wiedza/mapa.py` | mapa Jarva (§2b): rdzeń do promptu (build, validate) i notatka `jarvo/jak działa jarvo` (zasiew) |
+| `jarvo/mozg_sesji.py`, `tests/test_mozg_sesji.py` | mózg sesji omp (§4c): przypomnienie przed turą w skrzynce, linki od właściciela w rejestrze, tożsamość z rdzeniem mapy, graf Mózgu, `ocena`; `jarvo sesja <klucz> wiedza …` |
 | `scripts/build.py` → `build/wiedza/tozsamosc/` | tożsamość Jarva dla skarbca (§2a): SOUL, ZASADY, KRYTYCZNE, MAPA repo i nakładki, `zrodla.json` |
 | `tests/test_wiedza_mozg.py` | tożsamość i mapa, lustro pamięci po treści, GET/PUT /pamiec (zgodność z Hermesem), archiwum, przeniesienie, streszczenia, routing kompilatora, obieg end to end |
 | `wiedza/bledy/*.md` | zasiew księgi błędów (§4b): notatki `blad` z błędów floty, `zasiej --bledy` dokłada tylko nowe |

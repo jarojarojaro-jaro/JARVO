@@ -44,6 +44,9 @@ SOUL_POSTAC_BUDZET = 1600            # sama postać: tożsamość, charakter, g�
 # (~+120 tok.) i sekcja „Biznesy” w rdzeniu (każdy biznes z opiekunem, ~+215 tok.) = ~5 874 tok. z nakładką;
 # stała część promptu, trafia w cache dostawcy. Zapas ~125 tok.
 SOUL_BUDZET_ORKIESTRATORA = 6000
+# 22.11 (właściciel: „każdy agent jak Jarvo, bez marnowania tokenów”): rdzeń mapy specjalisty (bloki RDZEN jego MAPA.md)
+# to kilka linii, które musi znać od razu (skąd zlecenia, gdzie wyniki, pamięć); reszta mapy jest w skarbcu
+RDZEN_AGENTA = 250
 DLUGOSC_SCIEZKI = 60                 # średnia długość podstawionej ścieżki @@…@@ w zbudowanym SOUL
 SCIEZKI_MAPY = ("DATA_DIR", "JARVO_DIR", "KNOWLEDGE_DIR", "MISSIONS_DIR", "WORKSPACES_DIR", "INBOX_DIR")   # fl.sciezki_mapy
 # zasada bloku kontekstu (protokół floty, zasada 8; docs/HQ.md „Aplikacja”): każdy złożony SOUL nazywa znaczniki,
@@ -205,6 +208,54 @@ def check_skill_gate(name: str, cfg: dict, r: Report) -> None:
               "(skill agenta ma czekać na zgodę w poczekalni)")
 
 
+def zbudowany_prompt(fleet: fl.Fleet, a: fl.Agent, protocol: str) -> str:
+    """Prompt agenta (SOUL + ZASADY) taki, jaki dostaje model: najdłuższa kalibracja, jaką agent może dostać (zmiana
+    dostawcy albo modelu w panelu), protokół, sekcja „Czego nie zrobisz”, roster orkiestratora, rdzeń mapy (każdego agenta
+    z MAPA.md), tokeny właściciela, a reszta tokenów @@…@@ jako ścieżki średniej długości (19.11 źródło miało 3 400 tok.,
+    build 3 673). Z tego liczy budżet check_profile i pomiar przed/po zmianie promptu."""
+    d, orch = a.dir, a.name == fleet.orchestrator
+    calib = max((fl.calibration_section(f"{fam}-x", orch) for fam in CALIBRATION_FAMILIES), key=len)
+    _, pominiete = fl.available_skills(d / "skills")        # sekcja „Czego nie zrobisz” z buildu też jest w prefiksie
+    dopisek = "\n\n" + fl.missing_section(pominiete, fleet) if pominiete else ""
+    zbudowany = fl.soul_zrodlo(d).replace(fl.PROTOCOL_MARKER, f"{fl.protocol_for(protocol, orch)}\n\n{calib}") + dopisek
+    sciezki = fl.sciezki_mapy({k: "x" * DLUGOSC_SCIEZKI for k in SCIEZKI_MAPY}, a.name)
+    if orch:
+        zbudowany = zbudowany.replace(fl.ROSTER_MARKER, fl.render_roster_summary(fleet))
+    if fl.MAPA_MARKER in zbudowany:
+        zbudowany = zbudowany.replace(fl.MAPA_MARKER, fl.rdzen_mapy(fleet, sciezki, a.name))
+    for token, wartosc in fl.tokeny_wlasciciela(fleet).items():
+        zbudowany = zbudowany.replace(f"@@{token}@@", wartosc)
+    return re.sub(r"@@[A-Z_]+@@", "x" * DLUGOSC_SCIEZKI, zbudowany)
+
+
+def check_mapa(fleet: fl.Fleet, a: fl.Agent, soul: str, r: Report) -> None:
+    """Mapa agenta (docs/WIEDZA.md §2b): orkiestrator ma ją zawsze, a każdy agent w układzie Jarva (z ZASADY.md) też.
+    MAPA.md ⇔ znacznik `<!-- Jarvo:MAPA -->` w ZASADY.md (w SOUL.md postaci nie), sekcje tylko z wiedza/mapa.py SEKCJE
+    (jeden układ notatki „od A do Z” u każdego agenta), rdzeń w budżecie: orkiestrator mapa.MAX_TOKENOW_RDZENIA,
+    specjalista RDZEN_AGENTA (jego prompt ma być krótki: w rdzeniu tylko to, co musi wiedzieć od razu)."""
+    mapa = fl._modul_mapy()
+    repo, nakl = fl.mapa_zrodla(fleet, a.name)
+    orch, zasady = a.name == fleet.orchestrator, (a.dir / fl.ZASADY_FILE).exists()
+    if not (repo or nakl):
+        if orch or zasady:
+            r.err(f"{a.name}: brak {fl.MAPA_FILE} (agent w układzie SOUL + ZASADY ma mapę, docs/WIEDZA.md §2b)")
+        if fl.MAPA_MARKER in soul:
+            r.err(f"{a.name}: {fl.MAPA_MARKER} bez {fl.MAPA_FILE}")
+        return
+    if fl.MAPA_MARKER not in soul:
+        r.err(f"{a.name}: {fl.MAPA_FILE} jest, a SOUL.md ani {fl.ZASADY_FILE} nie ma {fl.MAPA_MARKER}")
+    postac = (a.dir / "SOUL.md").read_text(encoding="utf-8") if zasady and (a.dir / "SOUL.md").exists() else ""
+    if fl.MAPA_MARKER in postac:
+        r.err(f"{a.name}: SOUL.md to sama postać; {fl.MAPA_MARKER} należy do {fl.ZASADY_FILE}")
+    for nazwa in [*mapa.sekcje(repo), *mapa.sekcje(nakl)]:
+        if nazwa not in mapa.SEKCJE:
+            r.err(f"{a.name}: {fl.MAPA_FILE} ma sekcję {nazwa!r} spoza wiedza/mapa.py SEKCJE")
+    limit = mapa.MAX_TOKENOW_RDZENIA if orch else RDZEN_AGENTA
+    sciezki = fl.sciezki_mapy({k: "x" * DLUGOSC_SCIEZKI for k in SCIEZKI_MAPY}, a.name)
+    if (t := fl.approx_tokens(fl.rdzen_mapy(fleet, sciezki, a.name))) > limit:
+        r.err(f"{a.name}: rdzeń mapy ~{t} tokenów > {limit}; resztę zostaw poza blokami RDZEN (notatka w skarbcu)")
+
+
 def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set[str]:
     d = a.dir
     for rel in REQUIRED_FILES:
@@ -249,26 +300,12 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
     for znacznik in SOUL_KONTEKST:
         if znacznik not in zlozony:
             r.err(f"{a.name}: SOUL z protokołem bez zasady bloku kontekstu (brak {znacznik!r}; protokół, zasada 8)")
-    if a.name == fleet.orchestrator:
-        for znacznik in (fl.ROSTER_MARKER, fl.MAPA_MARKER):
-            if znacznik not in soul:
-                r.err(f"{a.name}: SOUL.md orkiestratora bez {znacznik}")
-    # budżet z najdłuższą kalibracją, jaką agent może dostać (zmiana dostawcy albo modelu w panelu), na tekście
-    # takim, jaki dostaje model: ścieżki @@…@@, roster i rdzeń mapy podstawione (19.11 źródło miało 3 400 tok., build 3 673)
-    orch = a.name == fleet.orchestrator
-    calib = max((fl.calibration_section(f"{fam}-x", orch) for fam in CALIBRATION_FAMILIES), key=len)
-    _, pominiete = fl.available_skills(d / "skills")        # sekcja „Czego nie zrobisz” z buildu też jest w prefiksie
-    dopisek = "\n\n" + fl.missing_section(pominiete, fleet) if pominiete else ""
-    zbudowany = soul.replace(fl.PROTOCOL_MARKER, f"{fl.protocol_for(protocol, orch)}\n\n{calib}") + dopisek
-    if orch:
-        sciezki = fl.sciezki_mapy({k: "x" * DLUGOSC_SCIEZKI for k in SCIEZKI_MAPY}, a.name)
-        zbudowany = zbudowany.replace(fl.ROSTER_MARKER, fl.render_roster_summary(fleet)).replace(
-            fl.MAPA_MARKER, fl.rdzen_mapy(fleet, sciezki))
-    for token, wartosc in fl.tokeny_wlasciciela(fleet).items():
-        zbudowany = zbudowany.replace(f"@@{token}@@", wartosc)
-    zbudowany = re.sub(r"@@[A-Z_]+@@", "x" * DLUGOSC_SCIEZKI, zbudowany)
+    if a.name == fleet.orchestrator and fl.ROSTER_MARKER not in soul:
+        r.err(f"{a.name}: SOUL.md orkiestratora bez {fl.ROSTER_MARKER}")
+    check_mapa(fleet, a, soul, r)
+    zbudowany = zbudowany_prompt(fleet, a, protocol)
     tokens = fl.approx_tokens(zbudowany)
-    budzet = SOUL_BUDZET_ORKIESTRATORA if orch else fl.SOUL_TOKEN_BUDGET
+    budzet = SOUL_BUDZET_ORKIESTRATORA if a.name == fleet.orchestrator else fl.SOUL_TOKEN_BUDGET
     if tokens > budzet:
         r.err(f"{a.name}: SOUL ~{tokens} tokenów (zbudowany: protokół, kalibracja, ścieżki) > budżet {budzet}")
 

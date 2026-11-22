@@ -12,10 +12,13 @@ Wpis w `<dane>/jarvo/konfig/sesje.json` (klucz = dopisek; rozmówcą jest tylko 
                            "omp_arg": ["--no-context-files", "--append-system-prompt", "~/…/system.md"],
                            "opis": "…", "kolejnosc": 2, "potwierdzenia": false, "zamykaj_bezczynna_min": 30,
                            "pobierz_linki": ["/ścieżka/python", "/ścieżka/pobierz_link.py"],
-                           "przed_tura": ["python3", "~/…/kernel.py", "system"]}}}
+                           "przed_tura": ["python3", "~/…/kernel.py", "system"],
+                           "wiedza": {"katalog": "~/…/wiki", …}, "tozsamosc": {"soul": "…", "plik": "~/…/system.md", …}}}}
 
 `przed_tura`: polecenie, które skrzynka uruchamia przed każdą turą (np. Kernel składa system.md z arsenałem floty);
 gdy zmieni plik podany w `omp_arg` (np. `--append-system-prompt`), skrzynka między turami startuje nowy proces omp.
+`wiedza` i `tozsamosc`: mózg sesji jak u Jarva (przypomnienie przed turą, linki od właściciela w rejestrze, graf Mózgu,
+stała część promptu z SOUL, ZASADY i rdzenia mapy); opis pól i obiegu: jarvo/mozg_sesji.py.
 
 Układ skrzynki: `nowe/` (czeka), `zrobione/`, `bledy/`, `tura/<tura>.jsonl` (strumień tury), `sesja.lock` (flock:
 skrzynka i terminal), `stan.json` (`tura {id, pid, start, klucze}`, `rpc {pid, skrzynka, od}` (proces `omp --mode rpc`
@@ -117,6 +120,8 @@ class Wpis:
     zamykaj_bezczynna_min: float = 0
     pobierz_linki: list[str] = field(default_factory=list)
     przed_tura: list[str] = field(default_factory=list)
+    wiedza: dict = field(default_factory=dict)
+    tozsamosc: dict = field(default_factory=dict)
     blad: str = ""
 
     def __getattr__(self, nazwa):                 # katalogi skrzynki: w.nowe, w.zrobione, w.bledy, w.tura, w.komendy
@@ -197,6 +202,8 @@ def wpis_z(klucz: str, surowy: dict, dom: Path | None = None) -> Wpis | None:
     w.omp_arg = [_arg(str(a)) for a in panel.get("omp_arg") or [] if isinstance(a, (str, int, float))]
     w.pobierz_linki = [_program_narzedzi(_arg(str(a))) for a in panel.get("pobierz_linki") or [] if isinstance(a, str)]
     w.przed_tura = [_arg(str(a)) for a in panel.get("przed_tura") or [] if isinstance(a, str)]
+    w.wiedza = panel["wiedza"] if isinstance(panel.get("wiedza"), dict) else {}
+    w.tozsamosc = panel["tozsamosc"] if isinstance(panel.get("tozsamosc"), dict) else {}
     w.sesja = str(panel.get("sesja") or "")
     if not KLUCZ_RE.fullmatch(klucz):
         w.blad = w.blad or "zły klucz"
