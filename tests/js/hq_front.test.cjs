@@ -871,7 +871,7 @@ const MOZG = (() => {
     URLSearchParams, Date, Math, JSON, Map, Set, String, Number, Array, Object, RegExp, Infinity, encodeURIComponent });
   vm.runInContext("const isPL = () => globalThis.PL !== false; const L = (pl, en) => (isPL() ? pl : en);\n" + fs.readFileSync(path.join(SRC, "63-mozg.js"), "utf8")
     + "\n;globalThis.M = { MOZG_KATEGORIE, MOZG_BLEDY_PAMIECI, mozgMapa, mozgSekcje, mozgSzukaj, mozgTytul, mozgProste, mozgWycofana, mozgWyzej, mozgWstecz,"
-    + " mozgPamiec, mozgBladPamieci, mozgProsba, mozgPopros, mozgWiki, mozgSpis, mozgSciezkaSekcji, mozgHash, mozgStan };", ctx, { filename: "63-mozg.js" });
+    + " mozgPamiec, mozgBladPamieci, mozgProsba, mozgPopros, mozgWiki, mozgPodziel, mozgSciezkaSekcji, mozgHash, mozgStan };", ctx, { filename: "63-mozg.js" });
   return { ...ctx.M, ctx, slad };
 })();
 const mozgWezel = (id, o = {}) => {
@@ -932,8 +932,10 @@ test("Mózg: „Najważniejsze” z podsumowania huba części i całego skarbca
   assert.strictEqual(m.korzen.id, "_hub-skarbiec");
   const cel = (t) => (t === "jarvo/zasady pracy" ? ["#/mozg?o=x", "Zasady pracy"] : null);
   assert.strictEqual(MOZG.mozgWiki(jarvo.hub.podsumowanie, cel), "Jarvo prowadzi flotę. Zasady: [Zasady pracy](#/mozg?o=x).");
-  // spis sekcji długiej notatki: tylko „## ” poza kodem, bez znaczników
-  eq(MOZG.mozgSpis("# T\n## Kim jestem\ntekst\n```\n## nie\n```\n### pod\n## **Co mogę** ##\n## Gdzie co jest"), ["Kim jestem", "Co mogę", "Gdzie co jest"]);
+  // strona notatki: streszczenie = pierwszy akapit, reszta wstępu i sekcje „## ” zwijane; „## ” w bloku kodu to nie sekcja
+  eq(MOZG.mozgPodziel("**Skrót.** Zdanie.\n\nDruga część wstępu.\n## Kim jestem\ntekst\n```\n## nie\n```\n### pod\n## **Co mogę** ##\n\n## Gdzie co jest\nx"),
+    { skrot: "**Skrót.** Zdanie.", wiecej: "Druga część wstępu.", sekcje: [{ tytul: "Kim jestem", tresc: "tekst\n```\n## nie\n```\n### pod" }, { tytul: "Gdzie co jest", tresc: "x" }] });
+  eq(MOZG.mozgPodziel(""), { skrot: "", wiecej: "", sekcje: [] });
   // wynik szukania z sekcją (GET /search: `notatka#Sekcja`) otwiera notatkę i przewija do sekcji ze spisu
   eq(MOZG.mozgSciezkaSekcji("jarvo/jak działa jarvo#Gdzie co jest"), ["jarvo/jak działa jarvo", "Gdzie co jest"]);
   eq(MOZG.mozgSciezkaSekcji("user/USER"), ["user/USER", ""]);

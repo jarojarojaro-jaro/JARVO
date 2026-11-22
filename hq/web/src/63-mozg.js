@@ -172,15 +172,21 @@ function mozgWiki(tekst, cel) {
 // wynik GET /search: `sciezka` notatki albo jej sekcji (`notatka#Sekcja`) → [notatka, sekcja]
 const mozgSciezkaSekcji = (s) => { const t = String(s || ""), i = t.indexOf("#"); return i < 0 ? [t, ""] : [t.slice(0, i), t.slice(i + 1)]; };
 
-// spis sekcji długiej notatki: nagłówki „## ” poza blokami kodu (w widoku h4.j-md-h2, ta sama kolejność), bez znaczników
-function mozgSpis(tekst) {
-  const wynik = [];
-  let kod = false;
+// notatka do przeglądania (22.11 właściciel: „krótkie streszczenie, a nie ściana tekstu z góry, łatwe do przeglądania”):
+// wstęp (do pierwszego „## ”) i sekcje „## ” poza blokami kodu; tytuł sekcji bez znaczników. Streszczenie = pierwszy
+// akapit wstępu, reszta wstępu to pierwsza zwijana część („Wstęp”, a bez sekcji „Cała treść”).
+function mozgPodziel(tekst) {
+  const sekcje = [], wstep = [];
+  let kod = false, biez = null;
   for (const l of String(tekst || "").split("\n")) {
     if (/^ {0,3}(```|~~~)/.test(l)) kod = !kod;
-    else if (!kod) { const m = /^ {0,3}##[ \t]+(.*?)[ \t#]*$/.exec(l); if (m && m[1]) wynik.push(m[1].replace(/[*_`]/g, "").trim()); }
+    const m = !kod && /^ {0,3}##[ \t]+(.*?)[ \t#]*$/.exec(l);
+    if (m && m[1]) { biez = { tytul: m[1].replace(/[*_`]/g, "").trim(), linie: [] }; sekcje.push(biez); }
+    else (biez ? biez.linie : wstep).push(l);
   }
-  return wynik;
+  const bloki = wstep.join("\n").trim().split(/\n[ \t]*\n/);
+  return { skrot: (bloki[0] || "").trim(), wiecej: bloki.slice(1).join("\n\n").trim(),
+    sekcje: sekcje.map((s) => ({ tytul: s.tytul, tresc: s.linie.join("\n").trim() })).filter((s) => s.tresc) };
 }
 
 // „Wstecz”: poprzedni widok Mózgu z historii przeglądarki (wpis oznaczony przy wejściu, history.back), a bez niego
@@ -373,22 +379,22 @@ function MozgStrona({ z, id, dane, mapa, href, cel, nazwaMiejsca, barwa, wstecz,
   }, [id, odsw, z.klucz]);
   useEffect(() => { if (zapisano && info.current) info.current.focus(); }, [zapisano]);
   const tresc = useMemo(() => n && !n.blad && mozgWiki(String(n.tresc || "").replace(/^\s*#\s[^\n]*\n/, ""), cel), [n]);
-  // długa notatka (od 4 sekcji „## ”, np. „Jarvo od A do Z”): spis sekcji; klik przewija do nagłówka i daje mu fokus
-  const spis = useMemo(() => (tresc ? mozgSpis(tresc) : []), [tresc]);
-  const skocz = (i) => {
-    const h = ref.current.querySelectorAll(".j-md .j-md-h2")[i];
-    if (!h) return;
-    h.setAttribute("tabindex", "-1");
-    h.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-    h.focus({ preventScroll: true });
-  };
-  // wynik szukania z sekcją (`sciezka#Sekcja` z GET /search): po wczytaniu notatki przewinięcie do tej sekcji
+  // streszczenie na górze, reszta w zwijanych częściach (zamknięte; „Rozwiń wszystko”); bez treści: opis z grafu
+  const czesci = useMemo(() => {
+    const p = mozgPodziel(tresc || "");
+    return { skrot: p.skrot || w.opis || "", sekcje: [...(p.wiecej ? [{ tytul: p.sekcje.length ? L("Wstęp", "Introduction") : L("Cała treść", "Full text"), tresc: p.wiecej }] : []), ...p.sekcje] };
+  }, [tresc]);
+  const [otwarte, setOtwarte] = useState(() => new Set());
+  const przelacz = (i, on) => setOtwarte((s) => { const x = new Set(s); if (on) x.add(i); else x.delete(i); return x; });
+  const wszystkieOtwarte = czesci.sekcje.length > 0 && otwarte.size === czesci.sekcje.length;
+  // wynik szukania z sekcją (`sciezka#Sekcja` z GET /search): ta część otwarta i przewinięta do niej
   useEffect(() => {
-    const i = sekcja && tresc ? spis.indexOf(sekcja.replace(/[*_`]/g, "").trim()) : -1;
+    const i = sekcja ? czesci.sekcje.findIndex((s) => s.tytul === sekcja.replace(/[*_`]/g, "").trim()) : -1;
     if (i < 0) return undefined;
-    const t = setTimeout(() => skocz(i), 0);
+    przelacz(i, true);
+    const t = setTimeout(() => { const h = ref.current.querySelectorAll(".j-mozg-czesc")[i]; if (h) h.scrollIntoView({ block: "start", behavior: "smooth" }); }, 30);
     return () => clearTimeout(t);
-  }, [tresc, sekcja]);
+  }, [czesci, sekcja]);
   const obok = [...(dane.sasiedzi.get(id) || [])].map((c) => dane.byId.get(c)).filter(Boolean).sort((a, b) => b.hub - a.hub || (b.we || 0) - (a.we || 0));
   const gd = mapa.gdzie.get(id), fm = (n && n.frontmatter) || {};
   const edycja = w.edycja || fm.edycja, pamiec = w.pamiec || fm.pamiec, profil = String(w.profil || fm.profil || ""), plik = String(fm.plik || "");
@@ -421,11 +427,15 @@ function MozgStrona({ z, id, dane, mapa, href, cel, nazwaMiejsca, barwa, wstecz,
       ${edytor === "uwaga" && html`<${MozgUwaga} id=${id} onKoniec=${() => setEdytor("")}/>`}
       ${edytor === "pamiec" ? html`<${MozgPamiec} klucz=${pamiec} profil=${profil} onKoniec=${() => setEdytor("")} onZapis=${() => { setEdytor(""); setZapisano(true); onZapis(); }}/>`
         : html`
-        ${spis.length >= 4 && html`<nav class="j-mozg-spis" aria-label=${L("Sekcje notatki", "Note sections")}>
-          <h3>${L("W tej notatce", "In this note")}</h3>
-          <ol>${spis.map((t, i) => html`<li key=${i}><button type="button" onClick=${() => skocz(i)}>${t}</button></li>`)}</ol></nav>`}
-        ${skarbiec || z.tresc ? (!n ? html`<${Spinner}/>` : n.blad ? html`<p>${L("Nie udało się otworzyć notatki.", "Could not open the note.")}</p>` : html`<${TrescMd} tekst=${tresc}/>`)
-          : w.opis && html`<p class="j-mozg-opis-n">${w.opis}</p>`}
+        ${(skarbiec || z.tresc) && !n ? html`<${Spinner}/>` : n && n.blad ? html`<p>${L("Nie udało się otworzyć notatki.", "Could not open the note.")}</p>` : html`
+          ${czesci.skrot && html`<div class="j-mozg-skrot"><h2>${L("W skrócie", "In short")}</h2><${TrescMd} tekst=${czesci.skrot}/></div>`}
+          ${czesci.sekcje.length > 0 && html`<div class="j-mozg-czesci">
+            <div class="j-mozg-czesci-gora"><h2>${L("W notatce", "In this note")} <span>${czesci.sekcje.length}</span></h2>
+              ${czesci.sekcje.length > 1 && html`<button type="button" class="j-mozg-wiecej" onClick=${() => setOtwarte(wszystkieOtwarte ? new Set() : new Set(czesci.sekcje.map((_, i) => i)))}>
+                ${wszystkieOtwarte ? L("Zwiń wszystko", "Collapse all") : L("Rozwiń wszystko", "Expand all")}</button>`}</div>
+            ${czesci.sekcje.map((s, i) => html`<details key=${i} class="j-mozg-czesc" open=${otwarte.has(i)} onToggle=${(e) => { if (e.currentTarget.open !== otwarte.has(i)) przelacz(i, e.currentTarget.open); }}>
+              <summary>${s.tytul}</summary>${otwarte.has(i) && html`<${TrescMd} tekst=${s.tresc}/>`}</details>`)}
+          </div>`}`}
         ${url && html`<p><a class="j-mozg-zewn" href=${url} target="_blank" rel="noopener noreferrer">${L("Otwórz w repozytorium ↗", "Open in the repository ↗")}</a></p>`}
         ${obok.length > 0 && html`<section class="j-mozg-obok"><h3>${L("Powiązane", "Linked")} <span>${obok.length}</span></h3>
           <ul>${(wszystkie ? obok : obok.slice(0, 12)).map((c) => html`<${MozgWiersz} key=${c.id} n=${c} href=${href} gdzie=${nazwaMiejsca(mapa.gdzie.get(c.id))}/>`)}</ul>

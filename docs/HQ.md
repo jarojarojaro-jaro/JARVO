@@ -1502,15 +1502,20 @@ z tekstem i jakieś edytuj”). Pakiet `mozg` ładuje się dopiero po wejściu w
   sam w karcie poziomu, w wynikach szukania i na stronie notatki): zwężający się pień od środka do węzła J, z J gałęzie
   do grup, grupa to skupisko kropek (słonecznik). Wycinek części rośnie z pierwiastkiem liczby notatek; grupy w łukach
   za J (największa w środku, kolejne rzędy dalej), bez nachodzenia (test). Kropka = notatka (wielkość z liczby
-  linków), wycofana poza archiwum szara. Włókna = linki bez kierunku (raz na parę) z gradientem od koloru części
-  jednej notatki do drugiej: w grupie łukiem przez jej środek, między grupami przez J, między częściami przez J obu
-  części i pnie przy środku (wiązka, ściśnięcie 0,82, wygładzenie Chaikina). Po włóknach i dendrytach biegną impulsy
-  (część włókien naraz, w shaderze), kropki lekko oddychają. Najechanie na część rozjaśnia ją i jej włókna, reszta
-  przygasa; na kropkę: obwódka, jej włókna w pełnym impulsie, podpis z tytułem i miejscem.
-- **Poziomy to kamera.** Klik w część albo jej nazwę: lot (0,9 s, wykładniczo w skali) na jej skupiska, inne części
-  przygasają, nad skupiskami nazwy grup; klik w grupę albo jej nazwę: lot na grupę; od przybliżenia ×3 tytuły
+  linków), wycofana poza archiwum szara; grupy w części na zmianę jaśniejsze i ciemniejsze, żeby skupiska dało się
+  odróżnić. W spoczynku widać tylko kropki i dendryty (22.11 właściciel: „za dużo naraz… koneksje tylko jak się
+  najedzie, normalnie różne kolory”). Włókna = linki bez kierunku (raz na parę) z gradientem od koloru części jednej
+  notatki do drugiej: w grupie łukiem przez jej środek, między grupami przez J, między częściami przez J obu części
+  i pnie przy środku (wiązka, ściśnięcie 0,82, wygładzenie Chaikina); pojawiają się z impulsami dopiero przy najechaniu:
+  na część (jej nazwę albo skupisko) jej włókna, reszta przygasa; na kropkę (na jej poziomie) obwódka, jej włókna
+  i podpis z tytułem i miejscem.
+- **Poziomy to kamera, po kolei** (właściciel: „najpierw klik w sekcję, później w poszczególne”). Na wejściu klik
+  w część, jej nazwę albo dowolną jej kropkę: lot (0,9 s, wykładniczo w skali) na część, inne przygasają, nad
+  skupiskami nazwy grup. W części klik w grupę, jej nazwę albo jej kropkę: lot na grupę. Kropka otwiera notatkę
+  dopiero na swoim poziomie (część z jedną grupą, grupa w kadrze albo przybliżenie ×5); od przybliżenia ×3 tytuły
   najważniejszych notatek w kadrze (do 18, bez nachodzenia, z obwódką dla czytelności). Klik w tło albo Esc: poziom
-  wyżej, klik w środek: cały mózg. Kółko przybliża wokół kursora, przeciąganie przesuwa, dwa palce przybliżają.
+  wyżej, klik w środek: cały mózg. Kółko przybliża i oddala płynnie wokół kursora (lot 0,26 s, kolejne obroty liczą
+  od celu), przeciąganie przesuwa, dwa palce przybliżają.
   Okruszki u góry (Mózg › część › grupa). Na wejściu nad mapą tylko szukanie i „Najważniejsze →” (hub skarbca) w prawym
   górnym rogu; w części i grupie w lewym dolnym rogu karta poziomu: „Wstecz”, nazwa i liczba, jedno zdanie i „Przegląd tej części →” (hub części albo grupy). Stan w hashu
   `#/mozg?k=<część>&g=<grupa>&o=<notatka>&z=<źródło>` (trasa aplikacji widzi `#/mozg`, parametry czyta tylko Mózg).
@@ -1529,12 +1534,15 @@ z tekstem i jakieś edytuj”). Pakiet `mozg` ładuje się dopiero po wejściu w
   otwiera, Esc czyści.
 - **Strona notatki** (klik w kropkę, w wynik szukania, w link): przykrywa mapę całą szerokością (mapa pod spodem
   stoi, bez rysowania, i wraca w tym samym kadrze), pasek: „Wstecz”, miejsce z kropką w kolorze części, „Edytuj”, ×;
-  kolumna do czytania (820 px): tytuł, rodzaj, data i liczba powiązanych, pełna treść w Markdown (`TrescMd`, bez
-  `innerHTML`) z `[[linkami]]` jako linkami Mózgu (napis albo tytuł celu), bez własnej sekcji „## Powiązane”
-  i komentarzy generatora. Treść: skarbiec z `/note`, źródło z pliku z `GET /mozg/<klucz>/notatka` (gdy ma katalog
-  `notatki`), inaczej opis z grafu i „Otwórz w repozytorium ↗”. Od 4 sekcji „## ” nad treścią **spis sekcji** (klik
-  przewija do nagłówka i daje mu fokus). Pod spodem „Powiązane” (sąsiedzi z obu stron linku, 12 + „Pokaż wszystkie”).
-  Esc i × zamykają (wpis historii zastąpiony, jak „Wstecz”).
+  kolumna do czytania (820 px): tytuł, rodzaj, data i liczba powiązanych, potem **„W skrócie”** (pierwszy akapit
+  notatki, bez treści opis z grafu) i **„W notatce”**: reszta wstępu („Wstęp”, bez sekcji „Cała treść”) i każda sekcja
+  „## ” jako zwijana część, zamknięta (właściciel: „krótkie streszczenie, a nie ściana tekstu z góry”; `mozgPodziel`,
+  „## ” w bloku kodu to nie sekcja), „Rozwiń wszystko”; treść części rysuje się dopiero po otwarciu. Markdown
+  (`TrescMd`, bez `innerHTML`) z `[[linkami]]` jako linkami Mózgu, bez własnej sekcji „## Powiązane” i komentarzy
+  generatora. Treść: skarbiec z `/note`, źródło z pliku z `GET /mozg/<klucz>/notatka` (gdy ma katalog `notatki`),
+  inaczej opis z grafu i „Otwórz w repozytorium ↗”. Wynik szukania z sekcją otwiera tę część i przewija do niej. Pod
+  spodem „Powiązane” (sąsiedzi z obu stron linku, 12 + „Pokaż wszystkie”). Esc i × zamykają (wpis historii
+  zastąpiony, jak „Wstecz”).
 - **„Edytuj”** zależy od notatki: zwykła notatka skarbca: pole „Co zmienić w tej notatce?” i „Wyślij do Jarva”
   (`POST /remark` wtyczki `jarvo-wiedza`: szkic-uwaga w skrzynce, kompilacja wnosi go sama kilka minut później;
   notatek skarbca nie pisze nikt poza kompilacją, docs/WIEDZA.md), Ctrl+Enter wysyła, Esc z pustym polem zamyka.
@@ -1568,9 +1576,10 @@ z tekstem i jakieś edytuj”). Pakiet `mozg` ładuje się dopiero po wejściu w
   /mozg/<klucz>/notatka?id=<id>` oddaje treść bez frontmattera (do 2 MB; `..`, ścieżka bezwzględna i dowiązanie poza
   katalog = 404). `rozmowca`: klucz rozmówcy z terminala (`s:gpu`), do którego idzie „Edytuj”.
 - **Wydajność:** układ liczony raz na dane (Kernel: ok. 760 kropek, 4 500 włókien po 9 odcinków w jednym buforze),
-  klatka to kilka wywołań rysowania (dendryty, włókna, kropki) i napisy w 2D. Impulsy: pętla do 30 klatek/s tylko
-  przy widocznym Mózgu; ukryta karta, otwarta strona notatki i `prefers-reduced-motion` (wtedy też bez lotów kamery)
-  = rysowanie tylko na żądanie. Utrata kontekstu WebGL: bufory budują się od nowa po odzyskaniu; bez WebGL komunikat,
+  klatka to kilka wywołań rysowania (dendryty, włókna, kropki) i napisy w 2D. Rysowanie na żądanie (lot, kółko,
+  przesunięcie, najechanie); pętla do 30 klatek/s tylko przy najechaniu (impulsy włókien), nie przy ukrytej karcie,
+  otwartej stronie notatki ani `prefers-reduced-motion` (wtedy też bez lotów kamery i impulsów). W spoczynku CPU 0.
+  Utrata kontekstu WebGL: bufory budują się od nowa po odzyskaniu; bez WebGL komunikat,
   szukanie i strony notatek działają.
 - **Telefon (≤ 700 px kontenera):** mapa na cały ekran, szukanie i karta poziomu węższe, strona notatki na cały
   ekran; przeciąganie przesuwa, dwa palce przybliżają.

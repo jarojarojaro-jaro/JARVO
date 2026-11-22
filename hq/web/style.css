@@ -2326,7 +2326,21 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-mozg-kolumna .j-md { font-size: 15px; line-height: 1.72; color: var(--j-tresc); }
 .j-mozg-kolumna .j-md h1, .j-mozg-kolumna .j-md h2 { font-size: 18px; margin-top: 28px; }
 .j-mozg-kolumna .j-md h3 { font-size: 15.5px; }
-.j-mozg-kolumna .j-md-h2 { scroll-margin-top: 72px; }
+/* „W skrócie” (pierwszy akapit) i zwijane części notatki: nagłówki jak spis, treść dopiero po otwarciu */
+.j-mozg-skrot { margin: 0 0 24px; padding: 16px 20px 14px; background: var(--j-tlo-karta); box-shadow: inset 3px 0 0 var(--c), inset 0 1px 0 var(--j-hi); }
+.j-mozg-skrot h2, .j-mozg-czesci-gora h2 { margin: 0 0 8px; color: var(--j-tekst-3); font: 500 10.5px/16px var(--j-font-mono); letter-spacing: .14em; text-transform: uppercase; }
+.j-mozg-skrot .j-md { font-size: 16px; line-height: 1.65; color: var(--j-tekst); }
+.j-mozg-czesci { margin: 0 0 8px; }
+.j-mozg-czesci-gora { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.j-mozg-czesci-gora h2 span { letter-spacing: 0; }
+.j-mozg-czesc { box-shadow: inset 0 -1px 0 var(--j-linia); scroll-margin-top: 64px; }
+.j-mozg-czesc summary { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 4px; cursor: pointer; list-style: none; color: var(--j-tekst); font: 600 14.5px var(--j-font-ui);
+  transition: background .2s var(--j-ease); }
+.j-mozg-czesc summary::-webkit-details-marker { display: none; }
+.j-mozg-czesc summary::before { content: ""; flex: none; width: 7px; height: 7px; border-right: 1.5px solid var(--c); border-bottom: 1.5px solid var(--c); transform: rotate(-45deg); transition: transform .2s var(--j-ease); }
+.j-mozg-czesc[open] summary::before { transform: rotate(45deg); }
+.j-mozg-czesc summary:hover { background: var(--j-tlo-hover); }
+.j-mozg-czesc > .j-md { padding: 4px 4px 20px 21px; }
 .j-mozg-opis-n { font-size: 15px; line-height: 1.7; color: var(--j-tresc); }
 .j-mozg .j-mozg-zewn { color: var(--j-link); font-size: 13px; }
 .j-mozg-obok { margin-top: 36px; padding-top: 16px; box-shadow: inset 0 1px 0 var(--j-linia); }
@@ -2365,13 +2379,6 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-mozg-pam-licz.is-ponad { color: var(--j-uwaga); }
 .j-mozg-pam-blad { margin: 8px 0; padding: 8px 12px; background: var(--j-uwaga-tlo); box-shadow: inset 2px 0 0 var(--j-uwaga); color: var(--j-tekst); font-size: 13px; line-height: 1.45; }
 .j-mozg-pam .j-mozg-akcje { margin: 12px 0 0; }
-.j-mozg-spis { margin: 0 0 20px; padding: 10px 14px; background: var(--j-wneka); box-shadow: inset 0 0 0 1px var(--j-linia); }
-.j-mozg-spis h3 { margin: 0 0 4px; color: var(--j-tekst-3); font: 500 10.5px var(--j-font-mono); letter-spacing: .14em; text-transform: uppercase; }
-.j-mozg-spis ol { margin: 0; padding-left: 22px; columns: 2 200px; column-gap: 24px; color: var(--j-tekst-3); font-size: 13px; }
-.j-mozg-spis li { break-inside: avoid; }
-.j-mozg-spis li::marker { font: 400 11px var(--j-font-mono); }
-.j-mozg-spis button { min-height: 30px; padding: 2px 0; border: 0; background: none; color: var(--j-link); font: inherit; text-align: left; cursor: pointer; }
-.j-mozg-spis button:hover { text-decoration: underline; text-underline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) { .j-mozg-strona { animation: none; } }
 @container app (max-width: 700px) {
   .j-mozg { gap: 0; }
