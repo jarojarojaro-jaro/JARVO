@@ -74,7 +74,12 @@ function nazwaDnia(klucz, teraz = Date.now() / 1000) {
   const pelna = d.toLocaleDateString(isPL() ? "pl-PL" : "en-GB", {
     weekday: "long", day: "numeric", month: "long", ...(d.getFullYear() !== new Date(teraz * 1000).getFullYear() ? { year: "numeric" } : {}) });
   const duza = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-  return g === "dzis" || g === "wczoraj" ? { glowna: T(`grupa.${g}`), pod: pelna } : { glowna: duza(pelna), pod: null };
+  if (g === "dzis" || g === "wczoraj") return { glowna: T(`grupa.${g}`), pod: pelna };
+  // inny dzień też w dwóch liniach jak „Dziś”: dzień tygodnia nad datą (jedna wysokość i szerokość w nawigacji)
+  const tydzien = d.toLocaleDateString(isPL() ? "pl-PL" : "en-GB", { weekday: "long" });
+  const data = d.toLocaleDateString(isPL() ? "pl-PL" : "en-GB", {
+    day: "numeric", month: "long", ...(d.getFullYear() !== new Date(teraz * 1000).getFullYear() ? { year: "numeric" } : {}) });
+  return { glowna: duza(tydzien), pod: data };
 }
 
 // Układ raportu w motywie TARS (tylko wygląd, treść ta sama): linia „Etykieta: treść” (krótka etykieta na początku
@@ -279,7 +284,7 @@ function Aktualizacje({ trasa }) {
   return html`<section class="j-rap" aria-label=${T("rap.tytul")}>
     <${NaglowekWidoku} ikona=${IKONY_WIDOKOW.aktualizacje} tytul=${T("rap.tytul")} opis=${podsumowanie}>
       ${nd && html`<div class="j-rap-nawig">
-        ${trasa.dzien && trasa.dzien !== ostatni && html`<${Przycisk} rodzaj="cichy" maly podpowiedz=${T("rap.najnowsze_tip")}
+        ${trasa.dzien && trasa.dzien !== ostatni && html`<${Przycisk} rodzaj="cichy" maly klasa="j-rap-najnowsze" podpowiedz=${T("rap.najnowsze_tip")}
           onClick=${() => Trasa.idz({ widok: "aktualizacje", rodzaj: rodzaj || undefined })}>${T("rap.najnowsze")}</${Przycisk}>`}
         <${Przycisk} rodzaj="cichy" ikona="back" etykieta=${T("rap.poprzedni")} disabled=${!poprzedni} onClick=${() => idzDo(poprzedni)}/>
         <button type="button" class="j-rap-data" aria-expanded=${String(kalOtwarty)} aria-controls="j-rap-bok" onClick=${() => setKalOtwarty(!kalOtwarty)}>

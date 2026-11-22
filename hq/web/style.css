@@ -2433,6 +2433,10 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-rap-tresc { flex: 1; min-height: 0; overflow: auto; }
 .j-rap-nawig { align-self: stretch; display: flex; align-items: stretch; box-shadow: inset 2px 0 0 var(--j-rowek); }
 .j-rap-nawig > .j-btn { height: auto; width: 40px; }
+/* „Najnowsze” (dzień inny niż ostatni): osobny segment z rowkiem, nie 40 px jak strzałki (22.11: wystawał poza moduł) */
+.j-rap-nawig > .j-btn.j-rap-najnowsze { width: auto; padding: 0 16px; white-space: nowrap; box-shadow: inset -2px 0 0 var(--j-rowek);
+  font: 500 11px/16px var(--j-font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--j-tekst-2); }
+.j-rap-nawig > .j-btn.j-rap-najnowsze:hover { color: var(--j-tekst); }
 /* stała szerokość daty: ‹ › nie skaczą pod kursorem, gdy „Dziś” zmienia się w „Wczoraj, środa, 18 listopada” */
 .j-rap-data { display: grid; grid-template-columns: auto auto; justify-content: center; align-content: center; align-items: center; column-gap: 6px; width: 200px; min-width: 0;
   padding: 4px 10px; border: 0; background: none; color: var(--j-tekst); text-align: center; font: inherit; cursor: default; }
