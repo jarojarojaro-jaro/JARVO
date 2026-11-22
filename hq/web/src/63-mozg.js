@@ -419,7 +419,7 @@ function MozgNotatka({ z, id, dane, mapa, href, cel, nazwaMiejsca, wstecz, sekcj
 // bez animacji”): statyczna sieć w SVG. Środek = źródło (JARVO, KERNEL), pierścień = części (wielkość węzła z liczby
 // notatek, pod nazwą jedno zdanie opisu), cienkie łuki między częściami = najmocniejsze powiązania ich notatek
 // (grubość z liczby linków). Najechanie rozjaśnia część i jej łuki; kliknięcie wchodzi do części.
-const MOZG_SIEC = { w: 1000, h: 660, r1: 225, rx: 300, luki: 14 };
+const MOZG_SIEC = { w: 1240, h: 680, r1: 230, rx: 270, luki: 14 };   // szerokość: podpisy z boku (do ok. 270 j.) mieszczą się
 function mozgSiec(mapa, linki) {
   const { w, h, r1 } = MOZG_SIEC, cx = w / 2, cy = h / 2;
   const czesci = mapa.kat.filter((d) => d.ile > 0), n = czesci.length, maks = Math.max(1, ...czesci.map((d) => d.ile));
