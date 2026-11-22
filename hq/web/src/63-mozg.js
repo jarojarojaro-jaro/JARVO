@@ -419,13 +419,13 @@ function MozgNotatka({ z, id, dane, mapa, href, cel, nazwaMiejsca, wstecz, sekcj
 // bez animacji”): statyczna sieć w SVG. Środek = źródło (JARVO, KERNEL), pierścień = części (wielkość węzła z liczby
 // notatek, pod nazwą jedno zdanie opisu), cienkie łuki między częściami = najmocniejsze powiązania ich notatek
 // (grubość z liczby linków). Najechanie rozjaśnia część i jej łuki; kliknięcie wchodzi do części.
-const MOZG_SIEC = { w: 1000, h: 660, r1: 225, luki: 14 };
+const MOZG_SIEC = { w: 1000, h: 660, r1: 225, rx: 300, luki: 14 };
 function mozgSiec(mapa, linki) {
   const { w, h, r1 } = MOZG_SIEC, cx = w / 2, cy = h / 2;
   const czesci = mapa.kat.filter((d) => d.ile > 0), n = czesci.length, maks = Math.max(1, ...czesci.map((d) => d.ile));
   const wezly = czesci.map((d, i) => {
     const a = -Math.PI / 2 + (i * 2 * Math.PI) / Math.max(1, n);
-    return { d, i, a, x: cx + r1 * Math.cos(a), y: cy + r1 * Math.sin(a), r: 7 + 11 * Math.sqrt(d.ile / maks) };
+    return { d, i, a, x: cx + MOZG_SIEC.rx * Math.cos(a), y: cy + r1 * Math.sin(a), r: 7 + 11 * Math.sqrt(d.ile / maks) };
   });
   const nr = new Map(czesci.map((d, i) => [d.k, i])), pary = new Map();
   for (const l of linki) {
@@ -445,7 +445,7 @@ function MozgSiec({ siec, centrum, ile, href, nazwa, opis }) {
   const { cx: sx, cy: sy, wezly, luki } = siec, { w, h } = MOZG_SIEC;
   // łuk między częściami wygięty lekko do środka (nie przez środek): czytelna sieć zamiast gwiazdy
   const luk = (a, b) => { const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2; return `M${a.x},${a.y} Q${sx + (mx - sx) * 0.62},${sy + (my - sy) * 0.62} ${b.x},${b.y}`; };
-  const podpis = (v) => { const c = Math.cos(v.a), s = Math.sin(v.a), d = v.r + 12, pion = Math.abs(c) < 0.35;
+  const podpis = (v) => { const c = Math.cos(v.a), s = Math.sin(v.a), d = v.r + 12, pion = Math.abs(c) < 0.12;
     return { x: v.x + c * d, y: v.y + s * d + (pion ? (s > 0 ? 14 : -18) : -2), kotwica: pion ? "middle" : c > 0 ? "start" : "end" }; };
   return html`<svg class=${cx("j-siec", nad >= 0 && "is-nad")} viewBox=${`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" role="group"
       aria-label=${L(`Mapa mózgu: ${centrum} i ${wezly.length} części`, `Brain map: ${centrum} and ${wezly.length} parts`)}>
