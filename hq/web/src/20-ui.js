@@ -117,11 +117,11 @@ function ZnakStanu({ stan }) {
 }
 
 function Awatar({ agent, r = 28, stan, klasa }) {
-  // figurka z pokoju agenta na tle jego ściany (22-figurka.js); ta sama w liście, wątku, kompozytorze i na starcie
-  const a = agent || {};
-  const pokoj = pokojAgenta(a);
-  return html`<span class=${cx("j-awatar", klasa)} data-pokoj=${pokoj} style=${{ "--s": `${r}px`, "--sciana": scianaAgenta(a) }}>
-    <svg class="j-awatar-f" viewBox="2 0 20 20" aria-hidden="true" focusable="false">${rysunekFigurki(pokoj)}</svg>
+  // znak agenta TARS (22-figurka.js): monolit w pozie agenta, odcień na dwóch segmentach; ten sam w liście, wątku,
+  // kompozytorze, kartach i Ustawieniach
+  const { poza, barwa } = znakAgenta(agent || {});
+  return html`<span class=${cx("j-awatar", klasa)} data-poza=${poza} style=${{ "--s": `${r}px`, "--a": `var(--j-barwa-${barwa})` }}>
+    <svg class="j-awatar-f" viewBox="-1 0 21 20" aria-hidden="true" focusable="false" shape-rendering="crispEdges">${rysunekZnaku(poza)}</svg>
     <${ZnakStanu} stan=${stan}/></span>`;
 }
 

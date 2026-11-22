@@ -511,7 +511,10 @@ function MozgWidok() {
     else idz({ g: id.slice(1), o: "" });
   };
 
-  useEffect(() => { g.current.dane(graf); }, [graf]);
+  // wejście Mózgu (motyw TARS): zamiast grafu czarna dziura z częściami na orbitach (pakiet „kosmos”); graf wtedy pusty,
+  // więc nie liczy układu w tle
+  const kosmos = !!mapa && !kat && !q.trim() && mapa.glowne.length > 0;
+  useEffect(() => { g.current.dane(kosmos ? null : graf); }, [graf, kosmos]);
   useEffect(() => { g.current.zaznacz(s.o || null); if (s.o) g.current.wysrodkuj(s.o); else g.current.calosc(); }, [s.o, graf]);
   // po przejściu na inny poziom fokus na jego nagłówku (czytnik ekranu czyta, gdzie jesteśmy); szukanie się czyści
   useEffect(() => {
@@ -563,9 +566,10 @@ function MozgWidok() {
     if (!kat) {
       poziom = html`
         ${!mapa.kat.length && html`<p class="j-mozg-opis">${L("Mózg jeszcze nic nie zapisał.", "The brain has not saved anything yet.")}</p>`}
-        <ul class="j-mozg-kafle">${mapa.glowne.map((d, ci) => html`<li key=${d.k}><a class="j-mozg-kafel" href=${href({ k: d.k, g: "", o: "" })} style=${{ "--c": `var(--j-barwa-${ci % 10})` }}>
-          <span class="j-mozg-ki"><${Ikona} n=${d.ikona || "folder"} r=${18}/></span>
-          <span class="j-mozg-kn">${nazwaKat(d)}</span><span class="j-mozg-kl">${d.ile}</span>
+        <ul class="j-mozg-kafle">${mapa.glowne.map((d, ci) => html`<li key=${d.k}><a class="j-mozg-kafel" href=${href({ k: d.k, g: "", o: "" })}
+            style=${{ "--c": `var(--j-barwa-${ci % 10})`, "--u": d.ile / Math.max(1, ...mapa.glowne.map((x) => x.ile)) }}>
+          <span class="j-mozg-ki" aria-hidden="true">${String(ci + 1).padStart(2, "0")}</span>
+          <span class="j-mozg-kn">${nazwaKat(d)}</span><u class="j-mozg-ku" aria-hidden="true"></u><span class="j-mozg-kl">${d.ile}</span>
           ${(d.opis || d.grupy.length > 1) && html`<span class="j-mozg-ko">${d.opis ? L(d.opis, d.opis_en || d.opis) : d.grupy.map((x) => x.nazwa).join(" · ")}</span>`}
         </a></li>`)}</ul>
         ${mapa.glowne.length > 0 && html`<section class="j-mozg-sekcja"><h3>${L("Ostatnio zmienione", "Recently changed")}</h3>
@@ -588,7 +592,7 @@ function MozgWidok() {
   }
   const hub = grupa && kat.grupy.length > 1 ? grupa.hub : kat && kat.hub, hubNaj = kat ? hub : mapa && mapa.korzen;
 
-  return html`<div ref=${korzen} class=${cx("j-mozg", s.o && dane && "is-notatka", naMapie && "is-mapa")} onKeyDown=${esc} data-mozg>
+  return html`<div ref=${korzen} class=${cx("j-mozg", s.o && dane && "is-notatka", naMapie && "is-mapa", kosmos && "is-kosmos")} onKeyDown=${esc} data-mozg>
     <${NaglowekWidoku} klasa="j-mozg-gora" ikona=${IKONY_WIDOKOW.mozg}
       tytul=${html`<span class="j-mozg-okruszki">${okruszki.map(([t, h], k) => html`<span key=${k} class="j-mozg-ok">${k > 0 && html`<span class="j-mozg-ok-sep" aria-hidden="true">›</span>`}${k === okruszki.length - 1 && !s.o
         ? html`<span aria-current="page">${t}</span>` : html`<a href=${h}>${t}</a>`}</span>`)}</span>`}
@@ -622,7 +626,9 @@ function MozgWidok() {
     </div>
     <div class="j-mozg-plotno">
       <canvas ref=${plotno} role="img" aria-label=${L("Mapa wiedzy tego poziomu; to samo jest na liście obok", "Knowledge map of this level; the list shows the same")}></canvas>
-      ${graf && html`<p class="j-mozg-podpowiedz" aria-hidden="true">${grupa ? L("Kropka = notatka. Kółko myszy przybliża.", "Dot = note. Scroll to zoom.")
+      ${kosmos && html`<${Leniwy} pakiet="kosmos" nazwa="MozgKosmos"
+        czesci=${mapa.glowne.map((d) => ({ k: d.k, nazwa: nazwaKat(d), ile: d.ile, href: href({ k: d.k, g: "", o: "" }) }))}/>`}
+      ${graf && !kosmos && html`<p class="j-mozg-podpowiedz" aria-hidden="true">${grupa ? L("Kropka = notatka. Kółko myszy przybliża.", "Dot = note. Scroll to zoom.")
         : L("Kliknij skupisko, żeby wejść.", "Click a cluster to go in.")}</p>`}
     </div>
     ${s.o && dane && mapa && html`<${MozgNotatka} key=${z.klucz + s.o} z=${z} id=${s.o} dane=${dane} mapa=${mapa} href=${hrefNotatki} cel=${celLinku}

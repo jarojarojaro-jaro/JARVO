@@ -1142,7 +1142,7 @@ innych kanałów etap 6.
   do więcej niż 3 agentów. Przeciągnięty plik nad wątkiem dostaje przerywaną ramkę i trafia do kompozytora.
 - **Wiadomości** (`32-wiadomosc.js`): dymek właściciela pojawia się od razu, zanim serwer odpowie (`sklep.wysylane`;
   „Wysyłam…” dopiero po chwili, nieudana wysyłka z **Spróbuj ponownie** i **Usuń**). Wiadomość agenta: awatar
-  (pikselowa figurka agenta z makiety V2, `22-figurka.js`),
+  (znak agenta TARS: monolit z czterech segmentów w pozie i odcieniu agenta, `22-figurka.js`, sekcja 5a),
   nazwa, czas, Markdown, karty plików, pod nią **Kopiuj** i **Odpowiedz: <agent>** (po najechaniu i przy fokusie, na
   dotyku zawsze); znacznik „bezpośrednio” przy wiadomości z pominięciem koordynatora. Trwająca praca to jeden żywy
   dymek: tekst z delt (po przeładowaniu z `tekst_dotad` migawki, bez rwania), kropki pisania i kroki. Stan, czas
@@ -1301,11 +1301,13 @@ innych kanałów etap 6.
   wiadomością stoi linia stanu „Zatrzymane” z **Ponów** (przebieg ponowiony albo ukryty jej nie dostaje). Teksty agentów, tytuły i nazwy plików idą
   zawsze jako węzły tekstowe (bez `innerHTML`, sekcja 2e). Pomocnicze: `Os.noweOdTad`, `ryzyko`, `wyboryZgody`,
   `krokiPodsumowanie`, `doZatrzymania`, `klasaBledu`; adresat i podpowiedzi kompozytora w `Pisanie` (ten sam plik).
-- **Wygląd** (`06-tokeny.js`, `style.css` od „Aplikacja Jarvo”): tokeny `--j-*` w dwóch motywach (`data-motyw`
-  `ciemny`/`jasny` na korzeniu, „Jak w systemie” z `prefers-color-scheme`): tła, linie, teksty, akcent karmazynowy,
-  fokus, uwaga, ok, błąd, cienie. Kontrast par tekst/tło ≥ 4,5:1 i elementów UI ≥ 3:1 w obu motywach pilnuje test.
-  Awatary agentów to pikselowe figurki z makiety V2 (`22-figurka.js`: ściana pokoju `hq_room` z floty i postać z wieży).
-  Kroje lokalne „Jarvo UI” (Inter) i „Jarvo Mono” (JetBrains Mono) z `zasoby/kroje/`. Cały styl aplikacji jest pod
+- **Wygląd** (`06-tokeny.js`, `style.css` od „Aplikacja Jarvo”; motyw TARS, sekcja [5a](#5a-motyw-tars-wygląd-aplikacji)): tokeny
+  `--j-*` w dwóch motywach (`data-motyw` `ciemny`/`jasny` na korzeniu, „Jak w systemie” z `prefers-color-scheme`;
+  domyślnie ciemny): tła na czterech poziomach, linie, teksty (tytuł, treść, opis, metadane), biel głównej akcji,
+  czerwień pracy, bursztyn „czeka na Ciebie”, błękit linków i kodu, ok, błąd, cienie. Kontrast par tekst/tło ≥ 4,5:1
+  i elementów UI ≥ 3:1 w obu motywach pilnuje test. Awatary agentów to znaki TARS (`22-figurka.js`), pikselowe
+  figurki zostały w wieży Starej Bazy. Kroje lokalne „Jarvo UI” (Geist), „Jarvo Mono” (Geist Mono) i „Jarvo Naglowek”
+  (Archivo szeroki) z `zasoby/kroje/` (`hq/web/fonts/tars/`, OFL). Cały styl aplikacji jest pod
   `.jarvo-app` (klasy `j-*`), więc nie dotyka Hermesa ani Starej Bazy; tarcza przed motywem Fosfor (linie
   skanowania `body::after`, poświata `text-shadow`, kwadratowe przyciski, tła pól, krój nagłówka) działa tylko przy
   `data-jarvo-app`. Ruch krótki (`--j-ease`), przy `prefers-reduced-motion` bez animacji i bez płynnego
@@ -1402,7 +1404,7 @@ innych kanałów etap 6.
   pomijany błąd strony to komunikat Chromium „ViewTransition opt-in disabled”: dashboard Hermesa włącza przejścia
   widoku między dokumentami, a strona `/login` nie, więc każde przejście na logowanie (także z `/sessions`) go zgłasza.
 - **Rozmiar i pakiety (centrum, krok 1a).** Build dzieli aplikację na pakiety (`scripts/hqbuild.py` `PAKIETY`):
-  rdzeń `app-rdzen-<h>.js` (powłoka, pasek, wątek, kompozytor, Markdown, strumień, API, i18n PL, figurki, okna
+  rdzeń `app-rdzen-<h>.js` (powłoka, pasek, wątek, kompozytor, Markdown, strumień, API, i18n PL, znaki agentów, okna
   plików) i na żądanie `app-baza` (Stara Baza), `app-edytor` (edytor filmów, animacja, konwerter; ładowane razem
   z Bazą), `app-poznajmy` (pierwsze spotkanie z lektorem), `app-ustawienia`, `app-stopka` (stopka bloczka
   wpisywania), `app-en` (angielski słownik, tylko przy
@@ -1417,7 +1419,9 @@ innych kanałów etap 6.
   ok. 278 KB (86,6 KB gzip), CSS 80 KB (16,1 KB gzip); wcześniej jeden pakiet 262 KB gzip. 20.11: rdzeń 97,2 KB gzip
   (rozwijane kroki i komendy po „/” w kompozytorze), budżet 95 → 100 KB; potem 97,8 KB JS i 17,4 KB CSS (licznik
   rozmowy, dopisek Enterem, pasek z przewijanym środkiem), a po wydzieleniu stopki do `app-stopka` (2,3 KB JS,
-  0,5 KB CSS gzip) rdzeń ok. 98,1 KB JS i 17,4 KB CSS. Pliki rdzenia nie mogą
+  0,5 KB CSS gzip) rdzeń ok. 98,1 KB JS i 17,4 KB CSS. 22.11 (motyw TARS): silnik pikseli `19-piksele.js` przeszedł
+  do `app-baza` (aplikacja ma znaki TARS zamiast figurek), styl pierwszego spotkania do `app-poznajmy`, a czarna
+  dziura wejścia Mózgu to osobny pakiet `app-kosmos` (shader WebGL, poza budżetem `mozg.js`). Pliki rdzenia nie mogą
   sięgać do nazw z pakietów inaczej niż przez `Zasoby.wez`, a pakiety nie zmieniają `let` rdzenia (język ustawia
   `ustawJezyk`).
 
@@ -1741,6 +1745,56 @@ Mono, linie skanowania, numerowane menu, podświetlenie w negatywie. Wieża zost
   próbie, także nieudanej), hasło działa jak dotąd, limit prób Hermesa obejmuje też klucze. Bez łatki budowa obrazu
   staje. `jarvo open` wypisuje na ekran (i do `install.log`) zwykły adres, klucz trafia tylko do przeglądarki.
   Testy: `tests/test_klucz_wejscia.py`, `tests/test_branding.py`.
+
+## 5a. Motyw TARS (wygląd aplikacji)
+
+Od 22.11 aplikacja Jarvo wygląda jak TARS z „Interstellar” (makieta zaakceptowana przez właściciela: monolit,
+brutalistyczny minimalizm). Jedno miejsce prawdy to blok tokenów na początku sekcji „Aplikacja Jarvo” w
+`hq/web/style.css`; stare tokeny `--j-*` zostały przemapowane, nowe doszły tylko tam, gdzie TARS ich potrzebuje.
+
+- **Moduły.** Aplikacja to płyty ze szczotkowanej stali (`--j-stal`, jeden obraz SVG) na czarnej próżni z odstępem
+  8 px: pasek (moduł 01), belka widoku (02), kompozytor, raport, lista Mózgu (03), kalendarz, mapa (04). Numer modułu
+  rysuje CSS (`--j-nr` i `::after` z pustym tekstem dla czytnika). Kąty proste w całej aplikacji (jedna reguła;
+  koło zostaje kręciołkowi i Gargantui bez WebGL, klasa `j-okr`). Rowki 2 px (`--j-rowek`) dzielą segmenty.
+- **Tła, cztery poziomy:** próżnia `--j-tlo`, moduł `--j-tlo-pasek`, blok `--j-tlo-karta`/`--j-tlo-2`, aktywny
+  `--j-tlo-3`; wnęka `--j-wneka` pod pola, kroki i kod.
+- **Pismo, trzy role:** `--j-font-naglowek` (Archivo szeroki, 125%) tytuły widoków, nadawcy, nagłówki modułów;
+  `--j-font-ui` (Geist) treść; `--j-font-mono` (Geist Mono) dane, godziny, kod, liczby, etykiety stanu i modułów.
+  Skala: tytuł widoku 20/700, nagłówek sekcji 16/600, nadawca 14/600, treść 14, opis 12,5, etykieta 10,5 mono wersaliki.
+- **Kolor z sensem:** `--j-tekst` tytuły i nazwy, `--j-tresc` treść ciągła, `--j-tekst-2` opisy, `--j-tekst-3`
+  metadane; biel `--j-akcent` = tu jesteś i główna akcja (Wyślij, Odpowiedz, wybrany dzień, aktywny segment z białą
+  krawędzią); czerwień `--j-praca` = agent pracuje (kwadrat stanu, etykieta PRACUJE, żywy moduł, oś); bursztyn
+  `--j-uwaga` = czeka na Ciebie (liczniki nieprzeczytanych, „Czeka na Ciebie”, decyzje, Najważniejsze); błękit
+  `--j-link` = link, kod, ścieżka, terminal; `--j-barwa-N` = przygaszony odcień agenta tylko na dwóch segmentach jego
+  znaku i rodzaje raportów. Pary kontrastu (w tym treść, link i czerwień na każdym poziomie tła, metadane na module
+  aktywnym i we wnęce) sprawdza `tests/test_hq_front.py`.
+- **Motyw jasny i ciemny.** TARS ciemny jest domyślny (`USTAWIENIA_DOMYSLNE.motyw`), a wybór motywu zapisany przed
+  TARS nie przechodzi (raz, znacznik `tars` w `jarvo.ustawienia.v1`). „Jasny” to ten sam monolit w świetle dnia na
+  tych samych tokenach (jasny grafit, ciemne pismo, czerń głównej akcji); „Jak w systemie” zostaje. Palety Fosforu
+  działają jak dotąd; paleta `jarvo` nazywa się w Ustawieniach „TARS · grafit”.
+- **Znaki agentów** (`22-figurka.js`, komponent `Awatar`): monolit z czterech segmentów 19×20 w pozie agenta (szef
+  stoi, silnik schodami, budowniczy bramą, napisy dwiema ścieżkami, terminal kursorem, łowca szczytem, reklama
+  falą) z nazwy, roli albo pokoju; odcień `--j-barwa-N` na dwóch segmentach. Pikselowe figurki zostały w wieży Starej
+  Bazy (silnik pikseli w pakiecie `app-baza`), robot CRT Jarva na starcie i w pierwszym spotkaniu (marka, antena
+  idzie za głosem).
+- **Komponenty.** Pasek: rozmówca jako wiersz 48 px z etykietą stanu mono (WOLNY, PRACUJE, W TERMINALU, CZEKA NA
+  CIEBIE), licznik w bursztynie, aktywny segment wysunięty do sceny; na dole stałe mikroteksty TARS „szczerość 90%,
+  humor 75%” (charakter, nie dane: `aria-hidden`) i stan połączenia. Rozmowa: oś czasu z godzinami w lewej kolumnie
+  i znacznikiem każdej pozycji, właściciel na jasnej płycie z białą krawędzią i etykietą źródła („Z TELEGRAMA”),
+  agent z nagłówkiem w kroju nagłówków, kroki we wnęce, żywy moduł pracy (znak z czerwoną krawędzią, kto, co robi,
+  czas, Zatrzymaj) nad kompozytorem, który jest płytą o poziom jaśniejszą ze sterami zrośniętymi w jeden segmentowy
+  pasek (Do:, model, wysiłek, tryb szybki). Aktualizacje: raport jako moduł z sekcjami, `ukladRaportu` (`64-raporty.js`)
+  tylko układa treść (linia „Etykieta: treść” = sekcja z etykietą w lewej kolumnie, sama etykieta = mały nagłówek,
+  w decyzjach pogrubione pytanie i bursztynowe „Rekomenduję …”), tekst zostaje ten sam (test w `hq_front.test.cjs`).
+  Mózg: części jako wiersze z numerem, wskaźnikiem i liczbą, Najważniejsze w bursztynie, notatka jako moduł; na
+  wejściu czarna dziura z częściami na orbitach (`65-kosmos.js`, pakiet `app-kosmos`).
+- **Ruch tylko celowy.** Segmenty wjeżdżają i zatrzaskują się (serwo `--j-serwo`, 160 do 400 ms), sygnał pracy
+  oddycha samą przezroczystością (kompozytor, bez przerysowania), pasek postępu karty nie przesuwa tła co klatkę.
+  Czarna dziura płynie ok. 9 klatek na sekundę przez 8 s po wejściu i chwilę po ruchu myszy nad mapą, potem stoi
+  (w spoczynku 0 klatek); na wolnym sprzęcie (pierwsza klatka > 160 ms) albo przy `prefers-reduced-motion` jedna
+  nieruchoma klatka, bez WebGL Gargantua z samego CSS.
+- **Telefon (390 px):** moduły na całą szerokość bez odstępów, bez osi czasu (godzina przy nadawcy), żywy moduł bez
+  nazwy, cele dotyku ≥ 40 px, dok rozmówców jako segmenty.
 
 ## 6. Język: polski i angielski
 

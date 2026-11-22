@@ -77,6 +77,31 @@ function nazwaDnia(klucz, teraz = Date.now() / 1000) {
   return g === "dzis" || g === "wczoraj" ? { glowna: T(`grupa.${g}`), pod: pelna } : { glowna: duza(pelna), pod: null };
 }
 
+// Układ raportu w motywie TARS (tylko wygląd, treść ta sama): linia „Etykieta: treść” (krótka etykieta na początku
+// linii, np. „Gotowe od wczoraj:”, „W toku:”) staje się osobnym akapitem z etykietą pogrubioną (style robią z niej
+// kolumnę sekcji), sama etykieta („Czeka na Ciebie (5 decyzji):”) małym nagłówkiem nad listą, a w punktach listy
+// numerowanej (decyzje) pytanie do pierwszego „?” (albo „:”) jest pogrubione i „Rekomenduję …” wyróżnione. Bloki kodu
+// i punkty z własnym pogrubieniem zostają bez zmian.
+const ETYKIETA_RAPORTU = /^([A-ZĄĆĘŁŃÓŚŹŻ][^:*`#>|\n·]{1,44}):(?:\s+(.*))?$/u;
+const PUNKT_DECYZJI = /^(\s*\d+[.)]\s+)(.+)$/;
+function ukladRaportu(tekst) {
+  let kod = false;
+  const wyj = [];
+  for (const linia of String(tekst || "").split("\n")) {
+    if (/^\s*(```|~~~)/.test(linia)) kod = !kod;
+    const e = !kod && ETYKIETA_RAPORTU.exec(linia);
+    const p = !kod && !e && PUNKT_DECYZJI.exec(linia);
+    if (e && e[1].trim().split(/\s+/).length <= 5) {
+      wyj.push("", e[2] ? `**${e[1].trim()}:** ${e[2]}` : `#### ${e[1].trim()}:`, "");
+    } else if (p && !p[2].includes("**")) {
+      const t = p[2], q = t.search(/\?(\s|$)/), i = q > 0 ? q : t.search(/:(\s|$)/);
+      const pytanie = i > 0 && i < 220 ? `**${t.slice(0, i + 1)}**${t.slice(i + 1)}` : t;
+      wyj.push(p[1] + pytanie.replace(/(Rekomenduj[eę][^.,;:)]*)/u, "*$1*"));
+    } else wyj.push(linia);
+  }
+  return wyj.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 // ------------------------------------------------------------------------------------------------- odpowiedź
 // „Odpowiedz”: cytat raportu na początek szkicu rozmowy (bez dubla przy drugim kliknięciu), potem rozmowa z kursorem
 function odpowiedzNaRaport(r, rozmowca) {
@@ -101,7 +126,7 @@ function Raport({ r, rozmowca, kolor }) {
     try { await copyText(r.tekst); setOk(true); setTimeout(() => setOk(false), 1500); } catch (e) { Komunikaty.pokaz(e.message || String(e), { rodzaj: "blad" }); }
   };
   const kto = rozmowca ? nazwaRozmowcy(rozmowca) : "";
-  return html`<article class=${cx("j-rap-r", r.nowy && "is-nowy", r.blad && "is-blad", !caly && "is-zwiniety")} data-raport=${r.id}
+  return html`<article class=${cx("j-rap-r", "j-nr", r.nowy && "is-nowy", r.blad && "is-blad", !caly && "is-zwiniety")} data-raport=${r.id}
       style=${{ "--j-rap-kolor": kolor }} aria-labelledby=${`j-rap-r-${r.id}`}>
     <header class="j-rap-r-g">
       <i class="j-rap-kropka" aria-hidden="true"></i>
@@ -110,12 +135,13 @@ function Raport({ r, rozmowca, kolor }) {
       ${r.nowy && html`<span class="j-rap-nowy">${T("rap.nowy")}</span>`}
       ${r.blad && html`<span class="j-tag is-blad"><${Ikona} n="alert" r=${12}/>${T("rap.blad")}</span>`}
     </header>
-    <div class="j-rap-r-t"><${TrescMd} tekst=${r.tekst} klasa="j-msg-t"/></div>
+    <div class="j-rap-r-t"><${TrescMd} tekst=${ukladRaportu(r.tekst)} klasa="j-msg-t"/></div>
     <footer class="j-rap-r-s">
       ${rozmowca && html`<${Przycisk} rodzaj="glowny" maly ikona="turn" data-odpowiedz=""
         etykieta=${T("rap.odpowiedz_tip", { kto })} onClick=${() => odpowiedzNaRaport(r, rozmowca)}>${T("rap.odpowiedz")}</${Przycisk}>`}
       ${dlugi && html`<button type="button" class="j-link" aria-expanded=${String(caly)} onClick=${() => setCaly(!caly)}>
         ${T(caly ? "rap.zwin" : "rap.calosc")}</button>`}
+      ${/Rekomenduj/.test(r.tekst || "") && html`<small class="j-rap-tars" aria-hidden="true">${T("tars.rekomendacje")}</small>`}
       <${Przycisk} rodzaj="cichy" maly ikona=${ok ? "check" : "copy"} etykieta=${T(ok ? "md.skopiowano" : "msg.kopiuj")} klasa="j-rap-kopiuj" onClick=${kopiuj}/>
     </footer>
   </article>`;
@@ -129,7 +155,7 @@ function Kalendarz({ miesiac, wybrany, dni, rodzaj, idzDo, dzis, kolory }) {
   const pl = isPL() ? "pl-PL" : "en-GB";
   const tytul = new Date(miesiac.r, miesiac.m, 1).toLocaleDateString(pl, { month: "long", year: "numeric" }).replace(/^./, (z) => z.toUpperCase());
   const naglowki = DNI_TYGODNIA[isPL() ? "pl" : "en"];
-  return html`<div class="j-kal" role="group" aria-label=${T("rap.kalendarz")}>
+  return html`<div class="j-kal j-nr" role="group" aria-label=${T("rap.kalendarz")}>
     <div class="j-kal-g"><b class="j-kal-t" aria-live="polite">${tytul}</b></div>
     <div class="j-kal-siatka">
       ${naglowki.map((n) => html`<span key=${n} class="j-kal-dt" aria-hidden="true">${n}</span>`)}

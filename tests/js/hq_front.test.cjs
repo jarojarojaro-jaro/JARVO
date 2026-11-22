@@ -14,12 +14,12 @@ const PLIKI = ["02-sklep.js", "03-trasa.js", "04-i18n.js", "05-skroty.js", "06-t
   "13-markdown.js", "14-czas.js", "15-os.js", "33-komendy.js", "37-poznajmy.js", "64-raporty.js"];
 const PRZED = `const React = {}; const useMemo = (f) => f(); const useRef = (v) => ({ current: v }); const useEffect = () => {};
 let HQ_LANG = null; const isPL = () => T.wymus !== "en"; const Zasoby = { daj() {} };\n`;
-const PO = "\n;({ T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, sklep, USTAWIENIA_DOMYSLNE, Poznanie, kwestiePoznania, Sciezki, kluczDnia, granicyDnia, siatkaMiesiaca, dniKalendarza, koloryRodzajow, cytatRaportu, Komendy });";
+const PO = "\n;({ T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, sklep, USTAWIENIA_DOMYSLNE, Poznanie, kwestiePoznania, Sciezki, kluczDnia, granicyDnia, siatkaMiesiaca, dniKalendarza, koloryRodzajow, cytatRaportu, ukladRaportu, Komendy });";
 const kod = PRZED + PLIKI.map((f) => `// ---- ${f}\n` + fs.readFileSync(path.join(SRC, f), "utf8")).join("\n") + PO;
 const kontekst = vm.createContext({ Intl, Date, Math, JSON, URLSearchParams, setTimeout, clearTimeout, console, Set, Map,
   encodeURIComponent, decodeURIComponent, Number, String, Object, Array, RegExp });
 const M = vm.runInContext(kod, kontekst, { filename: "hq-front.js" });
-const { T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, Poznanie, kwestiePoznania, Sciezki, kluczDnia, granicyDnia, siatkaMiesiaca, dniKalendarza, koloryRodzajow, cytatRaportu, Komendy } = M;
+const { T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, Poznanie, kwestiePoznania, Sciezki, kluczDnia, granicyDnia, siatkaMiesiaca, dniKalendarza, koloryRodzajow, cytatRaportu, ukladRaportu, Komendy } = M;
 
 let ile = 0;
 function test(nazwa, f) {
@@ -197,7 +197,8 @@ test("stanPoczatkowy: kształt sklepu", () => {
     "gotowosc", "inne_otwarte", "karty", "kolejnosc", "lista", "okno_aktualizacji", "os", "pasek", "podglad", "podpowiedzi", "podzial", "poznanie", "przebiegi", "pytanie", "raporty", "rozmowcy", "silnik",
     "stara_baza", "strumien", "szkice", "toasty", "ustawienia", "watki", "wersja", "wysylane"]);
   eq(stanPoczatkowy().lista.filtr, "rozmowy");
-  eq(stanPoczatkowy().ustawienia.motyw, "system");
+  eq(stanPoczatkowy().ustawienia.motyw, "ciemny");          // motyw TARS: ciemny domyślnie
+  eq(Motyw.WYBORY, ["ciemny", "jasny", "system"]);
 });
 
 // ------------------------------------------------------------------------------------------------ oś: kursory
@@ -783,6 +784,19 @@ test("Aktualizacje: trasa z dniem i rodzajem, dni kalendarza, kolory rodzajów, 
   s = Os.zastosujZdarzenie(s, "raporty.nowe", { nieprzeczytane: 3 });
   eq(s.raporty, { nieprzeczytane: 3, wersja: 1 });
   eq(Os.zastosujZdarzenie(s, "raporty.licznik", { nieprzeczytane: 0 }).raporty, { nieprzeczytane: 0, wersja: 1 });
+});
+test("ukladRaportu: sekcje z etykiet linii, decyzje z pogrubionym pytaniem i rekomendacją, treść bez zmian", () => {
+  const brief = "☀️ Brief B-2026-11-21 · Dzień dobry. Stan floty:\nGotowe od wczoraj: 48 kart domkniętych.\nW toku: AssemblyAI (3 konta).\n"
+    + "Czeka na Ciebie (5 decyzji):\n1. Monid: prosić ich o wynik testowy? Rekomenduję tak. Wisi od 3 dni.\n2. Już **pogrubione** zostaje\n"
+    + "```\nUwaga: w kodzie bez zmian\n```\nOdpowiedz np. „1 ok”.";
+  const u = ukladRaportu(brief);
+  assert.ok(u.startsWith("☀️ Brief B-2026-11-21 · Dzień dobry. Stan floty:\n\n**Gotowe od wczoraj:** 48 kart domkniętych.\n\n**W toku:** AssemblyAI"), u);
+  assert.ok(u.includes("#### Czeka na Ciebie (5 decyzji):\n\n1. **Monid: prosić ich o wynik testowy?** *Rekomenduję tak*. Wisi od 3 dni."), u);
+  assert.ok(u.includes("2. Już **pogrubione** zostaje") && u.includes("```\nUwaga: w kodzie bez zmian\n```"), u);
+  // bez znaczników Markdown treść jest ta sama (układ tylko dokłada pogrubienia, wyróżnienia, nagłówki i puste linie)
+  const czysty = (t) => t.replace(/\*+|^#### /gm, "").replace(/\s+/g, " ").trim();
+  assert.strictEqual(czysty(u), czysty(brief));
+  assert.strictEqual(ukladRaportu(""), "");
 });
 
 // ------------------------------------------------------------------------------------------------ komendy po „/”

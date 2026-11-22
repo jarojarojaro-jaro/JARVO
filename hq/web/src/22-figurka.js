@@ -1,54 +1,47 @@
-// Figurki agentów w aplikacji: kafel ze ścianą pokoju i postacią z wieży (silnik pikseli z 20-art.js), jak w makiecie V2.
-// Pokój agenta = `hq_room` z fleet.yaml (pole `pokoj` z GET /app); agent bez pokoju (testowy, własny) dostaje pokój
-// z sumy nazwy, więc wygląda tak samo w każdym miejscu i po każdym przeładowaniu.
-// Etap 7 (usunięcie Starej Bazy) zostawia z 20-art.js to, czego używa ten plik: Pix, Layers, shade, LOOKS, drawFigure.
+// Znak agenta w aplikacji (motyw TARS, docs/HQ.md §5a): monolit z czterech pionowych segmentów, każdy agent w swojej
+// pozie i w swoim odcieniu (--j-barwa-N tylko na dwóch segmentach), jeden segment z „ekranem danych”. Zastępuje pikselowe
+// figurki pokoi w liście, wątku, kompozytorze, kartach i Ustawieniach; pikselowe figurki zostają w Starej Bazie (wieża).
+// Poza i odcień z nazwy, roli albo pokoju agenta (`hq_room` z fleet.yaml), więc znak jest ten sam w każdym miejscu.
 
-const WYGLAD_POKOJU = {
-  bridge:     { look: "boss",       sciana: "#B81D36", sciana2: "#A51830", wzor: "panels" },
-  study:      { look: "study",      sciana: "#22513E", sciana2: "#2B604A", wzor: "stripes" },
-  devlab:     { look: "devlab",     sciana: "#2155AA", sciana2: "#2B62BA", wzor: "panels" },
-  atelier:    { look: "atelier",    sciana: "#C2507A", sciana2: "#AD4469", wzor: "bricks" },
-  filmstudio: { look: "filmstudio", sciana: "#423B5E", sciana2: "#363050", wzor: "foam" },
-  office:     { look: "office",     sciana: "#2F4058", sciana2: "#384B66", wzor: "panels" },
-  radar:      { look: "radar",      sciana: "#22423E", sciana2: "#2B504B", wzor: "panels" },
-  apps:       { look: "apps",       sciana: "#3E3772", sciana2: "#4A4284", wzor: "panels" },
-  control:    { look: "control",    sciana: "#21405A", sciana2: "#2A4D6B", wzor: "ribs" },
-  workshop:   { look: "workshop",   sciana: "#C96A22", sciana2: "#B25B18", wzor: "ribs" },
+// [góra, wysokość] czterech segmentów w polu 19×20
+const POZY_ZNAKU = {
+  stoi:    [[2, 16], [2, 16], [2, 16], [2, 16]],     // szef floty
+  schody:  [[11, 7], [8, 10], [5, 13], [2, 16]],     // przepustowość (silnik, GPU)
+  brama:   [[6, 12], [2, 16], [2, 16], [6, 12]],     // buduje (strony, aplikacje)
+  sciezki: [[2, 11], [7, 11], [2, 11], [7, 11]],     // dwie ścieżki (głos i napisy, obraz i dźwięk)
+  kursor:  [[2, 16], [12, 6], [12, 6], [2, 16]],     // terminal
+  szczyt:  [[8, 10], [2, 16], [8, 10], [12, 6]],     // szuka (leady, śledztwo)
+  fala:    [[6, 12], [10, 8], [4, 14], [8, 10]],     // reklama, kampanie
 };
-const POKOJE_ZAPASOWE = ["office", "devlab", "study", "radar", "apps", "control", "atelier", "workshop", "filmstudio"];
+const EKRAN_ZNAKU = { stoi: 1, schody: 3, brama: 2, sciezki: 0, kursor: 3, szczyt: 1, fala: 2 };
+const POZY_KOLEJNO = ["fala", "szczyt", "brama", "sciezki", "schody", "kursor"];
+// słowo w nazwie, roli albo pokoju → [poza, odcień]; kolejność ma znaczenie (pierwsze trafienie)
+const ZNAKI_AGENTOW = [
+  [/^(jarvo|bridge)$|orchestrator/, "stoi", 0], [/kernel|gpu|inferenc/, "schody", 1], [/dev|web|devlab|apps|mobile|aplikac/, "brama", 2],
+  [/transl|napis|dubb|wideo|film|studio|atelier/, "sciezki", 3], [/operator|terminal|control|omp/, "kursor", 4],
+  [/lowca|łowca|lead|radar|sherlock|study|detekt/, "szczyt", 5], [/ads|reklam|office|kampan/, "fala", 6],
+];
 
-function pokojAgenta(a) {
-  if (!a) return "office";
-  if (a.pokoj && WYGLAD_POKOJU[a.pokoj]) return a.pokoj;
-  if (a.rodzaj === "orchestrator") return "bridge";
-  const suma = [...String(a.name || "")].reduce((s, c) => (s * 31 + c.charCodeAt(0)) >>> 0, 7);
-  return POKOJE_ZAPASOWE[suma % POKOJE_ZAPASOWE.length];
+function znakAgenta(a) {
+  const n = String((a && a.name) || "").toLowerCase();
+  const slowa = [n, String((a && a.nazwa) || "").toLowerCase(), String((a && a.rodzaj) || ""), String((a && a.pokoj) || "")];
+  for (const [wz, poza, barwa] of ZNAKI_AGENTOW) if (slowa.some((s) => wz.test(s))) return { poza, barwa };
+  const suma = [...n].reduce((s, c) => (s * 31 + c.charCodeAt(0)) >>> 0, 7);
+  return { poza: POZY_KOLEJNO[suma % POZY_KOLEJNO.length], barwa: a && a.barwa != null ? a.barwa % 10 : suma % 10 };
 }
 
-// wzór ściany kafla (24×24 piksele), ten sam co w makiecie V2
-function scianaFigurki(g, w, W, H) {
-  g.r(0, 0, W, H, w.sciana);
-  const c = w.sciana2;
-  if (w.wzor === "stripes") for (let x = 1; x < W; x += 3) g.r(x, 0, 1, H, c);
-  else if (w.wzor === "bricks") for (let y = 1; y < H; y += 4) { g.r(0, y, W, 1, c); for (let x = (y >> 2) % 2 ? 1 : 5; x < W; x += 8) g.r(x, y, 1, 4, c); }
-  else if (w.wzor === "foam") for (let y = 1; y < H; y += 4) for (let x = (y >> 2) % 2 ? 0 : 2; x < W; x += 4) g.r(x, y, 2, 2, c);
-  else if (w.wzor === "ribs") for (let x = 1; x < W; x += 4) { g.r(x, 0, 1, H, shade(w.sciana, 0.1)); g.r(x + 1, 0, 1, H, c); }
-  else for (let x = 3; x < W; x += 8) { g.r(x, 0, 1, H, c); for (let y = 4; y < H; y += 9) { g.p(x - 2, y, c); g.p(x + 2, y, c); } }
-}
-
-// gotowy rysunek na pokój (elementy React są niezmienne, więc jeden obiekt służy wszystkim kaflom)
-const FIGURKI = new Map();
-function rysunekFigurki(pokoj) {
-  let r = FIGURKI.get(pokoj);
+// gotowy rysunek na pozę (elementy React są niezmienne, więc jeden obiekt służy wszystkim znakom)
+const RYSUNKI_ZNAKU = new Map();
+function rysunekZnaku(poza) {
+  let r = RYSUNKI_ZNAKU.get(poza);
   if (!r) {
-    const w = WYGLAD_POKOJU[pokoj] || WYGLAD_POKOJU.office;
-    const L = new Layers();
-    scianaFigurki(L.get("tlo"), w, 24, 24);
-    drawFigure(L, "f", 12, 31, w.look, { legs: false });
-    r = L.render();
-    FIGURKI.set(pokoj, r);
+    r = [];
+    POZY_ZNAKU[poza].forEach(([y, h], i) => {
+      const x = i * 5;
+      r.push(html`<rect key=${i} class=${i % 2 ? "j-zn-b" : "j-zn-a"} x=${x} y=${y} width="4" height=${h}/>`);
+      if (EKRAN_ZNAKU[poza] === i) r.push(html`<rect key="e" class="j-zn-o" x=${x + 1} y=${y + 2} width="2" height="2"/>`);
+    });
+    RYSUNKI_ZNAKU.set(poza, r);
   }
   return r;
 }
-
-const scianaAgenta = (a) => (WYGLAD_POKOJU[pokojAgenta(a)] || WYGLAD_POKOJU.office).sciana;

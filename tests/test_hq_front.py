@@ -21,7 +21,7 @@ validate = load_script("scripts/validate.py", "jarvo_test_validate_front")
 APLIKACJA = ("02-sklep.js", "03-trasa.js", "04-i18n.js", "05-skroty.js", "06-tokeny.js", "07-sciezki.js", "11-strumien.js", "12-wzmianki.js",
              "13-markdown.js", "14-czas.js", "15-os.js", "16-akcje.js", "20-ui.js", "21-ikony.js", "30-pasek.js", "31-watek.js",
              "32-wiadomosc.js", "33-komendy.js", "33-kompozytor.js", "34-pliki.js", "38-start.js", "62-ustawienia.js", "90-app.js", "22-figurka.js",
-             "23-robot.js", "36-glos.js", "37-poznajmy.js", "64-raporty.js")
+             "23-robot.js", "36-glos.js", "37-poznajmy.js", "64-raporty.js", "65-kosmos.js")
 
 
 def _tekst(nazwa: str) -> str:
@@ -146,7 +146,13 @@ PARY = [(fg, bg, "tlo-pasek" if bg in ("tlo-hover", "tlo-aktywne") else "tlo", 4
     ("blad", "tlo-pop", "tlo", 4.5), ("blad", "blad-tlo", "tlo", 4.5), ("uwaga", "tlo", "tlo", 4.5),
     ("uwaga", "uwaga-tlo", "tlo", 4.5), ("tekst", "uwaga-tlo", "tlo", 4.5),
     ("ok", "tlo-pasek", "tlo", 3), ("uwaga", "tlo-pasek", "tlo", 3), ("krawedz", "tlo-karta", "tlo", 3),
-    ("krawedz", "tlo-pasek", "tlo", 3)] + [("fokus", bg, "tlo", 3) for bg in ("tlo", "tlo-pasek", "tlo-karta", "tlo-pop")]
+    ("krawedz", "tlo-pasek", "tlo", 3)] + [("fokus", bg, "tlo", 3) for bg in ("tlo", "tlo-pasek", "tlo-karta", "tlo-pop")] + [
+    # TARS: treść ciągła, link i kod, czerwień pracy na każdym poziomie tła; metadane na module aktywnym i we wnęce;
+    # czarne (albo białe) pismo na bursztynowym liczniku, czerwonym „Zatrzymaj” i odznace błędu
+    (fg, bg, "tlo", 4.5) for fg in ("tresc", "link", "praca") for bg in ("tlo", "tlo-pasek", "tlo-karta", "tlo-2", "tlo-3", "tlo-pop", "wneka")] + [
+    ("tekst-3", "tlo-3", "tlo", 4.5), ("tekst-3", "wneka", "tlo", 4.5), ("tekst-2", "tlo-3", "tlo", 4.5), ("link", "link-tlo", "tlo-karta", 4.5),
+    ("uwaga", "tlo-karta", "tlo", 4.5), ("uwaga", "tlo-3", "tlo", 4.5), ("akcent-na", "uwaga", "tlo", 4.5), ("akcent-na", "blad", "tlo", 4.5),
+    ("akcent-na", "praca", "tlo", 4.5)]
 
 
 @pytest.mark.parametrize("motyw", ["ciemny", "jasny"])

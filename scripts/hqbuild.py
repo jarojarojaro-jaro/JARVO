@@ -88,7 +88,8 @@ def bundle_js(src_dir: Path | None = None, naglowek: str = "Jarvo HQ: plugin das
 # hq/web/src; `wspolne` to pliki spoza src dołączane na początek (graf wspólny z wtyczką Wiedzy). `zalezy`: pakiety
 # wczytywane razem (Stara Baza otwiera edytor, edytor używa okien Bazy). Demo i testy biorą pełny pakiet (bundle_js).
 PAKIETY = {
-    "baza": {"pliki": ("20-art.js", "30-building.js", "40-panel.js", "50-chat.js", "56-flota.js", "60-hud.js",
+    # 19-piksele.js (silnik pikseli: pokoje, figurki): tylko wieża Starej Bazy; aplikacja ma znaki TARS (22-figurka.js)
+    "baza": {"pliki": ("19-piksele.js", "20-art.js", "30-building.js", "40-panel.js", "50-chat.js", "56-flota.js", "60-hud.js",
                        "89-baza.js"), "zalezy": ("edytor",)},
     "edytor": {"pliki": ("43-*.js", "44-*.js", "45-*.js", "46-*.js", "47-*.js", "48-*.js", "49-*.js", "55-*.js"),
                "zalezy": ("baza",)},
@@ -101,6 +102,9 @@ PAKIETY = {
     # stopka kompozytora (model, myślenie, tryb szybki, pierścień kontekstu z dymkiem): przy pierwszej otwartej
     # rozmowie, do tej pory rząd bloczka ma tylko „Do:”, spinacz i wysyłanie (ta sama wysokość)
     "stopka": {"pliki": ("33-stopka.js",), "zalezy": ()},
+    # mapa wejścia Mózgu w motywie TARS (czarna dziura z orbitami części, shader WebGL): dopiero na wejściu Mózgu,
+    # poza budżetem mozg.js
+    "kosmos": {"pliki": ("65-kosmos.js",), "zalezy": ()},
 }
 # budżet gzip (bajty) z projektu etapu 1 §7: przekroczenie zatrzymuje build. Mózg 20 KB (20.11, było 14 KB, przedtem
 # 6 KB): części, grupy, szukanie w treści, [[linki]] i skupiska w grafie, a od 20.11 tożsamość Jarva, edytor pamięci
@@ -455,10 +459,11 @@ LOADER = """/* Jarvo: loader zakładki /jarvo. Plik generowany przez scripts/hqb
 })();
 """
 LOADER_MAX = 4096
-# kroje nowej aplikacji (Inter, JetBrains Mono, Bricolage Grotesque; OFL) i Inter edytora: serwowane z /zasoby/kroje/
-KROJE_APLIKACJI = ("inter-latin-wght-normal.woff2", "inter-latin-ext-wght-normal.woff2",
-                   "jetbrains-mono-latin-wght-normal.woff2", "jetbrains-mono-latin-ext-wght-normal.woff2",
-                   "bricolage-grotesque-latin-wght-normal.woff2", "bricolage-grotesque-latin-ext-wght-normal.woff2")
+# kroje aplikacji (motyw TARS: Geist treść, Geist Mono dane, Archivo szeroki nagłówki; OFL, hq/web/fonts/tars/ z
+# licencjami, pliki Fontsource bez zmian) i Inter edytora: serwowane z /zasoby/kroje/
+KROJE_APLIKACJI = ("geist-latin-wght-normal.woff2", "geist-latin-ext-wght-normal.woff2",
+                   "geist-mono-latin-wght-normal.woff2", "geist-mono-latin-ext-wght-normal.woff2",
+                   "archivo-latin-wdth-normal.woff2", "archivo-latin-ext-wdth-normal.woff2")
 # style leżą pod /api/plugins/jarvo-hq/zasoby/, a pełna biblioteka krojów edytora (kroje.css i ~150 plików) zostaje
 # w dist/fonts/ pluginu: względny adres z czterema „..” trafia tam także za proxy z prefiksem ścieżki
 DO_DIST = "../../../../dashboard-plugins/jarvo-hq/dist/"
@@ -546,7 +551,7 @@ def build_plugin(out: Path, fleet: fl.Fleet | None = None) -> Path:
     js, css = zapisz_pakiety(zasoby)
     (dash / "dist" / "index.js").write_text(loader_js(js, css), encoding="utf-8", newline="\n")
     for k in KROJE_APLIKACJI:
-        shutil.copy2(HQ / "web" / "fonts" / "kroje" / k, zasoby / "kroje" / k)
+        shutil.copy2(HQ / "web" / "fonts" / "tars" / k, zasoby / "kroje" / k)
     for k in ("Inter-latin.woff2", "Inter-latin-ext.woff2"):
         shutil.copy2(HQ / "web" / "fonts" / k, zasoby / "kroje" / k)
     shutil.copy2(HQ / "web" / "vendor" / "LICENSE-htm", dash / "dist" / "LICENSE-htm")

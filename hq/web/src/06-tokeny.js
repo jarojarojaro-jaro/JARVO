@@ -4,7 +4,7 @@
 // liczymy z visualViewport (kompozytor zostaje nad klawiaturą).
 
 const Motyw = {
-  WYBORY: ["system", "jasny", "ciemny"],
+  WYBORY: ["ciemny", "jasny", "system"],   // TARS: ciemny pierwszy (domyślny), jasny = ten sam monolit w świetle dnia
   rozwiaz: (wybor, systemCiemny) => (wybor === "jasny" || wybor === "ciemny" ? wybor : systemCiemny ? "ciemny" : "jasny"),
 };
 

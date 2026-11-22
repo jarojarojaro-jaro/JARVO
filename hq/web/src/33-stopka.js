@@ -69,10 +69,10 @@ function Stopka({ watek }) {
     aria-haspopup=${co === "fast" ? undefined : "menu"} onClick=${(e) => otworz(co, e)}>${tresc}</button>`;
   return html`<span class="j-pig-w">
       ${pig("model", krotkiModel(d.model), `${d.model}: ${L("kliknij, żeby zmienić model", "click to change the model")}`)}
-      ${pig("wysilek", html`<${Ikona} n="spark" r=${12}/>${d.wysilek || L("domyślne", "default")}`,
-        L("Wysiłek myślenia: kliknij, żeby zmienić", "Thinking effort: click to change"), "is-zb")}
-      ${d.fast_dostepny && pig("fast", "⚡", L(`Tryb szybki ${d.fast ? "włączony" : "wyłączony"}: kliknij, żeby przełączyć`,
-        `Fast mode ${d.fast ? "on" : "off"}: click to toggle`), cx("is-zb", !d.fast && "is-wyc"))}
+      ${pig("wysilek", d.wysilek || L("domyślne", "default"), L("Wysiłek myślenia: kliknij, żeby zmienić", "Thinking effort: click to change"), "is-zb")}
+      ${d.fast_dostepny && pig("fast", html`<${Ikona} n="bolt" r=${14}/><span class="j-sr">${L("Tryb szybki", "Fast mode")}</span>`,
+        L(`Tryb szybki ${d.fast ? "włączony" : "wyłączony"}: kliknij, żeby przełączyć`, `Fast mode ${d.fast ? "on" : "off"}: click to toggle`),
+        cx("is-zb", "is-fast", !d.fast && "is-wyc"))}
     </span><span class="j-rozpych"></span>
     ${pig("kontekst", html`<${Pierscien} p=${d.procent}/><span>${zaj != null ? `${zaj}%` : krotko(d.kontekst)}</span>`,
       szczegoly.join("\n"), cx("j-pig-k", zaj >= 80 && "is-duzo"))}

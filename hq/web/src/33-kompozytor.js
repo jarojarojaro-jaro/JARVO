@@ -101,6 +101,7 @@ function ZalacznikiKompozytora({ obrazy, pliki, wgrywa, onUsunObraz, onUsunPlik 
 }
 
 // ------------------------------------------------------------------------------------------------- pasek pracy
+// żywy moduł TARS nad kompozytorem: znak z czerwoną krawędzią, kto, co robi teraz (ostatni krok albo stan), czas, Zatrzymaj
 function PasekNaZywo({ przebiegi, watek }) {
   const teraz = useTeraz(1000, przebiegi.length > 0);
   const [stop, setStop] = useState(false);
@@ -109,11 +110,12 @@ function PasekNaZywo({ przebiegi, watek }) {
   const p = przebiegi.find((x) => x.stan !== "czeka_na_zgode") || przebiegi[0], od = p.przyjety_at || p.utworzony_at;
   const zatrzymuje = stop || przebiegi.every((x) => x.stan === "zatrzymywanie");
   const zatrzymaj = async () => { setStop(true); try { await akcje.zatrzymaj(watek); } finally { setStop(false); } };
+  const krok = p.stan === "pracuje" ? Os.krokiPodsumowanie(p.kroki || []).ostatni : null;
   return html`<div class="j-zywo" role="group" aria-label=${T("zywo.etykieta")}>
-    <${Awatar} agent=${sklep.stan().agenci[p.agent] || { name: p.agent }} r=${20}/>
-    <span class="j-zywo-t"><b>${nazwaAgenta(p.agent)}</b> ${stanPracy(p)}${przebiegi.length > 1 ? ` · ${T("zywo.i_inni", { n: przebiegi.length - 1 })}` : ""}</span>
+    <span class="j-zywo-z"><${Awatar} agent=${sklep.stan().agenci[p.agent] || { name: p.agent }} r=${22}/></span>
+    <b class="j-zywo-n">${nazwaAgenta(p.agent)}</b>
+    <span class="j-zywo-t">${krok ? `${czasownik(krok)}…` : stanPracy(p)}${przebiegi.length > 1 ? ` · ${T("zywo.i_inni", { n: przebiegi.length - 1 })}` : ""}</span>
     ${od ? html`<span class="j-zywo-c" aria-hidden="true">${Czas.trwanie(teraz - od)}</span>` : null}
-    <span class="j-rozpych"></span>
     <${Przycisk} maly rodzaj="cichy" ikona="stop" disabled=${zatrzymuje} onClick=${zatrzymaj} podpowiedz=${T("zywo.esc")}>
       ${T(zatrzymuje ? "zywo.zatrzymuje" : "zywo.zatrzymaj")}</${Przycisk}>
   </div>`;

@@ -36,7 +36,8 @@ def test_kroj_edytora_w_pluginie_i_demo(tmp_path):
     from urllib.parse import urljoin
     baza = "http://x/api/plugins/jarvo-hq/zasoby/"
     app_css = "".join(p.read_text(encoding="utf-8") for p in (dist / "zasoby").glob("app-*.css"))   # rdzeń i pakiety
-    adresy = [u for u in re.findall(r'url\(["\']?([^)"\']+)', app_css) if not u.startswith(("http", "data:"))]
+    # bez data: URI i odnośników do fragmentu (filtr SVG w data: URI motywu TARS: `filter='url(%23n)'`)
+    adresy = [u for u in re.findall(r'url\(["\']?([^)"\']+)', app_css) if not u.startswith(("http", "data:", "#", "%23"))]
     assert "kroje/Inter-latin.woff2" in adresy and any(u.endswith("fonts/kroje/kroje.css") for u in adresy)
     for u in adresy:
         sciezka = normpath(urljoin(baza, u)[len("http://x"):])

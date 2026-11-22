@@ -201,10 +201,10 @@ function Watek({ id, panel = 0, rozmowca = null }) {
           <${ElementOsi} x=${x} ctx=${ctx} ostatniaPrzebiegu=${ostatnie[x.przebieg_id] === x.id} tak=${tak[x.id]}/></${React.Fragment}>`)}
       </div>
     </div>
-    ${pokazDol && html`<button type="button" class="j-dodolu" onClick=${() => naDol(true)} aria-label=${T("watek.na_dol")}>
-      <${Ikona} n="down" r=${18}/></button>`}
     <p class="j-sr" aria-live="polite" aria-atomic="true">${ogloszenie}</p>
     <div class="j-dok">
+      ${pokazDol && html`<button type="button" class="j-dodolu" onClick=${() => naDol(true)} aria-label=${T("watek.na_dol")}>
+        <${Ikona} n="down" r=${18}/></button>`}
       ${rozmowca && html`<${BanerRozmowcy} klucz=${rozmowca}/>`}
       ${wKoszu ? html`<div class="j-kosz-uwaga"><${Ikona} n="trash" r=${16}/><span>${T("watek.w_koszu_opis")}</span>
           <${Przycisk} maly onClick=${() => akcje.przywroc(id)}>${T("watek.przywroc")}</${Przycisk}></div>`
@@ -221,19 +221,22 @@ function BanerRozmowcy({ klucz }) {
   const tekst = r.stan === "offline" ? T("rozm.baner_offline", { powod: r.powod || T("rozm.offline") })
     : T(r.stan === "terminal" ? "rozm.baner_terminal" : "rozm.baner_kolejka", { n: r.czeka || 0 });
   return html`<div class=${cx("j-baner-rozm", `is-${r.stan}`)} role="status">
-    <b>${linijkaStanu(r, { podglad: false })}</b><span>${tekst}</span></div>`;
+    <b><${LiniaStanu} r=${r} podglad=${false}/></b><span>${tekst}</span></div>`;
 }
 
-// nagłówek rozmowy z rozmówcą: figurka ze stanem, nazwa, opis i stan, „jedna historia” (panel, Telegram, terminal)
+// nagłówek rozmowy z rozmówcą (moduł 02 TARS): znak agenta ze stanem, nazwa w kroju nagłówków, opis, z prawej sygnał
+// stanu (kwadrat i słowo, czerwień = pracuje) i „wspólna rozmowa” z kanałami jednej historii (panel, Telegram, terminal)
 function NaglowekRozmowcy({ klucz, wstecz }) {
   const r = useSklep((s) => s.rozmowcy.find((x) => x.klucz === klucz));
   if (!r) return null;
-  const opis = (!isPL() && r.opis_en) || r.opis;
+  const opis = (!isPL() && r.opis_en) || r.opis, st = stanRozmowcy(r);
+  const kanaly = ["panel", r.temat && "telegram", r.zaplecze === "omp" && "terminal"].filter(Boolean).join(" · ");
   return html`${wstecz && html`<a class="j-wstecz" href="#/" aria-label=${T("rozm.wroc")}><${Ikona} n="back" r=${20}/></a>`}
     <${AwatarRozmowcy} r=${r} rozmiar=${32}/>
     <div class="j-gora-rozm"><h1 class="j-gora-t" tabIndex="-1">${nazwaRozmowcy(r)}</h1>
-      <p class="j-gora-opis">${[opis, linijkaStanu(r, { podglad: false })].filter(Boolean).join(" · ")}</p></div>
-    <span class="j-wspolna" title=${T("rozm.wspolna_opis")}>${r.temat ? "📱 " : ""}${r.zaplecze === "omp" ? "⌨ " : ""}🖥<span class="j-wspolna-t"> ${T("rozm.wspolna")}</span></span>`;
+      ${opis && html`<p class="j-gora-opis">${opis}</p>`}</div>
+    <span class=${`j-sygn is-${st}`}><i aria-hidden="true"></i>${slowoStanu(r)}</span>
+    <span class="j-wspolna" title=${T("rozm.wspolna_opis")}><span class="j-wspolna-t">${T("rozm.wspolna")}</span><small>${kanaly}</small></span>`;
 }
 
 // ------------------------------------------------------------------------------------------------- nagłówek wątku

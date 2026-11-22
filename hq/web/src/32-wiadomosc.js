@@ -56,11 +56,12 @@ function AkcjeWiadomosci({ tekst, agent, watek, koordynator }) {
 const OBRAZ_DATA = /^data:image\/(png|jpeg|gif|webp);base64,/;
 
 // ------------------------------------------------------------------------------------------------- właściciel
-// odznaka źródła w rozmowie z rozmówcą (centrum §2.1): 📱 Telegram, ⌨ terminal, 🖥 panel (wpis i wiadomość w drodze)
-const ZRODLA = { telegram: "📱", terminal: "⌨", panel: "🖥" };
-function Zrodlo({ zrodlo, ts }) {
-  const z = ZRODLA[zrodlo] ? zrodlo : "panel";
-  return html`<span class="j-zrodlo" data-zrodlo=${z}><span aria-hidden="true">${ZRODLA[z]} </span>${T(`zrodlo.${z}`)}${ts ? ` · ${Czas.godzina(ts)}` : ""}</span>`;
+// odznaka źródła w rozmowie z rozmówcą (centrum §2.1): „z Telegrama”, „z terminala”, „z panelu” (etykieta mono nad treścią;
+// godzina stoi na osi rozmowy)
+const ZRODLA = new Set(["telegram", "terminal", "panel"]);
+function Zrodlo({ zrodlo }) {
+  const z = ZRODLA.has(zrodlo) ? zrodlo : "panel";
+  return html`<span class="j-zrodlo" data-zrodlo=${z}>${T(`zrodlo.${z}`)}</span>`;
 }
 
 // stan przebiegu wiadomości właściciela (wpis_id → stan): jedna mapa na stan sklepu zamiast przeglądu wszystkich
@@ -90,11 +91,11 @@ function WiadomoscWlasciciela({ x, k, rozmowca }) {
   const dop = !!(w.dane && w.dane.dopisane_do);
   const stanDop = useSklep((s) => (o ? null : stanWpisu(s.przebiegi, x.id)));
   return html`<article class="j-msg j-msg-ja" data-wpis=${o ? undefined : x.id} data-zrodlo=${rozmowca ? x.zrodlo || "panel" : undefined}>
-    <h3 class="j-sr">${T("os.ty")}, ${Czas.godzina(x.ts)}</h3>
+    <h3 class="j-sr">${T("os.ty")}, ${Czas.godzina(x.ts)}</h3>${x.ts ? html`<time class="j-msg-ts" aria-hidden="true">${Czas.godzina(x.ts)}</time>` : null}
     ${bezposrednio && adresaci.length > 0 && html`<p class="j-msg-tag"><${Ikona} n="turn" r=${14}/>
       <span>${T("msg.bezposrednio")} · ${adresaci.map(nazwaAgenta).join(", ")}</span></p>`}
     ${x.tekst && html`<div class=${cx("j-babel", o && o.stan === "blad" && "is-blad")} title=${czasPelny(x.ts)}>
-      ${rozmowca && html`<${Zrodlo} zrodlo=${x.zrodlo} ts=${x.ts}/>`}${x.tekst}</div>`}
+      ${rozmowca && html`<${Zrodlo} zrodlo=${x.zrodlo}/>`}${x.tekst}</div>`}
     ${(obrazy.length > 0 || pliki.length > 0) && html`<div class="j-msg-pliki">
       ${obrazy.map((b, i) => html`<img key=${i} class="j-zal-obraz" src=${b.dane} alt=${b.nazwa || ""}/>`)}
       ${pliki.map((p) => html`<${KartaPliku} key=${p.path} plik=${p} kompakt=${true}/>`)}</div>`}

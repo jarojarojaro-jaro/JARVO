@@ -32,9 +32,16 @@ function utworzSklep(poczatek) {
   return sklep;
 }
 
-// powiadomienia przeglądarki domyślnie włączone (centrum D9): „czeka na Ciebie” i koniec długiej pracy rozmówcy
-const USTAWIENIA_DOMYSLNE = { motyw: "system", szczegoly: false, gestosc: "wygodna", dzwiek: false, powiadomienia: true,
-  zapytano_o_powiadomienia: false };
+// powiadomienia przeglądarki domyślnie włączone (centrum D9): „czeka na Ciebie” i koniec długiej pracy rozmówcy;
+// motyw TARS (22.11) domyślnie ciemny; `tars: 1` = ustawienia zapisane już w nim (motyw z nich obowiązuje)
+const USTAWIENIA_DOMYSLNE = { motyw: "ciemny", szczegoly: false, gestosc: "wygodna", dzwiek: false, powiadomienia: true,
+  zapytano_o_powiadomienia: false, tars: 1 };
+// wybór motywu zapisany przed TARS (jasny albo „jak w systemie” starego wyglądu) nie przechodzi: każdy zaczyna od TARS
+// ciemnego, a własny wybór z Ustawień zostaje już na stałe (zapis niesie `tars`)
+function ustawieniaZPamieci() {
+  const z = Pamiec.wez("jarvo.ustawienia.v1", null) || {};
+  return { ...USTAWIENIA_DOMYSLNE, ...z, ...(z.tars ? {} : { motyw: USTAWIENIA_DOMYSLNE.motyw, tars: 1 }) };
+}
 
 function stanPoczatkowy() {
   return {
@@ -58,7 +65,7 @@ function stanPoczatkowy() {
     decyzje: { liczba: 0 },
     strumien: { stan: "laczy", epoka: null, lider: false, wielokarty: false, nowa_wersja: false },
     podzial: Pamiec.wez("jarvo.podzial.v1", null) || { tryb: "jeden", panele: [], proporcja: 0.5, aktywny: 0 },
-    ustawienia: { ...USTAWIENIA_DOMYSLNE, ...(Pamiec.wez("jarvo.ustawienia.v1", null) || {}) },
+    ustawienia: ustawieniaZPamieci(),
     szkice: Pamiec.wez("jarvo.szkice.v1", null) || {},
     pasek: { otwarty: false, zwiniety: !!Pamiec.wez("jarvo.pasek_zwiniety", false) },
     toasty: [], aktualizacja: null, stara_baza: false,

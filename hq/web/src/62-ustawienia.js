@@ -19,7 +19,7 @@ const SEKCJE_USTAWIEN = [
 ];
 // palety Fosforu z branding/fosfor/palettes.yaml (test pilnuje zgodności); kolory dają zmienne --j-* w style.css
 const PALETY = [
-  { id: "jarvo", kolor: "#D4213D", pl: "Jarvo · biało-czerwony", en: "Jarvo · white and red" },
+  { id: "jarvo", kolor: "#F5F4F0", pl: "TARS · grafit", en: "TARS · graphite" },
   { id: "fosfor", kolor: "#89cff0", pl: "Fosfor · błękit", en: "Phosphor · blue" },
   { id: "fosfor-bursztyn", kolor: "#ffb000", pl: "Fosfor · bursztyn", en: "Phosphor · amber" },
   { id: "fosfor-zielen", kolor: "#41ff7a", pl: "Fosfor · zieleń", en: "Phosphor · green" },

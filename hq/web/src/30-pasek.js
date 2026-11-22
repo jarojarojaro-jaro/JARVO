@@ -109,29 +109,31 @@ function OdznakaAktualizacji({ otworz }) {
 }
 
 // ------------------------------------------------------------------------------------------------- rozmówcy
-// Sekcja ROZMÓWCY (centrum §1, §2.1): stała kolejność z konfiguracji, wiersz = figurka z kropką stanu, nazwa, skrót
-// ⌘1–⌘4 albo licznik nieprzeczytanych i linia „znak + słowo stanu · podgląd” (kropka i słowo: czytnik ekranu,
+// Sekcja ROZMÓWCY (centrum §1, §2.1): stała kolejność z konfiguracji, wiersz = znak agenta z kwadratem stanu, nazwa,
+// skrót ⌘1–⌘4 albo licznik nieprzeczytanych i linia „ETYKIETA STANU podgląd” (kwadrat i słowo: czytnik ekranu,
 // daltonizm). Lista to role=listbox: strzałki, Home/End, Enter; jeden wiersz w kolejności Tab (aktywny albo pierwszy).
-const ZNAKI_STANU = { pracuje: "●", czeka: "◐", wolny: "○", terminal: "⌨", kolejka: "◷", offline: "⊘" };
+const STANY_ROZMOWCY = new Set(["pracuje", "czeka", "wolny", "terminal", "kolejka", "offline"]);
 const nazwaRozmowcy = (r) => (r ? (!isPL() && r.nazwa_en) || r.nazwa || r.klucz : "");
 const agentRozmowcy = (r) => (r.zaplecze === "omp" ? r.klucz : r.cel);
-const stanRozmowcy = (r) => (ZNAKI_STANU[r && r.stan] ? r.stan : "offline");
+const stanRozmowcy = (r) => (STANY_ROZMOWCY.has(r && r.stan) ? r.stan : "offline");
 function slowoStanu(r) {
   const st = stanRozmowcy(r);
   return st === "kolejka" ? T("rozm.kolejka", { n: Math.max(1, r.czeka || 0) }) : T(`rozm.${st}`);
 }
-function linijkaStanu(r, { podglad = true } = {}) {
+// stan jako etykieta TARS (mono, wersaliki, kolor = stan: czerwień pracuje, bursztyn czeka) i reszta linijki
+// (podgląd ostatniej wiadomości, czekające w terminalu, powód niedostępności)
+function LiniaStanu({ r, podglad = true }) {
   const st = stanRozmowcy(r);
-  const cz = [`${ZNAKI_STANU[st]} ${slowoStanu(r)}`];
+  const cz = [];
   if (st === "terminal" && r.czeka > 0) cz.push(T("rozm.czeka_n", { n: r.czeka }));
   if (st === "offline" && r.powod) cz.push(r.powod);
   else if (podglad && r.podglad) cz.push(r.podglad);
-  return cz.join(" · ");
+  return html`<em class=${`j-st is-${st}`}>${slowoStanu(r)}</em>${cz.length > 0 && html`<span>${cz.join(" · ")}</span>`}`;
 }
 
 function AwatarRozmowcy({ r, rozmiar = 34 }) {
   const a = useSklep((s) => s.agenci[agentRozmowcy(r)]);
-  return html`<span class="j-rozm-av"><${Awatar} agent=${a || { name: agentRozmowcy(r) }} r=${rozmiar}/>
+  return html`<span class="j-rozm-av"><${Awatar} agent=${{ nazwa: r.nazwa, ...(a || { name: agentRozmowcy(r) }) }} r=${rozmiar}/>
     <i class=${`j-rk is-${stanRozmowcy(r)}`} aria-hidden="true"></i></span>`;
 }
 
@@ -170,7 +172,7 @@ function ListaRozmowcow({ trasa, duza = false }) {
         <span class="j-rozm-n">${nazwaRozmowcy(r)}</span>
         ${n > 0 ? html`<span class="j-rozm-licz" aria-hidden="true">${n > 99 ? "99+" : n}</span>`
           : i < 4 && !duza ? html`<kbd class="j-rozm-skrot" aria-hidden="true">${Skroty.opis(`Mod+${i + 1}`)}</kbd>` : html`<span></span>`}
-        <span class="j-rozm-st" aria-hidden="true">${linijkaStanu(r)}</span>
+        <span class="j-rozm-st" aria-hidden="true"><${LiniaStanu} r=${r}/></span>
       </li>`;
     })}
   </ul>`;
@@ -269,10 +271,16 @@ function StanPolaczenia({ klasa }) {
     <i aria-hidden="true">${ok ? "" : "⚠"}</i><span>${ok ? T("polaczenie.krotko") : T(`polaczenie.${stan}`)}</span></p>`;
 }
 
-// Stopka paska: bez drugiego wejścia do Ustawień (jest pozycja „Ustawienia” w nawigacji, ⌘,), tylko stan połączenia
-// i odznaka aktualizacji
+// Mikroteksty TARS (motyw, docs/HQ.md §5a): stałe „szczerość 90%, humor 75%” jak ustawienia robota z filmu; to ozdoba
+// charakteru, nie dane, więc czytnik ekranu ich nie czyta
+const TARS_USTAWIENIA = [["tars.szczerosc", 90], ["tars.humor", 75]];
+const MiernikiTars = () => html`<div class="j-tars" aria-hidden="true">${TARS_USTAWIENIA.map(([k, v]) => html`<div key=${k}>
+  <span>${T(k)}</span><i style=${{ "--v": v }}></i><em>${v}%</em></div>`)}</div>`;
+
+// Stopka paska: bez drugiego wejścia do Ustawień (jest pozycja „Ustawienia” w nawigacji, ⌘,), mierniki TARS, stan
+// połączenia i odznaka aktualizacji
 function StopkaPaska() {
-  return html`<div class="j-stopka">
+  return html`<${MiernikiTars}/><div class="j-stopka">
     <${StanPolaczenia}/>
     <${OdznakaAktualizacji} otworz=${(sekcja) => Trasa.idz({ widok: "ustawienia", sekcja })}/>
   </div>`;
