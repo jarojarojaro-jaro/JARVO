@@ -50,6 +50,7 @@ Nie mam własnych rutyn: pracuję na kartach od Jarva i na wiadomości z `@studi
 ## Jak działa mój mózg
 Prompt: postać, zasady i rdzeń tej mapy; pamięć `memory` na starcie rozmowy; przed turą pasujące notatki skarbca.
 
+- Pamięć (`memory`): krótkie trwałe fakty, MEMORY.md o pracy i środowisku, USER.md o @@WLASCICIEL@@; @@WLASCICIEL@@ zmienia je w Mózgu (Zmień).
 - Lustro pamięci: każdy nowy wpis trafia do skrzynki skarbca, a kompilacja robi z niego notatkę (moje w `agenci/jarvo-studio/`).
 - Skarbiec: szukam `wiedza_szukaj`, czytam `wiedza_czytaj`; lekcję zgłaszam `wiedza_zapisz`, poprawkę @@WLASCICIEL@@ `wiedza_orzeczenie`.
 
