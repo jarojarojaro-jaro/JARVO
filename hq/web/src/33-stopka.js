@@ -11,7 +11,7 @@
 // GET /rozmowy/{id}/licznik od razu po każdej zmianie pliku sesji (zdarzenie `watek.os`: krok, kompresja, zmiana modelu
 // albo myślenia w terminalu), co 2 s w trakcie pracy panelu, inaczej co 30 s; w ukrytej karcie przeglądarki nie pyta.
 
-const krotko = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(n % 1e6 ? 1 : 0)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k` : String(n || 0));
+const krotko = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(/\.0$/, "")}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k` : String(n || 0));
 // „anthropic/claude-opus-5-5” → „opus-5-5” (dostawca i rodzina w wysuwce i w dymku)
 const krotkiModel = (m) => String(m || "?").split("/").pop().replace(/^claude-/, "");
 const dolary = (x) => `$${Number(x || 0).toFixed(2)}`;
@@ -119,7 +119,6 @@ function ModelWybor({ o, onWybierz }) {
             ${ms.map((m) => html`<button key=${m.model} type="button" class=${cx("j-wm-m", m.biezacy && "is-biez")}
               aria-current=${m.biezacy ? "true" : undefined} title=${m.model} onClick=${() => onWybierz(m)}>
               <span class="j-wm-mn">${bezRodziny(m.nazwa)}</span><span class="j-rozpych"></span>
-              ${m.myslenie && html`<span class="j-wm-ms" title=${L("myśli", "reasons")}>◆</span>`}
               ${m.okno > 0 && html`<span class="j-wm-okno">${krotko(m.okno)}</span>`}
               <span class="j-wm-ok">${m.biezacy ? html`<${Ikona} n="check" r=${14}/>` : null}</span></button>`)}
           </div>`)}

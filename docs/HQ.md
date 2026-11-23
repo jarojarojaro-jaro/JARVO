@@ -1186,13 +1186,22 @@ innych kanałów etap 6.
   `wstrzymane` i `misja` tylko ręcznie). **Stopka w bloczku** (`Stopka` w pakiecie `app-stopka`, `33-stopka.js`,
   ładowanym przy pierwszej otwartej rozmowie; do tego czasu dolny rząd ma tylko „Do:”, spinacz i wysyłanie, ta sama
   wysokość): w dolnym rzędzie białego bloczka, jak w czatach z agentami. Obok „Do:” pigułki model (skrót nazwy, np.
-  `opus-5-5`), myślenie (poziom) i ⚡ (wyciszony, gdy tryb szybki wyłączony); klik w model albo myślenie otwiera menu
-  z `GET /rozmowy/<id>/opcje`, ⚡ przełącza, wybór idzie komendą `/model`, `/effort`, `/fast` (zostaje w rozmowie).
-  Przy spinaczu pierścień kontekstu z % okna (kolor uwagi od 80%): najechanie pokazuje szczegóły, klik otwiera je
-  w menu (kontekst z oknem, ↑ wejście ↓ wyjście, cache, koszt dziś i całej sesji z dopiskiem, że to równoważnik cen
-  API) ze „Skompresuj teraz” (omp: `/compact`) albo „Szczegóły” (Hermes: `/context`). Dane: `GET
-  /rozmowy/<id>/licznik` co 2 s w trakcie pracy, inaczej co 30 s, nie w ukrytej karcie. Na wąskim ekranie (poniżej
-  640 px) zostają model (skracany wielokropkiem) i pierścień, bez napisu „Do:”.
+  `opus-5-5`), wysiłek (mała skala 5 słupków i poziom) i ⚡ (wyciszony, gdy tryb szybki wyłączony); przy spinaczu
+  pierścień kontekstu z % okna (kolor uwagi od 80%). Klik w pigułkę otwiera wysuwkę nad nią (23.11 właściciel:
+  „modele podzielone na subskrypcje, effort fajne grafiki”): **model** (szukajka, dostawcy z `grupy` w `GET
+  /rozmowy/<id>/opcje` jako „subskrypcja” albo „klucz API · za tokeny”, zwijane, bieżący rozwinięty i pierwszy, w nich
+  rodziny Opus, Sonnet, Fable, Mythos, Haiku, potem reszta alfabetycznie, od najnowszych, przy modelu okno kontekstu;
+  datowane dublety typu `claude-haiku-4-5-20251001` ukryte), **wysiłek** (skala słupków od `off` do `max` z opisem
+  poziomu pod kursorem, strzałki ← →, „Jak ustawienie agenta”), **kontekst** (duży pierścień, tokeny w oknie, ostatnia
+  kompresja „611k → 44k”, wejście, wyjście, cache, koszt dziś i sesji jako równoważnik cen API, omp: pole „na czym się
+  skupić” i **Skompresuj teraz** = `/compact <tekst>`, Hermes: `/context`). ⚡ przełącza od razu; wybór idzie komendą
+  `/model`, `/effort`, `/fast`, `/compact` (zostaje w rozmowie). Dane: `GET /rozmowy/<id>/licznik` od razu po każdej
+  zmianie pliku sesji (zdarzenie `watek.os`, najwyżej raz na sekundę), co 2 s w trakcie pracy panelu, inaczej co 30 s,
+  nie w ukrytej karcie. Rozmówca omp 1:1 z terminalem: licznik czyta z pliku sesji także `compaction` (kontekst =
+  `tokensAfter`), `thinking_level_change`, `service_tier_change` (priority = tryb szybki) i `model_change`; myślenie
+  i tryb szybki to nowszy z dwóch: wybór panelu (`model.json`) albo zmiana w sesji. Oś pokazuje kompresję jako
+  „Kontekst skompresowany: 611k → 44k tokenów”. Na wąskim ekranie (poniżej 640 px) zostają model (skracany
+  wielokropkiem) i pierścień, bez napisu „Do:”.
 - <a id="komendy"></a>**Komendy** (`33-komendy.js`, serwer `hq/plugin/komendy.py`): tekst `/nazwa …` nigdy nie idzie do
   agenta (brama Hermesa nie wykonuje komend: `input` `/v1/runs` trafia prosto do modelu, a obsługa `/…` żyje tylko
   w kanałach gatewaya; trasa wiadomości odpowiada 409 `komenda`). Po wpisaniu „/” menu komend rozmowy (`GET /komendy`:

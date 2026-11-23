@@ -2568,6 +2568,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   box-shadow: inset 0 0 0 1px var(--j-linia); color: var(--j-tekst-3); }
 .j-wm-szukaj:focus-within { box-shadow: inset 0 0 0 1px var(--j-linia-mocna); }
 .j-wm-szukaj input { flex: 1; min-width: 0; border: 0; background: none; color: var(--j-tekst); font: 400 13px var(--j-font-ui); outline: none; }
+.j-wm-szukaj input:focus-visible { outline: none; box-shadow: none; }
 .j-wm-lista { overflow-y: auto; padding: 4px 0 8px; overscroll-behavior: contain; }
 .j-wm-sek + .j-wm-sek { border-top: 1px solid var(--j-linia); }
 .j-wm-g { display: flex; align-items: center; gap: 8px; width: 100%; padding: 11px 16px; border: 0; background: none; color: var(--j-tekst); cursor: pointer; text-align: left; }
