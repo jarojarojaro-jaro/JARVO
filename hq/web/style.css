@@ -2610,7 +2610,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   transition: fill .3s var(--j-ease); }
 .j-ww.is-max .j-ww-zegar { animation: j-ww-puls 1.6s ease-in-out infinite; }
 @keyframes j-ww-puls { 50% { filter: drop-shadow(0 0 10px color-mix(in srgb, var(--ww) 40%, transparent)); } }
-.j-ww-suwak { display: block; width: calc(100% - 40px); margin: 6px 20px 2px; accent-color: var(--ww); cursor: pointer; }
+.j-ww-suwak { display: block; width: calc(100% - 40px); margin: 14px 20px 2px; accent-color: var(--ww); cursor: pointer; }
 .j-ww-suwak:focus-visible { outline: 1px solid var(--ww); outline-offset: 4px; }
 .j-ww-wsk2 { display: grid; grid-template-columns: auto 1fr auto 1fr; align-items: center; gap: 6px 8px; margin: 8px 14px 0;
   font: 600 9.5px var(--j-font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--j-tekst-3); }
