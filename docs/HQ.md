@@ -1003,7 +1003,7 @@ innych kanałów etap 6.
   640 px szuflada zajmuje cały ekran: lista sekcji, potem sekcja z **Wróć**; cele dotyku ≥ 40 px. Pod szufladą
   i Starą Bazą układ dostaje `inert` (Tab i czytnik zostają w warstwie), a zamknięta warstwa oddaje fokus temu,
   co ją otworzyło.
-- **Pasek** (`30-pasek.js`): marka, pod nią **+ Nowa rozmowa** (akcent, Ctrl/⌘+Shift+O, `#/nowa`; nad ROZMÓWCAMI, na telefonie na górze ekranu rozmówców; jedyne wejście, przy „Inne rozmowy” go nie ma), szukaj (z opóźnieniem 250 ms, nowsze zapytanie wygrywa),
+- **Pasek** (`30-pasek.js`): marka, pod nią **+ Nowa rozmowa** (akcent, Ctrl/⌘+Shift+O, `#/nowa`; nad ROZMÓWCAMI; jedyne wejście, przy „Inne rozmowy” go nie ma; na telefonie ikona pióra w belce paska), szukaj (z opóźnieniem 250 ms, nowsze zapytanie wygrywa). **Telefon (23.11):** wejście `#/` to nowa rozmowa (powitanie na środku, pole przy kciuku), lista rozmówców jest tylko w pasku, który wysuwa ruch palca w prawo z każdego miejsca i chowa ruch w lewo (pasek idzie za palcem; `useGestPaska` w `90-app.js`, poza polami tekstu, kodem, tabelami i Mózgiem); Aktualizacje, Mózg i Ustawienia w lewym dolnym rogu paska;
   lista wątków w grupach Przypięte, Dziś, Wczoraj, Ten tydzień, Wcześniej (`Czas.grupa`, granice dni w strefie
   przeglądarki), wiersz z ikoną źródła, tytułem i znakiem stanu (z tekstem dla czytnika), **Więcej** dla następnej
   strony; nawigacja z pozycją Ustawienia (także bez rozmówców); stopka: stan połączenia słowem (`StanPolaczenia`,
@@ -1257,7 +1257,7 @@ innych kanałów etap 6.
   i **Stara Baza** (cała stara Baza na ekranie nad aplikacją, z **Wróć do Jarva**; jej skróty działają, skróty
   aplikacji milkną; zamknięcie oddaje fokus temu, co ją otworzyło). Całość działa z samej klawiatury. Na
   telefonie wybór sekcji przenosi fokus na jej nagłówek, a **Wróć** na przycisk tej sekcji w liście.
-- **Trasa** (`03-trasa.js`, hash): `#/` start, `#/nowa[/<agent>]` (bez agenta: nowa rozmowa także na telefonie, gdzie `#/` to lista rozmówców), `#/r/<wątek>[/m/<pozycja>]`, `#/s/<profil>/<sesja>`,
+- **Trasa** (`03-trasa.js`, hash): `#/` start (na telefonie nowa rozmowa), `#/nowa[/<agent>]`, `#/r/<wątek>[/m/<pozycja>]`, `#/s/<profil>/<sesja>`,
   parametry `u` (szuflada) oraz `n`, `p` (narzędzia: edytor, animacja, konwerter, wiedza, w kolejnych częściach).
   Każda część ma swój wzorzec (id wątku `w_` + 21 znaków hex, profil, sesja); reszta to start. Przed przejściem na
   logowanie hash trafia do `sessionStorage` (`jarvo.po_logowaniu`) i wraca po zalogowaniu. Hermes przy wczytaniu
