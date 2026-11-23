@@ -206,25 +206,6 @@ function NowaRozmowa({ fokus = false, duza = false }) {
     ${!duza && html`<kbd class="j-nowa-skrot" aria-hidden="true">${Skroty.opis("Mod+Shift+O")}</kbd>`}</a>`;
 }
 
-// Ekran 1 telefonu (centrum §2.2): duże wiersze rozmówców, pod nimi Aktualizacje, Mózg, Ustawienia i Inne rozmowy
-function EkranRozmowcow() {
-  const ile = useSklep((s) => s.lista.porzadek.length);
-  const trasa = useTrasa();
-  return html`<section class="j-ekran-rozm" aria-labelledby="j-ekran-rozm-t">
-    <h1 class="j-sr" id="j-ekran-rozm-t">${T("rozm.sekcja")}</h1>
-    <${NowaRozmowa} duza=${true}/>
-    <ul class="j-nawig is-duza is-gora"><${PozycjaAktualizacji} trasa=${trasa}/></ul>
-    <${StanPolaczenia} klasa="j-ekran-rozm-st"/>
-    <${ListaRozmowcow} trasa=${trasa} duza=${true}/>
-    <ul class="j-nawig is-duza">
-      <li><a href="#/mozg"><${Ikona} n=${IKONY_WIDOKOW.mozg} r=${18} klasa="j-nawig-i"/><span class="j-nawig-t">${T("rozm.mozg")}</span></a></li>
-      <li><a href="#/ustawienia"><${Ikona} n=${IKONY_WIDOKOW.ustawienia} r=${18} klasa="j-nawig-i"/><span class="j-nawig-t">${T("pasek.ustawienia")}</span></a></li>
-      <li><button type="button" onClick=${() => sklep.ustaw((s) => ({ ...s, inne_otwarte: true, pasek: { ...s.pasek, otwarty: true } }))}>
-        <span class="j-nawig-t is-cichy">${T("rozm.inne")} ▸</span><small>${ile || ""}</small></button></li>
-    </ul>
-  </section>`;
-}
-
 // pasek 4 rozmówców na dole rozmowy (telefon): figurka z kropką stanu i nazwa
 function DokRozmowcow({ trasa }) {
   const rozmowcy = useSklep((s) => s.rozmowcy);

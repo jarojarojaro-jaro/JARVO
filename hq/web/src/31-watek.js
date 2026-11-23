@@ -226,13 +226,12 @@ function BanerRozmowcy({ klucz }) {
 
 // nagłówek rozmowy z rozmówcą (moduł 02 TARS): znak agenta ze stanem, nazwa w kroju nagłówków, opis, z prawej sygnał
 // stanu (kwadrat i słowo, czerwień = pracuje) i „wspólna rozmowa” z kanałami jednej historii (panel, Telegram, terminal)
-function NaglowekRozmowcy({ klucz, wstecz }) {
+function NaglowekRozmowcy({ klucz }) {
   const r = useSklep((s) => s.rozmowcy.find((x) => x.klucz === klucz));
   if (!r) return null;
   const opis = (!isPL() && r.opis_en) || r.opis, st = stanRozmowcy(r);
   const kanaly = ["panel", r.temat && "telegram", r.zaplecze === "omp" && "terminal"].filter(Boolean).join(" · ");
-  return html`${wstecz && html`<a class="j-wstecz" href="#/" aria-label=${T("rozm.wroc")}><${Ikona} n="back" r=${20}/></a>`}
-    <${AwatarRozmowcy} r=${r} rozmiar=${32}/>
+  return html`<${AwatarRozmowcy} r=${r} rozmiar=${32}/>
     <div class="j-gora-rozm"><h1 class="j-gora-t" tabIndex="-1">${nazwaRozmowcy(r)}</h1>
       ${opis && html`<p class="j-gora-opis">${opis}</p>`}</div>
     <span class=${`j-sygn is-${st}`}><i aria-hidden="true"></i>${slowoStanu(r)}</span>

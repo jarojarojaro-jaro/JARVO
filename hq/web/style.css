@@ -2065,13 +2065,19 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   .j-komp-pole, .j-komp-w.is-start .j-komp-pole { font-size: 16px; padding: 12px 14px 4px; min-height: 50px; }
   .j-zywo { left: 8px; max-width: calc(100% - 16px); }
   .j-zywo-n { display: none !important; }
-  .j-komp-w.is-start { position: sticky; bottom: 8px; }
+  .j-komp-w.is-start { position: sticky; bottom: 0; order: 3; }
   .j-wyslij { width: 40px; height: 40px; }
   .j-do { height: 40px; }
   .j-do-x { width: 30px; height: 30px; }
   .j-do-jeden { display: none; }
   .j-komp-pod { white-space: normal; font-size: 12px; }
-  .j-start { align-items: flex-start; padding: 32px 16px 8px; }
+  /* nowa rozmowa jak w czatach na telefonie: powitanie na środku, podpowiedzi nad polem, pole przy kciuku */
+  .j-gora { position: relative; }
+  .j-start { align-items: stretch; padding: 0 12px calc(10px + env(safe-area-inset-bottom)); }
+  .j-start-in { min-height: 100%; margin: 0; }
+  .j-start-hero { order: 0; flex: 1; justify-content: center; padding: 20px 0; }
+  .j-start-os { order: 1; }
+  .j-start-pod { order: 2; margin: 0 0 12px; gap: 12px; }
   .j-zgoda-b .j-btn, .j-blad-b .j-btn { height: 40px; }
   .j-wiersz-m { width: 40px; height: 40px; }
   .j-okno.j-podglad { width: 100%; height: 100%; }
@@ -2160,11 +2166,6 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 /* „Inne rozmowy ▾” pod rozmówcami */
 .j-pasek-rozm > .j-inne { display: flex; align-items: center; gap: 8px; width: calc(100% + 16px); height: 40px; font-size: 13px; font-weight: 600; color: var(--j-tekst); }
 .j-pasek-rozm > .j-inne small { margin-left: auto; font: 400 10.5px var(--j-font-mono); color: var(--j-tekst-3); }
-.j-ekran-rozm { display: flex; flex-direction: column; min-height: 100%; padding-bottom: 8px; }
-.j-ekran-rozm-t { margin: 0; padding: 10px 16px 6px; font: 500 10.5px/16px var(--j-font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--j-tekst-3); }
-.j-ekran-rozm-st { flex: none; padding: 4px 16px; }
-.j-ekran-rozm .j-nawig { margin: 8px 0 0; padding: 8px 8px 0; }
-.j-ekran-rozm .j-nawig a, .j-ekran-rozm .j-nawig button { height: 44px; font-size: 15px; }
 .j-dok-rozm { display: flex; justify-content: space-around; gap: 1px; background: var(--j-rowek); padding: 0 0 env(safe-area-inset-bottom); }
 .j-dok-rozm a { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 56px; min-height: 52px;
   font: 500 10px var(--j-font-mono); letter-spacing: .04em; color: var(--j-tekst-2); text-decoration: none; background: var(--j-tlo-pasek); }
@@ -2199,7 +2200,8 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-gora-rozm { min-width: 0; flex: 0 1 auto; }
 .j-gora-ikona { width: 32px; height: 32px; flex: none; display: grid; place-items: center; background: var(--j-wneka); box-shadow: inset 0 0 0 1px var(--j-linia-2); color: var(--j-tekst-2); }
 .j-gora-opis { margin: 1px 0 0; font-size: 12.5px; line-height: 16px; color: var(--j-tekst-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.j-wstecz { display: grid; place-items: center; min-width: 44px; min-height: 44px; color: var(--j-tekst); }
+.j-gora-marka { position: absolute; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 8px;
+  font: 700 13px var(--j-font-naglowek); letter-spacing: .26em; text-transform: uppercase; color: var(--j-tekst); pointer-events: none; }
 
 /* === Ustawienia (UiUstawienia) === */
 /* palety Fosforu (branding/fosfor/palettes.yaml): jeden kolor --j-fosfor liczy resztę --j-*; „jarvo” = tokeny domyślne */

@@ -134,11 +134,14 @@ function Gora({ trasa }) {
   const tytul = wWatku ? (watek && watek.tytul) || T("watek.bez_tytulu") : "";
   // nagłówek h1 tylko w wątku (na starcie jest h1 powitania); tabIndex -1: tu wraca fokus po zmianie nazwy
   const telefon = useTelefon();
+  const start = trasa.widok === "start" || trasa.widok === "nowa";
+  // telefon: menu zawsze po lewej (lista rozmówców w wysuwanym pasku), na nowej rozmowie znak Jarva na środku
   return html`<header class=${cx("j-gora", (wWatku || trasa.rozmowca) && "is-watek", trasa.rozmowca && "is-rozmowca")}>
-    ${!(trasa.rozmowca && telefon) && html`<${Przycisk} rodzaj="cichy" ikona="menu" etykieta=${T("pasek.pokaz")} klasa="j-menu-btn"
+    <${Przycisk} rodzaj="cichy" ikona="menu" etykieta=${T("pasek.pokaz")} klasa="j-menu-btn"
       aria-expanded=${String(!!otwarty)} aria-controls="jarvo-pasek"
-      onClick=${() => sklep.zmien("pasek", (p) => ({ ...p, otwarty: true, zwiniety: false }))}/>`}
-    ${trasa.rozmowca && html`<${NaglowekRozmowcy} klucz=${trasa.rozmowca} wstecz=${telefon}/>`}
+      onClick=${() => sklep.zmien("pasek", (p) => ({ ...p, otwarty: true, zwiniety: false }))}/>
+    ${telefon && start && html`<span class="j-gora-marka"><${LogoJarvo} rozmiar=${18}/><span>Jarvo</span></span>`}
+    ${trasa.rozmowca && html`<${NaglowekRozmowcy} klucz=${trasa.rozmowca}/>`}
     ${wWatku && watek && edycja ? html`<${EdycjaTytulu} watek=${watek} onKoniec=${() => setEdycja(false)} klasa="j-gora-pole" fokusPo=".j-gora-t"/>`
       : tytul ? html`<h1 class="j-gora-t" tabIndex="-1" onDoubleClick=${() => watek && !watek.usuniety_at && setEdycja(true)}>${tytul}</h1>` : null}
     ${wWatku && watek && watek.usuniety_at && html`<span class="j-tag">${T("watek.w_koszu_tag")}</span>`}
@@ -295,7 +298,7 @@ function AplikacjaJarvo() {
   }, [trasa.widok, trasa.watek, trasa.rozmowca]);
 
   // pierwsze wejście bez adresu (#/) na komputerze: ostatni rozmówca, domyślnie pierwszy (centrum §3.3); telefon
-  // zaczyna od listy rozmówców, a „Nowa rozmowa” (#/nowa, ⌘⇧O) otwiera ekran startu z kompozytorem
+  // zaczyna od nowej rozmowy (23.11 właściciel: „jak się otworzy, to powinien być nowy chat”), rozmówcy są w pasku
   const startowy = useRef(!location.hash || location.hash === "#/" || location.hash === "#");
   useEffect(() => {
     if (!saRozmowcy || !startowy.current) return;
@@ -362,7 +365,6 @@ function AplikacjaJarvo() {
   else if (trasa.widok === "mozg") widok = html`<${WidokMozgu}/>`;
   else if (trasa.widok === "aktualizacje") widok = html`<${Leniwy} pakiet="raporty" nazwa="Aktualizacje" trasa=${trasa} zastepczy=${zastepczy}/>`;
   else if (trasa.widok === "ustawienia") widok = html`<${Leniwy} pakiet="ustawienia" nazwa="Ustawienia" trasa=${trasa} zastepczy=${zastepczy}/>`;
-  else if (trasa.widok === "start" && telefon && saRozmowcy) widok = html`<${EkranRozmowcow}/>`;
   else widok = html`<${EkranStartu} key=${trasa.agent || "start"} agent=${trasa.widok === "nowa" ? trasa.agent : null}/>`;
   return html`<div class="jarvo-app" data-jarvo-korzen="" data-motyw=${motyw} data-paleta=${paleta} lang=${isPL() ? "pl" : "en"} ref=${korzen}>
     <div class=${cx("j-uklad", pasek.zwiniety && "is-zwiniety", pasek.otwarty && "is-wysuniety")} ref=${uklad}>

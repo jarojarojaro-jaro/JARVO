@@ -115,7 +115,7 @@ ZNACZNIKI_APLIKACJI = (b'<link rel="manifest" href="/jarvo-aplikacja.webmanifest
                        b'<link rel="apple-touch-icon" href="/jarvo-ikona-180.png">'
                        b'<meta name="apple-mobile-web-app-capable" content="yes">'
                        b'<meta name="mobile-web-app-capable" content="yes">'
-                       b'<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
+                       b'<meta name="apple-mobile-web-app-status-bar-style" content="black">'
                        b'<meta name="apple-mobile-web-app-title" content="Jarvo">')
 
 
