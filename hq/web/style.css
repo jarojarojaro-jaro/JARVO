@@ -2665,5 +2665,5 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 @container app (max-width: 639px) {
   .j-pig-w .j-pig.is-fast, .j-do + .j-pig-w .j-pig.is-zb, .j-komp-pasek .j-do-l { display: none; }
   .j-pig { padding: 0 8px; height: 40px; }
-  .j-pig-w .j-pig { display: inline-block; line-height: 40px; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .j-pig-w .j-pig { flex: 0 1 auto; min-width: 0; overflow: hidden; }
 }
