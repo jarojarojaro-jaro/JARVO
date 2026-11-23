@@ -2414,7 +2414,14 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   .j-mozg { gap: 0; }
   .j-mozg .j-gora-ikona, .j-mozg .j-gora-opis { display: none; }
   .j-mozg-szukaj { left: 8px; top: 8px; width: calc(100% - 16px); }
-  .j-mozg-poziom { left: 8px; bottom: 8px; max-width: calc(100% - 16px); }
+  .j-mozg .j-mozg-naj { top: 58px; right: 8px; padding: 7px 12px; font-size: 12.5px; }      /* pod polem szukania, nie na nim */
+  .j-mozg-poziom { left: 8px; bottom: 8px; max-width: calc(100% - 16px); padding: 8px 14px 10px 16px; }
+  /* belka: z okruszków tylko bieżący poziom (wstecz jest w panelu poziomu), źródła wąsko i w jednej linii */
+  .j-mozg-okruszki { overflow: hidden; }
+  .j-mozg-ok:not(:last-child), .j-mozg-ok-sep { display: none; }
+  .j-mozg-ok:last-child > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .j-mozg-zrodla { flex: none; }
+  .j-mozg-zrodla button { padding: 0 10px; white-space: nowrap; font-size: 11.5px; }
   .j-mozg-strona { inset: 0; width: auto; }
   .j-mozg-kolumna { padding: 20px 16px 48px; }
   .j-mozg-dymek { display: none; }

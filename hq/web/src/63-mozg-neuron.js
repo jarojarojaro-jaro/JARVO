@@ -224,8 +224,8 @@ function utworzNeuron(pudlo, o) {
   }
   const swiat = (sx, sy) => [kam.x + (sx - W / 2) / kam.k, kam.y + (sy - H / 2) / kam.k];
   const ekran = (x, y) => [W / 2 + (x - kam.x) * kam.k, H / 2 + (y - kam.y) * kam.k];
-  function trafKropke(sx, sy) {
-    const [x, y] = swiat(sx, sy), zasieg = Math.max(9 / kam.k, 3), cx = Math.floor(x / 24), cy = Math.floor(y / 24);
+  function trafKropke(sx, sy, palec = false) {
+    const [x, y] = swiat(sx, sy), zasieg = Math.max((palec ? 20 : 9) / kam.k, 3), cx = Math.floor(x / 24), cy = Math.floor(y / 24);
     let naj = null, nd = Infinity;
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const k of komorki.get(cx + i + ":" + (cy + j)) || []) {
       const d = Math.hypot(k.x - x, k.y - y);
@@ -251,19 +251,33 @@ function utworzNeuron(pudlo, o) {
   }
 
   // ---- kamera
-  const dopasuj = (bb, mx, my, kmaks) => ({ x: (bb[0] + bb[2]) / 2, y: (bb[1] + bb[3]) / 2, k: Math.min((W - 2 * mx) / (bb[2] - bb[0]), (H - 2 * my) / (bb[3] - bb[1]), kmaks) });
+  // m = marginesy ekranu {l, r, t, b}: kadr to to, co zostaje między nimi (na telefonie pole szukania u góry i panel
+  // poziomu u dołu zasłaniają mapę, więc część przybliża się w wolne miejsce, a nie pod nie)
+  const dopasuj = (bb, m, kmaks) => {
+    const w = Math.max(40, W - m.l - m.r), h = Math.max(40, H - m.t - m.b);
+    const k = Math.min(w / (bb[2] - bb[0]), h / (bb[3] - bb[1]), kmaks);
+    return { x: (bb[0] + bb[2]) / 2 - (m.l + w / 2 - W / 2) / k, y: (bb[1] + bb[3]) / 2 - (m.t + h / 2 - H / 2) / k, k };
+  };
+  const waski = () => W < 700;   // jak @container app (max-width: 700px) w style.css
+  // marginesy poziomu: na telefonie wąsko w bok (napisy części dociskają się do brzegu) i z zasłonami widoku (o.zaslony)
+  function marginesy(bok, gora) {
+    if (!waski()) return { l: bok, r: bok, t: gora, b: gora };
+    const z = (o.zaslony && o.zaslony()) || { t: 0, b: 0 };
+    return { l: 16, r: 16, t: Math.max(24, z.t + 12), b: Math.max(24, z.b + 12) };
+  }
   function cel() {
     if (!u) return kam;
-    k0 = dopasuj(u.bb, Math.min(240, W * 0.2), 70, 6).k;
+    const calosc = marginesy(Math.min(240, W * 0.2), 70);
+    k0 = dopasuj(u.bb, waski() ? { ...calosc, l: 64, r: 64 } : calosc, 6).k;
     // otwarta notatka: kropka w środku tego, co zostaje obok panelu notatki (panel z prawej, do 480 px; telefon: cały ekran)
     if (stan.wybrana) {
       const k = u.byId.get(stan.wybrana), kz = Math.max(k0 * 5, kam.k), panel = W > 700 ? Math.min(480, W - 24) + 12 : 0;
       if (k) return { x: k.x + panel / 2 / kz, y: k.y, k: kz };
     }
     const cz = stan.fok >= 0 && u.czesci[stan.fok];
-    if (cz && stan.grupa >= 0 && cz.grupy[stan.grupa]) return dopasuj(cz.grupy[stan.grupa].bb, 120, 90, k0 * 14);
-    if (cz) return dopasuj(cz.bb, 150, 80, k0 * 9);
-    return dopasuj(u.bb, Math.min(240, W * 0.2), 70, 6);
+    if (cz && stan.grupa >= 0 && cz.grupy[stan.grupa]) return dopasuj(cz.grupy[stan.grupa].bb, marginesy(120, 90), k0 * 14);
+    if (cz) return dopasuj(cz.bb, marginesy(150, 80), k0 * 9);
+    return dopasuj(u.bb, waski() ? { ...calosc, l: 64, r: 64 } : calosc, 6);
   }
   function lec(c, ms = 900) {
     if (bezRuchu.matches || !ms) { Object.assign(kam, c); lot = null; } else lot = { z: { ...kam }, c, t: performance.now(), ms };
@@ -360,15 +374,21 @@ function utworzNeuron(pudlo, o) {
     const klucz = d ? `${d.id || d.czesc}:${d.x}:${d.y}` : "";
     if (klucz !== dymek) { dymek = klucz; o.dymek(d); }
     // nazwy części: za skupiskami części; nazwa, która wpadłaby na inną, schodzi o wiersz od środka
+    // telefon: mniejsze napisy dociśnięte do brzegu ekranu (wcześniej uciekały za brzeg, 23.11 właściciel: „Mózg na
+    // mobile trochę zbugowany”), a w przybliżonej części tylko jej napis, bez szarych napisów sąsiadów na kropkach
     x2.textAlign = "left";
+    const fN = waski() ? 13 : 15, fL = waski() ? 11 : 12;
     for (const cz of u.czesci) {
+      if (waski() && stan.fok >= 0 && stan.fok !== cz.p) continue;
       const d = cz.zasieg + 22 / Math.min(kam.k, 1.5), ca = Math.cos(cz.a), sa = Math.sin(cz.a);
       let [x, y] = ekran(d * ca, d * sa);
       if (x < -200 || x > W + 200 || y < -40 || y > H + 40) continue;
       const wyr = Math.abs(ca) < 0.25 ? "center" : ca > 0 ? "left" : "right", fok = stan.fok < 0 || stan.fok === cz.p;
       const nazwa = o.nazwa(cz.d), ile = String(cz.d.ile);
-      x2.font = `600 15px ${font}`; const wn = x2.measureText(nazwa).width; x2.font = `500 12px ${mono}`; const wl = x2.measureText(ile).width;
-      const cala = 14 + wn + 8 + wl, x0 = wyr === "center" ? x - cala / 2 : wyr === "right" ? x - cala : x;
+      x2.font = `600 ${fN}px ${font}`; const wn = x2.measureText(nazwa).width; x2.font = `500 ${fL}px ${mono}`; const wl = x2.measureText(ile).width;
+      const cala = 14 + wn + 8 + wl;
+      let x0 = wyr === "center" ? x - cala / 2 : wyr === "right" ? x - cala : x;
+      if (waski()) x0 = Math.max(8, Math.min(W - cala - 8, x0));
       let r = { x0: x0 - 6, y0: y - 16, x1: x0 + cala + 6, y1: y + 8, cel: { czesc: cz.p } };
       for (let i = 0; i < 4 && napisy.some((n) => r.x0 < n.x1 && r.x1 > n.x0 && r.y0 < n.y1 && r.y1 > n.y0); i++) {
         const dy = sa >= 0 ? 22 : -22; y += dy; r = { ...r, y0: r.y0 + dy, y1: r.y1 + dy };
@@ -376,8 +396,9 @@ function utworzNeuron(pudlo, o) {
       napisy.push(r);
       x2.globalAlpha = fok ? (cz.d.drugorzedna ? 0.72 : 1) : 0.4;
       x2.fillStyle = css(cz.p); x2.beginPath(); x2.arc(x0 + 4, y - 4.5, 4, 0, 2 * Math.PI); x2.fill();
-      x2.fillStyle = m.tekst; x2.font = `600 15px ${font}`; x2.fillText(nazwa, x0 + 14, y);
-      x2.fillStyle = m.tekst2; x2.font = `500 12px ${mono}`; x2.fillText(ile, x0 + 14 + wn + 8, y);
+      if (waski()) { x2.lineJoin = "round"; x2.lineWidth = 4; x2.strokeStyle = "rgba(0,0,0,.85)"; x2.font = `600 ${fN}px ${font}`; x2.strokeText(nazwa, x0 + 14, y); }
+      x2.fillStyle = m.tekst; x2.font = `600 ${fN}px ${font}`; x2.fillText(nazwa, x0 + 14, y);
+      x2.fillStyle = m.tekst2; x2.font = `500 ${fL}px ${mono}`; x2.fillText(ile, x0 + 14 + wn + 8, y);
       x2.globalAlpha = 1;
     }
     // nazwy grup: od przybliżenia ×1,7 (część w kadrze), nad skupiskiem
@@ -397,8 +418,9 @@ function utworzNeuron(pudlo, o) {
       let n = 0;
       for (const k of kand) {
         if (n >= NEURON.maksNapisow) break;
-        const [x, y] = ekran(k.x, k.y), t = o.tytul(k.n);
-        if (napis(t.length > 42 ? t.slice(0, 40) + "…" : t, x + Math.max(6, k.r * kam.k) + 4, y + 4, { font: `500 12px ${font}`, kolor: m.tekst2, cel: { notatka: k.id } })) n++;
+        const [x, y] = ekran(k.x, k.y), t = o.tytul(k.n), tx = x + Math.max(6, k.r * kam.k) + 4;
+        const zn = Math.min(42, Math.max(10, Math.floor((W - tx - 8) / 6.2)));   // telefon: tytuł kończy się przed brzegiem
+        if (napis(t.length > zn ? t.slice(0, zn - 2) + "…" : t, tx, y + 4, { font: `500 12px ${font}`, kolor: m.tekst2, cel: { notatka: k.id } })) n++;
       }
     }
   }
@@ -446,7 +468,7 @@ function utworzNeuron(pudlo, o) {
           const [a, b] = [...wsk.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), d0 = ciag.d || d;
           ciag.d = d; klikOk = false; zoom((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, d / d0); return;
         }
-        if (Math.hypot(p[0] - ciag.p[0], p[1] - ciag.p[1]) > 5) klikOk = false;
+        if (Math.hypot(p[0] - ciag.p[0], p[1] - ciag.p[1]) > (e.pointerType === "touch" ? 10 : 5)) klikOk = false;
         if (!klikOk) { kam.x -= (p[0] - stary[0]) / kam.k; kam.y -= (p[1] - stary[1]) / kam.k; lot = null; c2.style.cursor = "grabbing"; zamow(); }
         return;
       }
@@ -461,7 +483,7 @@ function utworzNeuron(pudlo, o) {
     pointerup: (e) => {
       const p = poz(e); wsk.delete(e.pointerId); c2.style.cursor = "grab";
       if (!klikOk || wsk.size) return;
-      const k = trafKropke(p[0], p[1]);
+      const k = trafKropke(p[0], p[1], e.pointerType === "touch");   // palec jest grubszy niż kursor
       if (k && dostepna(k)) return o.notatka(k.id);
       if (k) { const cz = u.czesci[k.p]; return o.czesc(cz.k, stan.fok === k.p && k.g >= 0 ? cz.grupy[k.g].k : ""); }
       const n = trafNapis(p[0], p[1]);

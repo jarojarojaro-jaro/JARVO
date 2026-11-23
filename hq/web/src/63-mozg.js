@@ -515,6 +515,14 @@ function MozgWidok() {
       nazwa: (d) => L(d.nazwa, d.nazwa_en || d.nazwa), tytul: (n) => n._t, miejsce: (id) => klik.current.miejsce(id),
       notatka: (id) => klik.current.notatka(id), czesc: (k, g) => klik.current.czesc(k, g), wyzej: (calkiem) => klik.current.wyzej(calkiem),
       dymek: (d) => setDymek(d),
+      // ile mapy zasłaniają u góry pole szukania (i „Najważniejsze”), a u dołu panel poziomu (telefon: kadr części)
+      zaslony: () => {
+        const r = pudlo.current.getBoundingClientRect(), wys = (sel, gora) => {
+          const el = korzen.current.querySelector(sel); if (!el) return 0;
+          const b = el.getBoundingClientRect(); return gora ? Math.max(0, b.bottom - r.top) : Math.max(0, r.bottom - b.top);
+        };
+        return { t: Math.max(wys(".j-mozg-szukaj", true), wys(".j-mozg-naj", true)), b: wys(".j-mozg-poziom", false) };
+      },
     });
     setBezGl(!neuron.current.gl);
     return () => neuron.current.zniszcz();
