@@ -579,6 +579,8 @@ def build_plugin(out: Path, fleet: fl.Fleet | None = None) -> Path:
     fl.kopiuj_kroje_izometrii(dash / "izometria" / "scripts")
     fl.write_json(dash / "fleet.json", fleet_json(fleet))
     (dash / LOGOWANIE_SIECI).write_bytes(strona_logowania_sieci())
+    for ikona in ("ikona-180.png", "ikona-512.png"):        # aplikacja na ekranie telefonu (siec.py IKONY)
+        shutil.copy2(fl.REPO_ROOT / "branding" / "panel-siec" / ikona, dash / ikona)
     return dash
 
 

@@ -275,7 +275,7 @@ def test_strona_logowania_jarva_bez_hermesa(sc, strona):
     """GET /login podaje bramka: strona Jarva (wygląd jarvo.pl), bez wołania Hermesa i bez innych plików."""
     app = Aplikacja()
     status, h, tresc = wolaj(bramka(sc, app), "/login", zapytanie=b"next=%2Fjarvo")
-    assert status == 200 and tresc == strona and app.wolania == []
+    assert status == 200 and tresc == s.ze_znacznikami(strona) and app.wolania == []
     assert naglowek(h, b"content-type") == [b"text/html; charset=utf-8"] and naglowek(h, b"cache-control") == [b"no-store"]
     assert naglowek(h, b"content-length") == [str(len(tresc)).encode()]
     tekst = tresc.decode("utf-8")
@@ -285,10 +285,37 @@ def test_strona_logowania_jarva_bez_hermesa(sc, strona):
         assert obce not in tekst, obce
     assert tekst.count("data:font/woff2;base64,") == 4 and 'aria-label="JARVO"' in tekst     # kroje i logo w pliku
     zasoby = set(re.findall(r'(?:src|href)="([^"]*)"', tekst)) | set(re.findall(r"url\((?!data:)([^)]*)\)", tekst))
-    assert zasoby == {"/favicon.svg"}                    # jedyny inny plik: publiczna ikona z dista
+    assert zasoby == {"/favicon.svg", "/jarvo-aplikacja.webmanifest", "/jarvo-ikona-180.png"}   # publiczne pliki
     status, h, spakowane = wolaj(bramka(sc), "/login", naglowki=[("accept-encoding", "gzip")])
-    assert naglowek(h, b"content-encoding") == [b"gzip"] and gzip.decompress(spakowane) == strona
+    assert naglowek(h, b"content-encoding") == [b"gzip"] and gzip.decompress(spakowane) == s.ze_znacznikami(strona)
     assert wolaj(bramka(sc, app), "/auth/password-login", metoda="POST")[0] == 200 and len(app.wolania) == 1
+
+
+def test_aplikacja_na_ekranie_telefonu(sc, tmp_path, monkeypatch):
+    """Panel jako aplikacja na ekranie iPhone'a: manifest i ikona bez sesji (ekran dodaje je przed logowaniem),
+    strona panelu z sesją ma znaczniki w <head> i poprawną długość; Hermes nie jest wołany o pliki aplikacji."""
+    ikona = tmp_path / "ikona-180.png"
+    ikona.write_bytes(b"\x89PNG-ikona")
+    monkeypatch.setattr(s, "IKONY", {"/jarvo-ikona-180.png": ikona, "/jarvo-ikona-512.png": tmp_path / "brak.png"})
+    app = Aplikacja()
+    b = bramka(sc, app)
+    status, h, tresc = wolaj(b, "/jarvo-aplikacja.webmanifest")
+    m = json.loads(tresc)
+    assert status == 200 and m["display"] == "standalone" and m["start_url"] == "/jarvo"
+    assert wolaj(b, "/jarvo-ikona-180.png")[2] == b"\x89PNG-ikona" and wolaj(b, "/jarvo-ikona-512.png")[0] == 404
+    assert app.wolania == []
+    _, ciastka = zalogowany(sc)
+    monkeypatch.setattr(Aplikacja, "__call__", _strona_z_head)
+    status, h, tresc = wolaj(b, "/jarvo", naglowki=[("cookie", ciastka)])
+    assert status == 200 and tresc.startswith(b"<html><head>" + s.ZNACZNIKI_APLIKACJI)
+    assert naglowek(h, b"content-length") == [str(len(tresc)).encode()]
+
+
+async def _strona_z_head(self, scope, receive, send):
+    tresc = b"<html><head><title>Jarvo</title></head><body></body></html>"
+    await send({"type": "http.response.start", "status": 200,
+                "headers": [(b"content-type", b"text/html"), (b"content-length", str(len(tresc)).encode())]})
+    await send({"type": "http.response.body", "body": tresc})
 
 
 def test_bez_pliku_strona_logowania_hermesa(sc, tmp_path, monkeypatch):

@@ -103,6 +103,20 @@ ODMOWA_HOSTA = {"detail": "Invalid Host header. Dashboard requests must use the 
 _log = logging.getLogger("jarvo.hq.siec")
 # strona logowania Jarva obok tego pliku we wtyczce (scripts/hqbuild.py LOGOWANIE_SIECI)
 STRONA_LOGOWANIA = Path(__file__).with_name("logowanie.html")
+# aplikacja na ekranie początkowym telefonu (23.11 właściciel: „link, dodam sobie na pulpit jak na iPhone, zamiast
+# Telegrama”): manifest, ikony obok wtyczki (scripts/hqbuild.py) i znaczniki w <head> każdej strony HTML panelu
+IKONY = {f"/jarvo-ikona-{r}.png": Path(__file__).with_name(f"ikona-{r}.png") for r in (180, 512)}
+MANIFEST_SCIEZKA = "/jarvo-aplikacja.webmanifest"
+MANIFEST = json.dumps({"name": "Jarvo", "short_name": "Jarvo", "start_url": "/jarvo", "scope": "/",
+                       "display": "standalone", "background_color": "#000000", "theme_color": "#000000",
+                       "icons": [{"src": "/jarvo-ikona-512.png", "sizes": "512x512", "type": "image/png"},
+                                 {"src": "/jarvo-ikona-180.png", "sizes": "180x180", "type": "image/png"}]}).encode()
+ZNACZNIKI_APLIKACJI = (b'<link rel="manifest" href="/jarvo-aplikacja.webmanifest">'
+                       b'<link rel="apple-touch-icon" href="/jarvo-ikona-180.png">'
+                       b'<meta name="apple-mobile-web-app-capable" content="yes">'
+                       b'<meta name="mobile-web-app-capable" content="yes">'
+                       b'<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
+                       b'<meta name="apple-mobile-web-app-title" content="Jarvo">')
 
 
 # ---------------------------------------------------------------------------------------------- ścieżki i pliki
@@ -455,6 +469,13 @@ def strona_logowania() -> bytes | None:
         return None
 
 
+def ze_znacznikami(html: bytes) -> bytes:
+    """Znaczniki aplikacji (manifest, ikona, tryb pełnoekranowy na iPhonie) zaraz po `<head>`; raz."""
+    if b"apple-mobile-web-app-capable" in html:
+        return html
+    return re.sub(rb"(<head[^>]*>)", lambda m: m.group(1) + ZNACZNIKI_APLIKACJI, html, count=1, flags=re.I)
+
+
 def bezpieczny_next(sciezka: str, zapytanie: str) -> str:
     """Cel po zalogowaniu (jak is_safe_next_path Hermesa): ścieżka strony, nie /api i nie trasy logowania."""
     if not sciezka.startswith("/") or sciezka.startswith("//") or sciezka == "/api" or sciezka.startswith("/api/"):
@@ -569,11 +590,20 @@ class Bramka:
             await self.app(self._jak_lokalne(scope, klient_lokalny=True), receive, send)
             return
         wyslij = self._gzip(scope, send)
+        if scope.get("method") in ("GET", "HEAD") and (sciezka in IKONY or sciezka == MANIFEST_SCIEZKA):
+            try:
+                tresc, rodzaj = ((IKONY[sciezka].read_bytes(), b"image/png") if sciezka in IKONY
+                                 else (MANIFEST, b"application/manifest+json"))
+            except OSError:
+                await self._json(send, 404, {"detail": "Not Found"})
+                return
+            await self._odpowiedz(wyslij, 200, tresc, rodzaj, [(b"cache-control", b"public, max-age=86400")])
+            return
         if publiczna(sciezka):
             if sciezka == "/login" and scope.get("method") == "GET":
                 strona = strona_logowania()
                 if strona is not None:
-                    await self._odpowiedz(wyslij, 200, strona, b"text/html; charset=utf-8")
+                    await self._odpowiedz(wyslij, 200, ze_znacznikami(strona), b"text/html; charset=utf-8")
                     return
             elif sciezka not in TRASY_LOGOWANIA:
                 wyslij = self._bez_strony(wyslij)
@@ -583,8 +613,35 @@ class Bramka:
         if sesja is None:
             await self._bez_sesji(scope, send)
             return
+        wyslij = self._html_aplikacji(wyslij)
         await self.app(self._jak_lokalne(scope, klient_lokalny=False), receive,
                        self._z_ciastkami(wyslij, nowa) if nowa else wyslij)
+
+    @staticmethod
+    def _html_aplikacji(send):
+        """Strona HTML panelu (200, cała w pamięci) dostaje znaczniki aplikacji na ekranie początkowym telefonu."""
+        stan: dict = {}
+
+        async def wyslij(wiadomosc: dict) -> None:
+            if wiadomosc.get("type") == "http.response.start":
+                h = dict(wiadomosc.get("headers") or ())
+                if wiadomosc.get("status") == 200 and h.get(b"content-type", b"").startswith(b"text/html"):
+                    stan["start"], stan["czesci"] = wiadomosc, []
+                    return
+                await send(wiadomosc)
+                return
+            if "start" not in stan:
+                await send(wiadomosc)
+                return
+            stan["czesci"].append(wiadomosc.get("body") or b"")
+            if wiadomosc.get("more_body"):
+                return
+            tresc = ze_znacznikami(b"".join(stan["czesci"]))
+            start = stan.pop("start")
+            naglowki = [(k, v) for k, v in start.get("headers") or () if k.lower() != b"content-length"]
+            await send({**start, "headers": naglowki + [(b"content-length", str(len(tresc)).encode())]})
+            await send({"type": "http.response.body", "body": tresc})
+        return wyslij
 
     @staticmethod
     def _bez_strony(send):

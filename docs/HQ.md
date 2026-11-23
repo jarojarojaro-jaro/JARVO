@@ -1639,6 +1639,11 @@ jarvo panel siec off       # koniec nasłuchu w sieci; 127.0.0.1 bez zmian
   wpisuje go i wchodzi sama. Sesja to ciasteczka
   Hermesa (`hermes_session_at` 12 h, `hermes_session_rt` 30 dni, odnawiane przy każdym odświeżeniu), podpisane HMAC
   sekretem `<dane>/jarvo/konfig/panel-siec.sekret` (32 bajty, tylko właściciel, nigdy na ekranie ani w logach).
+- **Aplikacja na ekranie telefonu.** Bramka podaje bez sesji `/jarvo-aplikacja.webmanifest` (standalone, start
+  `/jarvo`) i ikony `/jarvo-ikona-{180,512}.png` (`branding/panel-siec/`, kopiowane przez build obok `siec.py`)
+  i dopisuje do `<head>` strony logowania i każdej strony panelu manifest, `apple-touch-icon`
+  i `apple-mobile-web-app-capable`, więc „Udostępnij → Do ekranu początkowego” na iPhonie daje Jarva bez pasków
+  Safari. Aplikacja z ekranu ma własne ciasteczka: pierwsze wejście wymaga klucza z `jarvo panel klucz`.
 - **Szybkość.** Sprawdzenie sesji to jeden HMAC i `stat` pliku sekretu (treść czytana tylko po zmianie pliku), bez
   zapytań do Hermesa. Front Hermesa (ok. 2,7 MB JS i CSS) Hermes wysyła bez kompresji, więc bramka kompresuje gzip
   pełne odpowiedzi tekstowe z `Content-Length` (pliki `/assets/` raz, potem z pamięci; JS 68 KB → 23 KB), a strumienie
