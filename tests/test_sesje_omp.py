@@ -334,6 +334,19 @@ def test_odpowiedz_tury_to_wszystkie_teksty_po_ostatnim_narzedziu():
     assert t.odpowiedz == "Podsumowanie: 1. Strata… 13. Multi-Branch.\n\nPunkt 14 zapisany, commit 92be3f2."
 
 
+def test_polknieta_wiadomosc_wraca_do_kolejki(w, at):
+    """Model w turze przeniósł czekające wiadomości `mv nowe/*.json zrobione/` (Kernel 21.11 i 23.11): skrzynka
+    oddaje do `nowe/` tylko te bez odpowiedzi (bez `tura` i `odpowiedz`); obsłużone zostają w `zrobione/`."""
+    w.katalogi()
+    polknieta = {"tekst": "O JAK TAM HALO CZEKAM", "zrodlo": "telegram"}
+    (w.zrobione / "20261121-060451-376.json").write_text(json.dumps(polknieta))
+    (w.zrobione / "20261121-050000-370.json").write_text(json.dumps({"tekst": "stara", "tura": "t1", "odpowiedz": "ok"}))
+    wrocily = so.odzyskaj_polkniete(w, {"20261121-060451-376.json", "20261121-050000-370.json", "nie-ma.json"})
+    assert wrocily == ["20261121-060451-376.json"]
+    assert json.loads((w.nowe / "20261121-060451-376.json").read_text()) == polknieta
+    assert (w.zrobione / "20261121-050000-370.json").exists() and not (w.nowe / "20261121-050000-370.json").exists()
+
+
 def test_opcje_panelu_w_procesie_rpc_i_liczniku(w, at):
     """`/effort` i `/fast` z panelu (model.json: `myslenie`, `fast`, obok modelu) skrzynka stosuje w procesie RPC
     (`set_thinking_level`, `set_fast_mode`) przed turą, bez restartu procesu; licznik pokazuje je, a podsumowanie

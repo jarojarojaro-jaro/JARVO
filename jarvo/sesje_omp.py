@@ -133,6 +133,28 @@ def przenies(p: Path, m: dict, cel_kat: Path, **dodatki) -> None:
     p.unlink(missing_ok=True)
 
 
+def odzyskaj_polkniete(w, nazwy) -> list[str]:
+    """Wiadomości czekające w czasie tury (`nazwy`), które ktoś przeniósł z `nowe/` do `zrobione/` bez odpowiedzi
+    skrzynki (plik bez `tura` i `odpowiedz`), wracają do `nowe/` i ruszą jako następna tura. 21.11 i 23.11 Kernel
+    robił w turze `mv skrzynka/nowe/*.json skrzynka/zrobione/` i połknął tak 5 wiadomości (trzy właściciela z 21.11
+    i dwie operatora z 23.11), których model nigdy nie zobaczył."""
+    wrocily = []
+    for nazwa in sorted(nazwy):
+        src, cel = w.zrobione / nazwa, w.nowe / nazwa
+        if cel.exists() or not src.is_file():
+            continue
+        try:
+            m = json.loads(src.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(m, dict) or "tura" in m or "odpowiedz" in m:
+            continue
+        src.replace(cel)
+        wrocily.append(nazwa)
+        log(w, f"wiadomość {nazwa} przeniesiona w turze do zrobione/ bez odpowiedzi: wraca do nowe/")
+    return wrocily
+
+
 def pobierz_linki(w, tekst: str) -> str:
     urle = URL.findall(tekst)[:5]
     if not urle or not w.pobierz_linki:
@@ -788,6 +810,8 @@ class Sesja:
 
     def po_turze(self, t: Tura, ok: bool, sekundy: int) -> None:
         w = self.w
+        # czekające i niewysłane dopiski, które model przeniósł do zrobione/ w trakcie tury: z powrotem do kolejki
+        odzyskaj_polkniete(w, t.pominiete | {n for n, d in t.dopiski.items() if d["stan"] not in ("wlaczony", "wyslany")})
         wlaczone = [(d["p"], d["m"]) for d in t.dopiski.values() if d["stan"] == "wlaczony"]
         wszystkie = t.partia + wlaczone
         if t.zatrzymana:                           # stop z panelu: niedostarczone dopiski nie ruszają same
