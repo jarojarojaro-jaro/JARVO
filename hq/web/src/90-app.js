@@ -39,6 +39,8 @@ function kartaBezczynna() {
   return ![...document.querySelectorAll("[data-jarvo-korzen] [data-kompozytor]")].some((el) => String(el.value || "").trim());
 }
 
+// Aplikacja na telefonie w tle jest zamrożona (żadne „schowana karta” się nie wykona), więc po powrocie do niej przez
+// pierwsze 15 s nowa wersja też odświeża się sama (23.11: właściciel na iPhonie dalej widział stary panel po wdrożeniu)
 function useNowaWersja() {
   const nowa = useSklep((s) => s.strumien.nowa_wersja);
   useEffect(() => {
@@ -46,11 +48,13 @@ function useNowaWersja() {
     let t = 0;
     const wersja = () => String(sklep.stan().wersja || "");
     const juz = () => { try { return sessionStorage.getItem("jarvo.odswiezono_dla") === wersja(); } catch (_) { return true; } };
+    const wolno = () => document.visibilityState === "hidden"
+      || (performance.now() - widocznaOd < 15000 && !(document.activeElement && document.activeElement.matches && document.activeElement.matches(POLE_PISANIA)));
     const sprobuj = () => {
       clearTimeout(t);
-      if (document.visibilityState !== "hidden" || juz() || !kartaBezczynna()) return;
+      if (!wolno() || juz() || !kartaBezczynna()) return;
       t = setTimeout(() => {
-        if (document.visibilityState !== "hidden" || juz() || !kartaBezczynna()) return;
+        if (!wolno() || juz() || !kartaBezczynna()) return;
         try { sessionStorage.setItem("jarvo.odswiezono_dla", wersja()); } catch (_) { return; }
         location.reload();
       }, 2000);
@@ -61,6 +65,9 @@ function useNowaWersja() {
     return () => { clearTimeout(t); clearInterval(co); document.removeEventListener("visibilitychange", sprobuj); };
   }, [nowa]);
 }
+let widocznaOd = 0;
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") widocznaOd = performance.now(); });
+window.addEventListener("pageshow", () => { widocznaOd = performance.now(); });
 
 // Stan aktualizacji (odznaka „⬆ N”, System): GET /update co minutę (karta schowana: tylko gdy coś trwa), co 5 s
 // w trakcie i przy czekaniu na koniec pracy. Po 2 h czekania jedno przypomnienie na przeglądarkę (spec §15.3).

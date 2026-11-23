@@ -18,12 +18,26 @@ function useMotyw(wybor) {
   return Motyw.rozwiaz(wybor, ciemny);
 }
 
+// pole do pisania na ekranie dotykowym = klawiatura ekranowa (iPhone nie zmienia innerHeight w każdym trybie, więc sam
+// pomiar wysokości nie wystarczał: 23.11 właściciel znów widział pas pod paskiem rozmówców)
+const POLE_PISANIA = "textarea, select, [contenteditable=''], [contenteditable='true'], input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=range]):not([type=file])";
+// czy palec przewija coś wewnątrz aplikacji (lista rozmowy, długie pole, blok kodu w bok); inaczej ruch przesuwałby stronę
+function przewijalnyPrzodek(cel, korzen) {
+  for (let n = cel; n && n !== korzen && n.nodeType === 1; n = n.parentElement) {
+    const s = getComputedStyle(n);
+    if ((n.scrollHeight > n.clientHeight + 1 && /auto|scroll/.test(s.overflowY)) || (n.scrollWidth > n.clientWidth + 1 && /auto|scroll/.test(s.overflowX))) return true;
+  }
+  return false;
+}
+
 // zmienne na <html>, nie na korzeniu: korzeń aplikacji montuje się na nowo (ekran poznania, rozmowy), a wartości dziedziczy
 function useWidokTelefonu() {
   useEffect(() => {
     const vv = window.visualViewport, el = document.documentElement;
     if (!vv) return undefined;
-    let ramka = 0;
+    const dotyk = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+    let ramka = 0, klawiatura = false;
+    const polePisania = () => { const a = document.activeElement; return !!(a && a.matches && a.matches(POLE_PISANIA) && !a.readOnly && !a.disabled); };
     // iPhone z klawiaturą przesuwa widoczny obszar (offsetTop > 0) nad przypiętą aplikacją: bez `--j-vtop` jej góra
     // zostawała nad ekranem, a widać było dół i pustkę (23.11 właściciel: „klikam pole i pokazuje blank ekran”)
     const licz = () => {
@@ -32,13 +46,31 @@ function useWidokTelefonu() {
         el.style.setProperty("--j-vh", `${Math.round(vv.height)}px`);
         el.style.setProperty("--j-vtop", `${Math.max(0, Math.round(vv.offsetTop))}px`);
         // klawiatura wysunięta: bez paska rozmówców i bez bezpiecznego obszaru pod polem (martwy pas nad klawiaturą)
-        el.toggleAttribute("data-klawiatura", window.innerHeight - vv.height > 120);
+        klawiatura = (dotyk && polePisania()) || window.innerHeight - vv.height > 120;
+        el.toggleAttribute("data-klawiatura", klawiatura);
       });
+    };
+    // po schowaniu klawiatury iPhone potrafi zostawić stronę przewiniętą: wracamy na górę, gdy żadne pole nie ma fokusu
+    const poWyjsciu = () => setTimeout(() => { if (!polePisania()) { window.scrollTo(0, 0); licz(); } }, 60);
+    // przy klawiaturze ruch palca poza przewijaną listą przesuwał całą stronę (23.11: „dziwnie się scrolluje, jak się
+    // jest klikniętym na pasku do pisania”): taki ruch blokujemy, lista rozmowy i pole przewijają się dalej same
+    const ruch = (e) => {
+      if (!klawiatura || !e.cancelable || e.touches.length !== 1) return;
+      const korzen = document.querySelector("[data-jarvo-korzen]");
+      if (!korzen || !korzen.contains(e.target) || !przewijalnyPrzodek(e.target, korzen)) e.preventDefault();
     };
     licz();
     vv.addEventListener("resize", licz);
     vv.addEventListener("scroll", licz);
-    return () => { cancelAnimationFrame(ramka); vv.removeEventListener("resize", licz); vv.removeEventListener("scroll", licz); };
+    document.addEventListener("focusin", licz);
+    document.addEventListener("focusout", poWyjsciu);
+    document.addEventListener("touchmove", ruch, { passive: false });
+    return () => {
+      cancelAnimationFrame(ramka);
+      vv.removeEventListener("resize", licz); vv.removeEventListener("scroll", licz);
+      document.removeEventListener("focusin", licz); document.removeEventListener("focusout", poWyjsciu);
+      document.removeEventListener("touchmove", ruch);
+    };
   }, []);
 }
 
