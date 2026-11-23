@@ -2279,7 +2279,8 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
    i karta poziomu (lewy dolny: nazwa, liczba, zdanie, „Przegląd”). Kolor części (--c = --j-barwa-<nr części>) ten sam
    na mapie, w karcie, w wynikach szukania i na stronie notatki. Strona notatki przykrywa mapę całą szerokością (kolumna
    do czytania 820 px), mapa pod nią stoi; telefon: to samo na cały ekran. */
-.j-mozg { position: relative; display: grid; grid-template-columns: 1fr; grid-template-rows: auto 1fr; gap: 8px; height: 100%; min-height: 0; color: var(--j-tekst); }
+/* minmax(0, 1fr): długi tytuł w belce nie rozpycha widoku poza ekran (telefon: Mózg miał 423 px na 390) */
+.j-mozg { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; gap: 8px; height: 100%; min-height: 0; color: var(--j-tekst); }
 .j-mozg a { color: inherit; text-decoration: none; }
 .j-mozg-okruszki { display: inline-flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; }
 .j-mozg-ok { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
@@ -2420,7 +2421,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   /* belka: z okruszków tylko bieżący poziom (wstecz jest w panelu poziomu), źródła wąsko i w jednej linii */
   .j-mozg-okruszki { overflow: hidden; }
   .j-mozg-ok:not(:last-child), .j-mozg-ok-sep { display: none; }
-  .j-mozg-ok:last-child > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .j-mozg-ok:last-child > * { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .j-mozg-zrodla { flex: none; }
   .j-mozg-zrodla button { padding: 0 12px; white-space: nowrap; font: 600 11px var(--j-font-mono); letter-spacing: .1em; }
   .j-mozg-zr-d { display: none; }
