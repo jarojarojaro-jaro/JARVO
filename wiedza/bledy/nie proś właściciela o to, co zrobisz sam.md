@@ -23,4 +23,5 @@ wystapienia: 3
 - hub: [[bledy/_hub-bledy|Księga błędów]]
 - [[bledy/cloudflare nie przepuszcza komputera, krok na telefonie floty|Cloudflare nie przepuszcza Komputera]]
 - [[bledy/treść zastępcza w wyniku wraca do wykonawcy|Treść zastępcza w wyniku]]
+- [[bledy/pytanie do właściciela tylko o to, co nas dotyczy|Pytanie tylko o to, co nas dotyczy]]
 - [[fleet/lekcje|Księga lekcji floty]]

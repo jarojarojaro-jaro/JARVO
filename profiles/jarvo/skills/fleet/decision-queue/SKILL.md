@@ -1,7 +1,7 @@
 ---
 name: decision-queue
 description: "Decyzje dla użytkownika: zbierz, zapytaj zbiorczo, wdroż."
-version: 1.4.0
+version: 1.5.0
 author: Jarvo
 license: MIT
 metadata:
@@ -36,6 +36,7 @@ Potrzebuję <N> decyzji:
 Odpowiedz np. „1 ok, 2 A”. Bez odpowiedzi do <jutra 10:00> ruszam z rekomendacjami tylko tam, gdzie to odwracalne.
 ```
 Zasady:
+- pytasz tylko o sprawę, która nas dotyczy: zanim ją wpiszesz, sprawdzasz w konfigu, kodzie albo skarbcu, że tego używamy, bo wniosek z raportu agenta to nie dowód,
 - każda pozycja ma **rekomendację** i uzasadnienie w 1 zdaniu,
 - nieodwracalne rzeczy (A2) **nigdy** nie przechodzą domyślnie; czekają na wyraźne „tak”,
 - pozycja A2 niesie **odcisk wersji** z prośby wykonawcy (`odcisk.py`, 12 znaków): zgoda dotyczy dokładnie tych plików.

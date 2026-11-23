@@ -1,7 +1,7 @@
 ---
 name: daily-brief
 description: "Poranny brief: co w toku, co gotowe, jakie decyzje."
-version: 1.3.1
+version: 1.4.0
 author: Jarvo
 license: MIT
 metadata:
@@ -40,6 +40,7 @@ Odpowiedz np. „1 ok, 2 nie”.
 ## Zasady
 - Najpierw `otwarte_decyzje` (najstarsze na górze), potem nowe z kolejki (skill `decision-queue`), na końcu najwyżej
   jedna pozycja „🛠” z kopalni pomysłów, razem najwyżej 5. Bez decyzji i bez pomysłu sekcji „Czeka na Ciebie” nie ma.
+  Nowa pozycja tylko o sprawie, która nas dotyczy, sprawdzonej w konfigu, kodzie albo skarbcu (skill `decision-queue`).
   Pozycja z wcześniejszego briefu dostaje na końcu jego numer w nawiasie, dokładnie „(z B-RRRR-MM-DD/n)”: skrypt
   zamyka wtedy starą pozycję, a odpowiedź trafi do nowej. Pozycja otwarta ≥ 3 dni: zapytaj, czy jest jeszcze aktualna.
 - **Agenci biznesowi** (`agenci_biznesowi`, `szkice_do_zgody`): jedno-dwa zdania. Najpierw szkice czekające na zgodę
