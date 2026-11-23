@@ -495,6 +495,8 @@ function utworzNeuron(pudlo, o) {
     ustaw({ fok = -1, grupa = -1, wybrana = null, traf = null }, animuj = true) {
       const zmiana = fok !== stan.fok || grupa !== stan.grupa || wybrana !== stan.wybrana;
       Object.assign(stan, { fok, grupa, wybrana, traf });
+      // nowy poziom: najechanie (włókna, karta) gaśnie do następnego ruchu myszy, żeby po przybliżeniu był spokój
+      if (zmiana) { stan.nad = null; stan.nadP = -1; }
       if (zmiana) lec(cel(), animuj ? 900 : 0); else zamow();
     },
     zniszcz() {
