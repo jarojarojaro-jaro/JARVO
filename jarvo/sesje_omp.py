@@ -474,7 +474,9 @@ class Tura:
             elif self.dopiski[nazwa]["stan"] == "wyslany":
                 self.wlacz(nazwa)                            # już poza kolejką: omp go dostarczył
         elif typ == "prompt_result" and e.get("id") == self.prompt_id:
-            self.wynik, self.cisza = e, bool(e.get("sessionSettled"))
+            # model skończył tekstem: odpowiedź idzie od razu, nie po zadaniach w tle (23.11 Kernel miał gotowe wnioski
+            # o 14 linkach o 02:58, a sesja czekała na zadanie Gemini; ich wynik przyjdzie turą „omp ruszył sam”)
+            self.wynik, self.cisza = e, bool(e.get("sessionSettled")) or bool(self.koncowe)
         elif typ == "session_settled" and self.wynik is not None:
             self.cisza = True
         if self.wynik is not None and self.cisza and not self.koniec:
@@ -819,8 +821,12 @@ class Sesja:
                              kod=1, tura=t.id)
         if not wszystkie:
             log(w, f"tura {t.id} (omp ruszył sam): {'ok' if ok else 'błąd'} po {sekundy} s")
+            # wynik zadania w tle po odpowiedzi tury (podagent, Gemini): tam, gdzie poszła ostatnia odpowiedź
+            gdzie = getattr(self, "ostatnie_gdzie", None)
+            if ok and t.odpowiedz.strip() and gdzie:
+                self.tg(f"{w.nazwa}\n\n{t.odpowiedz}", *gdzie)
             return
-        gdzie = t.gdzie
+        gdzie = self.ostatnie_gdzie = t.gdzie
         if not ok:
             log(w, f"tura {t.id}: błąd {t.kod} po {sekundy} s")
             self.tg(f"⚠️ {w.nazwa}: tura nie wyszła ({t.blad[-200:] or f'kod {t.kod}'}). Wiadomości czekają "

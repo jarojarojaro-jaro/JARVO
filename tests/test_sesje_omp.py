@@ -332,6 +332,9 @@ def test_odpowiedz_tury_to_wszystkie_teksty_po_ostatnim_narzedziu():
               asystent("Punkt 14 zapisany, commit 92be3f2.")):
         t.zdarzenie(e)
     assert t.odpowiedz == "Podsumowanie: 1. Strata… 13. Multi-Branch.\n\nPunkt 14 zapisany, commit 92be3f2."
+    t.prompt_id, t.s = "p1", None
+    t.zdarzenie({"type": "prompt_result", "id": "p1", "sessionSettled": False})   # zadanie Gemini dalej w tle
+    assert t.koniec                                     # odpowiedź idzie od razu, nie po zadaniu w tle
 
 
 def test_polknieta_wiadomosc_wraca_do_kolejki(w, at):

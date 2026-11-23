@@ -128,17 +128,15 @@ function ModelWybor({ o, onWybierz }) {
     </div></div>`;
 }
 
-// wysiłek jako zegar (23.11 właściciel: „coś fajnego”, potem „mniejszy i bardziej epicki, nie szary z białym”): łuk
-// 220° z segmentów w barwach poziomów (od chłodnego błękitu przez fiolet do ognia przy max), zapalonych do wybranego,
-// z poświatą w barwie poziomu; wskazówka sprężyście jedzie za kursorem albo strzałkami. Pod zegarem nazwa poziomu
-// w jego barwie, suwak, szybkość i głębia, opis. Klik w zegar, puszczenie suwaka albo Enter ustawia poziom (cicho,
-// bez wpisu w rozmowie); bez kursora wskazówka stoi na bieżącym poziomie.
-const ZEGAR = { cx: 140, cy: 132, r: 92, od: 200, luk: 220 };
-const BARWY_WYSILKU = { off: "#7C8AA5", minimal: "#38BDF8", low: "#22D3EE", medium: "#3B82F6", high: "#8B5CF6",
-  xhigh: "#D946EF", max: "#FF5A1F" };
+// wysiłek jako obrotomierz (23.11 właściciel: kolorowa tęcza „do poprawy”, wcześniej „męsko, 007 Bond”): czarna
+// tarcza w stalowym pierścieniu, stalowa podziałka, czerwone pole ostatnich dwóch poziomów jak redline, cienki
+// bursztynowy łuk do wybranego poziomu i czerwona wskazówka ze sprężystym ruchem za kursorem albo strzałkami.
+// Na tarczy nazwa poziomu i jego kod. Klik w tarczę, puszczenie suwaka albo Enter ustawia poziom (cicho, bez wpisu
+// w rozmowie); bez kursora wskazówka stoi na bieżącym poziomie.
+const ZEGAR = { cx: 140, cy: 124, r: 88, od: 210, luk: 240 };
 const katPoziomu = (i, n) => ZEGAR.od - (ZEGAR.luk * i) / Math.max(1, n - 1);
 const punkt = (kat, r) => [ZEGAR.cx + r * Math.cos((kat * Math.PI) / 180), ZEGAR.cy - r * Math.sin((kat * Math.PI) / 180)];
-const lukMiedzy = (a, b, r) => { const [x0, y0] = punkt(a, r), [x1, y1] = punkt(b, r); return `M${x0} ${y0} A${r} ${r} 0 0 1 ${x1} ${y1}`; };
+const lukMiedzy = (a, b, r) => { const [x0, y0] = punkt(a, r), [x1, y1] = punkt(b, r); return `M${x0} ${y0} A${r} ${r} 0 ${a - b > 180 ? 1 : 0} 1 ${x1} ${y1}`; };
 
 function WysilekWybor({ poziomy, biezacy, onWybierz }) {
   const n = poziomy.length;
@@ -149,9 +147,9 @@ function WysilekWybor({ poziomy, biezacy, onWybierz }) {
   const p = i >= 0 ? poziomy[i] : null;
   const [tytul, opis] = p ? opisWysilku(p) : [L("Jak sesja", "Session default"), L("Poziom ustawiony w sesji albo agencie.", "The level set in the session or agent.")];
   const t = i >= 0 ? i / Math.max(1, n - 1) : 0;
-  const barwa = (BARWY_WYSILKU[p] || "#7C8AA5");
+  const czerwone = Math.max(1, n - 2);                // od tego poziomu pole czerwone (xhigh, max)
   useEffect(() => { if (suwak.current) suwak.current.focus({ preventScroll: true }); }, []);
-  // kąt kursora nad zegarem → najbliższy poziom
+  // kąt kursora nad tarczą → najbliższy poziom
   const zKursora = (e) => {
     const r = e.currentTarget.getBoundingClientRect(), s = r.width / 280;
     const dx = (e.clientX - r.left) / s - ZEGAR.cx, dy = ZEGAR.cy - (e.clientY - r.top) / s;
@@ -162,30 +160,38 @@ function WysilekWybor({ poziomy, biezacy, onWybierz }) {
   };
   const segmenty = (ile, klasa) => html`<span class=${cx("j-ww-seg", klasa)}>${[0, 1, 2, 3, 4].map((k) => html`<i key=${k} class=${k < ile ? "is-on" : ""}></i>`)}</span>`;
   const glebia = i >= 0 ? 1 + Math.round(t * 4) : 0;
-  return html`<div class=${cx("j-ww", t >= 0.99 && "is-max")} style=${{ "--ww": barwa }}>
+  const katW = i >= 0 ? katPoziomu(i, n) : ZEGAR.od;
+  return html`<div class=${cx("j-ww", i >= czerwone && "is-red")}>
     <div class="j-wys-g"><span class="j-wys-t">${L("Wysiłek myślenia", "Thinking effort")}</span>
       <span class="j-wys-teraz">${biezacy || "auto"}</span></div>
-    <svg class="j-ww-zegar" viewBox="0 0 280 172" aria-hidden="true" onPointerMove=${(e) => setPod(zKursora(e))}
+    <svg class="j-ww-zegar" viewBox="0 0 280 228" aria-hidden="true" onPointerMove=${(e) => setPod(zKursora(e))}
       onPointerLeave=${() => setPod(null)} onClick=${(e) => onWybierz(poziomy[zKursora(e)])}>
-      <defs><radialGradient id="j-ww-blask" cx="50%" cy="76%" r="55%">
-        <stop offset="0" class="j-ww-b0"/><stop offset="1" class="j-ww-b1"/></radialGradient></defs>
-      <circle cx=${ZEGAR.cx} cy=${ZEGAR.cy} r=${ZEGAR.r - 4} fill="url(#j-ww-blask)" class="j-ww-tlo"/>
-      ${poziomy.slice(1).map((q, k) => html`<path key=${q} d=${lukMiedzy(katPoziomu(k, n) - 1.2, katPoziomu(k + 1, n) + 1.2, ZEGAR.r)}
-        class=${cx("j-ww-luk", k + 1 <= i && "is-on")} style=${{ "--wl": BARWY_WYSILKU[q] || "#7C8AA5" }}/>`)}
+      <defs>
+        <radialGradient id="j-ww-tarcza" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#1b1c20"/><stop offset="1" stop-color="#050506"/></radialGradient>
+        <linearGradient id="j-ww-stal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e4e4e8"/>
+          <stop offset=".45" stop-color="#4a4b52"/><stop offset=".7" stop-color="#9a9ba3"/><stop offset="1" stop-color="#2a2b30"/></linearGradient>
+        <radialGradient id="j-ww-os" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#f2f2f4"/><stop offset="1" stop-color="#3a3b40"/></radialGradient>
+      </defs>
+      <circle cx=${ZEGAR.cx} cy=${ZEGAR.cy} r=${ZEGAR.r + 30} class="j-ww-ramka"/>
+      <circle cx=${ZEGAR.cx} cy=${ZEGAR.cy} r=${ZEGAR.r + 27} fill="url(#j-ww-tarcza)"/>
+      <path d=${lukMiedzy(katPoziomu(czerwone, n), ZEGAR.od - ZEGAR.luk, ZEGAR.r + 4)} class="j-ww-redline"/>
+      <path d=${lukMiedzy(ZEGAR.od, ZEGAR.od - ZEGAR.luk, ZEGAR.r - 6)} class="j-ww-tor"/>
+      ${i > 0 && html`<path d=${lukMiedzy(ZEGAR.od, katW, ZEGAR.r - 6)} class="j-ww-pelny"/>`}
+      ${Array.from({ length: 49 }, (_, k) => {
+        const kat = ZEGAR.od - (ZEGAR.luk * k) / 48, [ax, ay] = punkt(kat, ZEGAR.r + 1), [bx, by] = punkt(kat, ZEGAR.r + (k % 4 ? 6 : 9));
+        return html`<line key=${k} class=${cx("j-ww-drob", kat <= katPoziomu(czerwone, n) + 0.01 && "is-red")} x1=${ax} y1=${ay} x2=${bx} y2=${by}/>`;
+      })}
       ${poziomy.map((q, k) => {
-        const kat = katPoziomu(k, n), [ax, ay] = punkt(kat, ZEGAR.r + 9), [bx, by] = punkt(kat, ZEGAR.r + 16), [lx, ly] = punkt(kat, ZEGAR.r + 28);
-        return html`<g key=${q} class=${cx("j-ww-tik", k <= i && "is-on", k === i0 && "is-biez")} style=${{ "--wl": BARWY_WYSILKU[q] || "#7C8AA5" }}>
+        const kat = katPoziomu(k, n), [ax, ay] = punkt(kat, ZEGAR.r - 1), [bx, by] = punkt(kat, ZEGAR.r + 13), [lx, ly] = punkt(kat, ZEGAR.r - 20);
+        return html`<g key=${q} class=${cx("j-ww-tik", k === i && "is-on", k >= czerwone && "is-red")}>
           <line x1=${ax} y1=${ay} x2=${bx} y2=${by}/>
-          <text x=${lx} y=${ly + 3.5} text-anchor="middle">${q}</text></g>`;
+          <text x=${lx} y=${ly + 3.5} text-anchor="middle">${q === "minimal" ? "min" : q === "medium" ? "med" : q}</text></g>`;
       })}
-      ${Array.from({ length: 23 }, (_, k) => {
-        const kat = ZEGAR.od - (ZEGAR.luk * k) / 22, [ax, ay] = punkt(kat, ZEGAR.r - 13), [bx, by] = punkt(kat, ZEGAR.r - 9);
-        return html`<line key=${k} class="j-ww-drob" x1=${ax} y1=${ay} x2=${bx} y2=${by}/>`;
-      })}
-      <g class="j-ww-wsk" style=${{ transform: `rotate(${90 - (i >= 0 ? katPoziomu(i, n) : ZEGAR.od)}deg)` }}>
-        <line x1=${ZEGAR.cx} y1=${ZEGAR.cy + 14} x2=${ZEGAR.cx} y2=${ZEGAR.cy - ZEGAR.r + 18}/></g>
-      <circle cx=${ZEGAR.cx} cy=${ZEGAR.cy} r="8" class="j-ww-os"/><circle cx=${ZEGAR.cx} cy=${ZEGAR.cy} r="3" class="j-ww-os2"/>
-      <text x=${ZEGAR.cx} y=${ZEGAR.cy + 36} text-anchor="middle" class="j-ww-tytul">${tytul}</text>
+      <g class="j-ww-wsk" style=${{ transform: `rotate(${90 - katW}deg)` }}>
+        <path d=${`M${ZEGAR.cx - 3} ${ZEGAR.cy + 16} L${ZEGAR.cx} ${ZEGAR.cy - ZEGAR.r + 4} L${ZEGAR.cx + 3} ${ZEGAR.cy + 16} Z`}/></g>
+      <circle cx=${ZEGAR.cx} cy=${ZEGAR.cy} r="9" fill="url(#j-ww-os)"/><circle cx=${ZEGAR.cx} cy=${ZEGAR.cy} r="3" class="j-ww-os2"/>
+      <text x=${ZEGAR.cx} y=${ZEGAR.cy + 46} text-anchor="middle" class="j-ww-tytul">${tytul.toUpperCase()}</text>
+      <text x=${ZEGAR.cx} y=${ZEGAR.cy + 62} text-anchor="middle" class="j-ww-kod">${p || "auto"}</text>
     </svg>
     <input ref=${suwak} type="range" class="j-ww-suwak" min="0" max=${n - 1} step="1" value=${Math.max(0, i)}
       aria-label=${L("Wysiłek myślenia", "Thinking effort")} aria-valuetext=${p || "auto"}
