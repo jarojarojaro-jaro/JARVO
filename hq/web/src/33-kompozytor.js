@@ -126,7 +126,9 @@ const stanPracy = (p) => (p.stan === "przyjety" && (p.powod === "terminal" || p.
 
 // ------------------------------------------------------------------------------------------------- kompozytor
 // memo: wątek rysuje się przy każdej delcie strumienia, a pole z paskiem pracy nie ma po co (jego dane to props i sklep)
-const Kompozytor = React.memo(function KompozytorW({ watek = null, panel = 0, koordynator = "jarvo", start = false }) {
+// `staly`: rozmowa z rozmówcą (Operator, Jarvo, Kernel…) idzie zawsze do niego: bez wyboru „Do:” i bez kierowania
+// wzmianką (23.11 właściciel: „w tych czatach wybór, do kogo wiadomość, wypierdolmy; zawsze jest do danego agenta”)
+const Kompozytor = React.memo(function KompozytorW({ watek = null, panel = 0, koordynator = "jarvo", start = false, staly = false }) {
   const k = watek || "nowa";
   const kluczA = `${panel}:${k}`;
   const wybrany = useSklep((s) => s.adresaci[kluczA] || null);
@@ -148,7 +150,8 @@ const Kompozytor = React.memo(function KompozytorW({ watek = null, panel = 0, ko
   stan.current = { tekst, pliki, obrazy };
   const id = useIdJarvo();
 
-  const a = useMemo(() => Pisanie.adresat(tekst, wybrany, aliasy, koordynator, nazwy), [tekst, wybrany, aliasy, koordynator, nazwy]);
+  const a = useMemo(() => (staly ? Pisanie.adresat("", null, aliasy, koordynator, nazwy)
+    : Pisanie.adresat(tekst, wybrany, aliasy, koordynator, nazwy)), [staly, tekst, wybrany, aliasy, koordynator, nazwy]);
   const ustawWybor = (agent) => sklep.zmien("adresaci", { [kluczA]: agent || undefined });
   const pokazUwage = (t, zle = false, ms = 4000) => {
     clearTimeout(czasUwagi.current);
@@ -383,7 +386,7 @@ const Kompozytor = React.memo(function KompozytorW({ watek = null, panel = 0, ko
     ${!wzm && html`<${MenuKomend} id=${`${id}-k`} lista=${podpKom} aktywna=${iK} onNajedz=${setIKom}
       onWybierz=${(c) => wykonajKomende(`/${c.nazwa}`)}/>`}
     <div class="j-komp-pasek">
-      <${ChipAdresata} wybor=${a} koordynator=${koordynator} agenci=${agenci} onWybierz=${(x) => { ustawWybor(x); requestAnimationFrame(() => pole.current && pole.current.focus()); }}/>
+      ${!staly && html`<${ChipAdresata} wybor=${a} koordynator=${koordynator} agenci=${agenci} onWybierz=${(x) => { ustawWybor(x); requestAnimationFrame(() => pole.current && pole.current.focus()); }}/>`}
       ${watek ? html`<${Leniwy} pakiet="stopka" nazwa="Stopka" watek=${watek} zastepczy=${html`<span class="j-rozpych"></span>`}/>`
         : html`<span class="j-rozpych"></span>`}
       <${Przycisk} rodzaj="cichy" ikona="clip" etykieta=${T("zal.dodaj")} podpowiedz=${T("zal.dodaj")} onClick=${() => wybierak.current && wybierak.current.click()}/>
