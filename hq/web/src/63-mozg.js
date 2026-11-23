@@ -336,6 +336,48 @@ function MozgPamiec({ klucz, profil, onZapis, onKoniec }) {
   </div>`;
 }
 
+// streszczenie do karty pod kursorem: czysty tekst (bez [[linków]], znaczników Markdown i nagłówków), najwyżej `ile`
+// znaków, ucięte na granicy słowa
+function mozgCzysty(t, ile = 240) {
+  const s = String(t || "").replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, "$2").replace(/\[\[([^\]]+)\]\]/g, (_, c) => c.split("/").pop())
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/^\s{0,3}#+\s*/gm, "").replace(/[*_`>]/g, "").replace(/\s+/g, " ").trim();
+  return s.length > ile ? s.slice(0, ile).replace(/\s+\S*$/, "") + "…" : s;
+}
+
+// karta pod kursorem (22.11 właściciel: „przy najechaniu bardziej widoczne nagłówki i co w ogóle jest w notatce, jakiś
+// mini box”): nad kropką tytuł w całości, miejsce w kolorze części, rodzaj i data, kilka zdań streszczenia (opis z grafu
+// albo pierwszy akapit treści, dociągany po 150 ms i trzymany w pamięci widoku); nad częścią nazwa, liczba i opis
+function MozgDymek({ d, z, dane, mapa, pamiec, nazwaMiejsca, nazwaKat, barwa, szer }) {
+  const [, odswiez] = useState(0);
+  const w = d.id && dane.byId.get(d.id), cz = d.czesc && mapa.kat.find((x) => x.k === d.czesc);
+  const skrot = w ? mozgCzysty(w.opis || w.podsumowanie) || pamiec.current.get(d.id) || "" : "";
+  useEffect(() => {
+    if (!w || skrot || pamiec.current.has(d.id) || !(z.rodzaj === "skarbiec" || z.tresc)) return undefined;
+    let zywy = true;
+    const t = setTimeout(() => (z.rodzaj === "skarbiec" ? zadanie("GET", `/note?path=${encodeURIComponent(d.id)}`, undefined, MOZG_WIEDZA)
+      : zadanie("GET", `/mozg/${encodeURIComponent(z.klucz)}/notatka?id=${encodeURIComponent(d.id)}`)).then((n) => {
+      pamiec.current.set(d.id, mozgCzysty(mozgPodziel(String(n.tresc || "").replace(/^\s*#\s[^\n]*\n/, "")).skrot));
+      if (zywy) odswiez((x) => x + 1);
+    }, () => {}), 150);
+    return () => { zywy = false; clearTimeout(t); };
+  }, [d.id]);
+  if (!w && !cz) return null;
+  const lewo = d.x > szer - 360, styl = { "--c": barwa((w ? mapa.gdzie.get(w.id) || {} : { kat: cz.k }).kat), top: `${Math.max(12, d.y - 18)}px`,
+    ...(lewo ? { right: `${szer - d.x + d.r + 10}px` } : { left: `${d.x + d.r + 10}px` }) };
+  if (cz) return html`<div class="j-mozg-dymek" style=${styl} aria-hidden="true">
+    <p class="j-mozg-dymek-m"><i></i>${L("Część mózgu", "Brain part")}</p>
+    <h3>${nazwaKat(cz)} <span>${cz.ile}</span></h3>
+    ${cz.opis && html`<p class="j-mozg-dymek-s">${L(cz.opis, cz.opis_en || cz.opis)}</p>`}
+    <p class="j-mozg-dymek-h">${L("Kliknij, żeby przybliżyć", "Click to zoom in")}</p></div>`;
+  const ileObok = (dane.sasiedzi.get(w.id) || new Set()).size;
+  return html`<div class="j-mozg-dymek" style=${styl} aria-hidden="true">
+    <p class="j-mozg-dymek-m"><i></i>${nazwaMiejsca(mapa.gdzie.get(w.id))}</p>
+    <h3>${w._t}</h3>
+    <p class="j-mozg-dymek-d">${[mozgN(MOZG_TYPY[w.typ]), mozgData(w.zmieniono), ileObok ? L(`${ileObok} powiązanych`, `${ileObok} linked`) : ""].filter(Boolean).join(" · ")}</p>
+    ${skrot ? html`<p class="j-mozg-dymek-s">${skrot}</p>` : (z.rodzaj === "skarbiec" || z.tresc) && !pamiec.current.has(w.id) && html`<p class="j-mozg-dymek-s is-czeka">${L("Wczytuję streszczenie…", "Loading summary…")}</p>`}
+    <p class="j-mozg-dymek-h">${L("Kliknij, żeby otworzyć", "Click to open")}</p></div>`;
+}
+
 // „Edytuj” w zwykłej notatce skarbca: uwaga do notatki (POST /remark wtyczki jarvo-wiedza = szkic w skrzynce), którą
 // Jarvo wnosi przy najbliższym porządku wiedzy (kompilacja rusza sama kilka minut po szkicu). Notatek skarbca nie
 // pisze nikt poza kompilacją (docs/WIEDZA.md), więc edycja to polecenie zmiany, nie zapis pliku.
@@ -452,6 +494,8 @@ function MozgWidok() {
   const [dane, setDane] = useState(null);
   const [blad, setBlad] = useState(false);
   const [bezGl, setBezGl] = useState(false);
+  const [dymek, setDymek] = useState(null);   // karta pod kursorem: {id|czesc, x, y, r} z mapy
+  const streszczenia = useRef(new Map());     // id notatki → streszczenie do karty (raz na widok)
   const [q, setQ] = useState("");
   const [i, setI] = useState(0);
   const [tresc, setTresc] = useState([]);
@@ -470,6 +514,7 @@ function MozgWidok() {
       motyw: () => barwy.current, centrum: () => klik.current.centrum, podpis: () => klik.current.podpis,
       nazwa: (d) => L(d.nazwa, d.nazwa_en || d.nazwa), tytul: (n) => n._t, miejsce: (id) => klik.current.miejsce(id),
       notatka: (id) => klik.current.notatka(id), czesc: (k, g) => klik.current.czesc(k, g), wyzej: (calkiem) => klik.current.wyzej(calkiem),
+      dymek: (d) => setDymek(d),
     });
     setBezGl(!neuron.current.gl);
     return () => neuron.current.zniszcz();
@@ -495,6 +540,7 @@ function MozgWidok() {
   useEffect(() => {
     let zywy = true;
     if (wczytany.current !== z.klucz) { setDane(null); setBlad(false); }   // odświeżenie tego samego źródła bez migania
+    streszczenia.current.clear(); setDymek(null);
     (z.rodzaj === "skarbiec" ? zadanie("GET", "/graph", undefined, MOZG_WIEDZA) : zadanie("GET", `/mozg/${encodeURIComponent(z.klucz)}`)).then((d) => {
       if (!zywy) return;
       // _t: nazwa do pokazania (mozgTytul), szukanie zna też tytuł ze skarbca
@@ -541,8 +587,12 @@ function MozgWidok() {
     miejsce: (id) => (mapa ? nazwaMiejsca(mapa.gdzie.get(id)) : ""),
     notatka: (id) => idz(doNotatki(id)),
     czesc: (k, g) => idz({ k, g: g || "", o: "" }),
-    // klik w tło: poziom wyżej (grupa → część → cały mózg); klik w ciało komórki: cały mózg
-    wyzej: (calkiem) => { const w = calkiem ? (s.k ? { ...s, k: "", g: "", o: "" } : null) : mozgWyzej({ ...s, o: "" }, !!(kat && kat.grupy.length > 1)); if (w) idz(w); },
+    // klik w tło: przy otwartej notatce zamyka notatkę, inaczej poziom wyżej (grupa → część → cały mózg); klik w środek: cały mózg
+    wyzej: (calkiem) => {
+      if (s.o && !calkiem) return wGore({ ...s, o: "" });
+      const w = calkiem ? (s.k ? { ...s, k: "", g: "", o: "" } : null) : mozgWyzej(s, !!(kat && kat.grupy.length > 1));
+      if (w) idz(w);
+    },
   };
 
   const [tytuly, ileTytulow] = useMemo(() => (dane ? mozgSzukaj(dane.wezly, q) : [[], 0]), [dane, q]);
@@ -574,7 +624,6 @@ function MozgWidok() {
     const g = cz && cz.grupy.length > 1 ? cz.grupy.findIndex((x) => x.k === s.g) : -1;
     neuron.current.ustaw({ fok: p, grupa: g, wybrana: s.o || null, traf: szukam ? new Set(opcje.map((o) => o.n.id)) : null });
   }, [uklad, s.k, s.g, s.o, opcje, szukam]);
-  useEffect(() => { neuron.current.wstrzymaj(!!s.o); }, [s.o]);
   // po przejściu na inny poziom fokus na nagłówku poziomu (czytnik ekranu czyta, gdzie jesteśmy)
   const pierwszy = useRef(true);
   useEffect(() => { if (pierwszy.current) { pierwszy.current = false; return; } if (!s.o && naglowek.current) naglowek.current.focus({ preventScroll: true }); }, [s.k, s.g]);
@@ -609,6 +658,8 @@ function MozgWidok() {
     <div class="j-mozg-cialo">
       <div ref=${pudlo} class="j-mozg-mapa" tabIndex="0" role="img"
         aria-label=${L(`Mapa mózgu: ${centrum} w środku, części wokół, kropka to notatka. Klik przybliża, Esc oddala.`, `Brain map: ${centrum} in the middle, parts around, a dot is a note. Click zooms in, Esc zooms out.`)}></div>
+      ${dymek && dane && mapa && dymek.id !== s.o && html`<${MozgDymek} key=${dymek.id || dymek.czesc} d=${dymek} z=${z} dane=${dane} mapa=${mapa} pamiec=${streszczenia}
+        nazwaMiejsca=${nazwaMiejsca} nazwaKat=${nazwaKat} barwa=${barwaCzesci} szer=${pudlo.current ? pudlo.current.clientWidth : 1200}/>`}
       ${(bezGl || blad || !dane) && html`<div class="j-mozg-stan" role="status">${blad ? L("Nie udało się wczytać mózgu.", "Could not load the brain.")
         : bezGl ? L("Ta przeglądarka nie rysuje mapy (brak WebGL). Szukanie działa.", "This browser cannot draw the map (no WebGL). Search works.") : html`<${Spinner}/>`}</div>`}
       <div class="j-mozg-szukaj">

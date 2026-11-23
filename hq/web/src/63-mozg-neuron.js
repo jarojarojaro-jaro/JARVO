@@ -1,16 +1,17 @@
-// Mózg jako neuron (#/mozg, docs/HQ.md „Mózg”). 22.11 właściciel: „niech będzie neural, to wszystko połączone… stylowe,
-// szykowne, smooth”, „każda sekcja swój kolor… jak się łączą, to gradientowo”, „widać od razu wszystkie kropki i jak się
-// klika, to przybliża na te kropki”, a po pierwszej wersji: „za dużo naraz, oczopląs… koneksje tylko jak się najedzie,
-// normalnie różne kolory… ład i skład… najpierw klik w sekcję, później w poszczególne… zoom in, zoom out smooth”.
-// Jeden spokojny obraz: JARVO (albo KERNEL) to ciało komórki, każda część to dendryt we własnym kolorze, który
-// rozgałęzia się na grupy, a grupa to skupisko kropek (notatek). Linki (włókna z gradientem kolorów części, wiązką
-// przez pnie przy środku) i biegnące po nich impulsy widać tylko przy najechaniu na część albo kropkę. Poziomy to
-// kamera: klik w część przybliża część, w niej klik w grupę przybliża grupę, dopiero tam kropka otwiera notatkę.
-// `neuronUklad` (czysty, testowany w tests/test_mozg_zrodla.py) liczy świat z mozgMapa; `utworzNeuron` rysuje go
-// w WebGL (kropki, dendryty, włókna) i w Canvas 2D (ciało komórki, napisy, obwódki), obsługuje mysz, płynne kółko,
-// dotyk i lot kamery. Rysuje tylko na żądanie; pętla (do 30 klatek/s) tylko przy najechaniu, dla impulsów.
+// Mózg jako neuron (#/mozg, docs/HQ.md „Mózg”). 22.11 właściciel: „niech będzie neural, to wszystko połączone… smooth”,
+// „widać od razu wszystkie kropki i jak się klika, to przybliża na te kropki”, potem: „za dużo naraz… koneksje tylko jak
+// się najedzie… najpierw klik w sekcję, później w poszczególne… zoom smooth”, a na koniec: „linie od notatek do środka
+// wyglądają jak baloniki… ma być męsko, 007… czemu tak daleko, bardziej compacted, tylko lekkie nuty kolorów”.
+// Jeden spokojny obraz: JARVO (albo KERNEL) w środku, wokół zwarte skupiska kropek (grupy notatek) w wycinkach części,
+// kropki w jasnej stali z nutą koloru części. Linki (włókna z gradientem, między częściami wiązką przez okolice środka)
+// i biegnące po nich impulsy widać tylko przy najechaniu na część albo kropkę. Poziomy to kamera: klik w część
+// przybliża część, w niej klik w grupę przybliża grupę, dopiero tam kropka otwiera notatkę. Karta pod kursorem (tytuł,
+// streszczenie) to HTML widoku: `o.dymek`. `neuronUklad` (czysty, testowany w tests/test_mozg_zrodla.py) liczy świat
+// z mozgMapa; `utworzNeuron` rysuje go w WebGL (kropki, włókna) i w Canvas 2D (środek, napisy, obwódki), obsługuje mysz,
+// płynne kółko, dotyk i lot kamery. Rysuje tylko na żądanie; pętla (do 30 klatek/s) tylko przy najechaniu (impulsy).
 
-const NEURON = { soma: 74, pien: 150, krok: 7.5, przerwa: 16, wloknoKroki: 2, maksNapisow: 18 };
+// zwarty układ (22.11 właściciel: „czemu tak daleko… bardziej compacted”): skupiska tuż za ciałem komórki
+const NEURON = { soma: 56, pien: 16, krok: 6.6, przerwa: 9, wloknoKroki: 2, maksNapisow: 18 };
 
 // ------------------------------------------------------------------------------------------------------- układ
 // mapa (mozgMapa) → { czesci, kropki, byId, linki, bb }. Część: kąt na okręgu (szerokość wycinka z pierwiastka liczby
@@ -32,13 +33,15 @@ function neuronUklad(mapa, linki, kolejnosc) {
     kat += wycinek;
     const ca = Math.cos(a), sa = Math.sin(a), J = { x: (soma + pien) * ca, y: (soma + pien) * sa };
     const grupy = d.grupy.map((g, i) => ({ k: g.k, nazwa: g.nazwa, ile: g.ile, wezly: kolejnosc(g), i, r: promien(g.wezly.length) }));
-    // rzędy: każdy rząd to łuk o promieniu R, zapełniany do szerokości wycinka (z zapasem), środek rzędu na osi części
-    const rzedy = [], dostepny = Math.max(0.5, wycinek * 0.86);
-    let R = soma + pien + 26, rzad = [], szer = 0;
+    // rzędy: każdy rząd to łuk o promieniu R, zapełniany do szerokości wycinka (z zapasem na przerwę między częściami),
+    // środek rzędu na osi części; grupa szersza niż wycinek odsuwa swój rząd od środka, aż się w nim zmieści
+    const rzedy = [], dostepny = Math.max(0.35, wycinek * 0.8);
+    let R = soma + pien + 12, rzad = [], szer = 0;
     const zamknij = () => { if (rzad.length) { rzedy.push({ R: R + Math.max(...rzad.map((g) => g.r)), grupy: rzad }); R += 2 * Math.max(...rzad.map((g) => g.r)) + przerwa; } rzad = []; szer = 0; };
     for (const g of [...grupy].sort((x, y) => y.r - x.r)) {
-      const w = (2 * g.r + przerwa) / (R + g.r);
-      if (rzad.length && szer + w > dostepny) zamknij();
+      let w = (2 * g.r + przerwa) / (R + g.r);
+      if (rzad.length && szer + w > dostepny) { zamknij(); w = (2 * g.r + przerwa) / (R + g.r); }
+      if (!rzad.length && w > dostepny) { R = (2 * g.r + przerwa) / dostepny - g.r; w = dostepny; }
       rzad.push(g); szer += w;
     }
     zamknij();
@@ -82,7 +85,7 @@ function neuronTrasa(u, a, b) {
   const ga = a.g >= 0 && A.grupy[a.g], gb = b.g >= 0 && B.grupy[b.g];
   let pk;
   if (a.p === b.p && a.g === b.g) pk = [[a.x, a.y], [ga ? ga.x : A.J.x, ga ? ga.y : A.J.y], [b.x, b.y]];
-  else if (a.p === b.p) pk = [[a.x, a.y], ga ? [ga.x, ga.y] : null, [A.J.x, A.J.y], gb ? [gb.x, gb.y] : null, [b.x, b.y]].filter(Boolean);
+  else if (a.p === b.p) pk = [[a.x, a.y], ga ? [ga.x, ga.y] : null, gb ? [gb.x, gb.y] : null, [b.x, b.y]].filter(Boolean);
   else pk = [[a.x, a.y], ga ? [ga.x, ga.y] : null, [A.J.x, A.J.y], [s * Math.cos(A.a), s * Math.sin(A.a)], [s * Math.cos(B.a), s * Math.sin(B.a)],
     [B.J.x, B.J.y], gb ? [gb.x, gb.y] : null, [b.x, b.y]].filter(Boolean);
   const n = pk.length - 1, beta = pk.length > 3 ? 0.82 : 0.6;
@@ -100,7 +103,7 @@ function neuronTrasa(u, a, b) {
 }
 
 // ------------------------------------------------------------------------------------------------------- WebGL
-// włókna i dendryty jednym programem: `uWsz` 1 = rysuj wszystko (dendryty, włókna najechanej kropki), 0 = tylko włókna
+// włókna jednym programem: `uWsz` 1 = rysuj wszystko (włókna najechanej albo otwartej kropki), 0 = tylko włókna
 // dotykające najechanej części `uNad` (bez najechania włókien nie widać: 22.11 właściciel „koneksje tylko jak się
 // najedzie”); impuls biegnie tylko po widocznych włóknach
 const NEURON_VS_LINIA = `precision highp float;
@@ -146,12 +149,13 @@ void main() {
   gl_FragColor = vec4((vC * (rdzen * 0.95 + blask)) * vD, 1.0);
 }`;
 
-// kolor części z motywu (pastele panelu) mocniej nasycony na czerni, żeby małe kropki nie bielały
+// kolor części z motywu tylko jako lekka nuta (22.11 właściciel: „bardziej compacted, tylko lekkie nuty kolorów”,
+// „męsko, 007”): jasna stal z domieszką odcienia części
 const neuronRgb = (hex) => {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(hex).trim());
   const v = m ? parseInt(m[1], 16) : 0x999999, c = [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255];
   const s = (c[0] + c[1] + c[2]) / 3;
-  return c.map((x) => Math.max(0, Math.min(1, s + (x - s) * 2.1)));
+  return c.map((x) => Math.max(0, Math.min(1, 0.5 * 0.8 + 0.5 * (s + (x - s) * 1.5))));
 };
 
 function utworzNeuron(pudlo, o) {
@@ -162,8 +166,9 @@ function utworzNeuron(pudlo, o) {
   const x2 = c2.getContext("2d");
   const gl = cgl.getContext("webgl", { antialias: true, alpha: false, premultipliedAlpha: false, preserveDrawingBuffer: false });
   const bezRuchu = matchMedia("(prefers-reduced-motion: reduce)");
-  let W = 1, H = 1, dpr = 1, u = null, kolory = [], prog = null, bufory = null, raf = 0, ostatnia = 0, wstrzymany = false, zywy = true;
-  const kam = { x: 0, y: 0, k: 1 }, stan = { fok: -1, grupa: -1, wybrana: null, nad: null, nadP: -1, traf: null };
+  let W = 1, H = 1, dpr = 1, u = null, kolory = [], prog = null, bufory = null, raf = 0, ostatnia = 0, zywy = true;
+  const kam = { x: 0, y: 0, k: 1 }, stan = { fok: -1, grupa: -1, wybrana: null, nad: null, nadP: -1, traf: null, mysz: null };
+  let dymek = "";   // ostatnio zgłoszona karta pod kursorem (o.dymek), żeby nie zgłaszać co klatkę tego samego
   let lot = null, napisy = [], t0 = performance.now(), k0 = 1;
 
   // ---- programy i bufory
@@ -183,7 +188,7 @@ function utworzNeuron(pudlo, o) {
   function zbuduj() {
     if (!gl || !u) return;
     if (!prog) prog = { linia: program(NEURON_VS_LINIA, NEURON_FS_LINIA), kropka: program(NEURON_VS_KROPKA, NEURON_FS_KROPKA) };
-    if (bufory) for (const b of [bufory.linie, bufory.den, bufory.kropki]) gl.deleteBuffer(b);
+    if (bufory) for (const b of [bufory.linie, bufory.kropki]) gl.deleteBuffer(b);
     const kol = (p) => kolory[p % kolory.length] || [0.7, 0.7, 0.7];
     // włókna: gl.LINES, wierzchołek = x, y, r, g, b, t, faza, części (pa*64+pb); zakres każdej notatki do podświetlenia
     const L = [], zakresy = new Map();
@@ -198,37 +203,16 @@ function utworzNeuron(pudlo, o) {
       const ile = L.length / 9 - od;
       dodajZakres(a.id, od, ile); dodajZakres(b.id, od, ile);
     }
-    // dendryty: trójkąty zwężające się od ciała komórki do J i od J do grup (impuls biegnie do środka: t rośnie ku somie)
-    const D = [], tasma = (pk, w0, w1, c, p, faza) => {
-      for (let i = 0; i < pk.length - 1; i++) {
-        const [x0, y0] = pk[i], [x1, y1] = pk[i + 1], dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l;
-        const s0 = i / (pk.length - 1), s1 = (i + 1) / (pk.length - 1), a0 = (w0 + (w1 - w0) * s0) / 2, a1 = (w0 + (w1 - w0) * s1) / 2;
-        const v = (x, y, s) => D.push(x, y, c[0], c[1], c[2], 1 - s, faza, p * 64 + p, 0);
-        v(x0 + nx * a0, y0 + ny * a0, s0); v(x0 - nx * a0, y0 - ny * a0, s0); v(x1 + nx * a1, y1 + ny * a1, s1);
-        v(x1 + nx * a1, y1 + ny * a1, s1); v(x0 - nx * a0, y0 - ny * a0, s0); v(x1 - nx * a1, y1 - ny * a1, s1);
-      }
-    };
-    const krzywa = (a, b, c, n = 10) => Array.from({ length: n + 1 }, (_, i) => { const t = i / n, s = 1 - t; return [s * s * a[0] + 2 * s * t * b[0] + t * t * c[0], s * s * a[1] + 2 * s * t * b[1] + t * t * c[1]]; });
-    for (const cz of u.czesci) {
-      const c = kol(cz.p), so = NEURON.soma * 0.86, S = [so * Math.cos(cz.a), so * Math.sin(cz.a)], J = [cz.J.x, cz.J.y];
-      const odg = 0.18 * (cz.p % 2 ? 1 : -1), M = [(S[0] + J[0]) / 2 - Math.sin(cz.a) * odg * 40, (S[1] + J[1]) / 2 + Math.cos(cz.a) * odg * 40];
-      tasma(krzywa(S, M, J), 9 + Math.min(10, Math.sqrt(cz.d.ile)), 3.2, c, cz.p, Math.random());
-      for (const g of cz.grupy) {
-        const G = [g.x, g.y], K = [J[0] + (G[0] - J[0]) * 0.5 + Math.cos(cz.a) * 10, J[1] + (G[1] - J[1]) * 0.5 + Math.sin(cz.a) * 10];
-        tasma(krzywa(G, K, J, 8), 1.2, 2.6 + Math.min(3, Math.sqrt(g.ile) * 0.4), c, cz.p, Math.random());
-      }
-    }
     const K = [];
     const maks = Math.max(1, ...u.kropki.map((k) => k.waga));
     for (const k of u.kropki) {
       // kolor części; grupy w części lekko jaśniejsze albo ciemniejsze na zmianę, żeby skupiska dało się odróżnić
-      const odcien = k.g < 0 ? 1 : [1, 1.16, 0.86][k.g % 3];
-      const c = mozgWycofana(k.n) ? [0.45, 0.45, 0.48] : kol(k.p).map((v) => Math.min(1, v * odcien)), w = Math.sqrt(k.waga / maks);
-      k.r = 1.5 + 3.2 * w;
-      K.push(k.x, k.y, c[0] * (0.8 + 0.2 * w), c[1] * (0.8 + 0.2 * w), c[2] * (0.8 + 0.2 * w), k.r, k.p);
+      const odcien = k.g < 0 ? 1 : [1, 1.08, 0.92][k.g % 3];
+      const c = mozgWycofana(k.n) ? [0.4, 0.4, 0.43] : kol(k.p).map((v) => Math.min(1, v * odcien)), w = Math.sqrt(k.waga / maks);
+      k.r = 1.4 + 2.8 * w;
+      K.push(k.x, k.y, c[0] * (0.72 + 0.28 * w), c[1] * (0.72 + 0.28 * w), c[2] * (0.72 + 0.28 * w), k.r, k.p);
     }
-    bufory = { linie: bufor(new Float32Array(L)), nLinie: L.length / 9, den: bufor(new Float32Array(D)), nDen: D.length / 9,
-      kropki: bufor(new Float32Array(K)), nKropki: K.length / 7, zakresy };
+    bufory = { linie: bufor(new Float32Array(L)), nLinie: L.length / 9, kropki: bufor(new Float32Array(K)), nKropki: K.length / 7, zakresy };
     siatka();
   }
 
@@ -271,7 +255,11 @@ function utworzNeuron(pudlo, o) {
   function cel() {
     if (!u) return kam;
     k0 = dopasuj(u.bb, Math.min(240, W * 0.2), 70, 6).k;
-    if (stan.wybrana) { const k = u.byId.get(stan.wybrana); if (k) return { x: k.x, y: k.y, k: Math.max(k0 * 5, kam.k) }; }
+    // otwarta notatka: kropka w środku tego, co zostaje obok panelu notatki (panel z prawej, do 480 px; telefon: cały ekran)
+    if (stan.wybrana) {
+      const k = u.byId.get(stan.wybrana), kz = Math.max(k0 * 5, kam.k), panel = W > 700 ? Math.min(480, W - 24) + 12 : 0;
+      if (k) return { x: k.x + panel / 2 / kz, y: k.y, k: kz };
+    }
     const cz = stan.fok >= 0 && u.czesci[stan.fok];
     if (cz && stan.grupa >= 0 && cz.grupy[stan.grupa]) return dopasuj(cz.grupy[stan.grupa].bb, 120, 90, k0 * 14);
     if (cz) return dopasuj(cz.bb, 150, 80, k0 * 9);
@@ -304,9 +292,8 @@ function utworzNeuron(pudlo, o) {
       gl.enableVertexAttribArray(L.atr.c); gl.vertexAttribPointer(L.atr.c, 3, gl.FLOAT, false, 36, 8);
       gl.enableVertexAttribArray(L.atr.m); gl.vertexAttribPointer(L.atr.m, 3, gl.FLOAT, false, 36, 20);
     };
-    // dendryty zawsze (spokojny zarys: pień części i gałęzie do grup), włókna tylko najechanej części albo kropki
-    wiaz(bufory.den); gl.uniform1f(L.uni.uWsz, 1); gl.uniform1f(L.uni.uA, 0.2); gl.uniform1f(L.uni.uMocne, 0); gl.drawArrays(gl.TRIANGLES, 0, bufory.nDen);
-    wiaz(bufory.linie);
+    // w spoczynku same kropki; włókna tylko najechanej części albo kropki (i otwartej notatki)
+    wiaz(bufory.linie); gl.uniform1f(L.uni.uWsz, 1); gl.uniform1f(L.uni.uMocne, 0);
     const jasne = stan.nad || stan.wybrana;
     if (jasne && bufory.zakresy.has(jasne)) {
       gl.uniform1f(L.uni.uMocne, 1); gl.uniform1f(L.uni.uFok, -1); gl.uniform1f(L.uni.uNad, -1); gl.uniform1f(L.uni.uA, 0.35);
@@ -346,21 +333,12 @@ function utworzNeuron(pudlo, o) {
     napisy = [];
     if (!u) return;
     const m = o.motyw(), z = kam.k / k0, font = m.font || "sans-serif", mono = m.mono || "monospace";
-    // ciało komórki: tarcza z pierścieniem w kolorach części (każda w swoim kącie), nazwa i liczba notatek
+    // środek: czarna tarcza z cienkim stalowym pierścieniem i drugim, ledwie widocznym; nazwa i liczba notatek
     const [sx, sy] = ekran(0, 0), R = NEURON.soma * kam.k;
     if (sx > -R && sx < W + R && sy > -R && sy < H + R) {
-      const g = x2.createRadialGradient(sx, sy, R * 0.2, sx, sy, R * 1.6);
-      g.addColorStop(0, "rgba(255,255,255,.07)"); g.addColorStop(0.6, "rgba(255,255,255,.025)"); g.addColorStop(1, "rgba(255,255,255,0)");
-      x2.fillStyle = g; x2.beginPath(); x2.arc(sx, sy, R * 1.6, 0, 2 * Math.PI); x2.fill();
-      x2.fillStyle = "#07080B"; x2.beginPath(); x2.arc(sx, sy, R, 0, 2 * Math.PI); x2.fill();
-      if (x2.createConicGradient) {
-        const cg = x2.createConicGradient(0, sx, sy), kat = (cz) => (((cz.a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) / (2 * Math.PI);
-        const pierwsza = [...u.czesci].sort((a, b) => kat(a) - kat(b))[0];
-        cg.addColorStop(0, css(pierwsza.p)); cg.addColorStop(1, css(pierwsza.p));
-        for (const cz of u.czesci) cg.addColorStop(kat(cz), css(cz.p));
-        x2.strokeStyle = cg;
-      } else x2.strokeStyle = m.tekst;
-      x2.lineWidth = Math.max(1.5, R * 0.035); x2.beginPath(); x2.arc(sx, sy, R, 0, 2 * Math.PI); x2.stroke();
+      x2.fillStyle = "#06070A"; x2.beginPath(); x2.arc(sx, sy, R, 0, 2 * Math.PI); x2.fill();
+      x2.strokeStyle = "rgba(237,235,230,.55)"; x2.lineWidth = 1; x2.beginPath(); x2.arc(sx, sy, R, 0, 2 * Math.PI); x2.stroke();
+      x2.strokeStyle = "rgba(237,235,230,.12)"; x2.beginPath(); x2.arc(sx, sy, R + 6, 0, 2 * Math.PI); x2.stroke();
       const fs = Math.max(12, Math.min(40, R * 0.3));
       x2.textAlign = "center"; x2.fillStyle = m.tekst; x2.font = `700 ${fs}px ${m.naglowek || font}`;
       x2.save(); if ("letterSpacing" in x2) x2.letterSpacing = `${fs * 0.12}px`; x2.fillText(o.centrum(), sx, sy + fs * 0.25); x2.restore();
@@ -371,15 +349,17 @@ function utworzNeuron(pudlo, o) {
     const obw = (k, kolor, r) => { const [x, y] = ekran(k.x, k.y); x2.strokeStyle = kolor; x2.lineWidth = 1.5; x2.beginPath(); x2.arc(x, y, r, 0, 2 * Math.PI); x2.stroke(); };
     if (stan.traf) for (const id of stan.traf) { const k = u.byId.get(id); if (k) obw(k, m.uwaga, Math.max(6, k.r * kam.k + 4)); }
     if (stan.wybrana && u.byId.has(stan.wybrana)) { const k = u.byId.get(stan.wybrana); obw(k, m.tekst, Math.max(8, k.r * kam.k + 6)); }
-    // podpowiedź najechanej kropki: tytuł i miejsce (najpierw, żeby inne napisy jej nie zasłoniły)
+    // karta pod kursorem (HTML w widoku: tytuł, miejsce, streszczenie): kropka zakotwiczona w swoim miejscu na ekranie,
+    // część przy kursorze; zgłaszana tylko przy zmianie
+    let d = null;
     if (stan.nad && u.byId.has(stan.nad)) {
-      const k = u.byId.get(stan.nad), [x, y] = ekran(k.x, k.y);
-      obw(k, css(k.p), Math.max(7, k.r * kam.k + 5));
-      const t = o.tytul(k.n), gd = o.miejsce(k.n.id);
-      const r = napis(t.length > 60 ? t.slice(0, 58) + "…" : t, x + 14, y - 4, { font: `600 13px ${font}`, kolor: m.tekst, tlo: true, pad: 6 });
-      if (gd && r) napis(gd, x + 14, r.y1 + 12, { font: `400 11.5px ${font}`, kolor: m.tekst2, tlo: true, pad: 5 });
-    }
-    // nazwy części: na końcu dendrytu, poza skupiskami; nazwa, która wpadłaby na inną, schodzi o wiersz od środka
+      const k = u.byId.get(stan.nad), [x, y] = ekran(k.x, k.y), r = Math.max(7, k.r * kam.k + 5);
+      obw(k, m.tekst, r);
+      d = { id: k.id, x: Math.round(x), y: Math.round(y), r: Math.round(r) };
+    } else if (stan.nadP >= 0 && stan.mysz) d = { czesc: u.czesci[stan.nadP].k, x: Math.round(stan.mysz[0]), y: Math.round(stan.mysz[1]), r: 14 };
+    const klucz = d ? `${d.id || d.czesc}:${d.x}:${d.y}` : "";
+    if (klucz !== dymek) { dymek = klucz; o.dymek(d); }
+    // nazwy części: za skupiskami części; nazwa, która wpadłaby na inną, schodzi o wiersz od środka
     x2.textAlign = "left";
     for (const cz of u.czesci) {
       const d = cz.zasieg + 22 / Math.min(kam.k, 1.5), ca = Math.cos(cz.a), sa = Math.sin(cz.a);
@@ -439,10 +419,10 @@ function utworzNeuron(pudlo, o) {
     rysujGL(czas); rysuj2D(czas);
     ostatnia = teraz;
     if (lot) zamow();
-    else if (!wstrzymany && !bezRuchu.matches && !document.hidden && (stan.nad || stan.nadP >= 0))
+    else if (!bezRuchu.matches && !document.hidden && (stan.nad || stan.nadP >= 0))
       raf = requestAnimationFrame((t) => (t - ostatnia < 31 ? (raf = requestAnimationFrame(klatka)) : klatka(t)));
   }
-  function zamow() { if (!raf && zywy && !wstrzymany) raf = requestAnimationFrame(klatka); }
+  function zamow() { if (!raf && zywy) raf = requestAnimationFrame(klatka); }
 
   // ---- wejście: mysz, kółko, dotyk
   const wsk = new Map();
@@ -475,7 +455,8 @@ function utworzNeuron(pudlo, o) {
       // w przybliżonej części ruch myszy nie zapala wszystkich jej włókien (spokój), tylko kropka pod ręką
       const nad = k ? k.id : null, nadC = k ? -1 : n && n.cel && n.cel.czesc != null ? n.cel.czesc : cz ? cz.cz.p : -1, nadP = nadC === stan.fok ? -1 : nadC;
       c2.style.cursor = k || n || cz ? "pointer" : "grab";
-      if (nad !== stan.nad || nadP !== stan.nadP) { stan.nad = nad; stan.nadP = nadP; zamow(); }
+      stan.mysz = p;
+      if (nad !== stan.nad || nadP !== stan.nadP || (nadP >= 0 && !nad)) { stan.nad = nad; stan.nadP = nadP; zamow(); }
     },
     pointerup: (e) => {
       const p = poz(e); wsk.delete(e.pointerId); c2.style.cursor = "grab";
@@ -494,7 +475,7 @@ function utworzNeuron(pudlo, o) {
       o.wyzej(false);
     },
     pointercancel: (e) => { wsk.delete(e.pointerId); },
-    pointerleave: () => { if (stan.nad || stan.nadP >= 0) { stan.nad = null; stan.nadP = -1; zamow(); } },
+    pointerleave: () => { stan.mysz = null; if (stan.nad || stan.nadP >= 0) { stan.nad = null; stan.nadP = -1; zamow(); } },
     wheel: (e) => { e.preventDefault(); const p = poz(e); zoom(p[0], p[1], Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0016)), true); },
   };
   for (const [n, f] of Object.entries(zd)) c2.addEventListener(n, f, n === "wheel" ? { passive: false } : undefined);
@@ -516,7 +497,6 @@ function utworzNeuron(pudlo, o) {
       Object.assign(stan, { fok, grupa, wybrana, traf });
       if (zmiana) lec(cel(), animuj ? 900 : 0); else zamow();
     },
-    wstrzymaj(t) { wstrzymany = t; if (!t) zamow(); else if (raf) { cancelAnimationFrame(raf); raf = 0; } },
     zniszcz() {
       zywy = false; if (raf) cancelAnimationFrame(raf);
       ro.disconnect(); document.removeEventListener("visibilitychange", widocznosc);

@@ -2281,6 +2281,19 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-neuron-2d { cursor: grab; }
 .j-mozg-cialo::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, .55) 100%); }
 .j-mozg-stan { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; padding: 20px; color: var(--j-tekst-2); text-align: center; pointer-events: none; }
+/* karta pod kursorem: mały moduł przy kropce albo części (nie łapie myszy), wejście 120 ms */
+.j-mozg-dymek { position: absolute; z-index: 2; width: 320px; padding: 12px 14px 10px; pointer-events: none; background: rgba(10, 11, 14, .94); backdrop-filter: blur(8px);
+  box-shadow: inset 2px 0 0 var(--c), inset 0 0 0 1px var(--j-linia), 0 14px 36px rgba(0, 0, 0, .6); animation: j-mozg-dymek .12s var(--j-ease) both; }
+@keyframes j-mozg-dymek { from { opacity: 0; transform: translateY(3px); } }
+.j-mozg-dymek p { margin: 0; }
+.j-mozg-dymek-m { display: flex; align-items: center; gap: 7px; color: var(--j-tekst-2); font: 500 11px var(--j-font-mono); letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.j-mozg-dymek-m i { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
+.j-mozg-dymek h3 { margin: 6px 0 2px; color: var(--j-tekst); font: 600 15px/1.3 var(--j-font-ui); display: -webkit-box; overflow: hidden; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.j-mozg-dymek h3 span { color: var(--j-tekst-2); font: 500 12px var(--j-font-mono); }
+.j-mozg-dymek-d { color: var(--j-tekst-3); font: 400 11px var(--j-font-mono); }
+.j-mozg-dymek-s { margin-top: 8px !important; color: var(--j-tresc); font-size: 13px; line-height: 1.5; display: -webkit-box; overflow: hidden; -webkit-line-clamp: 5; -webkit-box-orient: vertical; }
+.j-mozg-dymek-s.is-czeka { color: var(--j-tekst-3); }
+.j-mozg-dymek-h { margin-top: 9px !important; padding-top: 7px; box-shadow: inset 0 1px 0 var(--j-linia); color: var(--j-tekst-3); font: 500 10.5px var(--j-font-mono); letter-spacing: .1em; text-transform: uppercase; }
 /* pływające: wyszukiwarka (wyniki pod polem), karta poziomu */
 .j-mozg-szukaj { position: absolute; z-index: 2; left: 16px; top: 16px; display: flex; flex-direction: column; width: min(380px, calc(100% - 32px)); max-height: calc(100% - 32px);
   background: rgba(14, 15, 19, .82); backdrop-filter: blur(10px); box-shadow: inset 0 0 0 1px var(--j-linia), 0 12px 32px rgba(0, 0, 0, .45); }
@@ -2309,9 +2322,10 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-mozg-wo { grid-column: 1 / -1; display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--j-tresc); font-size: 12.5px; line-height: 1.45; }
 .j-mozg-wr { grid-column: 1 / -1; margin: 10px 0 4px; color: var(--j-tekst-3); font: 500 10.5px var(--j-font-mono); letter-spacing: .14em; text-transform: uppercase; }
 .j-mozg-wiecej { min-height: 32px; margin: 2px 0; padding: 0; border: 0; background: none; color: var(--j-link); font: inherit; font-size: 12.5px; cursor: pointer; }
-/* strona notatki: pasek (Wstecz, miejsce w kolorze części, Edytuj, ×) i kolumna do czytania */
-.j-mozg-strona { position: absolute; inset: 0; z-index: 3; overflow: auto; background: var(--j-stal), var(--j-tlo-pasek); animation: j-mozg-strona .32s var(--j-ease) both; }
-@keyframes j-mozg-strona { from { opacity: 0; transform: translateY(8px); } }
+/* notatka jako panel z prawej (22.11 właściciel: „nie zasłania całego ekranu… pop niewielki z boku”): mapa obok żyje */
+.j-mozg-strona { position: absolute; z-index: 3; top: 12px; right: 12px; bottom: 12px; width: min(480px, calc(100% - 24px)); overflow: auto;
+  background: var(--j-stal), var(--j-tlo-pasek); box-shadow: inset 0 0 0 1px var(--j-linia), 0 18px 48px rgba(0, 0, 0, .55); animation: j-mozg-strona .26s var(--j-ease) both; }
+@keyframes j-mozg-strona { from { opacity: 0; transform: translateX(18px); } }
 .j-mozg-strona-gora { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 4px 8px 4px 20px;
   background: var(--j-tlo-pasek); box-shadow: inset 0 -1px 0 var(--j-linia), inset 0 2px 0 var(--c); }
 .j-mozg-miejsce { display: inline-flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; color: var(--j-tekst-2); font: 500 12px var(--j-font-mono); white-space: nowrap; text-overflow: ellipsis; }
@@ -2319,17 +2333,17 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-mozg-edytuj { margin-left: auto; }
 .j-mozg-strona-gora .j-mozg-x { margin-left: 0; }
 .j-mozg-strona-gora .j-mozg-wstecz + .j-mozg-x, .j-mozg-strona-gora .j-mozg-miejsce + .j-mozg-x { margin-left: auto; }
-.j-mozg-kolumna { max-width: 820px; margin: 0 auto; padding: 28px 32px 64px; }
-.j-mozg-kolumna h1 { margin: 0 0 6px; font: 700 28px/1.2 var(--j-font-naglowek); font-stretch: 125%; color: var(--j-tekst); }
+.j-mozg-kolumna { padding: 20px 24px 40px; }
+.j-mozg-kolumna h1 { margin: 0 0 6px; font: 700 21px/1.25 var(--j-font-naglowek); font-stretch: 115%; color: var(--j-tekst); }
 .j-mozg-kolumna > .j-mozg-wd { display: block; margin: 0 0 18px; white-space: normal; }
 .j-mozg-kto { margin: -10px 0 18px !important; }
-.j-mozg-kolumna .j-md { font-size: 15px; line-height: 1.72; color: var(--j-tresc); }
+.j-mozg-kolumna .j-md { font-size: 14px; line-height: 1.65; color: var(--j-tresc); }
 .j-mozg-kolumna .j-md h1, .j-mozg-kolumna .j-md h2 { font-size: 18px; margin-top: 28px; }
 .j-mozg-kolumna .j-md h3 { font-size: 15.5px; }
 /* „W skrócie” (pierwszy akapit) i zwijane części notatki: nagłówki jak spis, treść dopiero po otwarciu */
 .j-mozg-skrot { margin: 0 0 24px; padding: 16px 20px 14px; background: var(--j-tlo-karta); box-shadow: inset 3px 0 0 var(--c), inset 0 1px 0 var(--j-hi); }
 .j-mozg-skrot h2, .j-mozg-czesci-gora h2 { margin: 0 0 8px; color: var(--j-tekst-3); font: 500 10.5px/16px var(--j-font-mono); letter-spacing: .14em; text-transform: uppercase; }
-.j-mozg-skrot .j-md { font-size: 16px; line-height: 1.65; color: var(--j-tekst); }
+.j-mozg-skrot .j-md { font-size: 14.5px; line-height: 1.6; color: var(--j-tekst); }
 .j-mozg-czesci { margin: 0 0 8px; }
 .j-mozg-czesci-gora { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .j-mozg-czesci-gora h2 span { letter-spacing: 0; }
@@ -2346,7 +2360,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-mozg-obok { margin-top: 36px; padding-top: 16px; box-shadow: inset 0 1px 0 var(--j-linia); }
 .j-mozg-obok h3 { display: flex; gap: 10px; align-items: center; margin: 0 0 8px; color: var(--j-tekst-3); font: 500 10.5px/16px var(--j-font-mono); letter-spacing: .14em; text-transform: uppercase; }
 .j-mozg-obok h3 span { letter-spacing: 0; }
-.j-mozg-obok ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 2px 12px; }
+.j-mozg-obok ul { display: grid; gap: 2px; }
 .j-mozg-x { min-width: 44px; min-height: 44px; border: 0; background: none; color: var(--j-tekst-2); font-size: 22px; cursor: pointer; }
 .j-mozg-x:hover { color: var(--j-tekst); background: var(--j-tlo-hover); }
 /* „Wstecz” (← z podpisem miejsca), wycofane, akcje notatki, uwaga do Jarva i edytor pamięci (wpisy we wnęce) */
@@ -2379,14 +2393,15 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-mozg-pam-licz.is-ponad { color: var(--j-uwaga); }
 .j-mozg-pam-blad { margin: 8px 0; padding: 8px 12px; background: var(--j-uwaga-tlo); box-shadow: inset 2px 0 0 var(--j-uwaga); color: var(--j-tekst); font-size: 13px; line-height: 1.45; }
 .j-mozg-pam .j-mozg-akcje { margin: 12px 0 0; }
-@media (prefers-reduced-motion: reduce) { .j-mozg-strona { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .j-mozg-strona, .j-mozg-dymek { animation: none; } }
 @container app (max-width: 700px) {
   .j-mozg { gap: 0; }
   .j-mozg .j-gora-ikona, .j-mozg .j-gora-opis { display: none; }
   .j-mozg-szukaj { left: 8px; top: 8px; width: calc(100% - 16px); }
   .j-mozg-poziom { left: 8px; bottom: 8px; max-width: calc(100% - 16px); }
+  .j-mozg-strona { inset: 0; width: auto; }
   .j-mozg-kolumna { padding: 20px 16px 48px; }
-  .j-mozg-kolumna h1 { font-size: 22px; }
+  .j-mozg-dymek { display: none; }
   .j-mozg-strona-gora { padding-left: 12px; }
   .j-mozg-miejsce { display: none; }
 }

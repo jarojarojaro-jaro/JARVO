@@ -277,7 +277,7 @@ def test_czesci_grupy_szukanie_i_adresy(tmp_path):
     uk = w["uklad"]
     assert uk["ile"] == uk["unikalne"] == 16 and uk["czesci"] == ["ty", "zespol", "zrodla", "f-inne", "f-Łódź"]
     assert uk["linki"] == 1 and uk["nachodza"] == [] and uk["skonczone"]
-    assert uk["trasa"] == uk["konce"]
+    assert [c for p in uk["trasa"] for c in p] == pytest.approx([c for p in uk["konce"] for c in p])
     assert w["hash"] == "#/mozg?k=zespol&g=agenci%2Fjarvo-web&o=a%20%28b%29" and w["pusty"] == "#/mozg"
     assert w["stan"] == {"z": "", "k": "zespol", "g": "agenci/jarvo-web", "o": "a (b)"}
     assert w["wiki"] == "x [Lekcja A](#h) i N \n## Dalej\nz"

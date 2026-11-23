@@ -1497,18 +1497,22 @@ z tekstem i jakieś edytuj”). Pakiet `mozg` ładuje się dopiero po wejściu w
 - **Kolejność w skupisku grupy** (`mozgKolejnosc`, pierwsza w środku słonecznika): huby, potem sekcje rodzaju jak
   `mozgSekcje` (tożsamość zawsze pierwsza i w stałej kolejności: „Jarvo od A do Z”, kim jest, zasady pracy, zasady
   krytyczne, pamięć Jarva; dalej rodzaje od najliczniejszego, w rodzaju od najnowszej, wycofane na końcu).
-- **Mapa-neuron** (jeden obraz na wszystkich poziomach). Środek: ciało komórki z nazwą źródła (JARVO, KERNEL)
-  i liczbą notatek, obwódka w kolorach części. Każda część to dendryt we własnym kolorze (`--j-barwa-<nr części>`, ten
-  sam w karcie poziomu, w wynikach szukania i na stronie notatki): zwężający się pień od środka do węzła J, z J gałęzie
-  do grup, grupa to skupisko kropek (słonecznik). Wycinek części rośnie z pierwiastkiem liczby notatek; grupy w łukach
-  za J (największa w środku, kolejne rzędy dalej), bez nachodzenia (test). Kropka = notatka (wielkość z liczby
-  linków), wycofana poza archiwum szara; grupy w części na zmianę jaśniejsze i ciemniejsze, żeby skupiska dało się
-  odróżnić. W spoczynku widać tylko kropki i dendryty (22.11 właściciel: „za dużo naraz… koneksje tylko jak się
-  najedzie, normalnie różne kolory”). Włókna = linki bez kierunku (raz na parę) z gradientem od koloru części jednej
-  notatki do drugiej: w grupie łukiem przez jej środek, między grupami przez J, między częściami przez J obu części
-  i pnie przy środku (wiązka, ściśnięcie 0,82, wygładzenie Chaikina); pojawiają się z impulsami dopiero przy najechaniu:
-  na część (jej nazwę albo skupisko) jej włókna, reszta przygasa; na kropkę (na jej poziomie) obwódka, jej włókna
-  i podpis z tytułem i miejscem.
+- **Mapa-neuron** (jeden obraz na wszystkich poziomach). Środek: czarna tarcza ze stalowym pierścieniem, nazwą źródła
+  (JARVO, KERNEL) i liczbą notatek. Wokół, tuż za środkiem, zwarte skupiska kropek: każda część ma wycinek (szerokość
+  z pierwiastka liczby notatek, 80% wycinka na grupy, reszta to przerwa między częściami), grupy w łukach (największa
+  w środku, kolejne rzędy dalej, grupa szersza niż wycinek odsuwa swój rząd), w grupie słonecznik notatek; bez
+  nachodzenia (test). Bez linii do środka (22.11 właściciel: „linie od notatek do środka jak baloniki… męsko, 007…
+  bardziej compacted, tylko lekkie nuty kolorów”). Kropka = notatka (wielkość z liczby linków) w jasnej stali z nutą
+  koloru części (`--j-barwa-<nr części>`, ten sam w karcie poziomu, wynikach szukania i na stronie notatki), wycofana
+  poza archiwum szara, grupy w części na zmianę o ton jaśniejsze i ciemniejsze. Włókna = linki bez kierunku (raz na
+  parę) z gradientem kolorów części: w grupie łukiem przez jej środek, między grupami przez ich środki, między częściami
+  wiązką przez okolice środka (ściśnięcie 0,82, wygładzenie Chaikina); widać je z impulsami tylko przy najechaniu: na
+  część (nazwę albo skupisko, z wejścia) jej włókna, na kropkę na jej poziomie obwódka i jej włókna.
+- **Karta pod kursorem** (`MozgDymek`, HTML nad mapą, 320 px, nie łapie myszy): nad kropką miejsce z kropką koloru
+  części, pełny tytuł (do 3 linii), rodzaj, data i liczba powiązanych, streszczenie do 5 linii (opis z grafu albo
+  pierwszy akapit treści: `/note` albo `/mozg/<klucz>/notatka` po 150 ms, czysty tekst `mozgCzysty`, trzymane w pamięci
+  widoku do zmiany źródła) i „Kliknij, żeby otworzyć”; nad częścią nazwa, liczba, opis i „Kliknij, żeby przybliżyć”.
+  Przy prawym brzegu karta staje po lewej stronie kropki. Telefon: bez karty.
 - **Poziomy to kamera, po kolei** (właściciel: „najpierw klik w sekcję, później w poszczególne”). Na wejściu klik
   w część, jej nazwę albo dowolną jej kropkę: lot (0,9 s, wykładniczo w skali) na część, inne przygasają, nad
   skupiskami nazwy grup. W części klik w grupę, jej nazwę albo jej kropkę: lot na grupę. Kropka otwiera notatkę
@@ -1532,9 +1536,10 @@ z tekstem i jakieś edytuj”). Pakiet `mozg` ładuje się dopiero po wejściu w
   bywa sekcją długiej notatki (`sciezka` = `notatka#Sekcja`, np. mapa Jarva): wiersz „Tytuł: Sekcja”, wybór otwiera
   stronę notatki i przewija do tej sekcji (fokus na jej nagłówku). Combobox z `aria-activedescendant`: strzałki, Enter
   otwiera, Esc czyści.
-- **Strona notatki** (klik w kropkę, w wynik szukania, w link): przykrywa mapę całą szerokością (mapa pod spodem
-  stoi, bez rysowania, i wraca w tym samym kadrze), pasek: „Wstecz”, miejsce z kropką w kolorze części, „Edytuj”, ×;
-  kolumna do czytania (820 px): tytuł, rodzaj, data i liczba powiązanych, potem **„W skrócie”** (pierwszy akapit
+- **Strona notatki** (klik w kropkę, w wynik szukania, w link): panel z prawej (do 480 px, 22.11 właściciel: „nie
+  zasłania całego ekranu… pop niewielki z boku”), mapa obok żyje, a kamera stawia kropkę notatki w środku wolnej
+  części; klik w tło mapy zamyka notatkę, klik w inną kropkę otwiera tamtą. Pasek: „Wstecz”, miejsce z kropką w kolorze
+  części, „Edytuj”, ×; dalej tytuł, rodzaj, data i liczba powiązanych, potem **„W skrócie”** (pierwszy akapit
   notatki, bez treści opis z grafu) i **„W notatce”**: reszta wstępu („Wstęp”, bez sekcji „Cała treść”) i każda sekcja
   „## ” jako zwijana część, zamknięta (właściciel: „krótkie streszczenie, a nie ściana tekstu z góry”; `mozgPodziel`,
   „## ” w bloku kodu to nie sekcja), „Rozwiń wszystko”; treść części rysuje się dopiero po otwarciu. Markdown
