@@ -55,7 +55,8 @@ Build skleja `SOUL.md` + `ZASADY.md` w `SOUL.md` profilu Hermesa i wstawia rdze�
 (tokeny podstawione) idą do `build/wiedza/tozsamosc/` (Jarvo) i `build/wiedza/tozsamosc/agenci/<agent>/`, z których zasiew
 robi notatki tożsamości w skarbcu ([WIEDZA.md §2a](WIEDZA.md)). Walidator (`check_mapa`): profil z `ZASADY.md` ma `MAPA.md`,
 znacznik mapy jest w ZASADY.md (nie w SOUL), sekcje z `SEKCJE`, rdzeń w budżecie. Treść nie dubluje się między SOUL, ZASADY
-i protokołem floty (zasady 8, 11, 16 protokołu już są w prompcie).
+i protokołem floty (zasady 8, 11, 16 protokołu już są w prompcie). Zasada, którą da się opisać jednym zdaniem, stoi
+jednym zdaniem, bez przykładów i historii (decyzja właściciela 23.11; historia idzie do CHANGELOG i bazy).
 
 Profil bez `ZASADY.md` (dawny układ, już nieużywany we flocie): walidator wymaga sekcji `## Misja` i `## Osobowość` oraz
 znacznika `<!-- Jarvo:PROTOCOL -->`; bez znacznika build się zatrzymuje. Nowy profil zakłada `scripts/new-agent.py`
