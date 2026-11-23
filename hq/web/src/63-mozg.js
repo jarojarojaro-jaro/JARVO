@@ -660,8 +660,8 @@ function MozgWidok() {
       tytul=${html`<span class="j-mozg-okruszki">${okruszki.map(([t, h], k) => html`<span key=${k} class="j-mozg-ok">${k > 0 && html`<span class="j-mozg-ok-sep" aria-hidden="true">›</span>`}${k === okruszki.length - 1 && !s.o
         ? html`<span aria-current="page">${t}</span>` : html`<a href=${h}>${t}</a>`}</span>`)}</span>`}
       opis=${dane && `${dane.wezly.length} ${L("notatek", "notes")} · ${dane.linki.length} ${L("połączeń", "links")}`}>
-      ${zrodla.length > 1 && html`<div class="j-mozg-zrodla">${zrodla.map((x) => html`<button key=${x.klucz} type="button"
-        aria-pressed=${x === z} onClick=${() => { location.hash = mozgHash({ z: x.klucz }); }}>${L(x.nazwa, x.nazwa_en)}</button>`)}</div>`}
+      ${zrodla.length > 1 && html`<div class="j-mozg-zrodla">${zrodla.map((x) => html`<button key=${x.klucz} type="button" aria-label=${L(x.nazwa, x.nazwa_en)}
+        aria-pressed=${x === z} onClick=${() => { location.hash = mozgHash({ z: x.klucz }); }}><span class="j-mozg-zr-d">${L(x.nazwa, x.nazwa_en)}</span><span class="j-mozg-zr-k" aria-hidden="true">${x.klucz.toUpperCase()}</span></button>`)}</div>`}
     </${NaglowekWidoku}>
     <div class="j-mozg-cialo">
       <div ref=${pudlo} class="j-mozg-mapa" tabIndex="0" role="img"

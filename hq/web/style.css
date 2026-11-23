@@ -2289,6 +2289,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-mozg-zrodla { align-self: stretch; display: flex; gap: 1px; background: var(--j-rowek); padding-left: 2px; }
 .j-mozg-zrodla button { padding: 0 14px; border: 0; background: var(--j-tlo-pasek); color: var(--j-tekst-2); font: 500 12px var(--j-font-ui); cursor: pointer; }
 .j-mozg-zrodla button[aria-pressed="true"] { background: var(--j-tlo-3); color: var(--j-tekst); box-shadow: inset 0 -2px 0 var(--j-akcent); }
+.j-mozg-zr-k { display: none; }   /* krótka nazwa źródła (JARVO, KERNEL) tylko na telefonie */
 .jarvo-app .j-mozg [tabindex="-1"]:focus-visible, .j-mozg [tabindex="-1"]:focus { outline: none !important; }   /* fokus z kodu (nagłówek poziomu, notatka) */
 /* obszar mapy: czerń z delikatną winietą, kursor rączki; napisy i kropki rysuje 63-mozg-neuron.js */
 .j-mozg-cialo { position: relative; min-height: 0; overflow: hidden; background: #000; box-shadow: inset 0 0 0 1px var(--j-linia); }
@@ -2421,7 +2422,9 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   .j-mozg-ok:not(:last-child), .j-mozg-ok-sep { display: none; }
   .j-mozg-ok:last-child > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .j-mozg-zrodla { flex: none; }
-  .j-mozg-zrodla button { padding: 0 10px; white-space: nowrap; font-size: 11.5px; }
+  .j-mozg-zrodla button { padding: 0 12px; white-space: nowrap; font: 600 11px var(--j-font-mono); letter-spacing: .1em; }
+  .j-mozg-zr-d { display: none; }
+  .j-mozg-zr-k { display: inline; }
   .j-mozg-strona { inset: 0; width: auto; }
   .j-mozg-kolumna { padding: 20px 16px 48px; }
   .j-mozg-dymek { display: none; }

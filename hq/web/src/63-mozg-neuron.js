@@ -413,14 +413,18 @@ function utworzNeuron(pudlo, o) {
     }
     // tytuły notatek: od przybliżenia ×3, najważniejsze w kadrze, bez nachodzenia
     if (z > 3) {
-      const kand = u.kropki.filter((k) => { const [x, y] = ekran(k.x, k.y); return x > 0 && x < W - 40 && y > 10 && y < H - 10 && (stan.fok < 0 || k.p === stan.fok); })
+      const kand = u.kropki.filter((k) => { const [x, y] = ekran(k.x, k.y); return x > 0 && x < W - (waski() ? 100 : 40) && y > 10 && y < H - 10 && (stan.fok < 0 || k.p === stan.fok); })
         .sort((a, b) => b.waga - a.waga);
       let n = 0;
+      const fT = `500 12px ${font}`, maks = waski() ? 10 : NEURON.maksNapisow;
+      x2.font = fT;
       for (const k of kand) {
-        if (n >= NEURON.maksNapisow) break;
-        const [x, y] = ekran(k.x, k.y), t = o.tytul(k.n), tx = x + Math.max(6, k.r * kam.k) + 4;
-        const zn = Math.min(42, Math.max(10, Math.floor((W - tx - 8) / 6.2)));   // telefon: tytuł kończy się przed brzegiem
-        if (napis(t.length > zn ? t.slice(0, zn - 2) + "…" : t, tx, y + 4, { font: `500 12px ${font}`, kolor: m.tekst2, cel: { notatka: k.id } })) n++;
+        if (n >= maks) break;
+        const [x, y] = ekran(k.x, k.y), tx = x + Math.max(6, k.r * kam.k) + 4, miejsce = Math.min(300, W - tx - 8);
+        // tytuł kończy się przed brzegiem ekranu (telefon: wcześniej był ucięty w pół słowa za krawędzią)
+        let t = o.tytul(k.n);
+        if (x2.measureText(t).width > miejsce) { while (t.length > 4 && x2.measureText(t + "…").width > miejsce) t = t.slice(0, -1); t = t.trimEnd() + "…"; }
+        if (napis(t, tx, y + 4, { font: fT, kolor: m.tekst2, cel: { notatka: k.id } })) n++;
       }
     }
   }
