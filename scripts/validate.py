@@ -1084,6 +1084,23 @@ def check_nakladka(fleet: fl.Fleet, r: Report) -> None:
             r.err(f"{a.name}: brak ataku red teamu w nakładce ({fl.NAKLADKA_REDTEAM.as_posix()}, scripts/redteam.sh)")
 
 
+# Mała poprawka = jedno zdanie w CHANGELOG (właściciel 23.11: „nie 5-stronicowy paragraf na małą poprawkę”). Wpis
+# „## Niewydane” do 300 znaków; starsze długie wpisy zostają (zapadka: ich liczba może tylko maleć).
+CHANGELOG_MAKS = 300
+CHANGELOG_DLUGIE = {"jarvo": 145, "jarvo-ads": 25, "jarvo-lowca": 28, "jarvo-mobile": 28, "jarvo-reka": 23,
+                    "jarvo-sherlock": 29, "jarvo-studio": 29, "jarvo-web": 48, "jarvo-wideo": 130}
+
+
+def check_changelog_zwiezly(r: Report) -> None:
+    for plik in sorted((fl.REPO_ROOT / "profiles").glob("*/CHANGELOG.md")):
+        tekst = plik.read_text(encoding="utf-8")
+        m = re.search(r"^## Niewydane\n(.*?)(?=^## |\Z)", tekst, re.M | re.S)
+        dlugie = [l for l in (m[1].splitlines() if m else []) if l.startswith("- ") and len(l) > CHANGELOG_MAKS]
+        if len(dlugie) > CHANGELOG_DLUGIE.get(plik.parent.name, 0):
+            r.err(f"{w_repo(plik)}: wpis „Niewydane” dłuższy niż {CHANGELOG_MAKS} znaków: mała poprawka = jedno zdanie "
+                  f"(„{dlugie[0][:60]}…”)")
+
+
 def run(nakladka: Path | None = None) -> Report:
     """Walidacja publicznego repo; z `nakladka` także agentów nakładki prywatnej (na flocie połączonej: uchwyty,
     marki, kanarki i nazwy sprawdzane razem), a dokumenty repo dalej tylko z agentami repo."""
@@ -1116,6 +1133,7 @@ def run(nakladka: Path | None = None) -> Report:
     check_calibration(r)
     check_hq(r)
     check_bez_base(r)
+    check_changelog_zwiezly(r)
     check_docs(publiczna, r)
     check_scripts(r)
     check_secrets(r)
