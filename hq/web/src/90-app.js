@@ -302,7 +302,7 @@ function AplikacjaJarvo() {
   const got = useSklep((s) => s.gotowosc);
   const poznanie = useSklep((s) => s.poznanie);
   const korzen = useRef(null), uklad = useRef(null);
-  useWidokTelefonu(korzen);
+  useWidokTelefonu();
   useSkrotyAplikacji();
   useNowaWersja();
   useStanAktualizacji();

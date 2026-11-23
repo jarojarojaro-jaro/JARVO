@@ -1,7 +1,7 @@
 // Motyw aplikacji (docs/HQ.md „Aplikacja”): wybór jasny / ciemny / system; na korzeniu `data-motyw` ma zawsze wynik
 // (jasny albo ciemny), a tokeny kolorów (--j-*, oba motywy, kontrast sprawdza tests/test_hq_front.py) są w style.css.
-// Do tego wysokość widoku na telefonie: iOS Safari nie zmniejsza strony pod klawiaturą, więc --j-vh i --j-klawiatura
-// liczymy z visualViewport (kompozytor zostaje nad klawiaturą).
+// Do tego widok na telefonie: iOS Safari nie zmniejsza strony pod klawiaturą, więc wysokość (--j-vh) i górę (--j-vtop)
+// aplikacji liczymy z visualViewport (kompozytor zostaje nad klawiaturą, góra przy górze ekranu).
 
 const Motyw = {
   WYBORY: ["ciemny", "jasny", "system"],   // TARS: ciemny pierwszy (domyślny), jasny = ten sam monolit w świetle dnia
@@ -18,16 +18,19 @@ function useMotyw(wybor) {
   return Motyw.rozwiaz(wybor, ciemny);
 }
 
-function useWidokTelefonu(ref) {
+// zmienne na <html>, nie na korzeniu: korzeń aplikacji montuje się na nowo (ekran poznania, rozmowy), a wartości dziedziczy
+function useWidokTelefonu() {
   useEffect(() => {
-    const vv = window.visualViewport, el = ref.current;
-    if (!vv || !el) return undefined;
+    const vv = window.visualViewport, el = document.documentElement;
+    if (!vv) return undefined;
     let ramka = 0;
+    // iPhone z klawiaturą przesuwa widoczny obszar (offsetTop > 0) nad przypiętą aplikacją: bez `--j-vtop` jej góra
+    // zostawała nad ekranem, a widać było dół i pustkę (23.11 właściciel: „klikam pole i pokazuje blank ekran”)
     const licz = () => {
       cancelAnimationFrame(ramka);
       ramka = requestAnimationFrame(() => {
         el.style.setProperty("--j-vh", `${Math.round(vv.height)}px`);
-        el.style.setProperty("--j-klawiatura", `${Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop))}px`);
+        el.style.setProperty("--j-vtop", `${Math.max(0, Math.round(vv.offsetTop))}px`);
       });
     };
     licz();

@@ -997,7 +997,8 @@ Obecność agentów w pasku i karty kanbana w rozmowie to etap 4, widok nadzoru 
 innych kanałów etap 6.
 
 - **Układ.** Korzeń `.jarvo-app` z `data-jarvo-korzen` leży nad dashboardem (`position: fixed`, `z-index: 60`,
-  wysokość `--j-vh` z `visualViewport` na telefonie) i jest kontenerem zapytań (`container: app`). Siatka
+  wysokość `--j-vh` i góra `--j-vtop` z `visualViewport` na `<html>`, więc z klawiaturą iPhone'a aplikacja zostaje
+  w widocznym obszarze) i jest kontenerem zapytań (`container: app`). Siatka
   `.j-uklad`: pasek 280 px (do 1279 px: 248 px, zwijany Ctrl/⌘+Shift+S) i główna kolumna z nagłówkiem (tytuł wątku).
   Poniżej 1024 px pasek wysuwa się z lewej (przycisk menu w nagłówku; zamyka go zasłona, ✕ albo wybór wątku), poniżej
   640 px szuflada zajmuje cały ekran: lista sekcji, potem sekcja z **Wróć**; cele dotyku ≥ 40 px. Pod szufladą
