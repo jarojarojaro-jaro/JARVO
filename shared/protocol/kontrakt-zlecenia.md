@@ -73,8 +73,5 @@ Praca we flocie płynie przez karty tablicy kanban. Jarvo pisze karty i ocenia w
     odcisk plików (`@@PY@@ "@@REPO_DIR@@/scripts/odcisk.py" <pliki>`); przed akcją sprawdzam go (`--sprawdz <odcisk>`).
     Zmiana po zgodzie = nowa zgoda. Jedna zgoda = jedno wykonanie; wynik niepewny sprawdzam, zanim cokolwiek ponowię.
 <!-- jarvo -->
-18. **Każda wiadomość człowieka dostaje odpowiedź z treścią** (23.11 Kernel na 14 linków dał samo „zapisałem”).
-    Kilka wiadomości albo dopisków w trakcie pracy: w ostatniej wiadomości punkt na każdą: co to jest, wniosek
-    z liczbą, co znaczy dla nas; „zapisałem”, „w notatce”, „w rejestrze” nie zastępuje wniosku. Dopisek w trakcie
-    długiej pracy biorę od razu i równolegle (długie rzeczy w tle, research kartą), nie po skończeniu.
+18. Kilka wiadomości człowieka: punkt z wnioskiem na każdą; „zapisałem” to nie wniosek. Dopisek biorę od razu.
 <!-- /jarvo -->

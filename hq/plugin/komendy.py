@@ -1050,6 +1050,9 @@ def dolacz(router, *, m, trasy, silnik: Callable[[], Any], agenci, hub, log: Cal
         klucz: str = Field(..., pattern=trasy.KLUCZ_WZOR)
         watek: str | None = None
         agent: str | None = Field(None, max_length=64)
+        # wybór w stopce (model, wysiłek, tryb szybki): bez wpisu w rozmowie, stan pokazuje sama stopka (23.11 właściciel:
+        # „to usuwamy z interfejsu, że się pokazuje zmiana effortu”); odmowa wraca w odpowiedzi trasy
+        cicho: bool = False
 
     w_locie: dict[tuple, asyncio.Future] = {}          # (wątek, klucz) → wykonanie komendy w toku
 
@@ -1129,7 +1132,8 @@ def dolacz(router, *, m, trasy, silnik: Callable[[], Any], agenci, hub, log: Cal
                 wynik = blad(f"Brama Hermesa nie odpowiedziała ({e.kod}).", f"The Hermes gateway did not answer ({e.kod}).")
             dane = {"typ": "komenda", "polecenie": polecenie, "agent": k.agent, **wynik.dane()}
             log(f"jarvo-hq: komenda /{nazwa} {k.agent} ({k.zaplecze}) → {'ok' if wynik.ok else 'odmowa'}")
-            if not k.watek:
+            cicha = body.cicho and getattr(_PANEL.get(nazwa), "nazwa", "") in ("model", "effort", "fast")
+            if not k.watek or cicha:
                 return {"wynik": {**wynik.dane(), "polecenie": polecenie, "agent": k.agent}, "wpis": None}
             wid = k.watek["id"]
             w = sil.db.dodaj_wpis(wid, rodzaj="system", tekst=polecenie, dane=dane, klucz=body.klucz)

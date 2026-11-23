@@ -38,10 +38,11 @@ const Komendy = (() => {
     }
     return out.slice(0, MENU_MAKS);
   }
-  // POST /komendy; wpis wyniku od razu na osi (strumień przyniesie ten sam wpis, Os.osWpis podmienia po id)
-  async function wykonaj({ watek = null, agent = null, tekst }) {
+  // POST /komendy; wpis wyniku od razu na osi (strumień przyniesie ten sam wpis, Os.osWpis podmienia po id); `cicho`
+  // (stopka: model, wysiłek, tryb szybki) = bez wpisu w rozmowie
+  async function wykonaj({ watek = null, agent = null, tekst, cicho = false }) {
     const klucz = Pisanie.klucz(crypto.getRandomValues(new Uint8Array(16)));
-    const odp = await api.komendy.wykonaj({ tekst, klucz, watek, agent });
+    const odp = await api.komendy.wykonaj({ tekst, klucz, watek, agent, ...(cicho ? { cicho } : {}) });
     if (watek && odp && odp.wpis) {
       sklep.ustaw((s) => (s.os[watek] ? { ...s, os: { ...s.os, [watek]: Os.osWpis(s.os[watek], odp.wpis) } } : s));
     }
