@@ -328,6 +328,7 @@ def test_omp_effort_i_fast_w_model_json(tmp_path, monkeypatch):
     assert run("/fast off")["ok"] and M.omp_sesje.opcje_skrzynki(w) == {"myslenie": "high", "fast": False}
     o = asyncio.run(wyk.opcje(k))
     assert o["poziomy"] == ["off", "low", "high", "max"] and o["modele"][0]["biezacy"]
+    assert o["grupy"] == [{"slug": "anthropic", "nazwa": "Claude", "rodzaj": "subskrypcja"}]   # wybierak dzieli na subskrypcje
 
 
 def test_licznik_i_context_hermes(swiat):

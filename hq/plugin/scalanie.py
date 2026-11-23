@@ -402,8 +402,9 @@ def pozycje_omp(r: Mapping, os_: Mapping) -> list[dict]:
                  "verb_en": str(k.get("nazwa") or "?"), "detail": str(k.get("intencja") or "")[:140], "czas_ms": None,
                  "blad": False, "podglad": "", "ref": ref_kroku("o", k.get("wpis"), k.get("id"))}
                 for k in e.get("kroki") or []], **wsp))
-        elif typ == "streszczenie":
-            out.append(_pozycja(rodzaj="kompresja", tekst="Streszczenie wcześniejszej rozmowy", **wsp))
+        elif typ == "streszczenie":                  # z liczbą tokenów przed i po (/compact w terminalu albo panelu)
+            out.append(_pozycja(rodzaj="kompresja", tekst="Streszczenie wcześniejszej rozmowy",
+                                tokeny={"przed": int(e.get("przed") or 0), "po": int(e.get("po") or 0)}, **wsp))
     return out
 
 

@@ -78,7 +78,8 @@ def _skrot(e: dict) -> dict | None:
     """Skrócony wpis osi z wpisu sesji (None = niewidoczny, ale zostaje w drzewie)."""
     typ, czas = e.get("type"), e.get("timestamp")
     if typ == "compaction":
-        return {"typ": "streszczenie", "czas": czas, "tekst": str(e.get("shortSummary") or "")[:2000]}
+        return {"typ": "streszczenie", "czas": czas, "tekst": str(e.get("shortSummary") or "")[:2000],
+                "przed": int(e.get("tokensBefore") or 0), "po": int(e.get("tokensAfter") or 0)}
     if typ != "message":
         return None
     m = e.get("message") or {}

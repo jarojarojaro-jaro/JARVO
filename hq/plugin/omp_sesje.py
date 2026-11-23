@@ -51,9 +51,11 @@ Kontrakt dla panelu (CentrumUI; wszystko synchroniczne i szybkie, wołać w wąt
                                               czeka na jej koniec (compact w omp przerywa trwającą turę)
     wynik_komendy(wpis, klucz) -> dict        {stan: kolejka|pracuje|gotowe|blad|brak, wynik, blad}
     licznik(wpis) -> dict                     {model, kontekst, okno, procent, wejscie, wyjscie, cache_odczyt,
-                                              cache_zapis, koszt, koszt_dzis, czas, myslenie, fast}: na żywo od
-                                              skrzynki, bez niej z pliku sesji (przyrostowo); okno bez skrzynki
-                                              uzupełnia panel z katalogu `omp models --json` (komendy.py)
+                                              cache_zapis, koszt, koszt_dzis, czas, myslenie, fast, kompresja}: na żywo
+                                              od skrzynki, bez niej z pliku sesji (przyrostowo); kompresja, zmiana
+                                              myślenia, trybu szybkiego i modelu z terminala też z pliku (kompresja =
+                                              {przed, po, czas}); okno bez skrzynki uzupełnia panel z katalogu
+                                              `omp models --json` (komendy.py)
     plik_sesji(wpis) -> Path | None           plik *.jsonl sesji (oś: czytnik_omp.os_sesji)
     model_skrzynki(wpis) -> str               model z `/model` w panelu (`<skrzynka>/model.json`), "" = z `omp_arg`
     ustaw_model_skrzynki(wpis, model|None)    zapis albo usunięcie wyboru; argumenty_tury(wpis) wstawia go do tury
@@ -94,7 +96,8 @@ PLIK_LICZNIKA, PLIK_ZATRZYMAJ, PLIK_ZWOLNIJ, BUDZIK = "licznik.json", "zatrzymaj
 # komendy panelu, które skrzynka wykonuje przez RPC omp (jarvo/sesje_omp.py): nazwa → (opis, aliasy)
 KOMENDY = {"compact": ("Skompresuj kontekst sesji; po spacji możesz dodać, na czym się skupić", ("compress",))}
 LICZNIK_PUSTY = {"model": "", "kontekst": 0, "okno": 0, "procent": 0.0, "wejscie": 0, "wyjscie": 0, "cache_odczyt": 0,
-                 "cache_zapis": 0, "koszt": 0.0, "koszt_dzis": 0.0, "czas": None, "myslenie": "", "fast": None}
+                 "cache_zapis": 0, "koszt": 0.0, "koszt_dzis": 0.0, "czas": None, "myslenie": "", "fast": None,
+                 "kompresja": None}
 MYSLENIE = ("off", "minimal", "low", "medium", "high", "xhigh", "max")   # ThinkingLevel omp (omp://rpc.md)
 # podsumowanie pliku sesji czytane przyrostowo (panel pyta co 2 s, plik ma setki MB i rośnie w trakcie tury):
 # ścieżka → {ino, od (bajt po ostatniej pełnej linii), wynik, dni {data: koszt}}
@@ -403,7 +406,45 @@ def argumenty_tury(w: Wpis) -> list[str]:
 
 def _podsumowanie_puste() -> dict:
     return {"model": "", "dostawca": "", "odpowiedzi": 0, "wejscie": 0, "wyjscie": 0, "cache_odczyt": 0,
-            "cache_zapis": 0, "koszt": 0.0, "kontekst": 0}
+            "cache_zapis": 0, "koszt": 0.0, "kontekst": 0, "myslenie_sesji": "", "myslenie_czas": 0.0,
+            "fast_sesji": None, "fast_czas": 0.0, "kompresja": None}
+
+
+def _epoka(kiedy) -> float:
+    try:
+        return datetime.datetime.fromisoformat(str(kiedy).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return 0.0
+
+
+# wpisy sesji, które zmieniają stan bez odpowiedzi modelu (terminal: /compact, /model, Shift+Tab myślenie, /fast);
+# krótkie poza kompresją (ta niesie całe streszczenie, ale zdarza się raz na wiele godzin)
+_ZMIANY = (b'{"type":"compaction"', b'{"type":"thinking_level_change"', b'{"type":"service_tier_change"',
+           b'{"type":"model_change"')
+
+
+def _zmiana(s: dict, linia: bytes) -> None:
+    """Kompresja ustawia kontekst na `tokensAfter` (panel po /compact w terminalu od razu pokazuje mniejszy
+    kontekst, 23.11 właściciel: „zrobiłem compact, a w interfejsie się nie zupdatowało”), zmiana myślenia, trybu
+    szybkiego (`serviceTier` priority) i modelu zapisuje stan sesji z czasem (licznik waży go z wyborem panelu)."""
+    try:
+        e = json.loads(linia)
+    except ValueError:
+        return
+    if not isinstance(e, dict):
+        return
+    w, typ, czas = s["wynik"], e.get("type"), _epoka(e.get("timestamp"))
+    if typ == "compaction":
+        po, przed = _liczba(e, "tokensAfter"), _liczba(e, "tokensBefore")
+        if po:
+            w["kontekst"] = po
+        w["kompresja"] = {"przed": przed, "po": po, "czas": czas}
+    elif typ == "thinking_level_change" and str(e.get("thinkingLevel") or "") in MYSLENIE:
+        w["myslenie_sesji"], w["myslenie_czas"] = str(e["thinkingLevel"]), czas
+    elif typ == "service_tier_change":
+        w["fast_sesji"], w["fast_czas"] = e.get("serviceTier") == "priority", czas
+    elif typ == "model_change" and e.get("model"):
+        w["model"], w["dostawca"] = str(e["model"]), ""
 
 
 _DEKODER = json.JSONDecoder()
@@ -424,6 +465,9 @@ def _dolicz(s: dict, linia: bytes) -> None:
     zwarty JSON: wtedy bez parsowania całej linii (treść odpowiedzi bywa duża): `usage` to ostatni taki klucz w linii,
     przed nim `model` i `provider` wiadomości, a `timestamp` wpisu stoi na początku linii (przed `message`). Linia ze
     spacjami po dwukropkach (inny zapis) idzie przez pełny `json.loads`."""
+    if linia.startswith(_ZMIANY):
+        _zmiana(s, linia)
+        return
     if linia.startswith(b'{"type": "message"'):
         try:
             e = json.loads(linia)
@@ -814,9 +858,28 @@ def licznik(w: Wpis) -> dict:
             for k_ in ("wejscie", "wyjscie", "cache_odczyt", "cache_zapis", "koszt"):
                 wynik[k_] = max(wynik.get(k_) or 0, round(p[k_], 6) if k_ == "koszt" else p[k_])
             wynik["koszt_dzis"] = round(p["koszt_dzis"], 6)
-        o = opcje_skrzynki(w)                       # wybór panelu, potem stan procesu skrzynki, potem `omp_arg`
-        wynik["myslenie"] = o["myslenie"] or str(zapis.get("myslenie") or "") or myslenie_z_argumentow(w.omp_arg)
-        wynik["fast"] = o["fast"] if o["fast"] is not None else (zapis.get("fast") if isinstance(zapis.get("fast"), bool) else None)
+            k = p["kompresja"]
+            if k:
+                wynik["kompresja"] = dict(k)
+                if k["czas"] > t_zapisu and k["po"]:   # kompresja nowsza niż zapis skrzynki: kontekst z pliku
+                    wynik["kontekst"] = p["kontekst"]
+        # myślenie i tryb szybki: nowszy z dwóch, wybór panelu (model.json, działa od następnej tury skrzynki) albo
+        # zmiana zapisana w sesji (terminal albo skrzynka po zastosowaniu wyboru); potem proces skrzynki i `omp_arg`
+        o = opcje_skrzynki(w)
+        try:
+            t_wyboru = (w.skrzynka / PLIK_MODELU).stat().st_mtime
+        except OSError:
+            t_wyboru = 0.0
+        ms, ms_t = (p["myslenie_sesji"], p["myslenie_czas"]) if p else ("", 0.0)
+        fs, fs_t = (p["fast_sesji"], p["fast_czas"]) if p else (None, 0.0)
+        wynik["myslenie"] = (o["myslenie"] if o["myslenie"] and (not ms or t_wyboru >= ms_t) else ms) \
+            or str(zapis.get("myslenie") or "") or myslenie_z_argumentow(w.omp_arg)
+        if o["fast"] is not None and (fs is None or t_wyboru >= fs_t):
+            wynik["fast"] = o["fast"]
+        elif fs is not None:
+            wynik["fast"] = fs
+        else:
+            wynik["fast"] = zapis.get("fast") if isinstance(zapis.get("fast"), bool) else None
         okno = int(wynik.get("okno") or 0)
         wynik["procent"] = round(int(wynik.get("kontekst") or 0) * 100 / okno, 1) if okno else 0.0
         return wynik

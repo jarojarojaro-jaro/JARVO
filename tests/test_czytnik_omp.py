@@ -44,7 +44,7 @@ def sesja(tmp_path):
         msg("r2", "a2", "toolResult", [{"type": "text", "text": "SEKRET"}]),
         msg("x1", "r2", "assistant", [{"type": "text", "text": "porzucona gałąź"}]),
         {"type": "compaction", "id": "c9", "parentId": "r2", "timestamp": "t", "shortSummary": "streszczenie",
-         "summary": "długie SEKRET"},
+         "summary": "długie SEKRET", "tokensBefore": 611035, "tokensAfter": 43506},
         msg("a3", "c9", "assistant", [{"type": "text", "text": "Plan: restart bramy. [[czeka-na-tak]]"}]),
         msg("u2", "a3", "user", [{"type": "text", "text": "tak z terminala"}]),
     ])
@@ -55,7 +55,8 @@ def test_os_aktywnej_galezi_bez_wynikow_narzedzi(tmp_path):
     o = cz.os_sesji(sesja(tmp_path))
     assert o["blad"] is None and o["pelny"] is True and o["sesja"] == "01a13b13"
     assert [w["typ"] for w in o["wpisy"]] == ["uzytkownik", "kroki", "streszczenie", "asystent", "uzytkownik"]
-    u, kroki, _s, a, t = o["wpisy"]
+    u, kroki, s, a, t = o["wpisy"]
+    assert (s["przed"], s["po"]) == (611035, 43506)               # panel pisze „611k → 44k”
     assert u["zrodlo"] == "panel" and u["tekst"] == "sprawdź GPU\n\nlink"
     assert kroki["kroki"] == [{"nazwa": "bash", "intencja": "Sprawdzam GPU", "id": "c1", "wpis": "a1"},
                               {"nazwa": "read", "intencja": "Czytam log", "id": "c2", "wpis": "a2"}]

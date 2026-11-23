@@ -4,6 +4,7 @@ steer wraca, /compact, licznik, bezczynny proces się zamyka, terminal prosi o s
 skrzynki w trakcie tury, polecenie `jarvo sesja`."""
 from __future__ import annotations
 
+import datetime
 import io
 import json
 import os
@@ -288,6 +289,31 @@ def test_licznik_z_pliku_sesji(w, at):
     assert (lic["kontekst"], lic["okno"], lic["procent"], round(lic["koszt"], 2)) == (1050, 200000, 0.5, 0.01)
     (w.skrzynka / om.PLIK_LICZNIKA).write_text("zepsuty")
     assert om.licznik(w)["kontekst"] == 1050
+
+
+def test_licznik_po_compact_i_zmianach_z_terminala(w, at):
+    """23.11 właściciel: „zrobiłem compact, a w interfejsie się nie zupdatowało”. Kompresja, poziom myślenia i tryb
+    szybki zmienione w terminalu (wpisy `compaction`, `thinking_level_change`, `service_tier_change` w pliku sesji)
+    licznik pokazuje od razu, bez nowej odpowiedzi modelu; nowszy wybór panelu (model.json) wygrywa z tym z pliku."""
+    om.wyslij(w, "x", "k1")
+    so.skrzynka(w, Telegram())
+    (w.skrzynka / om.PLIK_LICZNIKA).unlink()
+    teraz = datetime.datetime.now(datetime.timezone.utc)
+    iso = lambda s: (teraz + datetime.timedelta(seconds=s)).isoformat().replace("+00:00", "Z")  # noqa: E731
+    wpisy = [{"type": "compaction", "id": "c1", "parentId": None, "timestamp": iso(-60), "summary": "…",
+              "shortSummary": "Remote compaction", "tokensBefore": 611035, "tokensAfter": 43506},
+             {"type": "thinking_level_change", "id": "t1", "parentId": "c1", "timestamp": iso(-50), "thinkingLevel": "xhigh"},
+             {"type": "service_tier_change", "id": "s1", "parentId": "t1", "timestamp": iso(-40), "serviceTier": "priority"}]
+    with om.plik_sesji(w).open("a", encoding="utf-8") as f:
+        f.write("".join(json.dumps(e, separators=(",", ":")) + "\n" for e in wpisy))
+    lic = om.licznik(w)
+    assert (lic["kontekst"], lic["myslenie"], lic["fast"]) == (43506, "xhigh", True)
+    assert lic["kompresja"]["przed"] == 611035 and lic["kompresja"]["po"] == 43506
+    om.ustaw_opcje_skrzynki(w, myslenie="low", fast=False)              # wybór panelu po zmianach w terminalu
+    assert (om.licznik(w)["myslenie"], om.licznik(w)["fast"]) == ("low", False)
+    stary = teraz.timestamp() - 3600
+    os.utime(w.skrzynka / om.PLIK_MODELU, (stary, stary))               # wybór sprzed zmian w terminalu
+    assert (om.licznik(w)["myslenie"], om.licznik(w)["fast"]) == ("xhigh", True)
 
 
 def test_opcje_panelu_w_procesie_rpc_i_liczniku(w, at):

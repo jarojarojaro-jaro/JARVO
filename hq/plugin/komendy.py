@@ -76,6 +76,17 @@ OKNO_PAMIEC_S = 600.0            # okno kontekstu modelu pamiętane 10 min (meta
 KATALOG_OMP_S = 6 * 3600.0       # katalog modeli omp (okna, poziomy myślenia) odświeżany co 6 h, w tle
 LICZNIK_ZERO = {"model": "", "kontekst": 0, "okno": 0, "procent": 0.0, "wejscie": 0, "wyjscie": 0, "cache_odczyt": 0,
                 "cache_zapis": 0, "koszt": 0.0, "koszt_dzis": 0.0, "czas": 0.0}
+# dostawcy modeli w wybieraku stopki (23.11 właściciel: „modele mają być podzielone na subskrypcje”): slug →
+# (nazwa, rodzaj: subskrypcja = w cenie abonamentu, klucz = płatne za tokeny); nieznany slug: nazwa z bramy,
+# rodzaj po końcówce `-api`
+DOSTAWCY_OPIS = {
+    "anthropic": ("Claude", "subskrypcja"), "anthropic-api": ("Anthropic API", "klucz"),
+    "commandcode": ("Command Code", "subskrypcja"), "openai-codex": ("ChatGPT", "subskrypcja"),
+    "google-antigravity": ("Antigravity", "subskrypcja"), "google-gemini-cli": ("Gemini CLI", "subskrypcja"),
+    "openrouter": ("OpenRouter", "klucz"), "openai": ("OpenAI API", "klucz"), "deepseek": ("DeepSeek API", "klucz"),
+    "xai": ("xAI API", "klucz"), "gemini": ("Gemini API", "klucz"),
+}
+_DATOWANY = re.compile(r"-\d{8}$")
 
 
 def parsuj(tekst: str) -> tuple[str, str] | None:
@@ -502,7 +513,8 @@ class Wykonawca:
                 out["procent"] = round(100.0 * int(out["kontekst"]) / out["okno"], 1) if out["okno"] else 0.0
             return {**out, "wysilek": str(d.get("myslenie") or ""),
                     "fast": d.get("fast") if isinstance(d.get("fast"), bool) else None,
-                    "fast_dostepny": True, "zaplecze": "omp", "szacunek": False}
+                    "fast_dostepny": True, "zaplecze": "omp", "szacunek": False,
+                    "kompresja": d.get("kompresja") if isinstance(d.get("kompresja"), dict) else None}
         wid = k.watek["id"] if k.watek else None
         wybrany = k.sil.db.model_czlonka(wid, k.agent) if wid else None
         klucz_okna = (k.agent, (wybrany or {}).get("model"), (wybrany or {}).get("provider"))
@@ -628,30 +640,44 @@ class Wykonawca:
 
     async def opcje(self, k: Kontekst) -> dict:
         """Stopka rozmowy po kliknięciu (`GET /rozmowy/{id}/opcje`): modele do wyboru (Hermes: dostawcy bramy, omp:
-        katalog omp), poziomy wysiłku, bieżący wysiłek i tryb szybki. Wybór wykonuje panel komendą (`/model`,
-        `/effort`, `/fast`), więc zostaje ślad w rozmowie jak w terminalu."""
+        cały katalog omp), poziomy wysiłku, bieżący wysiłek i tryb szybki. Model niesie `grupa` (slug dostawcy), a
+        `grupy` opisują dostawców jako subskrypcje albo klucze API (wybierak modeli dzieli listę na nie). Wybór
+        wykonuje panel komendą (`/model`, `/effort`, `/fast`), więc zostaje ślad w rozmowie jak w terminalu."""
         d = await self.licznik(k)
         modele: list[dict] = []
+        nazwy: dict[str, str] = {}
         if k.zaplecze == "omp":
             if not self.katalog_omp():
                 await asyncio.to_thread(self._czytaj_katalog_omp)
-            grupy: dict[str, list[dict]] = {}
-            for x in self.katalog_omp().values():
-                grupy.setdefault(x.get("provider") or "", []).append(x)
-            for lista in list(grupy.values())[:DOSTAWCY_MAKS]:
-                modele += [{"model": x["model"], "provider": "", "nazwa": x.get("nazwa") or x["model"],
-                            "biezacy": x["model"] == d["model"]} for x in lista[:MODELE_NA_DOSTAWCE]]
+            kat = self.katalog_omp()
+            for x in kat.values():
+                id_ = x["model"].split("/", 1)[-1]
+                if _DATOWANY.search(id_) and f"{x['provider']}/{_DATOWANY.sub('', id_)}" in kat:
+                    continue                          # „claude-haiku-4-5-20251001” obok „claude-haiku-4-5”: dubel
+                modele.append({"model": x["model"], "provider": "", "grupa": x.get("provider") or "",
+                               "nazwa": x.get("nazwa") or x["model"], "okno": int(x.get("okno") or 0),
+                               "myslenie": bool(x.get("myslenie")), "biezacy": x["model"] == d["model"]})
             if d["model"] and not any(x["biezacy"] for x in modele):
-                modele.insert(0, {"model": d["model"], "provider": "", "biezacy": True,
-                                  "nazwa": self.model_omp(d["model"]).get("nazwa") or d["model"]})
+                m = self.model_omp(d["model"])
+                modele.insert(0, {"model": d["model"], "provider": "", "grupa": d["model"].split("/", 1)[0],
+                                  "nazwa": m.get("nazwa") or d["model"], "okno": int(m.get("okno") or 0),
+                                  "myslenie": bool(m.get("myslenie")), "biezacy": True})
         else:
             try:
                 for dost in dostawcy_bramy(await k.sil.brama.opcje_modeli(k.agent))[:DOSTAWCY_MAKS]:
-                    modele += [{"model": mm, "provider": dost["slug"], "nazwa": dost["nazwa"],
-                                "biezacy": mm == d["model"]} for mm in dost["modele"][:MODELE_NA_DOSTAWCE]]
+                    nazwy[dost["slug"]] = dost["nazwa"]
+                    modele += [{"model": mm, "provider": dost["slug"], "grupa": dost["slug"], "nazwa": mm,
+                                "okno": 0, "myslenie": False, "biezacy": mm == d["model"]}
+                               for mm in dost["modele"][:MODELE_NA_DOSTAWCE]]
             except self.m.brama.BladBramy:
                 pass
-        return {"zaplecze": k.zaplecze, "model": d["model"], "modele": modele[:60], "wysilek": d["wysilek"],
+        grupy = []
+        for slug in dict.fromkeys(x["grupa"] for x in modele):
+            nazwa, rodzaj = DOSTAWCY_OPIS.get(slug.lower(), (nazwy.get(slug) or slug, ""))
+            if not rodzaj:
+                rodzaj = "klucz" if slug.lower().endswith("-api") else "subskrypcja"
+            grupy.append({"slug": slug, "nazwa": nazwa, "rodzaj": rodzaj})
+        return {"zaplecze": k.zaplecze, "model": d["model"], "modele": modele, "grupy": grupy, "wysilek": d["wysilek"],
                 "poziomy": self._poziomy(k, d["model"]), "fast": d["fast"], "fast_dostepny": d["fast_dostepny"]}
 
     # ------------------------------------------------------------------- /help
