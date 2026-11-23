@@ -202,15 +202,16 @@ function useSkrotyAplikacji() {
 // szerokości albo szybki ruch kończy gest. Pionowe przewijanie, pola tekstu, tabele, kod i Mózg (własne
 // przeciąganie) zostają bez zmian.
 const BEZ_GESTU = "input, textarea, select, pre, .j-md-tab, .j-mozg, .j-wys, .j-menu, .j-okno, [data-bez-gestu]";
-function useGestPaska(uklad, wlaczony, otwarty) {
+function useGestPaska(wlaczony, otwarty) {
   useEffect(() => {
-    const el = uklad.current;
-    if (!el || !wlaczony) return undefined;
-    let g = null;
+    if (!wlaczony) return undefined;
+    let g = null, el = null;
     const pasekEl = () => el.querySelector(".j-pasek"), zaslona = () => el.querySelector(".j-zaslona-paska");
+    // nasłuch na dokumencie: układ (.j-uklad) montuje się później niż aplikacja (ekran poznania, wczytywanie)
     const start = (e) => {
       const t = e.touches[0];
-      g = e.touches.length === 1 && !e.target.closest(BEZ_GESTU) ? { x: t.clientX, y: t.clientY, t: performance.now(), dx: 0, ruch: null } : null;
+      el = e.target.closest && e.target.closest(".j-uklad");
+      g = el && e.touches.length === 1 && !e.target.closest(BEZ_GESTU) ? { x: t.clientX, y: t.clientY, t: performance.now(), dx: 0, ruch: null } : null;
     };
     const ruch = (e) => {
       if (!g) return;
@@ -245,13 +246,14 @@ function useGestPaska(uklad, wlaczony, otwarty) {
         if (z) z.style.display = z.style.opacity = z.style.transition = "";
       }, 260);
     };
-    el.addEventListener("touchstart", start, { passive: true });
-    el.addEventListener("touchmove", ruch, { passive: true });
-    el.addEventListener("touchend", koniec);
-    el.addEventListener("touchcancel", koniec);
+    const d = document;
+    d.addEventListener("touchstart", start, { passive: true });
+    d.addEventListener("touchmove", ruch, { passive: true });
+    d.addEventListener("touchend", koniec);
+    d.addEventListener("touchcancel", koniec);
     return () => {
-      el.removeEventListener("touchstart", start); el.removeEventListener("touchmove", ruch);
-      el.removeEventListener("touchend", koniec); el.removeEventListener("touchcancel", koniec);
+      d.removeEventListener("touchstart", start); d.removeEventListener("touchmove", ruch);
+      d.removeEventListener("touchend", koniec); d.removeEventListener("touchcancel", koniec);
     };
   }, [wlaczony, otwarty]);
 }
@@ -391,7 +393,7 @@ function AplikacjaJarvo() {
   const waski = useWaskiEkran();
   const pasekWarstwa = waski && pasek.otwarty;
   React.useLayoutEffect(() => { Bezwladnosc.pasek(pasekWarstwa); }, [pasekWarstwa]);
-  useGestPaska(uklad, waski, pasek.otwarty);
+  useGestPaska(waski, pasek.otwarty);
   // <main> powłoki Hermesa nad aplikacją: bez roli, żeby czytnik nie widział dwóch głównych obszarów
   React.useLayoutEffect(() => {
     const m = korzen.current && korzen.current.parentElement && korzen.current.parentElement.closest("main");
