@@ -113,11 +113,12 @@ def test_tura_z_panelu(w, at):
     assert f"(załącznik: {w.nowe}/a.png)" in p["message"] and p["images"] == 1
     d = json.loads((w.zrobione / "panel-k1.json").read_text())
     assert d["odpowiedz"] == "Gotowe, zrobione." and om.przebieg(w, "k1")["stan"] == "gotowe"
-    plik = w.tura / f"{d['tura']}.jsonl"
     zdarzenia, _ = om.ogon(w, d["tura"])
-    assert [z["typ"] for z in zdarzenia] == ["narzedzie", "delta", "delta", "koniec"]
-    assert zdarzenia[0] == {"typ": "narzedzie", "nazwa": "bash", "intencja": "Sprawdzam GPU"}
-    assert zdarzenia[-1]["ok"] is True and "SEKRET" not in plik.read_text()
+    assert [z["typ"] for z in zdarzenia] == ["narzedzie", "narzedzie_koniec", "delta", "delta", "koniec"]
+    assert zdarzenia[0] == {"typ": "narzedzie", "nazwa": "bash", "id": "c1", "intencja": "Sprawdzam GPU"}
+    # wyjście kroku idzie do panelu na żywo (23.11 właściciel: „nie widać, co agent robi”), po redakcji sekretów
+    assert zdarzenia[1] == {"typ": "narzedzie_koniec", "id": "c1", "nazwa": "bash", "tekst": "SEKRET", "blad": False}
+    assert zdarzenia[-1]["ok"] is True
     assert tg.wyslane == [("🖥 sprawdź GPU", "-1001", "7"), ("Kernel\n\nGotowe, zrobione.", "-1001", "7")]
     s = om.czytaj_stan(w)
     assert s["tura"] is None and s["rpc"] is None and om.stan(w)["stan"] == "wolny"

@@ -13,8 +13,8 @@ Aktywna gałąź: od ostatniego wpisu (liść) w górę po `parentId`. `pelny` =
                                                        wpisie; `id` wywołania i `wpis` asystenta = adres szczegółów
     {"id", "czas", "typ": "streszczenie", "tekst"}                     compaction (krótkie streszczenie)
 
-**Oś nigdy nie ma wyników ani argumentów narzędzi**: treści wpisów `toolResult` nie parsujemy (z linii tylko id,
-rodzic, id wywołania i offset), z wywołania narzędzia zostaje nazwa i intencja (`intent`). Wiadomość użytkownika
+**Oś nigdy nie ma wyników narzędzi**: treści wpisów `toolResult` nie parsujemy (z linii tylko id, rodzic, id
+wywołania i offset), z wywołania narzędzia zostaje nazwa i jedna linia opisu (`opis_kroku`). Wiadomość użytkownika
 z obwiedniami skrzynki (`[Telegram · …]`, `[Panel · …]`, jarvo/sesje_omp.prompt) to tekst bloków bez wstępu
 i nagłówków; bez obwiedni = terminal.
 Plik czytany przyrostowo (pamięć: offset, skrócone wpisy i offsety linii wywołań i wyników), więc wielki plik sesji
@@ -74,6 +74,29 @@ def bez_obwiedni(tekst: str) -> tuple[str, str]:
     return (bloki[0]["zrodlo"] if bloki else "terminal"), "\n\n".join(b["tekst"] for b in bloki)
 
 
+# co krok robi, jedną linią z argumentów (sesje omp, np. Kernel, nie podają intencji): polecenie, plik, wzorzec…
+_OPIS_ARGUMENTOW = ("command", "path", "pattern", "query", "url", "title", "task", "name", "language")
+
+
+def opis_kroku(nazwa: str, args, intent: str = "") -> str:
+    """Jedna linia do 200 znaków: intencja omp (`intent` albo argument `i`), a bez niej polecenie, plik, wzorzec albo
+    pierwszy krótki tekst argumentów (23.11 właściciel: „pokazują się tylko jakieś wyrazy, nie wiadomo, co jest robione”)."""
+    a = args if isinstance(args, dict) else {}
+    t = str(intent or a.get("i") or "").strip()
+    if not t:
+        if nazwa == "edit" and isinstance(a.get("input"), str):
+            m = re.search(r"\[([^\]#]+)", a["input"])
+            t = m.group(1) if m else ""
+        elif nazwa == "task" and isinstance(a.get("tasks"), list):
+            t = ", ".join(str(x.get("name") or "") for x in a["tasks"] if isinstance(x, dict))
+        elif nazwa == "eval" and isinstance(a.get("code"), str):
+            t = str(a.get("title") or "") or (a["code"].strip().splitlines() or [""])[0]
+        else:
+            t = next((str(a[k]) for k in _OPIS_ARGUMENTOW if isinstance(a.get(k), (str, int)) and str(a[k]).strip()), "")
+    linia = " ".join(t.strip().splitlines()[0].split()) if t.strip() else ""
+    return linia[:200]
+
+
 def _skrot(e: dict) -> dict | None:
     """Skrócony wpis osi z wpisu sesji (None = niewidoczny, ale zostaje w drzewie)."""
     typ, czas = e.get("type"), e.get("timestamp")
@@ -97,7 +120,8 @@ def _skrot(e: dict) -> dict | None:
             wynik["bloki"] = [{"zrodlo": b["zrodlo"], "tekst": b["tekst"]} for b in bloki]
         return wynik
     if rola == "assistant":
-        kroki = [{"nazwa": str(c.get("name") or ""), "intencja": str(c.get("intent") or "")[:200],
+        kroki = [{"nazwa": str(c.get("name") or ""), "intencja": opis_kroku(str(c.get("name") or ""), c.get("arguments"),
+                                                                        str(c.get("intent") or "")),
                   "id": str(c.get("id") or ""), "wpis": str(e.get("id") or "")}
                  for c in m.get("content") or [] if isinstance(c, dict) and c.get("type") == "toolCall"]
         tekst = _tekst(m.get("content")).strip()
@@ -119,7 +143,7 @@ def _czytaj(plik: Path) -> dict:
     p = _PAMIEC.get(klucz)
     if not p or p["ino"] != st.st_ino or st.st_size < p["od"]:
         p = {"ino": st.st_ino, "od": 0, "naglowek": None, "wpisy": {}, "lisc": None, "blad": None, "odpowiedzi": 0,
-             "wywolania": {}, "wyniki": {}}
+             "wywolania": {}, "wyniki": {}, "wpis_wywolania": {}}
         _PAMIEC[klucz] = p
     if st.st_size == p["od"] or p["blad"]:
         return p
@@ -163,6 +187,8 @@ def _czytaj(plik: Path) -> dict:
         p["wpisy"][e["id"]] = (e.get("parentId"), skrot)
         if skrot and skrot.get("kroki"):
             p["wywolania"][str(e["id"])] = od
+            for k in skrot["kroki"]:                    # krok na żywo zna tylko id wywołania (ref `o:_:<id>`)
+                p["wpis_wywolania"][k["id"]] = str(e["id"])
         m = e.get("message") if e.get("type") == "message" else None
         if isinstance(m, dict) and m.get("role") == "toolResult" and m.get("toolCallId"):
             p["wyniki"].setdefault(str(m["toolCallId"]), []).append(od)
@@ -241,12 +267,15 @@ def szczegoly(plik: Path | str, wpis: str, wywolanie: str) -> dict | None:
         {"narzedzie", "intencja", "argumenty": dict, "mysl": str, "wynik": str | None (jeszcze nie ma), "blad",
          "zmiana": diff edycji | None, "kod": kod wyjścia | None, "czas_ms": int | None}
 
-    Krok z wynikiem trafia do małej pamięci (SZCZEGOLY_PAMIEC); zwrócony słownik tylko do odczytu."""
+    Krok z wynikiem trafia do małej pamięci (SZCZEGOLY_PAMIEC); zwrócony słownik tylko do odczytu. `wpis` = "_":
+    wpis asystenta z indeksu wywołań (krok na żywo z ogona tury zna tylko id wywołania)."""
     plik = Path(plik)
     try:
         p = _czytaj(plik)
     except OSError:
         return None
+    if wpis == "_":
+        wpis = p["wpis_wywolania"].get(wywolanie, "")
     od = p["wywolania"].get(wpis)
     if p["blad"] or od is None:
         return None

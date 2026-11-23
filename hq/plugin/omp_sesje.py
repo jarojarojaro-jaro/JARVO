@@ -41,7 +41,9 @@ Kontrakt dla panelu (CentrumUI; wszystko synchroniczne i szybkie, wołać w wąt
     przebieg(wpis, klucz) -> dict             {stan: kolejka|pracuje|wlaczony|gotowe|blad|brak, terminal, tura,
                                               odpowiedz, blad}; `wlaczony` = dopisek doszedł do trwającej tury `tura`
     ogon(wpis, tura, od=0) -> (zdarzenia, od) zdarzenia tury od bajtu `od`: {typ: delta, tekst} |
-                                              {typ: narzedzie, nazwa, intencja} | {typ: koniec, ok, kod, odpowiedz}
+                                              {typ: narzedzie, nazwa, id, intencja} | {typ: mysl, tekst} |
+                                              {typ: wyjscie|narzedzie_koniec, id, nazwa, tekst[, blad]} |
+                                              {typ: koniec, ok, kod, odpowiedz}
     zatrzymaj(wpis) -> bool                   abort bieżącej tury (prośba do skrzynki; bez skrzynki SIGTERM, tylko
                                               dla procesu omp z `--session-dir` wpisu)
     ponow(wpis, klucz) -> dict                ta sama wiadomość jeszcze raz do `nowe/` (nowy klucz `<klucz>-p<n>`)
@@ -696,7 +698,7 @@ def ogon(w: Wpis, tura: str, od: int = 0) -> tuple[list[dict], int]:
             z = json.loads(linia)
         except ValueError:
             continue
-        if isinstance(z, dict) and z.get("typ") in ("delta", "narzedzie", "koniec"):
+        if isinstance(z, dict) and z.get("typ") in ("delta", "narzedzie", "koniec", "mysl", "wyjscie", "narzedzie_koniec"):
             zdarzenia.append(z)
     return zdarzenia, od + koniec
 

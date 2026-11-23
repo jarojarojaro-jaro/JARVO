@@ -789,11 +789,24 @@ class Rejestr:
 
     def _omp_zdarzenie(self, pid: str, e: Mapping) -> None:
         teraz = self.zegar()
+        utajnij = self.utajnij or str
+        ref = f"o:_:{e['id']}" if e.get("id") else ""
         if e.get("typ") == "delta" and e.get("tekst"):
             self._zdarzenie(pid, {"event": "message.delta", "delta": str(e["tekst"]), "timestamp": teraz})
+        elif e.get("typ") == "mysl" and e.get("tekst"):
+            self._zdarzenie(pid, {"event": "omp.mysl", "text": utajnij(str(e["tekst"])), "timestamp": teraz})
         elif e.get("typ") == "narzedzie":
-            self._zdarzenie(pid, {"event": "tool.started", "tool": str(e.get("nazwa") or "?"),
-                                  "preview": str(e.get("intencja") or ""), "timestamp": teraz})
+            self._zdarzenie(pid, {"event": "tool.started", "tool": str(e.get("nazwa") or "?"), "ref": ref,
+                                  "preview": utajnij(str(e.get("intencja") or "")), "timestamp": teraz})
+        elif e.get("typ") == "wyjscie" and ref:
+            self._zdarzenie(pid, {"event": "tool.output", "ref": ref, "preview": utajnij(str(e.get("tekst") or "")),
+                                  "timestamp": teraz})
+        elif e.get("typ") == "narzedzie_koniec":
+            dz = self.dziennik(pid)
+            start = next((k["ts"] for k in reversed(dz.kroki) if ref and k.get("ref") == ref), teraz)
+            self._zdarzenie(pid, {"event": "tool.completed", "tool": str(e.get("nazwa") or "?"), "error": bool(e.get("blad")),
+                                  "preview": utajnij(str(e.get("tekst") or ""))[-PODGLAD_MAKS:],
+                                  "duration": max(0.0, teraz - start), "timestamp": teraz})
 
     async def _omp_petla(self, pid: str) -> None:
         tura, od, brak = None, 0, 0
@@ -1082,6 +1095,17 @@ class Rejestr:
             if ev.get("preview"):
                 krok["podglad"] = str(ev["preview"])[:PODGLAD_MAKS]
             self._nadaj(p, "przebieg.narzedzie", {"faza": "koniec", "krok": krok})
+        elif typ == "tool.output":                    # wyjście kroku w trakcie (sesje omp): ten sam krok, nowy podgląd
+            krok = next((k for k in reversed(dz.kroki) if k.get("ref") and k["ref"] == ev.get("ref")), None)
+            if krok is not None and krok.get("czas_ms") is None:
+                krok["podglad"] = str(ev.get("preview") or "")[-PODGLAD_MAKS:]
+                self._nadaj(p, "przebieg.narzedzie", {"faza": "wyjscie", "krok": krok})
+        elif typ == "omp.mysl":                       # myśl modelu między krokami (sesje omp), jak w terminalu
+            p = self._do_pracy(p)
+            krok = {"ts": float(ev.get("timestamp") or self.zegar()), "komentarz": str(ev.get("text") or "")[:MYSL_MAKS],
+                    "mysl": True}
+            dz.kroki.append(krok)
+            self._nadaj(p, "przebieg.narzedzie", {"faza": "start", "krok": krok})
         elif typ.startswith("subagent."):
             opis = str(ev.get("goal") or ev.get("summary") or ev.get("preview") or ev.get("text") or "")[:300]
             self._nadaj(p, "przebieg.podagent", {"faza": typ.split(".", 1)[1], "opis": opis})
@@ -1103,9 +1127,12 @@ class Rejestr:
         nazwa = str(ev.get("tool") or "?")
         podglad = str(ev.get("preview") or "")
         e = self.etykieta(nazwa, {"command": podglad, "path": podglad}) if self.etykieta else {}
-        return {"ts": float(ev.get("timestamp") or self.zegar()), "narzedzie": nazwa, "verb": e.get("verb", nazwa),
-                "verb_en": e.get("verb_en", nazwa), "detail": e.get("detail", "")[:140], "czas_ms": None, "blad": False,
-                "podglad": podglad[:PODGLAD_MAKS]}
+        krok = {"ts": float(ev.get("timestamp") or self.zegar()), "narzedzie": nazwa, "verb": e.get("verb", nazwa),
+                "verb_en": e.get("verb_en", nazwa), "detail": (e.get("detail") or podglad)[:140], "czas_ms": None,
+                "blad": False, "podglad": podglad[:PODGLAD_MAKS]}
+        if ev.get("ref"):                             # sesja omp: opis w linii, podgląd to wyjście kroku, szczegóły z pliku
+            krok.update(ref=str(ev["ref"]), podglad="")
+        return krok
 
     def _zaplanuj_delte(self, pid: str) -> None:
         dz = self._dzienniki.get(pid)

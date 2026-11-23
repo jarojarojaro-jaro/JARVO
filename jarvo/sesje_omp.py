@@ -15,8 +15,9 @@ albo terminal. Oba biorą tę samą blokadę (`<skrzynka>/sesja.lock`) i przed s
              panelu z `steer` (omp_sesje.dopisz) i wiadomość z Telegrama w trakcie tury idą do niej jako `steer`
              (niedostarczony steer wraca z kolejki omp i rusza jako następna tura); komendy panelu z `komendy/`
              (compact); licznik zużycia (`get_session_stats`) do `licznik.json` po każdej odpowiedzi modelu.
-             Strumień tury do `tura/<tura>.jsonl` (tekst, nazwa i intencja narzędzia, koniec; nigdy wyniki ani
-             argumenty narzędzi), odpowiedź = ostatni `message_end` asystenta, do Telegrama (`jarvo telegram
+             Strumień tury do `tura/<tura>.jsonl` (tekst, myśli, krok z jednolinijkowym opisem, ostatnie 1500 znaków
+             wyjścia kroku, wszystko po redakcji sekretów; panel pokazuje pracę na żywo jak terminal), odpowiedź =
+             ostatni `message_end` asystenta, do Telegrama (`jarvo telegram
              wyslij`), wiadomości do `zrobione/` albo `bledy/`. Bez pracy przez `panel.zamykaj_bezczynna_min`
              (domyślnie 5 min) proces omp się kończy i sesja jest wolna. Przed każdą turą hak `panel.przed_tura`
              (Kernel: `kernel.py system` składa system.md z arsenałem); zmieniony plik z `omp_arg` albo model
@@ -71,17 +72,19 @@ WSTEP_DOPISKU = ("Dopisek od właściciela w trakcie Twojej pracy. Zajmij się n
                  "i daj mu w odpowiedzi punkt z wnioskiem.")
 
 
-def _rdzen():
-    """hq/plugin/omp_sesje.py (jedna definicja wpisu i stanu dla CLI i panelu; wtyczka HQ jest bez pakietu jarvo)."""
-    if "jarvo_omp_sesje" not in sys.modules:
-        spec = importlib.util.spec_from_file_location("jarvo_omp_sesje", _REPO / "hq" / "plugin" / "omp_sesje.py")
+def _modul_hq(nazwa: str, plik: str):
+    """Moduł wtyczki HQ (`hq/plugin/<plik>`): jedna definicja dla CLI i panelu; wtyczka HQ jest bez pakietu jarvo."""
+    if nazwa not in sys.modules:
+        spec = importlib.util.spec_from_file_location(nazwa, _REPO / "hq" / "plugin" / plik)
         mod = importlib.util.module_from_spec(spec)
-        sys.modules["jarvo_omp_sesje"] = mod
+        sys.modules[nazwa] = mod
         spec.loader.exec_module(mod)
-    return sys.modules["jarvo_omp_sesje"]
+    return sys.modules[nazwa]
 
 
-rdzen = _rdzen()
+rdzen = _modul_hq("jarvo_omp_sesje", "omp_sesje.py")
+czytnik = _modul_hq("jarvo_czytnik_omp", "czytnik_omp.py")   # opis kroku jedną linią (ten sam co na osi panelu)
+ochrona = _modul_hq("jarvo_ochrona", "ochrona.py")            # redakcja sekretów przed zapisem ogona tury
 
 
 def log(w, tekst: str) -> None:
@@ -244,6 +247,13 @@ def obrazy_rpc(sciezki: list[str]) -> list[dict]:
 def _tekst(m: dict) -> str:
     return "".join(c.get("text", "") for c in m.get("content") or []
                    if isinstance(c, dict) and c.get("type") == "text").strip()
+
+
+def _tekst_wyniku(r) -> str:
+    """Tekst wyniku narzędzia omp (`result` / `partialResult`: {content: [{type: text}]}, czasem sam tekst)."""
+    if isinstance(r, str):
+        return r
+    return _tekst(r) if isinstance(r, dict) else ""
 
 
 def _liczba(v) -> int:
@@ -430,6 +440,8 @@ class Tura:
         self.blad, self.kod = "", 0
         self.koniec = False
         self.f = None
+        self.mysl: list[str] = []                  # myślenie modelu od ostatniego kroku (panel pokazuje je jak terminal)
+        self.wyjscie_at: dict[str, float] = {}     # id wywołania → ostatni zapis wyjścia na żywo (najwyżej co sekundę)
 
     def klucze(self) -> list[str]:
         return [str(m.get("klucz")) for _, m in self.partia if m.get("klucz")]
@@ -439,15 +451,40 @@ class Tura:
             self.f.write(json.dumps(z, ensure_ascii=False) + "\n")
             self.f.flush()
 
+    def _mysl(self) -> None:
+        tekst = "".join(self.mysl).strip()
+        self.mysl = []
+        if tekst:
+            self._zapisz({"typ": "mysl", "tekst": ochrona.utajnij_krok(tekst[-2000:])})
+
     def zdarzenie(self, e: dict) -> None:
         typ = e.get("type")
         if typ == "message_update":
             a = e.get("assistantMessageEvent") or {}
             if a.get("type") == "text_delta" and a.get("delta"):
                 self._zapisz({"typ": "delta", "tekst": str(a["delta"])})
+            elif a.get("type") == "thinking_delta" and a.get("delta"):
+                self.mysl.append(str(a["delta"]))
+            elif a.get("type") in ("thinking_end", "toolcall_start", "text_start"):
+                self._mysl()
         elif typ == "tool_execution_start":
-            self._zapisz({"typ": "narzedzie", "nazwa": str(e.get("toolName") or ""),
-                          "intencja": str(e.get("intent") or "")[:200]})
+            self._mysl()
+            nazwa = str(e.get("toolName") or "")
+            self._zapisz({"typ": "narzedzie", "nazwa": nazwa, "id": str(e.get("toolCallId") or ""),
+                          "intencja": ochrona.utajnij_krok(czytnik.opis_kroku(nazwa, e.get("args"), str(e.get("intent") or "")))})
+        elif typ in ("tool_execution_update", "tool_execution_end"):
+            ident = str(e.get("toolCallId") or "")
+            teraz = time.monotonic()
+            if typ == "tool_execution_update" and teraz - self.wyjscie_at.get(ident, 0) < 1.0:
+                return
+            self.wyjscie_at[ident] = teraz
+            tekst = _tekst_wyniku(e.get("result") if typ == "tool_execution_end" else e.get("partialResult"))
+            z = {"typ": "wyjscie" if typ == "tool_execution_update" else "narzedzie_koniec", "id": ident,
+                 "nazwa": str(e.get("toolName") or ""), "tekst": ochrona.utajnij_krok(tekst[-1500:])}
+            if typ == "tool_execution_end":
+                z["blad"] = bool(e.get("isError"))
+            if tekst or typ == "tool_execution_end":
+                self._zapisz(z)
         elif typ == "message_end":
             m = e.get("message") or {}
             tekst = _tekst(m)

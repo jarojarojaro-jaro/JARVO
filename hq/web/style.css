@@ -1745,6 +1745,9 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-kroki-l li.is-komentarz { margin: 4px 0; }
 .j-kroki-kom { color: var(--j-tresc); font: 400 13px/1.5 var(--j-font-ui); overflow-wrap: anywhere; }
 .j-kroki-kom .j-md > * + * { margin-top: .3em; }
+/* na żywo (sesje omp): myśl modelu przygaszona kursywą, krok w toku z bursztynową kreską i wyjściem pod spodem */
+.j-kroki-l li.is-mysl .j-kroki-kom { color: var(--j-tekst-2); font-style: italic; max-height: 7.5em; overflow: auto; }
+.j-kroki-l li.is-trwa .j-kroki-o { box-shadow: inset 2px 0 0 var(--j-uwaga); padding-left: 6px; }
 .j-kroki-czas { color: var(--j-tekst-3); font-variant-numeric: tabular-nums; }
 .j-kroki-podglad { grid-column: 2; margin: 2px 0 6px; padding: 6px 8px; background: var(--j-tlo-pasek); font: 12px/1.5 var(--j-font-mono); color: var(--j-tresc);
   white-space: pre-wrap; overflow-wrap: anywhere; max-height: 160px; overflow: auto; }

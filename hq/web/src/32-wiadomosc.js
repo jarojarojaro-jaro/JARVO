@@ -244,8 +244,9 @@ function KrokSzczegoly({ id, watek, krokRef }) {
   </div>`;
 }
 
-// Krok z adresem (`ref`) w wątku rozwija się sam (każdy osobno), reszta zostaje zwykłą linią.
-function KrokiLista({ kroki, szczegoly, watek }) {
+// Krok z adresem (`ref`) w wątku rozwija się sam (każdy osobno), reszta zostaje zwykłą linią. Na żywo (`zywe`) jak
+// w terminalu: myśli między krokami i wyjście kroku, który właśnie trwa (23.11 właściciel: „nie widać, co agent robi”).
+function KrokiLista({ kroki, szczegoly, watek, zywe }) {
   const [wszystkie, setWszystkie] = useState(false);
   const [rozwiniete, setRozwiniete] = useState(() => new Set());
   const id = useIdJarvo();
@@ -255,33 +256,42 @@ function KrokiLista({ kroki, szczegoly, watek }) {
     return n;
   });
   const widoczne = wszystkie ? kroki : kroki.slice(-KROKI_NAJPIERW);
+  let trwa = -1;
+  if (zywe) for (let i = widoczne.length - 1; i >= 0; i--) if (widoczne[i].komentarz == null) { if (widoczne[i].czas_ms == null) trwa = i; break; }
   return html`<div class="j-kroki-l">
     ${widoczne.length < kroki.length && html`<button type="button" class="j-link" onClick=${() => setWszystkie(true)}>
       ${T("kroki.wczesniejsze", { n: kroki.length - widoczne.length })}</button>`}
     <ol>${widoczne.map((k, i) => {
       if (k.komentarz != null) {
-        return html`<li key=${i} class="is-komentarz"><time>${Czas.godzina(k.ts)}</time><div class="j-kroki-kom"><${TrescMd} tekst=${bezZnacznika(k.komentarz)}/></div></li>`;
+        return html`<li key=${i} class=${cx("is-komentarz", k.mysl && "is-mysl")}><time>${Czas.godzina(k.ts)}</time><div class="j-kroki-kom"><${TrescMd} tekst=${bezZnacznika(k.komentarz)}/></div></li>`;
       }
       const moze = !!(watek && k.ref);
       const otwarty = moze && rozwiniete.has(k.ref);
       const opis = html`<b>${czasownik(k)}</b>${k.detail ? ` ${k.detail}` : ""}${k.blad ? html` <span class="j-kroki-blad">· ${T("kroki.blad")}</span>` : null}
         ${szczegoly && k.czas_ms > 0 && html` <span class="j-kroki-czas">${Czas.trwanie(k.czas_ms / 1000)}</span>`}`;
-      return html`<li key=${i} class=${cx(k.blad && "is-blad")}>
+      return html`<li key=${i} class=${cx(k.blad && "is-blad", i === trwa && "is-trwa")}>
       <time>${Czas.godzina(k.ts)}</time>
       ${moze ? html`<button type="button" class="j-kroki-o j-kroki-k" aria-expanded=${String(otwarty)} aria-controls=${`${id}-${i}`}
           onClick=${() => przelacz(k.ref)}><span>${opis}</span><${Ikona} n="right" r=${12}/></button>`
         : html`<span class="j-kroki-o">${opis}</span>`}
-      ${szczegoly && k.podglad && !otwarty && html`<pre class="j-kroki-podglad">${k.podglad}</pre>`}
+      ${(szczegoly || i === trwa) && k.podglad && !otwarty && html`<${PodgladKroku} tekst=${k.podglad}/>`}
       ${otwarty && html`<${KrokSzczegoly} id=${`${id}-${i}`} watek=${watek} krokRef=${k.ref}/>`}</li>`;
     })}</ol></div>`;
+}
+
+// wyjście kroku przewinięte na koniec (jak terminal: widać ostatnie linie)
+function PodgladKroku({ tekst }) {
+  const ref = useRef(null);
+  useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [tekst]);
+  return html`<pre ref=${ref} class="j-kroki-podglad">${tekst}</pre>`;
 }
 
 // Prosty: zwinięta linia „12 kroków · 2:05” (przy trwającej pracy też ostatni krok), bez licznika błędów narzędzi
 // (zwykle odzyskane potknięcia, a czerwone „2 błędy” pod odpowiedzią wyglądało jak awaria; błąd widać na liście kroków);
 // Szczegóły: rozwinięte, z licznikiem błędów. Każdy krok z adresem rozwija się dalej sam (KrokSzczegoly).
 function Kroki({ kroki, szczegoly, zywe, watek }) {
-  const [otwarte, setOtwarte] = useState(!!szczegoly);
-  useEffect(() => setOtwarte(!!szczegoly), [szczegoly]);
+  const [otwarte, setOtwarte] = useState(!!(szczegoly || zywe));
+  useEffect(() => setOtwarte(!!(szczegoly || zywe)), [szczegoly, zywe]);
   const id = useIdJarvo();
   const s = Os.krokiPodsumowanie(kroki);
   if (!s.n) return null;
@@ -291,7 +301,7 @@ function Kroki({ kroki, szczegoly, zywe, watek }) {
       ${szczegoly && s.bledy > 0 && html`<span class="j-kroki-blad">· ${T("kroki.bledy", { n: s.bledy })}</span>`}
       ${zywe && s.ostatni && html`<span class="j-kroki-teraz">· ${czasownik(s.ostatni)}</span>`}
     </button>
-    <div id=${id} hidden=${!otwarte}>${otwarte && html`<${KrokiLista} kroki=${kroki} szczegoly=${szczegoly} watek=${watek}/>`}</div>
+    <div id=${id} hidden=${!otwarte}>${otwarte && html`<${KrokiLista} kroki=${kroki} szczegoly=${szczegoly} watek=${watek} zywe=${zywe}/>`}</div>
   </div>`;
 }
 

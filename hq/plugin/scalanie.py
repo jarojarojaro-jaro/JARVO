@@ -370,7 +370,7 @@ def _czas(v: Any) -> float:
         return 0.0
 
 
-def pozycje_omp(r: Mapping, os_: Mapping) -> list[dict]:
+def pozycje_omp(r: Mapping, os_: Mapping, utajnij: Callable[[str], str] | None = None) -> list[dict]:
     """Oś sesji omp (czytnik_omp.os_sesji) jako pozycje osi: wiadomości spoza panelu = dymek właściciela ze źródłem
     (📱 telegram, ⌨ terminal; z panelu pokazuje je wpis), asystent = `agent`, narzędzia = `kroki` z nazwą, intencją
     i adresem `ref` (argumenty i wyniki dopiero na żądanie, czytnik_omp.szczegoly), kompresja = `kompresja`.
@@ -399,7 +399,8 @@ def pozycje_omp(r: Mapping, os_: Mapping) -> list[dict]:
         elif typ == "kroki":
             out.append(_pozycja(rodzaj="kroki", kroki=[
                 {"ts": wsp["ts"], "narzedzie": str(k.get("nazwa") or "?"), "verb": str(k.get("nazwa") or "?"),
-                 "verb_en": str(k.get("nazwa") or "?"), "detail": str(k.get("intencja") or "")[:140], "czas_ms": None,
+                 "verb_en": str(k.get("nazwa") or "?"), "detail": (utajnij or str)(str(k.get("intencja") or ""))[:140],
+                 "czas_ms": None,
                  "blad": False, "podglad": "", "ref": ref_kroku("o", k.get("wpis"), k.get("id"))}
                 for k in e.get("kroki") or []], **wsp))
         elif typ == "streszczenie":                  # z liczbą tokenów przed i po (/compact w terminalu albo panelu)
@@ -546,7 +547,7 @@ def zrodla(db, czytnik, wid: str, *, budzenia=None, etykieta: Callable | None = 
         if os_.get("blad"):
             bledy.append({"agent": (r or {}).get("klucz") or "omp", "blad": str(os_["blad"])})
         else:
-            out["omp"] = pozycje_omp(r, os_)
+            out["omp"] = pozycje_omp(r, os_, utajnij)
             info["omp"] = {"koniec": len(out["omp"]), "od_ponownie": None, "skompaktowane": 0,
                            "pelny": bool(os_.get("pelny"))}
         return {"zrodla": out, "info": info, "g": 0, "bledy": bledy}

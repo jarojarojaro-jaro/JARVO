@@ -94,6 +94,11 @@ const Os = (() => {
   };
   const swiezy = (p, kursor) => !p || !p._kursor || !kursor || porownaj(kursor, p._kursor) > 0;
   function krok(kroki, faza, k) {
+    if (faza === "wyjscie") {                    // wyjście kroku w trakcie (sesje omp): ten sam krok z nowym podglądem
+      const i = kroki.findIndex((x) => x.ref && x.ref === k.ref);
+      if (i < 0) return kroki;
+      const n = kroki.slice(); n[i] = k; return n;
+    }
     if (faza === "koniec") {
       for (let i = kroki.length - 1; i >= 0; i--) {
         const x = kroki[i];

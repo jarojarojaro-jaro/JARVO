@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Panel pokazuje pracę agenta omp na żywo jak terminal: krok z poleceniem albo plikiem, myśli między krokami i wyjście kroku, który trwa.
 - Brief pyta tylko o sprawy, które nas dotyczą, sprawdzone w konfigu, kodzie albo skarbcu (`decision-queue` 1.5.0, `daily-brief` 1.4.0; pytał o Google Custom Search API, którego nie używamy).
 - Odpowiedź właściciela na brief zapisuje kod (hak `pre_llm_call`), a brief nie pyta o sprawy już ustalone, także innymi słowami (`briefy.filtruj_brief`, `otwarte()`).
 - Mózg na telefonie mieści się w ekranie (siatka `minmax(0, 1fr)`), z krótką belką, napisami przy brzegu i większym trafieniem palcem.

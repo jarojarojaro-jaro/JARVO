@@ -179,3 +179,14 @@ def test_szczegoly_kroku_na_zadanie_i_przyrostowo(tmp_path, monkeypatch, zwarte)
     assert cz.szczegoly(p, "a1", "c9") is None and cz.szczegoly(p, "u1", "c1") is None
     assert cz.szczegoly(p, "brak", "c1") is None and cz.szczegoly(tmp_path / "brak.jsonl", "a1", "c1") is None
     assert "linia 1" not in json.dumps(cz.os_sesji(p))     # oś nadal bez wyników
+
+
+def test_opis_kroku_bez_intencji():
+    """23.11 właściciel o Kernelu: „pokazują się tylko jakieś wyrazy, nie wiadomo, co jest robione”; Kernel nie podaje
+    intencji, więc linia kroku bierze polecenie, plik albo zadania z argumentów."""
+    assert cz.opis_kroku("bash", {"command": "ssh -n jaroserverai 'tail -2 q.out'\nexit"}) == "ssh -n jaroserverai 'tail -2 q.out'"
+    assert cz.opis_kroku("bash", {"command": "ls", "i": "Listing files"}) == "Listing files"
+    assert cz.opis_kroku("write", {"path": "/tmp/a.py", "content": "x" * 5000}) == "/tmp/a.py"
+    assert cz.opis_kroku("edit", {"input": "[/home/x/y.py#AB12]\nPUT 1:"}) == "/home/x/y.py"
+    assert cz.opis_kroku("task", {"tasks": [{"name": "A"}, {"name": "B"}]}) == "A, B"
+    assert cz.opis_kroku("wait", {}) == ""
