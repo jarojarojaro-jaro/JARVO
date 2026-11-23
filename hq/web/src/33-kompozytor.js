@@ -114,7 +114,8 @@ function PasekNaZywo({ przebiegi, watek }) {
   return html`<div class="j-zywo" role="group" aria-label=${T("zywo.etykieta")}>
     <span class="j-zywo-z"><${Awatar} agent=${sklep.stan().agenci[p.agent] || { name: p.agent }} r=${22}/></span>
     <b class="j-zywo-n">${nazwaAgenta(p.agent)}</b>
-    <span class="j-zywo-t">${krok ? `${czasownik(krok)}…` : stanPracy(p)}${przebiegi.length > 1 ? ` · ${T("zywo.i_inni", { n: przebiegi.length - 1 })}` : ""}</span>
+    <span class="j-zywo-t" title=${krok && krok.detail ? `${czasownik(krok)} ${krok.detail}` : undefined}>${krok
+      ? html`<b>${czasownik(krok)}</b>${krok.detail ? ` ${krok.detail}` : "…"}` : stanPracy(p)}${przebiegi.length > 1 ? ` · ${T("zywo.i_inni", { n: przebiegi.length - 1 })}` : ""}</span>
     ${od ? html`<span class="j-zywo-c" aria-hidden="true">${Czas.trwanie(teraz - od)}</span>` : null}
     <${Przycisk} maly rodzaj="cichy" ikona="stop" disabled=${zatrzymuje} onClick=${zatrzymaj} podpowiedz=${T("zywo.esc")}>
       ${T(zatrzymuje ? "zywo.zatrzymuje" : "zywo.zatrzymaj")}</${Przycisk}>

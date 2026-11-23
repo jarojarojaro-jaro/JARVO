@@ -17,16 +17,9 @@ const krotkiModel = (m) => String(m || "?").split("/").pop().replace(/^claude-/,
 const dolary = (x) => `$${Number(x || 0).toFixed(2)}`;
 const godzina = (s) => new Date(s * 1000).toLocaleTimeString(isPL() ? "pl-PL" : "en-GB", { hour: "2-digit", minute: "2-digit" });
 
-const OPIS_WYSILKU = {
-  off: ["Bez myślenia", "Najszybciej. Proste pytania i krótkie polecenia.", "No thinking", "Fastest. Simple questions and short commands."],
-  minimal: ["Ślad myślenia", "Prawie od razu, z krótkim namysłem.", "A trace of thinking", "Almost instant, with a brief pause."],
-  low: ["Krótko", "Szybko i tanio. Codzienna robota.", "Brief", "Quick and cheap. Everyday work."],
-  medium: ["Rozsądnie", "Środek między szybkością a dokładnością.", "Balanced", "Between speed and care."],
-  high: ["Dokładnie", "Wolniej, ale pewniej przy trudnych rzeczach.", "Thorough", "Slower, surer on hard problems."],
-  xhigh: ["Głęboko", "Długie zadania, duży kod, wiele kroków.", "Deep", "Long tasks, big code, many steps."],
-  max: ["Pełna moc", "Najwolniej i najdokładniej. Gdy liczy się każdy szczegół.", "Full power", "Slowest and most careful. When every detail matters."],
-};
-const opisWysilku = (p) => { const o = OPIS_WYSILKU[p] || [p, "", p, ""]; return isPL() ? [o[0], o[1]] : [o[2], o[3]]; };
+// nazwy poziomów wprost (23.11 właściciel: „nie głęboko, szeroko, dokładnie, po prostu off, auto, low… max”)
+const NAZWA_WYSILKU = { off: "OFF", minimal: "MINIMAL", low: "LOW", medium: "MEDIUM", high: "HIGH", xhigh: "EXTRA HIGH", max: "MAX" };
+const nazwaWysilku = (p) => (p ? NAZWA_WYSILKU[p] || String(p).toUpperCase() : "AUTO");
 
 function Pierscien({ p, r = 7, w = 16, grubosc = 2 }) {
   const o = 2 * Math.PI * r, c = r + grubosc;
@@ -145,8 +138,7 @@ function WysilekWybor({ poziomy, biezacy, onWybierz }) {
   const suwak = useRef(null);
   const i = pod != null ? pod : i0;
   const p = i >= 0 ? poziomy[i] : null;
-  const [tytul, opis] = p ? opisWysilku(p) : [L("Jak sesja", "Session default"), L("Poziom ustawiony w sesji albo agencie.", "The level set in the session or agent.")];
-  const t = i >= 0 ? i / Math.max(1, n - 1) : 0;
+  const tytul = nazwaWysilku(p);
   const czerwone = Math.max(1, n - 2);                // od tego poziomu pole czerwone (xhigh, max)
   useEffect(() => { if (suwak.current) suwak.current.focus({ preventScroll: true }); }, []);
   // kąt kursora nad tarczą → najbliższy poziom
@@ -158,8 +150,6 @@ function WysilekWybor({ poziomy, biezacy, onWybierz }) {
     const k = Math.round(((ZEGAR.od - Math.max(ZEGAR.od - ZEGAR.luk, Math.min(ZEGAR.od, kat))) / ZEGAR.luk) * (n - 1));
     return Math.max(0, Math.min(n - 1, k));
   };
-  const segmenty = (ile, klasa) => html`<span class=${cx("j-ww-seg", klasa)}>${[0, 1, 2, 3, 4].map((k) => html`<i key=${k} class=${k < ile ? "is-on" : ""}></i>`)}</span>`;
-  const glebia = i >= 0 ? 1 + Math.round(t * 4) : 0;
   const katW = i >= 0 ? katPoziomu(i, n) : ZEGAR.od;
   return html`<div class=${cx("j-ww", i >= czerwone && "is-red")}>
     <div class="j-wys-g"><span class="j-wys-t">${L("Wysiłek myślenia", "Thinking effort")}</span>
@@ -190,19 +180,13 @@ function WysilekWybor({ poziomy, biezacy, onWybierz }) {
       <g class="j-ww-wsk" style=${{ transform: `rotate(${90 - katW}deg)` }}>
         <path d=${`M${ZEGAR.cx - 3} ${ZEGAR.cy + 16} L${ZEGAR.cx} ${ZEGAR.cy - ZEGAR.r + 4} L${ZEGAR.cx + 3} ${ZEGAR.cy + 16} Z`}/></g>
       <circle cx=${ZEGAR.cx} cy=${ZEGAR.cy} r="9" fill="url(#j-ww-os)"/><circle cx=${ZEGAR.cx} cy=${ZEGAR.cy} r="3" class="j-ww-os2"/>
-      <text x=${ZEGAR.cx} y=${ZEGAR.cy + 46} text-anchor="middle" class="j-ww-tytul">${tytul.toUpperCase()}</text>
-      <text x=${ZEGAR.cx} y=${ZEGAR.cy + 62} text-anchor="middle" class="j-ww-kod">${p || "auto"}</text>
+      <text x=${ZEGAR.cx} y=${ZEGAR.cy + 50} text-anchor="middle" class="j-ww-tytul">${tytul}</text>
     </svg>
     <input ref=${suwak} type="range" class="j-ww-suwak" min="0" max=${n - 1} step="1" value=${Math.max(0, i)}
       aria-label=${L("Wysiłek myślenia", "Thinking effort")} aria-valuetext=${p || "auto"}
       onInput=${(e) => setPod(Number(e.currentTarget.value))}
       onPointerUp=${(e) => onWybierz(poziomy[Number(e.currentTarget.value)])}
       onKeyDown=${(e) => { if (e.key === "Enter") { e.preventDefault(); onWybierz(poziomy[Math.max(0, i)]); } }}/>
-    <div class="j-ww-wsk2">
-      <span>${L("Szybkość", "Speed")}</span>${segmenty(i >= 0 ? 6 - glebia : 0)}
-      <span>${L("Głębia", "Depth")}</span>${segmenty(glebia, "is-gl")}
-    </div>
-    <p class="j-ww-opis" aria-live="polite">${opis}</p>
   </div>`;
 }
 
