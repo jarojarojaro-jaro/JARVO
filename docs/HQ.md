@@ -1191,8 +1191,9 @@ innych kanałów etap 6.
   „modele podzielone na subskrypcje, effort fajne grafiki”): **model** (szukajka, dostawcy z `grupy` w `GET
   /rozmowy/<id>/opcje` jako „subskrypcja” albo „klucz API · za tokeny”, zwijane, bieżący rozwinięty i pierwszy, w nich
   rodziny Opus, Sonnet, Fable, Mythos, Haiku, potem reszta alfabetycznie, od najnowszych, przy modelu okno kontekstu;
-  datowane dublety typu `claude-haiku-4-5-20251001` ukryte), **wysiłek** (skala słupków od `off` do `max` z opisem
-  poziomu pod kursorem, strzałki ← →, „Jak ustawienie agenta”), **kontekst** (duży pierścień, tokeny w oknie, ostatnia
+  datowane dublety typu `claude-haiku-4-5-20251001` ukryte), **wysiłek** (zegar: łuk 220° z podziałką poziomów od stali
+  do bursztynu przy `max`, sprężysta wskazówka jedzie za kursorem, klik w zegar ustawia; pod nim nazwa poziomu, suwak
+  ze strzałkami i Enterem, wskaźniki szybkości i głębi, opis, „Jak ustawienie agenta”), **kontekst** (duży pierścień, tokeny w oknie, ostatnia
   kompresja „611k → 44k”, wejście, wyjście, cache, koszt dziś i sesji jako równoważnik cen API, omp: pole „na czym się
   skupić” i **Skompresuj teraz** = `/compact <tekst>`, Hermes: `/context`). ⚡ przełącza od razu; wybór idzie komendą
   `/model`, `/effort`, `/fast`, `/compact` (zostaje w rozmowie). Dane: `GET /rozmowy/<id>/licznik` od razu po każdej
