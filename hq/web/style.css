@@ -1200,7 +1200,8 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   padding: 8px; transition: grid-template-columns .32s var(--j-serwo); }
 .j-uklad.is-zwiniety { grid-template-columns: 0 minmax(0, 1fr); column-gap: 0; }
 .j-uklad.is-zwiniety .j-pasek { visibility: hidden; }
-.j-zaslona-paska { display: none; }
+/* zasłona zawsze poza przepływem (agent Mobile 23.11: w trakcie gestu jako element gridu spychała treść o 180 px) */
+.j-zaslona-paska { display: none; position: absolute; inset: 0; z-index: 30; background: var(--j-zaslona); }
 .j-glowna { position: relative; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; height: 100%; }
 .j-gora { position: relative; height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 0 0 12px; flex: none; }
 .j-gora::after { align-self: stretch; display: grid; place-items: center; width: 48px; box-shadow: inset 2px 0 0 var(--j-rowek); }
@@ -1921,6 +1922,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-sz-tresc h3:focus, .j-gora-t:focus { outline: none; }
 .j-komp-pasek { display: flex; align-items: center; gap: 8px; padding: 0 8px 8px; min-width: 0; }
 .j-komp-pod { min-height: 16px; margin: 6px 0 8px; font-size: 12px; color: var(--j-tekst-2); line-height: 1.4; }
+.j-komp-pod:empty { min-height: 0; margin: 0; }
 .j-komp-pod.is-zle { color: var(--j-blad); }
 .j-msg-stan.is-dop { gap: 4px; }
 .j-komp-w.is-start { margin-top: 26px; }
@@ -2038,7 +2040,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   .j-pasek { position: absolute; left: 0; top: 0; bottom: 0; width: min(304px, 86%); z-index: 40; transform: translateX(-102%); visibility: hidden;
     transition: transform .32s var(--j-serwo), visibility 0s .32s; box-shadow: var(--j-cien-2); }
   .j-uklad.is-wysuniety .j-pasek { transform: none; visibility: visible; transition: transform .32s var(--j-serwo); }
-  .j-uklad.is-wysuniety .j-zaslona-paska { display: block; position: absolute; inset: 0; z-index: 30; background: var(--j-zaslona); }
+  .j-uklad.is-wysuniety .j-zaslona-paska { display: block; }
   .j-uklad .j-menu-btn, .j-uklad .j-zamknij-pasek { display: inline-grid; }
   .j-uklad .j-zwin { display: none; }
   .j-gora { padding-left: 8px; }
@@ -2071,6 +2073,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   .j-plik.is-obraz .j-plik-mini { height: 180px; }
   .j-md-tab :is(th, td) { white-space: nowrap; padding: 6px 10px; }
   .j-dok { padding: 0 0 env(safe-area-inset-bottom); }
+  .j-glowna.is-rozmowca .j-dok { padding-bottom: 0; }      /* bezpieczny obszar ma pasek rozmówców pod polem */
   .j-komp-pod { margin: 4px 8px 6px; }
   .j-komp-pole, .j-komp-w.is-start .j-komp-pole { font-size: 16px; padding: 12px 14px 4px; min-height: 50px; }
   .j-zywo { left: 8px; max-width: calc(100% - 16px); }

@@ -229,7 +229,7 @@ function useGestPaska(wlaczony, otwarty) {
       const x = otwarty ? Math.min(0, g.dx) : Math.min(0, g.dx - g.w);
       g.p.style.transform = `translateX(${x}px)`;
       const z = zaslona();
-      if (z) { z.style.display = "block"; z.style.opacity = String(1 + x / g.w); }
+      if (z) { z.style.display = "block"; z.style.pointerEvents = "none"; z.style.opacity = String(1 + x / g.w); }
     };
     const koniec = () => {
       if (!g || !g.ruch) { g = null; return; }
@@ -244,7 +244,7 @@ function useGestPaska(wlaczony, otwarty) {
       if (otworz !== otwarty) sklep.zmien("pasek", { otwarty: otworz, zwiniety: false });
       setTimeout(() => {
         p.style.transition = p.style.transform = p.style.visibility = "";
-        if (z) z.style.display = z.style.opacity = z.style.transition = "";
+        if (z) z.style.display = z.style.opacity = z.style.transition = z.style.pointerEvents = "";
       }, 260);
     };
     const d = document;
