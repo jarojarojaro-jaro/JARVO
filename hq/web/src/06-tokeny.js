@@ -31,6 +31,8 @@ function useWidokTelefonu() {
       ramka = requestAnimationFrame(() => {
         el.style.setProperty("--j-vh", `${Math.round(vv.height)}px`);
         el.style.setProperty("--j-vtop", `${Math.max(0, Math.round(vv.offsetTop))}px`);
+        // klawiatura wysunięta: bez paska rozmówców i bez bezpiecznego obszaru pod polem (martwy pas nad klawiaturą)
+        el.toggleAttribute("data-klawiatura", window.innerHeight - vv.height > 120);
       });
     };
     licz();

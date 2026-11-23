@@ -2074,6 +2074,9 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   .j-md-tab :is(th, td) { white-space: nowrap; padding: 6px 10px; }
   .j-dok { padding: 0 0 env(safe-area-inset-bottom); }
   .j-glowna.is-rozmowca .j-dok { padding-bottom: 0; }      /* bezpieczny obszar ma pasek rozmówców pod polem */
+  /* klawiatura wysunięta (06-tokeny.js): pole przylega do klawiatury, pasek rozmówców i dolny margines znikają */
+  :root[data-klawiatura] .j-dok-rozm { display: none; }
+  :root[data-klawiatura] .j-dok, :root[data-klawiatura] .j-start { padding-bottom: 0; }
   .j-komp-pod { margin: 4px 8px 6px; }
   .j-komp-pole, .j-komp-w.is-start .j-komp-pole { font-size: 16px; padding: 12px 14px 4px; min-height: 50px; }
   .j-zywo { left: 8px; max-width: calc(100% - 16px); }
