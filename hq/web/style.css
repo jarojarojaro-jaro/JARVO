@@ -2421,7 +2421,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   /* belka: z okruszków tylko bieżący poziom (wstecz jest w panelu poziomu), źródła wąsko i w jednej linii */
   .j-mozg-okruszki { overflow: hidden; }
   .j-mozg-ok:not(:last-child), .j-mozg-ok-sep { display: none; }
-  .j-mozg-ok:last-child > * { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .j-mozg-ok:last-child > :not(.j-mozg-ok-sep) { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .j-mozg-zrodla { flex: none; }
   .j-mozg-zrodla button { padding: 0 12px; white-space: nowrap; font: 600 11px var(--j-font-mono); letter-spacing: .1em; }
   .j-mozg-zr-d { display: none; }
