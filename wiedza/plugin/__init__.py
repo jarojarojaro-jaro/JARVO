@@ -136,9 +136,9 @@ def blokada_przed_tura(**kwargs) -> Optional[Dict[str, Any]]:
 
 
 def blokada_bez_ciszy(**kwargs) -> Optional[str]:
-    """Hak `transform_llm_output` (Hermes bierze pierwszy wynik tekstowy, więc obie straże w jednym haku):
-    blokada `needs_input` nigdy nie kończy się `[SILENT]` (cisza_tablicy.py), a tekst do właściciela idzie bez
-    myślników (styl.py, właściciel 20.11)."""
+    """Hak `transform_llm_output` (Hermes bierze pierwszy wynik tekstowy, więc wszystkie straże w jednym haku):
+    blokada `needs_input` nigdy nie kończy się `[SILENT]` (cisza_tablicy.py), brief nie pyta o sprawy już ustalone
+    (briefy.py `filtruj_brief`), a tekst do właściciela idzie bez myślników (styl.py, właściciel 20.11)."""
     tekst = kwargs.get("response_text")
     try:
         po_ciszy = _modul("jarvo_cisza_tablicy", "cisza_tablicy.py").po_odpowiedzi(**kwargs)
@@ -147,11 +147,69 @@ def blokada_bez_ciszy(**kwargs) -> Optional[str]:
         po_ciszy = None
     wynik = po_ciszy if isinstance(po_ciszy, str) and po_ciszy else tekst
     try:
+        if isinstance(wynik, str) and "Brief B-" in wynik and (b := _briefy()) is not None:
+            wynik, wyciete = b.filtruj_brief(wynik, _sciezki(_hermes_home())[0])
+            if wyciete:
+                logger.info("jarvo-wiedza: brief bez %d pytań o sprawy ustalone (%s)", len(wyciete),
+                            ", ".join(w["ustalona"]["numer"] for w in wyciete))
+    except Exception as e:
+        logger.warning("jarvo-wiedza: filtr briefu niedostępny: %s", e)
+    try:
         if isinstance(wynik, str):
             wynik = _modul("jarvo_styl", "styl.py").bez_myslnikow(wynik)
     except Exception as e:
         logger.warning("jarvo-wiedza: styl odpowiedzi niedostępny: %s", e)
     return wynik if isinstance(wynik, str) and wynik and wynik != tekst else None
+
+
+def _briefy():
+    """briefy.py ze skryptów Jarva (profil `jarvo` albo korzeń danych, z którego brama prowadzi Jarva); None u innych
+    agentów floty: briefy i ich odpowiedzi są tylko Jarva."""
+    home = _hermes_home()
+    if _profil(home) not in ("jarvo", "host"):
+        return None
+    plik = _korzen(home) / "profiles" / "jarvo" / "scripts" / "briefy.py"
+    if not plik.exists():
+        return None
+    katalog = str(plik.parent)
+    if katalog not in sys.path:
+        sys.path.insert(0, katalog)                 # briefy.py importuje _sciezki obok siebie
+    spec = importlib.util.spec_from_file_location("jarvo_briefy", plik)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def odpowiedz_na_brief(user_message: Any = None, conversation_history: Any = None, **_kw: Any) -> Optional[Dict[str, Any]]:
+    """Hak `pre_llm_call`: wiadomość właściciela w odpowiedzi na brief trafia do tabeli briefu kodem, zanim model
+    cokolwiek zrobi (23.11 właściciel: „odpowiadam na coś, a on mnie pyta o to samo”; Jarvo nie wpisał odpowiedzi
+    z 20.11 i brief pytał o nie przez 3 dni). Model dostaje, co zapisano i czego nie przypisano. Błąd = log."""
+    if not isinstance(user_message, str) or not user_message.strip():
+        return None
+    try:
+        b = _briefy()
+        if b is None:
+            return None
+        poprzednia = ""
+        for w in reversed(list(conversation_history or [])):
+            if isinstance(w, dict) and w.get("role") == "assistant" and isinstance(w.get("content"), str):
+                poprzednia = w["content"]
+                break
+        wynik = b.odpowiedz_z_wiadomosci(user_message, poprzednia, _sciezki(_hermes_home())[0])
+    except Exception as e:
+        logger.warning("jarvo-wiedza: zapis odpowiedzi na brief: %s", e)
+        return None
+    if not wynik:
+        return None
+    numer, przypisane, puste = wynik
+    skrypt = f'"{sys.executable}" "{b.__file__}"'
+    zapis = "; ".join(f"{n}: {s}" for n, s in przypisane.items()) or "żaden wiersz (słowa zapisane w notatce)"
+    tekst = (f"Ta wiadomość odpowiada na brief {numer}; kod zapisał w tabeli briefu: {zapis}. "
+             f"Wdróż te odpowiedzi (decision-queue) i wpisz, co zrobione: {skrypt} zrobione <B-…/n> \"…\".")
+    if puste:
+        tekst += (f" Bez odpowiedzi zostały: {', '.join(puste)}; jeśli wiadomość na któreś odpowiada, wpisz jego słowa: "
+                  f"{skrypt} odpowiedz <B-…/n> \"…\".")
+    return {"context": tekst}
 
 
 def przypomnienie_bledu(tool_name: str = "", result: Any = None, status: str = "", session_id: str = "", task_id: str = "",
@@ -1656,7 +1714,8 @@ def register(ctx) -> None:
         ctx.register_hook("post_tool_call", cisza_po_narzedziu)
     except Exception as e:
         logger.debug("jarvo-wiedza: cisza tablicy nie zarejestrowana: %s", e)
-    for hak, funkcja in (("pre_llm_call", blokada_przed_tura), ("transform_llm_output", blokada_bez_ciszy)):
+    for hak, funkcja in (("pre_llm_call", blokada_przed_tura), ("pre_llm_call", odpowiedz_na_brief),
+                         ("transform_llm_output", blokada_bez_ciszy)):
         try:
             ctx.register_hook(hak, funkcja)
         except Exception as e:

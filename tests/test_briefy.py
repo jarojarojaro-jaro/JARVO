@@ -75,3 +75,66 @@ def test_otwarte_odpowiedzi_i_powtorka_zamyka_stara(tmp_path):
     assert briefy.tydzien(dzis, k) == [{"numer": "B-2026-11-12", "decyzje": 3, "z_odpowiedzia": 1, "przeniesione": 1},
                                        {"numer": "B-2026-11-13", "decyzje": 2, "z_odpowiedzia": 0, "przeniesione": 0}]
     assert briefy.otwarte(k, dt.date(2026, 12, 1)) == []                                           # po 14 dniach nie wraca
+
+
+# 23.11: właściciel odpowiedział na brief B-2026-11-20 w panelu, Jarvo nie wpisał odpowiedzi do tabeli, a briefy 21–23.11
+# pytały o te same sprawy innymi słowami (bez „(z …)”). Odpowiedź zapisuje kod, a brief nie pyta o sprawy ustalone.
+BRIEF_20 = """☀️ Brief B-2026-11-20 · Dzień dobry. Stan floty:
+Czeka na Ciebie (5 decyzji):
+1. Monid: poprosić ich o wynik testowy, a ICP.yaml dla jarodev.pl zrobić osobną kartą? Rekomenduję tak. (z B-2026-11-18/4 i /5)
+2. Jarodev: przydzielić telefon „second” i włączyć rutynę dnia? Rekomenduję tak, bez tego lejek nie ruszy.
+3. Ankiety: wysłać gotową prośbę do OneFormy o zgodę Project Ownera? Rekomenduję tak, to jedyna legalna droga.
+4. 🛠 Pomijać zdublowane linki: wczoraj ten sam link context.dev przyszedł dwa razy w minutę, każde powtórzenie to drugi pełny research. Rekomenduję tak, tanie.
+5. AssemblyAI: zapisać 3 klucze do `konfig/assemblyai-konta/`? Rekomenduję tak, bo inaczej $150 kredytów leży bezużyteczne.
+Odpowiedz np. „1 ok, 2 nie”."""
+
+BRIEF_23 = """☀️ Brief B-2026-11-23 · Dzień dobry. Stan floty:
+Czeka na Ciebie (4 decyzji):
+1. Monid: nie zakładać konta za $1, poprosić o wynik testowy mailem, ICP.yaml zrobić osobno? Wisi 5 dni. (z B-2026-11-18/4)
+2. 🛠 Pomijać zdublowane linki: ten sam link przyszedł dwa razy w minutę, a każde powtórzenie to drugi research. Wisi 4 dni.
+3. Szukać zamiennika wyszukiwarki przed 1.01.2027, bo Google zamyka Custom Search API? Rekomenduję tak.
+4. AssemblyAI: zapisać 3 klucze w `konfig/assemblyai-konta/`? Rekomenduję tak, bez tego $150 kredytów leży bezużyteczne.
+Dziś w planie: patrol co 30 min.
+Odpowiedz np. „1 ok, 2 nie”."""
+
+
+def test_odpowiedz_na_brief_zapisuje_kod_i_brief_nie_pyta_o_ustalone(tmp_path):
+    k, out = tmp_path / "knowledge", tmp_path / "output"
+    k.mkdir()
+    wyjscie(out, "jarvo-daily-brief", dt.datetime(2026, 11, 20, 7, 51), BRIEF_20)
+    briefy.synchronizuj(k, out)
+    odp = ("> Odpowiadam na raport „Poranny brief” (07:51): ☀️ Brief B-2026-11-20 · Dzień dobry. Stan floty:\n\n"
+           "1 - na monid trzeba zalozyc konta i skorzystac z ich free creditow\nJarodev jeszcze nie, ale pamiętać\n"
+           "4 pomijac zdublowane linki - dawac znac ze byl juz research\n5 tak assembly ai zapisac oczyiwscie")
+    numer, przypisane, puste = briefy.odpowiedz_z_wiadomosci(odp, "", k, dt.datetime(2026, 11, 20, 14, 21))
+    assert numer == "B-2026-11-20" and puste == ["B-2026-11-20/3"]
+    assert przypisane == {"B-2026-11-20/1": "1 na monid trzeba zalozyc konta i skorzystac z ich free creditow",
+                          "B-2026-11-20/4": "4 pomijac zdublowane linki - dawac znac ze byl juz research",
+                          "B-2026-11-20/5": "5 tak assembly ai zapisac oczyiwscie",
+                          "B-2026-11-20/2": "Jarodev jeszcze nie, ale pamiętać"}
+    notatka = (k / "briefy" / "B-2026-11-20.md").read_text(encoding="utf-8")
+    assert "| „5 tak assembly ai zapisac oczyiwscie” (20.11 14:21) | 2026-11-20 |" in notatka
+    assert "## Odpowiedzi właściciela" in notatka and "- 2026-11-20 14:21: „1 - na monid" in notatka   # surowo, nic nie ginie
+    # brief 23.11 pyta o te same sprawy innymi słowami: zostaje tylko nowa, przenumerowana, z poprawną liczbą
+    tekst, wyciete = briefy.filtruj_brief(BRIEF_23, k, dt.date(2026, 11, 23))
+    assert [w["ustalona"]["numer"] for w in wyciete] == ["B-2026-11-20/1", "B-2026-11-20/4", "B-2026-11-20/5"]
+    assert "Czeka na Ciebie (1 decyzja):\n1. Szukać zamiennika wyszukiwarki" in tekst
+    assert "AssemblyAI" not in tekst and "zdublowane" not in tekst and "Dziś w planie: patrol" in tekst
+    assert [o["numer"] for o in briefy.otwarte(k, dt.date(2026, 11, 23))] == ["B-2026-11-20/3"]
+
+
+def test_odpowiedz_tylko_na_brief(tmp_path):
+    k, out = tmp_path / "knowledge", tmp_path / "output"
+    k.mkdir()
+    wyjscie(out, "jarvo-daily-brief", dt.datetime(2026, 11, 20, 7, 51), BRIEF_20)
+    briefy.synchronizuj(k, out)
+    # zwykła wiadomość, raport innej rutyny i prompt rutyny z numerami decyzji: nic nie zapisane
+    assert briefy.odpowiedz_z_wiadomosci("1 rzecz: zrób stronę", "", k) is None
+    assert briefy.odpowiedz_z_wiadomosci("> Odpowiadam na raport „Patrol floty” (09:00): ok\n\n1 ok", "", k) is None
+    assert briefy.odpowiedz_z_wiadomosci("Dane: otwarte B-2026-11-20/3 (3 dni)", "", k) is None
+    # Telegram: odpowiedź na wiadomość z briefem; po czasie numerem pozycji; „1.01.2027” to nie pozycja
+    tg = f'[Replying to your previous message: "{BRIEF_20}"]\n\n3 nie, przed 1.01.2027 wrócimy'
+    assert briefy.odpowiedz_z_wiadomosci(tg, "", k)[1] == {"B-2026-11-20/3": "3 nie, przed 1.01.2027 wrócimy"}
+    assert briefy.odpowiedz_z_wiadomosci("B-2026-11-20/2 tak", "", k)[1] == {"B-2026-11-20/2": "2 tak"}
+    assert briefy.odpowiedz_z_wiadomosci("1 ok, 5 nie", "☀️ Brief B-2026-11-20 · Dzień dobry", k)[1] == {
+        "B-2026-11-20/1": "1 ok", "B-2026-11-20/5": "5 nie"}

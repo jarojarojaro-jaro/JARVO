@@ -1,7 +1,7 @@
 ---
 name: decision-queue
 description: "Decyzje dla użytkownika: zbierz, zapytaj zbiorczo, wdroż."
-version: 1.3.0
+version: 1.4.0
 author: Jarvo
 license: MIT
 metadata:
@@ -54,12 +54,8 @@ Dla każdej odpowiedzi:
 4. dla A2: zlecenie wykonania akcji (np. karta „wdrożenie” dla `jarvo-web` z wyraźnym „właściciel zatwierdził
    (<data> <godzina>): „<jego słowa>”, wersja <odcisk>”). Wykonawca sprawdza odcisk przed akcją; niezgodny = pliki
    zmieniły się po zgodzie = nowe pytanie,
-5. **brief w skarbcu:** w tabeli „Decyzje” notatki briefu wypełnij wiersz tej pozycji (`read_file`, potem jeden `patch`
-   na wszystkie odpowiedzi): odpowiedź właściciela jego słowami, krótko; data RRRR-MM-DD; co zrobione („karta t_… założona”,
-   „wstrzymane do pilota”, „cennik zapisany w misji”). To jedyne źródło prawdy: `briefy.py otwarte` czyta tylko kolumnę
-   „Odpowiedź właściciela” tabeli briefu, więc odpowiedź wpisana tylko w `MISSION.md` dla floty nie istnieje, a pusty
-   wiersz wraca jutro jako decyzja bez odpowiedzi (B-2026-11-15: 0/4, choć wszystkie 4 były rozstrzygnięte). Po
-   zamknięciu misji dopisz do wiersza jej numer i „co zrobione”. Bez `|` w komórkach. Wiersza nie usuwasz i nie zmieniasz numeru,
+5. **brief w skarbcu:** odpowiedź właściciela kod wpisuje do tabeli briefu sam (dopisek w turze mówi, co zapisał), a Ty
+   wpisujesz `@@PY@@ "$HERMES_HOME/scripts/briefy.py" zrobione B-…/n "co zrobione"` i, dla wiersza, którego kod nie przypisał, `… odpowiedz B-…/n "jego słowa"`.
 6. **trwałe ustalenie** (cena, zasada, kierunek, „nie robimy X”): jeden szkic `wiedza_zapisz(typ="decyzja", …,
    zrodlo="brief B-…/n, odpowiedź właściciela RRRR-MM-DD")`; korekta faktu o właścicielu albo jego pracy: `wiedza_orzeczenie`.
    Jednorazowe „ok, rób” bez ustalenia na przyszłość: bez szkicu (zapis jest w tabeli briefu).

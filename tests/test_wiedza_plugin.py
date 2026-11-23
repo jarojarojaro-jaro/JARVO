@@ -985,3 +985,44 @@ def test_haki_po_ladowaniu_jak_hermes_i_odmowa_komputera_u_pracownika_karty(tmp_
     licznik = w.licznik_bledow(sk.stan)
     assert licznik["bledy/ekran komputera zajęty przez inną kartę"]["przypomnien"] == 1
     assert licznik["bledy/google nie loguje w przeglądarce komputera, konta google na telefonie"]["przypomnien"] == 1
+
+
+def test_odpowiedz_na_brief_hakiem_i_brief_bez_ustalonych(tmp_path, monkeypatch):
+    """23.11 właściciel: „odpowiadam na coś, a on mnie pyta o to samo”. Odpowiedź na brief zapisuje hak `pre_llm_call`
+    (kod, nie model), a `transform_llm_output` wycina z nowego briefu pytanie o sprawę ustaloną; agent floty bez zmian."""
+    root = tmp_path / "dane"
+    skrypty = root / "profiles" / "jarvo" / "scripts"
+    skrypty.mkdir(parents=True)
+    for plik in ("briefy.py", "_sciezki.py"):
+        shutil.copy2(REPO / "profiles" / "jarvo" / "scripts" / plik, skrypty / plik)
+    monkeypatch.delenv("JARVO_KNOWLEDGE_DIR", raising=False)
+    monkeypatch.setenv("HERMES_HOME", str(root / "profiles" / "jarvo"))
+    haki = []
+
+    class Ctx:
+        def register_memory_provider(self, provider): pass
+        def register_hook(self, nazwa, f): haki.append((nazwa, f))
+        def register_auxiliary_task(self, *a, **k): pass
+
+    pl.register(Ctx())
+    przed = [f for n, f in haki if n == "pre_llm_call"]
+    assert pl.odpowiedz_na_brief in przed and pl.blokada_przed_tura in przed
+    briefy = root / "jarvo" / "knowledge" / "briefy"
+    briefy.mkdir(parents=True)
+    (briefy / "B-2026-11-20.md").write_text(
+        "# Poranny brief B-2026-11-20\n\n## Decyzje\n\n| Numer | Decyzja | Odpowiedź właściciela | Kiedy | Co zrobione |\n|---|---|---|---|---|\n"
+        "| B-2026-11-20/1 | AssemblyAI: zapisać 3 klucze do `konfig/assemblyai-konta/`? Rekomenduję tak. |  |  |  |\n\n## Treść\n\nx\n",
+        encoding="utf-8")
+    wynik = pl.odpowiedz_na_brief(user_message="> Odpowiadam na raport „Poranny brief” (07:51): ☀️ Brief B-2026-11-20\n\n1 tak, zapisać",
+                                  conversation_history=[], session_id="s", turn_id="t")
+    assert "B-2026-11-20/1: 1 tak, zapisać" in wynik["context"] and "zrobione" in wynik["context"]
+    assert "| „1 tak, zapisać”" in (briefy / "B-2026-11-20.md").read_text(encoding="utf-8")
+    assert pl.odpowiedz_na_brief(user_message="co słychać?", conversation_history=[]) is None
+    brief = ("☀️ Brief B-2026-11-23 · Dzień dobry.\nCzeka na Ciebie (2 decyzji):\n"
+             "1. AssemblyAI: zapisać 3 klucze w `konfig/assemblyai-konta/`? Rekomenduję tak.\n"
+             "2. Szukać zamiennika wyszukiwarki przed 1.01.2027? Rekomenduję tak.\nOdpowiedz np. „1 ok”.")
+    nowy = pl.blokada_bez_ciszy(response_text=brief, session_id="cron", turn_id="t2")
+    assert "AssemblyAI" not in nowy and "(1 decyzja):\n1. Szukać zamiennika" in nowy
+    monkeypatch.setenv("HERMES_HOME", str(root / "profiles" / "jarvo-web"))               # inny agent: bez briefów
+    assert pl.odpowiedz_na_brief(user_message="> Odpowiadam na raport „Poranny brief” (07:51): Brief B-2026-11-20\n\n1 nie",
+                                 conversation_history=[]) is None
