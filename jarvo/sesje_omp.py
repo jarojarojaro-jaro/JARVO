@@ -400,6 +400,7 @@ class Tura:
         self.pominiete: set[str] = {p.name for p in rdzen.czekajace(self.w)} if gdzie is not None else set()
         self.przygotowane: queue.Queue = queue.Queue()
         self.odpowiedz = ""
+        self.koncowe: list[str] = []               # teksty asystenta po ostatnim wywołaniu narzędzia (odpowiedź tury)
         self.prompt_id: str | None = None
         self.wynik: dict | None = None if gdzie is not None else {"status": "completed"}
         self.cisza = False
@@ -430,8 +431,14 @@ class Tura:
         elif typ == "message_end":
             m = e.get("message") or {}
             tekst = _tekst(m)
-            if m.get("role") == "assistant" and tekst:
-                self.odpowiedz = tekst
+            narzedzia = any(isinstance(c, dict) and c.get("type") == "toolCall" for c in m.get("content") or [])
+            if m.get("role") == "assistant" and narzedzia:
+                self.koncowe = []                     # tekst przy wywołaniu narzędzia to komentarz w trakcie, nie odpowiedź
+            elif m.get("role") == "assistant" and tekst:
+                # odpowiedź = wszystkie teksty po ostatnim narzędziu: 23.11 Kernel napisał pełne podsumowanie linków,
+                # dostał dopisek i dopisał jedno zdanie o nim; właściciel dostał tylko to zdanie (140 znaków)
+                self.koncowe.append(tekst)
+                self.odpowiedz = "\n\n".join(self.koncowe)
             elif m.get("role") == "user":
                 for nazwa, d in self.dopiski.items():
                     if d["stan"] == "wyslany" and d["tekst"].strip() == tekst:

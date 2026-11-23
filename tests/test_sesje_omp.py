@@ -316,6 +316,24 @@ def test_licznik_po_compact_i_zmianach_z_terminala(w, at):
     assert (om.licznik(w)["myslenie"], om.licznik(w)["fast"]) == ("xhigh", True)
 
 
+def test_odpowiedz_tury_to_wszystkie_teksty_po_ostatnim_narzedziu():
+    """23.11: Kernel napisał podsumowanie 13 linków, w tej chwili doszedł dopisek, dopisał zdanie o nim i właściciel
+    dostał tylko to zdanie. Odpowiedź tury = wszystkie teksty po ostatnim wywołaniu narzędzia; komentarz przy
+    wywołaniu narzędzia („Meanwhile…”) nie jest odpowiedzią."""
+    t = so.Tura.__new__(so.Tura)
+    t.koncowe, t.odpowiedz, t.dopiski, t.f, t.wynik, t.cisza, t.koniec, t.prompt_id, t.usuwane = \
+        [], "", {}, None, None, False, False, None, {}
+    asystent = lambda tekst, narzedzie=False: {"type": "message_end", "message": {"role": "assistant", "content":  # noqa: E731
+        [{"type": "text", "text": tekst}] + ([{"type": "toolCall", "id": "c", "name": "bash"}] if narzedzie else [])}}
+    for e in (asystent("Meanwhile wiersz w rejestrze.", True),
+              {"type": "message_end", "message": {"role": "toolResult", "content": [{"type": "text", "text": "ok"}]}},
+              asystent("Podsumowanie: 1. Strata… 13. Multi-Branch."),
+              {"type": "message_end", "message": {"role": "user", "content": [{"type": "text", "text": "dopisek"}]}},
+              asystent("Punkt 14 zapisany, commit 92be3f2.")):
+        t.zdarzenie(e)
+    assert t.odpowiedz == "Podsumowanie: 1. Strata… 13. Multi-Branch.\n\nPunkt 14 zapisany, commit 92be3f2."
+
+
 def test_opcje_panelu_w_procesie_rpc_i_liczniku(w, at):
     """`/effort` i `/fast` z panelu (model.json: `myslenie`, `fast`, obok modelu) skrzynka stosuje w procesie RPC
     (`set_thinking_level`, `set_fast_mode`) przed turą, bez restartu procesu; licznik pokazuje je, a podsumowanie
