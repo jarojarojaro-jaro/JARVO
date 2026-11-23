@@ -788,7 +788,7 @@ class Rejestr:
             self._omp_sledzone[pid] = self._zadanie(self._omp_petla(pid))
 
     def _omp_zdarzenie(self, pid: str, e: Mapping) -> None:
-        teraz = self.zegar()
+        teraz = float(e["t"]) if isinstance(e.get("t"), (int, float)) else self.zegar()   # czas z ogona tury (restart panelu)
         utajnij = self.utajnij or str
         ref = f"o:_:{e['id']}" if e.get("id") else ""
         if e.get("typ") == "delta" and e.get("tekst"):

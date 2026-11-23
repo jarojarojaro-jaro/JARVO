@@ -448,6 +448,8 @@ class Tura:
 
     def _zapisz(self, z: dict) -> None:
         if self.f is not None:
+            if z.get("typ") in ("narzedzie", "narzedzie_koniec", "mysl"):   # czas kroku przeżywa restart panelu
+                z = {**z, "t": round(time.time(), 3)}
             self.f.write(json.dumps(z, ensure_ascii=False) + "\n")
             self.f.flush()
 
