@@ -197,6 +197,65 @@ function useSkrotyAplikacji() {
   }, []);
 }
 
+// telefon i wąski ekran: pasek rozmów wysuwa się ruchem palca w prawo z każdego miejsca (23.11 właściciel: „chcę sobie
+// swipnąć na dashboard, jak jestem w czacie”) i chowa ruchem w lewo; pasek idzie za palcem, puszczenie po 30%
+// szerokości albo szybki ruch kończy gest. Pionowe przewijanie, pola tekstu, tabele, kod i Mózg (własne
+// przeciąganie) zostają bez zmian.
+const BEZ_GESTU = "input, textarea, select, pre, .j-md-tab, .j-mozg, .j-wys, .j-menu, .j-okno, [data-bez-gestu]";
+function useGestPaska(uklad, wlaczony, otwarty) {
+  useEffect(() => {
+    const el = uklad.current;
+    if (!el || !wlaczony) return undefined;
+    let g = null;
+    const pasekEl = () => el.querySelector(".j-pasek"), zaslona = () => el.querySelector(".j-zaslona-paska");
+    const start = (e) => {
+      const t = e.touches[0];
+      g = e.touches.length === 1 && !e.target.closest(BEZ_GESTU) ? { x: t.clientX, y: t.clientY, t: performance.now(), dx: 0, ruch: null } : null;
+    };
+    const ruch = (e) => {
+      if (!g) return;
+      const t = e.touches[0];
+      g.dx = t.clientX - g.x;
+      const dy = t.clientY - g.y;
+      if (g.ruch === null) {
+        if (Math.abs(g.dx) < 10 && Math.abs(dy) < 10) return;
+        g.ruch = Math.abs(g.dx) > Math.abs(dy) * 1.3 && (otwarty ? g.dx < 0 : g.dx > 0);
+        if (!g.ruch) { g = null; return; }
+        g.p = pasekEl(); g.w = g.p.offsetWidth;
+        g.p.style.transition = "none"; g.p.style.visibility = "visible";
+      }
+      const x = otwarty ? Math.min(0, g.dx) : Math.min(0, g.dx - g.w);
+      g.p.style.transform = `translateX(${x}px)`;
+      const z = zaslona();
+      if (z) { z.style.display = "block"; z.style.opacity = String(1 + x / g.w); }
+    };
+    const koniec = () => {
+      if (!g || !g.ruch) { g = null; return; }
+      const v = Math.abs(g.dx) / Math.max(1, performance.now() - g.t);
+      const otworz = (Math.abs(g.dx) > g.w * 0.3 || v > 0.5) !== otwarty;
+      const { p } = g, z = zaslona();
+      g = null;
+      // dokończenie ruchu z miejsca, gdzie palec puścił; potem styl wraca do klas (is-wysuniety)
+      p.style.transition = "transform .24s var(--j-serwo)";
+      p.style.transform = otworz ? "translateX(0)" : "translateX(-102%)";
+      if (z) { z.style.transition = "opacity .24s"; z.style.opacity = otworz ? "1" : "0"; }
+      if (otworz !== otwarty) sklep.zmien("pasek", { otwarty: otworz, zwiniety: false });
+      setTimeout(() => {
+        p.style.transition = p.style.transform = p.style.visibility = "";
+        if (z) z.style.display = z.style.opacity = z.style.transition = "";
+      }, 260);
+    };
+    el.addEventListener("touchstart", start, { passive: true });
+    el.addEventListener("touchmove", ruch, { passive: true });
+    el.addEventListener("touchend", koniec);
+    el.addEventListener("touchcancel", koniec);
+    return () => {
+      el.removeEventListener("touchstart", start); el.removeEventListener("touchmove", ruch);
+      el.removeEventListener("touchend", koniec); el.removeEventListener("touchcancel", koniec);
+    };
+  }, [wlaczony, otwarty]);
+}
+
 // pierwsze spotkanie (37-poznajmy.js, pakiet „poznajmy”): otwarte, dopóki właściciel nie ma profilu i go nie pominął
 const POZNANIE_POMINIETE = "jarvo.poznanie.pominiete.v1";
 const poznanieOtwarte = (got) => !!got && !got.profil_wlasciciela && !Pamiec.wez(POZNANIE_POMINIETE, false);
@@ -329,8 +388,10 @@ function AplikacjaJarvo() {
   const warstwa = staraBaza;
   React.useLayoutEffect(() => { Bezwladnosc.warstwa(warstwa); }, [warstwa]);
   // wysunięty pasek na telefonie jest warstwą: treść obok nieaktywna, Esc zamyka, fokus wraca do przycisku menu
-  const pasekWarstwa = useWaskiEkran() && pasek.otwarty;
+  const waski = useWaskiEkran();
+  const pasekWarstwa = waski && pasek.otwarty;
   React.useLayoutEffect(() => { Bezwladnosc.pasek(pasekWarstwa); }, [pasekWarstwa]);
+  useGestPaska(uklad, waski, pasek.otwarty);
   // <main> powłoki Hermesa nad aplikacją: bez roli, żeby czytnik nie widział dwóch głównych obszarów
   React.useLayoutEffect(() => {
     const m = korzen.current && korzen.current.parentElement && korzen.current.parentElement.closest("main");

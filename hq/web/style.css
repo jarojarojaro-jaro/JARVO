@@ -1206,7 +1206,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-gora::after { align-self: stretch; display: grid; place-items: center; width: 48px; box-shadow: inset 2px 0 0 var(--j-rowek); }
 .j-gora-t { font: 700 20px/24px var(--j-font-naglowek) !important; font-stretch: 125% !important; letter-spacing: -.005em !important; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; min-width: 0; color: var(--j-tekst); }
-.j-uklad .j-menu-btn, .j-uklad .j-zamknij-pasek, .jarvo-app .j-na-telefonie { display: none; }
+.j-uklad .j-menu-btn, .j-uklad .j-zamknij-pasek, .jarvo-app .j-na-telefonie, .j-uklad .j-pisz, .j-nawig .j-tylko-telefon { display: none; }
 .j-uklad.is-zwiniety .j-menu-btn { display: inline-grid; }
 /* start i nowa rozmowa: belka bez tytułu (tylko przycisk menu) nie stoi pustym modułem, gdy pasek jest widoczny */
 .j-uklad:not(.is-zwiniety) .j-gora:not(.is-watek):not(.is-widok) { display: none; }
@@ -1226,7 +1226,6 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-nowa-plus { font-size: 18px; line-height: 1; font-weight: 400; width: 16px; text-align: center; }
 .j-nowa-t { flex: 1; }
 .j-nowa-skrot { font: 400 10.5px var(--j-font-mono); color: var(--j-tekst-2); }
-.j-nowa.is-duza { margin: 8px 16px 4px; height: 48px; font-size: 15px; }
 .j-szukaj { display: flex; align-items: center; gap: 12px; height: 32px; padding: 0 8px; color: var(--j-tekst-3); flex: none; cursor: text;
   transition: background .24s var(--j-ease), box-shadow .24s var(--j-ease); }
 .j-szukaj:hover { background: var(--j-tlo-hover); }
@@ -2050,6 +2049,17 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   .j-glowna { gap: 0; }
   .j-gora { height: 52px; padding: 0 0 0 4px; gap: 6px; }
   .j-gora::after, .j-gora .j-wspolna, .j-pasek-g::after, .j-komp::after { display: none; }
+  /* pasek na telefonie: nowa rozmowa jako ikona w belce, Aktualizacje, Mózg i Ustawienia w lewym dolnym rogu */
+  .j-pasek { width: min(320px, 86%); padding: 0 10px; }
+  .j-pasek-g { height: 60px; padding: 0 4px 0 8px; }
+  .j-uklad .j-pisz { display: inline-grid; width: 44px; height: 44px; }
+  .j-uklad .j-zamknij-pasek, .j-pasek > .j-nowa, .j-pasek > .j-nawig.is-gora { display: none; }
+  .j-nawig .j-tylko-telefon { display: list-item; }
+  .j-nawig.is-dol { padding-top: 6px; }
+  .j-nawig.is-dol a { height: 44px; font-size: 15px; }
+  .j-nawig.is-dol .j-rozm-skrot, .j-rozm-skrot { display: none; }
+  .j-rozm { min-height: 56px; }
+  .j-stopka { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
   .j-gora-t { flex: 1; font-size: 17px !important; }
   .j-gora-rozm { flex: 1 1 auto; }
   .j-sygn { padding: 0 10px; }
@@ -2143,8 +2153,6 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-rozm-licz { min-width: 22px; height: 16px; padding: 0 5px; background: var(--j-uwaga); color: var(--j-akcent-na); font: 600 11px/16px var(--j-font-mono);
   text-align: center; font-variant-numeric: tabular-nums; display: inline-block; }
 .j-rozm-skrot { font: 400 10.5px var(--j-font-mono); color: var(--j-tekst-3); }
-.j-rozmowcy.is-duza .j-rozm { min-height: 60px; grid-template-columns: 40px 1fr auto; padding: 8px 16px; }
-.j-rozmowcy.is-duza .j-rozm.is-aktywny { margin-right: 0; }
 /* kwadrat stanu w rogu znaku: pusty = wolny, czerwony z sygnałem = pracuje (sama przezroczystość, kompozytor) */
 .j-rk { position: absolute; right: -2px; bottom: -2px; width: 6px; height: 6px; background: var(--j-tlo-pasek); box-shadow: inset 0 0 0 1px var(--j-tekst-3), 0 0 0 2px var(--j-tlo-pasek); }
 .j-rozm.is-aktywny .j-rk { box-shadow: inset 0 0 0 1px var(--j-tekst-2), 0 0 0 2px var(--j-tlo-3); }

@@ -142,7 +142,7 @@ const otworzRozmowce = (r, fokus = true) => {
   Trasa.idz({ widok: "rozmowca", rozmowca: r.klucz });
 };
 
-function ListaRozmowcow({ trasa, duza = false }) {
+function ListaRozmowcow({ trasa }) {
   const rozmowcy = useSklep((s) => s.rozmowcy);
   const ref = useRef(null);
   if (!rozmowcy.length) return null;
@@ -161,17 +161,17 @@ function ListaRozmowcow({ trasa, duza = false }) {
     e.preventDefault();
     el[j].focus();
   };
-  return html`<ul class=${cx("j-rozmowcy", duza && "is-duza")} role="listbox" aria-label=${T("rozm.sekcja")} ref=${ref} onKeyDown=${klawisz}>
+  return html`<ul class="j-rozmowcy" role="listbox" aria-label=${T("rozm.sekcja")} ref=${ref} onKeyDown=${klawisz}>
     ${rozmowcy.map((r, i) => {
       const st = stanRozmowcy(r), n = r.nieprzeczytane || 0;
       const opis = [nazwaRozmowcy(r), slowoStanu(r), n > 0 ? T("watek.nieprzeczytane", { n }) : ""].filter(Boolean).join(", ");
       return html`<li key=${r.klucz} role="option" class=${cx("j-rozm", i === aktywny && "is-aktywny", `is-${st}`)}
           aria-selected=${String(i === aktywny)} tabIndex=${i === wTabie ? "0" : "-1"} aria-label=${opis}
           data-rozmowca=${r.klucz} onClick=${() => otworzRozmowce(r)}>
-        <${AwatarRozmowcy} r=${r} rozmiar=${duza ? 40 : 34}/>
+        <${AwatarRozmowcy} r=${r} rozmiar=${34}/>
         <span class="j-rozm-n">${nazwaRozmowcy(r)}</span>
         ${n > 0 ? html`<span class="j-rozm-licz" aria-hidden="true">${n > 99 ? "99+" : n}</span>`
-          : i < 4 && !duza ? html`<kbd class="j-rozm-skrot" aria-hidden="true">${Skroty.opis(`Mod+${i + 1}`)}</kbd>` : html`<span></span>`}
+          : i < 4 ? html`<kbd class="j-rozm-skrot" aria-hidden="true">${Skroty.opis(`Mod+${i + 1}`)}</kbd>` : html`<span></span>`}
         <span class="j-rozm-st" aria-hidden="true"><${LiniaStanu} r=${r}/></span>
       </li>`;
     })}
@@ -179,11 +179,12 @@ function ListaRozmowcow({ trasa, duza = false }) {
 }
 
 // Aktualizacje (raporty rutyn z licznikiem nieprzeczytanych) na górze, pod „+ Nowa rozmowa” (19.11 właściciel:
-// „Aktualizacje ma być na górze”); Mózg i Ustawienia pod rozmówcami (⌘M, ⌘,)
-function PozycjaAktualizacji({ trasa }) {
+// „Aktualizacje ma być na górze”); Mózg i Ustawienia pod rozmówcami (⌘M, ⌘,). Telefon (23.11 właściciel: „miały być
+// wciśnięte w lewy dolny róg”): Aktualizacje razem z Mózgiem i Ustawieniami na dole paska, góra ich nie pokazuje
+function PozycjaAktualizacji({ trasa, klasa }) {
   const n = useSklep((s) => s.raporty.nieprzeczytane);
   const tu = trasa.widok === "aktualizacje";
-  return html`<li><a href=${Trasa.zbuduj({ widok: "aktualizacje" })} aria-current=${tu ? "page" : undefined}
+  return html`<li class=${klasa}><a href=${Trasa.zbuduj({ widok: "aktualizacje" })} aria-current=${tu ? "page" : undefined}
       class=${cx(tu && "is-aktywny")} data-nawig="aktualizacje"
       aria-label=${n > 0 ? `${T("rap.tytul")}, ${T("rap.nowe", { n })}` : undefined}>
     <${Ikona} n=${IKONY_WIDOKOW.aktualizacje} r=${16} klasa="j-nawig-i"/><span class="j-nawig-t">${T("rap.tytul")}</span>
@@ -192,18 +193,19 @@ function PozycjaAktualizacji({ trasa }) {
 
 function NawigacjaCentrum({ trasa }) {
   const poz = [["mozg", T("rozm.mozg"), "Mod+M"], ["ustawienia", T("pasek.ustawienia"), "Mod+,"]];
-  return html`<ul class="j-nawig">${poz.map(([w, tekst, komb]) => html`<li key=${w}>
+  return html`<ul class="j-nawig is-dol"><${PozycjaAktualizacji} trasa=${trasa} klasa="j-tylko-telefon"/>
+    ${poz.map(([w, tekst, komb]) => html`<li key=${w}>
     <a href=${Trasa.zbuduj({ widok: w })} aria-current=${trasa.widok === w ? "page" : undefined} class=${cx(trasa.widok === w && "is-aktywny")}>
       <${Ikona} n=${IKONY_WIDOKOW[w]} r=${16} klasa="j-nawig-i"/><span class="j-nawig-t">${tekst}</span>
       <kbd class="j-rozm-skrot" aria-hidden="true">${Skroty.opis(komb)}</kbd></a></li>`)}</ul>`;
 }
 
 // „+ Nowa rozmowa” na samej górze (nad rozmówcami, ⌘⇧O): otwiera start z kompozytorem i wyborem „Do:” (domyślnie Jarvo)
-function NowaRozmowa({ fokus = false, duza = false }) {
-  return html`<a class=${cx("j-nowa", duza && "is-duza")} href="#/nowa" data-nowa data-fokus=${fokus ? "" : undefined}
+function NowaRozmowa({ fokus = false }) {
+  return html`<a class="j-nowa" href="#/nowa" data-nowa data-fokus=${fokus ? "" : undefined}
       aria-keyshortcuts="Meta+Shift+O Control+Shift+O" onClick=${() => Fokus.odloz("kompozytor")}>
     <span class="j-nowa-plus" aria-hidden="true">+</span><span class="j-nowa-t">${T("pasek.nowa")}</span>
-    ${!duza && html`<kbd class="j-nowa-skrot" aria-hidden="true">${Skroty.opis("Mod+Shift+O")}</kbd>`}</a>`;
+    <kbd class="j-nowa-skrot" aria-hidden="true">${Skroty.opis("Mod+Shift+O")}</kbd></a>`;
 }
 
 // pasek 4 rozmówców na dole rozmowy (telefon): figurka z kropką stanu i nazwa
@@ -310,10 +312,13 @@ function Pasek({ trasa, warstwa = false }) {
       <h3 class="j-grupa-t" id=${`j-grupa-${g.id}`}>${T(`grupa.${g.id}`)}</h3>${g.elementy.map(wiersz)}</div>`);
   }
   // układ: góra stała (marka, Nowa rozmowa, Aktualizacje), środek przewijany (Rozmówcy, pod nimi Inne rozmowy
-  // z wyszukiwarką i listą), dół przypięty do rogu (Mózg, Ustawienia, stan połączenia)
+  // z wyszukiwarką i listą), dół przypięty do rogu (Mózg, Ustawienia, stan połączenia). Telefon: nowa rozmowa to ikona
+  // w belce paska, Aktualizacje na dole z Mózgiem i Ustawieniami
   return html`<nav class="j-pasek" id="jarvo-pasek" aria-label=${T("pasek.rozmowy")} data-region="pasek" tabIndex="-1" ref=${nav}>
     <div class="j-pasek-g">
       <span class="j-marka"><${LogoJarvo}/><span>Jarvo</span></span>
+      <${Przycisk} rodzaj="cichy" ikona="compose" etykieta=${T("pasek.nowa")} klasa="j-pisz"
+        onClick=${() => { Fokus.odloz("kompozytor"); Trasa.idz({ widok: "nowa" }); }}/>
       <${Przycisk} rodzaj="cichy" ikona="panel" etykieta=${T("pasek.zwin")} klasa="j-zwin" onClick=${zwin}/>
       <${Przycisk} rodzaj="cichy" ikona="x" etykieta=${T("ui.zamknij")} klasa="j-zamknij-pasek"
         onClick=${() => sklep.zmien("pasek", { otwarty: false })}/>
