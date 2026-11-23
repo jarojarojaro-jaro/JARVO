@@ -128,34 +128,73 @@ function ModelWybor({ o, onWybierz }) {
     </div></div>`;
 }
 
+// wysiłek jako zegar (23.11 właściciel: „ten wybór effortu usprawnić, coś fajnego”): łuk 220° z podziałką poziomów,
+// wskazówka płynnie (sprężyście) jedzie za kursorem albo strzałkami, łuk wypełnia się od stali do bursztynu przy max;
+// pod zegarem nazwa poziomu, dwa wskaźniki (szybkość i głębia) i opis. Klik w zegar, w podziałkę albo puszczenie
+// suwaka ustawia poziom; Enter też. Bez kursora wskazówka stoi na bieżącym poziomie.
+const ZEGAR = { cx: 140, cy: 132, r: 92, od: 200, luk: 220 };
+const katPoziomu = (i, n) => ZEGAR.od - (ZEGAR.luk * i) / Math.max(1, n - 1);
+const punkt = (kat, r) => [ZEGAR.cx + r * Math.cos((kat * Math.PI) / 180), ZEGAR.cy - r * Math.sin((kat * Math.PI) / 180)];
+
 function WysilekWybor({ poziomy, biezacy, onWybierz }) {
-  const [pod, setPod] = useState(null);
-  const ref = useRef(null);
+  const n = poziomy.length;
   const i0 = poziomy.indexOf(biezacy);
-  const pokaz = pod != null ? poziomy[pod] : biezacy || null;
-  const [tytul, opis] = pokaz ? opisWysilku(pokaz) : [L("Jak ustawienie agenta", "Agent default"), L("Poziom z konfiguracji agenta albo sesji.", "The level from the agent or session settings.")];
-  useEffect(() => { const b = ref.current && ref.current.querySelectorAll(".j-ww-s")[Math.max(0, i0)]; if (b) b.focus({ preventScroll: true }); }, []);
-  const klawisz = (e, i) => {
-    const d = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[e.key];
-    if (!d) return;
-    e.preventDefault();
-    const n = Math.max(0, Math.min(poziomy.length - 1, i + d));
-    ref.current.querySelectorAll(".j-ww-s")[n].focus();
-    setPod(n);
+  const [pod, setPod] = useState(null);
+  const suwak = useRef(null);
+  const i = pod != null ? pod : i0;
+  const p = i >= 0 ? poziomy[i] : null;
+  const [tytul, opis] = p ? opisWysilku(p) : [L("Jak ustawienie agenta", "Agent default"), L("Poziom z konfiguracji agenta albo sesji.", "The level from the agent or session settings.")];
+  const t = i >= 0 ? i / Math.max(1, n - 1) : 0;
+  const dl = (ZEGAR.r * ZEGAR.luk * Math.PI) / 180;
+  const [x0, y0] = punkt(ZEGAR.od, ZEGAR.r), [x1, y1] = punkt(ZEGAR.od - ZEGAR.luk, ZEGAR.r);
+  const luk = `M${x0} ${y0} A${ZEGAR.r} ${ZEGAR.r} 0 1 1 ${x1} ${y1}`;
+  useEffect(() => { if (suwak.current) suwak.current.focus({ preventScroll: true }); }, []);
+  // kąt kursora nad zegarem → najbliższy poziom
+  const zKursora = (e) => {
+    const r = e.currentTarget.getBoundingClientRect(), s = r.width / 280;
+    const dx = (e.clientX - r.left) / s - ZEGAR.cx, dy = ZEGAR.cy - (e.clientY - r.top) / s;
+    let kat = (Math.atan2(dy, dx) * 180) / Math.PI;
+    if (kat < -90) kat += 360;
+    const k = Math.round(((ZEGAR.od - Math.max(ZEGAR.od - ZEGAR.luk, Math.min(ZEGAR.od, kat))) / ZEGAR.luk) * (n - 1));
+    return Math.max(0, Math.min(n - 1, k));
   };
-  return html`<div class="j-ww" ref=${ref}>
+  const segmenty = (ile, klasa) => html`<span class=${cx("j-ww-seg", klasa)}>${[0, 1, 2, 3, 4].map((k) => html`<i key=${k} class=${k < ile ? "is-on" : ""}></i>`)}</span>`;
+  const glebia = i >= 0 ? 1 + Math.round(t * 4) : 0;
+  return html`<div class=${cx("j-ww", t >= 0.99 && "is-max")}>
     <div class="j-wys-g"><span class="j-wys-t">${L("Wysiłek myślenia", "Thinking effort")}</span>
       <span class="j-wys-teraz">${biezacy || L("domyślne", "default")}</span></div>
-    <div class="j-ww-skala" role="radiogroup" aria-label=${L("Wysiłek myślenia", "Thinking effort")} onPointerLeave=${() => setPod(null)}>
-      ${poziomy.map((p, i) => {
-        const h = 14 + (i / Math.max(1, poziomy.length - 1)) * 58;
-        const zaznacz = pod != null ? i <= pod : i0 >= 0 && i <= i0;
-        return html`<button key=${p} type="button" role="radio" aria-checked=${String(p === biezacy)} class=${cx("j-ww-s", zaznacz && "is-pelny", p === biezacy && "is-biez", pod != null && "is-podglad")}
-          onPointerEnter=${() => setPod(i)} onFocus=${() => setPod(i)} onKeyDown=${(e) => klawisz(e, i)} onClick=${() => onWybierz(p)}>
-          <span class="j-ww-sl" style=${{ height: `${h}px` }}></span><span class="j-ww-p">${p}</span></button>`;
+    <svg class="j-ww-zegar" viewBox="0 0 280 178" aria-hidden="true" onPointerMove=${(e) => setPod(zKursora(e))}
+      onPointerLeave=${() => setPod(null)} onClick=${(e) => onWybierz(poziomy[zKursora(e)])}>
+      <defs><linearGradient id="j-ww-grad" x1="0" x2="1" y1="0" y2="0">
+        <stop offset="0" class="j-ww-g0"/><stop offset=".62" class="j-ww-g1"/><stop offset="1" class="j-ww-g2"/></linearGradient></defs>
+      <path d=${luk} class="j-ww-tor"/>
+      <path d=${luk} class="j-ww-pelny" stroke-dasharray=${`${dl * t} ${dl}`}/>
+      ${poziomy.map((q, k) => {
+        const kat = katPoziomu(k, n), [ax, ay] = punkt(kat, ZEGAR.r + 9), [bx, by] = punkt(kat, ZEGAR.r + 17), [lx, ly] = punkt(kat, ZEGAR.r + 30);
+        return html`<g key=${q} class=${cx("j-ww-tik", k <= i && "is-on", k === i0 && "is-biez")}>
+          <line x1=${ax} y1=${ay} x2=${bx} y2=${by}/>
+          <text x=${lx} y=${ly + 3.5} text-anchor="middle">${q}</text></g>`;
       })}
+      ${Array.from({ length: 23 }, (_, k) => {
+        const kat = ZEGAR.od - (ZEGAR.luk * k) / 22, [ax, ay] = punkt(kat, ZEGAR.r - 12), [bx, by] = punkt(kat, ZEGAR.r - 8);
+        return html`<line key=${k} class="j-ww-drob" x1=${ax} y1=${ay} x2=${bx} y2=${by}/>`;
+      })}
+      <g class="j-ww-wsk" style=${{ transform: `rotate(${90 - (i >= 0 ? katPoziomu(i, n) : ZEGAR.od)}deg)` }}>
+        <line x1=${ZEGAR.cx} y1=${ZEGAR.cy + 14} x2=${ZEGAR.cx} y2=${ZEGAR.cy - ZEGAR.r + 16}/></g>
+      <circle cx=${ZEGAR.cx} cy=${ZEGAR.cy} r="7" class="j-ww-os"/><circle cx=${ZEGAR.cx} cy=${ZEGAR.cy} r="2.5" class="j-ww-os2"/>
+      <text x=${ZEGAR.cx} y=${ZEGAR.cy + 34} text-anchor="middle" class="j-ww-kod">${p || "auto"}</text>
+    </svg>
+    <div class="j-ww-tytul" aria-live="polite">${tytul}</div>
+    <input ref=${suwak} type="range" class="j-ww-suwak" min="0" max=${n - 1} step="1" value=${Math.max(0, i)}
+      aria-label=${L("Wysiłek myślenia", "Thinking effort")} aria-valuetext=${p || L("domyślne", "default")}
+      onInput=${(e) => setPod(Number(e.currentTarget.value))}
+      onPointerUp=${(e) => onWybierz(poziomy[Number(e.currentTarget.value)])}
+      onKeyDown=${(e) => { if (e.key === "Enter") { e.preventDefault(); onWybierz(poziomy[Math.max(0, i)]); } }}/>
+    <div class="j-ww-wsk2">
+      <span>${L("Szybkość", "Speed")}</span>${segmenty(i >= 0 ? 6 - glebia : 0)}
+      <span>${L("Głębia", "Depth")}</span>${segmenty(glebia, "is-gl")}
     </div>
-    <div class="j-ww-opis" aria-live="polite"><strong>${tytul}</strong><span>${opis}</span></div>
+    <p class="j-ww-opis">${opis}</p>
     <button type="button" class=${cx("j-ww-dom", !biezacy && "is-biez")} onClick=${() => onWybierz("domyslny")}>
       ${!biezacy && html`<${Ikona} n="check" r=${14}/>`}<span>${L("Jak ustawienie agenta", "Agent default")}</span></button>
   </div>`;
