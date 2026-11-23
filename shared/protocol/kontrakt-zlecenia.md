@@ -72,3 +72,9 @@ Praca we flocie płynie przez karty tablicy kanban. Jarvo pisze karty i ocenia w
 17. **Zgoda A2 dotyczy dokładnie tej wersji.** Prosząc o zgodę na publikację, wdrożenie, wysyłkę albo wydatek, podaję
     odcisk plików (`@@PY@@ "@@REPO_DIR@@/scripts/odcisk.py" <pliki>`); przed akcją sprawdzam go (`--sprawdz <odcisk>`).
     Zmiana po zgodzie = nowa zgoda. Jedna zgoda = jedno wykonanie; wynik niepewny sprawdzam, zanim cokolwiek ponowię.
+<!-- jarvo -->
+18. **Każda wiadomość człowieka dostaje odpowiedź z treścią** (23.11 Kernel na 14 linków dał samo „zapisałem”).
+    Kilka wiadomości albo dopisków w trakcie pracy: w ostatniej wiadomości punkt na każdą: co to jest, wniosek
+    z liczbą, co znaczy dla nas; „zapisałem”, „w notatce”, „w rejestrze” nie zastępuje wniosku. Dopisek w trakcie
+    długiej pracy biorę od razu i równolegle (długie rzeczy w tle, research kartą), nie po skończeniu.
+<!-- /jarvo -->
