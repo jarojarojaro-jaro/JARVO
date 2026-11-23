@@ -66,7 +66,11 @@ OBRAZY = tuple(MIME)
 POTWIERDZENIA = ("Zasada potwierdzeń: wdrożenie (jarvo update, restart bramy), publikacja na żywe strony, sudo, "
                  "rzeczy płatne i kasowanie danych = najpierw plan w odpowiedzi, na jego końcu znacznik "
                  "[[czeka-na-tak]], i stop. Wykonujesz dopiero po odpowiedzi „tak” w następnej wiadomości.")
-WSTEP_DOPISKU = "Dopisek od właściciela w trakcie Twojej pracy. Uwzględnij go w tej samej turze."
+# 23.11 Kernel dostał 9 linków w trakcie godzinnych testów: zajął się nimi dopiero między krokami testu, a w odpowiedzi
+# napisał tylko „zapisałem 9 linków z werdyktem w rejestrze”, bez treści (właściciel: „zero info mi dał”)
+WSTEP_DOPISKU = ("Dopisek od właściciela w trakcie Twojej pracy. Zajmij się nim od razu, równolegle z bieżącą pracą "
+                 "(długie rzeczy w tle, research podagentom), nie dopiero po niej. W ostatniej wiadomości tury osobny "
+                 "punkt dla tego dopisku: co to jest, werdykt i co znaczy dla nas, nigdy samo „zapisałem”.")
 
 
 def _rdzen():
