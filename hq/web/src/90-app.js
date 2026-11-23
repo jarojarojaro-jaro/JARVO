@@ -225,6 +225,7 @@ function useGestPaska(wlaczony, otwarty) {
         g.p = pasekEl(); g.w = g.p.offsetWidth;
         g.p.style.transition = "none"; g.p.style.visibility = "visible";
       }
+      if (e.cancelable) e.preventDefault();         // gest paska, nie „wstecz” przeglądarki ani przewijanie w bok
       const x = otwarty ? Math.min(0, g.dx) : Math.min(0, g.dx - g.w);
       g.p.style.transform = `translateX(${x}px)`;
       const z = zaslona();
@@ -248,7 +249,7 @@ function useGestPaska(wlaczony, otwarty) {
     };
     const d = document;
     d.addEventListener("touchstart", start, { passive: true });
-    d.addEventListener("touchmove", ruch, { passive: true });
+    d.addEventListener("touchmove", ruch, { passive: false });
     d.addEventListener("touchend", koniec);
     d.addEventListener("touchcancel", koniec);
     return () => {

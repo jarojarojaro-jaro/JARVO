@@ -1149,7 +1149,7 @@ button.thq-out-name:hover { text-decoration: underline; }
 /* ---- podstawy */
 .jarvo-app { position: fixed; inset: 0; z-index: 60; height: var(--j-vh, 100dvh); overflow: hidden; overflow: clip; container: app / inline-size;
   background: var(--j-tlo); color: var(--j-tekst); font: 14px/1.5 var(--j-font-ui); text-align: left;
-  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; overscroll-behavior: none; }
 .jarvo-app *, .jarvo-app *::before, .jarvo-app *::after { box-sizing: border-box; }
 /* podstawy elementów z wagą jednej klasy (:where): każda klasa j-* zapisana niżej je nadpisuje */
 .jarvo-app :where(button) { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: inherit; }
