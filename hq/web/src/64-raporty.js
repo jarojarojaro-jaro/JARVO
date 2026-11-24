@@ -58,12 +58,12 @@ function koloryRodzajow(rodzaje) {
   return mapa;
 }
 const DNI_TYGODNIA = { pl: ["pn", "wt", "śr", "cz", "pt", "so", "nd"], en: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"] };
-// tekst do pola wiadomości po „Odpowiedz”: cytat z rodzajem, czasem i pierwszą treściwą linią raportu
+// tekst do pola wiadomości po „Odpowiedz”: rodzaj, numer briefu (po nim rutyna rozpoznaje odpowiedź) i czas, bez
+// treści raportu (24.11 właściciel: „bez tego dzień dobry, stan floty, nieestetyczne”)
 function cytatRaportu(r, teraz = Date.now() / 1000) {
-  const linia = String(r.tekst || "").split("\n").map((x) => x.replace(/[#>*_`~|]/g, "").replace(/\s+/g, " ").trim()).find(Boolean) || "";
-  const krotka = linia.length > 140 ? `${linia.slice(0, 139).trimEnd()}…` : linia;
+  const numer = (String(r.tekst || "").match(/\b[BT]-\d{4}-(?:\d{2}-\d{2}|W\d{2})\b/) || [])[0];
   const kiedy = kluczDnia(r.ts) === kluczDnia(teraz) ? Czas.godzina(r.ts) : `${Czas.data(r.ts)}, ${Czas.godzina(r.ts)}`;
-  return `> ${T("rap.cytat")} „${r.nazwa}” (${kiedy}): ${krotka}\n\n`;
+  return `> ${T("rap.cytat")} „${r.nazwa}”${numer ? ` ${numer}` : ""} (${kiedy})\n\n`;
 }
 
 // nagłówek dnia: Dziś / Wczoraj, dalej dzień tygodnia z datą (rok tylko poza bieżącym)

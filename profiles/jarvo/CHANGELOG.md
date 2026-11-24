@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- „Odpowiedz” przy raporcie wstawia samo „> Odpowiadam na „Poranny brief” B-2026-11-24 (07:54)”, bez początku treści raportu.
 - `jarvo stan [temat]` daje stan instalacji jednym poleceniem (rutyny, flota, sprzęt, porty, panel, skarbiec), a zasady każą Jarvowi brać z niego fakty na teraz, powtarzaną serię zapisywać jako własne polecenie w `polecenia/` i łączyć kroki telefonu w `batch`.
 - Obraz telefonu w podglądzie wypełnia panel bez pustych pasów, a znak NA ŻYWO nie pokazuje liczby ms.
 - Przycisk „Na żywo” stoi na stałe w pasku pracy z ikoną urządzenia i działa jak przełącznik, zamiast skakać po liście kroków.

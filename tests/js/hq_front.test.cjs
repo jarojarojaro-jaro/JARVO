@@ -793,11 +793,12 @@ test("Aktualizacje: trasa z dniem i rodzajem, dni kalendarza, kolory rodzajów, 
   eq(Object.keys(k).sort(), ["jarvo-daily-brief", "jarvo-patrol", "jarvo-weekly-review"]);
   assert.strictEqual(new Set(Object.values(k)).size, 3);
   assert.strictEqual(koloryRodzajow(["jarvo-patrol", "jarvo-daily-brief"])["jarvo-patrol"], k["jarvo-patrol"]);
-  // cytat: pierwsza treściwa linia bez znaczników Markdown, rodzaj i czas; dziś sama godzina
+  // cytat: rodzaj, numer briefu i czas, bez treści raportu; dziś sama godzina
   const r = { nazwa: "Patrol floty", ts: ts("2026-11-18T14:47"), tekst: "\n## ✅ **Monid** — oceniony\n\nreszta" };
   T.wymus = "pl";
-  assert.strictEqual(cytatRaportu(r, ts("2026-11-18T20:00")), "> Odpowiadam na raport „Patrol floty” (14:47): ✅ Monid — oceniony\n\n");
-  assert.ok(cytatRaportu({ ...r, tekst: "x".repeat(300) }, ts("2026-11-19T08:00")).includes("…"));
+  assert.strictEqual(cytatRaportu(r, ts("2026-11-18T20:00")), "> Odpowiadam na „Patrol floty” (14:47)\n\n");
+  assert.strictEqual(cytatRaportu({ nazwa: "Poranny brief", ts: ts("2026-11-18T07:54"), tekst: "☀️ Brief B-2026-11-18 · Dzień dobry" },
+    ts("2026-11-18T20:00")), "> Odpowiadam na „Poranny brief” B-2026-11-18 (07:54)\n\n");
   T.wymus = null;
   let s = stanPoczatkowy();
   s = Os.zastosujZdarzenie(s, "raporty.nowe", { nieprzeczytane: 3 });

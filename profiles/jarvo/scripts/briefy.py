@@ -42,7 +42,7 @@ NUMER_BRIEFU = re.compile(r"\b([BT]-\d{4}-(?:\d{2}-\d{2}|W\d{2}))(?:/(\d{1,2}))?
 # „1 ok, 2 nie”, „4 pomijac zdublowane…”, „5 - tak”: numer na początku wiadomości albo po nowej linii, przecinku,
 # średniku, kropce ze spacją (nie „1.01.2027” ani „zapisać 3 klucze”)
 SEGMENT = re.compile(r"(?:^|(?<=[\n,;])|(?<=\.\s))[ \t]*(\d{1,2})(?:[ \t]*[-–.):]+[ \t]*|[ \t]+)(?=\S)")
-# cytat przed słowami właściciela: panel „> Odpowiadam na raport …”, Telegram „[Replying to…: "…"]” (cały brief)
+# cytat przed słowami właściciela: panel „> Odpowiadam na „Poranny brief” B-… (07:50)”, Telegram „[Replying to…: "…"]” (cały brief)
 CYTAT = re.compile(r"^\s*(?:(?:>[^\n]*\n)+|\[Replying to.*?\"\]\s*\n)\s*", re.S)
 NAGLOWEK_DECYZJI = re.compile(r"(czeka na ciebie|potrzebuj\w* \d+ decyzj|do decyzji|decyzje)", re.I)
 POZYCJA = re.compile(r"^\s*(\d{1,2})[.)]\s+(.+)$")
@@ -329,7 +329,7 @@ def zapisz_odpowiedz(skarbiec: Path, numer: str, tekst: str, kiedy: dt.datetime 
 def odpowiedz_z_wiadomosci(wiadomosc: str, poprzednia: str = "", skarbiec: Path | None = None,
                            kiedy: dt.datetime | None = None) -> tuple[str, dict[str, str], list[str]] | None:
     """Czy wiadomość odpowiada na brief i co z niej zapisano: (numer briefu, {wiersz: słowa}, wiersze bez odpowiedzi)
-    albo None. Brief rozpoznany po cytacie (panel „> Odpowiadam na raport…”, Telegram „[Replying to…]”), po numerze
+    albo None. Brief rozpoznany po cytacie (panel „> Odpowiadam na „…” B-…”, Telegram „[Replying to…]”), po numerze
     „B-…/n” w treści albo po briefie w poprzedniej wiadomości Jarva, gdy wiadomość zaczyna się od numeru pozycji."""
     skarbiec = Path(skarbiec or _sciezki.skarbiec())
     tekst = str(wiadomosc or "")

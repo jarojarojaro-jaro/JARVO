@@ -624,7 +624,7 @@ Object.assign(SLOWNIK.pl, {
   "rap.kalendarz": "Kalendarz",
   "rap.w_dniu": { one: "{n} raport", few: "{n} raporty", many: "{n} raportów", other: "{n} raportu" },
   "rap.nowe": { one: "{n} nowy raport", few: "{n} nowe raporty", many: "{n} nowych raportów", other: "{n} nowego raportu" },
-  "rap.cytat": "Odpowiadam na raport",
+  "rap.cytat": "Odpowiadam na",
 });
 Object.assign(SLOWNIK.en, {
   "rap.tytul": "Updates", "rap.rutyna": "Routine",
@@ -638,6 +638,6 @@ Object.assign(SLOWNIK.en, {
   "rap.kalendarz": "Calendar",
   "rap.w_dniu": { one: "{n} report", other: "{n} reports" },
   "rap.nowe": { one: "{n} new report", other: "{n} new reports" },
-  "rap.cytat": "Replying to the report",
+  "rap.cytat": "Replying to",
 });
 /* === koniec Aktualizacji === */

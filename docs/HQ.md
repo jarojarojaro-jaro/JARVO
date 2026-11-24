@@ -1457,7 +1457,7 @@ otwiera ostatni dzień z raportami (tego rodzaju przy filtrze).
   kolejność wyraźnych barw `--j-barwa-N` po id rodzaju. Długi raport (> 1600 znaków) zwinięty z „Pokaż całość”.
 - **Telefon (≤ 760 px kontenera):** data z ‹ › na górze, kalendarz pod klikniętą datą, rodzaje w jednym rzędzie.
 - **Odpowiedz** (przycisk przy raporcie): otwiera rozmowę z rozmówcą profilu rutyny (Jarvo: temat JARVO) z cytatem
-  raportu w polu wiadomości („> Odpowiadam na raport „<rodzaj>” (<czas>): <pierwsza linia>”), kursor na końcu;
+  raportu w polu wiadomości („> Odpowiadam na „<rodzaj>” <numer briefu> (<czas>)”, bez treści raportu), kursor na końcu;
   drugi klik nie dubluje cytatu. Dzień obejrzany bez filtra oznacza raporty do jego najnowszego jako przeczytane.
 
 - **Archiwum** (`hq/plugin/raporty.py`, w kodzie „raporty”, bo „aktualizacja” to aktualizacja Jarva): pętla silnika co
