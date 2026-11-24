@@ -238,11 +238,21 @@ const Os = (() => {
   // przebiegiem dostaje `zatrzymany` (linia „Zatrzymane · Ponów” pod nią, spec §9.1), dopóki nie ma ponowienia;
   // zatrzymany przed pierwszym słowem (żadnej pozycji agenta) zostaje pustym dymkiem z tą linią.
   function widok(pozycje, przebiegiWatku, { szczegoly = false, oczekujace = null } = {}) {
-    // odpowiedź sesji omp na partię wiadomości panelu niesie wszystkie ich przebiegi (`przebiegi`)
-    const jego = (x, p) => x.przebieg_id === p.id || (x.przebiegi && x.przebiegi.includes(p.id));
+    const lista = przebiegiWatku || [];
+    // odpowiedź sesji omp na partię wiadomości panelu niesie wszystkie ich przebiegi (`przebiegi`); tura z dopiskami
+    // kończy się odpowiedzią z przebiegiem ostatniego dopisku, więc jest też odpowiedzią przebiegu, do którego go
+    // dopisano (24.11: dymek tury stał z odpowiedzią nad dopiskami, choć oś miała ją pod nimi)
+    const dopiskiDo = new Map();
+    const dodaj = (cel, id) => { if (cel && id) dopiskiDo.set(cel, (dopiskiDo.get(cel) || []).concat(id)); };
+    for (const q of lista) dodaj(q.dopisany_do, q.id);
+    // po wejściu do tury przebieg dopisku traci `dopisany_do`; zostaje wpis właściciela z `dane.dopisane_do`
+    const celWpisu = new Map();
+    for (const x of pozycje) if (x.rodzaj === "wlasciciel" && x.wpis && x.wpis.dane && x.wpis.dane.dopisane_do) celWpisu.set(x.id, x.wpis.dane.dopisane_do);
+    for (const q of lista) if (!q.dopisany_do && celWpisu.has(q.wpis_id)) dodaj(celWpisu.get(q.wpis_id), q.id);
+    const ids = (p) => [p.id, ...(dopiskiDo.get(p.id) || [])];
+    const jego = (x, p) => ids(p).some((id) => x.przebieg_id === id || (x.przebiegi && x.przebiegi.includes(id)));
     const maOdpowiedz = (p) => pozycje.some((x) => jego(x, p) && !x.w_toku && x.rodzaj === "agent");
     const maSlad = (p) => pozycje.some((x) => jego(x, p) && x.rodzaj === "agent");
-    const lista = przebiegiWatku || [];
     const ponowione = new Set(lista.map((p) => p.ponowienie_z).filter(Boolean));
     const zywe = lista.filter((p) => p.zrodlo !== "nadzor" && p.stan !== "dopisany" && !ponowione.has(p.id)
       && (!KONCOWE.has(p.stan) || ((p.tekst || p.blad || (PONOWIALNE.has(p.stan) && (p.stan !== "zatrzymane" || !maSlad(p))))

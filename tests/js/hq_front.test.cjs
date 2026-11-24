@@ -364,6 +364,11 @@ test("Os.widok: trwająca praca pod ostatnim dopiskiem właściciela, nie wyżej
   eq(Os.widok([e1, e2, e3], [zywy]).map((x) => x.id), ["e1", "e2", "z:r1", "e3"]);
   const dopisek = { id: "r2", stan: "wlaczony", wpis_id: "e3", dopisany_do: "r1", agent: "jarvo" };
   eq(Os.widok([e1, e2, e3], [zywy, dopisek]).map((x) => x.id), ["e1", "e2", "e3", "z:r1"]);
+  // tura skończona: odpowiedź ma przebieg ostatniego dopisku (bez `dopisany_do` po wejściu do tury), dymek r1 znika,
+  // a odpowiedź stoi pod dopiskami
+  const q = { id: "r2", stan: "wlaczony", wpis_id: "e2", agent: "jarvo" };
+  const odp = { id: "a1", rodzaj: "agent", ts: 7, agent: "jarvo", przebieg_id: "r2", przebiegi: ["r2"], tekst: "Wnioski" };
+  eq(Os.widok([e1, e2, odp], [{ ...zywy, stan: "gotowe", tekst: "Wnioski" }, q]).map((x) => x.id), ["e1", "e2", "a1"]);
 });
 
 test("Os.widok: tura z Telegrama to jedna wiadomość, komentarze między narzędziami w krokach", () => {
