@@ -317,6 +317,8 @@ function PodagenciLinia({ watek, pidy, agent }) {
       <span class=${cx("j-na-zywo-k", !s.trwa && "is-stoi")} aria-hidden="true"></span>
       ${L(`Podagenci: ${s.gotowe} z ${s.razem} gotowe`, `Subagents: ${s.gotowe} of ${s.razem} done`)}
     </button>
+    <button type="button" class="j-na-zywo" onClick=${() => NaZywo.otworz(null)}><span class="j-na-zywo-k" aria-hidden="true"></span>
+      ${L("Podgląd na żywo", "Live view")}</button>
     ${otwarte && html`<ul class="j-pa-l">${delegacje.flatMap((d) => d.zadania.map((z) => {
       const k = `${d.id}:${z.nr}`;
       return html`<li key=${k}><button type="button" class=${cx("j-pa-z", z.koniec ? "is-gotowe" : "is-pracuje")}

@@ -2724,7 +2724,8 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 @keyframes j-pz-krag { from { transform: scale(.4); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .j-pz-krag { animation-duration: .01s; } }
 /* podagenci w tle pod wiadomością agenta (42-podglad.js PodagenciLinia) */
-.j-pa { margin-top: 8px; font-size: 12.5px; }
+.j-pa { margin-top: 8px; font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.j-pa > .j-pa-l { flex-basis: 100%; }
 .j-pa-g { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 0; cursor: pointer;
   background: var(--j-tlo-karta); color: var(--j-tresc); font: 600 12px var(--j-font-mono); box-shadow: inset 2px 0 0 var(--j-tekst-3); }
 .j-pa.is-trwa .j-pa-g { box-shadow: inset 2px 0 0 var(--j-praca); color: var(--j-tekst); }
