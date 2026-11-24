@@ -9,8 +9,10 @@ Aktywna gałąź: od ostatniego wpisu (liść) w górę po `parentId`. `pelny` =
 
     {"id", "czas", "typ": "uzytkownik", "zrodlo": "telegram|panel|terminal|<inne>", "tekst"}
     {"id", "czas", "typ": "asystent", "tekst", "czeka_na_tak": bool}    znacznik [[czeka-na-tak]] wycięty
-    {"id", "czas", "typ": "kroki", "kroki": [{"nazwa", "intencja", "id", "wpis"}, …]}   kolejne narzędzia w jednym
-                                                       wpisie; `id` wywołania i `wpis` asystenta = adres szczegółów
+    {"id", "czas", "typ": "kroki", "kroki": [{"nazwa", "intencja", "id", "wpis"[, "args"]}, …]}   kolejne narzędzia
+                                                       w jednym wpisie; `id` wywołania i `wpis` asystenta = adres
+                                                       szczegółów; `args` tylko dla telefonu i Komputera
+                                                       (argumenty_urzadzenia: phone, cmd, x, y, index)
     {"id", "czas", "typ": "streszczenie", "tekst"}                     compaction (krótkie streszczenie)
 
 **Oś nigdy nie ma wyników narzędzi**: treści wpisów `toolResult` nie parsujemy (z linii tylko id, rodzic, id
@@ -97,6 +99,56 @@ def opis_kroku(nazwa: str, args, intent: str = "") -> str:
     return linia[:200]
 
 
+# Podgląd na żywo (hq/plugin/podglad_zywo.py): narzędzia telefonów PhoneUse (Hermes: mcp__phone__act, omp:
+# mcp__phone_act) i Komputera Jarva. Z argumentów idą do panelu tylko te pola: telefon, rodzaj działania, punkt
+# i numer wiersza; nigdy `text` ani inne treści (`type` niesie hasła i kody).
+NARZEDZIE_TELEFONU = re.compile(r"^mcp__phone__?(act|batch|screen|shot|ping|wait)$")
+NARZEDZIA_KOMPUTERA = ("computer_use", "komputer")
+_NAZWA_TELEFONU = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+_DZIALANIE = re.compile(r"^[a-z_]{1,24}$")
+
+
+def _liczba(v) -> float | int | None:
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) and abs(v) < 100000 else None
+
+
+def argumenty_urzadzenia(nazwa: str, args) -> dict | None:
+    """Bezpieczne argumenty kroku na telefonie albo Komputerze: {"phone", "cmd", "x", "y", "index"} (tylko obecne
+    i poprawne pola); None dla innych narzędzi. computer_use: `action` jako cmd, `coordinate` jako x i y, `element`
+    jako index."""
+    a = args if isinstance(args, dict) else {}
+    if isinstance(args, str):
+        try:
+            a = json.loads(args)
+        except ValueError:
+            a = {}
+        a = a if isinstance(a, dict) else {}
+    m = NARZEDZIE_TELEFONU.match(nazwa or "")
+    if m:
+        out: dict = {"cmd": m.group(1)} if m.group(1) != "act" else {}
+        if isinstance(a.get("phone"), str) and _NAZWA_TELEFONU.match(a["phone"]):
+            out["phone"] = a["phone"]
+        if m.group(1) == "act" and isinstance(a.get("cmd"), str) and _DZIALANIE.match(a["cmd"]):
+            out["cmd"] = a["cmd"]
+        # act: punkt i wiersz w `args` ({"cmd": "tap", "args": {"x", "y"}}); batch: pierwszy krok z punktem
+        g = a.get("args") if isinstance(a.get("args"), dict) else a
+        if m.group(1) == "batch" and isinstance(a.get("steps"), list):
+            g = next((s for s in a["steps"] if isinstance(s, dict) and _liczba(s.get("x")) is not None), {})
+        x, y, i = _liczba(g.get("x")), _liczba(g.get("y")), _liczba(g.get("index"))
+    elif nazwa in NARZEDZIA_KOMPUTERA:
+        out = {"cmd": a["action"]} if isinstance(a.get("action"), str) and _DZIALANIE.match(a["action"]) else {}
+        k = a.get("coordinate")
+        x, y = (_liczba(k[0]), _liczba(k[1])) if isinstance(k, (list, tuple)) and len(k) == 2 else (None, None)
+        i = _liczba(a.get("element"))
+    else:
+        return None
+    if x is not None and y is not None:
+        out.update(x=x, y=y)
+    if isinstance(i, int):
+        out["index"] = i
+    return out
+
+
 def _skrot(e: dict) -> dict | None:
     """Skrócony wpis osi z wpisu sesji (None = niewidoczny, ale zostaje w drzewie)."""
     typ, czas = e.get("type"), e.get("timestamp")
@@ -124,6 +176,10 @@ def _skrot(e: dict) -> dict | None:
                                                                         str(c.get("intent") or "")),
                   "id": str(c.get("id") or ""), "wpis": str(e.get("id") or "")}
                  for c in m.get("content") or [] if isinstance(c, dict) and c.get("type") == "toolCall"]
+        for k, c in zip(kroki, (c for c in m.get("content") or [] if isinstance(c, dict) and c.get("type") == "toolCall")):
+            u = argumenty_urzadzenia(k["nazwa"], c.get("arguments"))
+            if u is not None:
+                k["args"] = u
         tekst = _tekst(m.get("content")).strip()
         wynik = {"czas": czas, "kroki": kroki}
         if tekst:

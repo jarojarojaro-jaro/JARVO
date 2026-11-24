@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Panel pokazuje na żywo ekran telefonu i przeglądarki Jarva, gdy agent na nich pracuje: przycisk „Podgląd na żywo” przy kroku otwiera obraz po prawej (na telefonie w rogu), z opóźnieniem w ms i kropką przy urządzeniu agenta.
 - Panel budzi agenta, gdy jego podagenci w tle skończą (Hermes przez api_server zapisywał ich wynik bez budzenia), i zostawia w rozmowie notkę „Podagenci skończyli: N z N”.
 - Panel otwiera pliki z załączników kart (`kanban/attachments`), które Jarvo wysyła w czacie; dotąd pokazywał „Nie udało się wczytać pliku”.
 - Jarvo ma `delegate_task` w czacie: pracę ogólną naraz dzieli na swoich podagentów, a specjaliści dostają tylko swoją dziedzinę (24.11 rozdał przesiew 206 ofert Sherlockowi, Łowcy, Web i Studio).

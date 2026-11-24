@@ -449,6 +449,7 @@ function AplikacjaJarvo() {
     </div>
     ${staraBaza && html`<${OknoStarejBazy}/>`}
     <${PodgladPliku}/>
+    <${NaZywoOkno}/>
     <${OknoPytania}/>
     ${oknoAkt && html`<${Leniwy} pakiet="ustawienia" nazwa="OknoAktualizacji"/>`}
     <${Pasy}/>

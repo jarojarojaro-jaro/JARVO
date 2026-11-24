@@ -297,6 +297,9 @@ def _czlonek(agent: str, rola: str, linia: list[dict], przebiegi: list[dict], wp
                     krok = {"ts": float(m["ts"]), "narzedzie": nazwa, "verb": e.get("verb", nazwa),
                             "verb_en": e.get("verb_en", nazwa), "detail": e.get("detail", ""), "czas_ms": czas,
                             "blad": False, "podglad": "", "ref": ref_kroku("h", agent, rola, tc.get("id"))}
+                    u = _czytnik_omp().argumenty_urzadzenia(nazwa, args)
+                    if u is not None:                 # telefon i Komputer: podgląd na żywo (bez treści argumentów)
+                        krok["args"] = u
                     grupa["kroki"].append(krok)
                     if tc.get("id"):
                         kroki_wywolan[str(tc["id"])] = krok
@@ -327,15 +330,24 @@ def _czlonek(agent: str, rola: str, linia: list[dict], przebiegi: list[dict], wp
     return out, {"koniec": i, "od_ponownie": od_ponownie, "skompaktowane": skompaktowane}
 
 
-def _sciezki():
-    """sciezki.py wtyczki (załadowany przez plugin_api jako jarvo_hq_sciezki albo z pliku obok)."""
-    mod = sys.modules.get("jarvo_hq_sciezki")
+def _obok(nazwa: str):
+    """Moduł wtyczki `<nazwa>.py` (załadowany przez plugin_api jako jarvo_hq_<nazwa> albo z pliku obok)."""
+    mod = sys.modules.get(f"jarvo_hq_{nazwa}")
     if mod is None:
-        spec = importlib.util.spec_from_file_location("jarvo_hq_sciezki", Path(__file__).with_name("sciezki.py"))
+        spec = importlib.util.spec_from_file_location(f"jarvo_hq_{nazwa}", Path(__file__).with_name(f"{nazwa}.py"))
         mod = importlib.util.module_from_spec(spec)
-        sys.modules["jarvo_hq_sciezki"] = mod
+        sys.modules[f"jarvo_hq_{nazwa}"] = mod
         spec.loader.exec_module(mod)
     return mod
+
+
+def _sciezki():
+    return _obok("sciezki")
+
+
+def _czytnik_omp():
+    """argumenty_urzadzenia: bezpieczne argumenty kroków telefonu i Komputera (podgląd na żywo)."""
+    return _obok("czytnik_omp")
 
 
 # ścieżki floty w odpowiedzi agenta: /opt/data/… (stare rozmowy) i faktyczny korzeń danych (HERMES_HOME)
@@ -401,7 +413,8 @@ def pozycje_omp(r: Mapping, os_: Mapping, utajnij: Callable[[str], str] | None =
                 {"ts": wsp["ts"], "narzedzie": str(k.get("nazwa") or "?"), "verb": str(k.get("nazwa") or "?"),
                  "verb_en": str(k.get("nazwa") or "?"), "detail": (utajnij or str)(str(k.get("intencja") or ""))[:140],
                  "czas_ms": None,
-                 "blad": False, "podglad": "", "ref": ref_kroku("o", k.get("wpis"), k.get("id"))}
+                 "blad": False, "podglad": "", "ref": ref_kroku("o", k.get("wpis"), k.get("id")),
+                 **({"args": dict(k["args"])} if isinstance(k.get("args"), dict) else {})}
                 for k in e.get("kroki") or []], **wsp))
         elif typ == "streszczenie":                  # z liczbą tokenów przed i po (/compact w terminalu albo panelu)
             out.append(_pozycja(rodzaj="kompresja", tekst="Streszczenie wcześniejszej rozmowy",

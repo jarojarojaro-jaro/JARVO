@@ -54,7 +54,9 @@ PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "ochrona.py", "e
                 # źródła Mózgu (docs/HQ.md „Mózg”): skarbiec Jarva i grafy z konfig/mozg.json
                 "mozg_zrodla.py",
                 # kanał Aktualizacje (docs/HQ.md „Aktualizacje”): archiwum raportów rutyn z cron/output profili
-                "raporty.py")
+                "raporty.py",
+                # podgląd na żywo telefonów floty i Komputera Jarva (docs/HQ.md „Podgląd na żywo”): WebSocket z obrazem
+                "podglad_zywo.py")
 # wspólny graf wiedzy (canvas, układ sił): zakładka Wiedza (Mózg aplikacji HQ ma od 22.11 własną mapę-neuron)
 GRAF_WSPOLNY = fl.REPO_ROOT / "shared" / "web" / "graf.js"
 
@@ -101,6 +103,9 @@ PAKIETY = {
     # stopka kompozytora (model, myślenie, tryb szybki, pierścień kontekstu z dymkiem): przy pierwszej otwartej
     # rozmowie, do tej pory rząd bloczka ma tylko „Do:”, spinacz i wysyłanie (ta sama wysokość)
     "stopka": {"pliki": ("33-stopka.js",), "zalezy": ()},
+    # okno podglądu na żywo (dekoder H.264 WebCodecs, JPEG Komputera, stany, zakładki): po kliknięciu „Podgląd na
+    # żywo”; w rdzeniu zostaje tylko wykrywanie urządzenia z kroku i przycisk (41-na-zywo.js)
+    "podglad": {"pliki": ("42-podglad.js",), "zalezy": ()},
 }
 # budżet gzip (bajty) z projektu etapu 1 §7: przekroczenie zatrzymuje build. Mózg 20 KB (20.11, było 14 KB, przedtem
 # 6 KB): części, grupy, szukanie w treści, [[linki]] i skupiska w grafie, a od 20.11 tożsamość Jarva, edytor pamięci

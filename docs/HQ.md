@@ -1599,6 +1599,25 @@ z tekstem i jakieś edytuj”). Pakiet `mozg` ładuje się dopiero po wejściu w
   szukanie i strony notatek działają.
 - **Telefon (≤ 700 px kontenera):** mapa na cały ekran, szukanie i karta poziomu węższe, strona notatki na cały
   ekran; przeciąganie przesuwa, dwa palce przybliżają.
+### Podgląd na żywo (telefony i Komputer)
+
+- **Wejście.** Krok agenta na telefonie (`mcp__phone__act|batch|screen|shot|ping|wait`, argument `phone`) albo w
+  Komputerze (`computer_use`, `komputer`) ma w pasku pracy i w kroku rozmowy przycisk „Telefon second · Podgląd na
+  żywo” (`41-na-zywo.js`). Kroki niosą tylko bezpieczne argumenty `args` {phone, cmd, x, y, index}
+  (`czytnik_omp.argumenty_urzadzenia`, nigdy `text`). Krok Hermesa na żywo nie ma argumentów (tool.started z
+  `/v1/runs`): który telefon jest w użyciu, mówi serwer z plików PhoneUse `<stan>/<nazwa>.busy`.
+- **Okno** (pakiet `podglad`, `42-podglad.js`): ≥ 1100 px panel 380 px po prawej, wężej pływający podgląd w rogu
+  (stuknięcie = pełny ekran, zrzucenie w dół = zamknij); zakładki urządzeń, „Za agentem”, NA ŻYWO z ms, krąg
+  stuknięcia, stany słowami (łączę, ekran wygaszony, poza siecią, skończył N s temu; po 30 s okno się chowa).
+  Ustawienia › Powiadomienia: „Otwieraj podgląd sam” (localStorage, domyślnie wyłączone).
+- **Serwer** (`hq/plugin/podglad_zywo.py`): WebSocket `/podglad/ws?token=` z uwierzytelnieniem WebSocketów Hermesa;
+  telefon przez scrcpy-server 5.0.1 (`vendor/natywne.yaml` `scrcpy-server`, przy pierwszym użyciu) i adb Jarva,
+  tylko obraz H.264 bez przekodowania, pamięć konfiguracji i GOP dla nowego widza, strumień gaśnie 10 s po
+  ostatnim widzu; Komputer: klatki JPEG z `klatka` kanału `ster` (long-poll). Protokół w docstringu modułu.
+- **Pomiar 24.11** (telefon first, Tailscale): pierwsza klatka 1,1 do 1,5 s przy zimnym starcie (JVM serwera na
+  telefonie ok. 1 s), 30 ms dla drugiego widza; 55 klatek/s przy zmiennym obrazie; ekran telefonu → serwer
+  mediana 135 ms (p10 92, p90 180, błąd zegara ±45 ms).
+
 ## 2g. Panel w sieci (Tailscale)
 
 Instalacja natywna: panel słucha na `127.0.0.1:<port>` (domyślnie 9119) bez hasła. Żeby właściciel używał go

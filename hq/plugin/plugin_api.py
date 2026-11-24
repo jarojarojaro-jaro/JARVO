@@ -2237,6 +2237,10 @@ trasy_aplikacji.dolacz(router, m=roz, trasy=trasy_rozmow, silnik=_silnik, agenci
 _load("jarvo_hq_mozg_zrodla", "mozg_zrodla.py").dolacz(router, konfig=core.JARVO_DIR / "konfig" / "mozg.json", log=_log_hq)
 # Aktualizacje (#/aktualizacje): GET /raporty, POST /raporty/przeczytane
 roz.raporty.dolacz(router, archiwum=RAPORTY, hub=HUB, log=_log_hq)
+# Podgląd na żywo (podglad_zywo.py, docs/HQ.md „Podgląd na żywo”): telefony floty (scrcpy-server przez adb) i Komputer
+# Jarva jednym WebSocketem /podglad/ws z uwierzytelnieniem WebSocketów dashboardu; strumień tylko, gdy ktoś patrzy
+podglad_zywo = _load("jarvo_hq_podglad_zywo", "podglad_zywo.py")
+podglad_zywo.dolacz(router, podglad=podglad_zywo.Podglad.z_otoczenia(log=_log_hq))
 
 
 async def _zdrowie_rozmow() -> dict:

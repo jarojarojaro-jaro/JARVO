@@ -2673,3 +2673,53 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   .j-pig { padding: 0 8px; height: 40px; }
   .j-pig-w .j-pig { flex: 0 1 auto; min-width: 0; overflow: hidden; }
 }
+/* @@pakiet rdzen */
+/* przycisk „Telefon second · Podgląd na żywo” (41-na-zywo.js) w pasku pracy i przy kroku rozmowy, kropka pulsuje */
+.j-na-zywo { display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 12px; border: 0; background: var(--j-tlo-3); box-shadow: inset 0 1px 0 var(--j-hi);
+  font: 400 12px var(--j-font-mono); color: var(--j-tekst); white-space: nowrap; cursor: pointer; }
+.j-na-zywo:hover, .j-na-zywo:focus-visible { background: var(--j-praca); color: var(--j-akcent-na); }
+.j-zywo > .j-na-zywo { height: 40px; padding: 0 14px; background: var(--j-stal), var(--j-tlo-karta); }
+.j-kroki-l li > .j-na-zywo { margin: 4px 0 2px; }
+.j-na-zywo-k { width: 7px; height: 7px; border-radius: 50%; background: var(--j-praca); flex: none; animation: j-na-zywo 1.6s ease-in-out infinite; }
+@keyframes j-na-zywo { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .j-na-zywo-k { animation: none; } }
+/* @@pakiet podglad */
+/* okno podglądu na żywo (42-podglad.js): panel 380 px po prawej rozmowy (≥ 1100 px) albo pływający podgląd w rogu */
+.jarvo-app.is-podglad-bok .j-uklad { margin-right: 388px; }
+.j-pz { position: fixed; z-index: 60; display: flex; flex-direction: column; gap: 1px; background: var(--j-rowek); color: var(--j-tekst); box-shadow: 0 12px 40px rgba(0, 0, 0, .45); }
+.j-pz.is-bok { top: 8px; right: 8px; bottom: 8px; width: 380px; }
+.j-pz.is-pip { width: min(42vw, 200px); touch-action: none; }
+.j-pz.is-pip > :not(.j-pz-ekran) { display: none; }
+.j-pz.is-pip.is-gl { top: calc(env(safe-area-inset-top) + 12px); left: 12px; }
+.j-pz.is-pip.is-gp { top: calc(env(safe-area-inset-top) + 12px); right: 12px; }
+.j-pz.is-pip.is-dl { bottom: calc(env(safe-area-inset-bottom) + 96px); left: 12px; }
+.j-pz.is-pip.is-dp { bottom: calc(env(safe-area-inset-bottom) + 96px); right: 12px; }
+.j-pz.is-pip.is-pelny { inset: 0; width: auto; z-index: 80; }
+.j-pz.is-pip.is-pelny > :not(.j-pz-ekran) { display: flex; }
+.j-pz > * { background: var(--j-stal), var(--j-tlo-karta); box-shadow: inset 0 1px 0 var(--j-hi); }
+.j-pz-g { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 4px 0 14px; padding-top: env(safe-area-inset-top); }
+.j-pz-n { flex: 1 1 auto; font: 600 13px/20px var(--j-font-naglowek); font-stretch: 125%; }
+.j-pz-zywo { display: inline-flex; align-items: center; gap: 7px; font: 400 11px var(--j-font-mono); color: var(--j-tekst-2); font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+.j-pz-ruch { margin: 0; padding: 8px 14px; font: 400 12px/16px var(--j-font-mono); color: var(--j-tekst-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.j-pz-z { display: flex !important; flex-wrap: wrap; gap: 1px; background: var(--j-rowek) !important; box-shadow: none !important; }
+.j-pz-z button { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border: 0; background: var(--j-tlo-3); color: var(--j-tekst-2);
+  font: 400 12px var(--j-font-mono); cursor: pointer; }
+.j-pz-z button[aria-pressed="true"] { color: var(--j-tekst); box-shadow: inset 0 -2px 0 var(--j-praca); }
+.j-pz-z .j-pz-za { margin-left: auto; }
+.j-pz-ekran { position: relative; flex: 1 1 auto; min-height: 0; display: flex !important; align-items: center; justify-content: center; overflow: hidden; background: var(--j-wneka, #000) !important; }
+.j-pz.is-bok .j-pz-ekran.is-pion { padding: 14px 40px; }
+.j-pz.is-pip .j-pz-ekran { aspect-ratio: 9 / 19; }
+.j-pz.is-pip .j-pz-ekran.is-poziom { aspect-ratio: 16 / 10; }
+.j-pz.is-pip.is-pelny .j-pz-ekran { aspect-ratio: auto; }
+.j-pz-ekran canvas { display: block; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 0; transition: opacity .3s var(--j-ease, ease), filter .3s var(--j-ease, ease); }
+.j-pz-ekran.is-pion canvas { border: 6px solid #0c0c0e; border-radius: 22px; }
+.j-pz-ekran.is-komputer canvas { aspect-ratio: 16 / 10; width: 100%; height: auto; }
+.j-pz-ekran canvas.is-pusty { opacity: 0; }
+.j-pz.is-koniec canvas { filter: brightness(.45) grayscale(.6); }
+.j-pz-napis { position: absolute; inset: auto 12px 50% 12px; transform: translateY(50%); display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0;
+  padding: 10px 14px; background: color-mix(in srgb, var(--j-tlo-karta) 88%, transparent); font: 400 12px/16px var(--j-font-mono); color: var(--j-tekst); text-align: center; }
+.j-pz.is-pip .j-pz-napis { inset: auto 4px 50% 4px; padding: 6px; font-size: 11px; }
+.j-pz-krag { position: absolute; width: 36px; height: 36px; margin: -18px 0 0 -18px; border: 2px solid var(--j-praca); border-radius: 50%; pointer-events: none;
+  animation: j-pz-krag .9s ease-out forwards; }
+@keyframes j-pz-krag { from { transform: scale(.4); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .j-pz-krag { animation-duration: .01s; } }

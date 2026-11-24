@@ -914,6 +914,28 @@ narzedzia:
       linux-arm64:
         brak: "scrcpy nie wydaje binarki na Linux aarch64 (w wydaniu tylko linux-x86_64); bez ekranu w oknie, telefon dalej przez adb z systemu"
 
+  # scrcpy-server 5.0.1 (ten sam tag co scrcpy wyżej): sam serwer (plik JAR uruchamiany na telefonie przez adb
+  # app_process) dla podglądu na żywo telefonów floty w panelu (hq/plugin/podglad_zywo.py): tylko wideo H.264, bez
+  # sterowania; panel przekazuje ramki do przeglądarki bez przekodowania. Ten sam plik na każdej platformie; sha256
+  # sprawdzone 2026-11-24: SHA256SUMS.txt wydania = digest GitHuba = własne liczenie.
+  scrcpy-server:
+    zrodlo: scrcpy
+    wersja: "5.0.1"
+    licencja: Apache-2.0
+    rola: "podgląd na żywo ekranu telefonów floty w panelu (tylko obraz, bez sterowania)"
+    kiedy: przy-uzyciu
+    pliki:
+      windows-x64: &scrcpy-server
+        url: https://github.com/Genymobile/scrcpy/releases/download/v5.0.1/scrcpy-server-v5.0.1
+        sha256: 764eb6f79811d5211fe9df341120882ba9994c7a61b897d7bf3fb662e53bc536
+        rozmiar: 733930
+        format: plik
+        nazwa_pliku: scrcpy-server.jar
+      windows-arm64: *scrcpy-server
+      macos-arm64: *scrcpy-server
+      linux-x64: *scrcpy-server
+      linux-arm64: *scrcpy-server
+
   # Android SDK Platform-Tools r37.0.1 (Google, wydanie 2026-07-30): adb i fastboot, przegląd 2026-10-24. Źródło nie ma
   # repo git (AOSP nie taguje tego wydania, lustra na GitHubie nie ma), więc w vendor/zrodla.yaml jest jako `paczka`
   # .zip (android-platform-tools: platform-tools-latest-windows.zip, przejrzane = sha256 pliku win niżej). Licencja

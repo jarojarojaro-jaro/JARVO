@@ -474,8 +474,12 @@ class Tura:
         elif typ == "tool_execution_start":
             self._mysl()
             nazwa = str(e.get("toolName") or "")
-            self._zapisz({"typ": "narzedzie", "nazwa": nazwa, "id": str(e.get("toolCallId") or ""),
-                          "intencja": ochrona.utajnij_krok(czytnik.opis_kroku(nazwa, e.get("args"), str(e.get("intent") or "")))})
+            z = {"typ": "narzedzie", "nazwa": nazwa, "id": str(e.get("toolCallId") or ""),
+                 "intencja": ochrona.utajnij_krok(czytnik.opis_kroku(nazwa, e.get("args"), str(e.get("intent") or "")))}
+            u = czytnik.argumenty_urzadzenia(nazwa, e.get("args"))   # telefon i Komputer: podgląd na żywo w panelu
+            if u is not None:
+                z["args"] = u
+            self._zapisz(z)
         elif typ in ("tool_execution_update", "tool_execution_end"):
             ident = str(e.get("toolCallId") or "")
             teraz = time.monotonic()

@@ -797,7 +797,8 @@ class Rejestr:
             self._zdarzenie(pid, {"event": "omp.mysl", "text": utajnij(str(e["tekst"])), "timestamp": teraz})
         elif e.get("typ") == "narzedzie":
             self._zdarzenie(pid, {"event": "tool.started", "tool": str(e.get("nazwa") or "?"), "ref": ref,
-                                  "preview": utajnij(str(e.get("intencja") or "")), "timestamp": teraz})
+                                  "preview": utajnij(str(e.get("intencja") or "")), "timestamp": teraz,
+                                  **({"args": e["args"]} if isinstance(e.get("args"), dict) else {})})
         elif e.get("typ") == "wyjscie" and ref:
             self._zdarzenie(pid, {"event": "tool.output", "ref": ref, "preview": utajnij(str(e.get("tekst") or "")),
                                   "timestamp": teraz})
@@ -1132,6 +1133,12 @@ class Rejestr:
                 "blad": False, "podglad": podglad[:PODGLAD_MAKS]}
         if ev.get("ref"):                             # sesja omp: opis w linii, podgląd to wyjście kroku, szczegóły z pliku
             krok.update(ref=str(ev["ref"]), podglad="")
+        args = ev.get("args")
+        if isinstance(args, Mapping):                 # telefon i Komputer (czytnik_omp.argumenty_urzadzenia): podgląd na żywo
+            czyste = {k: v for k, v in args.items() if k in ("phone", "cmd") and isinstance(v, str) and len(v) <= 64
+                      or k in ("x", "y", "index") and isinstance(v, (int, float)) and not isinstance(v, bool)}
+            if czyste:
+                krok["args"] = czyste
         return krok
 
     def _zaplanuj_delte(self, pid: str) -> None:

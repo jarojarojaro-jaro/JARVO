@@ -206,6 +206,8 @@ function SekcjaPowiadomienia() {
           onZmien=${powiadomienia}/></${Wiersz}>
       <${Wiersz} ikona="play" tytul=${T("ust.dzwiek")} opis=${T("ust.dzwiek_opis")}>
         <${Przelacznik} wl=${u.dzwiek} etykieta=${T("ust.dzwiek")} onZmien=${(v) => sklep.zmien("ustawienia", { dzwiek: v })}/></${Wiersz}>
+      <${Wiersz} ikona="phone" tytul=${T("ust.podglad_sam")} opis=${T("ust.podglad_sam_opis")}>
+        <${Przelacznik} wl=${u.podglad_sam} etykieta=${T("ust.podglad_sam")} onZmien=${(v) => sklep.zmien("ustawienia", { podglad_sam: v })}/></${Wiersz}>
     </div>`;
 }
 
