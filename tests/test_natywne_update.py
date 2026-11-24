@@ -755,6 +755,34 @@ def test_tura_rozmowy_w_panelu_to_praca_w_toku(tmp_path):
     assert aktualizacja.karty_w_toku(u) == ["p_1 jarvo: tura rozmowy w panelu", "p_4 s:gpu: tura rozmowy w panelu"]
 
 
+def test_podagenci_w_tle_to_praca_w_toku(tmp_path):
+    """24.11 13:22: wgranie po kartach zabiło trzech podagentów `delegate_task` (tura Jarva już się skończyła, więc
+    ani karta, ani przebieg nie blokowały). Delegacja z zadaniem bez końca czeka; skończona, zabita przez wcześniejszy
+    restart bramy i cicha od 30 min nie blokują."""
+    import os
+    import time as czas
+    u, _ = _instalacja(tmp_path)
+    live = u.dane / "profiles" / "jarvo" / "cache" / "delegation" / "live"
+
+    def delegacja(did, stany, dzienniki, wiek):
+        k = live / did
+        k.mkdir(parents=True)
+        (k / "manifest.json").write_text(json.dumps({"tasks": [{"index": i, "status": s} for i, s in enumerate(stany)]}),
+                                         encoding="utf-8")
+        for i, tekst in enumerate(dzienniki):
+            (k / f"task-{i}.log").write_text(tekst, encoding="utf-8")
+        for p in k.iterdir():
+            os.utime(p, (czas.time() - wiek,) * 2)
+
+    (u.dane / "gateway.pid").write_text("1", encoding="utf-8")
+    os.utime(u.dane / "gateway.pid", (czas.time() - 600,) * 2)
+    delegacja("deleg_a1", ["running", "running"], ["13:22 tool | -> x\n", "13:22 final    | status=completed\n"], 5)
+    delegacja("deleg_b2", ["running"], ["13:22 final    | end status=completed exit_reason=completed\n"], 5)
+    delegacja("deleg_c3", ["running"], ["13:22 tool | -> x\n"], 900)       # przed restartem bramy: już martwa
+    delegacja("deleg_d4", ["completed"], ["…\n"], 5)
+    assert aktualizacja.karty_w_toku(u) == ["deleg_a1 jarvo: podagenci w tle (1 pracuje)"]
+
+
 def test_po_kartach_czeka_lokalnie_i_pyta_github_raz(tmp_path, monkeypatch):
     """16.11: operator ponawiał `jarvo update` co 30 s w czasie karty; każde wywołanie pytało GitHub i po 15 min
     skończył się limit 60 zapytań na godzinę. `--po-kartach` czeka na tablicę lokalnie, a wersję sprawdza raz."""

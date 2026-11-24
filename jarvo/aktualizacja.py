@@ -865,9 +865,10 @@ PRZEBIEG_SWIEZY_S = 1800      # przebieg bez zdarzenia dłużej = zawieszony, ni
 
 
 def karty_w_toku(u: Uklad) -> list[str]:
-    """Praca, którą restart bramy by przerwał: karty kanbana w toku (status `running`) i tury rozmów panelu
-    (przebiegi ze zdarzeniem w ostatnich 30 min; 24.11 wgranie przerwało turę Jarva z odpowiedzią dla właściciela).
-    „<id> <agent>: <tytuł>”. Brak bazy = []."""
+    """Praca, którą restart bramy by przerwał: karty kanbana w toku (status `running`), tury rozmów panelu
+    (przebiegi ze zdarzeniem w ostatnich 30 min; 24.11 wgranie przerwało turę Jarva z odpowiedzią dla właściciela)
+    i podagenci w tle `delegate_task` (24.11 13:22 wgranie zabiło trzech podagentów zakładających konta, bo tura Jarva
+    już się skończyła). „<id> <agent>: <tytuł>”. Brak bazy = []."""
     import sqlite3
     wynik: list[str] = []
     for db, zapytanie, arg in (
@@ -886,6 +887,41 @@ def karty_w_toku(u: Uklad) -> list[str]:
                 conn.close()
         except Exception:                     # noqa: BLE001 - odczyt pomocniczy; brak odpowiedzi bazy nie blokuje
             continue
+    return wynik + podagenci_w_toku(u)
+
+
+KONIEC_PODAGENTA = re.compile(r"^\S+ final\s*\|\s*(?:end )?status=\w+", re.M)
+
+
+def podagenci_w_toku(u: Uklad) -> list[str]:
+    """Delegacje Hermesa (`<dane>/profiles/<agent>/cache/delegation/live/<id>`) z zadaniem bez końca w manifeście
+    i w dzienniku, zapisane w ostatnich 30 min i po starcie bramy (starsze zabił już restart)."""
+    try:
+        start_bramy = (u.dane / "gateway.pid").stat().st_mtime
+    except OSError:
+        start_bramy = 0.0
+    wynik = []
+    for manifest in sorted(u.dane.glob("profiles/*/cache/delegation/live/*/manifest.json")):
+        try:
+            zadania = json.loads(manifest.read_text(encoding="utf-8")).get("tasks") or []
+            ostatni = max([manifest.stat().st_mtime] + [p.stat().st_mtime for p in manifest.parent.glob("task-*.log")])
+        except (OSError, ValueError, AttributeError):
+            continue
+        if ostatni < max(start_bramy, time.time() - PRZEBIEG_SWIEZY_S):
+            continue
+        trwa = 0
+        for i, t in enumerate(zadania):
+            if not isinstance(t, dict) or t.get("status") in ("completed", "failed", "error", "interrupted",
+                                                              "cancelled", "timeout", "stopped"):
+                continue
+            dziennik = manifest.parent / f"task-{t.get('index', i)}.log"
+            try:
+                koniec = KONIEC_PODAGENTA.search(dziennik.read_bytes()[-8192:].decode("utf-8", "replace"))
+            except OSError:
+                koniec = None
+            trwa += koniec is None
+        if trwa:
+            wynik.append(f"{manifest.parent.name} {manifest.parts[-6]}: podagenci w tle ({trwa} pracuje)")
     return wynik
 
 

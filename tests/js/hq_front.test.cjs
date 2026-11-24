@@ -1085,10 +1085,11 @@ test("Podgląd na żywo: kodek z SPS, punkt stuknięcia na obrazie (obrót), nap
 
 test("Podagenci w tle: licznik gotowych i czy któraś delegacja trwa", () => {
   const { stanPodagentow } = NA_ZYWO;
-  eq(stanPodagentow([]), { gotowe: 0, razem: 0, trwa: false });
+  eq(stanPodagentow([]), { gotowe: 0, przerwane: 0, razem: 0, trwa: false });
   const d = [{ koniec: false, zadania: [{ koniec: true }, { koniec: false }] }, { koniec: true, zadania: [{ koniec: true }] }];
-  eq(stanPodagentow(d), { gotowe: 2, razem: 3, trwa: true });
-  eq(stanPodagentow([{ ...d[0], koniec: true, zadania: [{ koniec: true }, { koniec: true }] }]), { gotowe: 2, razem: 2, trwa: false });
+  eq(stanPodagentow(d), { gotowe: 2, przerwane: 0, razem: 3, trwa: true });
+  eq(stanPodagentow([{ ...d[0], koniec: true, zadania: [{ koniec: true }, { koniec: true, stan: "interrupted" }] }]),
+    { gotowe: 1, przerwane: 1, razem: 2, trwa: false });
 });
 
 console.log(`ok ${ile}`);

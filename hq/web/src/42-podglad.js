@@ -306,7 +306,9 @@ function PodgladOkno({ stan, biezacy }) {
 // nie widział w panelu pracy podagentów, bo agent skończył turę, a oni pracowali dalej).
 function stanPodagentow(delegacje) {
   const zad = (delegacje || []).flatMap((d) => d.zadania || []);
-  return { gotowe: zad.filter((z) => z.koniec).length, razem: zad.length, trwa: (delegacje || []).some((d) => !d.koniec) };
+  const przerwane = zad.filter((z) => z.stan === "interrupted").length;
+  return { gotowe: zad.filter((z) => z.koniec).length - przerwane, przerwane, razem: zad.length,
+    trwa: (delegacje || []).some((d) => !d.koniec) };
 }
 
 function DziennikPodagenta({ watek, did, nr, trwa }) {
@@ -345,14 +347,16 @@ function PodagenciLinia({ watek, pidy, agent }) {
   return html`<div class=${cx("j-pa", s.trwa && "is-trwa")}>
     <button type="button" class="j-pa-g" aria-expanded=${String(otwarte)} onClick=${() => setOtwarte(!otwarte)}>
       <span class=${cx("j-na-zywo-k", !s.trwa && "is-stoi")} aria-hidden="true"></span>
-      ${L(`Podagenci: ${s.gotowe} z ${s.razem} gotowe`, `Subagents: ${s.gotowe} of ${s.razem} done`)}
+      ${L(`Podagenci: ${s.gotowe} z ${s.razem} gotowe`, `Subagents: ${s.gotowe} of ${s.razem} done`)}${s.przerwane
+        ? L(`, ${s.przerwane} przerwane`, `, ${s.przerwane} interrupted`) : ""}
     </button>
-    <${PrzyciskNaZywo} urz=${{ rodzaj: "telefon", u: null }}/>
+    ${s.trwa && html`<${PrzyciskNaZywo} urz=${{ rodzaj: "telefon", u: null }}/>`}
     ${otwarte && html`<ul class="j-pa-l">${delegacje.flatMap((d) => d.zadania.map((z) => {
       const k = `${d.id}:${z.nr}`;
+      const stan = z.stan === "interrupted" ? L("przerwane", "interrupted") : z.koniec ? L("gotowe", "done") : L("pracuje", "working");
       return html`<li key=${k}><button type="button" class=${cx("j-pa-z", z.koniec ? "is-gotowe" : "is-pracuje")}
           aria-expanded=${String(log === k)} onClick=${() => setLog(log === k ? null : k)}>
-          <b>${z.koniec ? L("gotowe", "done") : L("pracuje", "working")}</b> ${z.cel}</button>
+          <b>${stan}</b> ${z.cel}</button>
         ${log === k && html`<${DziennikPodagenta} watek=${watek} did=${d.id} nr=${z.nr} trwa=${!z.koniec}/>`}</li>`;
     }))}</ul>`}
   </div>`;

@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Wgranie czeka też na podagentów w tle, a podagenci zabici restartem bramy są w panelu „przerwani” i budzą Jarva, żeby ich wznowił (24.11 wgranie zabiło trzech zakładających konta, a pasek stał na „0 z 3”).
 - „Odpowiedz” przy raporcie wstawia samo „> Odpowiadam na „Poranny brief” B-2026-11-24 (07:54)”, bez początku treści raportu.
 - `jarvo stan [temat]` daje stan instalacji jednym poleceniem (rutyny, flota, sprzęt, porty, panel, skarbiec), a zasady każą Jarvowi brać z niego fakty na teraz, powtarzaną serię zapisywać jako własne polecenie w `polecenia/` i łączyć kroki telefonu w `batch`.
 - Obraz telefonu w podglądzie wypełnia panel bez pustych pasów, a znak NA ŻYWO nie pokazuje liczby ms.

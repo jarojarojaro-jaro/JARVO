@@ -25,6 +25,7 @@ Asyncio na pętli wątku silnika; testy: tests/test_silnik_rozmow.py.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import json
 import re
@@ -41,11 +42,28 @@ PODAGENCI_S = 15.0
 PODAGENCI_OKNO_S = 86400.0
 DELEGACJA = re.compile(r"deleg_[0-9a-f]{6,32}")
 KONCOWE_PODAGENTA = {"completed", "failed", "error", "interrupted", "cancelled", "timeout", "stopped"}
+KONIEC_W_DZIENNIKU = re.compile(r"^\S+ final\s*\|\s*(?:end )?status=(\w+)", re.M)
 
 
-def stan_delegacji(katalog: Path) -> dict | None:
+def _koniec_z_dziennika(plik: Path) -> str:
+    """Stan końcowy podagenta z jego dziennika (`final | status=…`, ostatnie 8 KiB); pusty napis, gdy go nie ma."""
+    try:
+        with open(plik, "rb") as f:
+            f.seek(max(0, f.seek(0, 2) - 8192))
+            tekst = f.read().decode("utf-8", errors="replace")
+    except OSError:
+        return ""
+    stany = KONIEC_W_DZIENNIKU.findall(tekst)
+    return stany[-1] if stany else ""
+
+
+def stan_delegacji(katalog: Path, start_bramy: float | None = None) -> dict | None:
     """Manifest podagentów w tle (Hermes `cache/delegation/live/<id>/manifest.json`): {id, zadania [{nr, cel, stan}],
-    gotowe, razem, koniec, start, mtime}; None bez manifestu albo zadań. `nr` to `index` zadania (plik `task-<nr>.log`)."""
+    gotowe, razem, koniec, przerwana, start, mtime}; None bez manifestu albo zadań. `nr` to `index` zadania (plik
+    `task-<nr>.log`). Hermes nie dopisuje końca do manifestu, gdy restart bramy zabije podagentów (24.11 wgranie
+    o 13:22 przerwało trzech, a panel pokazywał „0 z 3” bez końca), więc stan bierzemy też z dziennika zadania, a zadanie
+    bez końca, którego ostatni zapis jest starszy niż start bramy (`<dane>/gateway.pid`), ma stan „interrupted”.
+    `mtime` to ostatni zapis delegacji (manifest albo dziennik)."""
     plik = katalog / "manifest.json"
     try:
         dane = json.loads(plik.read_text(encoding="utf-8"))
@@ -54,17 +72,37 @@ def stan_delegacji(katalog: Path) -> dict | None:
         return None
     if not isinstance(dane, dict):
         return None
-    zadania = [{"nr": t["index"] if type(t.get("index")) is int else i, "cel": str(t.get("goal") or "")[:200],
-                "stan": str(t.get("status") or "")}
-               for i, t in enumerate(dane.get("tasks") or []) if isinstance(t, dict)]
+    if start_bramy is None:
+        try:
+            start_bramy = (katalog.parents[5] / "gateway.pid").stat().st_mtime    # <dane>/profiles/<a>/cache/delegation/live/<id>
+        except (OSError, IndexError):
+            start_bramy = 0.0
+    zadania, przerwana = [], False
+    for i, t in enumerate(dane.get("tasks") or []):
+        if not isinstance(t, dict):
+            continue
+        nr = int(t["index"]) if str(t.get("index", "")).isdigit() else i
+        stan = str(t.get("status") or "")
+        dziennik = katalog / f"task-{nr}.log"
+        with contextlib.suppress(OSError):
+            mtime = max(mtime, dziennik.stat().st_mtime)
+        if stan not in KONCOWE_PODAGENTA:
+            stan = _koniec_z_dziennika(dziennik) or stan
+        zadania.append({"nr": nr, "cel": str(t.get("goal") or "")[:200], "stan": stan})
     if not zadania:
         return None
+    if start_bramy > mtime and any(z["stan"] not in KONCOWE_PODAGENTA for z in zadania):
+        przerwana = True                       # brama wstała po ostatnim zapisie: tych podagentów już nie ma
+        for z in zadania:
+            if z["stan"] not in KONCOWE_PODAGENTA:
+                z["stan"] = "interrupted"
+    przerwana = przerwana or any(z["stan"] == "interrupted" for z in zadania)
     gotowe = sum(z["stan"] in KONCOWE_PODAGENTA for z in zadania)
     start = next((float(dane[k]) for k in ("started_at", "created_at")
                   if isinstance(dane.get(k), (int, float)) and not isinstance(dane.get(k), bool)), None)
     return {"id": str(dane.get("delegation_id") or katalog.name), "zadania": zadania, "gotowe": gotowe,
-            "razem": len(zadania), "koniec": gotowe == len(zadania), "start": start, "mtime": mtime,
-            "katalog": str(katalog)}
+            "razem": len(zadania), "koniec": gotowe == len(zadania), "przerwana": przerwana, "start": start,
+            "mtime": mtime, "katalog": str(katalog)}
 
 
 def katalog_delegacji(home: Path | str, agent: str, did: str) -> Path | None:
@@ -127,11 +165,16 @@ def ogon_dziennika(katalog: Path, nr: int, *, linie: int = 40, bajty: int = 6553
 
 
 def tekst_budzenia_podagentow(d: dict) -> str:
-    """Wiadomość, którą obserwator budzi agenta, gdy jego podagenci w tle skończyli."""
+    """Wiadomość, którą obserwator budzi agenta, gdy jego podagenci w tle skończyli albo restart bramy ich przerwał."""
     linie = [f"[podagenci] Delegacja {d['id']}: {d['gotowe']} z {d['razem']} skończonych."]
     linie += [f"- {z['cel'][:140]} ({z['stan']})" for z in d["zadania"]]
-    linie += ["", f"Wyniki i dzienniki podagentów: {d['katalog']}/ (task-<n>.log, ostatnie linie to podsumowanie).",
-              "Sprawdź je i dokończ zadanie właściciela jednym raportem."]
+    linie += ["", f"Wyniki i dzienniki podagentów: {d['katalog']}/ (task-<n>.log, ostatnie linie to podsumowanie)."]
+    if d.get("przerwana"):
+        linie.append("Restart bramy przerwał podagentów oznaczonych interrupted: z dzienników ustal, co już zrobili, "
+                     "przerwane części daj od nowa podagentom delegate_task i powiedz właścicielowi jednym zdaniem, "
+                     "że praca była przerwana i ruszyła dalej.")
+    else:
+        linie.append("Sprawdź je i dokończ zadanie właściciela jednym raportem.")
     return "\n".join(linie)
 
 
@@ -245,7 +288,8 @@ class Obserwator:
                 if pozniej:                                  # agent pracował już po końcu podagentów: wynik ma
                     continue
                 w = self.db.dodaj_wpis(p["watek_id"], rodzaj="system",
-                                       tekst=f"Podagenci skończyli: {d['gotowe']} z {d['razem']}",
+                                       tekst=(f"Podagenci przerwani restartem: {d['gotowe']} z {d['razem']} skończonych"
+                                              if d["przerwana"] else f"Podagenci skończyli: {d['gotowe']} z {d['razem']}"),
                                        dane={"typ": "podagenci", "agent": p["agent"], "delegacja": did})
                 self.hub.nadaj("watek.wpis", {"watek_id": p["watek_id"], "wpis": w}, watek_id=p["watek_id"])
                 self.rejestr.zlec(watek_id=p["watek_id"], wpis_id=w["id"], agent=p["agent"], zrodlo="system",

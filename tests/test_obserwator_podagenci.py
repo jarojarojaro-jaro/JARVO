@@ -83,3 +83,31 @@ def test_podagenci_nie_budza_gdy_agent_juz_pracowal_po_ich_koncu(tmp_path):
     o, db, rej = _obserwator(tmp_path, [tura, pozniej])
     asyncio.run(o._podagenci(100.0))
     assert rej.zlecone == [] and db.wpisy == []
+
+
+def test_restart_bramy_konczy_podagentow_bez_konca_w_manifescie_i_budzi_agenta(tmp_path):
+    """24.11 13:22: wgranie zrestartowało bramę w trakcie pracy trzech podagentów; Hermes nie dopisał końca do
+    manifestu, panel pokazywał „0 z 3 gotowe” bez końca, a Jarvo nie wiedział, że praca stoi."""
+    import os
+    k = _manifest(tmp_path, "deleg_494badc9", ["running", "running", "running"])
+    (k / "task-0.log").write_text("13:22:44 tool     | -> vision_analyze(...)\n", encoding="utf-8")
+    (k / "task-1.log").write_text("13:22:49 final    | status=interrupted duration=415.95s summary: …\n", encoding="utf-8")
+    for p in k.iterdir():
+        os.utime(p, (1000.0, 1000.0))
+    tura = {"id": "r1", "watek_id": "w1", "agent": "jarvo", "utworzony_at": 1.0,
+            "kroki": [{"narzedzie": "delegate_task", "podglad": "deleg_494badc9"}]}
+    o, db, rej = _obserwator(tmp_path, [tura])
+
+    (tmp_path / "gateway.pid").write_text("1", encoding="utf-8")
+    os.utime(tmp_path / "gateway.pid", (900.0, 900.0))           # brama sprzed ostatniego zapisu: praca trwa
+    d = obserwator.stan_delegacji(k)
+    assert [z["stan"] for z in d["zadania"]] == ["running", "interrupted", "running"] and not d["koniec"]
+    asyncio.run(o._podagenci(100.0))
+    assert rej.zlecone == []
+
+    os.utime(tmp_path / "gateway.pid", (1100.0, 1100.0))         # brama wstała po ostatnim zapisie
+    d = obserwator.stan_delegacji(k)
+    assert [z["stan"] for z in d["zadania"]] == ["interrupted"] * 3 and d["koniec"] and d["przerwana"]
+    asyncio.run(o._podagenci(200.0))
+    assert len(rej.zlecone) == 1 and "Restart bramy przerwał" in rej.zlecone[0]["prosba"]
+    assert db.wpisy[0]["tekst"] == "Podagenci przerwani restartem: 3 z 3 skończonych"
