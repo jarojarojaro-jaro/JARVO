@@ -6,7 +6,7 @@ zmieniono: 2026-11-24
 status: aktualna
 zrodlo: "panel 24.11 03:30–03:50: przesiew 206 darmowych ofert rozdany jako 5 paczek Ręce, Sherlockowi, Łowcy, Web i Studio; właściciel: „czemu puścił Sherlocka, Łowcę, wszystkich”"
 agent: jarvo
-sygnatury: []
+sygnatury: ["/\\bpaczk\\w* \\d+ z \\d+\\b/"]
 wystapienia: 1
 ---
 # Praca ogólna do podagentów, nie do specjalistów
@@ -22,3 +22,4 @@ wystapienia: 1
 ## Powiązane
 - hub: [[bledy/_hub-bledy|Księga błędów]]
 - [[fleet/lekcje|Księga lekcji floty]]
+- [[bledy/limit iteracji karty zjadły skrypty łatające raport|Limit iteracji karty]]

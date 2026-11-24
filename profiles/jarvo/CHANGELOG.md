@@ -1,6 +1,8 @@
 # Changelog: jarvo
 
 ## Niewydane
+- `jarvo stan [temat]` daje stan instalacji jednym poleceniem (rutyny, flota, sprzęt, porty, panel, skarbiec), a zasady każą Jarvowi brać z niego fakty na teraz, powtarzaną serię zapisywać jako własne polecenie w `polecenia/` i łączyć kroki telefonu w `batch`.
+- Obraz telefonu w podglądzie wypełnia panel bez pustych pasów, a znak NA ŻYWO nie pokazuje liczby ms.
 - Przycisk „Na żywo” stoi na stałe w pasku pracy z ikoną urządzenia i działa jak przełącznik, zamiast skakać po liście kroków.
 - `jarvo update --po-kartach` czeka też na trwające tury rozmów w panelu (24.11 wgranie przerwało odpowiedź Jarva dla właściciela).
 - Podgląd na żywo stoi obok rozmowy jako panel z uchwytem szerokości i małymi ikonami telefonów i przeglądarki, a `jarvo panel siec https on` daje panel pod https (obraz telefonu), stary adres przekierowuje.

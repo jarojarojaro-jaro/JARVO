@@ -188,6 +188,8 @@ def _parser() -> argparse.ArgumentParser:
     telefon.dodaj_polecenia(sub)
     from . import sesje_omp                 # sesje omp z sesje.json (centrum 1d): jarvo sesja <klucz> stan|terminal|skrzynka
     sesje_omp.dodaj_polecenia(sub)
+    from . import stan                      # stan instalacji jednym poleceniem: jarvo stan [temat…]
+    stan.dodaj_polecenia(sub)
 
     s = sub.add_parser("komputer", add_help=False, help="Komputer Jarva: przeglądarka Jarva (on, off, status, …) "
                        "i ręce na Twoim ekranie (komputer rece on|off|status)",

@@ -124,14 +124,20 @@ def _api_wiedza(tmp_path, monkeypatch):
     return mod
 
 
+# trasy WebSocket nie mogą być ochrona.Trasa: przeglądarka nie wysyła nagłówka formularza, więc każda sprawdza sama
+# token sesji, Host i Origin (podglad_zywo.py); nowa trasa WebSocket = dopisz ją tu po takim sprawdzeniu
+WEBSOCKETY = {"jarvo-hq": {"/podglad/ws"}}
+
+
 def _trasy(router):
-    return [t for t in router.routes if hasattr(t, "dependant")]
+    return [t for t in router.routes if hasattr(t, "dependant") and hasattr(t, "methods")]
 
 
 def _sprawdz_router(api, nazwa):
     # każda trasa to Trasa: zwykła trasa Starlette (router.add_route, router.mount) ominęłaby route_class, a _trasy
     # (tylko trasy z .dependant) by jej nie zobaczyło
-    obce = [f"{type(t).__name__} {getattr(t, 'path', '?')}" for t in api.router.routes if not isinstance(t, api.ochrona.Trasa)]
+    obce = [f"{type(t).__name__} {getattr(t, 'path', '?')}" for t in api.router.routes
+            if not isinstance(t, api.ochrona.Trasa) and getattr(t, "path", None) not in WEBSOCKETY.get(nazwa, ())]
     assert not obce, f"{nazwa}: trasy spoza ochrona.Trasa: {obce}"
     zapis = [t for t in _trasy(api.router) if set(t.methods) & api.ochrona.METODY_ZAPISU]
     assert zapis, f"{nazwa}: brak tras zapisu"
@@ -176,6 +182,8 @@ def test_odczyty_hq_bez_skutkow(monkeypatch):
         "/agenci",
         # szczegóły kroku (rozwinięty krok): plik sesji omp i state.db członka tylko do odczytu, pamięć w procesie
         "/rozmowy/{wid}/krok",
+        # podagenci tury (trasy_rozmow.py): dzienniki delegate_task z cache profilu tylko do odczytu
+        "/rozmowy/{wid}/podagenci", "/rozmowy/{wid}/podagenci/{did}/{nr}",
         # karty pracy (karty.py): kanban.db i state.db pracowników tylko do odczytu (mode=ro)
         "/karty", "/karty/{tid}",
         # start aplikacji (trasy_aplikacji.py): USER.md, config i .env profilu Jarva tylko po nazwach, nawyki.db mode=ro

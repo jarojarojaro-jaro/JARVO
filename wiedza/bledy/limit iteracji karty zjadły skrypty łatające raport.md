@@ -24,4 +24,5 @@ wystapienia: 1
 - hub: [[bledy/_hub-bledy|Księga błędów]]
 - [[bledy/port zajęty przez serwer z poprzedniej karty|Port zajęty przez stary serwer]]
 - [[bledy/limit zapytań api, bez pętli ponowień|Limit zapytań API]]
+- [[bledy/praca ogólna do podagentów, nie do specjalistów|Praca ogólna do podagentów]]
 - [[fleet/lekcje|Księga lekcji floty]]
