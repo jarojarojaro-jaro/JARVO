@@ -24,7 +24,14 @@ from typing import Callable
 
 from .sciezki import Uklad
 
-TEMATY = ("serwis", "rutyny", "wiedza", "flota", "sprzet", "porty", "polecenia")
+TEMATY = ("serwis", "rutyny", "raporty", "wiedza", "flota", "poczekalnia", "telefony", "sprzet", "porty", "polecenia")
+# słowa, których agent używa zamiast nazwy części (pomiar 24.11: `jarvo stan panel`, `jarvo stan telefony`)
+INNE_NAZWY = {"panel": "serwis", "siec": "serwis", "sieć": "serwis", "zegary": "rutyny", "cron": "rutyny",
+              "kopia": "rutyny", "harmonogram": "rutyny", "mozg": "wiedza", "mózg": "wiedza", "skarbiec": "wiedza",
+              "agenci": "flota", "zadania": "flota", "skille": "poczekalnia", "zgody": "poczekalnia",
+              "telefon": "telefony", "sprzęt": "sprzet", "cpu": "sprzet", "port": "porty", "uslugi": "porty",
+              "usługi": "porty"}
+NAJWYZEJ_RAPORTOW = 8
 DNI = ("poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota", "niedziela")
 STANY_OTWARTE = ("running", "ready", "todo", "blocked", "review", "triage")
 NAZWY_STANOW = {"running": "w toku", "ready": "gotowe do startu", "todo": "czeka", "blocked": "zablokowane",
@@ -101,13 +108,16 @@ def rutyny_profili(u: Uklad, teraz: float) -> list[str]:
             harm = j.get("schedule_display") or (sched.get("expr") or sched.get("display")
                                                  if isinstance(sched, dict) else sched) or "?"
             wlaczona = bool(j.get("enabled")) and j.get("state") != "paused"
-            czasy = ""
             if wlaczona:
-                czasy = (f" · ostatnio {kiedy(_iso(j.get('last_run_at')), teraz)}"
+                czasy = (f"włączona · ostatnio {kiedy(_iso(j.get('last_run_at')), teraz)}"
                          + (f" ({j['last_status']})" if j.get("last_status") else "")
                          + f" · następnie {kiedy(_iso(j.get('next_run_at')), teraz)}")
-            w.append(f"{plik.parts[-3]}: {j.get('name') or j.get('id')} · {harm} · "
-                     f"{'włączona' if wlaczona else 'wstrzymana'}{czasy}")
+            else:
+                od = _iso(j.get("paused_at"))
+                czasy = ("wstrzymana" + (f" od {time.strftime('%d.%m', time.localtime(od))}" if od else "")
+                         + (f" ({' '.join(str(j['paused_reason']).split())[:90]})" if j.get("paused_reason") else "")
+                         + ", sama nie ruszy")
+            w.append(f"{plik.parts[-3]}: {j.get('name') or j.get('id')} · {harm} · {czasy}")
     return w
 
 
@@ -120,14 +130,17 @@ def zegary_systemu(wolaj_: Wolaj, teraz: float) -> list[str]:
     czasy = {x.get("unit"): x for x in lista if isinstance(x, dict) and x.get("unit")}
     if not czasy:
         return []
-    opisy = _wlasciwosci(wolaj_, list(czasy), ("Description", "FragmentPath"))
+    opisy = _wlasciwosci(wolaj_, [*czasy, *(x.get("activates") or "" for x in czasy.values())],
+                         ("Description", "FragmentPath"))
     wlasne = str(Path.home() / ".config" / "systemd" / "user")
     w = []
     for nazwa, x in czasy.items():
         o = opisy.get(nazwa, {})
         if not o.get("FragmentPath", "").startswith(wlasne):
             continue
-        w.append(f"{nazwa} · {o.get('Description') or x.get('activates') or ''} · ostatnio "
+        robi = opisy.get(x.get("activates") or "", {}).get("Description", "")
+        w.append(f"{nazwa} · {o.get('Description') or x.get('activates') or ''}"
+                 + (f" · uruchamia: {robi}" if robi and robi != o.get("Description") else "") + " · ostatnio "
                  f"{kiedy((x.get('last') or 0) / 1e6, teraz)} · następnie {kiedy((x.get('next') or 0) / 1e6, teraz)}")
     return w
 
@@ -136,7 +149,7 @@ def _wlasciwosci(wolaj_: Wolaj, jednostki: list[str], pola: tuple[str, ...]) -> 
     """`systemctl --user show` dla wielu jednostek naraz: {jednostka: {pole: wartość}}."""
     if not jednostki:
         return {}
-    arg = ["systemctl", "--user", "show", *jednostki, "-p", "Id"]
+    arg = ["systemctl", "--user", "show", *(j for j in jednostki if j), "-p", "Id"]
     for p in pola:
         arg += ["-p", p]
     out: dict[str, dict] = {}
@@ -309,11 +322,54 @@ def czesc_polecenia(u: Uklad, _ot, _wolaj: Wolaj, _teraz: float) -> list[str]:
     return w or [f"brak; skrypt zapisany w {kat} z opisem w pierwszym komentarzu pojawi się tutaj"]
 
 
+def czesc_raporty(u: Uklad, _ot, _wolaj: Wolaj, teraz: float) -> list[str]:
+    """Raporty rutyn: gdzie je czytać i ostatnie wpisy z `<dane>/jarvo/state/raporty.db`."""
+    w = ["raporty rutyn czyta się w panelu w zakładce Aktualizacje i tam, dokąd rutyna dostarcza (Telegram)"]
+    baza = u.jarvo_dane / "state" / "raporty.db"
+    if not baza.is_file():
+        return w + ["żadnego raportu jeszcze nie ma"]
+    c = sqlite3.connect(f"file:{baza}?mode=ro", uri=True, timeout=2)
+    try:
+        wiersze = c.execute("select profil, nazwa, ts, blad from raporty order by ts desc limit ?",
+                            (NAJWYZEJ_RAPORTOW,)).fetchall()
+    finally:
+        c.close()
+    return w + [f"  {kiedy(ts, teraz)} · {profil} · {nazwa}" + (" · BŁĄD" if blad else "")
+                for profil, nazwa, ts, blad in wiersze]
+
+
+def czesc_poczekalnia(u: Uklad, _ot, _wolaj: Wolaj, teraz: float) -> list[str]:
+    """Zmiany skilli i pamięci czekające na zgodę właściciela (`<dane>/profiles/*/pending/*/*.json`)."""
+    wpisy = []
+    for p in (u.dane / "profiles").glob("*/pending/*/*.json"):
+        d = _json(p) or {}
+        od = float(d.get("created_at") or 0)
+        wpisy.append((od, f"{p.parts[-4]} · {d.get('subsystem') or p.parts[-2]} · {d.get('id') or p.stem} · "
+                          f"{' '.join(str(d.get('summary') or '').split())[:90]} · czeka od {kiedy(od, teraz)}"))
+    if not wpisy:
+        return ["nic nie czeka; zmiana skilla przez skill_manage trafia tu do zgody właściciela"]
+    wpisy.sort(reverse=True)
+    return [f"czeka {len(wpisy)}, najnowsze:"] + [f"  {x}" for _od, x in wpisy[:NAJWYZEJ_RAPORTOW]] + [
+        "zatwierdza albo odrzuca właściciel (`/skills pending`); do tego czasu zmiana nie jest zapisana"]
+
+
+def czesc_telefony(u: Uklad, ot, _wolaj: Wolaj, _teraz: float) -> list[str]:
+    from . import telefon
+    bufor = io.StringIO()
+    with contextlib.redirect_stdout(bufor), contextlib.redirect_stderr(bufor):
+        telefon.polecenie_status(u, SimpleNamespace(json=False), (), ot)
+    return [x.strip() for x in bufor.getvalue().splitlines() if x.strip()] + [
+        "nazwy i stan telefonów na żywo: narzędzia `mcp__phone__list_phones` i `mcp__phone__ping`"]
+
+
 CZESCI: dict[str, tuple[str, Callable]] = {
     "serwis": ("serwis i panel", czesc_serwis),
     "rutyny": ("co działa samo i kiedy", czesc_rutyny),
+    "raporty": ("raporty rutyn", czesc_raporty),
     "wiedza": ("skarbiec wiedzy", czesc_wiedza),
     "flota": ("flota i lista zadań", czesc_flota),
+    "poczekalnia": ("zmiany czekające na zgodę", czesc_poczekalnia),
+    "telefony": ("telefony floty", czesc_telefony),
     "sprzet": ("sprzęt", czesc_sprzet),
     "porty": ("porty i kto na nich słucha", czesc_porty),
     "polecenia": ("własne polecenia", czesc_polecenia),
@@ -335,11 +391,12 @@ def raport(u: Uklad, ot, tematy: tuple[str, ...] = (), *, wolaj_: Wolaj = wolaj,
 
 
 def polecenie_stan(u: Uklad, a, _reszta, ot) -> int:
-    zle = [x for x in a.tematy if x not in TEMATY]
+    """Nieznany temat nie kończy się błędem: agent dostaje cały stan i listę tematów, bez drugiego wywołania."""
+    tematy = [INNE_NAZWY.get(x.casefold(), x.casefold()) for x in a.tematy]
+    zle = [x for x in tematy if x not in TEMATY]
     if zle:
-        print(f"Nie znam tematu {', '.join(zle)}. Są: {', '.join(TEMATY)}.", file=sys.stderr)
-        return 2
-    print(raport(u, ot, tuple(a.tematy)))
+        print(f"(tematu {', '.join(zle)} nie ma; tematy: {', '.join(TEMATY)}; niżej cały stan)")
+    print(raport(u, ot, () if zle else tuple(dict.fromkeys(tematy))))
     return 0
 
 

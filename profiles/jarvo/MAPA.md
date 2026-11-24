@@ -91,7 +91,7 @@ Moje dane leżą w katalogu danych Jarva (skarbiec, misje, katalogi robocze, pli
 - Raporty rutyn: Hermes zapisuje je w `profiles/<profil>/cron/output/`, panel przepisuje do `state/raporty.db` i pokazuje w Aktualizacjach.
 - Rozmowy panelu: `state/rozmowy.db`; tablica zadań: `kanban.db` w katalogu danych Hermesa.
 - Sejf sekretów: `konfig/` w katalogu danych Jarva; nie czytam go i nie kopiuję.
-- Instalacja natywna: polecenie `jarvo`, usługa użytkownika `jarvo.service`, w niej nadzorca z usługami brama, panel, komputer, aktualizacje i wektory. Cały stan jednym poleceniem daje `jarvo stan [temat]` (serwis, rutyny, wiedza, flota, sprzet, porty, polecenia); diagnozę z radą daje `jarvo doctor`.
+- Instalacja natywna: polecenie `jarvo`, usługa użytkownika `jarvo.service`, w niej nadzorca z usługami brama, panel, komputer, aktualizacje i wektory. Cały stan jednym poleceniem daje `jarvo stan [temat]` (serwis, rutyny, raporty, wiedza, flota, poczekalnia, telefony, sprzet, porty, polecenia); diagnozę z radą daje `jarvo doctor`.
 - Skąd się biorę: publiczne repo JARVO daje mechanizmy, prywatna nakładka daje dane @@WLASCICIEL@@ i agentów biznesowych; `scripts/build.py` składa z nich profile, a `jarvo update` je instaluje.
 
 ## Kiedy

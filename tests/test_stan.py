@@ -37,7 +37,7 @@ def u(tmp_path):
                    "last_run_at": iso(-17 * 60), "next_run_at": iso(17 * 3600 + 50 * 60)}],
         "jarvo-translator": [{"id": "translator-dzien", "name": "Translator: dzień pracy", "enabled": False,
                               "state": "paused", "schedule": {"kind": "cron", "expr": "10 9 * * 1-5"},
-                              "next_run_at": None}],
+                              "paused_at": iso(-5 * 86400), "paused_reason": "czeka na\nprzegląd", "next_run_at": None}],
     }.items():
         kat = uk.dane / "profiles" / profil
         (kat / "cron").mkdir(parents=True)
@@ -64,6 +64,7 @@ def atrapa(argv: list[str]) -> str:
     if argv[:3] == ["systemctl", "--user", "show"]:
         return (f"Id=kopia.timer\nDescription=Kopia co godzinę\nFragmentPath={DOM_ZEGAROW}/kopia.timer\n\n"
                 "Id=obcy.timer\nDescription=Systemowy\nFragmentPath=/usr/lib/systemd/user/obcy.timer\n\n"
+                "Id=kopia.service\nDescription=Kopia na GitHub\n\n"
                 "Id=jarvo.service\nCPUQuotaPerSecUSec=3s\n")
     if argv[0] == "ss":
         return ('LISTEN 0 128 100.64.0.1:9119 0.0.0.0:* users:(("hermes",pid=999999991,fd=5))\n'
@@ -80,8 +81,8 @@ def test_rutyny_wszystkich_profili_wstrzymana_bez_terminu_a_zegary_tylko_wlascic
     r = raport(u, "rutyny")
     assert "Jarvo stan · wtorek 2026-11-24 14:00" in r
     assert "jarvo: Patrol floty · every 30m · włączona · ostatnio dziś 13:43 (ok) · następnie jutro 07:50" in r
-    assert "jarvo-translator: Translator: dzień pracy · 10 9 * * 1-5 · wstrzymana\n" in r
-    assert "kopia.timer · Kopia co godzinę · ostatnio dziś 13:00 · następnie dziś 14:01" in r
+    assert "jarvo-translator: Translator: dzień pracy · 10 9 * * 1-5 · wstrzymana od 19.11 (czeka na przegląd), sama nie ruszy\n" in r
+    assert "kopia.timer · Kopia co godzinę · uruchamia: Kopia na GitHub · ostatnio dziś 13:00 · następnie dziś 14:01" in r
     assert "obcy.timer" not in r
     assert "crontab użytkownika: pusty" in r
 
@@ -113,11 +114,34 @@ def test_wlasne_polecenia_z_opisem_z_pierwszego_komentarza(u):
     assert ".ukryty" not in r
 
 
-def test_blad_jednej_czesci_nie_zabiera_reszty_a_zly_temat_to_kod_2(u, capsys, monkeypatch):
+def test_blad_jednej_czesci_nie_zabiera_reszty(u, monkeypatch):
     monkeypatch.setitem(stan.CZESCI, "porty", ("porty", lambda *_a: 1 / 0))
     r = raport(u, "porty", "wiedza", "flota")
     assert "## porty: porty\n(nie udało się odczytać: ZeroDivisionError" in r
     assert "Brak skarbca" in r and "szkic staje się" not in r
     assert "agenci (2)" in r
-    assert stan.polecenie_stan(u, SimpleNamespace(tematy=["nieznany"]), [], None) == 2
-    assert "Są: serwis, rutyny" in capsys.readouterr().err
+
+
+def test_inna_nazwa_tematu_dziala_a_nieznany_daje_caly_stan_bez_bledu(u, capsys, monkeypatch):
+    wolane = []
+    monkeypatch.setattr(stan, "raport", lambda _u, _ot, tematy: wolane.append(tematy) or "RAPORT")
+    assert stan.polecenie_stan(u, SimpleNamespace(tematy=["Zadania", "flota", "kopia"]), [], None) == 0
+    assert stan.polecenie_stan(u, SimpleNamespace(tematy=["nieznany"]), [], None) == 0
+    assert wolane == [("flota", "rutyny"), ()]
+    assert "(tematu nieznany nie ma; tematy: serwis, rutyny" in capsys.readouterr().out
+
+
+def test_poczekalnia_i_raporty_rutyn(u):
+    assert "nic nie czeka" in raport(u, "poczekalnia")
+    kat = u.dane / "profiles" / "jarvo" / "pending" / "skills"
+    kat.mkdir(parents=True)
+    (kat / "ab12.json").write_text(json.dumps({"id": "ab12", "subsystem": "skills", "summary": "patch on\nposty",
+                                               "created_at": TERAZ - 3600}), encoding="utf-8")
+    assert "czeka 1, najnowsze:\n  jarvo · skills · ab12 · patch on posty · czeka od dziś 13:00" in raport(u, "poczekalnia")
+    (u.jarvo_dane / "state").mkdir(parents=True)
+    c = sqlite3.connect(u.jarvo_dane / "state" / "raporty.db")
+    c.execute("create table raporty (id text, profil text, rodzaj text, nazwa text, ts real, tekst text, blad integer)")
+    c.execute("insert into raporty values ('r1','jarvo','rutyna','Poranny brief',?,'…',1)", (TERAZ - 86400,))
+    c.commit()
+    c.close()
+    assert "  wczoraj 14:00 · jarvo · Poranny brief · BŁĄD" in raport(u, "raporty")

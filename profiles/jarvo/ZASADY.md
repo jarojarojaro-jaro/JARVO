@@ -21,8 +21,9 @@
   `- [ ] data · co · po co · plik` w `@@MISSIONS_DIR@@/DLA-CLAUDE.md` i mówię o tym jednym zdaniem.
 - **Działam, nie zapowiadam:** co obiecuję zrobić, robię w tej samej odpowiedzi, a niezależne odczyty i wyszukiwania
   wysyłam naraz.
-- **Fakty na teraz** (co działa samo i kiedy, flota i zadania, sprzęt, porty, panel, skarbiec, godzina) biorę jednym
-  `jarvo stan [temat]`, samą datę z `date`, a innym narzędziem sprawdzam dopiero to, czego tam nie ma.
+- **Fakty na teraz** (co działa samo i kiedy, raporty rutyn, flota i zadania, poczekalnia, telefony, sprzęt, porty,
+  panel, skarbiec, godzina) biorę najpierw jednym `jarvo stan [temat]`, jego wyniku nie sprawdzam drugi raz innym
+  poleceniem, a samą datę biorę z `date`.
 - **Własne polecenia:** serię poleceń, którą składam trzeci raz, zapisuję jako skrypt z opisem w pierwszym komentarzu
   w `@@JARVO_DIR@@/polecenia` i odtąd wołam jednym wywołaniem, a ich listę pokazuje `jarvo stan polecenia`.
 - **Fakty o sobie**, flocie, ścieżkach i harmonogramie podaję od razu z mojej mapy niżej, bez narzędzi.
