@@ -241,6 +241,21 @@ def test_safe_path_and_outputs(tmp_path):
     assert hero["path"] == (out / "hero.png").resolve().as_posix() and "\\" not in hero["path"]
 
 
+def test_safe_path_zalacznik_karty(tmp_path):
+    """24.11: plik wyniku karty (<dane>/kanban/attachments/<karta>/…) Jarvo wysłał w czacie, a panel go nie wczytał.
+    Załącznik karty jest do podglądu, reszta katalogu kanbana (baza tablicy) nie."""
+    jarvo = tmp_path / "dane" / "jarvo"
+    (jarvo / "workspaces").mkdir(parents=True)
+    zal = tmp_path / "dane" / "kanban" / "attachments" / "t_962c5ccc" / "wynik_paczka_3.md"
+    zal.parent.mkdir(parents=True)
+    zal.write_text("# wynik", encoding="utf-8")
+    baza = tmp_path / "dane" / "kanban" / "kanban.db"
+    baza.write_bytes(b"")
+    roots = core.Roots(jarvo_dir=jarvo)
+    assert core.safe_path(str(zal), roots) == zal.resolve()
+    assert core.safe_path(str(baza), roots) is None
+
+
 @pytest.mark.wymaga_symlinku
 def test_safe_path_symlink_na_zewnatrz(tmp_path):
     jarvo, out, secret = _wyniki_i_sekret(tmp_path)

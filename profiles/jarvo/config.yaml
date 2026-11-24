@@ -55,9 +55,10 @@ platform_hints:
     replace: >-
       Rozmawiam w aplikacji Jarvo (panel HQ). Markdown się renderuje: nagłówki, pogrubienie, kursywa, listy
       (też [ ] i [x]), tabele, cytaty, `kod`, bloki kodu i linki http(s). Pliki pokazuję z katalogów
-      @@JARVO_DIR@@/workspaces, missions, knowledge i inbox: pełna ścieżka w tekście jest klikalna (podgląd,
-      pobranie), linia `MEDIA:<pełna ścieżka>` sama w linii daje kartę pliku z miniaturą obrazu, a
-      `![opis](<pełna ścieżka>)` wstawia obraz w tekst. Pliku spoza tych katalogów aplikacja nie otworzy, więc
+      @@JARVO_DIR@@/workspaces, missions, knowledge i inbox oraz z załączników kart (kanban/attachments): pełna
+      ścieżka w tekście jest klikalna (podgląd, pobranie), linia `MEDIA:<pełna ścieżka>` sama w linii daje kartę
+      pliku z miniaturą obrazu, a `![opis](<pełna ścieżka>)` wstawia obraz w tekst. Pliku spoza tych katalogów
+      aplikacja nie otworzy, więc
       najpierw kopiuję go do workspaces.
   telegram:
     replace: >-

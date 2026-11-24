@@ -36,9 +36,10 @@ const Sciezki = (() => {
   function wzor(klucz, zrob) {
     if (!pamiec.has(klucz)) {
       const z = zrodloKorzenia();
-      const alias = `${esc(ALIAS)}\\/jarvo\\/${KATALOGI}\\/`;
-      const natywny = z ? `${z}${sep()}jarvo${sep()}${KATALOGI}${sep()}` : null;
-      // początek ścieżki pliku floty: <korzeń>/jarvo/<workspaces|missions|knowledge|inbox>/
+      const alias = `${esc(ALIAS)}\\/(?:jarvo\\/${KATALOGI}|kanban\\/attachments)\\/`;
+      const natywny = z ? `${z}${sep()}(?:jarvo${sep()}${KATALOGI}|kanban${sep()}attachments)${sep()}` : null;
+      // początek ścieżki pliku floty: <korzeń>/jarvo/<workspaces|missions|knowledge|inbox>/ albo załącznik karty
+      // <korzeń>/kanban/attachments/ (serwer: hq_core.PREVIEW_KANBAN)
       pamiec.set(klucz, zrob({ poczatek: natywny ? `(?:${natywny}|${alias})` : alias, korzen: z, alias }));
     }
     return pamiec.get(klucz);

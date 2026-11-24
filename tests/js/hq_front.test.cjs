@@ -616,6 +616,9 @@ test("Sciezki: korzeń natywny Windows (litera dysku, „\\” i „/”, spacje
     eq(sciezki("w Git Bash: /c/Users/Michał Żółć/AppData/Local/Jarvo/dane/jarvo/missions/M-1/RAPORT.md"),
       ["/c/Users/Michał Żółć/AppData/Local/Jarvo/dane/jarvo/missions/M-1/RAPORT.md"]);
     eq(sciezki("stara rozmowa: /opt/data/jarvo/workspaces/web/a.html"), ["/opt/data/jarvo/workspaces/web/a.html"]);
+    // 24.11: wynik karty z <dane>/kanban/attachments jest ścieżką pliku (karta, podgląd); reszta kanbana nie
+    eq(sciezki(`plik ${K}/kanban/attachments/t_962c5ccc/wynik_paczka_3.md i ${K}/kanban/kanban.db`),
+      [`${K}/kanban/attachments/t_962c5ccc/wynik_paczka_3.md`]);
     eq(sciezki(`${K}/jarvo/../profiles/.env i D:/Users/Michał Żółć/AppData/Local/Jarvo/dane/jarvo/inbox/x.png`), []);
     eq(MD(`MEDIA:${K}/jarvo/workspaces/wideo/film-końcowy.mp4\n📎 C:\\Users\\inny\\x.pdf`),     // spacja tylko w korzeniu
       [{ t: "pliki", sciezki: [`${K}/jarvo/workspaces/wideo/film-końcowy.mp4`, "C:\\Users\\inny\\x.pdf"] }]);

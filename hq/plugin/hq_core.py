@@ -64,6 +64,9 @@ OUTPUT_LIMIT = 60
 
 # Pliki, które GUI może pokazać (podgląd wyników agentów). Wszystko inne jest poza zasięgiem.
 PREVIEW_ROOTS = ("workspaces", "missions", "knowledge", "inbox")   # inbox: pliki wysłane w czacie HQ
+# załączniki kart kanbana (<dane>/kanban/attachments, obok katalogu Jarva): wyniki agentów, które Jarvo wysyła w czacie
+# (24.11: plik paczki z karty pokazywał „Nie udało się wczytać pliku”)
+PREVIEW_KANBAN = ("kanban", "attachments")
 
 KIND_BY_EXT = {
     **{e: "image" for e in (".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif", ".svg")},
@@ -540,7 +543,7 @@ class Roots:
     korzen: Path = HOME           # korzeń danych: stare ścieżki /opt/data/… wskazują pod niego (sciezki.na_dysk)
 
     def allowed(self) -> list[Path]:
-        return [(self.jarvo_dir / r).resolve() for r in PREVIEW_ROOTS]
+        return [(self.jarvo_dir / r).resolve() for r in PREVIEW_ROOTS] + [self.jarvo_dir.parent.joinpath(*PREVIEW_KANBAN).resolve()]
 
 
 def safe_path(raw: str, roots: Roots) -> Path | None:
