@@ -238,6 +238,19 @@ def test_obcy_origin_403(sc):
     assert app.wolania == []
 
 
+def test_z_https_strona_po_http_idzie_na_https_a_api_i_serve_nie(sc):
+    app = Aplikacja()
+    _, ciastka = zalogowany(sc)
+    b = s.Bramka(app, s.Sesje(sc), {ADRES, NAZWA}, f"127.0.0.1:{PORT}", https=NAZWA)
+    status, h, _ = wolaj(b, "/login", zapytanie=b"next=%2Fjarvo", naglowki=[("sec-fetch-dest", "document")])
+    assert status == 302 and naglowek(h, b"location") == [f"https://{NAZWA}/login?next=%2Fjarvo".encode()]
+    assert wolaj(b, "/jarvo", naglowki=[("accept", "text/html")])[0] == 302          # Safari bez Sec-Fetch
+    assert wolaj(b, "/api/x", naglowki=[("cookie", ciastka), ("sec-fetch-dest", "document")])[0] == 200
+    assert wolaj(b, "/jarvo", naglowki=[("cookie", ciastka), ("sec-fetch-dest", "document"),
+                                        ("x-forwarded-proto", "https")])[0] == 200    # przez tailscale serve
+    assert wolaj(b, "/assets/app.js", naglowki=[("cookie", ciastka), ("sec-fetch-dest", "script")])[0] == 200
+
+
 def test_odswiezenie_samym_rt_ustawia_nowe_ciasteczka(sc):
     app = Aplikacja()
     sesja, _ = zalogowany(sc)

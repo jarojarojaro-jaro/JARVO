@@ -14,6 +14,8 @@ nasłuch włącza i wyłącza sam panel w ciągu kilku sekund, bez restartu (bez
   jarvo panel siec status [--json]   ustawienia, stan nasłuchu z panelu, próba GET /api/status w sieci (401 bez sesji
         = bramka działa), ważne klucze, adres Tailscale teraz; samo `jarvo panel siec` to status
   jarvo panel siec wyloguj    nowy sekret: każda sesja (każde urządzenie) traci ważność od razu
+  jarvo panel siec https on|off   `tailscale serve` pod https://<nazwa MagicDNS>/ (certyfikat Tailscale, tylko
+        w tailnecie) i 302 stron z adresu http tam; obraz telefonu w podglądzie na żywo (WebCodecs) działa tylko po https
   jarvo panel klucz [--waznosc 1h]   klucz JRV-XXXX-XXXX-XXXX (działa raz, domyślnie 1 h, najwyżej 24 h) i link
         `http://<adres>:<port>/login?next=%2Fjarvo#klucz=…` do wysłania właścicielowi; na dysku tylko skrót SHA-256
 
@@ -149,7 +151,11 @@ def tailscale() -> dict:
 
 # ---------------------------------------------------------------- adresy i stan
 
-def adresy(ust: dict, port: int, sciezka: str = "/jarvo") -> list[str]:
+def adresy(ust: dict, port: int, sciezka: str = "/jarvo", *, bezposrednie: bool = False) -> list[str]:
+    """Adresy panelu w sieci: z https (tailscale serve) tylko https://<nazwa>, bo http przekierowuje tam; `bezposrednie`
+    = nasłuch bramki po http (próba w `sprawdz_nasluch`)."""
+    if ust.get("https") and ust.get("nazwa") and not bezposrednie:
+        return [f"https://{ust['nazwa']}{sciezka}"]
     hosty = [h for h in (ust.get("adres"), ust.get("nazwa")) if h]
     return [f"http://{'[' + h + ']' if ':' in h else h}:{port}{sciezka}" for h in hosty]
 
@@ -158,7 +164,7 @@ def sprawdz_nasluch(ust: dict, port: int, ot=None) -> tuple[str, str]:
     """Próba GET /api/status na adresie sieci: ("bramka", opis) = 401 od bramki panelu; ("otwarty", opis) =
     odpowiedź bez logowania (błąd); ("brak", opis) = nikt nie odpowiada; ("inny", opis) = coś innego."""
     from .instalator import zapytaj_http
-    adres = adresy(ust, port, "/api/status")[0]
+    adres = adresy(ust, port, "/api/status", bezposrednie=True)[0]
     odp = (ot.zapytaj_http if ot is not None else zapytaj_http)(adres, 3.0)
     if odp is None:
         return "brak", f"{adres}: nikt nie odpowiada"
@@ -262,9 +268,14 @@ def polecenie_on(u: Uklad, a, _reszta=(), ot=None) -> int:
     if not s.Sesje(sc).sekret():
         s.nowy_sekret(sc)
         _chron(sc.sekret)
-    s.zapisz_ustawienia(sc, wlaczony=True, adres=ts["adres"], nazwa=nazwa)
+    https = s.ustawienia(sc)["https"] and s.ustawienia(sc)["nazwa"] == nazwa
+    s.zapisz_ustawienia(sc, wlaczony=True, adres=ts["adres"], nazwa=nazwa, https=https)
     ust = s.ustawienia(sc)
     port = _port(ot)
+    if https:
+        ok, opis_serve = serve(ts["adres"], port, wlacz=True)
+        if not ok:
+            print(f"Uwaga: https nie działa ({opis_serve}); panel dalej po http.", file=sys.stderr)
     print(f"Panel w sieci włączony ({ts['zrodlo']}): " + " i ".join(adresy(ust, port)))
     print("Na 127.0.0.1 panel działa dalej bez hasła. W sieci każde urządzenie loguje się kluczem jednorazowym.")
     stan, opis = _czekaj(ust, port, ot)
@@ -290,10 +301,55 @@ def polecenie_off(u: Uklad, _a, _reszta=(), ot=None) -> int:
     if not ust["wlaczony"]:
         print("Panel w sieci jest wyłączony.")
         return 0
-    s.zapisz_ustawienia(sc, wlaczony=False, adres=ust["adres"], nazwa=ust["nazwa"])
+    s.zapisz_ustawienia(sc, wlaczony=False, adres=ust["adres"], nazwa=ust["nazwa"], https=ust["https"])
     print("Panel w sieci wyłączony: panel zamknie nasłuch w ciągu kilku sekund; 127.0.0.1 działa jak dotąd. "
           "Zalogowane urządzenia tracą dostęp (po ponownym włączeniu sesje wracają; wylogowanie wszystkich: "
           "jarvo panel siec wyloguj).")
+    return 0
+
+
+def serve(adres: str, port: int, *, wlacz: bool) -> tuple[bool, str]:
+    """`tailscale serve` na https://<nazwa MagicDNS>/ (port 443, tylko w tailnecie) do nasłuchu bramki
+    http://<adres>:<port>; certyfikat robi Tailscale. (ok, opis błędu)."""
+    program = program_tailscale()
+    if not program:
+        return False, "brak CLI tailscale"
+    cel = f"http://{'[' + adres + ']' if ':' in adres else adres}:{port}"
+    polecenie = [program, "serve", "--bg", "--https=443", cel] if wlacz else [program, "serve", "--https=443", "off"]
+    try:
+        r = subprocess.run(polecenie, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           timeout=120, creationflags=NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return False, f"`tailscale serve` nie odpowiedział ({type(e).__name__})"
+    if r.returncode == 0:
+        return True, ""
+    blad = (r.stderr or r.stdout).strip().splitlines()
+    return False, (blad[-1] if blad else f"kod {r.returncode}") + (
+        "; potrzebne: HTTPS Certificates w panelu Tailscale (DNS) i `sudo tailscale set --operator=$USER`")
+
+
+def polecenie_https(u: Uklad, a, _reszta=(), ot=None) -> int:
+    kod = _bez_instalacji(u) or _odmowa_floty(u, "Panel pod https włącza")
+    if kod:
+        return kod
+    s = siec()
+    sc = sciezki(u)
+    ust = s.ustawienia(sc)
+    wlacz = a.stan == "on"
+    if wlacz and not (ust["wlaczony"] and ust["nazwa"]):
+        print("BŁĄD: najpierw panel w sieci z nazwą MagicDNS: jarvo panel siec on", file=sys.stderr)
+        return 1
+    port = _port(ot)
+    ok, opis = serve(ust["adres"], port, wlacz=wlacz)
+    if not ok:
+        print(f"BŁĄD: {opis}", file=sys.stderr)
+        return 1
+    s.zapisz_ustawienia(sc, wlaczony=ust["wlaczony"], adres=ust["adres"], nazwa=ust["nazwa"], https=wlacz)
+    if wlacz:
+        print(f"Panel pod https: {adresy(s.ustawienia(sc), port)[0]} (adres http przekierowuje tam w ciągu 5 s; "
+              "obraz telefonu w podglądzie na żywo działa tylko tu).")
+    else:
+        print("Panel bez https: tylko " + " i ".join(adresy(s.ustawienia(sc), port)))
     return 0
 
 
@@ -456,6 +512,9 @@ def dodaj_polecenia(panel) -> None:
     p.set_defaults(funkcja=polecenie_status)
     p = k.add_parser("wyloguj", help="nowy sekret: wyloguj od razu wszystkie urządzenia")
     p.set_defaults(funkcja=polecenie_wyloguj)
+    p = k.add_parser("https", help="panel też pod https://<nazwa MagicDNS>/ (tailscale serve), http przekierowuje")
+    p.add_argument("stan", choices=("on", "off"))
+    p.set_defaults(funkcja=polecenie_https)
     s = t.add_parser("klucz", help="klucz jednorazowy i link logowania dla właściciela (panel w sieci)")
     s.add_argument("--waznosc", default="1h", metavar="CZAS", help="jak długo ważny: 30m, 1h (domyślnie), najwyżej 1d")
     s.set_defaults(funkcja=polecenie_klucz)

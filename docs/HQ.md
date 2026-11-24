@@ -1606,9 +1606,13 @@ z tekstem i jakieś edytuj”). Pakiet `mozg` ładuje się dopiero po wejściu w
   żywo” (`41-na-zywo.js`). Kroki niosą tylko bezpieczne argumenty `args` {phone, cmd, x, y, index}
   (`czytnik_omp.argumenty_urzadzenia`, nigdy `text`). Krok Hermesa na żywo nie ma argumentów (tool.started z
   `/v1/runs`): który telefon jest w użyciu, mówi serwer z plików PhoneUse `<stan>/<nazwa>.busy`.
-- **Okno** (pakiet `podglad`, `42-podglad.js`): ≥ 1100 px panel 380 px po prawej, wężej pływający podgląd w rogu
-  (stuknięcie = pełny ekran, zrzucenie w dół = zamknij); zakładki urządzeń, „Za agentem”, NA ŻYWO z ms, krąg
-  stuknięcia, stany słowami (łączę, ekran wygaszony, poza siecią, skończył N s temu; po 30 s okno się chowa).
+- **Okno** (pakiet `podglad`, `42-podglad.js`): ≥ 900 px panel obok rozmowy po prawej (rozmowa się zwęża,
+  szerokość z uchwytu na lewej krawędzi, 320 px do 70% okna, zapamiętana w localStorage), wężej pływający podgląd
+  w rogu (stuknięcie = pełny ekran, zrzucenie w dół = zamknij); w nagłówku małe ikony urządzeń (telefon z numerem,
+  glob = przeglądarka Komputera, kropka przy urządzeniu agenta) i pinezka „Za agentem”, pod nim nazwa i ruch
+  agenta albo tytuł strony; NA ŻYWO z ms, krąg stuknięcia, stany słowami (łączę, ekran wygaszony, poza siecią,
+  skończył N s temu; po 30 s okno się chowa). Przycisk jest też przy pasku „Podagenci”. Obraz telefonu (H.264,
+  WebCodecs) działa tylko po https: `jarvo panel siec https on` (rozdział 2g).
   Ustawienia › Powiadomienia: „Otwieraj podgląd sam” (localStorage, domyślnie wyłączone).
 - **Serwer** (`hq/plugin/podglad_zywo.py`): WebSocket `/podglad/ws?token=` z uwierzytelnieniem WebSocketów Hermesa;
   telefon przez scrcpy-server 5.0.1 (`vendor/natywne.yaml` `scrcpy-server`, przy pierwszym użyciu) i adb Jarva,
@@ -1629,6 +1633,7 @@ jarvo panel klucz          # klucz JRV-XXXX-XXXX-XXXX (działa raz, 1 h; --wazno
 jarvo panel siec status    # ustawienia, nasłuch, próba w sieci, ważne klucze, adres Tailscale teraz
 jarvo panel siec wyloguj   # nowy sekret: każde urządzenie wylogowane od razu
 jarvo panel siec off       # koniec nasłuchu w sieci; 127.0.0.1 bez zmian
+jarvo panel siec https on  # tailscale serve: panel pod https://<nazwa MagicDNS>/ (certyfikat Tailscale), strony z http dostają 302 tam
 ```
 
 - **Jak działa.** Bramka logowania Hermesa włącza się dla całego procesu (bind spoza pętli zwrotnej albo

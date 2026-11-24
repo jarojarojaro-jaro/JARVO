@@ -172,10 +172,13 @@ class PolaczeniePodgladu {
   }
 }
 
-const SZEROKI_PODGLAD = "(min-width: 1100px)";
+const SZEROKI_PODGLAD = "(min-width: 900px)";
+const SZER_KLUCZ = "jarvo.podglad.szer";
+const szerPodgladu = (w) => Math.round(Math.max(320, Math.min(w, window.innerWidth * 0.7)));
 
 function PodgladOkno({ stan, biezacy }) {
   const szeroki = useMedia(SZEROKI_PODGLAD);
+  const [szer, setSzer] = useState(() => szerPodgladu(Number(localStorage.getItem(SZER_KLUCZ)) || 460));
   const canvas = useRef(null), pol = useRef(null);
   const [s, setS] = useState({ polaczenie: "laczy", telefony: [], klatka: false });
   const [u, setU] = useState(stan.u || (biezacy && biezacy.u) || null);
@@ -215,13 +218,22 @@ function PodgladOkno({ stan, biezacy }) {
   const teraz = useTeraz(1000, koniecAt != null);
   const koniecS = koniecAt != null ? Math.max(0, Math.round(teraz - koniecAt)) : null;
   useEffect(() => { if (koniecS != null && koniecS >= 30) NaZywo.zamknij(); }, [koniecS]);
-  // panel po prawej: rozmowa robi mu miejsce
+  // panel po prawej obok rozmowy (rozmowa robi mu miejsce), szerokość z uchwytu na lewej krawędzi
   React.useLayoutEffect(() => {
     const k = document.querySelector("[data-jarvo-korzen]");
     if (!k || !szeroki) return undefined;
     k.classList.add("is-podglad-bok");
     return () => k.classList.remove("is-podglad-bok");
   }, [szeroki]);
+  React.useLayoutEffect(() => {
+    const k = document.querySelector("[data-jarvo-korzen]");
+    if (k) k.style.setProperty("--j-pz-szer", `${szer}px`);
+  }, [szer]);
+  const uchwyt = {
+    onPointerDown: (e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); e.currentTarget.dataset.ciagnie = "1"; },
+    onPointerMove: (e) => { if (e.currentTarget.dataset.ciagnie) setSzer(szerPodgladu(window.innerWidth - e.clientX - 8)); },
+    onPointerUp: (e) => { delete e.currentTarget.dataset.ciagnie; localStorage.setItem(SZER_KLUCZ, String(szerPodgladu(window.innerWidth - e.clientX - 8))); },
+  };
   // telefon: przeciąganie po rogach, stuknięcie = pełny ekran, zrzucenie na dół = zamknij
   const [rog, setRog] = useState("pd");
   const [przes, setPrzes] = useState(null);
@@ -246,23 +258,31 @@ function PodgladOkno({ stan, biezacy }) {
   const napis = napisPodgladu({ ...s, u: widac }, nazwa, koniecS);
   const naZywo = s.klatka && s.stan === "dziala" && !(s.ekran && s.ekran.wlaczony === false) && koniecS == null;
   const ruchAgenta = biezacy ? `${nazwaAgenta(biezacy.agent)}: ${czasownik(biezacy.krok)}${biezacy.krok.detail ? ` ${biezacy.krok.detail}` : ""}` : "";
+  const podpis = ruchAgenta || (widac === "komputer" && s.komputer && s.komputer.tytul) || "";
   const pionowy = s.obraz ? s.obraz.h >= s.obraz.w : widac !== "komputer";
+  const nrTelefonu = (id) => (s.telefony || []).findIndex((t) => t.id === id) + 1;
   return html`<aside class=${cx("j-pz", szeroki ? "is-bok" : "is-pip", !szeroki && `is-${rog}`, pelny && "is-pelny", koniecS != null && "is-koniec")}
       aria-label=${L("Podgląd na żywo", "Live view")} data-urzadzenie=${widac || ""}
       style=${przes ? { transform: `translate(${przes.x}px, ${przes.y}px)` } : undefined}>
+    ${szeroki && html`<div class="j-pz-uchwyt" role="separator" aria-orientation="vertical" aria-label=${L("Szerokość podglądu", "Live view width")} ...${uchwyt}></div>`}
     <header class="j-pz-g">
-      <b class="j-pz-n">${nazwa}</b>
+      ${(szeroki || pelny) && urzadzenia.length > 0 ? html`<nav class="j-pz-z" aria-label=${L("Urządzenia", "Devices")}>
+        ${urzadzenia.map((id) => {
+          const opis = nazwaUrzadzenia(id);
+          return html`<button type="button" key=${id} class="j-ma-tip" aria-pressed=${String(id === widac)} aria-label=${opis}
+            onClick=${() => { setZaAgentem(false); setU(id); }}>
+            <${Ikona} n=${id === "komputer" ? "globe" : "phone"} r=${16}/>${id !== "komputer" && html`<span class="j-pz-nr">${nrTelefonu(id) || ""}</span>`}
+            ${id === agentU && biezacy && html`<span class="j-pz-tu" aria-hidden="true"></span>`}<${Podpowiedz} tekst=${opis}/></button>`;
+        })}
+        <span class="j-pz-kreska" aria-hidden="true"></span>
+        <button type="button" class="j-ma-tip" aria-pressed=${String(zaAgentem)} aria-label=${L("Za agentem", "Follow agent")}
+          onClick=${() => setZaAgentem(!zaAgentem)}><${Ikona} n="pin" r=${16}/><${Podpowiedz} tekst=${L("Za agentem: przełączam sam na urządzenie, na którym pracuje", "Follow agent: switch to the device it works on")}/></button>
+      </nav>` : html`<b class="j-pz-n">${nazwa}</b>`}
       ${naZywo && html`<span class="j-pz-zywo" role="status"><span class="j-na-zywo-k" aria-hidden="true"></span>${L("NA ŻYWO", "LIVE")}${s.opoznienie != null ? ` ${s.opoznienie} ms` : ""}</span>`}
       ${pelny && !szeroki && html`<${Przycisk} maly rodzaj="cichy" ikona="down" etykieta=${L("Mniejszy podgląd", "Smaller view")} onClick=${() => setPelny(false)}/>`}
       <${Przycisk} maly rodzaj="cichy" ikona="x" etykieta=${L("Zamknij podgląd", "Close live view")} onClick=${() => NaZywo.zamknij()}/>
     </header>
-    ${ruchAgenta && html`<p class="j-pz-ruch" title=${ruchAgenta}>${ruchAgenta}</p>`}
-    ${(szeroki || pelny) && urzadzenia.length > 0 && html`<nav class="j-pz-z" aria-label=${L("Urządzenia", "Devices")}>
-      ${urzadzenia.map((id) => html`<button type="button" key=${id} aria-pressed=${String(id === widac)}
-        onClick=${() => { setZaAgentem(false); setU(id); }}>${id === "komputer" ? L("Komputer", "Computer") : id}
-        ${id === agentU && biezacy && html`<span class="j-na-zywo-k" title=${L("Agent pracuje tutaj", "The agent works here")}></span>`}</button>`)}
-      <button type="button" class="j-pz-za" aria-pressed=${String(zaAgentem)} onClick=${() => setZaAgentem(!zaAgentem)}>${L("Za agentem", "Follow agent")}</button>
-    </nav>`}
+    ${(szeroki || pelny) && html`<p class="j-pz-ruch" title=${podpis}><b>${nazwa}</b>${podpis && ` · ${podpis}`}</p>`}
     <div class=${cx("j-pz-ekran", pionowy ? "is-pion" : "is-poziom", widac === "komputer" && "is-komputer")} ...${dotyk}>
       <canvas ref=${canvas} class=${cx(!s.klatka && "is-pusty")}></canvas>
       ${kregi.map((k) => html`<span key=${k.id} class="j-pz-krag" style=${{ left: `${k.x * 100}%`, top: `${k.y * 100}%` }} aria-hidden="true"></span>`)}

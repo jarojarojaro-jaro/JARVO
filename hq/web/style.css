@@ -2684,10 +2684,13 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 @keyframes j-na-zywo { 50% { opacity: .3; } }
 @media (prefers-reduced-motion: reduce) { .j-na-zywo-k { animation: none; } }
 /* @@pakiet podglad */
-/* okno podglądu na żywo (42-podglad.js): panel 380 px po prawej rozmowy (≥ 1100 px) albo pływający podgląd w rogu */
-.jarvo-app.is-podglad-bok .j-uklad { margin-right: 388px; }
+/* okno podglądu na żywo (42-podglad.js): panel obok rozmowy po prawej (≥ 900 px, szerokość z uchwytu,
+   --j-pz-szer na korzeniu) albo pływający podgląd w rogu */
+.jarvo-app.is-podglad-bok .j-uklad { margin-right: calc(var(--j-pz-szer, 460px) + 8px); }
 .j-pz { position: fixed; z-index: 60; display: flex; flex-direction: column; gap: 1px; background: var(--j-rowek); color: var(--j-tekst); box-shadow: 0 12px 40px rgba(0, 0, 0, .45); }
-.j-pz.is-bok { top: 8px; right: 8px; bottom: 8px; width: 380px; }
+.j-pz.is-bok { top: 8px; right: 8px; bottom: 8px; width: var(--j-pz-szer, 460px); box-shadow: none; }
+.j-pz > .j-pz-uchwyt { position: absolute; z-index: 1; top: 0; bottom: 0; left: -8px; width: 8px; cursor: col-resize; touch-action: none; background: none; box-shadow: none; }
+.j-pz-uchwyt:hover, .j-pz-uchwyt[data-ciagnie] { background: linear-gradient(90deg, transparent 3px, var(--j-praca) 3px, var(--j-praca) 5px, transparent 5px); }
 .j-pz.is-pip { width: min(42vw, 200px); touch-action: none; }
 .j-pz.is-pip > :not(.j-pz-ekran) { display: none; }
 .j-pz.is-pip.is-gl { top: calc(env(safe-area-inset-top) + 12px); left: 12px; }
@@ -2697,15 +2700,19 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-pz.is-pip.is-pelny { inset: 0; width: auto; z-index: 80; }
 .j-pz.is-pip.is-pelny > :not(.j-pz-ekran) { display: flex; }
 .j-pz > * { background: var(--j-stal), var(--j-tlo-karta); box-shadow: inset 0 1px 0 var(--j-hi); }
-.j-pz-g { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 4px 0 14px; padding-top: env(safe-area-inset-top); }
-.j-pz-n { flex: 1 1 auto; font: 600 13px/20px var(--j-font-naglowek); font-stretch: 125%; }
-.j-pz-zywo { display: inline-flex; align-items: center; gap: 7px; font: 400 11px var(--j-font-mono); color: var(--j-tekst-2); font-variant-numeric: tabular-nums; letter-spacing: .04em; }
-.j-pz-ruch { margin: 0; padding: 8px 14px; font: 400 12px/16px var(--j-font-mono); color: var(--j-tekst-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.j-pz-z { display: flex !important; flex-wrap: wrap; gap: 1px; background: var(--j-rowek) !important; box-shadow: none !important; }
-.j-pz-z button { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border: 0; background: var(--j-tlo-3); color: var(--j-tekst-2);
-  font: 400 12px var(--j-font-mono); cursor: pointer; }
-.j-pz-z button[aria-pressed="true"] { color: var(--j-tekst); box-shadow: inset 0 -2px 0 var(--j-praca); }
-.j-pz-z .j-pz-za { margin-left: auto; }
+.j-pz-g { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 4px 0 6px; padding-top: env(safe-area-inset-top); }
+.j-pz-n { flex: 1 1 auto; padding-left: 8px; font: 600 13px/20px var(--j-font-naglowek); font-stretch: 125%; }
+.j-pz-zywo { display: inline-flex; align-items: center; gap: 7px; font: 400 11px var(--j-font-mono); color: var(--j-tekst-2); font-variant-numeric: tabular-nums; letter-spacing: .04em; white-space: nowrap; }
+.j-pz-ruch { margin: 0; padding: 7px 14px; font: 400 12px/16px var(--j-font-mono); color: var(--j-tekst-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.j-pz-ruch b { font-weight: 600; color: var(--j-tekst); }
+.j-pz-z { flex: 1 1 auto; display: flex; align-items: center; gap: 2px; min-width: 0; }
+.j-pz-z button { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 2px; height: 32px; min-width: 34px; padding: 0 7px; border: 0;
+  background: none; color: var(--j-tekst-3); font: 600 10px var(--j-font-mono); cursor: pointer; }
+.j-pz-z button:hover, .j-pz-z button:focus-visible { background: var(--j-tlo-3); color: var(--j-tekst); }
+.j-pz-z button[aria-pressed="true"] { background: var(--j-tlo-3); color: var(--j-tekst); box-shadow: inset 0 -2px 0 var(--j-praca); }
+.j-pz-nr { align-self: flex-end; margin-bottom: 7px; }
+.j-pz-tu { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--j-praca); }
+.j-pz-kreska { width: 1px; height: 18px; margin: 0 4px; background: var(--j-rowek); }
 .j-pz-ekran { position: relative; flex: 1 1 auto; min-height: 0; display: flex !important; align-items: center; justify-content: center; overflow: hidden; background: var(--j-wneka, #000) !important; }
 .j-pz.is-bok .j-pz-ekran.is-pion { padding: 14px 40px; }
 .j-pz.is-pip .j-pz-ekran { aspect-ratio: 9 / 19; }

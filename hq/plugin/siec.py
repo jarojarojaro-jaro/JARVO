@@ -34,7 +34,8 @@ nazwa użytkownika, hasło = klucz). Link `http://<adres>:<port>/login#klucz=…
 do serwera z adresem; skrypt strony wpisuje go i wysyła.
 `jarvo panel siec wyloguj` zmienia sekret: każda sesja traci ważność od razu (sekret czytamy przy zmianie pliku).
 
-Włączenie: `<dane>/jarvo/konfig/panel-siec.json` (`jarvo panel siec on|off`): {"wlaczony", "adres", "nazwa"}.
+Włączenie: `<dane>/jarvo/konfig/panel-siec.json` (`jarvo panel siec on|off|https`): {"wlaczony", "adres", "nazwa",
+"https"}; `https` = panel też pod https://<nazwa>/ przez `tailscale serve`, a strony z http dostają 302 tam.
 Pętla `_petla` sprawdza go co 5 s: włączony = rejestracja dostawcy i nasłuch, wyłączony albo inny adres =
 zatrzymanie (bez restartu panelu, więc bez przerwy w rozmowach). Adres niedostępny (Tailscale jeszcze nie wstał)
 = ponowienie co 5 s. Stan nasłuchu: `<dane>/jarvo/state/panel-siec.json` (czyta go `jarvo panel siec status`).
@@ -171,16 +172,20 @@ def nazwa_poprawna(nazwa: str) -> bool:
 
 
 def ustawienia(sc: Sciezki) -> dict:
-    """{"wlaczony": bool, "adres": str, "nazwa": str} z pliku ustawień; zły wpis = wyłączony."""
+    """{"wlaczony": bool, "adres": str, "nazwa": str, "https": bool} z pliku ustawień; zły wpis = wyłączony. `https`:
+    panel podaje też `tailscale serve` pod https://<nazwa>/ (jarvo panel siec https on), więc strony z adresu http
+    przekierowujemy tam (obraz telefonu w podglądzie na żywo dekoduje WebCodecs, tylko w bezpiecznym kontekście)."""
     d = _json(sc.ustawienia)
     adres = str(d.get("adres") or "").strip()
     nazwa = str(d.get("nazwa") or "").strip().lower().rstrip(".")
+    nazwa = nazwa if nazwa_poprawna(nazwa) else ""
     return {"wlaczony": d.get("wlaczony") is True and adres_poprawny(adres), "adres": adres,
-            "nazwa": nazwa if nazwa_poprawna(nazwa) else "", "kiedy": d.get("kiedy")}
+            "nazwa": nazwa, "https": d.get("https") is True and bool(nazwa), "kiedy": d.get("kiedy")}
 
 
-def zapisz_ustawienia(sc: Sciezki, *, wlaczony: bool, adres: str, nazwa: str = "") -> dict:
-    d = {"wlaczony": bool(wlaczony), "adres": adres, "nazwa": nazwa, "kiedy": time.strftime("%Y-%m-%dT%H:%M:%S")}
+def zapisz_ustawienia(sc: Sciezki, *, wlaczony: bool, adres: str, nazwa: str = "", https: bool = False) -> dict:
+    d = {"wlaczony": bool(wlaczony), "adres": adres, "nazwa": nazwa, "https": bool(https),
+         "kiedy": time.strftime("%Y-%m-%dT%H:%M:%S")}
     zapisz_atomowo(sc.ustawienia, json.dumps(d, ensure_ascii=False, indent=2) + "\n")
     return d
 
@@ -193,8 +198,8 @@ def dostep(sc: Sciezki) -> dict:
     """Ustawienia › Dostęp w aplikacji (tylko odczyt): włączenie, adres, nazwa MagicDNS, port i nasłuch. Bez sekretu
     i kluczy; klucz jednorazowy wydaje `jarvo panel klucz`."""
     u, s = ustawienia(sc), stan(sc)
-    return {"wlaczony": u["wlaczony"], "adres": u["adres"], "nazwa": u["nazwa"], "port": s.get("port"),
-            "nasluch": bool(s.get("nasluch")), "od": s.get("od"), "blad": s.get("blad")}
+    return {"wlaczony": u["wlaczony"], "adres": u["adres"], "nazwa": u["nazwa"], "https": u["https"],
+            "port": s.get("port"), "nasluch": bool(s.get("nasluch")), "od": s.get("od"), "blad": s.get("blad")}
 
 
 def _zapisz_stan(sc: Sciezki, **pola: Any) -> None:
@@ -487,10 +492,12 @@ def bezpieczny_next(sciezka: str, zapytanie: str) -> str:
 
 class Bramka:
     """ASGI przed aplikacją Hermesa na nasłuchu sieci (docstring modułu). `hosty`: dokładne nazwy dozwolone
-    w Host i Origin (adres Tailscale, nazwa MagicDNS); `lokalny`: autorytet loopbacku, np. "127.0.0.1:9119"."""
+    w Host i Origin (adres Tailscale, nazwa MagicDNS); `lokalny`: autorytet loopbacku, np. "127.0.0.1:9119";
+    `https`: nazwa MagicDNS, gdy panel jest też pod https://<nazwa>/ (tailscale serve): strony otwarte po http
+    dostają wtedy 302 na ten sam adres po https."""
 
-    def __init__(self, app, sesje: Sesje, hosty: set[str] | frozenset[str], lokalny: str):
-        self.app, self.sesje, self.lokalny = app, sesje, lokalny
+    def __init__(self, app, sesje: Sesje, hosty: set[str] | frozenset[str], lokalny: str, https: str = ""):
+        self.app, self.sesje, self.lokalny, self.https = app, sesje, lokalny, https
         self.hosty = frozenset(h.lower() for h in hosty if h)
 
     # -- pomocnicze
@@ -505,6 +512,16 @@ class Bramka:
             return True
         schemat, _, reszta = origin.partition("://")
         return schemat in ("http", "https") and nazwa_hosta(reszta) in self.hosty
+
+    def _na_https(self, scope: dict, sciezka: str) -> bool:
+        """Otwarcie strony (dokument, nie API, zasób ani WebSocket) po http, nie przez tailscale serve (ten wysyła
+        X-Forwarded-Proto: https)."""
+        if scope.get("method") not in ("GET", "HEAD") or sciezka.startswith("/api/"):
+            return False
+        if self._naglowek(scope, b"x-forwarded-proto").lower() == "https":
+            return False
+        cel = self._naglowek(scope, b"sec-fetch-dest")
+        return cel == "document" if cel else "text/html" in self._naglowek(scope, b"accept")
 
     def _jak_lokalne(self, scope: dict, klient_lokalny: bool) -> dict:
         lokalny = self.lokalny.encode("latin-1")
@@ -588,6 +605,11 @@ class Bramka:
                 await send({"type": "websocket.close", "code": 1008})
                 return
             await self.app(self._jak_lokalne(scope, klient_lokalny=True), receive, send)
+            return
+        if self.https and self._na_https(scope, sciezka):
+            zapytanie = (scope.get("query_string") or b"").decode("latin-1")
+            cel = f"https://{self.https}{sciezka}" + (f"?{zapytanie}" if zapytanie else "")
+            await self._odpowiedz(send, 302, b"", b"text/plain; charset=utf-8", [(b"location", cel.encode("latin-1"))])
             return
         wyslij = self._gzip(scope, send)
         if scope.get("method") in ("GET", "HEAD") and (sciezka in IKONY or sciezka == MANIFEST_SCIEZKA):
@@ -806,7 +828,7 @@ async def _petla(glowny, sc: Sciezki, log: Callable[[str], None]) -> None:
         if time.monotonic() >= nastepny:
             nastepny = time.monotonic() + CO_ILE
             u = ustawienia(sc)
-            nowy_cel = (u["adres"], port, u["nazwa"]) if u["wlaczony"] and port else None
+            nowy_cel = (u["adres"], port, u["nazwa"], u["https"]) if u["wlaczony"] and port else None
             if nowy_cel != cel and nasluch is not None:
                 await nasluch.zatrzymaj()
                 nasluch, cel = None, None
@@ -819,13 +841,13 @@ async def _petla(glowny, sc: Sciezki, log: Callable[[str], None]) -> None:
                 if dostawca is None:
                     dostawca = dostawca_hermesa(sesje)
                     register_global_provider(dostawca)
-                adres, _, nazwa = nowy_cel
+                adres, _, nazwa, https = nowy_cel
                 hosty = {adres.lower(), *([nazwa] if nazwa else [])}
                 try:
                     if sesje.sekret() is None:
                         raise OSError(f"brak sekretu sesji {sc.sekret} (jarvo panel siec on)")
-                    nasluch = await uruchom_nasluch(Bramka(_hermes_app(), sesje, hosty, f"127.0.0.1:{port}"),
-                                                    adres, port)
+                    nasluch = await uruchom_nasluch(Bramka(_hermes_app(), sesje, hosty, f"127.0.0.1:{port}",
+                                                           https=nazwa if https else ""), adres, port)
                     cel, ostatni_blad = nowy_cel, ""
                     log(f"panel w sieci: słucham na http://{adres}:{port}" + (f" i http://{nazwa}:{port}"
                                                                               if nazwa else ""))
