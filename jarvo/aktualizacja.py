@@ -865,16 +865,18 @@ PRZEBIEG_SWIEZY_S = 1800      # przebieg bez zdarzenia dłużej = zawieszony, ni
 
 
 def karty_w_toku(u: Uklad) -> list[str]:
-    """Praca, którą restart bramy by przerwał: karty kanbana w toku (status `running`), tury rozmów panelu
-    (przebiegi ze zdarzeniem w ostatnich 30 min; 24.11 wgranie przerwało turę Jarva z odpowiedzią dla właściciela)
-    i podagenci w tle `delegate_task` (24.11 13:22 wgranie zabiło trzech podagentów zakładających konta, bo tura Jarva
-    już się skończyła). „<id> <agent>: <tytuł>”. Brak bazy = []."""
+    """Praca, którą restart bramy by przerwał: karty kanbana w toku (status `running`), tury rozmów panelu u agentów
+    Hermesa (przebiegi ze zdarzeniem w ostatnich 30 min; 24.11 wgranie przerwało turę Jarva z odpowiedzią dla
+    właściciela) i podagenci w tle `delegate_task` (24.11 13:22 wgranie zabiło trzech podagentów zakładających konta,
+    bo tura Jarva już się skończyła). Tury sesji omp (Kernel, operator) nie blokują: biegną we własnych usługach
+    systemd i restart bramy ich nie dotyka (24.11 wgranie czekało na 100-minutową turę Kernela). „<id> <agent>:
+    <tytuł>”. Brak bazy = []."""
     import sqlite3
     wynik: list[str] = []
     for db, zapytanie, arg in (
             (u.dane / "kanban.db", "SELECT id, assignee, title FROM tasks WHERE status = 'running' ORDER BY id", ()),
             (u.dane / "jarvo" / "state" / "rozmowy.db",
-             f"SELECT id, agent, 'tura rozmowy w panelu' FROM przebiegi WHERE stan IN "
+             f"SELECT id, agent, 'tura rozmowy w panelu' FROM przebiegi WHERE zaplecze = 'hermes' AND stan IN "
              f"({','.join('?' * len(PRZEBIEGI_W_TOKU))}) AND COALESCE(ostatnie_zdarzenie_at, utworzony_at) > ? "
              "ORDER BY id", (*PRZEBIEGI_W_TOKU, time.time() - PRZEBIEG_SWIEZY_S))):
         if not db.is_file():
