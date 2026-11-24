@@ -31,8 +31,11 @@ function punktNaObrazie(punkt, ekran, obraz) {
 
 // który napis zamiast obrazu (albo null, gdy obraz jest i nic nie trzeba mówić)
 function napisPodgladu(s, nazwa, koniecS) {
-  if (s.bladObrazu) return L("Ta przeglądarka nie pokaże obrazu telefonu. Otwórz panel w Chrome, Edge albo Safari 17.",
-    "This browser cannot show the phone. Open the panel in Chrome, Edge or Safari 17.");
+  if (s.bladObrazu) return typeof window !== "undefined" && !window.isSecureContext
+    ? L("Obraz telefonu działa tylko w panelu z kłódką, pod adresem https.",
+      "The phone view needs the panel over https.")
+    : L("Ta przeglądarka nie pokaże obrazu telefonu. Otwórz panel w Chrome, Edge albo Safari 17.",
+      "This browser cannot show the phone. Open the panel in Chrome, Edge or Safari 17.");
   if (s.polaczenie !== "otwarte") return L("Łączę…", "Connecting…");
   if (s.stan === "niedostepny") return s.opis || L("Podgląd tego urządzenia jest niedostępny.", "Live view of this device is unavailable.");
   if (s.stan === "poza_siecia") return s.u === "komputer" ? L("Komputer nie odpowiada, łączę ponownie", "The Computer does not answer, reconnecting")

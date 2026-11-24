@@ -2160,7 +2160,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-st.is-pracuje { color: var(--j-praca); }
 .j-st.is-czeka { color: var(--j-uwaga); }
 .j-st.is-terminal, .j-st.is-kolejka { color: var(--j-link); }
-.j-rozm-licz { min-width: 22px; height: 16px; padding: 0 5px; background: var(--j-uwaga); color: var(--j-akcent-na); font: 600 11px/16px var(--j-font-mono);
+.j-rozm-licz { min-width: 22px; height: 20px; padding: 0 6px; border-radius: 10px; background: #e5281e; color: #fff; font: 700 13px/20px var(--j-font-mono);
   text-align: center; font-variant-numeric: tabular-nums; display: inline-block; }
 .j-rozm-skrot { font: 400 10.5px var(--j-font-mono); color: var(--j-tekst-3); }
 /* kwadrat stanu w rogu znaku: pusty = wolny, czerwony z sygnałem = pracuje (sama przezroczystość, kompozytor) */
