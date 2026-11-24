@@ -1614,7 +1614,8 @@ z tekstem i jakieś edytuj”). Pakiet `mozg` ładuje się dopiero po wejściu w
   agenta albo tytuł strony; znak NA ŻYWO (bez liczby ms), krąg stuknięcia, stany słowami (łączę, ekran wygaszony, poza siecią,
   skończył N s temu; po 30 s okno się chowa). Przycisk jest też przy pasku „Podagenci”. Obraz telefonu (H.264,
   WebCodecs) działa tylko po https: `jarvo panel siec https on` (rozdział 2g).
-  Ustawienia › Powiadomienia: „Otwieraj podgląd sam” (localStorage, domyślnie wyłączone).
+  Ustawienia › Powiadomienia: „Otwieraj podgląd sam” (localStorage, domyślnie wyłączone). Okno należy do otwartej
+  rozmowy: przejście do innej rozmowy je zamyka, a „sam” i „Za agentem” patrzą tylko na przebiegi tej rozmowy.
 - **Serwer** (`hq/plugin/podglad_zywo.py`): WebSocket `/podglad/ws?token=` z uwierzytelnieniem WebSocketów Hermesa;
   telefon przez scrcpy-server 5.0.1 (`vendor/natywne.yaml` `scrcpy-server`, przy pierwszym użyciu) i adb Jarva,
   tylko obraz H.264 bez przekodowania, pamięć konfiguracji i GOP dla nowego widza, strumień gaśnie 10 s po

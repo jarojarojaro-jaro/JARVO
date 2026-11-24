@@ -1029,15 +1029,23 @@ test("Podgląd na żywo: urządzenie z bieżącego kroku (telefon z argumentem p
   eq(u({ narzedzie: "komputer" }), { rodzaj: "komputer", u: "komputer", punkt: null, cmd: null });
   for (const k of [{ narzedzie: "terminal", args: { phone: "first" } }, { narzedzie: "mcp__phone__list_phones" }, { narzedzie: "browser_click" },
     { komentarz: "myśl", narzedzie: "mcp__phone__act" }, null]) assert.strictEqual(u(k), null, JSON.stringify(k));
-  // bieżący krok: ostatni krok narzędzia pracującego przebiegu, najnowszy z kilku; komentarze pomijane
-  const p = (id, stan, kroki) => ({ id, stan, agent: "jarvo", kroki });
-  const teraz = NA_ZYWO.NaZywo.teraz([
+  // bieżący krok: ostatni krok narzędzia pracującego przebiegu otwartej rozmowy, najnowszy z kilku; komentarze
+  // pomijane; 24.11 właściciel: podgląd z rozmowy Jarva został w rozmowie Kernela, więc inne rozmowy się nie liczą
+  const p = (id, stan, kroki, watek_id = "w_a") => ({ id, stan, agent: "jarvo", watek_id, kroki });
+  const przebiegi = [
     p("a", "pracuje", [{ ts: 5, narzedzie: "mcp__phone__act", args: { phone: "first" } }, { ts: 6, komentarz: "patrzę" }]),
     p("b", "pracuje", [{ ts: 9, narzedzie: "mcp__phone__act", args: { phone: "second" } }, { ts: 10, narzedzie: "terminal" }]),
-    p("c", "gotowe", [{ ts: 20, narzedzie: "computer_use" }])]);
+    p("c", "gotowe", [{ ts: 20, narzedzie: "computer_use" }]),
+    p("e", "pracuje", [{ ts: 30, narzedzie: "mcp__phone__act", args: { phone: "third" } }], "w_b")];
+  const teraz = NA_ZYWO.NaZywo.teraz(przebiegi, "w_a");
   eq([teraz.u, teraz.pid, teraz.agent], ["first", "a", "jarvo"]);
-  assert.strictEqual(NA_ZYWO.NaZywo.teraz([p("d", "pracuje", [{ ts: 1, narzedzie: "read_file" }])]), null);
+  eq(NA_ZYWO.NaZywo.teraz(przebiegi, "w_b").u, "third");
+  assert.strictEqual(NA_ZYWO.NaZywo.teraz(przebiegi, null), null);
+  assert.strictEqual(NA_ZYWO.NaZywo.teraz([p("d", "pracuje", [{ ts: 1, narzedzie: "read_file" }])], "w_a"), null);
   assert.ok(NA_ZYWO.NaZywo.rowne(teraz, { ...teraz }));
+  // rozmowa na ekranie: z trasy rozmowy albo rozmówcy z lewej kolumny
+  const w = NA_ZYWO.NaZywo.watekTrasy, s = { rozmowcy: [{ klucz: "s:gpu", watek_id: "w_k" }] };
+  eq([w(s, { widok: "watek", watek: "w_j" }), w(s, { widok: "rozmowca", rozmowca: "s:gpu" }), w(s, { widok: "start" })], ["w_j", "w_k", null]);
 });
 test("Podgląd na żywo: przycisk tylko przy urządzeniu, z nazwą; stoi od kroku na urządzeniu; drugi klik zamyka", () => {
   const { NaZywo, PrzyciskNaZywo } = NA_ZYWO;
