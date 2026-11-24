@@ -362,27 +362,32 @@ def czesc_telefony(u: Uklad, ot, _wolaj: Wolaj, _teraz: float) -> list[str]:
         "nazwy i stan telefonów na żywo: narzędzia `mcp__phone__list_phones` i `mcp__phone__ping`"]
 
 
-CZESCI: dict[str, tuple[str, Callable]] = {
-    "serwis": ("serwis i panel", czesc_serwis),
-    "rutyny": ("co działa samo i kiedy", czesc_rutyny),
-    "raporty": ("raporty rutyn", czesc_raporty),
-    "wiedza": ("skarbiec wiedzy", czesc_wiedza),
-    "flota": ("flota i lista zadań", czesc_flota),
-    "poczekalnia": ("zmiany czekające na zgodę", czesc_poczekalnia),
-    "telefony": ("telefony floty", czesc_telefony),
-    "sprzet": ("sprzęt", czesc_sprzet),
-    "porty": ("porty i kto na nich słucha", czesc_porty),
-    "polecenia": ("własne polecenia", czesc_polecenia),
+# temat: (tytuł, źródło, funkcja); źródło stoi w nagłówku części, bo agent bez niego szedł sprawdzać fakt w plikach
+# (pomiar 24.11: po `jarvo stan flota` szukał w kodzie, skąd jest limit zadań)
+CZESCI: dict[str, tuple[str, str, Callable]] = {
+    "serwis": ("serwis i panel", "nadzorca serwisu i panel, jak `jarvo status`", czesc_serwis),
+    "rutyny": ("co działa samo i kiedy", "profiles/*/cron/jobs.json, `systemctl --user list-timers`, `crontab -l`",
+               czesc_rutyny),
+    "raporty": ("raporty rutyn", "jarvo/state/raporty.db", czesc_raporty),
+    "wiedza": ("skarbiec wiedzy", "skarbiec i indeks, jak `jarvo wiedza status`; progi z wiedza.py", czesc_wiedza),
+    "flota": ("flota i lista zadań", "profiles/*/config.yaml (model, delegation), config.yaml (kanban), kanban.db, "
+              "jarvo/konfig/sesje.json", czesc_flota),
+    "poczekalnia": ("zmiany czekające na zgodę", "profiles/*/pending/*/*.json", czesc_poczekalnia),
+    "telefony": ("telefony floty", "jak `jarvo telefon status`", czesc_telefony),
+    "sprzet": ("sprzęt", "/proc, /sys, `systemctl --user show jarvo.service`", czesc_sprzet),
+    "porty": ("porty i kto na nich słucha", "`ss -ltnp`, /proc/<pid>, opisy usług systemd", czesc_porty),
+    "polecenia": ("własne polecenia", "jarvo/polecenia", czesc_polecenia),
 }
 
 
 def raport(u: Uklad, ot, tematy: tuple[str, ...] = (), *, wolaj_: Wolaj = wolaj, teraz: float | None = None) -> str:
     teraz = time.time() if teraz is None else teraz
     t = time.localtime(teraz)
-    w = [f"Jarvo stan · {DNI[t.tm_wday]} {time.strftime('%Y-%m-%d %H:%M %Z', t)}"]
+    w = [f"Jarvo stan · {DNI[t.tm_wday]} {time.strftime('%Y-%m-%d %H:%M %Z', t)} · odczyt na żywo w tej chwili, "
+         f"źródło przy każdej części (ścieżki względem {u.dane})"]
     for temat in tematy or TEMATY:
-        tytul, funkcja = CZESCI[temat]
-        w.append(f"\n## {temat}: {tytul}")
+        tytul, zrodlo, funkcja = CZESCI[temat]
+        w.append(f"\n## {temat}: {tytul} (źródło: {zrodlo})")
         try:
             w += funkcja(u, ot, wolaj_, teraz) or ["(pusto)"]
         except Exception as e:  # noqa: BLE001  (jedna część nie zabiera reszty)

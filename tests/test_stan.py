@@ -115,9 +115,9 @@ def test_wlasne_polecenia_z_opisem_z_pierwszego_komentarza(u):
 
 
 def test_blad_jednej_czesci_nie_zabiera_reszty(u, monkeypatch):
-    monkeypatch.setitem(stan.CZESCI, "porty", ("porty", lambda *_a: 1 / 0))
+    monkeypatch.setitem(stan.CZESCI, "porty", ("porty", "nic", lambda *_a: 1 / 0))
     r = raport(u, "porty", "wiedza", "flota")
-    assert "## porty: porty\n(nie udało się odczytać: ZeroDivisionError" in r
+    assert "## porty: porty (źródło: nic)\n(nie udało się odczytać: ZeroDivisionError" in r
     assert "Brak skarbca" in r and "szkic staje się" not in r
     assert "agenci (2)" in r
 
