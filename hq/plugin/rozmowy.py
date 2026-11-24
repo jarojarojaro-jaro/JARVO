@@ -921,6 +921,11 @@ class Rozmowy:
     def przebiegi_lancucha(self, lancuch_id: str) -> list[dict]:
         return self._przebiegi("lancuch_id = ?", (lancuch_id,))
 
+    def przebiegi_z_podagentami(self, od: float) -> list[dict]:
+        """Zakończone od `od` przebiegi, których kroki niosą identyfikator delegacji `deleg_…` (podagenci w tle):
+        obserwator budzi agenta, gdy jego podagenci skończą (Hermes przez api_server nie budzi sam)."""
+        return self._przebiegi("zakonczony_at >= ? AND kroki LIKE '%deleg\\_%' ESCAPE '\\'", (od,))
+
     def nasze_wiersze(self, wid: str) -> dict[str, dict]:
         """Przebiegi wątku, które wysłały turę: po czym scalanie rozpozna nasze wiersze użytkownika w state.db
         (`user_msg_id`, a przed nim `payload_sha` od `wyslany_at − 2 s`) i wiersze tury w toku."""

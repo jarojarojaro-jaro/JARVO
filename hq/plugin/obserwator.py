@@ -26,6 +26,8 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
+import re
 import time
 from pathlib import Path
 from typing import Callable
@@ -35,6 +37,37 @@ SPRZATANIE_S = 86400.0
 PRACA_ODSWIEZ_S = 60.0
 DZIERZAWY_S = 10.0
 PO_PRACY_CISZA_S = 30.0
+PODAGENCI_S = 15.0
+PODAGENCI_OKNO_S = 86400.0
+DELEGACJA = re.compile(r"deleg_[0-9a-f]{6,32}")
+KONCOWE_PODAGENTA = {"completed", "failed", "error", "interrupted", "cancelled", "timeout", "stopped"}
+
+
+def stan_delegacji(katalog: Path) -> dict | None:
+    """Manifest podagentów w tle (Hermes `cache/delegation/live/<id>/manifest.json`): {id, zadania [{cel, stan}],
+    gotowe, razem, koniec, mtime}; None bez manifestu albo zadań."""
+    plik = katalog / "manifest.json"
+    try:
+        dane = json.loads(plik.read_text(encoding="utf-8"))
+        mtime = plik.stat().st_mtime
+    except (OSError, ValueError):
+        return None
+    zadania = [{"cel": str(t.get("goal") or "")[:200], "stan": str(t.get("status") or "")}
+               for t in dane.get("tasks") or [] if isinstance(t, dict)]
+    if not zadania:
+        return None
+    gotowe = sum(z["stan"] in KONCOWE_PODAGENTA for z in zadania)
+    return {"id": str(dane.get("delegation_id") or katalog.name), "zadania": zadania, "gotowe": gotowe,
+            "razem": len(zadania), "koniec": gotowe == len(zadania), "mtime": mtime, "katalog": str(katalog)}
+
+
+def tekst_budzenia_podagentow(d: dict) -> str:
+    """Wiadomość, którą obserwator budzi agenta, gdy jego podagenci w tle skończyli."""
+    linie = [f"[podagenci] Delegacja {d['id']}: {d['gotowe']} z {d['razem']} skończonych."]
+    linie += [f"- {z['cel'][:140]} ({z['stan']})" for z in d["zadania"]]
+    linie += ["", f"Wyniki i dzienniki podagentów: {d['katalog']}/ (task-<n>.log, ostatnie linie to podsumowanie).",
+              "Sprawdź je i dokończ zadanie właściciela jednym raportem."]
+    return "\n".join(linie)
 
 
 def _zapisz_prosbe(plik: Path) -> None:
@@ -84,6 +117,8 @@ class Obserwator:
         self._porzadki: asyncio.Task | None = None
         self.cykl_ms = 0
         self.bledy = 0
+        self._podagenci_at = 0.0
+        self._obudzone: set[str] = set()
 
     # ------------------------------------------------------------------------------------------- pętla
     async def petla(self) -> None:
@@ -108,6 +143,7 @@ class Obserwator:
                 self._syg_plikow[nazwa] = s
                 self.hub.nadaj(typ, self.stan_aktualizacji() if nazwa == "aktualizacja" else {})
         await self._praca_floty(teraz, bool(zmienione_profile))
+        await self._podagenci(teraz)
         if teraz - self._przypinanie_at >= PRZYPINANIE_S and (self._porzadki is None or self._porzadki.done()):
             # osobne zadanie (najwyżej jedno naraz): wolna brama (do 15 s na wywołanie) nie zatrzymuje patrzenia na pliki
             self._przypinanie_at = teraz
@@ -122,6 +158,34 @@ class Obserwator:
         except Exception as exc:
             self.bledy += 1
             self.log(f"jarvo-hq: obserwator, przypinanie i sprzątanie: {type(exc).__name__}")
+
+    # ------------------------------------------------------------------------------------------- podagenci w tle
+    async def _podagenci(self, teraz: float) -> None:
+        """24.11: Jarvo dał pracę 3 podagentom `delegate_task` i skończył turę; Hermes przez api_server zapisuje ich
+        wynik bez budzenia modelu, więc agent nie wracał. Gdy wszyscy podagenci delegacji z kroków zakończonego
+        przebiegu skończą, a agent w tym wątku nie pracował od tej chwili, zlecamy mu turę systemu z ich wynikiem."""
+        if teraz - self._podagenci_at < PODAGENCI_S or not hasattr(self.db, "przebiegi_z_podagentami"):
+            return
+        self._podagenci_at = teraz
+        for p in self.db.przebiegi_z_podagentami(teraz - PODAGENCI_OKNO_S):
+            for did in sorted(set(DELEGACJA.findall(json.dumps(p.get("kroki") or [], ensure_ascii=False)))):
+                if did in self._obudzone:
+                    continue
+                d = stan_delegacji(self.home / "profiles" / p["agent"] / "cache" / "delegation" / "live" / did)
+                if d is None or not d["koniec"]:
+                    continue
+                self._obudzone.add(did)
+                pozniej = [q for q in self.db.przebiegi_watku(p["watek_id"])
+                           if q["agent"] == p["agent"] and q["id"] != p["id"] and float(q.get("utworzony_at") or 0) >= d["mtime"]]
+                if pozniej:                                  # agent pracował już po końcu podagentów: wynik ma
+                    continue
+                w = self.db.dodaj_wpis(p["watek_id"], rodzaj="system",
+                                       tekst=f"Podagenci skończyli: {d['gotowe']} z {d['razem']}",
+                                       dane={"typ": "podagenci", "agent": p["agent"], "delegacja": did})
+                self.hub.nadaj("watek.wpis", {"watek_id": p["watek_id"], "wpis": w}, watek_id=p["watek_id"])
+                self.rejestr.zlec(watek_id=p["watek_id"], wpis_id=w["id"], agent=p["agent"], zrodlo="system",
+                                  prosba=tekst_budzenia_podagentow(d), lancuch_id=p.get("lancuch_id"))
+                self.log(f"jarvo-hq: podagenci {did} skończyli: budzę {p['agent']} w {p['watek_id']}")
 
     # ------------------------------------------------------------------------------------------- profile
     async def _profile(self) -> set[str]:
