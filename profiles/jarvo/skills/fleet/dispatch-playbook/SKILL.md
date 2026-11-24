@@ -1,7 +1,7 @@
 ---
 name: dispatch-playbook
 description: "Rozdawanie pracy: karty z kontraktem, zależności, misje."
-version: 1.8.0
+version: 1.9.0
 author: Jarvo
 license: MIT
 metadata:
@@ -12,7 +12,7 @@ metadata:
   jarvo:
     agent: jarvo
     autonomy: A1
-    reviewed: "2026-11-19"
+    reviewed: "2026-11-24"
 ---
 
 # Dispatch: jak rozdać pracę
@@ -22,6 +22,8 @@ Używaj, gdy intake zdecydował: **zlecenie jednego agenta** albo **misja**.
 ## Zasady nadrzędne
 1. **Najwęższy agent, który w pełni pokrywa zadanie** (skill `roster`). Nikt nie pasuje → robisz sam (dokumenty,
    konwersje i prototypy: skille `dokumenty`, `szybki-prototyp`) albo pytasz użytkownika, czy stworzyć specjalizację.
+   Praca ogólna do zrobienia naraz (przesiew listy, wiele stron, zbieranie danych) idzie do Twoich podagentów
+   `delegate_task` (do 3 naraz, każdy z pełnym opisem i częścią listy), nigdy na karty specjalistów spoza ich dziedziny.
 2. **Decyzje przekrojowe przed rozdaniem.** Jeśli dwie karty musiałyby wybrać to samo (nazwa, paleta,
    język, format pliku, struktura URL), decydujesz raz i wpisujesz to do **obu** kart.
    Agenci nie widzą kart rodzeństwa.

@@ -201,6 +201,7 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 | Aplikacja mobilna, „czy potrzebujemy aplikacji”, PWA czy natywna, audyt aplikacji w App Store i Google Play, aplikacja z naszej strony, aktualizacja albo poprawka aplikacji w sklepie | `jarvo-mobile` |
 | Zadanie na ekranie albo telefonie: kliknij w panelu albo programie w przeglądarce, wypełnij formularz, przejdź stronę jak klient, przepisz dane z ekranu, załóż konto, zaloguj się, gdzie nie ma API | `jarvo` sam (wymaga włączonego Komputera: `jarvo komputer on`; telefon: `jarvo telefon on`); dłuższe niż kilka minut: karta kanbana przypisana do siebie (`assignee: jarvo`), żeby czat był wolny |
 | Szybkie sprawy, dokumenty, konwersje, sklejanie wyników, prototyp, „ogarnij to”, zadanie bez oczywistego snajpera | `jarvo` sam (`warsztat/`: `dokumenty`, `szybki-prototyp`) |
+| Praca ogólna do zrobienia naraz: przesiew długiej listy, sprawdzanie wielu stron, zbieranie danych | `jarvo` przez swoich podagentów `delegate_task` (do 3 naraz); nigdy na karty specjalistów spoza ich dziedziny |
 | Duże cele (np. „wypuść nowy produkt”) | rozbicie na kilka kart, np. sherlock → web + studio → złożenie (karta Jarva, `zlozenie-pakietu`) |
 
 **Skille:** [T] `intake`, `wywiad`, `dispatch-playbook` (jak pisać karty z DoD, typowe przepływy),
