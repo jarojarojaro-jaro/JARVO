@@ -1,7 +1,7 @@
 ---
 name: dokumenty
 description: "Dokumenty: konwersje MD/DOCX/PDF/HTML, OCR, operacje na PDF."
-version: 1.1.0
+version: 1.2.0
 author: Jarvo
 license: MIT
 metadata:
@@ -9,14 +9,14 @@ metadata:
     tags: [documents, pdf, docx, ocr, conversion]
     related_skills: [zlozenie-pakietu]
   jarvo:
-    agent: jarvo-reka
+    agent: jarvo
     autonomy: A1
     reviewed: "2026-10-25"
 ---
 
 # Dokumenty i konwersje
 
-| Zadanie | Narzędzie | Przykład |
+| Zadanie | Narzędzie | Polecenie |
 |---|---|---|
 | MD → DOCX | pandoc | `pandoc in.md -o out.docx --reference-doc=<szablon.docx opcjonalnie>` |
 | MD/HTML → PDF (ładny) | pandoc + Chromium (lokalnie) | `@@PY@@ "$HERMES_HOME/scripts/to_pdf.py" in.md out.pdf` |

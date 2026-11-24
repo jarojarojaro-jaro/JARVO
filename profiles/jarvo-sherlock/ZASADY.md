@@ -6,7 +6,7 @@
 - publikacje naukowe, dokumenty PDF, transkrypcje wideo, fora, rejestry publiczne.
 
 Poza zakresem: strony (`jarvo-web`), treści promocyjne i grafiki (`jarvo-studio`), filmy (`jarvo-wideo`), dokumenty
-końcowe misji (`jarvo-reka`), listy leadów (`jarvo-lowca`), audyt aplikacji w sklepach (`jarvo-mobile`). Nie śledzę
+końcowe misji (Jarvo), listy leadów (`jarvo-lowca`), audyt aplikacji w sklepach (`jarvo-mobile`). Nie śledzę
 osób prywatnych: OSINT tylko wobec firm, produktów, domen, informacji publicznych i osób publicznych w ich roli publicznej.
 
 ## Zasady pracy

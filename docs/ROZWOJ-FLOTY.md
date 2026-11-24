@@ -31,7 +31,6 @@ Z tego wynikają cztery reguły tego planu:
 | `jarvo-sherlock` | 8 | 3 (~900 linii) | 15 | średnia | cytowania sprawdzane w kodzie (rejestr, cytaty-dowody z tekstem strony, `verify` raportu); bez Wayback i źródeł prawa PL |
 | `jarvo-studio` | 7 | 3 (~360 linii) + 1 szablon | 25 | nisko-średnia | renderuje i mierzy wymiary, ale tekstu, układu i publikacji kod nie sprawdza |
 | `jarvo-mobile` | 10 | 18 + biblioteka (~7 300 linii) + szablon Expo | 20 | wysoka | od decyzji „natywna czy PWA” po sklep; podgląd w Expo Go czeka na organizację Expo właściciela |
-| `jarvo-reka` | 4 | 2 (~190 linii) | 4 + wszystkie skille floty | niska | generalista bez dostępu do Twojej poczty, kalendarza i dokumentów |
 
 ## 3. Do naprawy od razu (błędy znalezione przy audycie)
 
@@ -46,7 +45,7 @@ Te punkty nie wymagają decyzji, tylko poprawki:
    i telefonem do każdego abonenta, także firmy i adresu ogólnego typu `biuro@`. Najcenniejsze są więc
    leady, które same proszą o oferty (przetargi, zapytania ofertowe), bo odpowiedź na nie nie jest
    niezamówiona.
-3. ✅ **Ręka kierowała zadania po ręcznej, nieaktualnej tabeli** (naprawione 2026-10-01). Tabelę „komu oddać” generuje
+3. ✅ **Zadania kierowano po ręcznej, nieaktualnej tabeli** (naprawione 2026-10-01). Tabelę „komu oddać” generuje
    teraz build z pola `oddaj_gdy` każdego specjalisty w `fleet.yaml`. Walidator nie przepuści aktywnego specjalisty bez
    tego pola ani bez miejsca we wzorcach misji Jarva, a `make new-agent` od razu dopisuje pole do uzupełnienia.
 4. ✅ **Ads miał martwe ścieżki** (naprawione 2026-10-01): `podlacz-konto`, `start-kampanii` i `optymalizacja` wołały
@@ -61,7 +60,7 @@ Te punkty nie wymagają decyzji, tylko poprawki:
 
 ## 4. Fundament wspólny: polskie rejestry w jednym module
 
-Pięciu agentów (Łowca, Sherlock, Ręka i dwóch nowych) potrzebuje tych samych sprawdzeń firmy. Zamiast
+Pięciu agentów (Łowca, Sherlock, Jarvo i dwóch nowych) potrzebuje tych samych sprawdzeń firmy. Zamiast
 pięciu kopii: jeden moduł `shared/scripts/rejestry_pl.py` (sama biblioteka standardowa), z wynikiem zawsze
 z datą i surowym JSON-em jako dowodem.
 
@@ -122,7 +121,7 @@ Uczciwie: modele marketing mix (Meridian, PyMC-Marketing, Robyn) potrzebują 2�
 i są za ciężkie; `eksperyment.py` i `planer.py` wystarczą małej firmie. Odrzucone: scrapowanie bibliotek
 reklam, płatne API scraperów, nieoficjalne MCP z tokenami do zapisu, klucze mogące wydawać pieniądze w kontenerze.
 
-### 5.3 Prawa ręka: „biuro w Telegramie”
+### 5.3 Jarvo: „biuro w Telegramie”
 
 **Sygnatura:** poranny brief o 7:00: kalendarz i kolizje, pilne maile, terminy z najbliższych 7 dni,
 ostrzeżenia pogodowe, opóźnienia pociągów; do tego szkice odpowiedzi czekające w skrzynce i notatki ze
@@ -234,12 +233,12 @@ Część bólów jest prawdziwa, ale nie uzasadnia osobnego profilu:
 
 | Ból | Gdzie | Co dokładnie |
 |---|---|---|
-| Zaległe płatności (84% firm) | Ręka, skill `naleznosci` | przeterminowane faktury z programu do faktur (Fakturownia, inFakt, wFirma, iFirma mają API), szkice przypomnień, odsetki ustawowe i 40 euro rekompensaty; wysyłka A2 |
+| Zaległe płatności (84% firm) | Jarvo, skill `naleznosci` | przeterminowane faktury z programu do faktur (Fakturownia, inFakt, wFirma, iFirma mają API), szkice przypomnień, odsetki ustawowe i 40 euro rekompensaty; wysyłka A2 |
 | Dotacje | Łowca, miesięczny skill | miesięczne zestawienia naborów (XLSX z funduszeeuropejskie.gov.pl) dopasowane do profilu firmy; ile zostało limitu de minimis z [SUDOP](https://sudop.uokik.gov.pl/search/aidBeneficiary) po NIP; szkolenia z Bazy Usług Rozwojowych |
 | Tygodniowy raport biznesowy | Jarvo, rozbudowa `weekly-review` | GA4 (oficjalne MCP tylko do odczytu), Search Console, sprzedaż; „co się zmieniło i dlaczego” z dziennikiem floty |
 | Newsletter | Studio | szkic newslettera z treści tygodnia jako kampania-szkic w GetResponse, MailerLite albo FreshMail; nigdy nie wysyła |
 | Lokalne SEO | Web | spójność nazwy, adresu i telefonu, dane strukturalne LocalBusiness |
-| Rekrutacja | Ręka | ogłoszenie zgodne z jawnością wynagrodzeń (Kodeks pracy od 24.12.2025) i klauzula RODO; bez oceniania CV (AI Act: wysokie ryzyko) |
+| Rekrutacja | Jarvo | ogłoszenie zgodne z jawnością wynagrodzeń (Kodeks pracy od 24.12.2025) i klauzula RODO; bez oceniania CV (AI Act: wysokie ryzyko) |
 
 Odrzucone także w drugiej rundzie: autonomiczny handlowiec wysyłający maile (najgorsze dane rynkowe, a Łowca celowo
 niczego nie wysyła), telefoniczna recepcja (recenzje „robotyczna”; test CallBay zostaje osobnym tematem), optymalizator
@@ -272,7 +271,7 @@ więc dokładamy mu prawną część tego samego audytu:
 | A. Naprawy i fundament | §3 (punkty 1, 3 i 4 zrobione), `rejestry_pl.py` (§4) | 1–2 dni | brak |
 | B. Sygnatury bez kont | Ads: audyt gotowości (5.2 #1–3); Łowca: karta leada (5.1 #2–8, potem #9 na Twojej ofercie); Sherlock: raport z dowodami (5.4 #1–5); Studio: pakiet startowy (5.5 #1–5) | ok. 2 tygodnie | darmowe: archive.org, OpenAlex, GUS BIR, PageSpeed |
 | C. Web: audyt zgodności | §6.4 | 3–5 dni | brak |
-| D. Ręka z Twoimi kontami | 5.3 #1–11 | ok. tydzień | poczta, kalendarz (Twoja zgoda na każde) |
+| D. Jarvo z Twoimi kontami | 5.3 #1–11 | ok. tydzień | poczta, kalendarz (Twoja zgoda na każde) |
 | E. Konta reklamowe | Skarbiec faza 1, MCP tylko do odczytu (5.2 #6–7) | ok. tydzień | Meta `ads_read`, Google rola „tylko odczyt” |
 
 Każdy etap kończy się tak jak dotąd: testy, evals, red team dla nowych wejść z sieci, wdrożenie i próba
@@ -292,7 +291,7 @@ w działającym kontenerze, dokumentacja.
 ## 9. Źródła
 
 Raporty badawcze z 2026-10-01: audyt repo (wszystkie profile, skrypty i evals) oraz research narzędzi dla
-Łowcy, Ads, Ręki, Sherlocka ze Studio i nowych specjalistów. Najważniejsze źródła prawne i techniczne są
+Łowcy, Ads, warsztatu Jarva, Sherlocka ze Studio i nowych specjalistów. Najważniejsze źródła prawne i techniczne są
 podlinkowane przy punktach powyżej; licencje sprawdzone w rejestrach PyPI, npm i na GitHubie.
 Przepisy: art. 398–399 PKE (od 10.11.2024), KSeF ([harmonogram](https://jpk.info.pl/faktury/e-faktura-ustrukturyzowana-ksef/harmonogram/)),
 GPSR (od 13.12.2024), zamknięcie platformy ODR (20.07.2025), art. 50 AI Act (od 2.08.2026),

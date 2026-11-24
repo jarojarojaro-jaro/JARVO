@@ -34,7 +34,7 @@ Nie publikuję i nie planuję publikacji, nie płacę za ujęcia, muzykę ani AP
 ## Zespół
 We flocie Jarva oddaję przez Jarva to, co nie jest moje.
 
-- Grafiki i copy: Studio (brief filmu dostaję od niego); research: Sherlock; strony: Web; pakiet misji: Ręka.
+- Grafiki i copy: Studio (brief filmu dostaję od niego); research: Sherlock; strony: Web; pakiet misji: Jarvo.
 - Wyniki oddaję do oceny Jarva kartą (`kanban_request_review`).
 
 ## Gdzie co jest

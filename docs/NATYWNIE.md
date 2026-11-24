@@ -250,7 +250,7 @@ Ma działać wszystko, co działa dziś: czat w terminalu z trybami zgód, pierw
 | **F02** jarvo-web: 10 skryptów, 10 skilli, MCP inspo | audit.sh (bash 4, ścieżka z `pwd`), brand_extract.sh, skrypty .cjs z `--no-sandbox`, security_check.py woła `npm` | audit.py i brand_extract.py w Pythonie; CHROME_PATH; bez `--no-sandbox`; npm przez which; podgląd stron na 127.0.0.1 zamiast 0.0.0.0 | bash 3.2 nie zna `declare -A`, więc też Python | Ubuntu 24.04: piaskownica Chromium wymaga profilu AppArmor (sudo raz) | pierwsza sesja zleca audyt Webowi; skill audyt-strony opisuje security_check w audit.sh, a skrypt go nie woła |
 | **F03** jarvo-sherlock: 4 skrypty, 8 skilli | SearXNG, `lightpanda fetch --dump markdown`, extract.py z os.execv do /opt/jarvo/venv, exiftool | wyszukiwarka z U01; bez `lightpanda fetch` (odczyt przez browser_*); extract.py bez execv, wynik przez as_posix | `lightpanda fetch` zostaje | to samo | pierwsza sesja (konkurencja) potrzebuje działającej wyszukiwarki |
 | **F04** jarvo-lowca: 8 skryptów, 7 skilli | sama biblioteka standardowa + har.cjs (Playwright) | logika bez zmian; python3 i node w PATH procesów, CHROME_PATH, `"$HERMES_HOME"` w cudzysłowie, pamięć HTTP w `<dane>` zamiast ~/.cache | to samo | to samo | najłatwiejszy do przeniesienia; testy przechodzą natywnie |
-| **F05** jarvo-reka: 2 skrypty, 4 skille | pack.py, to_pdf.py; pandoc, ocrmypdf, qpdf, LibreOffice; external_dirs w buildzie (:ro) | MANIFEST przez as_posix; CHROME_PATH i SOFFICE z instalacji; external_dirs z „/” | to samo | to samo | natywnie external_dirs przestają być tylko do odczytu (F16) |
+| **F05** jarvo, warsztat: 2 skrypty, 3 skille | pack.py, to_pdf.py; pandoc, ocrmypdf, qpdf, LibreOffice | MANIFEST przez as_posix; CHROME_PATH i SOFFICE z instalacji | to samo | to samo | brak |
 | **F06** jarvo-studio: check_media.py, lemo_wake.py, render_html.cjs | ffprobe, Playwright z NODE_PATH, Postiz jako opcjonalny kontener AGPL | działa po CHROME_PATH i NODE_PATH; lemo w M07; Postiz tylko jako zewnętrzny POSTIZ_URL | to samo | to samo | |
 | **F07** jarvo-ads: 5 skryptów | biblioteka standardowa; skille uruchamiają .py przez shebang | kod bez zmian; skille wołają interpreter jawnie | shebang trafiłby w zaślepkę /usr/bin/python3 | działa | Skarbiec (osobny kontener z budżetem) zostaje odłożony |
 | **F08** jarvo-mobile: 15 .py, 4 .cjs + Node, npx, expo, eas-cli, adb | `subprocess.run(["npx", ...])` listą, adb do kontenera Redroid, tesseract w sklep_check | resolver programów (lista z `npx` daje WinError 2, pełna ścieżka .CMD działa; sprawdzone); telefon właściciela (U04); ścieżki z warstwy ścieżek | npm działa listą | adb na arm64 z systemu | iOS dalej przez GitHub Actions na macOS; przy .cmd ostrożne cytowanie argumentów |
@@ -530,7 +530,7 @@ Stan (2026-10-25): wtyczka jest w `zgody/plugin` (jarvo-zgody, opis w [zgody/REA
 9. **Końce linii:** `.gitattributes` z `* text=auto eol=lf`, `*.ps1`, `*.cmd` i `*.bat` z `eol=crlf`, binaria jako `binary`. Dziś core.autocrlf=true daje CRLF w 987 plikach na Windows: inne sumy plików i błędy `$'\r'` w bashu.
 10. **Ścieżki w wiadomościach i UI:** HQ rozpoznaje ścieżki od faktycznego korzenia (litera dysku, spacje) i zachowuje alias /opt/data dla starych rozmów.
 
-**Kolejność portowania**, według tego, co blokuje pierwszą sesję: Web (audyt), Sherlock (wyszukiwarka), Łowca, potem Wideograf (render), Ręka, Studio, Mobile, Ads, ekran Jarva.
+**Kolejność portowania**, według tego, co blokuje pierwszą sesję: Web (audyt), Sherlock (wyszukiwarka), Łowca, potem Wideograf (render), warsztat Jarva (dokumenty, pakiet), Studio, Mobile, Ads, ekran Jarva.
 
 **Testy.** pytest w macierzy z markerami windows_only, posix_only i linux_only. Job pada, gdy marker niczego nie wybrał (kod 5), żeby zielony wynik nie był pusty. Na każdej nodze testy z katalogiem danych ze spacją i polskimi znakami (`C:\Users\Michał Żółć\...`).
 
@@ -671,7 +671,7 @@ Każdy etap to mały, osobny commit (albo krótka seria), wypchnięty od razu, z
 ### E4. Flota natywnie, czat i zgody
 - **Co:** build.py z tokenami i wartościami per system (S06), install_fleet.py (S07), wtyczki jako kopie albo junction (H27), healthchecki argv i `jarvo doctor` (S02), wtyczka zgód z trzema trybami (sekcja d), home_mode, zakazy per system (F15), kwarantanna paczek (H25), shim python3 (F12), Git Bash (B04).
 - **CI:** atrapa modelu (scripts/atrapa_modelu.py): `jarvo chat` w trzech trybach (zgoda, odmowa, zapis w folderze i poza nim); karta kanbana do agenta, która przeżywa restart bramy; jednorazowa rutyna; delegate_task. W logach pracowników nie może być „runs without a user present”. 5 nóg.
-- **Gotowe, gdy:** 9 agentów zainstalowanych, healthchecki zielone (poza jawnymi brakami platform).
+- **Gotowe, gdy:** 8 agentów zainstalowanych, healthchecki zielone (poza jawnymi brakami platform).
 
 ### E5. Przeglądarki i wyszukiwarka (potrzebne do pierwszej sesji)
 - **Co:** C01–C07, nakładka agent-browsera w Pythonie, audit.py i brand_extract.py (F02), wyszukiwarka z U01 i search_fanout.py (F03), har.cjs i Łowca (F04), MCP inspo (P06), Lighthouse.

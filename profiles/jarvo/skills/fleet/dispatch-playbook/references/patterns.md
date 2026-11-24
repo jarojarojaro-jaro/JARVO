@@ -11,7 +11,7 @@ Każdy wzorzec to punkt wyjścia. Dopasuj go do intencji, nie odwrotnie.
 2. `jarvo-web` / `landing` (parents: rynek): landing w Astro, SEO on-page pod słowa kluczowe, schema Product/Organization, favicony, OG, podgląd.
 3. `jarvo-studio` / `grafiki` (parents: rynek): OG image, 3 grafiki social (1080×1350, 1080×1920), 5 postów.
 4. opcjonalnie `jarvo-wideo` / `film` (parents: rynek): film 20–30 s 9:16 (hook, przesłanie i CTA z raportu rynku).
-5. `jarvo-reka` / `zlozenie` (parents: landing, grafiki, film): pakiet z INDEX.md.
+5. `jarvo` / `zlozenie` (parents: landing, grafiki, film): pakiet z INDEX.md (skill `zlozenie-pakietu`).
 Decyzje przed rozdaniem: nazwa produktu, język, domena/ścieżka, CTA (np. zapis na listę), paleta z brand kitu.
 
 ## 3. Audyt + naprawa strony
@@ -26,7 +26,7 @@ Decyzje przed rozdaniem: nazwa produktu, język, domena/ścieżka, CTA (np. zapi
 4. opcjonalnie, gdy kampania ma budżet reklamowy: `jarvo-ads` / `reklamy` (parents: kampania, filmy): plan kampanii
    płatnej (budżet, grupy odbiorców, test kreacji, prognoza) i wnioski dla Studia; start kampanii tylko przez Skarbiec
    z kodem zgody (A2), a bez Skarbca: plan i kreacje do ręcznego wgrania.
-5. `jarvo-reka` / `zlozenie`: pakiet + kalendarz w jednym dokumencie.
+5. `jarvo` / `zlozenie`: pakiet + kalendarz w jednym dokumencie (skill `zlozenie-pakietu`).
 Publikacja = decyzja użytkownika (A2), potem Studio ustawia kolejkę.
 
 ## 5. Brand kit z istniejącej strony
@@ -94,5 +94,5 @@ jak klient albo przepisać dane z ekranu, a nie ma API ani zwykłego pobrania st
 Jedna karta na ekranie naraz (jeden ekran); kolejne ustaw jako `parents`. Haseł i kodów nie wpisuj do treści kart.
 
 ## 12. Szybkie zadanie (pojedyncze)
-Jedna karta dla właściwego agenta, bez MISSION.md (tylko wpis w INDEX.md z ID `Z-…`).
-Przykłady: „zrób favicon z tego logo”, „sprawdź, czy ta informacja jest prawdziwa”, „przerób ten PDF na DOCX”.
+Jedna karta dla właściwego agenta, bez MISSION.md (tylko wpis w INDEX.md z ID `Z-…`). Dokument, konwersja pliku albo
+mały skrypt bez specjalisty robisz sam w rozmowie (skille `dokumenty`, `konwersja-plikow`, `szybki-prototyp`).

@@ -227,7 +227,7 @@ def test_patch_pisze_konce_linii_lf_na_kazdym_systemie(tmp_path):
 def test_skin_and_profiles_use_jarvo_branding():
     skin = yaml.safe_load((REPO / "branding" / "skin-jarvo.yaml").read_text(encoding="utf-8"))
     assert skin["name"] == "jarvo" and skin["branding"]["agent_name"] == "Jarvo"
-    for name in ["_host", "jarvo", "jarvo-sherlock", "jarvo-web", "jarvo-studio", "jarvo-reka"]:
+    for name in ["_host", "jarvo", "jarvo-sherlock", "jarvo-web", "jarvo-studio", "jarvo-wideo"]:
         cfg = yaml.safe_load((REPO / "profiles" / name / "config.yaml").read_text(encoding="utf-8"))
         assert cfg["display"]["skin"] == "jarvo", name
     ico = (REPO / "branding" / "favicon.ico").read_bytes()

@@ -7,7 +7,7 @@
 - ujęcia z AI (`video_generate`, obraz → wideo), formaty i strefy platform.
 
 Poza zakresem: grafiki statyczne, posty, copy kampanii i kalendarze (`jarvo-studio`; okładkę z tekstem zamawiam
-przez Jarva), research i fakty (`jarvo-sherlock` albo jego raport), strony (`jarvo-web`), pakiet misji (`jarvo-reka`).
+przez Jarva), research i fakty (`jarvo-sherlock` albo jego raport), strony (`jarvo-web`), pakiet misji (Jarvo).
 **Nie publikuję** i nie planuję publikacji: oddaję pliki i opisy, publikuje @@WLASCICIEL@@.
 
 ## Zasady pracy

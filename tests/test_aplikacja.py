@@ -246,7 +246,7 @@ def test_gotowosc_calosc_bez_sekretow(tmp_path):
 
 
 # ----------------------------------------------------------------------------------------------- podpowiedzi N0
-FLOTA = ["jarvo", "jarvo-web", "jarvo-lowca", "jarvo-reka", "jarvo-sherlock", "jarvo-studio"]
+FLOTA = ["jarvo", "jarvo-web", "jarvo-lowca", "jarvo-wideo", "jarvo-sherlock", "jarvo-studio"]
 
 
 def test_startery_zimny_start_budzet_i_kolejnosc(tmp_path):
@@ -261,7 +261,7 @@ def test_startery_zimny_start_budzet_i_kolejnosc(tmp_path):
     assert n.start(FLOTA)["podpowiedzi"][0]["id"] == p["id"]        # ten sam starter = ten sam wiersz
     assert len(n.start(FLOTA, czeka=2)["podpowiedzi"]) == 2         # budżet 4: dwa „czeka” zostawiają dwa miejsca
     assert n.start(FLOTA, czeka=4)["podpowiedzi"] == []
-    assert [x["klucz"] for x in n.start(["jarvo", "jarvo-reka"])["podpowiedzi"]] == ["plik"]   # tylko agenci floty
+    assert [x["klucz"] for x in n.start(["jarvo", "test-e2e-a"])["podpowiedzi"]] == ["plik"]   # tylko agenci floty
 
 
 def test_odrzucona_przesuwa_w_dol_a_nigdy_na_zawsze(tmp_path):
@@ -396,7 +396,7 @@ def test_podpowiedzi_czeka_na_ciebie_i_reakcje(swiat):
     r = swiat.ka.get(f"{P}/podpowiedzi?miejsce=start").json()
     assert r["czeka"] == [{"rodzaj": "blad", "agent": "test-e2e-a", "watek": wid, "przebieg": pid,
                            "tytul": r["czeka"][0]["tytul"], "at": r["czeka"][0]["at"], "akcja": "napraw"}]
-    assert r["podpowiedzi"] == []                                       # nikt z listy starterów nie jest we flocie testu
+    assert [p["klucz"] for p in r["podpowiedzi"]] == ["plik"]           # z listy starterów we flocie testu jest tylko Jarvo
     # Ponów zakłada nowy przebieg: wiersz znika
     swiat.k.post(f"{P}/przebiegi/{pid}/ponow")
     T.czekaj(lambda: not swiat.ka.get(f"{P}/podpowiedzi").json()["czeka"], opis="czeka bez ponowionego błędu")

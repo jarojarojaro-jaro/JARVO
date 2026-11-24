@@ -95,7 +95,7 @@ function WiadomoscWlasciciela({ x, k, rozmowca }) {
     ${bezposrednio && adresaci.length > 0 && html`<p class="j-msg-tag"><${Ikona} n="turn" r=${14}/>
       <span>${T("msg.bezposrednio")} · ${adresaci.map(nazwaAgenta).join(", ")}</span></p>`}
     ${x.tekst && html`<div class=${cx("j-babel", o && o.stan === "blad" && "is-blad")} title=${czasPelny(x.ts)}>
-      ${rozmowca && html`<${Zrodlo} zrodlo=${x.zrodlo}/>`}${x.tekst}</div>`}
+      ${rozmowca && html`<${Zrodlo} zrodlo=${x.zrodlo}/>`}${renderujInline(Md.linki(x.tekst))}</div>`}
     ${(obrazy.length > 0 || pliki.length > 0) && html`<div class="j-msg-pliki">
       ${obrazy.map((b, i) => html`<img key=${i} class="j-zal-obraz" src=${b.dane} alt=${b.nazwa || ""}/>`)}
       ${pliki.map((p) => html`<${KartaPliku} key=${p.path} plik=${p} kompakt=${true}/>`)}</div>`}
@@ -458,7 +458,7 @@ function WiadomoscObca({ x }) {
   return html`<article class="j-msg j-msg-ja is-obca">
     <h3 class="j-sr">${T("os.obca")}, ${Czas.godzina(x.ts)}</h3>
     <p class="j-msg-tag"><${Ikona} n="msg" r=${14}/><span>${T("os.obca")}</span></p>
-    <div class="j-babel is-obca">${x.tekst}</div></article>`;
+    <div class="j-babel is-obca">${renderujInline(Md.linki(x.tekst))}</div></article>`;
 }
 
 function BladTury({ x }) {

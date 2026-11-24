@@ -67,7 +67,7 @@ CATEGORY_DESCRIPTIONS = {
     "studio": "Workflowy Studio: pakiety kampanii, grafiki social, filmy z kodu, generacja AI, formaty, copy PL, publikacja.",
     "bezpieczenstwo": "Bezpieczeństwo aplikacji (CC BY-SA, bez zmian): przegląd kodu wg OWASP (getsentry), ryzyko zależności (Trail of Bits).",
     "kod": "Praca na kodzie: mapa repo (graf wywołań), wpływ zmian przed refaktorem, debugowanie od przyczyny.",
-    "reka": "Workflowy prawej ręki: składanie pakietów misji, dokumenty i konwersje, szybkie prototypy, granice.",
+    "warsztat": "Warsztat Jarva: dokumenty i konwersje, szybkie prototypy, pakiet końcowy misji.",
     # kategorie skilli zewnętrznych
     "research": "Narzędzia researchu z Hermesa (MIT): wyszukiwarki, cytowanie, arXiv, YouTube, Reddit, RSS, OSINT firm.",
     "market": "Research rynku (marketingskills, MIT): profile konkurencji, research klientów.",

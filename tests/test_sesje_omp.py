@@ -52,6 +52,18 @@ def w(tmp_path, at):
     return wpis
 
 
+def test_sekrety_wpisu_ida_do_srodowiska_omp(tmp_path):
+    """24.11: Kernel nie miał NUMES_API_KEY, bo klucz leży w pliku, którego agent nie otwiera; `panel.sekrety`
+    (zmienna → plik) czyta program i daje procesowi omp tylko nazwaną zmienną. Ścieżka spoza domu odpada."""
+    plik = tmp_path / "konfig" / "numes.env"
+    plik.parent.mkdir()
+    plik.write_text("# konto third\nEMAIL=a@b.pl\nexport NUMES_API_KEY='nk-123'\nZLA LINIA\n", encoding="utf-8")
+    w = om.wpis_z("gpu", surowy_wpis(tmp_path, sekrety={"NUMES_API_KEY": str(plik), "ZLY": "/etc/passwd",
+                                                       "zla nazwa": str(plik)}), tmp_path)
+    assert w.sekrety == {"NUMES_API_KEY": plik.resolve()}
+    assert om.env_sekretow(w) == {"NUMES_API_KEY": "nk-123"}
+
+
 class Telegram:
     def __init__(self):
         self.wyslane = []

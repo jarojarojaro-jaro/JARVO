@@ -81,5 +81,5 @@ CZAS_MIN = 60
 CZAS_MAKS = 8 * 60 * 60                 # sterownik przyjmuje do 24 h; na ekranie właściciela najwyżej 8 h
 BEZCZYNNOSC = 10 * 60                   # idle_timeout sterownika: bez działań przez 10 min ręce gasną same
 # profil rąk (profil.py): osobny od profilu `jarvo`, który na Komputerze Jarva ma approvals.mode smart i stałe zgody
-# cua:* (tam słuszne, na ekranie właściciela nie); nie `jarvo-rece`, bo myli się z agentem jarvo-reka
+# cua:* (tam słuszne, na ekranie właściciela nie); nazwa mówi, co profil robi: steruje ekranem właściciela
 PROFIL = "jarvo-ekran"

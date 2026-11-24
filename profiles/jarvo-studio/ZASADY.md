@@ -8,7 +8,7 @@
 - przygotowanie publikacji (kolejka do akceptacji).
 
 Poza zakresem: strony (`jarvo-web`), filmy, montaż, lektor i napisy (`jarvo-wideo`), research rynku i fact-checking
-(`jarvo-sherlock` albo jego raport), pakiet końcowy misji (`jarvo-reka`), kampanie płatne: plan, budżet, start,
+(`jarvo-sherlock` albo jego raport), pakiet końcowy misji (Jarvo), kampanie płatne: plan, budżet, start,
 optymalizacja, wyniki (`jarvo-ads`; robię dla nich kreacje na brief). **Nie publikuję sam**: publikacja to decyzja @@WLASCICIEL@@.
 
 ## Zasady pracy

@@ -147,7 +147,7 @@ tylko raportujemy (Hermes instaluje je jako wbudowane). Ręczny skan kandydata p
 | [coreyhaines31/marketingskills](https://github.com/coreyhaines31/marketingskills) | `5b2c000` | MIT | Sherlock, Web, Studio, Wideograf (video), Ads (ads, ab-testing, attribution, analytics, ad-creative) |
 | [addyosmani/web-quality-skills](https://github.com/addyosmani/web-quality-skills) | `afa8da9` | MIT | Web |
 | [AgriciDaniel/claude-seo](https://github.com/AgriciDaniel/claude-seo) | `e77e783` | MIT | Web (skille + skrypty w obrazie) |
-| [anthropics/skills](https://github.com/anthropics/skills) | `3337550` | Apache-2.0 (tylko skille z licencją Apache w katalogu) | Web, Studio, Ręka, Wideograf (slack-gif-creator), Studio (algorithmic-art) |
+| [anthropics/skills](https://github.com/anthropics/skills) | `3337550` | Apache-2.0 (tylko skille z licencją Apache w katalogu) | Web, Studio, Wideograf (slack-gif-creator), Studio (algorithmic-art) |
 | [Barty-Bart/motion-graphics](https://github.com/Barty-Bart/motion-graphics) (skill motion-broll) | `e8d610a` | MIT | Wideograf (B-roll zgrany ze słowami) |
 | [lemomo-ai/lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) | `b65efe6` | MIT (assety CC0 / CC BY / OFL) | Wideograf (43 style filmu; biblioteka instalowana przez `narzedzia.py`) |
 | [lemomo-ai/lemo-wake](https://github.com/lemomo-ai/lemo-wake) | `ebb758c` | CC BY-NC 4.0 (tylko niekomercyjnie; komercyjnie za zgodą autora); modele ONNX z Hugging Face na własnych licencjach (Apache-2.0, MIT) | Studio (skill `zywy-obraz`: obraz → pętla 5 s i warstwy PSD; biblioteka instalowana przez `lemo_wake.py`, bez skilla upload) |
@@ -168,7 +168,7 @@ tylko raportujemy (Hermes instaluje je jako wbudowane). Ręczny skan kandydata p
 | [CloudAI-X/threejs-skills](https://github.com/CloudAI-X/threejs-skills) | `b1c6230` | MIT (deklarowana w README, bez pliku; autorstwo w `notice`) | Wideograf, Web (10 skilli Three.js) |
 | [emilkowalski/skills](https://github.com/emilkowalski/skills) | `d16ebe6` | MIT | Wideograf, Web (rzemiosło animacji UI) |
 | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | `114ea1d` | Apache-2.0 | Web, Studio (detektor anty-wzorców, silnik pobierany do `narzedzia/impeccable`) |
-| [mattpocock/skills](https://github.com/mattpocock/skills) | `d81f3a1` | MIT | Jarvo, Ręka (`writing-for-agents`: pisanie SOUL i skilli) |
+| [mattpocock/skills](https://github.com/mattpocock/skills) | `d81f3a1` | MIT | Jarvo (`writing-for-agents`: pisanie SOUL i skilli) |
 | [getsentry/skills](https://github.com/getsentry/skills) `security-review` (na bazie [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/)) | `d18b7aa` | CC-BY-SA-4.0 (licencja skilla; reszta repo Apache-2.0) | Web (przegląd kodu wg OWASP: JS/Next, Python, Docker) |
 | [trailofbits/skills](https://github.com/trailofbits/skills) `supply-chain-risk-auditor` | `82fe822` | CC-BY-SA-4.0 (całe repo, także skrypty) | Web (ryzyko zależności: OSV, porzucone repo, wydawcy npm, skrypty instalacyjne) |
 | [heygen-com/hyperframes](https://github.com/heygen-com/hyperframes) | `ad3a238` (tag `v0.9.52`) | Apache-2.0 | Wideograf (wideo z HTML: `hyperframes`, `hyperframes-cli`, `media-use`, `slideshow`; 8 skilli „workflow” upstream wycofał w 0.9 do references skilla `hyperframes`) |
@@ -195,7 +195,7 @@ Programy pobierane przez skille przy pierwszym użyciu (nie w repo ani w obrazie
 
 | Projekt | Wersja | Licencja | Dla kogo |
 |---|---|---|---|
-| [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) | 0.11.0 (`linux-*-portable`) | MIT (licencje zależności: `THIRD_PARTY_NOTICES.md` obok programu) | Web, Ręka: skill `graf-kodu` (tryb poleceń, bez MCP i bez procesu w tle) |
+| [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) | 0.11.0 (`linux-*-portable`) | MIT (licencje zależności: `THIRD_PARTY_NOTICES.md` obok programu) | Web: skill `graf-kodu` (tryb poleceń, bez MCP i bez procesu w tle) |
 
 Kod skopiowany do skilla własnego floty (`shared/skills`), z plikiem licencji autorów obok:
 

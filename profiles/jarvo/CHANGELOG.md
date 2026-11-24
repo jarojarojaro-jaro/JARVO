@@ -1,6 +1,10 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Agenta Ręka nie ma: dokumenty, konwersje, prototypy i pakiet końcowy misji robi Jarvo (skille `warsztat/`, `to_pdf.py`, `pack.py`), a stary profil trafia do `profiles/.usuniete/`.
+- Adres w wiadomości właściciela w panelu jest klikalny i otwiera się w przeglądarce.
+- Sesja omp dostaje klucze z `panel.sekrety` (zmienna → plik) w środowisku, bez otwierania pliku przez agenta; Kernel ma `NUMES_API_KEY`.
+- Dopisek do trwającej pracy: praca agenta stoi pod najnowszą wiadomością właściciela, a agent od razu pisze jedno zdanie, co z nim robi.
 - Prompt Jarva bez przykładów, same ogólne zasady jednym zdaniem; angielskie bloki Hermesa powtórzone w zasadach wyłączone, hint Telegrama po polsku, a walidator odrzuca przykłady w SOUL i ZASADY.
 - Pasek pracy nad polem na całą szerokość, z bieżącym krokiem (polecenie albo plik), a wysiłek nazwany wprost: OFF, LOW, MEDIUM, HIGH, EXTRA HIGH, MAX.
 - Panel pokazuje pracę agenta omp na żywo jak terminal: krok z poleceniem albo plikiem, myśli między krokami i wyjście kroku, który trwa.

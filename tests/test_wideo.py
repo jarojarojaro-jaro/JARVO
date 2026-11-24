@@ -236,11 +236,11 @@ def test_montaz_ruch_z_trf_mediana_pomija_obiekty():
 def test_montaz_drzenie_panorama_zero_reka_wiecej():
     panorama = [(3.0, 0.0)] * 120                                     # płynna panorama: nie drżenie
     assert montaz.drzenie_z_ruchu(panorama, 640) == pytest.approx(0.0, abs=1e-9)
-    reka = [(6.0 * (-1) ** i, 4.0 * (-1) ** (i // 2)) for i in range(120)]
-    pan_reka = [(3.0 + dx, dy) for dx, dy in reka]
-    assert montaz.drzenie_z_ruchu(reka, 640) > 0.3
-    assert montaz.drzenie_z_ruchu(pan_reka, 640) == pytest.approx(montaz.drzenie_z_ruchu(reka, 640), rel=0.05)
-    assert montaz.drzenie_z_ruchu(reka, 1280) == pytest.approx(montaz.drzenie_z_ruchu(reka, 640) / 2, rel=0.01)
+    z_reki = [(6.0 * (-1) ** i, 4.0 * (-1) ** (i // 2)) for i in range(120)]
+    pan_z_reki = [(3.0 + dx, dy) for dx, dy in z_reki]
+    assert montaz.drzenie_z_ruchu(z_reki, 640) > 0.3
+    assert montaz.drzenie_z_ruchu(pan_z_reki, 640) == pytest.approx(montaz.drzenie_z_ruchu(z_reki, 640), rel=0.05)
+    assert montaz.drzenie_z_ruchu(z_reki, 1280) == pytest.approx(montaz.drzenie_z_ruchu(z_reki, 640) / 2, rel=0.01)
     assert montaz.drzenie_z_ruchu([(9.0, 9.0)], 640) == 0.0
     assert [montaz.rada_drzenia(x).split(":")[0] for x in (0.05, 0.3, 0.8, 2.3)] == \
         ["stabilne", "lekkie drżenie", "z ręki", "mocno trzęsie"]
@@ -293,7 +293,7 @@ def test_montaz_stabilizuj_nagranie_z_reki(tmp_path):
     wyraźnie spada (libvidstab na innych systemach liczy inaczej: tam tylko, że narzędzie zadziałało)."""
     if not montaz.ma_vidstab():
         pytest.skip("ffmpeg bez vidstab")
-    zdj, src, out = tmp_path / "z.png", tmp_path / "reka.mp4", tmp_path / "stab.mp4"
+    zdj, src, out = tmp_path / "z.png", tmp_path / "z_reki.mp4", tmp_path / "stab.mp4"
     subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=960x540", "-frames:v", "1",
                     str(zdj)], check=True)
     subprocess.run(["ffmpeg", "-loglevel", "error", "-loop", "1", "-framerate", "30", "-i", str(zdj), "-f", "lavfi",

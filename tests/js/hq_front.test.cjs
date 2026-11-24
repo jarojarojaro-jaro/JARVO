@@ -355,6 +355,17 @@ test("Os.widok: karty pod wiadomością, która je zapowiada; w trwającej turze
   eq(Os.widok([wpis, kroki(1, true), karta(2, true), karta(3, true)], [zywy]).map((x) => x.id), ["e1", "z:r1", "p2", "p3"]);
 });
 
+test("Os.widok: trwająca praca pod ostatnim dopiskiem właściciela, nie wyżej w wątku", () => {
+  // 24.11: dopisek do trwającej tury stał pod dymkiem, a praca szła dalej nad nim i wyglądało, że agent go nie widzi
+  const e1 = { id: "e1", rodzaj: "wlasciciel", ts: 0 };
+  const e2 = { id: "e2", rodzaj: "wlasciciel", ts: 5, wpis: { dane: { dopisane_do: "r1" } } };
+  const e3 = { id: "e3", rodzaj: "wlasciciel", ts: 6 };
+  const zywy = { id: "r1", stan: "pracuje", wpis_id: "e1", agent: "jarvo", tekst: "" };
+  eq(Os.widok([e1, e2, e3], [zywy]).map((x) => x.id), ["e1", "e2", "z:r1", "e3"]);
+  const dopisek = { id: "r2", stan: "wlaczony", wpis_id: "e3", dopisany_do: "r1", agent: "jarvo" };
+  eq(Os.widok([e1, e2, e3], [zywy, dopisek]).map((x) => x.id), ["e1", "e2", "e3", "z:r1"]);
+});
+
 test("Os.widok: tura z Telegrama to jedna wiadomość, komentarze między narzędziami w krokach", () => {
   // 19.11: link z Telegrama, Jarvo komentował każdy krok („Sprawdzam…”, „Działa…”) i panel pokazał 15 wiadomości
   const wl = { id: "w1", rodzaj: "wlasciciel", ts: 0 };

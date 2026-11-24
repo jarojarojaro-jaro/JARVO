@@ -7,11 +7,11 @@ Każdy agent jest budowany według [PROFILE-SPEC.md](PROFILE-SPEC.md) (main prom
 knowledge packi, skrypty, toolbox, granice, evals). Zweryfikowane narzędzia open-source
 każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.md).
 
-**Stan: wszystkie dziewięć profili jest zbudowanych.** Ten dokument to specyfikacja. Implementacja:
+**Stan: wszystkie osiem profili jest zbudowanych.** Ten dokument to specyfikacja. Implementacja:
 
 | Agent | Main prompt | Workflowy własne | Skille zewnętrzne | Skrypty | Evals |
 |---|---|---|---|---|---|
-| `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) (postać) + [ZASADY](../profiles/jarvo/ZASADY.md) | 23: [17 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster`, [5 w `skills/ekran/`](../profiles/jarvo/skills/ekran), [1 w `skills/social/`](../profiles/jarvo/skills/social) | 3 (`writing-for-agents`, mattpocock; wspólne `konwersja-plikow` i `odczyt-ekranu`) | patrol, brief, przegląd, raport floty, liczby floty, świeżość, linter kontraktu, prosty polski, księga lekcji, poczekalnia skilli, wgrywanie stron, skrzynka linków, kopalnia pomysłów; wtyczka `jarvo-komputer` (stan, dziennik, oddanie ekranu; natywnie strony: idz, patrz, kroki, czekaj) + narzędzie `computer_use` Hermesa przez bramkę `komputer/jarvo_cua.py` | [57](../evals/jarvo/scenarios.yaml) |
+| `jarvo` | [SOUL](../profiles/jarvo/SOUL.md) (postać) + [ZASADY](../profiles/jarvo/ZASADY.md) | 26: [17 w `skills/fleet/`](../profiles/jarvo/skills/fleet) + generowany `roster`, [5 w `skills/ekran/`](../profiles/jarvo/skills/ekran), [1 w `skills/social/`](../profiles/jarvo/skills/social), [3 w `skills/warsztat/`](../profiles/jarvo/skills/warsztat) | 3 (`writing-for-agents`, mattpocock; wspólne `konwersja-plikow` i `odczyt-ekranu`) | patrol, brief, przegląd, raport floty, liczby floty, świeżość, linter kontraktu, prosty polski, księga lekcji, poczekalnia skilli, wgrywanie stron, skrzynka linków, kopalnia pomysłów, pack (pakiet misji), to_pdf; wtyczka `jarvo-komputer` (stan, dziennik, oddanie ekranu; natywnie strony: idz, patrz, kroki, czekaj) + narzędzie `computer_use` Hermesa przez bramkę `komputer/jarvo_cua.py` | [57](../evals/jarvo/scenarios.yaml) |
 | `jarvo-sherlock` | [SOUL](../profiles/jarvo-sherlock/SOUL.md) | [9 w `skills/sherlock/`](../profiles/jarvo-sherlock/skills/sherlock) | 18 (Hermes, marketingskills, wspólne `transkrypcja-filmu`, `konwersja-plikow`, `odczyt-ekranu` i `ostrozna-przegladarka`) | search_fanout, extract, sources (rejestr cytowań), fakty (brief do filmu) | [16](../evals/jarvo-sherlock/scenarios.yaml) |
 | `jarvo-web` | [SOUL](../profiles/jarvo-web/SOUL.md) | [12 w `skills/web/`](../profiles/jarvo-web/skills/web) | 62 (web-quality, claude-seo, marketingskills, Anthropic, Hermes, getsentry, Trail of Bits, impeccable, GSAP, Three.js, motion, Lottie, wspólne `graf-kodu`, `izometria`, `warsztat-3d`, `konwersja-plikow` i `odczyt-ekranu`) | audit, szybki_audyt, seo_check, screenshots, a11y, favicons, images, brand_extract, hostile, security_check | [21](../evals/jarvo-web/scenarios.yaml) |
 | `jarvo-studio` | [SOUL](../profiles/jarvo-studio/SOUL.md) | [7 w `skills/studio/`](../profiles/jarvo-studio/skills/studio) | 28 (marketingskills, Anthropic, Hermes, impeccable, lemo-wake, wspólne `hooki`, `izometria`, `konwersja-plikow` i `odczyt-ekranu`) | render_html, check_media, lemo_wake | [15](../evals/jarvo-studio/scenarios.yaml) |
@@ -19,7 +19,6 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [11 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 8 (marketingskills, wspólne `hooki`, `konwersja-plikow` i `odczyt-ekranu`) | ads, planer, eksperyment, eksport, paczka | [14](../evals/jarvo-ads/scenarios.yaml) |
 | `jarvo-lowca` | [SOUL](../profiles/jarvo-lowca/SOUL.md) | [7 w `skills/lowca/`](../profiles/jarvo-lowca/skills/lowca) | 3 (wspólne `konwersja-plikow`, `odczyt-ekranu` i `ostrozna-przegladarka`) | krs, ceidg, przetargi, strona, leady, zrodlo | [16](../evals/jarvo-lowca/scenarios.yaml) |
 | `jarvo-mobile` | [SOUL](../profiles/jarvo-mobile/SOUL.md) | [10 w `skills/mobile/`](../profiles/jarvo-mobile/skills/mobile) | 23 (Expo, React Native, ASO; wspólne `konwersja-plikow`, `odczyt-ekranu` i `warsztat-3d`; `vendor/skills.lock.yaml`) | audyt_mobilny, decyzja, zgodnosc, aplikacja, ikony, zrzuty, wrogie, urzadzenie, ios_ci, bramka, sklep_check, pakiet, kadry, wydanie, odrzucenie, ze_strony, utrzymanie, paczki (+ mobile_lib, szablon `expo-jarvo`, workflow iOS) | [34](../evals/jarvo-mobile/scenarios.yaml) |
-| `jarvo-reka` | [SOUL](../profiles/jarvo-reka/SOUL.md) | [4 w `skills/reka/`](../profiles/jarvo-reka/skills/reka) | 6 (skill-creator, `writing-for-agents`, `graf-kodu`, `transkrypcja-filmu`, `konwersja-plikow`, `odczyt-ekranu`) + skille wszystkich snajperów (`external_dirs`, tylko odczyt) + katalog Hermesa | pack, to_pdf | [15](../evals/jarvo-reka/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
 
@@ -38,7 +37,6 @@ Legenda przy skillach:
 | `jarvo-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy | snajper | A1 (renderuje; publikacja i zakupy = A2) |
 | `jarvo-lowca` | Łowca leadów: firmy z sygnałem zakupowym i opublikowanym kontaktem | snajper | A1 (szuka i ocenia; wysyłka = decyzja człowieka) |
 | `jarvo-mobile` | Twórca aplikacji: natywna czy PWA, audyt mobilny, aplikacje Expo do sklepów | snajper | A1 (audyty i rekomendacje; konta sklepów i wysyłka = A2) |
-| `jarvo-reka` | Prawa ręka: generalista, który ogarnia wszystko | generalista | A1 (e-maile i akcje zewnętrzne = A2) |
 
 ---
 
@@ -61,7 +59,6 @@ bez polskich znaków (`@łowca` = `@lowca`) i opcjonalne pole `aliasy` (lista). 
 | `jarvo-ads` | `@ads` | reklamy Meta i Google |
 | `jarvo-lowca` | `@lowca` | nowi klienci z KRS i CEIDG |
 | `jarvo-mobile` | `@mobile` | aplikacje na telefon |
-| `jarvo-reka` | `@reka` | dokumenty i szybkie sprawy |
 
 Pole `rola` (i `en.rola`) to krótka rola agenta, najwyżej 8 słów: aplikacja pokazuje ją w Ustawieniach › Zespół
 i w podpowiedzi kompozytora po wyborze adresata. `scripts/validate.py` pilnuje, żeby każdy aktywny agent miał
@@ -157,7 +154,7 @@ Układ nakładki odpowiada repo:
 | `README.md` | opis nakładki |
 
 Build i instalacja traktują agentów nakładki jak publicznych (skille, skrypty, klucze, cron, `fleet.json` z `marka`,
-wątki Telegrama, kanban, roster); Ręka dostaje ich skille w `skills.external_dirs` przy buildzie. Ta sama nazwa
+wątki Telegrama, kanban, roster). Ta sama nazwa
 agenta w nakładce i w publicznym repo = błąd buildu. Skrypty repo (`scripts/build.py`, evals, kuźnia) widzą nakładkę
 tylko z `JARVO_NAKLADKA`; `make validate` sprawdza samo publiczne repo, także przy ustawionej `JARVO_NAKLADKA` (ten sam
 wynik w CI i na każdej maszynie). `scripts/validate.py --nakladka DIR` sprawdza dodatkowo agentów nakładki (pliki,
@@ -203,8 +200,8 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 | Leady, nowi klienci, „komu sprzedać”, przetargi do wzięcia, nowe firmy w branży, kontakt do firm | `jarvo-lowca` |
 | Aplikacja mobilna, „czy potrzebujemy aplikacji”, PWA czy natywna, audyt aplikacji w App Store i Google Play, aplikacja z naszej strony, aktualizacja albo poprawka aplikacji w sklepie | `jarvo-mobile` |
 | Zadanie na ekranie albo telefonie: kliknij w panelu albo programie w przeglądarce, wypełnij formularz, przejdź stronę jak klient, przepisz dane z ekranu, załóż konto, zaloguj się, gdzie nie ma API | `jarvo` sam (wymaga włączonego Komputera: `jarvo komputer on`; telefon: `jarvo telefon on`); dłuższe niż kilka minut: karta kanbana przypisana do siebie (`assignee: jarvo`), żeby czat był wolny |
-| Szybkie sprawy, sklejanie wyników, prototyp, „ogarnij to”, zadanie bez oczywistego snajpera | `jarvo-reka` |
-| Duże cele (np. „wypuść nowy produkt”) | rozbicie na kilka kart, np. sherlock → web + studio → reka (spięcie) |
+| Szybkie sprawy, dokumenty, konwersje, sklejanie wyników, prototyp, „ogarnij to”, zadanie bez oczywistego snajpera | `jarvo` sam (`warsztat/`: `dokumenty`, `szybki-prototyp`) |
+| Duże cele (np. „wypuść nowy produkt”) | rozbicie na kilka kart, np. sherlock → web + studio → złożenie (karta Jarva, `zlozenie-pakietu`) |
 
 **Skille:** [T] `intake`, `wywiad`, `dispatch-playbook` (jak pisać karty z DoD, typowe przepływy),
 `mission-ledger` (dziennik misji i raport końcowy), `decision-queue`, `sdlc-review` (sędzia; rubryki agentów
@@ -218,7 +215,9 @@ briefie pozycja „🛠” z jedną rzeczą wartą zbudowania, z dowodem z 48 h;
 werdykty, odmowy wejścia), `formularze` (pole po polu, listy przez `set_value`, sprawdzenie wartości, formularze
 wrażliwe), `dane-z-ekranu` (tabela z drzewa albo obrazu do CSV z adresem i godziną, dane osób), `przejscie-strony`
 (ścieżka klienta z tabelą kroków i zrzutem problemu), `oddaj-ekran` (krok właściciela: CAPTCHA po jednej próbie,
-płatność bez zgody, prośba w jednym zdaniu).
+płatność bez zgody, prośba w jednym zdaniu); [T] skille warsztatu w `skills/warsztat/`: `dokumenty` (dokumenty
+i konwersje, PDF przez `to_pdf.py`), `szybki-prototyp` (prototyp na szybko), `zlozenie-pakietu` (karta „Złożenie”:
+wyniki kart misji w jeden pakiet końcowy przez `pack.py`).
 
 **Toolsety:** na Telegramie `kanban`, `memory`, `file`, `web`, `session_search`, `clarify`, `todo`, `skills`, `cronjob`,
 `computer_use`, `komputer`, `terminal`; narzędzia `schemat` (SVG → PNG w rozmowie) i `pobierz_link` (skrzynka linków: skrypt profilu w venvie narzędzi) daje mu wtyczka `jarvo-wiedza` razem z narzędziami skarbca; w czacie HQ (`api_server`) to samo bez `clarify`. Pracownik-sędzia (CLI) ma dodatkowo `browser` i `vision` do weryfikacji wyników.
@@ -475,31 +474,6 @@ Pełna lista narzędzi: [TOOLBOX.md](TOOLBOX.md#jarvo-wideo-wideograf).
 
 ---
 
-## `jarvo-reka`: Prawa ręka
-
-**Misja:** zapierdala i pomaga na każdy możliwy sposób. Ogarnia, rozkminia, proponuje,
-robi szybkie rzeczy od ręki, skleja wyniki snajperów i łata dziury, gdzie nie ma specjalisty.
-
-**Czym różni się od Jarva:** Jarvo *zarządza i ocenia*, a prawa ręka *wykonuje*.
-Jarvo nie robi pracy dziedzinowej (sam robi tylko ekran, konta, telefon i terminal), a ręka robi wszystko.
-
-**Czym różni się od snajperów:** ma **dostęp do skilli wszystkich snajperów** (tylko do odczytu; walidator
-pilnuje, żeby nowy snajper też tu trafił) i pełny katalog Hermesa, ale nie ma ich pamięci ani głębi.
-Do szybkich i przekrojowych zadań jest idealna. Gdy zadanie wymaga jakości snajpera, sama proponuje oddanie go przez Jarva.
-
-**Typowe zadania:** szybka odpowiedź lub obliczenie, poprawka tekstu, porządki w plikach,
-prototyp na szybko, zebranie wyników kilku snajperów w jeden dokument, maile, notatki,
-plan dnia, „znajdź sposób, żeby…”.
-
-**Skille:** pełny katalog [H], skille wszystkich snajperów przez `skills.external_dirs` (build zamontowany
-w kontenerze tylko do odczytu, `:ro`, więc ręka nie może ich modyfikować), [Z] `skill-creator`, `writing-for-agents`, `graf-kodu`,
-`transkrypcja-filmu`, `konwersja-plikow`, `odczyt-ekranu` oraz [T] `zlozenie-pakietu`, `dokumenty`, `szybki-prototyp`, `kiedy-oddac-snajperowi` (tabela
-„komu oddać” generowana z pól `oddaj_gdy` w `fleet.yaml`, więc każdy nowy specjalista trafia do niej sam).
-
-**Rubryka sędziego (DoD):** zadanie wykonane, wynik sprawdzony przez nią samą, jasno powiedziane, czego nie zrobiła.
-
----
-
 ## `jarvo-ads`: Specjalista Ads
 
 Meta Ads i Google Ads od planu kampanii po raport: plan, testy A/B/C, paczka do publikacji, raporty z listą zmian
@@ -570,12 +544,12 @@ i `templates/ci/jarvo-ios.yml`.
 1. `jarvo` + `jarvo-sherlock`: najprostsze narzędzia, dobre do przetestowania pętli sędziego.
 2. `jarvo-web`: najwięcej wiedzy do spisania, najbardziej mierzalne wyniki (Lighthouse).
 3. `jarvo-studio`: wymaga najwięcej narzędzi i kluczy API (OpenRouter, FFmpeg, renderery).
-4. `jarvo-reka`: na końcu, bo korzysta ze skilli pozostałych.
+4. Warsztat (dokumenty, prototypy, złożenie pakietu): najpierw osobny agent, od 2026-11-24 robi to sam `jarvo`.
 5. `jarvo-wideo`: wydzielony później ze Studia (wideo to osobny warsztat).
 6. `jarvo-ads`: bez kluczy, kampanie jako paczka do publikacji przez właściciela; Skarbiec (sejf tokenów) odłożony ([ADS.md](ADS.md)).
 7. `jarvo-lowca` i `jarvo-mobile`: specjaliści z własnymi skryptami do źródeł publicznych ([LEADY.md](LEADY.md), [MOBILE.md](MOBILE.md)).
 8. Ekran (computer use na Komputerze Jarva, po kanale z twardymi zasadami, etapy K0–K3 w [KOMPUTER.md](KOMPUTER.md)): najpierw osobny agent, od 2026-11-14 robi to sam `jarvo`.
 
 Pierwszy wspólny test floty: **„wypuść landing nowego produktu”**. Sherlock robi research
-i słowa kluczowe, web buduje stronę, studio przygotowuje grafiki i posty, ręka składa
-wszystko w pakiet, a Jarvo ocenia każdy etap.
+i słowa kluczowe, web buduje stronę, studio przygotowuje grafiki i posty, Jarvo składa
+wszystko w pakiet i ocenia każdy etap.

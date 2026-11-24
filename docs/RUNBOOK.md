@@ -16,14 +16,14 @@ Czas: ok. 1,5 h przy pierwszym razie (z czego ~20 min to budowa obrazu).
 | Klucz SSH (ed25519) | logowanie na serwer | hasła będą wyłączone |
 | Konto [Tailscale](https://tailscale.com) (darmowe) | prywatny dostęp do serwera i paneli | nic nie wystawiamy publicznie |
 | Konto ChatGPT (z dostępem do Codex) | domyślne modele floty (`openai-codex`, gpt-6-luna) | logowanie OAuth w dashboardzie: Models → Login przy profilu „default” |
-| Konto [OpenRouter](https://openrouter.ai) z kredytami | obrazy i wideo AI (modele tylko przy zestawie `openrouter`) | **10 kluczy**: host + 9 agentów, każdy z limitem kredytów |
+| Konto [OpenRouter](https://openrouter.ai) z kredytami | obrazy i wideo AI (modele tylko przy zestawie `openrouter`) | **9 kluczy**: host + 8 agentów, każdy z limitem kredytów |
 | Klucz [Pexels](https://www.pexels.com/api/) albo [Pixabay](https://pixabay.com/api/docs/) (darmowy) | ujęcia stock dla Wideografa | `PEXELS_API_KEY` / `PIXABAY_API_KEY` w Keys (profil główny) |
 | Token [CEIDG](https://dane.biznes.gov.pl) (darmowy, opcjonalny) | jednoosobowe działalności dla Łowcy | `CEIDG_TOKEN` w Keys przy profilu `jarvo-lowca` (Własne klucze); kroki: [LEADY.md](LEADY.md#token-ceidg) |
 | Konto Telegram | główny kanał | bot + supergrupa „Jarvo HQ” z tematami |
 | Miejsce na backup (Backblaze B2, S3 albo SFTP) | nocne kopie restic | poza serwerem |
 
 Limity kluczy OpenRouter na start (miesięcznie, do korekty po 2 tygodniach): `jarvo` 30 $, `jarvo-sherlock` 20 $,
-`jarvo-web` 20 $, `jarvo-studio` 20 $ (obrazy), `jarvo-wideo` 30 $ (wideo AI), `jarvo-ads` 15 $, `jarvo-lowca` 10 $, `jarvo-mobile` 15 $, `jarvo-reka` 15 $, host 5 $. Klucz z limitem to bezpiecznik:
+`jarvo-web` 20 $, `jarvo-studio` 20 $ (obrazy), `jarvo-wideo` 30 $ (wideo AI), `jarvo-ads` 15 $, `jarvo-lowca` 10 $, `jarvo-mobile` 15 $, host 5 $. Klucz z limitem to bezpiecznik:
 zapętlony agent nie wyczyści konta.
 
 Przed wdrożeniem sprawdź, czy modele z `fleet.yaml` nadal istnieją (lokalnie albo na serwerze). Przy domyślnym
@@ -89,8 +89,8 @@ Zainstaluj Tailscale też na laptopie i telefonie. Od teraz łącz się przez `s
 4. **Supergrupa:** nowa grupa „Jarvo HQ” → Ustawienia → **Tematy (Topics): włącz**. Dodaj bota
    (**po** zmianie prywatności; jeśli był dodany wcześniej: usuń i dodaj ponownie) i nadaj mu admina.
 5. **Tematy:** temat General nazywa się „JARVO” i należy do Jarva; własny wątek ma tylko agent biznesowy z nakładki
-   (np. `JARODEV`) i sesja zewnętrzna (`KERNEL`). Specjaliści (Sherlock, Web, Studio, Wideograf, Ads, Łowca, Aplikacje,
-   Ręka) wątków nie mają: pracują przez Jarva (decyzja 16.11). Wątki zakłada i nazywa (krótka nazwa wielkimi literami,
+   (np. `JARODEV`) i sesja zewnętrzna (`KERNEL`). Specjaliści (Sherlock, Web, Studio, Wideograf, Ads, Łowca,
+   Aplikacje) wątków nie mają: pracują przez Jarva (decyzja 16.11). Wątki zakłada i nazywa (krótka nazwa wielkimi literami,
    General przez `editGeneralForumTopic`; powtórka niczego nie zmienia) `jarvo telegram tematy`; bot potrzebuje prawa
    „Zarządzanie tematami”. Adresata wybierasz tematem.
    **Dom Jarva (decyzja 17.11):** wszystko, co Jarvo wysyła sam, idzie do tematu JARVO: rutyny (patrol, brief, przegląd
@@ -154,7 +154,7 @@ TELEGRAM_REQUIRE_MENTION=false
 OPENROUTER_API_KEY=sk-or-v1-…     # klucz "host" (niski limit)
 ```
 
-**`/srv/jarvo/secrets/<agent>.env`** dla `jarvo`, `jarvo-sherlock`, `jarvo-web`, `jarvo-studio`, `jarvo-wideo`, `jarvo-ads`, `jarvo-lowca`, `jarvo-mobile`, `jarvo-reka`:
+**`/srv/jarvo/secrets/<agent>.env`** dla `jarvo`, `jarvo-sherlock`, `jarvo-web`, `jarvo-studio`, `jarvo-wideo`, `jarvo-ads`, `jarvo-lowca`, `jarvo-mobile`:
 ```ini
 OPENROUTER_API_KEY=sk-or-v1-…     # osobny klucz na agenta
 ```
@@ -180,7 +180,7 @@ kanbana) dostaje najszybszy model zestawu, chyba że wybrano mu model ręcznie p
 ### Klucze dostawców i logowanie (OAuth)
 
 Każdy agent floty to osobny profil Hermesa z własnym `.env`, a Hermes celowo ich nie miesza (izolacja kluczy
-przy multipleksowaniu). Żeby nie wpisywać klucza dziewięć razy:
+przy multipleksowaniu). Żeby nie wpisywać klucza osiem razy:
 
 - **Klucze API** (CommandCode, OpenRouter, OpenCode, Exa…) dodawaj w dashboardzie **Keys przy profilu
   „default”**. Jarvo HQ w ciągu kilku sekund kopiuje je do wszystkich agentów (`scripts/share_keys.py`, blok
@@ -225,7 +225,7 @@ sudo systemctl start jarvo-updater
 
 ## 6. Test dymny (smoke test)
 
-1. **DM z botem:** „Cześć, kim jesteś i kogo masz w zespole?” → odpowiada Jarvo, wymienia 5 snajperów i Prawą rękę.
+1. **DM z botem:** „Cześć, kim jesteś i kogo masz w zespole?” → odpowiada Jarvo i wymienia 7 specjalistów.
 2. **Temat Sherlock:** „Jaka jest aktualna stawka VAT na usługi IT w Polsce? Podaj źródło.” → odpowiada Sherlock.
 3. **Misja przez Jarva (DM):** „Sprawdź 3 konkurentów kawiarni specialty w Krakowie i przygotuj szkic landing page’a.”
    Jarvo powinien potwierdzić zlecenie efektami, a na tablicy pojawić się karty:
@@ -234,7 +234,7 @@ sudo systemctl start jarvo-updater
    ```
    Po kilku–kilkunastu minutach: recenzja Jarva (status `review` → `done` albo prośba o poprawki) i raport w DM.
 4. **Aplikacja Jarvo:** `http://<ip-tailscale>:9119/jarvo` (zakładka **Jarvo**, pierwsza w menu, nad CHAT; adres `/` prowadzi tam sam; obok **Wiedza** z grafem skarbca: po wdrożeniu
-   widać huby 9 agentów), login `jarvo` + `DASHBOARD_PASSWORD`
+   widać huby 8 agentów), login `jarvo` + `DASHBOARD_PASSWORD`
    z `compose/.env`. To aplikacja czatu: ekran startu (powitanie, jedno zdanie gotowości, gdy brakuje modelu albo profilu
    właściciela), rozmowy z Jarvem i agentami, ustawienia w szufladzie (pozycja **Ustawienia** w pasku); budynek floty z pokojami agentów,
    decyzjami i misjami jest w **Ustawienia › Stara Baza** ([HQ.md](HQ.md)). Na `/jarvo` menu Hermesa jest schowane;

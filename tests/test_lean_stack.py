@@ -156,7 +156,7 @@ def test_stt_wyjscie_w_utf8_takze_bez_trybu_utf8(tmp_path):
 
 @pytest.fixture
 def to_pdf(monkeypatch):
-    mod = load_script("profiles/jarvo-reka/scripts/to_pdf.py")
+    mod = load_script("profiles/jarvo/scripts/to_pdf.py")
     calls: list[list[str]] = []
 
     def fake_run(cmd, **kw):
@@ -397,7 +397,7 @@ def test_node_tools_drop_heavy_packages_and_share_chromium():
 # ------------------------------------------------------------------ konfiguracja
 
 def test_profiles_use_lightpanda_and_local_stt():
-    for agent in ["jarvo", "jarvo-sherlock", "jarvo-web", "jarvo-studio", "jarvo-wideo", "jarvo-reka"]:
+    for agent in ["jarvo", "jarvo-sherlock", "jarvo-web", "jarvo-studio", "jarvo-wideo"]:
         cfg = yaml.safe_load((REPO / "profiles" / agent / "config.yaml").read_text(encoding="utf-8"))
         assert cfg["browser"]["engine"] == "lightpanda", agent
         assert cfg["browser"]["backend"] == "off", agent      # string, nie bool (YAML 1.1: off → False)

@@ -287,31 +287,6 @@ agents:
     oddaj_gdy: "aplikacja mobilna: czy firmie potrzebna (natywna, PWA, Wallet), prototyp i budowa aplikacji, podgląd na telefonie, audyt aplikacji w App Store i Google Play"
     status: active
 
-  - name: jarvo-reka
-    kind: generalist
-    title: "Prawa ręka"
-    emoji: "🦾"
-    description: >-
-      Generalista wykonawczy: szybkie zadania, dokumenty i konwersje, prototypy, organizacja,
-      składanie wyników specjalistów w pakiet końcowy misji. Zna skille wszystkich agentów
-      (tylko do odczytu), bez ich głębi i pamięci.
-    model_tier: strong
-    delegation_tier: fast
-    autonomy_max: A1
-    hq_room: workshop    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
-    hq_label: "Warsztat"
-    hq_short: "Ręka"
-    rola: "dokumenty i szybkie sprawy"
-    handle: reka
-    oddaj_gdy: "szybka praca bez specjalisty: dokument, konwersja pliku, prototyp, porządek, pakiet końcowy misji ze składanych wyników"
-    en:
-      title: "Right hand"
-      rola: "documents and quick tasks"
-      hq_label: "Workshop"
-      description: >-
-        Hands-on generalist: quick tasks, documents and conversions, prototypes, organisation, assembling the specialists' results into the final mission package. Knows every agent's skills (read-only), without their depth or memory.
-    status: active
-
 shared:
   user_memory: builtin          # MVP: pamięć wbudowana + wspólny profil użytkownika; faza 3: honcho
   user_profile: knowledge/user/USER.md      # w skarbcu: @@KNOWLEDGE_DIR@@/user/USER.md

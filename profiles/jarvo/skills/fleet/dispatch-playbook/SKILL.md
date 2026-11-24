@@ -20,8 +20,8 @@ metadata:
 Używaj, gdy intake zdecydował: **zlecenie jednego agenta** albo **misja**.
 
 ## Zasady nadrzędne
-1. **Najwęższy agent, który w pełni pokrywa zadanie** (skill `roster`). Nikt nie pasuje →
-   `jarvo-reka` z adnotacją „poza snajperami” albo zapytaj użytkownika, czy stworzyć specjalizację.
+1. **Najwęższy agent, który w pełni pokrywa zadanie** (skill `roster`). Nikt nie pasuje → robisz sam (dokumenty,
+   konwersje i prototypy: skille `dokumenty`, `szybki-prototyp`) albo pytasz użytkownika, czy stworzyć specjalizację.
 2. **Decyzje przekrojowe przed rozdaniem.** Jeśli dwie karty musiałyby wybrać to samo (nazwa, paleta,
    język, format pliku, struktura URL), decydujesz raz i wpisujesz to do **obu** kart.
    Agenci nie widzą kart rodzeństwa.
@@ -86,9 +86,9 @@ kanban_create(
 | Wzorzec | Karty |
 |---|---|
 | **Research → decyzja** | sherlock (`szybki-research`: 10–15 min, raport na jedną stronę, DoD 2–4 punkty, bez tabel „wszystkiego” i CSV; `metoda-sherlocka` tylko, gdy właściciel zamówił pełny albo głęboki research) → Jarvo relacjonuje, pyta o decyzję |
-| **Landing produktu** | sherlock (rynek + słowa kluczowe) → web (landing) ∥ studio (grafiki + posty) ∥ wideo (film, opcjonalnie) → reka (złożenie) |
+| **Landing produktu** | sherlock (rynek + słowa kluczowe) → web (landing) ∥ studio (grafiki + posty) ∥ wideo (film, opcjonalnie) → jarvo (złożenie) |
 | **Audyt + naprawa strony** | web (audyt) → [decyzja użytkownika, co naprawiać] → web (poprawki) |
-| **Kampania** | sherlock (grupa docelowa, konkurencja) → studio (pakiet + brief wideo) → wideo (filmy) → reka (złożenie + kalendarz) |
+| **Kampania** | sherlock (grupa docelowa, konkurencja) → studio (pakiet + brief wideo) → wideo (filmy) → jarvo (złożenie + kalendarz) |
 | **Film** | [sherlock (fakty), gdy film podaje liczby] → wideo (film, warianty, montaż, klipy) |
 | **Wyjaśnij mi filmem** | [sherlock (fakty), gdy tematu nie ma w skarbcu ani w misjach] → wideo (explainer dla Ciebie, 60–90 s, bez publikacji) |
 | **Nowa marka / brand kit** | web (brand z URL) → studio (weryfikacja tonu i wizualiów) |
@@ -98,8 +98,9 @@ kanban_create(
 | **Zadanie na ekranie** | [droga bez ekranu: `web_extract`, sherlock albo web] → robisz sam (`praca-na-ekranie`); dłużej niż kilka minut → karta dla siebie (`assignee="jarvo"`, jedna naraz, jeden ekran); płatność, wysyłka, publikacja: linia ZGODA WŁAŚCICIELA albo prośba do właściciela |
 | **Konto w serwisie** (mail, usługa, klucz API) | robisz sam: rejestracja w Komputerze Jarva albo na telefonie („przez Google/GitHub”, kod SMS z telefonu), hasło w menedżerze haseł przeglądarki, zrzut każdego kroku; CAPTCHA próbujesz sam, nie przejdzie → prośba do właściciela o klik przez VNC. Klucz API: CLI usługi w terminalu (logowanie agenta, np. `instabox login --agent`) prosto do sejfu (`secret-tool`), nigdy do czatu ani pliku; klucz tylko w panelu WWW: klikasz „utwórz”, kopiuje właściciel przez VNC (Komputer ukrywa klucze przed agentem). Film z procesu: → wideo (motion graphic ze zrzutów, 30–45 s, do 15 MB) |
 
-**Karta „złożenie”** (dla misji z ≥2 agentami): `assignee="jarvo-reka"`, `parents` = wszystkie karty merytoryczne,
-cel: jeden pakiet w `@@MISSIONS_DIR@@/<MISJA>/zlozenie/out/` (INDEX.md z opisem i ścieżkami, bez przerabiania treści).
+**Karta „złożenie”** (dla misji z ≥2 agentami): `assignee="jarvo"`, `parents` = wszystkie karty merytoryczne, skill
+`zlozenie-pakietu`; cel: jeden pakiet w `@@MISSIONS_DIR@@/<MISJA>/zlozenie/out/` (INDEX.md z opisem i ścieżkami, bez
+przerabiania treści).
 
 ## Po utworzeniu kart
 1. Zapisz plan w `MISSION.md` (tabela kart: id, agent, zależy od, status) i dopisz misję do `INDEX.md` (skill `mission-ledger`).

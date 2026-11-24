@@ -42,7 +42,7 @@ WAGI = {"kliknieta": (0.2, 0.0), "wyslana": (0.5, 0.0), "ukonczona": (0.3, 0.0),
         "pokazana": (0.0, 0.0)}
 REAKCJE_KLIENTA = ("pokazana", "kliknieta", "odrzucona", "nigdy")
 
-# klucz, agent, (tytuł, powód, tekst do pola) PL i EN; kolejność = kolejność przy remisie (mock V2: web, łowca, ręka)
+# klucz, agent, (tytuł, powód, tekst do pola) PL i EN; kolejność = kolejność przy remisie (mock V2: web, łowca, Jarvo)
 STARTERY = (
     ("strona", "jarvo-web",
      ("Zrób stronę dla mojej firmy", "pierwsza wersja w kilkanaście minut", "Zrób stronę dla mojej firmy: "),
@@ -50,7 +50,7 @@ STARTERY = (
     ("klienci", "jarvo-lowca",
      ("Znajdź nowych klientów w okolicy", "firmy z KRS i CEIDG", "Znajdź nowych klientów w okolicy: "),
      ("Find new customers nearby", "companies from public registers", "Find new customers nearby: ")),
-    ("plik", "jarvo-reka",
+    ("plik", "jarvo",
      ("Zamień plik na PDF albo Word", "wystarczy go przeciągnąć tutaj", "Zamień ten plik na PDF albo Word: "),
      ("Convert a file to PDF or Word", "just drag it here", "Convert this file to PDF or Word: ")),
     ("temat", "jarvo-sherlock",

@@ -13,7 +13,7 @@ from conftest import REPO, load_script
 
 seo = load_script("profiles/jarvo-web/scripts/seo_check.py")
 sources = load_script("profiles/jarvo-sherlock/scripts/sources.py")
-pack = load_script("profiles/jarvo-reka/scripts/pack.py")
+pack = load_script("profiles/jarvo/scripts/pack.py")
 media = load_script("profiles/jarvo-studio/scripts/check_media.py")
 
 GOOD_HTML = """<!doctype html>

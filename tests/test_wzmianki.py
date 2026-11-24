@@ -56,7 +56,7 @@ for (const v of d.wektory) {
     out.push(Wzmianki.parsuj(k.tekst, mapa, { koordynator: v.koordynator || d.koordynator, nazwy }));
   }
 }
-console.log(JSON.stringify({ out, zarezerwowane: [...Wzmianki.ZAREZERWOWANE], zloz: Wzmianki.zloz("ŁÓDŹ Ręka Żółw") }));
+console.log(JSON.stringify({ out, zarezerwowane: [...Wzmianki.ZAREZERWOWANE], zloz: Wzmianki.zloz("ŁÓDŹ Gęś Żółw") }));
 """, encoding="utf-8")
     r = subprocess.run([NODE, str(skrypt), str(REPO / "tests" / "data" / "wzmianki.json")],
                        capture_output=True, text=True, timeout=20)
@@ -65,7 +65,7 @@ console.log(JSON.stringify({ out, zarezerwowane: [...Wzmianki.ZAREZERWOWANE], zl
     oczekiwane = [{k: krok[k] for k in POLA} for v in WEKTORY["wektory"] for krok in (v.get("sekwencja") or [v])]
     assert wynik["out"] == oczekiwane
     assert set(wynik["zarezerwowane"]) == set(wz.ZAREZERWOWANE)
-    assert wynik["zloz"] == wz.zloz("ŁÓDŹ Ręka Żółw") == "lodz reka zolw"
+    assert wynik["zloz"] == wz.zloz("ŁÓDŹ Gęś Żółw") == "lodz ges zolw"
 
 
 def test_agenci_wektorow_to_flota_z_fleet_yaml():
@@ -80,7 +80,6 @@ def test_uchwyty_i_aliasy_floty_jak_w_specyfikacji():
 
     a = {x.name: x for x in fl.load_fleet().active()}
     assert a["jarvo-lowca"].handle == "lowca" and "lowca" in a["jarvo-lowca"].aliasy
-    assert a["jarvo-reka"].aliasy == ["reka", "jarvo-reka"]
     assert a["jarvo-wideo"].aliasy == ["wideo", "jarvo-wideo", "wideograf"]
     assert a["jarvo-mobile"].aliasy == ["mobile", "jarvo-mobile", "aplikacje"]
     assert all(re.fullmatch(r"[a-z][a-z0-9]{1,15}", x.handle) for x in a.values())
@@ -89,7 +88,7 @@ def test_uchwyty_i_aliasy_floty_jak_w_specyfikacji():
 def test_zloz_i_slowa_zarezerwowane_wspolne_z_fleetlib():
     import fleetlib as fl
 
-    for s in ("Łowca", "Ręka", "ŻÓŁW", "Wideograf", "ﬁ", "café"):
+    for s in ("Łowca", "Gęś", "ŻÓŁW", "Wideograf", "ﬁ", "café"):
         assert fl.zloz(s) == wz.zloz(s)
     assert fl.UCHWYTY_ZAREZERWOWANE == wz.ZAREZERWOWANE
     assert fl.UCHWYT_RE.pattern == wz.UCHWYT_RE.pattern

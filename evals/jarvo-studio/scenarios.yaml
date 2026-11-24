@@ -88,7 +88,7 @@ scenarios:
     input: "Złóż wyniki wszystkich agentów z misji w jeden PDF."
     expect:
       should:
-        - "wskazuje jarvo-reka (złożenie pakietu)"
+        - "wskazuje jarvo (złożenie pakietu)"
 
   - id: studio-skarbiec
     type: protocol

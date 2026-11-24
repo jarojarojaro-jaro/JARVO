@@ -127,6 +127,7 @@ class Wpis:
     przed_tura: list[str] = field(default_factory=list)
     wiedza: dict = field(default_factory=dict)
     tozsamosc: dict = field(default_factory=dict)
+    sekrety: dict[str, Path] = field(default_factory=dict)   # zmienna → plik KEY=wartość (konfig/…) dla procesu omp
     blad: str = ""
 
     def __getattr__(self, nazwa):                 # katalogi skrzynki: w.nowe, w.zrobione, w.bledy, w.tura, w.komendy
@@ -209,6 +210,9 @@ def wpis_z(klucz: str, surowy: dict, dom: Path | None = None) -> Wpis | None:
     w.przed_tura = [_arg(str(a)) for a in panel.get("przed_tura") or [] if isinstance(a, str)]
     w.wiedza = panel["wiedza"] if isinstance(panel.get("wiedza"), dict) else {}
     w.tozsamosc = panel["tozsamosc"] if isinstance(panel.get("tozsamosc"), dict) else {}
+    w.sekrety = {k: p for k, a in (panel.get("sekrety") or {}).items()
+                 if isinstance(a, str) and _NAZWA_ZMIENNEJ.fullmatch(str(k)) and (p := bezpieczna(a, dom))} \
+        if isinstance(panel.get("sekrety"), dict) else {}
     w.sesja = str(panel.get("sesja") or "")
     if not KLUCZ_RE.fullmatch(klucz):
         w.blad = w.blad or "zły klucz"
@@ -220,6 +224,31 @@ def wpis_z(klucz: str, surowy: dict, dom: Path | None = None) -> Wpis | None:
     if w.skrzynka is None or w.sesje is None:
         w.blad = w.blad or "niebezpieczna ścieżka"
     return w
+
+
+_NAZWA_ZMIENNEJ = re.compile(r"[A-Z_][A-Z0-9_]*")
+_ZMIENNA_RE = re.compile(r"^\s*(?:export\s+)?([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$")
+
+
+def env_sekretow(w: Wpis) -> dict[str, str]:
+    """Zmienne z `panel.sekrety` wpisu ({"NUMES_API_KEY": "<plik KEY=wartość>"}) dla procesu omp sesji: agent sesji
+    dostaje klucz w środowisku (`$NUMES_API_KEY`), a pliku z kluczem nie otwiera. Z pliku idzie tylko nazwana zmienna
+    (reszta pliku, np. e-mail konta, zostaje). Czyta tylko program; wartości nie idą do logów ani błędów."""
+    env: dict[str, str] = {}
+    for nazwa, plik in (getattr(w, "sekrety", None) or {}).items():
+        try:
+            linie = plik.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError):
+            continue
+        for linia in linie:
+            m = _ZMIENNA_RE.match(linia)
+            if not m or m.group(1) != nazwa:
+                continue
+            wartosc = m.group(2)
+            if len(wartosc) >= 2 and wartosc[0] == wartosc[-1] and wartosc[0] in "\"'":
+                wartosc = wartosc[1:-1]
+            env[nazwa] = wartosc
+    return env
 
 
 def wpisy(dane: Path, dom: Path | None = None) -> dict[str, Wpis]:

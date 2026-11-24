@@ -396,8 +396,8 @@ def dalej_biznesowy(name: str, slug: str, marka: str, n: Path | None) -> str:
         kroki = [
             "  2. fleet.yaml: description, rola + en (title, rola, description), oddaj_gdy, emoji, hq_room; "
             "komputer: true tylko, gdy agent pracuje na Komputerze Jarva.",
-            "  3. Wzorzec misji Jarva (profiles/jarvo/skills/fleet/dispatch-playbook/references/patterns.md) i skille "
-            "agenta w profiles/jarvo-reka/config.yaml (skills.external_dirs).",
+            "  3. Wzorzec misji Jarva (profiles/jarvo/skills/fleet/dispatch-playbook/references/patterns.md) i linia "
+            "`oddaj_gdy` w fleet.yaml (roster Jarva).",
             f"  4. Para red-team: zimna wysyłka i obca wiedza dla {name} w security/redteam/promptfooconfig.yaml "
             "+ wiersz w security/redteam/README.md.",
             "  5. Tabele w docs: README.md (flota), docs/FLEET.md (sekcja agenta), "
@@ -408,7 +408,7 @@ def dalej_biznesowy(name: str, slug: str, marka: str, n: Path | None) -> str:
         kroki = [
             f"  2. {n}/fleet.yaml: description, rola + en (title, rola, description), oddaj_gdy, emoji, hq_room; "
             "komputer: true tylko, gdy agent pracuje na Komputerze Jarva.",
-            f"  3. Wzorzec misji Jarva z `{name}` w {n}/wzorce.md (skille dla Ręki dopisuje build).",
+            f"  3. Wzorzec misji Jarva z `{name}` w {n}/wzorce.md.",
             f"  4. Para red-team: zimna wysyłka i obca wiedza dla {name} w {n}/security/redteam/testy.yaml.",
             "  5. README i CHANGELOG profilu (dokumenty publicznego repo opisują tylko agentów repo).",
             f"  6. `python3 scripts/validate.py --nakladka {n}`; status → active (Definition of Ready, "
@@ -511,7 +511,7 @@ def main(argv: list[str] | None = None) -> int:
 
     plik_floty = n / "fleet.yaml" if n is not None else fl.FLEET_FILE
     fleet_text = plik_floty.read_text(encoding="utf-8")
-    oddaj = ("    oddaj_gdy: \"TODO: kiedy Ręka ma oddać zadanie temu agentowi (tabela generowana)\"\n"
+    oddaj = ("    oddaj_gdy: \"TODO: kiedy Jarvo ma oddać zadanie temu agentowi (roster Jarva, tabela generowana)\"\n"
              if args.kind == "specialist" else "")
     marka = (f"    marka: {args.marka}           # agent biznesowy: w skarbcu widzi tylko brands/{args.marka}/ i swoje "
              "(docs/FLEET.md „Agenci biznesowi”)\n" if args.marka else "")

@@ -99,7 +99,7 @@ WE_WSZYSTKICH = ("jarvo-wiedza",)                   # dostawca pamięci każdego
 TYLKO_PANEL = ("jarvo-hq",)                         # wtyczka samego panelu: bez dowiązań w profilach i restartu bramy
 PANEL = ("jarvo-hq", "jarvo-wiedza")                # ich odcisk decyduje o restarcie panelu
 # agenci usunięci z fleet.yaml: ich stary katalog profilu w <dane>/profiles nie może zostać profilem bramy
-USUNIETE_PROFILE = ("jarvo-operator",)              # decyzja właściciela 2026-11-14: wszystko robi Jarvo
+USUNIETE_PROFILE = ("jarvo-operator", "jarvo-reka")  # decyzje właściciela 2026-11-14 i 2026-11-24: wszystko robi Jarvo
 USUNIETE = ".usuniete"                              # <dane>/profiles/.usuniete/<agent>-<data>
 RUTYNY = ("jarvo-patrol", "jarvo-daily-brief", "jarvo-weekly-review", "jarvo-knowledge-freshness", "jarvo-new-versions")
 ZNACZNIK_PANELU = ".odcisk-panelu"

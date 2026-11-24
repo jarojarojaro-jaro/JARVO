@@ -1,15 +1,15 @@
 ---
 name: szybki-prototyp
 description: "Mały skrypt/narzędzie/automat: działa, sprawdzony, opisany."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
     tags: [prototype, scripting, automation]
-    related_skills: [kiedy-oddac-snajperowi]
+    related_skills: [dokumenty]
   jarvo:
-    agent: jarvo-reka
+    agent: jarvo
     autonomy: A1
     reviewed: "2026-09-26"
 ---
@@ -24,4 +24,4 @@ Dla „zrób mi coś, co…”: jednorazowe narzędzie, przeliczenie, automat, a
 3. **README w 5 liniach:** co robi, jak uruchomić, wejście, wyjście, ograniczenia.
 4. **Bez sekretów w kodzie**; klucze tylko przez zmienne środowiskowe.
 5. **Bez akcji zewnętrznych** (wysyłki, zapisy do cudzych systemów) bez zgody (A2); prototyp domyślnie działa „na sucho”.
-6. Gdy prototyp ma stać się czymś stałym (strona, rutyna, produkt), zaproponuj to Jarvowi jako osobne zlecenie.
+6. Gdy prototyp ma stać się czymś stałym (strona, rutyna, produkt), proponuję to właścicielowi jako osobne zlecenie.

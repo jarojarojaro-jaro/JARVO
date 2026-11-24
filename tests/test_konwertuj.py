@@ -428,7 +428,7 @@ def test_skill_jest_u_calej_floty():
     lock = fl.load_lock()["agents"]
     # skrypt wymaga terminala: ma go każdy agent floty (Jarvo także, od 2026-11-14 z ekranem)
     agenci = [a.name for a in fl.load_fleet().active()]
-    assert len(agenci) >= 9
+    assert len(agenci) >= 8
     for a in agenci:
         wpisy = [x for x in lock.get(a) or [] if x.get("path") == "shared/skills/konwersja-plikow"]
         assert wpisy == [{"source": "jarvo", "path": "shared/skills/konwersja-plikow", "dest": "pliki/konwersja-plikow"}], a
@@ -1483,10 +1483,10 @@ def test_obraz_yml_probuje_skryptow_w_zbudowanym_obrazie():
         assert kawalek in run, kawalek
 
 
-# --------------------------------------------------------------------------- jarvo-reka: to_pdf.py i pack.py natywnie (F05)
+# --------------------------------------------------------------------------- jarvo: to_pdf.py i pack.py natywnie (F05)
 
-TO_PDF = load_script("profiles/jarvo-reka/scripts/to_pdf.py")
-PACK = load_script("profiles/jarvo-reka/scripts/pack.py")
+TO_PDF = load_script("profiles/jarvo/scripts/to_pdf.py")
+PACK = load_script("profiles/jarvo/scripts/pack.py")
 
 
 def test_to_pdf_natywnie_bez_okna_pusty_katalog_danych_i_piaskownica(monkeypatch, tmp_path):

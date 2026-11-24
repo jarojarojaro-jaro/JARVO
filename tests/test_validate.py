@@ -159,12 +159,12 @@ def test_sekrety_wykryte_tez_w_repo_pod_katalogiem_claude(repo_copy, tmp_path, m
 
 
 def test_too_few_evals(repo_copy):
-    path = repo_copy / "evals/jarvo-reka/scenarios.yaml"
+    path = repo_copy / "evals/jarvo-web/scenarios.yaml"
     data = fl.load_yaml(path)
     data["scenarios"] = data["scenarios"][:4]
     path.write_text(fl.dump_yaml(data), encoding="utf-8")
     report = validate.run()
-    assert errors_matching(report, r"jarvo-reka: 4 scenariuszy evals < 10")
+    assert errors_matching(report, r"jarvo-web: 4 scenariuszy evals < 10")
 
 
 def test_unpinned_lock_source(repo_copy):
@@ -258,8 +258,8 @@ def test_docs_handle_column_must_match_fleet(repo_copy):
 
 def test_docs_must_list_whole_fleet(repo_copy):
     readme = repo_copy / "README.md"
-    readme.write_text(readme.read_text(encoding="utf-8").replace("`jarvo-reka`", "jarvo-reka"), encoding="utf-8")
-    assert errors_matching(validate.run(), r"README.md: brak agenta `jarvo-reka`")
+    readme.write_text(readme.read_text(encoding="utf-8").replace("`jarvo-web`", "jarvo-web"), encoding="utf-8")
+    assert errors_matching(validate.run(), r"README.md: brak agenta `jarvo-web`")
 
 
 def test_docs_broken_link_and_anchor(repo_copy):
@@ -271,13 +271,6 @@ def test_docs_broken_link_and_anchor(repo_copy):
     assert not errors_matching(report, r"6-roadmapa")
 
 
-def test_generalist_must_see_every_specialist(repo_copy):
-    cfg = repo_copy / "profiles/jarvo-reka/config.yaml"
-    cfg.write_text(cfg.read_text(encoding="utf-8").replace('    - "@@BUILD_DIR@@/profiles/jarvo-ads/skills"\n', ""),
-                   encoding="utf-8")
-    assert errors_matching(validate.run(), r"jarvo-reka: skills.external_dirs bez skilli jarvo-ads")
-
-
 # ---------------------------------------------------------------- routing: nowy agent nie może być „niewidzialny”
 
 def test_specialist_without_handoff_line(repo_copy):
@@ -286,13 +279,6 @@ def test_specialist_without_handoff_line(repo_copy):
     linia = next(l for l in tekst.splitlines() if l.strip().startswith("oddaj_gdy: \"szukanie klientów"))
     fy.write_text(tekst.replace(linia + "\n", ""), encoding="utf-8")
     assert errors_matching(validate.run(), r"jarvo-lowca: brak `oddaj_gdy`")
-
-
-def test_generalist_handoff_table_must_be_generated(repo_copy):
-    sk = repo_copy / "profiles/jarvo-reka/skills/reka/kiedy-oddac-snajperowi/SKILL.md"
-    sk.write_text(sk.read_text(encoding="utf-8").replace(fl.ODDAJ_MARKER, "| Sygnał | Agent |\n|---|---|\n| strona | `jarvo-web` |"),
-                  encoding="utf-8")
-    assert errors_matching(validate.run(), r"jarvo-reka: żaden skill nie ma znacznika")
 
 
 def test_specialist_missing_from_dispatch_patterns(repo_copy):

@@ -874,7 +874,7 @@ def test_huby_agentow_tylko_gdy_pytanie_nazywa_agenta(srodowisko):
         assert any(t["sciezka"] == "agenci/jarvo-web/_hub-web" for t in w.notatki_przypomnienia(ix, "co umie Web: strony SEO nowa strona"))
     finally:
         ix.zamknij()
-    assert w.hub_agenta_nazwany("agenci/jarvo-reka/_hub-ręka", {"co", "robi", "reka"})
+    assert w.hub_agenta_nazwany("agenci/jarvo-wideo/_hub-wideograf", {"co", "robi", "wideograf"})
     assert w.hub_agenta_nazwany("agenci/jarvo-lowca/_hub-łowca", {"jarvo", "lowca"})
     assert not w.hub_agenta_nazwany("agenci/jarvo-web/_hub-web", {"strona", "seo"})
     assert "_hub-web" not in p.prefetch("strony SEO nowa strona")

@@ -177,12 +177,14 @@ def test_orchestrator_roster_and_rubrics(built):
     assert "metoda-sherlocka" in roster     # pin_skills Sherlocka
 
 
-def test_generalist_sees_specialist_skills(built):
+def test_jarvo_has_warsztat_skills_and_scripts(built):
     _, out = built
-    cfg = fl.load_yaml(out / "jarvo-reka" / "config.yaml")
-    dirs = cfg["skills"]["external_dirs"]
-    assert "/opt/jarvo/build/profiles/jarvo-web/skills" in dirs
-    assert (out / "jarvo-reka" / ".no-bundled-skills").exists() is False
+    jarvo = out / "jarvo"
+    for skill in ("dokumenty", "szybki-prototyp", "zlozenie-pakietu"):
+        assert (jarvo / f"skills/warsztat/{skill}/SKILL.md").is_file(), skill
+    assert (jarvo / "skills/warsztat/DESCRIPTION.md").is_file()
+    for skrypt in ("to_pdf.py", "pack.py"):
+        assert (jarvo / "scripts" / skrypt).is_file(), skrypt
 
 
 def test_category_descriptions(built):
@@ -422,16 +424,6 @@ def test_repo_do_skarbca_zasady_zmiany_materialy_zrodla(built, tmp_path):
     assert "| [agency-agents](https://github.com/msitarzewski/agency-agents) | odlozone |" in zrodla
 
 
-def test_generalist_handoff_table_covers_every_specialist(built):
-    fleet, out = built
-    tekst = (out / "jarvo-reka/skills/reka/kiedy-oddac-snajperowi/SKILL.md").read_text(encoding="utf-8")
-    assert fl.ODDAJ_MARKER not in tekst
-    for a in fleet.active():
-        if a.kind == "specialist":
-            assert f"`{a.name}`" in tekst and a.oddaj_gdy in tekst, a.name
-    assert "`jarvo-reka`" not in tekst and f"`{fleet.orchestrator}` (misja)" in tekst
-
-
 def test_skills_without_required_service_are_left_out(built):
     fleet, out = built
     ads = out / "jarvo-ads"
@@ -584,9 +576,8 @@ def test_natywny_windows_sciezki_i_wartosci_per_system(natywny_win):
         assert cfg["tts"]["providers"]["matcha"]["command"] == (
             f'"{WIN_PROGRAM}/bin-floty/jarvo-tts.exe" --plik {{input_path}} -o {{output_path}} --glos {{voice}}'), a.name
         assert "Układ natywny (windows)" in (profile / a.name / "config.yaml").read_text(encoding="utf-8").splitlines()[1]
-    reka = fl.load_yaml(profile / "jarvo-reka" / "config.yaml")
-    assert "D:/JarvoTest/proba-build/Michał Żółć/build/profiles/jarvo-web/skills" in reka["skills"]["external_dirs"]
-    assert "Michał Żółć/dane/jarvo/missions." in reka["approvals"]["smart_policy"].replace("\n", " ")
+    jarvo = fl.load_yaml(profile / "jarvo" / "config.yaml")
+    assert f"{WIN_DANE}/jarvo/workspaces" in jarvo["approvals"]["smart_policy"].replace("\n", " ")
     host = fl.load_yaml(natywny_win / "host" / "config.yaml")
     # jarvo-sesje także w hoście (wiadomości bez trasy profilu); dostawca pamięci jarvo-wiedza ładuje się dopiero przy
     # pierwszym agencie, więc hak nie może w nim siedzieć (14.11 pierwsza wiadomość po restarcie trafiła do Jarva)
@@ -762,10 +753,10 @@ def test_sciezka_z_ukosnikiem_w_cudzyslowie_lamie_yaml_a_build_daje_ukosnik_w_pr
     assert sciezka == WIN_DANE and fl.loads_yaml(f'cwd: "{sciezka}"') == {"cwd": WIN_DANE}
     fleet = fl.load_fleet()
     u = build.Uklad(nazwa="natywny", system="windows", dane=sciezka)
-    tokeny = build.base_tokens(fleet, fleet.agent("jarvo-reka"), "D:/b", ENV, u)
-    cfg = fl.loads_yaml(build.render_tokens((fleet.agent("jarvo-reka").dir / "config.yaml").read_text(encoding="utf-8"),
+    tokeny = build.base_tokens(fleet, fleet.agent("jarvo-web"), "D:/b", ENV, u)
+    cfg = fl.loads_yaml(build.render_tokens((fleet.agent("jarvo-web").dir / "config.yaml").read_text(encoding="utf-8"),
                                             tokeny))
-    assert cfg["terminal"]["cwd"] == f"{WIN_DANE}/jarvo/workspaces/jarvo-reka"
+    assert cfg["terminal"]["cwd"] == f"{WIN_DANE}/jarvo/workspaces/jarvo-web"
     inny = "linux" if build.system_tego_komputera() == "macos" else "macos"     # ścieżka względna dla obcego systemu
     for zla, system in (('D:/a"b', "windows"), ("/home/x/$HOME", "linux"), ("/home/a\\b", "linux"), ("dane", inny)):
         with pytest.raises(SystemExit):

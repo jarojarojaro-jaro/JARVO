@@ -171,7 +171,7 @@ Obowiązki bazowe z kroku 4 i test wartości z kroku 4c obowiązują w każdej r
 - w `out/` żadnych haseł, numerów kart, kodów ani danych osób ponad kolumny z karty; nic nie zalogowane,
   zapłacone ani wysłane przez agenta.
 
-**jarvo-reka (złożenie/dokumenty):**
+**jarvo (karta „złożenie” i dokumenty, które Jarvo zrobił sam):**
 - kompletność pakietu wobec kart-rodziców, działające ścieżki, spójny INDEX.md, nic nie zgubione i nic nie przeinaczone,
 - wylosuj 3 liczby z INDEX.md i porównaj z plikami rodziców; zestaw twierdzenia o firmie ze wszystkich kart (adres,
   godziny, oferta, „robimy sami”) i sprawdź, czy się nie wykluczają: przemilczana sprzeczność blokuje,

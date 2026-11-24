@@ -67,9 +67,11 @@ OBRAZY = tuple(MIME)
 POTWIERDZENIA = ("Zasada potwierdzeń: wdrożenie (jarvo update, restart bramy), publikacja na żywe strony, sudo, "
                  "rzeczy płatne i kasowanie danych = najpierw plan w odpowiedzi, na jego końcu znacznik "
                  "[[czeka-na-tak]], i stop. Wykonujesz dopiero po odpowiedzi „tak” w następnej wiadomości.")
-# 23.11 Kernel brał dopiski dopiero między krokami testu i odpisał „zapisałem 9 linków”, bez wniosków
-WSTEP_DOPISKU = ("Dopisek od właściciela w trakcie Twojej pracy. Zajmij się nim od razu (długie rzeczy w tle) "
-                 "i daj mu w odpowiedzi punkt z wnioskiem.")
+# 23.11 Kernel brał dopiski dopiero między krokami testu i odpisał „zapisałem 9 linków”, bez wniosków; 24.11 dopisek
+# doszedł w 6 s, ale właściciel czekał 50 min na koniec tury, zanim zobaczył, że agent go przyjął
+WSTEP_DOPISKU = ("Dopisek od właściciela w trakcie Twojej pracy: zanim zrobisz następny krok, napisz mu jedno zdanie, "
+                 "co z nim robisz (widzi to od razu w panelu), potem zmień plan według dopisku, a w odpowiedzi daj "
+                 "punkt z wnioskiem.")
 
 
 def _modul_hq(nazwa: str, plik: str):
@@ -338,7 +340,7 @@ class Rpc:
         cwd = w.cwd if w.cwd and w.cwd.is_dir() else Path.home()
         self.proc = subprocess.Popen(cmd, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                      stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
-                                     env=dict(os.environ, OMP_NUM_THREADS="2"))
+                                     env={**os.environ, **rdzen.env_sekretow(w), "OMP_NUM_THREADS": "2"})
         self.pid, self.od = self.proc.pid, time.time()
         self.zdarzenia: queue.Queue = queue.Queue()
         self._stderr: collections.deque[str] = collections.deque(maxlen=40)
@@ -1091,7 +1093,7 @@ def terminal(w, reszta: list[str], po_wyjsciu=uruchom_skrzynke_w_tle, korzen: Pa
         tozsamosc(w)                               # ta sama stała część promptu co w skrzynce (bez nowego procesu)
         mozg_arg, mozg_env = mozg_terminalu(w, korzen)
         proc = subprocess.Popen(polecenie(w, *mozg_arg, *reszta), cwd=cwd,
-                                env={**os.environ, **mozg_env} if mozg_env else None)
+                                env={**os.environ, **rdzen.env_sekretow(w), **mozg_env})
         rdzen.zapisz_stan(w, terminal={"pid": os.getpid(), "omp": proc.pid, "od": time.time()})
         try:
             while True:

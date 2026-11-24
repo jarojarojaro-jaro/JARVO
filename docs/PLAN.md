@@ -65,9 +65,10 @@ do Ciebie tylko prawdziwe decyzje. Stan żyje na dysku, więc wszystko przeżywa
 
 Zasady:
 1. **Specjalista = snajper.** Jedna dziedzina, własne skille, własna wiedza, własna pamięć.
-   Bez katalogu skilli Hermesa: dystrybucja snajpera ma znacznik `.no-bundled-skills` (wyjątek: generalista
-   `jarvo-reka`), a toolsety ograniczone do tego, czego dziedzina potrzebuje. Czego nie umie, tego nie robi. Oddaje zadanie szefowi.
-2. **Jarvo = szef floty (orkiestrator).** Sam nie wykonuje pracy dziedzinowej. Robi cztery rzeczy:
+   Bez katalogu skilli Hermesa: dystrybucja snajpera ma znacznik `.no-bundled-skills`, a toolsety ograniczone
+   do tego, czego dziedzina potrzebuje. Czego nie umie, tego nie robi. Oddaje zadanie szefowi.
+2. **Jarvo = szef floty (orkiestrator).** Sam nie wykonuje pracy dziedzinowej snajperów; szybkie sprawy, dokumenty,
+   prototypy i złożenie pakietu końcowego misji robi sam (skille `warsztat/`). Jako szef robi cztery rzeczy:
    - **intake:** rozumie, czego chcesz, dopytuje tylko o prawdziwe decyzje,
    - **dispatch:** rozbija cel na karty kanbana i przypisuje je właściwym snajperom,
    - **judge:** każdy wynik wraca w statusie `review`, a Jarvo go ocenia według kryteriów
@@ -89,19 +90,19 @@ Zasady:
                           │  kanban (orkiestrator)       │     zleca specjalistom
                           └──────────────┬───────────────┘
                                          │ kanban_create / delegate_task
-        ┌─────────────┬─────────────┬────┴────────┬─────────────┬─────────────┬─────────────┬─────────────┐
-        ▼             ▼             ▼             ▼             ▼             ▼             ▼             ▼
- jarvo-sherlock   jarvo-web   jarvo-studio   jarvo-wideo    jarvo-ads   jarvo-lowca  jarvo-mobile    jarvo-reka
-   (research)     (strony)      (kreacja)      (wideo)      (reklamy)     (leady)    (aplikacje)  (prawa ręka)
-  SOUL + skille SOUL + skille SOUL + skille SOUL + skille SOUL + skille SOUL + skille SOUL + skille SOUL + skille
-  własna pamięć własna pamięć własna pamięć własna pamięć własna pamięć własna pamięć własna pamięć własna pamięć
-        ▲             ▲             ▲             ▲             ▲             ▲             ▲             ▲
-        └─────────────┴───────────────── rozmowa bezpośrednia ──────────────┴─────────────┴─────────────┘
+        ┌─────────────┬─────────────┬────┴────────┬─────────────┬─────────────┬─────────────┐
+        ▼             ▼             ▼             ▼             ▼             ▼             ▼
+ jarvo-sherlock   jarvo-web   jarvo-studio   jarvo-wideo    jarvo-ads   jarvo-lowca  jarvo-mobile
+   (research)     (strony)      (kreacja)      (wideo)      (reklamy)     (leady)    (aplikacje)
+  SOUL + skille SOUL + skille SOUL + skille SOUL + skille SOUL + skille SOUL + skille SOUL + skille
+  własna pamięć własna pamięć własna pamięć własna pamięć własna pamięć własna pamięć własna pamięć
+        ▲             ▲             ▲             ▲             ▲             ▲             ▲
+        └─────────────┴───────────────── rozmowa bezpośrednia ──────────────┴─────────────┘
                (alias CLI, Bot Chat w desktopie, własny temat na Telegramie)
 
   Wspólne warstwy (dla wszystkich profili):
    • pamięć o Tobie    → MVP: USER.md + pamięć Jarva; później Honcho (wspólny user peer)
-   • skille wspólne    → tylko wybrane, z repo (`shared/skills/`, np. `graf-kodu` u Weba i Ręki);
+   • skille wspólne    → tylko wybrane, z repo (`shared/skills/`, np. `graf-kodu` u Weba);
                          poza tym każdy snajper ma wyłącznie swoje
    • tablica zadań     → /opt/data/kanban.db (HERMES_HOME hosta, współdzielona przez profile)
 ```
@@ -224,7 +225,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ⬜ Zasady prywatności: co gdzie leży, co nigdy nie opuszcza serwera.
 
 ### Faza 4: Reszta floty v1, potem kolejni specjaliści
-- ✅ `jarvo-web`, `jarvo-studio`, `jarvo-reka` według kontraktu: SOUL, workflowy, skrypty, rubryki, evals.
+- ✅ `jarvo-web`, `jarvo-studio` według kontraktu: SOUL, workflowy, skrypty, rubryki, evals.
 - ✅ `jarvo-wideo` (Wideograf): 18 skilli, pętla krytyki (7 osi), maskotka, clipmaker (rolki z długich nagrań), demo strony (nagranie z kursorem i napisami kroków), zasada tempa (`krytyka.py tempo`), film z kodu jako projekt edytora (`projekt.py z-kodu`), 32 scenariusze evals.
 - 🟡 `jarvo-ads` (reklamy Meta i Google): SOUL, 11 skilli, skrypty, rubryka, 14 scenariuszy evals; bez kluczy: kampania jako paczka, publikujesz Ty ([ADS.md](ADS.md)).
 - 🟡 Clipmaker Wideografa: długie nagranie → edytowalne rolki (kadr z focusem, napisy karaoke, `klipy.py`); kroki 1–4 gotowe, krok 5: test na prawdziwym nagraniu ([KLIPY.md](KLIPY.md)).
@@ -233,7 +234,7 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
 - ✅ Zapasowa przeglądarka Camoufox dla Łowcy i Sherlocka (skill `ostrozna-przegladarka`): jedna próba po odmowie strony, robots.txt i limity w skrypcie; serwisy za Cloudflare zwykle odmawiają dalej ([TOOLBOX.md](TOOLBOX.md#łowca-i-sherlock-skill-ostrozna-przegladarka)).
 - ⬜ Integracje MCP per agent (kalendarz, mail, notatki, dysk): zależą od aplikacji, których używasz.
 - ⬜ Dogfooding: tydzień pracy każdego agenta na prawdziwych zadaniach, poprawki promptów i skilli.
-- ⬜ Test floty: „wypuść landing nowego produktu” (sherlock → web + studio → reka, Jarvo ocenia).
+- ⬜ Test floty: „wypuść landing nowego produktu” (sherlock → web + studio → złożenie u Jarva, Jarvo ocenia).
 - 🟡 **Twórca aplikacji** `jarvo-mobile` (aplikacje mobilne w Expo od pomysłu do sklepu: darmowy audyt mobilny, prototyp
   na telefonie, testy na Androidzie i w symulatorze iOS, bramka aplikacji, 44-punktowa lista kontrolna sklepów, zrzuty,
   obsługa odrzuceń, aplikacja ze strony firmy, utrzymanie): projekt zaakceptowany 2026-10-01; etapy 1, 2, 4 i 6 gotowe
@@ -247,8 +248,8 @@ z prawdziwymi modelami i Telegramem · ⬜ do zrobienia.
   K6 (Ręce: Twój komputer z Linuksem, macOS albo Windows, `jarvo komputer rece on`, profil rąk `jarvo-ekran`) w kodzie,
   przed pierwszą próbą na żywo z prawdziwym sterownikiem; K4 (Ekran w HQ: podgląd, Przejmij, Oddaj, Zatrzymaj) i K5
   (terminal i serwery) w kolejce.
-- 🟡 Dopracowanie słabszych agentów (Łowca, Ads, Ręka, Sherlock, Studio) i audyt zgodności (cookies, zgody, Omnibus)
-  jako skill Weba: plan w [ROZWOJ-FLOTY.md](ROZWOJ-FLOTY.md); naprawy z §3 (ocena leadów, tabela Ręki, martwe ścieżki Ads)
+- 🟡 Dopracowanie słabszych agentów (Łowca, Ads, Sherlock, Studio) i audyt zgodności (cookies, zgody, Omnibus)
+  jako skill Weba: plan w [ROZWOJ-FLOTY.md](ROZWOJ-FLOTY.md); naprawy z §3 (ocena leadów, tabela „komu oddać”, martwe ścieżki Ads)
   zrobione 2026-10-01. Nowi specjaliści: na razie żadni (dwie rundy propozycji odłożone, [ROZWOJ-FLOTY.md](ROZWOJ-FLOTY.md) §6).
 
 ### Faza 5: Automatyzacje i rój
@@ -298,11 +299,11 @@ Wake word, Home Assistant, aplikacja mobilna, kolejne specjalizacje…
   Uwaga: OmniParser w Perception jest na **AGPL-3.0** (tylko użytek prywatny, bez udostępniania innym).
   Sam odczyt tekstu z pikseli flota już ma: wspólny skill `odczyt-ekranu` (Indra OCR, 2026-10-17) daje tekst
   i ramkę napisu ze zrzutu (`ocr.py --szukaj`), więc z Perception zostałoby tylko rozpoznawanie ikon i przycisków.
-  Kandydat: Ręka z własnym pulpitem XFCE w kontenerze uruchamianym na żądanie (zmierzyć RAM na VPS 8 GB),
+  Kandydat: osobny pulpit XFCE w kontenerze uruchamianym na żądanie (zmierzyć RAM na VPS 8 GB),
   sterowanie Twoim Windowsem tylko za zgodą (A2). Chmura Cua Fleets jest płatna: pomijamy.
 - **„Drugi mózg” (analiza 8 repo, 2026-09-28):** Jarvo działa na Hermesie, który już ma pamięć, `session_search`,
   kanban z zależnościami i dostawców pamięci (w tym mem0), więc bierzemy tylko to, czego brak.
-  - **Wdrożone:** `DeusData/codebase-memory-mcp` 0.11.0 (MIT) jako skill `kod/graf-kodu` u Weba i Ręki, w trybie
+  - **Wdrożone:** `DeusData/codebase-memory-mcp` 0.11.0 (MIT) jako skill `kod/graf-kodu` u Weba, w trybie
     poleceń (nie MCP: opisy 17 narzędzi nie jadą w każdym zapytaniu), pobierany przy pierwszym użyciu z SHA-256
     (program 300 MB, więc nie w obrazie), bez obserwatora i UI. Test na repo Jarvo: indeks ~7 s, pytanie ~5 s;
     trafność dobra przy zwykłych importach, błędy przy tych samych nazwach w różnych modułach i importach
@@ -343,7 +344,7 @@ Osiem profili. Pełna specyfikacja (zakres, skille, narzędzia, rubryki sędzieg
 
 | Profil | Rola |
 |---|---|
-| `jarvo` | Jarvo, szef floty: przyjmuje zlecenia, rozdziela, ocenia, raportuje |
+| `jarvo` | Jarvo, szef floty: przyjmuje zlecenia, rozdziela, ocenia, raportuje; sam robi szybkie sprawy, dokumenty, prototypy i pakiet końcowy misji |
 | `jarvo-web` | Web Senior Dev: strony od faviconu po SEO, uczy się marki |
 | `jarvo-sherlock` | Researcher-detektyw: wiele źródeł, weryfikacja faktów |
 | `jarvo-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media |
@@ -351,7 +352,6 @@ Osiem profili. Pełna specyfikacja (zakres, skille, narzędzia, rubryki sędzieg
 | `jarvo-ads` | Specjalista Ads: Meta i Google Ads, kampanie, testy A/B/C, raporty; wydaje tylko w kopercie z kodem |
 | `jarvo-lowca` | Łowca leadów: sygnały zakupowe z oficjalnych źródeł → ranking firm z „dlaczego teraz” i kontaktem; niczego nie wysyła |
 | `jarvo-mobile` | Twórca aplikacji: „natywna czy PWA” z kosztami, darmowy audyt mobilny, aplikacje Expo do App Store i Google Play |
-| `jarvo-reka` | Prawa ręka: generalista, który wykonuje i ogarnia wszystko |
 
 Kolejni specjaliści dojdą później, każdy według tego samego kontraktu.
 

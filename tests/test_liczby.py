@@ -32,7 +32,7 @@ def kanban(path):
     c.executemany("INSERT INTO tasks (id, title, assignee, status, created_at, completed_at) VALUES (?,?,?,?,?,?)", [
         ("t_web", "Strona", "jarvo-web", "done", NOW - 20 * D, NOW - D),        # poprawka sprzed okna 7 dni
         ("t_sh", "Research", "jarvo-sherlock", "done", NOW - 2 * D, NOW - D),   # przyjęta za 1. razem
-        ("t_sam", "Bez recenzji", "jarvo-reka", "done", NOW - 2 * D, NOW - D),  # nie liczy się jako „za 1. razem”
+        ("t_sam", "Bez recenzji", "jarvo-lowca", "done", NOW - 2 * D, NOW - D),  # nie liczy się jako „za 1. razem”
         ("t_blk", "Czeka", "jarvo-studio", "blocked", NOW - D, None),
         ("t_run", "Cisza", "jarvo-wideo", "running", NOW - D, None),
     ])
@@ -76,7 +76,7 @@ def test_jakosc_liczy_wykonawce_i_poprawki_sprzed_okna(tmp_path):
     w = liczby.policz(dane(tmp_path), NOW, 7)
     assert w["jakosc"]["jarvo-web"] == {"done": 1, "reviews": 2, "first_pass": 0, "changes_requested": 1, "with_changes": 1}
     assert w["jakosc"]["jarvo-sherlock"]["first_pass"] == 1
-    assert w["jakosc"]["jarvo-reka"] == {"done": 1, "reviews": 0, "first_pass": 0, "changes_requested": 0, "with_changes": 0}
+    assert w["jakosc"]["jarvo-lowca"] == {"done": 1, "reviews": 0, "first_pass": 0, "changes_requested": 0, "with_changes": 0}
     assert w["za_1_razem"] == {"przyjete": 1, "zrobione": 3, "procent": 33}
 
 
@@ -101,9 +101,9 @@ def test_hq_liczy_tak_samo_jak_przeglad_tygodnia(tmp_path):
     """HQ widzi poprawkę sprzed 7 dni (wcześniej liczył tylko zdarzenia z okna i kartę bez recenzji jako przyjętą)."""
     board = core.read_board(dane(tmp_path) / "kanban.db", NOW)
     assert core.agent_stats("jarvo-web", board, NOW) == {"done_7d": 1, "first_pass_7d": 0, "changes_7d": 1}
-    assert core.agent_stats("jarvo-reka", board, NOW) == {"done_7d": 1, "first_pass_7d": 0, "changes_7d": 0}
+    assert core.agent_stats("jarvo-lowca", board, NOW) == {"done_7d": 1, "first_pass_7d": 0, "changes_7d": 0}
     w = liczby.policz(tmp_path, NOW, 7)
-    for a in ("jarvo-web", "jarvo-sherlock", "jarvo-reka"):
+    for a in ("jarvo-web", "jarvo-sherlock", "jarvo-lowca"):
         s = core.agent_stats(a, board, NOW)
         assert (s["done_7d"], s["first_pass_7d"]) == (w["jakosc"][a]["done"], w["jakosc"][a]["first_pass"])
 

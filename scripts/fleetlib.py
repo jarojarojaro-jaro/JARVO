@@ -154,7 +154,7 @@ def rdzen_mapy(fleet: "Fleet", sciezki: dict[str, str], agent: str = "") -> str:
     return _modul_mapy().rdzen(repo, nakl, zadania_cron_floty(fleet), sciezki)
 
 
-# tabela „komu oddać” generowana z fleet.yaml (pole `oddaj_gdy` każdego specjalisty): Ręka i każdy, kto routuje
+# tabela „komu oddać” generowana z fleet.yaml (pole `oddaj_gdy` każdego specjalisty): roster Jarva i każdy, kto routuje
 ODDAJ_MARKER = "<!-- Jarvo:ODDAJ -->"
 COMPOSE_FILE = Path(__file__).resolve().parent.parent / "infra" / "docker-compose.yml"
 AGENT_KINDS = {"orchestrator", "specialist", "generalist"}
@@ -275,7 +275,7 @@ class Agent:
     handle: str = ""                          # uchwyt w rozmowie aplikacji (`@web`), docs/FLEET.md „Uchwyty”
     aliasy_extra: list[str] = field(default_factory=list)   # dodatkowe aliasy wzmianki (pole `aliasy` we fleet.yaml)
     en: dict = field(default_factory=dict)   # angielskie title / hq_label / description (HQ po angielsku)
-    oddaj_gdy: str = ""                       # kiedy generalista (Ręka) ma oddać zadanie temu agentowi; tabela generowana
+    oddaj_gdy: str = ""                       # kiedy Jarvo oddaje zadanie temu agentowi (roster w prompcie); tabela generowana
     komputer: bool = False                    # agent z narzędziem computer_use (Komputer Jarva, docs/KOMPUTER.md)
     # agent biznesowy: slug marki = katalog brands/<marka>/ w skarbcu; widzi w wiedzy tylko swoją markę
     # (docs/FLEET.md „Agenci biznesowi”); "" = bez marki, widzi wszystko

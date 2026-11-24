@@ -21,7 +21,7 @@ dźwięk z filmu”, „zmniejsz to zdjęcie”, „połącz te skany w jeden PD
 Robisz to sam, od razu, na tym komputerze: plik nie wychodzi na żaden zewnętrzny konwerter. Skrypt nie zużywa tokenów
 modelu. To samo narzędzie właściciel ma w HQ (Centrala → Konwerter): prostą zamianę może zrobić sam.
 
-Bez narzędzia `terminal` (Jarvo na czacie) nie uruchomisz skryptu: jedna karta dla `jarvo-reka` bez misji
+Bez narzędzia `terminal` (rutyna cron) nie uruchomisz skryptu: zrób to w rozmowie albo jako zadanie dla `jarvo`
 (CEL: plik w formacie X; WEJŚCIA: pełna ścieżka z 📎; DoD: wynik istnieje, oddany linią `MEDIA:`). Właścicielowi
 w HQ możesz też wskazać Centrala → Konwerter: zrobi to sam w kilka sekund.
 

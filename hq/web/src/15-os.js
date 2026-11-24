@@ -306,8 +306,16 @@ const Os = (() => {
       for (const [pid, i] of ostatnia) out[i] = { ...out[i], zatrzymany: stop.get(pid) };
     }
     for (const o of oczekujaceWidoczne(pozycje, oczekujace)) out.push({ rodzaj: "wlasciciel", id: `o:${o.klucz}`, ts: o.ts, tekst: o.tekst, oczekuje: o });
+    // dopiski do trwającej tury (wpis z `dane.dopisane_do` albo przebieg z `dopisany_do` = ten przebieg) stoją na osi
+    // pod wpisem tury, więc żywy dymek idzie pod ostatni z nich: pracę widać pod najnowszą wiadomością właściciela,
+    // nie wyżej w wątku (24.11)
+    const dopiski = new Map();
+    const dopisz = (pid, wid) => { if (pid && wid) dopiski.set(pid, (dopiski.get(pid) || []).concat(wid)); };
+    for (const q of lista) dopisz(q.dopisany_do, q.wpis_id);
+    for (const x of out) if (x.rodzaj === "wlasciciel" && x.wpis && x.wpis.dane) dopisz(x.wpis.dane.dopisane_do, x.id);
     for (const p of zywe) {
       let i = out.findIndex((x) => x.id === p.wpis_id);
+      if (!KONCOWE.has(p.stan)) for (const wid of dopiski.get(p.id) || []) i = Math.max(i, out.findIndex((x) => x.id === wid));
       if (i < 0) { out.push({ rodzaj: "zywy", id: `z:${p.id}`, przebieg: p }); continue; }
       while (i + 1 < out.length && out[i + 1].rodzaj === "zywy") i++;
       out.splice(i + 1, 0, { rodzaj: "zywy", id: `z:${p.id}`, przebieg: p });

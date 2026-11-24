@@ -38,7 +38,7 @@
       ["write_file", "out/RAPORT.md (Lighthouse 98/100/100/100)"], ["kanban_request_review", "Landing gotowy, LCP 1,2 s, CLS 0"],
     ],
     judge_hosting: [
-      ["read_file", "references/rubric-jarvo-reka.md"], ["read_file", "out/porownanie-hostingu.md"],
+      ["read_file", "references/rubric-jarvo-sherlock.md"], ["read_file", "out/porownanie-hostingu.md"],
       ["terminal", "python3 -c 'sprawdza ceny w 3 źródłach'"], ["kanban_complete", "Zatwierdzone: Netlify Free wystarcza"],
     ],
     judge_research: [
@@ -83,9 +83,9 @@
         t_c04: card("t_c04", "Grafiki IG na otwarcie (post 4:5 i story 9:16)", "jarvo-studio", "blocked",
           { block_kind: "needs_input", reason: "Która data otwarcia na grafikach: 12 czy 19 października?", blocked_at: t - 900 }),
         t_c05: card("t_c05", "Film 20 s na Reels z napisami PL", "jarvo-wideo", "running", { started_at: t - 150, script: "film", step: 4 }),
-        t_c06: card("t_c06", "Złożenie pakietu misji", "jarvo-reka", "todo", {}),
-        t_c07: card("t_c07", "Porównanie hostingu dla strony Ziarno", "jarvo-reka", "review", { worker: "jarvo", script: "judge_hosting", step: 1, started_at: t - 60 }),
-        t_c08: card("t_c08", "Cennik PDF dla kawiarni", "jarvo-reka", "done", { completed_at: t - 5000 }),
+        t_c06: card("t_c06", "Złożenie pakietu misji", "jarvo", "todo", {}),
+        t_c07: card("t_c07", "Porównanie hostingu dla strony Ziarno", "jarvo-sherlock", "review", { worker: "jarvo", script: "judge_hosting", step: 1, started_at: t - 60 }),
+        t_c08: card("t_c08", "Cennik PDF dla kawiarni", "jarvo", "done", { completed_at: t - 5000 }),
       },
       activity: {},
       feed: [],
@@ -238,8 +238,8 @@
   const OUTPUTS = {
     "jarvo-web": [["ziarno-hero-375.png", "image", "#6B3E26"], ["ziarno-hero-1440.png", "image", "#8C5B35"], ["RAPORT.md", "text"], ["summary.json", "text"]],
     "jarvo-studio": [["ig-1080x1350.png", "image", "#D96B3C"], ["story-1080x1920.png", "image", "#2F6552"], ["kalendarz.csv", "text"]],
-    "jarvo-sherlock": [["RAPORT.md", "text"], ["zrodla.json", "text"]],
-    "jarvo-reka": [["porownanie-hostingu.md", "text"], ["cennik.pdf", "pdf"]],
+    "jarvo-sherlock": [["RAPORT.md", "text"], ["zrodla.json", "text"], ["porownanie-hostingu.md", "text"]],
+    "jarvo": [["cennik.pdf", "pdf"], ["INDEX.md", "text"]],
     "jarvo-wideo": [["otwarcie-9x16-miniatura.jpg", "image", "#3B2416"], ["SCENARIUSZ.md", "text"], ["film.json", "text"]],
   };
 
@@ -345,7 +345,6 @@ GRANICE: autonomia A1 (bez publikacji i wdrożeń); budżet ~45 min; nie ruszać
       "jarvo-sherlock": [[["web_search", msg.slice(0, 50)]], "Sprawdziłem wstępnie. Mam 3 źródła pierwotne, ale zanim dam liczby, potwierdzę je krzyżowo. Jeśli to ma być pełne śledztwo, zleć je przez Jarva, wtedy dostaniesz raport z cytatami."],
       "jarvo-web": [[["read_file", "knowledge/brands/ziarno/BRAND.md"]], "Mogę to zrobić w ramach landingu Ziarno. Budżety jakości zostają: LCP poniżej 2,5 s, CLS poniżej 0,1, Lighthouse 90+. Wdrożenie na produkcję tylko po Twojej zgodzie."],
       "jarvo-studio": [[["skill_view", "formaty-platform"]], "Zrobię to w formatach 4:5 i 9:16, w kolorach z brand kitu Ziarno. Publikacja dopiero po Twojej akceptacji. Pierwsza wersja:\n\nMEDIA:/opt/data/jarvo/workspaces/jarvo-studio/out/ig-1080x1350.png\nMEDIA:/opt/data/jarvo/workspaces/jarvo-studio/out/kalendarz.csv\n\nPodgląd na żywo: http://localhost:9120/demo/index.html, pliki w `/opt/data/jarvo/workspaces/jarvo-studio/out/ig-1080x1350.png`."],
-      "jarvo-reka": [[["terminal", "python3 -c '…'"]], "Zrobione, wynik w out/. Jeśli to część misji, Jarvo dopnie to do pakietu końcowego."],
       "jarvo-wideo": [[["skill_view", "krotki-film"]], "Zrobię to jako reels 9:16: hook do 2 s, polski lektor, napisy karaoke i muzyka pod głosem. Najpierw szkic do oceny rytmu, potem finał i kontrola jakości. Nic nie publikuję bez Twojej zgody."],
     };
     const [tools, text] = byAgent[name] || [[], "Jasne."];

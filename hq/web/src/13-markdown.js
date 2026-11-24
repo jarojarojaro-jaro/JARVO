@@ -385,7 +385,14 @@ const Md = (() => {
     return (w || []).map((x) => (x.t === "br" ? "\n" : x.v != null && !x.d ? x.v : x.href && !x.d ? x.href : tekstWezlow(x.d))).join("");
   }
 
-  return { MAKS, parsuj, inline, granica, bezpiecznyUrl, sciezkaFloty, obrazData, tekstWezlow, plikLinia };
+  // tekst właściciela bez Markdownu (gwiazdki i podkreślenia zostają jak napisał), tylko adresy i ścieżki floty klikalne
+  function linki(t) {
+    const out = [];
+    tekstZLinkami(String(t || ""), out, false);
+    return out;
+  }
+
+  return { MAKS, parsuj, inline, linki, granica, bezpiecznyUrl, sciezkaFloty, obrazData, tekstWezlow, plikLinia };
 })();
 
 // ------------------------------------------------------------------------------------------------- render

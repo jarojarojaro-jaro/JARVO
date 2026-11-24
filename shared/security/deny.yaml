@@ -1,7 +1,7 @@
 # Zakazy dla CAŁEJ floty: build dopina je do approvals.deny każdego profilu. Hermes blokuje je bezwarunkowo
 # (także w yolo i mode=off) i sprawdza też części komendy (po && ; |) oraz warianty z cudzysłowami.
 # Źródło: red team (security/redteam) z 2026-09-29: Wideograf zmienił własną konfigurację przez
-# `hermes config set` po odmowie strażnika plików; Ręka dwa razy próbowała `rm -rf` danych floty.
+# `hermes config set` po odmowie strażnika plików, a inny agent dwa razy próbował `rm -rf` danych floty.
 deny:
   # agent nie zmienia własnej ani cudzej konfiguracji Hermesa
   - "*hermes config set*"

@@ -5,7 +5,7 @@
         [--punkty 1,2,7] [--bez-panelu] [--pytest] [--obraz]
 
 Natywnie (domyślnie) sprawdza skrypty floty tak, jak wołają je agenci na zainstalowanym korzeniu (--korzen, JARVO_ROOT
-albo domyślny katalog systemu, jak polecenie jarvo): kopie z profilu jarvo-reka w `<dane>/profiles/jarvo-reka` (skille
+albo domyślny katalog systemu, jak polecenie jarvo): kopie z profilu jarvo w `<dane>/profiles/jarvo` (skille
 `pliki/konwersja-plikow` i `pliki/odczyt-ekranu`, skrypty `to_pdf.py` i `pack.py`), uruchamiane Pythonem skryptów
 floty (@@PY@@ = Python venvu narzędzi z `<stan>/narzedzia.json`) w środowisku procesów Jarva (jarvo/srodowisko.py: PATH
 z bin-floty i programami z instalacji, CHROME_PATH, JARVO_OCR_PYTHON, JARVO_TOOLS_PYTHON, TESSDATA_PREFIX…). Pliki
@@ -24,7 +24,7 @@ Punkty:
   2. md → pdf (pandoc + Chromium) z polskim tekstem i tabelą; ten PDF → txt (PDFium) ma „Zażółć gęślą jaźń”
   3. docx → pdf: DOCX z pandoca, potem PDF trasą pandoc → Chromium (bez LibreOffice), a z LibreOffice jego trasą;
      tekst PDF z polskimi znakami
-  4. to_pdf.py (jarvo-reka): md → pdf i docx → pdf
+  4. to_pdf.py (jarvo): md → pdf i docx → pdf
   5. metadane zdjęcia w „Michał Żółć”: JPG z GPS i telefonem (exiftool), `--metadane` je pokazuje, `--usun-metadane`
      daje plik bez nich (sprawdzone też samym exiftoolem), a zamiana PNG → JPG (Pillow) wychodzi bez metadanych
   6. PDF: qpdf --linearize i --check-linearization, `--polacz` (liczba stron), PDF → PNG stron (PDFium); mniejszy PDF
@@ -189,7 +189,7 @@ class Srodowisko:
 
 
 class Instalacja(Srodowisko):
-    """Układ, środowisko procesów Jarva i skrypty floty z profilu jarvo-reka."""
+    """Układ, środowisko procesów Jarva i skrypty floty z profilu jarvo."""
 
     def __init__(self, a: argparse.Namespace):
         env = dict(os.environ)
@@ -205,7 +205,7 @@ class Instalacja(Srodowisko):
         self.narz = narz
         self.py = (narz.get("venv-narzedzia") or {}).get("python")
         musi(self.py and Path(self.py).is_file(), "brak Pythona venvu narzędzi (venv-narzedzia w narzedzia.json)")
-        profil = self.u.dane / "profiles" / "jarvo-reka"
+        profil = self.u.dane / "profiles" / "jarvo"
         self.konwertuj = profil / "skills" / "pliki" / "konwersja-plikow" / "scripts" / "konwertuj.py"
         self.ocr = profil / "skills" / "pliki" / "odczyt-ekranu" / "scripts" / "ocr.py"
         self.to_pdf = profil / "scripts" / "to_pdf.py"
@@ -235,8 +235,8 @@ class Obraz(Srodowisko):
         musi(self.py, "brak python3 w PATH (obraz Jarva: PATH=/opt/hermes/bin:/opt/hermes/.venv/bin:$PATH)")
         self.konwertuj = REPO / "shared" / "skills" / "konwersja-plikow" / "scripts" / "konwertuj.py"
         self.ocr = REPO / "shared" / "skills" / "odczyt-ekranu" / "scripts" / "ocr.py"
-        self.to_pdf = REPO / "profiles" / "jarvo-reka" / "scripts" / "to_pdf.py"
-        self.pack = REPO / "profiles" / "jarvo-reka" / "scripts" / "pack.py"
+        self.to_pdf = REPO / "profiles" / "jarvo" / "scripts" / "to_pdf.py"
+        self.pack = REPO / "profiles" / "jarvo" / "scripts" / "pack.py"
         self.chrome = self.env.get("CHROME_PATH") or self.program("chromium")
         self.port = None
         self.korzen_proby = Path(a.wyniki).resolve()
@@ -635,9 +635,9 @@ def p11_pytest(i: Srodowisko, kat: Path, ctx: dict) -> dict:
 
 
 PUNKTY = [(1, "programy z instalacji i silniki", p1_programy), (2, "md → pdf z polskim tekstem", p2_md_pdf),
-          (3, "docx → pdf (pandoc + Chromium albo LibreOffice)", p3_docx_pdf), (4, "to_pdf.py jarvo-reka", p4_to_pdf),
+          (3, "docx → pdf (pandoc + Chromium albo LibreOffice)", p3_docx_pdf), (4, "to_pdf.py jarvo", p4_to_pdf),
           (5, "metadane zdjęcia (exiftool) i Pillow", p5_metadane), (6, "qpdf, PDFium i mniejszy PDF", p6_pdf),
-          (7, "OCR: zrzut, faktura_październik.png, PDF", p7_ocr), (8, "pack.py jarvo-reka", p8_pack),
+          (7, "OCR: zrzut, faktura_październik.png, PDF", p7_ocr), (8, "pack.py jarvo", p8_pack),
           (9, "Konwerter w panelu", p9_panel), (10, "SVG → PNG (FFmpeg albo Chromium)", p10_svg),
           (11, "pytest test_konwertuj i test_ocr w środowisku Jarva", p11_pytest)]
 DOMYSLNE = set(range(1, 11))       # punkt 11 tylko na życzenie (--pytest albo --punkty 11)

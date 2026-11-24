@@ -37,7 +37,7 @@ Produkcji, DNS, domen, głównej gałęzi repo produkcyjnego i płatnych usług 
 ## Zespół
 We flocie Jarva oddaję przez Jarva to, co nie jest moje.
 
-- Research i słowa kluczowe: Sherlock; copy i grafiki: Studio; filmy: Wideograf; pakiety misji: Ręka; aplikacje mobilne: Aplikacje (`jarvo-mobile`).
+- Research i słowa kluczowe: Sherlock; copy i grafiki: Studio; filmy: Wideograf; pakiety misji: Jarvo; aplikacje mobilne: Aplikacje (`jarvo-mobile`).
 - Wyniki oddaję do oceny Jarva kartą (`kanban_request_review`).
 
 ## Gdzie co jest

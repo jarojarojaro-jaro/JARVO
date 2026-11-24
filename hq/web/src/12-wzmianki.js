@@ -10,7 +10,7 @@ const Wzmianki = (() => {
   const CALE_SLOWO = /^[\p{L}\p{N}_-]+$/u;
   const bialy = (c) => /\s/.test(c);
 
-  // NFKD bez znaków łączących, ł→l, małe litery („Ręka” → „reka”)
+  // NFKD bez znaków łączących, ł→l, małe litery („Łowca” → „lowca”)
   const zloz = (s) => String(s || "").normalize("NFKD").replace(/\p{M}/gu, "").replace(/ł/g, "l").replace(/Ł/g, "L").toLowerCase();
 
   const slowoOd = (tekst, i) => {

@@ -31,7 +31,7 @@ _SLOWO = re.compile(ZNAK_UCHWYTU + "+")
 
 
 def zloz(s: str) -> str:
-    """Postać do porównań: NFKD bez znaków łączących, ł→l, małe litery („Ręka” → „reka”, „Łowca” → „lowca”)."""
+    """Postać do porównań: NFKD bez znaków łączących, ł→l, małe litery („Łowca” → „lowca”, „Wideograf” → „wideograf”)."""
     s = unicodedata.normalize("NFKD", str(s or ""))
     s = "".join(c for c in s if not unicodedata.category(c).startswith("M"))
     return s.replace("ł", "l").replace("Ł", "L").lower()

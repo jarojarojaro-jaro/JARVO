@@ -3,7 +3,7 @@
    sprawdza wyniki, raport wraca do Ciebie. Dane między znacznikami FLOTA wstawia `iso.py flota` z fleet.yaml
    (tu przykład); czas tylko z api, więc PNG i film wychodzą zawsze tak samo. */
 (() => {
-const FLOTA = /*FLOTA*/{"szef": {"nazwa": "Jarvo", "rola": "main judge"}, "agenci": [{"nazwa": "Sherlock", "rola": "researcher-detektyw"}, {"nazwa": "Web", "rola": "web senior dev"}, {"nazwa": "Studio", "rola": "marketing i kreacja"}, {"nazwa": "Wideograf", "rola": "wideograf"}, {"nazwa": "Ręka", "rola": "prawa ręka"}], "przyklad": [0, 1, 2]}/*FLOTA*/;
+const FLOTA = /*FLOTA*/{"szef": {"nazwa": "Jarvo", "rola": "main judge"}, "agenci": [{"nazwa": "Sherlock", "rola": "researcher-detektyw"}, {"nazwa": "Web", "rola": "web senior dev"}, {"nazwa": "Studio", "rola": "marketing i kreacja"}, {"nazwa": "Wideograf", "rola": "wideograf"}], "przyklad": [0, 1, 2]}/*FLOTA*/;
 const A = FLOTA.agenci, N = A.length, SZEF = FLOTA.szef.nazwa.toLowerCase();
 const agentow = n => n === 1 ? 'agent' : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? 'agenci' : 'agentów';
 const lista = A.map(a => `${a.nazwa} (${a.rola})`).join(', ');

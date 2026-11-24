@@ -27,7 +27,7 @@ spec = importlib.util.spec_from_file_location("ocr_jarvo", OCR)
 ocr = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ocr)
 
-AGENCI = ("jarvo", "jarvo-sherlock", "jarvo-web", "jarvo-studio", "jarvo-wideo", "jarvo-ads", "jarvo-reka",
+AGENCI = ("jarvo", "jarvo-sherlock", "jarvo-web", "jarvo-studio", "jarvo-wideo", "jarvo-ads",
           "jarvo-mobile", "jarvo-lowca")
 
 

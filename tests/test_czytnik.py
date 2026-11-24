@@ -131,7 +131,7 @@ def test_czytnik_profili_sprawdza_nazwe_i_schemat(tmp_path):
     assert c.sesja("jarvo-web", "s-indeks") is None                     # profil bez state.db
     linia = c.linia("test-e2e-a", ["s-nie-ma", "s-pusta"])
     assert [(x["sesja_id"], x["stan"]) for x in linia] == [("s-nie-ma", cz.BRAK_SESJI), ("s-pusta", "ok")]
-    for zly in ("jarvo-reka", "../etc", "Test", ""):
+    for zly in ("jarvo-ads", "../etc", "Test", ""):
         with pytest.raises(ValueError):
             c.sesja(zly, "s-indeks")
     # schemat po aktualizacji Hermesa bez wymaganej kolumny

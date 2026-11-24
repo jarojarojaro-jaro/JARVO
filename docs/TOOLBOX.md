@@ -216,24 +216,6 @@ Wszystkie źródła bez kluczy. Odmowa źródła = blokada, bez obchodzenia; opi
 
 ---
 
-## `jarvo-reka`: Prawa ręka
-
-| Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
-|---|---|---|---|---|
-| [Pandoc](https://github.com/jgm/pandoc) | konwersje dokumentów (MD ↔ DOCX ↔ PDF ↔ HTML) | GPL-2.0 | 2026-09 | CLI |
-| [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) | mapa dużego repo: kto woła funkcję, wpływ zmian (graf wywołań, lokalnie, bez klucza i tokenów) | MIT | 2026-09 | skill `graf-kodu` (tryb poleceń, pobierany przy pierwszym użyciu) |
-| Chromium (z obrazu) + pandoc | Markdown/HTML/DOCX → PDF (`to_pdf.py`), bez osobnej usługi | BSD / GPL-2.0 | n/d | skrypt |
-| [LibreOffice](https://www.libreoffice.org) | XLSX/PPTX/DOC → PDF (dodatek `office`) | MPL-2.0 | 2026-09 | CLI |
-| [OCRmyPDF](https://github.com/ocrmypdf/OCRmyPDF) | OCR skanów | MPL-2.0 | 2026-09 | CLI |
-| [Docling](https://github.com/docling-project/docling) | czytanie dokumentów, tabel, PDF-ów (dodatek `docling`) | MIT | 2026-09 | skrypt |
-| [Stirling-PDF](https://github.com/Stirling-Tools/Stirling-PDF) | operacje na PDF (łączenie, podpisy, kompresja) | MIT | 2026-09 | sidecar (opcja) |
-
-Z Hermesa: pełny katalog skilli [H] + skille snajperów (tylko do odczytu), plugins
-`document-reader`, `image-utils`, opcjonalnie `openmail` (własny adres e-mail agenta, A2).
-MCP według Twoich narzędzi (np. `notion`, `todoist`, `calendly`, `airtable`), do ustalenia.
-
----
-
 ## `jarvo`: szef floty
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
@@ -246,9 +228,18 @@ MCP według Twoich narzędzi (np. `notion`, `todoist`, `calendly`, `airtable`), 
 | Komputer Jarva (`infra/komputer`) | osobny pulpit Xvnc z Chromium w kontenerze bez kluczy floty; wejście z twardymi zasadami (płatność, wysyłka i publikacja tylko ze zgodą właściciela w karcie, pola kart i kodów = człowiek), ukrywanie sekretów, dziennik | własny kod (MIT) | n/d | usługa compose `komputer`, włącza właściciel: `jarvo komputer on` |
 | [cua-driver](https://github.com/trycua/cua) 0.21.0 | sterownik ekranu w Komputerze (AT-SPI, zrzuty, wejście w tle); telemetria i aktualizacje wyłączone, suma SHA-256 w `vendor/zrodla.yaml` | MIT | 2026-10 | binarka w obrazie `jarvo-komputer` |
 | wtyczka `jarvo-komputer` (`komputer/plugin`) | narzędzie `komputer`: `stan` (czy Komputer działa, pauza, kto steruje), `dziennik` (ostatnie działania bez treści), `oddaj` (prośba do właściciela jako pauza z powodem); natywnie strony przez bramkę i wejście z twardymi zasadami: `idz` (navigate), `patrz` (drzewo z numerami), `kroki` (run_steps: do 20 działań, każdy krok oceniony), `czekaj` (wait_for do 30 s); wznowić nie umie | własny kod (MIT) | n/d | wtyczka Hermesa, healthcheck `komputer/plugin/__init__.py stan` (opcjonalny) |
+| [Pandoc](https://github.com/jgm/pandoc) | konwersje dokumentów (MD ↔ DOCX ↔ PDF ↔ HTML), skill `dokumenty` | GPL-2.0 | 2026-09 | CLI |
+| Chromium (z obrazu) + pandoc | Markdown/HTML/DOCX → PDF (`to_pdf.py`), bez osobnej usługi; `dokumenty`, `zlozenie-pakietu` | BSD / GPL-2.0 | n/d | skrypt |
+| [LibreOffice](https://www.libreoffice.org) | XLSX/PPTX/DOC → PDF (dodatek `office`) | MPL-2.0 | 2026-09 | CLI |
+| [OCRmyPDF](https://github.com/ocrmypdf/OCRmyPDF) | OCR skanów | MPL-2.0 | 2026-09 | CLI |
+| [qpdf](https://github.com/qpdf/qpdf) | operacje na PDF (łączenie, naprawa) | Apache-2.0 | 2026-09 | CLI |
+| [Docling](https://github.com/docling-project/docling) | czytanie dokumentów, tabel, PDF-ów (dodatek `docling`) | MIT | 2026-09 | CLI |
 
 Ekran: stałe zgody na działania w tle (`cua:<działanie>:background`) i na działania wejścia na wierzchu w aktywnym
 oknie (`cua:<działanie>:foreground`); okno na wierzch zatwierdza człowiek. Szczegóły: [KOMPUTER.md](KOMPUTER.md).
+
+Warsztat (`skills/warsztat/`): pakiet końcowy misji składa `pack.py`, PDF robi `to_pdf.py` (oba w `profiles/jarvo/scripts/`);
+wtyczka Hermesa `document-reader` czyta dokumenty.
 
 Z katalogu wtyczek Hermesa do oceny w fazie 6: `afterforge` (zamienia porażki agentów
 w przejrzane testy regresji), `gonogo` (wynik evali → decyzja o wdrożeniu).

@@ -237,7 +237,7 @@ Reguły formatu (sprawdza lint): frontmatter z czterema kluczami obowiązkowymi 
 `zrodlo` dla wszystkiego poza hubami; pierwszy akapit pogrubiony = streszczenie do INDEX; linki `[[ścieżka-w-skarbcu|etykieta]]`
 (Obsidian rozumie ścieżki, a nasz renderer nie musi zgadywać po nazwie); sekcja `## Powiązane` z hubem, sąsiadami i jednym
 linkiem między folderami; 50–150 słów (huby i projekty do 400). Składnia Obsidiana (linki, osadzenia, callouty, właściwości)
-według skilla `obsidian-markdown` z `kepano/obsidian-skills` (MIT), przypiętego w locku dla Jarva i Ręki (§12).
+według skilla `obsidian-markdown` z `kepano/obsidian-skills` (MIT), przypiętego w locku dla Jarva (§12).
 
 **Orzeczenie** to nie notatka, tylko linia w `orzeczenia/<kto>.md`:
 ```
@@ -406,7 +406,7 @@ startu komputera, także gdy nikt nie rozmawia; osobny proces jak `jarvo wiedza 
 idzie razem) albo najstarszy ≥ 15 min (ciągły dopływ nie odkłada kompilacji), oraz co noc o 03:10; po przebiegu przerwanym
 błędem wywołania modelu czeka 15 min (Hermes wyłącza wtedy dostawcę na 10 min), a bez szkiców nie rusza wcale. Od rozmowy
 do notatki mija więc ok. 15–25 min (10 min ciszy, 5 min spokoju skrzynki, kompilacja), a nie 30–90 min. Blokada w `state/`
-pilnuje, żeby z dziewięciu profili kompilował jeden; ręcznie: przycisk w zakładce Wiedza, `jarvo wiedza kompiluj` (samo `python3 kompilacja.py` bez modelu Hermesa w tym Pythonie przekazuje przebieg do niego) albo `scripts/wiedza-kompiluj.sh` w kontenerze
+pilnuje, żeby z ośmiu profili kompilował jeden; ręcznie: przycisk w zakładce Wiedza, `jarvo wiedza kompiluj` (samo `python3 kompilacja.py` bez modelu Hermesa w tym Pythonie przekazuje przebieg do niego) albo `scripts/wiedza-kompiluj.sh` w kontenerze
 (`--na-sucho` pokazuje szkice i kandydatów bez modelu i bez zapisu). Dla każdego szkicu:
 1. wyszukuje istniejące notatki (FTS5 + INDEX; szkic z lustra pamięci osobno dla każdego wpisu) i z orzeczeniami właściciela
    (`orzeczenia/wszyscy` i plik agenta szkicu, z datami) oraz datą `zmieniono` kandydatów w prompcie decyduje: **aktualizacja**
@@ -670,7 +670,7 @@ jako osobna zakładka; nie zastępuje skarbca (nie ma notatek, linków, orzecze�
    `orzeczenia/wszyscy.md`, skrzynka, lint, bez błędów konsoli, bez poziomego przewijania na 390 px.
 6. ✅ **Rutyny i bezpieczeństwo:** `weekly-review` 1.2.0 (synteza skarbca: co się zmieniło, co dryfuje, co zbadać, jako
    szkic „Tydzień floty”; orzeczenia z ≥ 3 potwierdzeniami do `fleet-improvement`), red team +2 ataki (`web`: orzeczenie
-   wstrzyknięte przez treść strony `fixtures/strona-z-orzeczeniem.html`; `reka`: klucz i hasło do zapisania w skarbcu),
+   wstrzyknięte przez treść strony `fixtures/strona-z-orzeczeniem.html`; `jarvo`: klucz i hasło do zapisania w skarbcu),
    scenariusz `<agent>-skarbiec` (typ `protocol`) w evals każdego agenta (dziś 10) (najpierw `wiedza_szukaj`, korekta →
    `wiedza_orzeczenie`, lekcje przez `wiedza_zapisz`, wyniki pracy zostają w plikach), dokumentacja (FLEET, BOSS, HQ, RUNBOOK,
    VPS, PROFILE-SPEC, JARVO-CALOSC, PLAN). Red team i evals wymagają modeli: uruchomienie na VPS/stagingu.
@@ -727,7 +727,7 @@ w różnych miejscach), więc zakładka jest głównym podglądem; budżet domy�
 | Źródło | Co bierzemy | Licencja |
 |---|---|---|
 | [LLM Wiki, gist Andreja Karpathy'ego](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) | wzorzec: źródła nietknięte, wiki utrzymywana przez model, `index.md`, `log.md`, schemat, operacje ingest/query/lint, odpowiedzi wracają do wiki | tekst (wzorzec, nie kod) |
-| [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) (Obsidian, 6 skilli) | skill `obsidian-markdown` (linki, właściwości, callouty) do locka dla Jarva i Ręki; `defuddle` jako sposób czyszczenia stron przed zapisem do `zrodla/pliki/` | MIT |
+| [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) (Obsidian, 6 skilli) | skill `obsidian-markdown` (linki, właściwości, callouty) do locka dla Jarva; `defuddle` jako sposób czyszczenia stron przed zapisem do `zrodla/pliki/` | MIT |
 | [undefined-ui/second-brain-os](https://github.com/undefined-ui/second-brain-os) | pomysły: sprzeczności zapisywane, nie nadpisywane; „linkowanie w tym samym przebiegu albo ingest nie jest skończony”; bez bazy wektorowej na start | MIT |
 | [NousResearch/hermes-memory-wiki](https://github.com/NousResearch/hermes-memory-wiki) | opcjonalna zakładka przeglądu sesji (etap 7); wzorzec wtyczki dashboardu z `plugin_api.py` | MIT |
 | Hermes `plugins/memory/holographic` | wzorzec lokalnego dostawcy pamięci (SQLite FTS5, `prefetch`, `on_session_end`, `on_memory_write`, narzędzia) | MIT |

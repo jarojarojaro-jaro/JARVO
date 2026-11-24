@@ -26,7 +26,7 @@ FLEET = [
     {"name": "jarvo-sherlock", "kind": "specialist", "title": "Detektyw", "emoji": "🔎", "room": "study", "short": "Sherlock"},
     {"name": "jarvo-web", "kind": "specialist", "title": "Web", "emoji": "🌐", "room": "devlab", "short": "Web"},
     {"name": "jarvo-studio", "kind": "specialist", "title": "Studio", "emoji": "🎬", "room": "atelier", "short": "Studio"},
-    {"name": "jarvo-reka", "kind": "generalist", "title": "Ręka", "emoji": "🦾", "room": "workshop", "short": "Ręka"},
+    {"name": "jarvo-wideo", "kind": "specialist", "title": "Wideograf", "emoji": "🎥", "room": "filmstudio", "short": "Wideograf"},
 ]
 
 
@@ -52,9 +52,9 @@ def make_kanban(path: Path) -> None:
         ("t_a2", "Landing Ziarno", "jarvo-web", "review", n - 3600, n - 1200, None, n - 400, 2, None, None, None),
         ("t_a3", "Grafiki IG", "jarvo-studio", "blocked", n - 3600, None, None, None, None, None, "needs_input", None),
         ("t_a4", "Film Reels", "jarvo-studio", "ready", n - 3600, None, None, None, None, None, None, None),
-        ("t_a5", "Złożenie pakietu", "jarvo-reka", "todo", n - 3600, None, None, None, None, None, None, None),
-        ("t_a6", "Cennik PDF", "jarvo-reka", "done", n - 9000, n - 8000, n - 7000, None, None, None, None, None),
-        ("t_a7", "Stara karta", "jarvo-reka", "done", n - 30 * 86400, None, n - 29 * 86400, None, None, None, None, None),
+        ("t_a5", "Rolka na otwarcie", "jarvo-wideo", "todo", n - 3600, None, None, None, None, None, None, None),
+        ("t_a6", "Film z cennikiem", "jarvo-wideo", "done", n - 9000, n - 8000, n - 7000, None, None, None, None, None),
+        ("t_a7", "Stara karta", "jarvo-wideo", "done", n - 30 * 86400, None, n - 29 * 86400, None, None, None, None, None),
         ("t_a8", "Dostęp do Cloudflare", "jarvo-web", "blocked", n - 3600, None, None, None, None, None, "capability", None),
     ]
     conn.executemany("""INSERT INTO tasks (id, title, assignee, status, created_at, started_at, completed_at,
@@ -141,7 +141,7 @@ def test_build_state_statuses(home):
     assert by["jarvo"]["status"] == "working"                     # Jarvo właśnie ocenia t_a2 (run profilu jarvo)
     assert by["jarvo-web"]["status"] == "blocked"                # blokada ma pierwszeństwo przed oceną
     assert by["jarvo-studio"]["status"] == "blocked" and "12 czy 19" in by["jarvo-studio"]["reason"]
-    assert by["jarvo-reka"]["status"] == "queued" and by["jarvo-reka"]["counts"]["done_today"] == 1
+    assert by["jarvo-wideo"]["status"] == "queued" and by["jarvo-wideo"]["counts"]["done_today"] == 1
     assert st["board"]["blocked"] == 2 and st["board"]["ready"] == 2 and st["board"]["running"] == 1
 
 
@@ -268,7 +268,7 @@ def test_safe_path_alias_opt_data_i_git_bash(tmp_path):
 
 def test_agent_stats(home):
     board = core.read_board(home / "kanban.db", NOW)
-    s = core.agent_stats("jarvo-reka", board, NOW)
+    s = core.agent_stats("jarvo-wideo", board, NOW)
     assert s == {"done_7d": 1, "first_pass_7d": 0, "changes_7d": 1}
 
 

@@ -34,7 +34,7 @@ Nie publikuję i nie planuję postów, nie uruchamiam reklam płatnych ani wysy�
 ## Zespół
 We flocie Jarva oddaję przez Jarva to, co nie jest moje.
 
-- Strony: Web; filmy: Wideograf (piszę mu brief); research: Sherlock; kampanie płatne: Ads; pakiet misji: Ręka.
+- Strony: Web; filmy: Wideograf (piszę mu brief); research: Sherlock; kampanie płatne: Ads; pakiet misji: Jarvo.
 - Wyniki oddaję do oceny Jarva kartą (`kanban_request_review`).
 
 ## Gdzie co jest

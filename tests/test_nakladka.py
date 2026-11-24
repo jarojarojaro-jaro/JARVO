@@ -1,5 +1,5 @@
 """Nakładka prywatna z agentami biznesowymi (docs/FLEET.md „Agenci biznesowi”): flota połączona z nakładką, kolizja
-nazw, lock skilli, build (profil, fleet.json z marką, trasa Telegrama, skille dla Ręki, wzorce misji, BUILD.json),
+nazw, lock skilli, build (profil, fleet.json z marką, trasa Telegrama, wzorce misji, BUILD.json),
 walidacja `--nakladka`, ataki red teamu nakładki, `git pull` przy instalacji i stan w `jarvo status`.
 Nakładka powstaje w katalogu tymczasowym z `scripts/new-agent.py --marka`; publiczne repo zostaje nietknięte."""
 from __future__ import annotations
@@ -133,24 +133,15 @@ def test_build_profil_nakladki_jak_publiczny(zbudowany, nakladka):
     assert manifest["nakladka"] == {"sciezka": nakladka.resolve().as_posix(), "commit": ""}
 
 
-def test_build_wiedza_telegram_reka_i_wzorce(zbudowany):
+def test_build_wiedza_telegram_i_wzorce(zbudowany):
     wiedza = json.loads((zbudowany / "wiedza" / "fleet.json").read_text(encoding="utf-8"))
     sklep = next(a for a in wiedza["agents"] if a["name"] == AGENT)
     assert sklep["marka"] == "sklep" and sklep["evals"]
     trasy = fl.load_yaml(zbudowany / "host" / "config.yaml")["gateway"]["profile_routes"]
     trasa = next(t for t in trasy if t["profile"] == AGENT)
     assert trasa["chat_id"] == ENV["TELEGRAM_HQ_CHAT_ID"] and str(trasa.get("thread_id")) == ENV["TELEGRAM_TOPIC_SKLEP"]
-    reka = fl.load_yaml(zbudowany / "profiles" / "jarvo-reka" / "config.yaml")["skills"]["external_dirs"]
-    assert sum(f"/profiles/{AGENT}/skills" in k for k in reka) == 1
-    assert "/profiles/jarvo-web/skills" in " ".join(reka)
     wzorce = (zbudowany / "profiles" / "jarvo" / fl.PATTERNS_FILE).read_text(encoding="utf-8")
     assert wzorce.rstrip().endswith(WZORZEC.rstrip()) and "nakładki prywatnej" in wzorce
-
-
-def test_publiczny_config_reki_bez_agentow_nakladki():
-    dirs = " ".join(fl.load_yaml(REPO / "profiles" / "jarvo-reka" / "config.yaml")["skills"]["external_dirs"])
-    publiczni = {a.name for a in fl.load_fleet(nakladka=None).agents}
-    assert all(d.split("/profiles/")[1].split("/")[0] in publiczni for d in dirs.split() if "/profiles/" in d)
 
 
 @pytest.fixture()

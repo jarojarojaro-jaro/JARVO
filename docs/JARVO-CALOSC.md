@@ -29,8 +29,9 @@ Inspiracja: firstmate. Rozmawiasz z jednym agentem, a on prowadzi załogę.
 
 - **Snajper = specjalista.** Jedna dziedzina, własne skille, własna wiedza, własna pamięć.
   Dystrybucja snajpera ma znacznik `.no-bundled-skills` (bez katalogu skilli Hermesa) — dostaje tylko to,
-  co mu damy (wyjątek: generalista `jarvo-reka`). Czego nie umie, tego nie robi: oddaje zadanie szefowi.
-- **Jarvo = szef floty (orkiestrator).** Sam nie robi pracy dziedzinowej. Robi cztery rzeczy:
+  co mu damy. Czego nie umie, tego nie robi: oddaje zadanie szefowi.
+- **Jarvo = szef floty (orkiestrator).** Sam nie robi pracy dziedzinowej snajperów; szybkie sprawy, dokumenty
+  i konwersje, prototypy i złożenie pakietu końcowego misji robi sam (skille `warsztat/`). Jako szef robi cztery rzeczy:
   1. **intake** — rozumie, czego chcesz, dopytuje tylko o prawdziwe decyzje,
   2. **dispatch** — rozbija cel na karty kanbana i przypisuje snajperom,
   3. **judge** — każdy wynik wraca w statusie `review`; Jarvo ocenia go według rubryki agenta:
@@ -39,14 +40,14 @@ Inspiracja: firstmate. Rozmawiasz z jednym agentem, a on prowadzi załogę.
 - **Bezpośredni kontakt zostaje** — z każdym snajperem pogadasz osobno, ale praca wieloetapowa
   zawsze idzie przez szefa.
 - **Nowy agent nie może być „niewidzialny”.** Każdy specjalista ma w `fleet.yaml` pole `oddaj_gdy`, z którego build
-  generuje tabelę „komu oddać” u Ręki, i występuje we wzorcach misji Jarva; walidator nie przepuści go bez tego.
+  generuje roster Jarva, i występuje we wzorcach misji Jarva; walidator nie przepuści go bez tego.
 - **Bez martwych ścieżek.** Skill, który potrzebuje usługi (np. Skarbca), deklaruje `metadata.jarvo.wymaga`; dopóki usługi
   nie ma w `infra/docker-compose.yml`, nie trafia do profilu, a SOUL agenta mówi, czego dziś nie zrobi.
 - **Wspólne:** wiedza o Tobie (USER.md), brand kity (`knowledge/brands`) i **skarbiec wiedzy** (`knowledge/`, [WIEDZA.md](WIEDZA.md):
   notatki z linkami, orzeczenia z Twoich korekt, wyciągi z rozmów i kart, księga błędów `bledy/`; wtyczka `jarvo-wiedza` daje
   każdemu agentowi przypomnienia przed turą, narzędzia `wiedza_*` i pod wynikiem narzędzia ze znanym błędem krok
   „jak poprawnie” z księgi). Pamięć i skille są per agent
-  (wyjątki: skille z `shared/skills/`: `graf-kodu` u Weba i Ręki, `transkrypcja-filmu` u Sherlocka, Wideografa i Ręki, `hooki` u Studia, Wideografa i Ads, `izometria` u Weba, Studia i Wideografa, `warsztat-3d` (model 3D z kodu) u Weba, Wideografa i Mobile, `konwersja-plikow` (plik → inny format albo bez metadanych) i `odczyt-ekranu` (tekst ze zrzutu ekranu, skanu albo PDF: Indra OCR, zapas Tesseract) u wszystkich, `ostrozna-przegladarka` (jedna próba Camoufoxem po odmowie strony) u Łowcy i Sherlocka; Ręka czyta skille wszystkich).
+  (wyjątki: skille z `shared/skills/`: `graf-kodu` u Weba, `transkrypcja-filmu` u Sherlocka i Wideografa, `hooki` u Studia, Wideografa i Ads, `izometria` u Weba, Studia i Wideografa, `warsztat-3d` (model 3D z kodu) u Weba, Wideografa i Mobile, `konwersja-plikow` (plik → inny format albo bez metadanych) i `odczyt-ekranu` (tekst ze zrzutu ekranu, skanu albo PDF: Indra OCR, zapas Tesseract) u wszystkich, `ostrozna-przegladarka` (jedna próba Camoufoxem po odmowie strony) u Łowcy i Sherlocka).
 - **Nadzór bez palenia tokenów:** dispatcher kanbana i patrol (skrypt bez modelu) pilnują floty
   i budzą Jarva tylko przy anomaliach albo gdy trzeba Twojej decyzji.
 
@@ -55,18 +56,18 @@ Poziomy autonomii: **A0** odczyt · **A1** szkice we własnym workspace · **A2*
 
 ---
 
-## 2. Flota agentów (9 profili w repo)
+## 2. Flota agentów (8 profili w repo)
 
 Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady), `config.yaml`
-(model, toolset, deny), skille, skrypty, rubryka jakości, toolbox, dystrybucja. Rejestr: `fleet.yaml` (9 agentów:
-Jarvo, 7 specjalistów, generalista Ręka) i profil hosta `profiles/_host/`. Prywatna nakładka właściciela
+(model, toolset, deny), skille, skrypty, rubryka jakości, toolbox, dystrybucja. Rejestr: `fleet.yaml` (8 agentów:
+Jarvo i 7 specjalistów) i profil hosta `profiles/_host/`. Prywatna nakładka właściciela
 (`<root>/nakladka`, §2a°°) dokłada swoich agentów; na komputerze właściciela to `jarvo-jarodev` i `jarvo-translator`,
-razem 11 profili w `<dane>/profiles/`. Liczba skilli w tabeli = pliki `SKILL.md` w `profiles/<agent>/skills/`
-(Jarvo: 17 `fleet/` + 5 `ekran/` + 1 `social/`; roster i skille zewnętrzne dochodzą przy buildzie).
+razem 10 profili w `<dane>/profiles/`. Liczba skilli w tabeli = pliki `SKILL.md` w `profiles/<agent>/skills/`
+(Jarvo: 17 `fleet/` + 5 `ekran/` + 1 `social/` + 3 `warsztat/`; roster i skille zewnętrzne dochodzą przy buildzie).
 
 | Agent | Rola | Uchwyt | Pokój HQ | Temat Telegram | Skille |
 |---|---|---|---|---|---|
-| 🛰️ `jarvo` | **Prawa ręka właściciela i szef floty** — intake, misje, karty, ocena wyników, raporty, patrol, wgrywanie stron właściciela na hosting za zgodą, skrzynka linków (link od właściciela → ocena i szkic w skarbcu), kopalnia pomysłów (w briefie jedna rzecz warta zbudowania), komentarze na X z telefonów na polecenie; sam pracuje na ekranie Komputera Jarva (computer use) i na telefonie właściciela (PHONEUSE), zakłada konta i loguje się; płatność, wysyłka i publikacja tylko z `ZGODA WŁAŚCICIELA` w karcie | `@jarvo` | Mostek dowodzenia (`bridge`) | general | 23 |
+| 🛰️ `jarvo` | **Prawa ręka właściciela i szef floty** — intake, misje, karty, ocena wyników, raporty, patrol, szybkie sprawy, dokumenty i konwersje, prototypy, złożenie pakietu końcowego misji, wgrywanie stron właściciela na hosting za zgodą, skrzynka linków (link od właściciela → ocena i szkic w skarbcu), kopalnia pomysłów (w briefie jedna rzecz warta zbudowania), komentarze na X z telefonów na polecenie; sam pracuje na ekranie Komputera Jarva (computer use) i na telefonie właściciela (PHONEUSE), zakłada konta i loguje się; płatność, wysyłka i publikacja tylko z `ZGODA WŁAŚCICIELA` w karcie | `@jarvo` | Mostek dowodzenia (`bridge`) | general | 26 |
 | 🔎 `jarvo-sherlock` | **Researcher-detektyw** — szybki research (domyślnie 10–15 min, raport na jedną stronę), pełne śledztwo na zamówienie, weryfikacja faktów, raporty z cytatami z rejestru źródeł sprawdzanymi przed oddaniem, transkrypcja filmu z linku | `@sherlock` | Gabinet śledczy (`study`) | — (przez Jarva) | 9 |
 | 🌐 `jarvo-web` | **Web Senior Dev** — strony/landingi (z inspiracjami z branży: Inspo + własna baza), SEO techniczne, bezpieczeństwo aplikacji, wydajność, wdrożenie | `@web` | Pracownia webowa (`devlab`) | — (przez Jarva) | 12 |
 | 🎬 `jarvo-studio` | **Marketing i kreacja** — grafiki social, obrazy AI, żywe obrazy (pętla 5 s, warstwy PSD), copy PL, kampanie, kalendarze | `@studio` | Atelier kreatywne (`atelier`) | — (przez Jarva) | 7 |
@@ -74,7 +75,6 @@ razem 11 profili w `<dane>/profiles/`. Liczba skilli w tabeli = pliki `SKILL.md`
 | 📈 `jarvo-ads` | **Specjalista Ads** — Meta + Google Ads, kampanie, testy A/B/C, raporty; przygotowuje paczkę, publikujesz Ty | `@ads` | Sala operacyjna (`office`) | — (przez Jarva) | 11 |
 | 🎯 `jarvo-lowca` | **Łowca leadów** — sygnały zakupowe (KRS, CEIDG, przetargi BZP/TED, strony firm, oferty pracy), kwalifikacja wg profilu klienta, ranking z „dlaczego teraz”, kontakt opublikowany ze źródłem, monitoring, rozpoznanie nowego źródła; nic nie wysyła | `@lowca` | Radar sprzedaży (`radar`) | — (przez Jarva) | 7 |
 | 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go, bramka jakości (Android, iOS w CI), pakiet do sklepów z listą 44 punktów, wydanie za zgodą i nauka z odrzuceń, aplikacja ze strony firmy, utrzymanie (terminy, opinie, SDK, poprawki OTA za zgodą), kontrola paczek npm; konta zawsze właściciela | `@mobile` | Pracownia aplikacji (`apps`) | — (przez Jarva) | 10 |
-| 🦾 `jarvo-reka` | **Prawa ręka** — generalista, składa pakiety misji, dokumenty, prototypy; zna skille wszystkich (read-only) | `@reka` | Warsztat (`workshop`) | — (przez Jarva) | 4 |
 
 **Telegram** (`jarvo telegram status`): jeden bot, grupa **JARVO HQ** z tematami: **JARVO** (General: Jarvo, jego dom:
 rutyny, karty, powiadomienia), **JARODEV** (agent `jarvo-jarodev`), **TRANSLATOR** (agent `jarvo-translator`),
@@ -318,7 +318,7 @@ skończą”: prośba do pomocnika 30 s po końcu pracy) i językiem w Konto (`h
 ([HQ.md §2f](HQ.md#2f-aplikacja-rozmowa-pasek-szuflada)).
 **Stara Baza** (Ustawienia › Stara Baza): budynek z pokojami agentów (pixel art), minifigurki, dymki
 „co każdy robi teraz”, podgląd pracy na żywo, wyniki, decyzje i czat z Jarvem albo dowolnym agentem.
-Pokoje: bridge, study, devlab, atelier, filmstudio, workshop, office, radar. Sesje klikalne (Historia
+Pokoje: bridge, study, devlab, atelier, filmstudio, office, radar. Sesje klikalne (Historia
 domyślnie). Czat obsługuje zdjęcia i pliki w obie strony. Linki „Odpal” (podgląd) i „Pokaż w folderze”.
 W Centrali **Konwerter**: plik → inny format na serwerze albo ten sam plik bez metadanych (GPS, telefon, daty, autor i firma w PDF i Wordzie; ten sam `konwertuj.py` co skill floty `konwersja-plikow`). **Jak działa usługa**: flota jako klikalna figura izometryczna (wieża z Jarvem i pokojami agentów, demo = droga zlecenia; `iso.py flota` ze skilla `izometria`).
 Edytor filmów w stylu CapCut (przejścia między klipami, które nie skracają filmu, kolor klipu ze stylami i Auto, menu Audio z biblioteką efektów i podkładów CC0, lektorem, nagraniem z mikrofonu i wyodrębnianiem dźwięku, uwagi na osi z kadrem dla Wideografa, typografia słowo po słowie z napisem za osobą: maska MODNet) i podgląd animacji z kodu na żywo z suwakami

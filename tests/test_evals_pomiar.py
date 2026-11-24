@@ -193,17 +193,17 @@ def test_no_judge_and_empty_answer_are_not_success(fake, monkeypatch, capsys):
     (tak wyszło w piaskownicy bez modelu: dawniej 14/14 z wynikiem 1,00)."""
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.setattr(evals, "judge", lambda *a: {"pass": None, "pominiety": True})
-    scen = ev.wczytaj(REPO, "jarvo-reka")["scenarios"]
+    scen = ev.wczytaj(REPO, "jarvo-studio")["scenarios"]
     fake["answers"][scen[0]["input"]] = ""
     out = fake["out"]
-    rc = evals.main(["--agent", "jarvo-reka", "--out", str(out), "--ustaw-odniesienie"])
+    rc = evals.main(["--agent", "jarvo-studio", "--out", str(out), "--ustaw-odniesienie"])
     text = capsys.readouterr().out
     assert rc == 1 and "nieocenionych" in text and "punktu odniesienia nie zmieniam" in text
-    assert not ev.odniesienie_path(out, "jarvo-reka").exists()
-    recs = {r["id"]: r for r in ev.wczytaj_przebieg(next(p for p in out.iterdir() if p.is_dir()) / "jarvo-reka.jsonl")}
+    assert not ev.odniesienie_path(out, "jarvo-studio").exists()
+    recs = {r["id"]: r for r in ev.wczytaj_przebieg(next(p for p in out.iterdir() if p.is_dir()) / "jarvo-studio.jsonl")}
     assert recs[scen[0]["id"]]["pass"] is False and "pusta odpowiedź" in recs[scen[0]["id"]]["runs"][0]["deterministic_fails"][0]
     assert recs[scen[1]["id"]]["pass"] is None and recs[scen[1]["id"]]["score"] is None
-    summary = ev.historia(out, "jarvo-reka")[0]["podsumowanie"]["razem"]
+    summary = ev.historia(out, "jarvo-studio")[0]["podsumowanie"]["razem"]
     assert summary["zaliczone"] == 0 and summary["nieocenione"] == len(scen) - 1 and summary["score"] == 0.0
 
 

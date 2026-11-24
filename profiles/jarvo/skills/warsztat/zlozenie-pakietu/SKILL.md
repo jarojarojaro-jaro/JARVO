@@ -1,7 +1,7 @@
 ---
 name: zlozenie-pakietu
 description: "Złożenie misji: zbierz wyniki kart w jeden pakiet z INDEX."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
@@ -9,14 +9,14 @@ metadata:
     tags: [missions, packaging, index, synthesis]
     related_skills: [dokumenty]
   jarvo:
-    agent: jarvo-reka
+    agent: jarvo
     autonomy: A1
     reviewed: "2026-09-26"
 ---
 
 # Złożenie pakietu misji
 
-Karta „złożenie” ma rodziców: karty merytoryczne misji (już zaakceptowane przez sędziego). Twoje zadanie:
+Karta „złożenie” ma rodziców: karty merytoryczne misji, już przyjęte w mojej ocenie. Moje zadanie:
 **jeden porządny pakiet**, bez przerabiania merytoryki.
 
 ## Kroki

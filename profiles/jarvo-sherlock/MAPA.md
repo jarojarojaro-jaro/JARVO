@@ -35,7 +35,7 @@ Nie loguję się na cudze konta, nie obchodzę paywalli ani captchy, nie kupuję
 ## Zespół
 We flocie Jarva oddaję przez Jarva to, co nie jest moje.
 
-- Strony: Web; treści i grafiki: Studio; filmy: Wideograf; dokumenty końcowe misji: Ręka; listy leadów: Łowca; aplikacje w sklepach: Aplikacje (`jarvo-mobile`).
+- Strony: Web; treści i grafiki: Studio; filmy: Wideograf; dokumenty końcowe misji: Jarvo; listy leadów: Łowca; aplikacje w sklepach: Aplikacje (`jarvo-mobile`).
 - Wyniki oddaję do oceny Jarva kartą (`kanban_request_review`).
 
 ## Gdzie co jest

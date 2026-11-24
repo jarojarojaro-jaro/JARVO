@@ -1019,12 +1019,12 @@ PATTERNS_FILE = fl.PATTERNS_FILE
 
 
 def check_routing(fleet: fl.Fleet, r: Report) -> None:
-    """Nowy agent nie może zostać „niewidzialny”: każdy specjalista ma `oddaj_gdy` (generowana tabela Ręki), generalista
-    kieruje przez tę tabelę, a Jarvo ma każdego specjalistę we wzorcach misji."""
+    """Nowy agent nie może zostać „niewidzialny”: każdy specjalista ma `oddaj_gdy` (roster Jarva, tabela generowana),
+    generalista (gdy jest) kieruje przez tę tabelę, a Jarvo ma każdego specjalistę we wzorcach misji."""
     aktywni = fleet.active()
     for a in aktywni:
         if a.kind == "specialist" and (not a.oddaj_gdy or a.oddaj_gdy.startswith("TODO")):
-            r.err(f"{a.name}: brak `oddaj_gdy` w fleet.yaml (kiedy generalista ma oddać mu zadanie; tabela jest generowana)")
+            r.err(f"{a.name}: brak `oddaj_gdy` w fleet.yaml (kiedy Jarvo ma oddać mu zadanie; tabela jest generowana)")
     for a in aktywni:
         if a.kind != "generalist":
             continue
@@ -1092,7 +1092,7 @@ def check_nakladka(fleet: fl.Fleet, r: Report) -> None:
 # Mała poprawka = jedno zdanie w CHANGELOG (właściciel 23.11: „nie 5-stronicowy paragraf na małą poprawkę”). Wpis
 # „## Niewydane” do 300 znaków; starsze długie wpisy zostają (zapadka: ich liczba może tylko maleć).
 CHANGELOG_MAKS = 300
-CHANGELOG_DLUGIE = {"jarvo": 145, "jarvo-ads": 25, "jarvo-lowca": 28, "jarvo-mobile": 28, "jarvo-reka": 23,
+CHANGELOG_DLUGIE = {"jarvo": 145, "jarvo-ads": 25, "jarvo-lowca": 28, "jarvo-mobile": 28,
                     "jarvo-sherlock": 29, "jarvo-studio": 29, "jarvo-web": 48, "jarvo-wideo": 130}
 
 

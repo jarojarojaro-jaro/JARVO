@@ -280,13 +280,13 @@ Agent wchodzi do floty (`status: active` w `fleet.yaml`) dopiero, gdy:
 - [ ] knowledge packi mają źródła i daty,
 - [ ] `toolbox.yaml` jest kompletny, a healthchecki przechodzą na VPS,
 - [ ] ma rubrykę dla sędziego,
-- [ ] ma ≥ 10 evals (u snajperów i generalisty w tym ≥ 3 „poza zakresem”, gdzie oczekiwanym zachowaniem jest oddanie
+- [ ] ma ≥ 10 evals (u snajperów w tym ≥ 3 „poza zakresem”, gdzie oczekiwanym zachowaniem jest oddanie
   zadania; u Jarva scenariusze `routing`),
 - [ ] przeszedł tydzień dogfoodingu bez krytycznych problemów,
 - [ ] ma README i changelog w dystrybucji,
 - [ ] agent biznesowy (pole `marka` we `fleet.yaml`, slug `[a-z0-9-]+`, tylko specjalista, jedna marka = jeden agent)
   ma evals na zgodę właściciela przed każdym wyjściem i na pytanie spoza swojej marki („to nie mój obszar”),
-- [ ] specjalista ma w `fleet.yaml` pole `oddaj_gdy` (z niego build generuje tabelę „komu oddać” u Ręki)
+- [ ] specjalista ma w `fleet.yaml` pole `oddaj_gdy` (z niego build generuje roster Jarva i tabelę „komu oddać”)
   i występuje we wzorcach misji Jarva (`dispatch-playbook/references/patterns.md`); bez tego walidator go nie przepuści.
 
 ---
@@ -304,7 +304,7 @@ profiles/jarvo-web/
 │                            # phone dla jarvo dopisuje do instalacji `jarvo telefon on`, dla agenta
 │                            # biznesowego `jarvo telefon przydziel`: jeden telefon),
 │                            # skills.write_approval: true przy creation_nudge_interval > 0 (poczekalnia, RSI.md §5)
-├── .no-bundled-skills       # snajper i orkiestrator: bez katalogu skilli Hermesa (brak tylko u jarvo-reka)
+├── .no-bundled-skills       # snajper i orkiestrator: bez katalogu skilli Hermesa
 ├── toolbox.yaml             # narzędzia OSS (nasz manifest + healthchecki)
 ├── skills/
 │   └── web/                 # kategoria (DESCRIPTION.md generuje build)
@@ -329,7 +329,7 @@ fleet.yaml (wpis agenta)               # kind, handle (+ aliasy), rola (+ en.rol
 
 Build (`scripts/build.py`) dokłada do kopii profilu: `profile.yaml` (opis z `fleet.yaml` do routingu kanbana),
 protokół i kalibrację w SOUL, u Jarva skrót floty (`<!-- Jarvo:ROSTER -->`), skill `roster` i rubryki w `sdlc-review`,
-tabelę „komu oddać” z pól `oddaj_gdy` wszędzie, gdzie skill ma `<!-- Jarvo:ODDAJ -->` (u Ręki), pomija skille, którym
+tabelę „komu oddać” z pól `oddaj_gdy` wszędzie, gdzie skill ma `<!-- Jarvo:ODDAJ -->`, pomija skille, którym
 brakuje usługi z `metadata.jarvo.wymaga` (i dopisuje je do SOUL jako niedostępne),
 tokeny `@@…@@` w `config.yaml`, `distribution.yaml` i skillach, wspólne zakazy w `approvals.deny`, `fallback_providers`,
 `DESCRIPTION.md` kategorii, skille z locka z licencjami oraz `cron/jobs.json` (u Wideografa także silnik edytora HQ

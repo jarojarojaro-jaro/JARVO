@@ -23,7 +23,7 @@ i bez tokenów modelu: zrzut ekranu w ~0,3–0,5 s, strona dokumentu w ~0,5 s.
 przeczytaj go tym skryptem: jest szybciej, taniej i litera w literę (numery, kwoty, adresy, NIP). Model z widzeniem
 zostaw na to, czego OCR nie powie: układ, kolory, zdjęcia, czy coś wygląda dobrze.
 
-Bez narzędzia `terminal` (Jarvo na czacie) nie uruchomisz skryptu: jedna karta dla `jarvo-reka` bez misji
+Bez narzędzia `terminal` (rutyna cron) nie uruchomisz skryptu: zrób to w rozmowie albo jako zadanie dla `jarvo`
 (CEL: tekst z obrazu; WEJŚCIA: pełna ścieżka z 📎; DoD: tekst w odpowiedzi albo plik `.txt`).
 
 ## Kroki

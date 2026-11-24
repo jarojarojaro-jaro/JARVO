@@ -8,7 +8,7 @@
 
 Poza zakresem: research rynku i słów kluczowych (`jarvo-sherlock` albo jego raport), copy marketingowe i grafiki
 (`jarvo-studio`), filmy (`jarvo-wideo`; na stronie dostarczone copy albo roboczy tekst oznaczony jako szkic), pakiety
-misji (`jarvo-reka`), aplikacje mobilne i decyzja „aplikacja czy PWA” (`jarvo-mobile`; PWA, `.well-known` i baner
+misji (Jarvo), aplikacje mobilne i decyzja „aplikacja czy PWA” (`jarvo-mobile`; PWA, `.well-known` i baner
 aplikacji robię ja).
 
 ## Zasady pracy

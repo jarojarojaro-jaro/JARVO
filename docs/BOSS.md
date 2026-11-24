@@ -42,7 +42,7 @@ Dzięki temu po każdym restarcie, kompresji czy nowej rozmowie Jarvo odtwarza p
          ▼                                                          ▼
   missions/<ID>/MISSION.md                         jarvo-sherlock / jarvo-web / jarvo-studio /
                                                    jarvo-wideo / jarvo-ads / jarvo-lowca /
-                                                   jarvo-mobile / jarvo-reka / jarvo (ekran, długie)
+                                                   jarvo-mobile / jarvo (ekran, dokumenty, złożenie, długie)
                                                             │ kanban_request_review(reviewer="jarvo")
                                                             ▼
                                                    jarvo (pracownik-sędzia, lane "review")
@@ -108,8 +108,8 @@ Dla misji Jarvo (skill `dispatch-playbook`):
 4. tworzy karty (`kanban_create`) z kontraktem zlecenia, przypiętymi skillami (`skills`),
    zależnościami (`parents`), `idempotency_key = <ID>-<rola>`, `workspace_kind: dir`
    i `workspace_path: /opt/data/jarvo/missions/<ID>/<rola>`,
-5. dla misji wieloagentowych dodaje kartę **„Złożenie”** dla `jarvo-reka` z `parents` =
-   wszystkie karty merytoryczne, która składa pakiet końcowy,
+5. dla misji wieloagentowych dodaje kartę **„Złożenie”** przypisaną do siebie (`assignee: jarvo`) z `parents` =
+   wszystkie karty merytoryczne; pakiet końcowy składa sam skillem `zlozenie-pakietu`,
 6. dopisuje misję do `missions/INDEX.md` i odpowiada Ci jednym zdaniem: co ruszyło, kto nad czym pracuje i kiedy spodziewać się wyniku.
 
 ### 3.3 Wykonanie
@@ -327,7 +327,7 @@ utworzona: <RRRR-MM-DD HH:MM> · kanał: <telegram DM / Jarvo HQ / cli>
 
 Generowany z `fleet.yaml` do skilla `roster` Jarva. Zasada: **najwęższy agent, który
 w pełni pokrywa zadanie**. Jeśli nikt nie pokrywa, Jarvo proponuje nową specjalizację
-albo daje kartę `jarvo-reka` z adnotacją „poza snajperami”.
+albo robi zadanie sam (szybkie i przekrojowe) z adnotacją „poza snajperami”.
 
 | Sygnał w zleceniu | Agent |
 |---|---|
@@ -339,7 +339,7 @@ albo daje kartę `jarvo-reka` z adnotacją „poza snajperami”.
 | leady, nowi klienci, komu sprzedać, przetargi do wzięcia, nowe firmy w branży, kontakt do firm | `jarvo-lowca` |
 | aplikacja mobilna, „czy potrzebujemy aplikacji”, PWA czy natywna, App Store, Google Play, audyt aplikacji | `jarvo-mobile` |
 | kliknij w panelu albo programie w przeglądarce, wypełnij formularz, przejdź stronę jak klient, przepisz z ekranu, załóż konto, zaloguj się, telefon, gdzie nie ma API | `jarvo` sam (gdy Komputer jest włączony); dłuższe niż kilka minut: karta przypisana do siebie (`assignee: jarvo`); płatność, wysyłka i publikacja tylko z `ZGODA WŁAŚCICIELA` w karcie |
-| szybkie sprawy, dokumenty, konwersje, sklejanie wyników, organizacja, „ogarnij” | `jarvo-reka` |
+| szybkie sprawy, dokumenty, konwersje, sklejanie wyników, prototyp na szybko, organizacja, „ogarnij” | `jarvo` sam (skille `warsztat/`: `dokumenty`, `szybki-prototyp`, `zlozenie-pakietu`) |
 
 ---
 

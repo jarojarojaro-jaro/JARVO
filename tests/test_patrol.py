@@ -30,8 +30,8 @@ def board(**overrides):
         {"id": "t_aa01", "title": "Research rynku", "status": "blocked", "assignee": "jarvo-sherlock",
          "created_at": NOW - 90 * MIN},
         {"id": "t_aa02", "title": "Landing", "status": "ready", "assignee": "jarvo-web", "created_at": NOW - 45 * MIN},
-        {"id": "t_bb01", "title": "Stary raport", "status": "done", "assignee": "jarvo-reka", "created_at": NOW - 900 * MIN},
-        {"id": "t_cc01", "title": "Szybka odpowiedź", "status": "review", "assignee": "jarvo-reka",
+        {"id": "t_bb01", "title": "Stary raport", "status": "done", "assignee": "jarvo-lowca", "created_at": NOW - 900 * MIN},
+        {"id": "t_cc01", "title": "Szybka odpowiedź", "status": "review", "assignee": "jarvo-lowca",
          "created_at": NOW - 200 * MIN},
         {"id": "t_ee01", "title": "Pętla", "status": "triage", "assignee": "jarvo-studio", "created_at": NOW - 5 * MIN},
         {"id": "t_ff01", "title": "Długi render", "status": "running", "assignee": "jarvo-studio",
@@ -41,7 +41,7 @@ def board(**overrides):
     events = {
         "t_aa01": [{"kind": "blocked", "created_at": NOW - 30 * MIN,
                     "payload": {"kind": "needs_input", "reason": "Który rynek: PL czy UE?"}}],
-        "t_cc01": [{"kind": "review_requested", "created_at": NOW - 100 * MIN, "payload": {"implementer": "jarvo-reka"}}],
+        "t_cc01": [{"kind": "review_requested", "created_at": NOW - 100 * MIN, "payload": {"implementer": "jarvo-lowca"}}],
     }
     data = {"tasks": tasks, "events": events, "diagnostics": [], "index": INDEX}
     data.update(overrides)
