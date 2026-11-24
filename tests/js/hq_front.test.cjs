@@ -1059,7 +1059,11 @@ test("Podgląd na żywo: przycisk tylko przy urządzeniu, z nazwą; stoi od krok
   assert.strictEqual(NaZywo.ostatnie([{ narzedzie: "read_file" }]), null);
 });
 test("Podgląd na żywo: kodek z SPS, punkt stuknięcia na obrazie (obrót), napisy stanów bez czarnego ekranu", () => {
-  const { spsZKonfiguracji, kodekAvc, punktNaObrazie, napisPodgladu } = NA_ZYWO;
+  const { spsZKonfiguracji, kodekAvc, punktNaObrazie, napisPodgladu, kadrObrazu } = NA_ZYWO;
+  // 24.11 właściciel: puste pasy nad i pod telefonem; kadr wpisany w pole, także powiększony, z ramką
+  eq(kadrObrazu({ w: 436, h: 700 }, { w: 576, h: 1280 }, 5), { w: 320, h: 700 });
+  eq(kadrObrazu({ w: 300, h: 900 }, { w: 288, h: 640 }, 5), { w: 300, h: 654 });
+  assert.strictEqual(kadrObrazu(null, { w: 576, h: 1280 }, 5), null);
   const cfg = new Uint8Array([0, 0, 0, 1, 0x67, 0x42, 0xc0, 0x1f, 0xaa, 0, 0, 0, 1, 0x68, 0xce]);
   assert.strictEqual(kodekAvc(spsZKonfiguracji(cfg)), "avc1.42c01f");
   assert.strictEqual(spsZKonfiguracji(new Uint8Array([0, 0, 1, 0x68, 1])), null);

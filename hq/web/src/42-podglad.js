@@ -29,6 +29,14 @@ function punktNaObrazie(punkt, ekran, obraz) {
   return x >= 0 && x <= 1 && y >= 0 && y <= 1 ? { x, y } : null;
 }
 
+// kadr obrazu wpisany w pole (contain, także w górę) z ramką `ramka` px wokół; całe piksele; null bez pola
+const RAMKA_TELEFONU = 5;
+function kadrObrazu(pole, obraz, ramka) {
+  if (!pole || !obraz || !obraz.w || !obraz.h || pole.w <= 2 * ramka || pole.h <= 2 * ramka) return null;
+  const skala = Math.min((pole.w - 2 * ramka) / obraz.w, (pole.h - 2 * ramka) / obraz.h);
+  return { w: Math.floor(obraz.w * skala) + 2 * ramka, h: Math.floor(obraz.h * skala) + 2 * ramka };
+}
+
 // który napis zamiast obrazu (albo null, gdy obraz jest i nic nie trzeba mówić)
 function napisPodgladu(s, nazwa, koniecS) {
   if (s.bladObrazu) return typeof window !== "undefined" && !window.isSecureContext
@@ -260,6 +268,17 @@ function PodgladOkno({ stan, biezacy }) {
   const ruchAgenta = biezacy ? `${nazwaAgenta(biezacy.agent)}: ${czasownik(biezacy.krok)}${biezacy.krok.detail ? ` ${biezacy.krok.detail}` : ""}` : "";
   const podpis = ruchAgenta || (widac === "komputer" && s.komputer && s.komputer.tytul) || "";
   const pionowy = s.obraz ? s.obraz.h >= s.obraz.w : widac !== "komputer";
+  // kadr: obraz wpisany w wolne miejsce (także powiększony), ramka telefonu wokół; bez pasów pod i nad telefonem
+  const ekranRef = useRef(null);
+  const [pole, setPole] = useState(null);
+  useEffect(() => {
+    const el = ekranRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(([e]) => setPole({ w: e.contentRect.width, h: e.contentRect.height }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const kadr = kadrObrazu(pole, s.obraz || (pionowy ? { w: 9, h: 19.5 } : { w: 16, h: 10 }), pionowy ? RAMKA_TELEFONU : 0);
   const nrTelefonu = (id) => (s.telefony || []).findIndex((t) => t.id === id) + 1;
   return html`<aside class=${cx("j-pz", szeroki ? "is-bok" : "is-pip", !szeroki && `is-${rog}`, pelny && "is-pelny", koniecS != null && "is-koniec")}
       aria-label=${L("Podgląd na żywo", "Live view")} data-urzadzenie=${widac || ""}
@@ -283,9 +302,11 @@ function PodgladOkno({ stan, biezacy }) {
       <${Przycisk} maly rodzaj="cichy" ikona="x" etykieta=${L("Zamknij podgląd", "Close live view")} onClick=${() => NaZywo.zamknij()}/>
     </header>
     ${(szeroki || pelny) && html`<p class="j-pz-ruch" title=${podpis}><b>${nazwa}</b>${podpis && ` · ${podpis}`}</p>`}
-    <div class=${cx("j-pz-ekran", pionowy ? "is-pion" : "is-poziom", widac === "komputer" && "is-komputer")} ...${dotyk}>
-      <canvas ref=${canvas} class=${cx(!s.klatka && "is-pusty")}></canvas>
-      ${kregi.map((k) => html`<span key=${k.id} class="j-pz-krag" style=${{ left: `${k.x * 100}%`, top: `${k.y * 100}%` }} aria-hidden="true"></span>`)}
+    <div class=${cx("j-pz-ekran", pionowy ? "is-pion" : "is-poziom", widac === "komputer" && "is-komputer")} ref=${ekranRef} ...${dotyk}>
+      <div class="j-pz-kadr" style=${kadr ? { width: `${kadr.w}px`, height: `${kadr.h}px` } : undefined}>
+        <canvas ref=${canvas} class=${cx(!s.klatka && "is-pusty")}></canvas>
+        ${kregi.map((k) => html`<span key=${k.id} class="j-pz-krag" style=${{ left: `${k.x * 100}%`, top: `${k.y * 100}%` }} aria-hidden="true"></span>`)}
+      </div>
       ${napis && html`<p class="j-pz-napis" role="status">${s.polaczenie !== "otwarte" || (!s.klatka && s.stan !== "niedostepny") ? html`<${Spinner}/>` : null}${napis}</p>`}
     </div>
   </aside>`;
@@ -348,4 +369,4 @@ function PodagenciLinia({ watek, pidy, agent }) {
   </div>`;
 }
 
-Zasoby.daj({ PodgladOkno, PodagenciLinia, stanPodagentow, spsZKonfiguracji, kodekAvc, punktNaObrazie, napisPodgladu });
+Zasoby.daj({ PodgladOkno, PodagenciLinia, stanPodagentow, spsZKonfiguracji, kodekAvc, punktNaObrazie, kadrObrazu, napisPodgladu });

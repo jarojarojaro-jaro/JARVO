@@ -2720,13 +2720,15 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-pz-tu { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--j-praca); }
 .j-pz-kreska { width: 1px; height: 18px; margin: 0 4px; background: var(--j-rowek); }
 .j-pz-ekran { position: relative; flex: 1 1 auto; min-height: 0; display: flex !important; align-items: center; justify-content: center; overflow: hidden; background: var(--j-wneka, #000) !important; }
-.j-pz.is-bok .j-pz-ekran.is-pion { padding: 14px 40px; }
+.j-pz.is-bok .j-pz-ekran { padding: 12px; }
+/* kadr ma rozmiar z kadrObrazu (42-podglad.js): obraz wpisany w pole, ramka telefonu wokół, kręgi liczone względem obrazu */
+.j-pz-kadr { position: relative; flex: none; max-width: 100%; max-height: 100%; }
+.j-pz-ekran.is-pion .j-pz-kadr { border: 5px solid #0c0c0e; overflow: hidden; box-shadow: 0 0 0 1px var(--j-rowek), 0 18px 40px rgba(0, 0, 0, .45); }
 .j-pz.is-pip .j-pz-ekran { aspect-ratio: 9 / 19; }
 .j-pz.is-pip .j-pz-ekran.is-poziom { aspect-ratio: 16 / 10; }
 .j-pz.is-pip.is-pelny .j-pz-ekran { aspect-ratio: auto; }
-.j-pz-ekran canvas { display: block; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 0; transition: opacity .3s var(--j-ease, ease), filter .3s var(--j-ease, ease); }
-.j-pz-ekran.is-pion canvas { border: 6px solid #0c0c0e; border-radius: 22px; }
-.j-pz-ekran.is-komputer canvas { aspect-ratio: 16 / 10; width: 100%; height: auto; }
+.j-pz-ekran canvas { display: block; width: 100%; height: 100%; transition: opacity .3s var(--j-ease, ease), filter .3s var(--j-ease, ease); }
+.j-pz-kadr:not([style]) canvas { width: auto; height: auto; max-width: 100%; max-height: 100%; }
 .j-pz-ekran canvas.is-pusty { opacity: 0; }
 .j-pz.is-koniec canvas { filter: brightness(.45) grayscale(.6); }
 .j-pz-napis { position: absolute; inset: auto 12px 50% 12px; transform: translateY(50%); display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0;
