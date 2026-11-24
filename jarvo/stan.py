@@ -69,12 +69,16 @@ def _json(p: Path):
         return None
 
 
-def _yaml(p: Path) -> dict:
+def _z_yaml(p: Path, sekcja: str, klucz: str) -> str:
+    """Wartość `klucz` z bloku najwyższego poziomu `sekcja:` w pliku YAML, bez biblioteki (polecenie `jarvo` biegnie
+    na Pythonie instalatora, a PyYAML jest tylko w środowisku Hermesa); brak pliku albo klucza to pusty napis."""
     try:
-        import yaml
-        return yaml.safe_load(p.read_text(encoding="utf-8")) or {}
-    except Exception:  # noqa: BLE001  (brak pliku, zły YAML, brak biblioteki: część pokaże to, co ma)
-        return {}
+        tekst = p.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    blok = re.search(rf"^{re.escape(sekcja)}:[ \t]*\n((?:[ \t]+.*\n?|[ \t]*\n)*)", tekst, re.M)
+    m = re.search(rf"^[ \t]+{re.escape(klucz)}:[ \t]*([^#\n]*)", blok.group(1), re.M) if blok else None
+    return m.group(1).strip().strip("'\"") if m else ""
 
 
 # ---------------------------------------------------------------- części
@@ -172,20 +176,19 @@ def czesc_flota(u: Uklad, _ot, _wolaj: Wolaj, _teraz: float) -> list[str]:
     w = []
     modele: dict[str, list[str]] = {}
     for p in sorted((u.dane / "profiles").glob("*/config.yaml")):
-        m = (_yaml(p).get("model") or {})
-        modele.setdefault(str(m.get("default") or "?") if isinstance(m, dict) else str(m), []).append(p.parent.name)
+        modele.setdefault(_z_yaml(p, "model", "default") or "?", []).append(p.parent.name)
     for model, agenci in modele.items():
         w.append(f"agenci ({len(agenci)}) na {model}: {', '.join(agenci)}")
     sesje = _json(u.jarvo_dane / "konfig" / "sesje.json") or {}
     if isinstance(sesje, dict) and sesje:
         w.append("sesje omp (osobne programy, rozmówcy w panelu): " + ", ".join(
-            f"{k} = {v.get('nazwa') or k}" + (f" ({v['opis']})" if v.get("opis") else "")
+            f"{k} = {v.get('nazwa') or k}" + (f" ({o})" if (o := (v.get("panel") or {}).get("opis")) else "")
             for k, v in sesje.items() if isinstance(v, dict)))
-    kanban = _yaml(u.dane / "config.yaml").get("kanban") or {}
-    deleg = _yaml(u.dane / "profiles" / "jarvo" / "config.yaml").get("delegation") or {}
-    limity = [f"zadań naraz najwyżej {kanban['max_in_progress']}" if kanban.get("max_in_progress") else "",
-              f"na jednego agenta {kanban['max_in_progress_per_profile']}" if kanban.get("max_in_progress_per_profile") else "",
-              f"podagentów Jarva naraz {deleg['max_concurrent_children']}" if deleg.get("max_concurrent_children") else ""]
+    ile = {k: _z_yaml(u.dane / "config.yaml", "kanban", k) for k in ("max_in_progress", "max_in_progress_per_profile")}
+    dzieci = _z_yaml(u.dane / "profiles" / "jarvo" / "config.yaml", "delegation", "max_concurrent_children")
+    limity = [f"zadań naraz najwyżej {ile['max_in_progress']}" if ile["max_in_progress"] else "",
+              f"na jednego agenta {ile['max_in_progress_per_profile']}" if ile["max_in_progress_per_profile"] else "",
+              f"podagentów Jarva naraz {dzieci}" if dzieci else ""]
     if any(limity):
         w.append("limity: " + ", ".join(x for x in limity if x))
     w += _zadania(u.dane / "kanban.db")
@@ -271,15 +274,16 @@ def czesc_porty(_u: Uklad, _ot, wolaj_: Wolaj, _teraz: float) -> list[str]:
                 x["katalog"] = os.readlink(f"/proc/{x['pid']}/cwd")
     opisy = _wlasciwosci(wolaj_, sorted({x["usluga"] for x in porty.values() if x["usluga"]}), ("Description",))
     dom = str(Path.home())
-    w = []
+    grupy: dict[tuple, list[str]] = {}      # porty tego samego programu, usługi i zasięgu w jednej linii
     for port, x in sorted(porty.items()):
         if not x["pid"]:
             continue                        # proces innego użytkownika (system): nie nasz
         opis = opisy.get(x["usluga"], {}).get("Description", "")
-        w.append(" · ".join(k for k in (
-            str(port), "tylko ten komputer" if x["lokalny"] else "w sieci", x["program"],
+        grupy.setdefault((
+            "tylko ten komputer" if x["lokalny"] else "w sieci", x["program"],
             x["usluga"] + (f" ({opis})" if opis else "") if x["usluga"] else "",
-            x["katalog"].replace(dom, "~") if x["katalog"] not in ("", "/") else "") if k))
+            x["katalog"].replace(dom, "~") if x["katalog"] not in ("", "/") else ""), []).append(str(port))
+    w = [" · ".join(k for k in (", ".join(numery), *reszta) if k) for reszta, numery in grupy.items()]
     return w or ["nie udało się odczytać portów (brak `ss`)"]
 
 
