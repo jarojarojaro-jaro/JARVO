@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Jarvo ma `delegate_task` w czacie: pracę ogólną naraz dzieli na swoich podagentów, a specjaliści dostają tylko swoją dziedzinę (24.11 rozdał przesiew 206 ofert Sherlockowi, Łowcy, Web i Studio).
 - Agenta Ręka nie ma: dokumenty, konwersje, prototypy i pakiet końcowy misji robi Jarvo (skille `warsztat/`, `to_pdf.py`, `pack.py`), a stary profil trafia do `profiles/.usuniete/`.
 - Adres w wiadomości właściciela w panelu jest klikalny i otwiera się w przeglądarce.
 - Sesja omp dostaje klucze z `panel.sekrety` (zmienna → plik) w środowisku, bez otwierania pliku przez agenta; Kernel ma `NUMES_API_KEY`.

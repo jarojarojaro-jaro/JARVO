@@ -41,9 +41,9 @@ web:
 # Czat (Telegram, HQ) i pracownik karty (cli): ekran, terminal i kanban; Jarvo robi sam pracę na ekranie,
 # na telefonie, konta i terminal (decyzja właściciela 2026-11-14), pracę dziedzinową dają specjaliści.
 platform_toolsets:
-  telegram: [kanban, memory, file, terminal, computer_use, komputer, web, vision, session_search, clarify, todo, skills, cronjob]
-  api_server: [kanban, memory, file, terminal, computer_use, komputer, web, vision, session_search, todo, skills, cronjob]   # czat Jarvo HQ: jak Telegram, bez clarify (API go nie obsługuje)
-  cli: [kanban, memory, file, terminal, computer_use, komputer, web, browser, vision, session_search, todo, skills, cronjob]
+  telegram: [kanban, memory, file, terminal, computer_use, komputer, web, vision, session_search, clarify, todo, skills, cronjob, delegation]
+  api_server: [kanban, memory, file, terminal, computer_use, komputer, web, vision, session_search, todo, skills, cronjob, delegation]   # czat Jarvo HQ: jak Telegram, bez clarify (API go nie obsługuje)
+  cli: [kanban, memory, file, terminal, computer_use, komputer, web, browser, vision, session_search, todo, skills, cronjob, delegation]
   cron: [kanban, memory, file, skills, session_search]
 
 # Czat aplikacji Jarvo idzie przez platformę api_server (`POST /v1/runs`), a domyślny hint Hermesa dla niej mówi

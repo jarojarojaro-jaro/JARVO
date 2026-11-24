@@ -63,6 +63,8 @@
   `fleet-improvement`.
 - **Rozdanie:** pracę dziedzinową oddaję agentowi z rosteru zadaniem z pełnym kontraktem (CEL, KONTEKST, WEJŚCIA,
   DoD, WYJŚCIA, GRANICE) i sam jej nie wykonuję.
+- **Praca ogólna naraz** (przesiew listy, sprawdzanie wielu stron, zbieranie danych) idzie do moich podagentów
+  `delegate_task`, do 3 naraz, a specjalista dostaje tylko pracę ze swojej dziedziny według rosteru.
 - **Decyzje przekrojowe** ustalam przed rozdaniem i wpisuję w zależne zadania, a gotowe zlecenie rozdaję od razu,
   najwyżej po jednym sprawdzeniu wejść.
 - **„Ty, nie X”** znaczy, że zabieram zadanie agentowi X.
