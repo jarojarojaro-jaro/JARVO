@@ -32,7 +32,7 @@ REQUIRED_FILES = ["SOUL.md", "config.yaml", "distribution.yaml", "toolbox.yaml",
 SOUL_REQUIRED = ["## Misja", "## Osobowość"]
 # profil z ZASADY.md: SOUL.md to sama postać (decyzja właściciela 19.11) z sekcją charakteru, bez znaczników procedur
 SOUL_POSTAC_REQUIRED = ["## Charakter"]
-SOUL_POSTAC_BUDZET = 1600            # sama postać: tożsamość, charakter, głos, przykłady
+SOUL_POSTAC_BUDZET = 1600            # sama postać: tożsamość, charakter, głos (bez przykładów, PRZYKLAD_RE)
 # Jarvo: postać + zasady szefa floty, ekranu i telefonu (po usuniętym Operatorze, 14.11) + roster. 19.11 (SOUL v2):
 # budżet liczony na złożonym prompcie z prawdziwymi długościami ścieżek; wzrost o ~500 tok. wobec v1 kompensuje
 # wyłączenie sprzecznych bloków Hermesa (~1 000 tok.) i orzeczeń doklejanych do każdej wiadomości (~2 000 tok./turę).
@@ -52,6 +52,7 @@ SCIEZKI_MAPY = ("DATA_DIR", "JARVO_DIR", "KNOWLEDGE_DIR", "MISSIONS_DIR", "WORKS
 # zasada bloku kontekstu (protokół floty, zasada 8; docs/HQ.md „Aplikacja”): każdy złożony SOUL nazywa znaczniki,
 # które składa hq/plugin/kontekst.py
 SOUL_KONTEKST = ["[Jarvo · kontekst rozmowy <kod>]", "[koniec kontekstu <kod>]", "[Wiadomość właściciela <kod>]"]
+PRZYKLAD_RE = re.compile(r"<examples?>|^\s*(?:\*\*)?Przykłady?(?: [^\n:]{0,40})?:", re.M | re.I)
 # tryb „bezpośrednio” (aplikacja Jarvo, docs/HQ.md §2f): @uchwyt kieruje do agenta tylko jedną wiadomość; ta sama zasada
 # w BOSS.md (zasada 6) i w SOUL Jarva, bo inaczej szef i Jarvo opisują aplikację inaczej
 TRYB_BEZPOSREDNI = {"docs/BOSS.md": "@ działa na jedną wiadomość: następna bez @ idzie znowu do Jarva.",
@@ -302,6 +303,10 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
             r.err(f"{a.name}: SOUL z protokołem bez zasady bloku kontekstu (brak {znacznik!r}; protokół, zasada 8)")
     if a.name == fleet.orchestrator and fl.ROSTER_MARKER not in soul:
         r.err(f"{a.name}: SOUL.md orkiestratora bez {fl.ROSTER_MARKER}")
+    # 24.11 (właściciel: „nie możemy dawać przykładów, to naprowadza AI”): prompt agenta to ogólne zasady, bez bloków
+    # przykładów, które model kopiuje zamiast zrozumieć zasadę
+    if PRZYKLAD_RE.search(soul):
+        r.err(f"{a.name}: SOUL.md albo {fl.ZASADY_FILE} z przykładem (<example>, „Przykład:”); w prompcie stoją ogólne zasady")
     check_mapa(fleet, a, soul, r)
     zbudowany = zbudowany_prompt(fleet, a, protocol)
     tokens = fl.approx_tokens(zbudowany)

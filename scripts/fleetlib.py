@@ -102,8 +102,9 @@ def render_roster_summary(fleet: "Fleet") -> str:
     for a in fleet.active():
         if a.name == fleet.orchestrator:
             continue
-        linia = " ".join(x for x in (f"- {a.emoji}", f"`{a.name}`", f"@{a.handle}" if a.handle else "",
-                                     f"{a.hq_short or a.name}: {a.title}") if x)
+        nazwa = a.hq_short or a.name
+        tytul = a.title if a.title.startswith(f"{nazwa}:") else f"{nazwa}: {a.title}"   # tytuł z nazwą (nakładka) bez dubla
+        linia = " ".join(x for x in (f"- {a.emoji}", f"`{a.name}`", f"@{a.handle}" if a.handle else "", tytul) if x)
         linie.append(linia + (f"; oddaję, gdy: {a.oddaj_gdy}" if a.oddaj_gdy else ""))
     return "\n".join(linie)
 

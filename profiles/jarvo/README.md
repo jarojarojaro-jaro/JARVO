@@ -5,7 +5,7 @@ od A do Z (źródło prawdy): [MAPA.md](MAPA.md).
 
 | Element | Zawartość |
 |---|---|
-| `SOUL.md` | postać: kim jest Jarvo, charakter, głos, przykłady |
+| `SOUL.md` | postać: kim jest Jarvo, charakter, głos (ogólne zasady, bez przykładów) |
 | `ZASADY.md` | zasady pracy: zasady krytyczne, fakty na żywo, zapis, hamulec, tryby oceny, skrót mapy; build skleja je z `SOUL.md` |
 | `MAPA.md` | „Jarvo od A do Z”: co robi, co może, czego nie robi bez zgody, zespół, gdzie co jest, kiedy, mózg |
 | `skills/fleet/` | 18 (17 w repo + generowany roster): intake, wywiad, dispatch-playbook, mission-ledger, decision-queue, sdlc-review (sędzia), patrol, daily-brief, weekly-review, onboarding-interview, fleet-improvement, prosty-polski, schemat, pierwsza-sesja, wgrywanie-stron (strony właściciela na hosting za zgodą), skrzynka-linkow (link od właściciela: pobranie, ocena, szkic w skarbcu, z nauki próba z miarą albo zlecenie dla Claude Code), kopalnia-pomyslow (w porannym briefie jedna rzecz warta zbudowania z ostatnich 48 h, `kopalnia.py`), roster (generowany) |

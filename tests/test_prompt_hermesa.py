@@ -34,13 +34,12 @@ def _katalogi_podgladu() -> tuple[str, ...]:
     raise AssertionError("brak PREVIEW_ROOTS w hq_core.py")
 
 
-def test_bez_execution_discipline_z_reszta_wskazowek():
-    """„# Execution discipline” (confirm scope, „current facts → ALWAYS use a tool”) wyłączony jawnie, nie „auto”
-    (dla deepseek „auto” = włączony); „Finishing the job” i „Parallel tool calls” zostają."""
+def test_bez_angielskich_wskazowek_powtorzonych_w_zasadach():
+    """24.11: bloki Hermesa, które ZASADY Jarva mówią jednym zdaniem po polsku, wyłączone jawnie, nie „auto”
+    (dla deepseek „auto” = włączony): Execution discipline, Finishing the job, Parallel tool calls, Tool-use enforcement."""
     agent = _cfg()["agent"]
-    assert agent["execution_guidance"] is False
-    for klucz in ("task_completion_guidance", "parallel_tool_call_guidance", "tool_use_enforcement"):
-        assert agent.get(klucz, True) is not False, klucz
+    for klucz in ("execution_guidance", "task_completion_guidance", "parallel_tool_call_guidance", "tool_use_enforcement"):
+        assert agent[klucz] is False, klucz
 
 
 def test_skill_manage_jarva_przez_poczekalnie():
@@ -115,9 +114,10 @@ def test_prompt_zlozony_przez_hermesa(tmp_path):
         assert "# Execution discipline" not in prompt, platforma
         assert "confirm scope before executing" not in prompt, platforma
         assert "Current facts (weather, news, versions)" not in prompt, platforma
-        for zostaje in ("# Finishing the job", "# Parallel tool calls", "# Tool-use enforcement"):
-            assert zostaje in prompt, (platforma, zostaje)
+        for blok in ("# Finishing the job", "# Parallel tool calls", "# Tool-use enforcement"):
+            assert blok not in prompt, (platforma, blok)
         assert "vision" in dane["toolsety"], platforma
     assert "Markdown się renderuje" in wynik["api_server"]["prompt"]
     assert "assume plain text" not in wynik["api_server"]["prompt"]
-    assert "You are on Telegram" in wynik["telegram"]["prompt"]
+    assert "Rozmawiam na Telegramie" in wynik["telegram"]["prompt"]
+    assert "You are on Telegram" not in wynik["telegram"]["prompt"]

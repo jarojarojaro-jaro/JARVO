@@ -10,13 +10,14 @@ model:
 agent:
   reasoning_effort: high
   max_turns: 200
-  # Bez angielskiego bloku „# Execution discipline” Hermesa (dla DeepSeek domyślnie włączony, ~1000 tok.): jego
-  # <verification> każe „confirm scope before executing” przy każdym zapisie i poleceniu (wbrew zasadzie 2 SOUL:
-  # polecenie właściciela jest zgodą), a <mandatory_tool_use> „current facts → ALWAYS use a tool” (wbrew zasadzie 10:
-  # najpierw skarbiec, świeżej notatki nie sprawdzam drugi raz). „# Finishing the job”, „# Parallel tool calls”
-  # i „# Tool-use enforcement” zostają (osobne bramki: task_completion_guidance, parallel_tool_call_guidance,
-  # tool_use_enforcement).
+  # Bez angielskich bloków Hermesa, które ZASADY mówią po polsku jednym zdaniem (24.11, właściciel: prompt bez
+  # przykładów, same ogólne zasady): „# Execution discipline” (dla DeepSeek domyślnie włączony; „confirm scope before
+  # executing” wbrew zasadzie 2, „current facts → ALWAYS use a tool” wbrew zasadzie faktów), „# Finishing the job”
+  # (= „Gotowe”), „# Parallel tool calls” i „# Tool-use enforcement” (= „Działam, nie zapowiadam” i zasada 6).
   execution_guidance: false
+  task_completion_guidance: false
+  parallel_tool_call_guidance: false
+  tool_use_enforcement: false
 
 timezone: "@@TIMEZONE@@"
 
@@ -52,12 +53,18 @@ platform_toolsets:
 platform_hints:
   api_server:
     replace: >-
-      Rozmawiasz w aplikacji Jarvo (panel HQ). Markdown się renderuje: nagłówki, pogrubienie, kursywa, listy
-      (też [ ] i [x]), tabele, cytaty, `kod`, bloki kodu i linki http(s). Pliki pokazujesz z katalogów
+      Rozmawiam w aplikacji Jarvo (panel HQ). Markdown się renderuje: nagłówki, pogrubienie, kursywa, listy
+      (też [ ] i [x]), tabele, cytaty, `kod`, bloki kodu i linki http(s). Pliki pokazuję z katalogów
       @@JARVO_DIR@@/workspaces, missions, knowledge i inbox: pełna ścieżka w tekście jest klikalna (podgląd,
-      pobranie), linia `MEDIA:<pełna ścieżka>` sama w linii daje kartę pliku (obraz z miniaturą), a
-      `![opis](<pełna ścieżka>)` wstawia obraz w tekst. Pliku spoza tych katalogów aplikacja nie otworzy:
-      najpierw skopiuj go do workspaces.
+      pobranie), linia `MEDIA:<pełna ścieżka>` sama w linii daje kartę pliku z miniaturą obrazu, a
+      `![opis](<pełna ścieżka>)` wstawia obraz w tekst. Pliku spoza tych katalogów aplikacja nie otworzy, więc
+      najpierw kopiuję go do workspaces.
+  telegram:
+    replace: >-
+      Rozmawiam na Telegramie. Markdown zamienia się w formatowanie (pogrubienie, kursywa, `kod`, bloki kodu,
+      linki), ale tabel nie ma, więc dane podaję listą albo liniami z etykietą. Plik wysyłam linią
+      `MEDIA:<pełna ścieżka>` samą w linii: obraz przychodzi jako zdjęcie, .mp4 jako film, reszta jako dokument,
+      a dźwięk z linią `[[audio_as_voice]]` jako wiadomość głosowa.
 
 terminal:
   backend: local

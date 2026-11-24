@@ -303,6 +303,7 @@ agents:
     hq_short: "Ręka"
     rola: "dokumenty i szybkie sprawy"
     handle: reka
+    oddaj_gdy: "szybka praca bez specjalisty: dokument, konwersja pliku, prototyp, porządek, pakiet końcowy misji ze składanych wyników"
     en:
       title: "Right hand"
       rola: "documents and quick tasks"

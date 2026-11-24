@@ -80,6 +80,17 @@ def test_soul_postac_bez_procedur(repo_copy):
     assert errors_matching(validate.run(), rf"jarvo: SOUL.md to sama postać; {fl.PROTOCOL_MARKER} należy do ZASADY.md")
 
 
+def test_prompt_bez_przykladow(repo_copy):
+    """24.11 właściciel: przykłady w prompcie naprowadzają model, więc SOUL i ZASADY to same ogólne zasady."""
+    soul = repo_copy / "profiles/jarvo/SOUL.md"
+    soul.write_text(soul.read_text(encoding="utf-8") + "\n<example>Ty: działa?\nJarvo: Działa.</example>\n", encoding="utf-8")
+    zasady = repo_copy / "profiles/jarvo-web/ZASADY.md"
+    zasady.write_text(zasady.read_text(encoding="utf-8") + "\nPrzykład raportu: Gotowe, sprawdzone.\n", encoding="utf-8")
+    report = validate.run()
+    assert errors_matching(report, r"^jarvo: SOUL.md albo ZASADY.md z przykładem")
+    assert errors_matching(report, r"^jarvo-web: SOUL.md albo ZASADY.md z przykładem")
+
+
 def test_budzet_soul_na_zbudowanym_tekscie(repo_copy):
     """19.11: walidator liczył źródło z krótkimi @@ŚCIEŻKAMI@@ (3 400 tok.), a model dostawał 3 673 tok."""
     zasady = repo_copy / "profiles/jarvo/ZASADY.md"
