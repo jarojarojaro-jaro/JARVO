@@ -860,21 +860,33 @@ CZEKAJ_NA_KARTY_S = 30          # `--po-kartach`: odstęp lokalnego sprawdzania 
 _spij = time.sleep              # testy podmieniają (bez prawdziwego czekania)
 
 
+PRZEBIEGI_W_TOKU = ("kolejka", "wysylanie", "przyjety", "pracuje", "czeka_na_ture", "zatrzymywanie", "dopisany")
+PRZEBIEG_SWIEZY_S = 1800      # przebieg bez zdarzenia dłużej = zawieszony, nie blokuje aktualizacji
+
+
 def karty_w_toku(u: Uklad) -> list[str]:
-    """Karty kanbana, nad którymi pracuje agent (status `running`): „<id> <agent>: <tytuł>”. Brak tablicy = []."""
-    db = u.dane / "kanban.db"
-    if not db.is_file():
-        return []
-    try:
-        import sqlite3
-        conn = sqlite3.connect(f"{db.as_uri()}?mode=ro", uri=True, timeout=3)
+    """Praca, którą restart bramy by przerwał: karty kanbana w toku (status `running`) i tury rozmów panelu
+    (przebiegi ze zdarzeniem w ostatnich 30 min; 24.11 wgranie przerwało turę Jarva z odpowiedzią dla właściciela).
+    „<id> <agent>: <tytuł>”. Brak bazy = []."""
+    import sqlite3
+    wynik: list[str] = []
+    for db, zapytanie, arg in (
+            (u.dane / "kanban.db", "SELECT id, assignee, title FROM tasks WHERE status = 'running' ORDER BY id", ()),
+            (u.dane / "jarvo" / "state" / "rozmowy.db",
+             f"SELECT id, agent, 'tura rozmowy w panelu' FROM przebiegi WHERE stan IN "
+             f"({','.join('?' * len(PRZEBIEGI_W_TOKU))}) AND COALESCE(ostatnie_zdarzenie_at, utworzony_at) > ? "
+             "ORDER BY id", (*PRZEBIEGI_W_TOKU, time.time() - PRZEBIEG_SWIEZY_S))):
+        if not db.is_file():
+            continue
         try:
-            return [f"{i} {a or '?'}: {(t or '')[:70]}" for i, a, t in
-                    conn.execute("SELECT id, assignee, title FROM tasks WHERE status = 'running' ORDER BY id")]
-        finally:
-            conn.close()
-    except Exception:                         # noqa: BLE001 - odczyt pomocniczy; brak odpowiedzi tablicy nie blokuje
-        return []
+            conn = sqlite3.connect(f"{db.as_uri()}?mode=ro", uri=True, timeout=3)
+            try:
+                wynik += [f"{i} {a or '?'}: {(t or '')[:70]}" for i, a, t in conn.execute(zapytanie, arg)]
+            finally:
+                conn.close()
+        except Exception:                     # noqa: BLE001 - odczyt pomocniczy; brak odpowiedzi bazy nie blokuje
+            continue
+    return wynik
 
 
 class _Aktualizacja:

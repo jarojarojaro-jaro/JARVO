@@ -735,6 +735,26 @@ def test_aktualizacja_czeka_na_karty_w_toku(tmp_path):
     assert kod == 0 and raport["wynik"] == "zaktualizowano", log
 
 
+def test_tura_rozmowy_w_panelu_to_praca_w_toku(tmp_path):
+    """24.11: wgranie po kartach zrestartowało bramę w trakcie tury Jarva z odpowiedzią dla właściciela („Operation
+    interrupted”). Świeży przebieg rozmowy panelu czeka jak karta; zawieszony od 30 min i skończony nie blokują."""
+    import sqlite3
+    import time as czas
+    u, _ = _instalacja(tmp_path)
+    (u.dane / "jarvo" / "state").mkdir(parents=True, exist_ok=True)
+    c = sqlite3.connect(u.dane / "jarvo" / "state" / "rozmowy.db")
+    c.execute("CREATE TABLE przebiegi (id TEXT, agent TEXT, stan TEXT, utworzony_at REAL, ostatnie_zdarzenie_at REAL)")
+    teraz = czas.time()
+    c.executemany("INSERT INTO przebiegi VALUES (?, ?, ?, ?, ?)", [
+        ("p_1", "jarvo", "pracuje", teraz - 60, teraz - 5),
+        ("p_2", "jarvo", "pracuje", teraz - 7200, teraz - 3600),
+        ("p_3", "jarvo-web", "gotowe", teraz - 60, teraz - 5),
+        ("p_4", "s:gpu", "przyjety", teraz - 10, None)])
+    c.commit()
+    c.close()
+    assert aktualizacja.karty_w_toku(u) == ["p_1 jarvo: tura rozmowy w panelu", "p_4 s:gpu: tura rozmowy w panelu"]
+
+
 def test_po_kartach_czeka_lokalnie_i_pyta_github_raz(tmp_path, monkeypatch):
     """16.11: operator ponawiał `jarvo update` co 30 s w czasie karty; każde wywołanie pytało GitHub i po 15 min
     skończył się limit 60 zapytań na godzinę. `--po-kartach` czeka na tablicę lokalnie, a wersję sprawdza raz."""
