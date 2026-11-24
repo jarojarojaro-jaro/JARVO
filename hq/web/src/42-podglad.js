@@ -2,8 +2,8 @@
 // /podglad/ws (hq/plugin/podglad_zywo.py) z tokenem sesji panelu, obraz telefonu w H.264 dekodowany przez WebCodecs
 // (VideoDecoder z optimizeForLatency, rysowanie na canvas zaraz po dekodzie), JPEG Komputera przez createImageBitmap.
 // Na komputerze (≥ 1100 px) panel po prawej stronie rozmowy, na telefonie pływający podgląd w rogu (przeciąganie
-// palcem, stuknięcie = pełny ekran, zrzucenie w dół = zamknij). Stany zawsze słowami, nigdy czarny ekran; opóźnienie
-// z czasu odbioru ramki na serwerze i różnicy zegarów (ping przy połączeniu); krótki okrąg w miejscu stuknięcia
+// palcem, stuknięcie = pełny ekran, zrzucenie w dół = zamknij). Stany zawsze słowami, nigdy czarny ekran; znak
+// NA ŻYWO bez liczby ms (24.11 właściciel: liczba myliła); krótki okrąg w miejscu stuknięcia
 // agenta; zakładki urządzeń z kropką przy tym, na którym agent pracuje, i „Za agentem”. Tylko podgląd, bez sterowania.
 
 // SPS z konfiguracji H.264 (Annex B): pierwsza jednostka NAL typu 7, bez kodu startu
@@ -54,12 +54,12 @@ function napisPodgladu(s, nazwa, koniecS) {
   return null;
 }
 
-// Połączenie poza Reactem: WebSocket, dekoder, rysowanie i zegar; `zmien(stan)` daje Reactowi zmiany (opóźnienie
-// najwyżej 4 razy na sekundę)
+// Połączenie poza Reactem: WebSocket, dekoder i rysowanie; `zmien(stan)` daje Reactowi zmiany; ping co 10 s
+// podtrzymuje połączenie, gdy obraz stoi (ekran wygaszony)
 class PolaczeniePodgladu {
   constructor(canvas, zmien) {
-    Object.assign(this, { canvas, zmien, u: undefined, przesuniecie: 0, rtt: Infinity, proby: 0, koniec: false, czasy: new Map(),
-      dekoder: null, kodek: null, config: null, czekaKlucza: true, jpegZajety: false, jpegNastepny: null, ostatniZnak: 0 });
+    Object.assign(this, { canvas, zmien, u: undefined, proby: 0, koniec: false,
+      dekoder: null, kodek: null, config: null, czekaKlucza: true, jpegZajety: false, jpegNastepny: null });
     this.otworz();
   }
   otworz() {
@@ -69,7 +69,6 @@ class PolaczeniePodgladu {
     ws.onopen = () => {
       this.proby = 0;
       this.zmien({ polaczenie: "otwarte" });
-      [0, 150, 400, 900].forEach((t) => setTimeout(() => this.wyslij({ typ: "ping", t: Date.now() }), t));
       this.zegar = setInterval(() => this.wyslij({ typ: "ping", t: Date.now() }), 10000);
       if (this.u !== undefined) this.wyslij({ typ: "patrz", u: this.u });
     };
@@ -88,14 +87,11 @@ class PolaczeniePodgladu {
     this.config = null;
     const g = this.canvas && this.canvas.getContext("2d");
     if (g) g.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    this.zmien({ klatka: false, sesja: null, ekran: null, komputer: null, stan: "laczy", opis: "", opoznienie: null });
+    this.zmien({ klatka: false, sesja: null, ekran: null, komputer: null, stan: "laczy", opis: "" });
     this.wyslij({ typ: "patrz", u });
   }
   tekst(d) {
-    if (d.typ === "pong") {
-      const teraz = Date.now(), rtt = teraz - d.t;
-      if (rtt < this.rtt) { this.rtt = rtt; this.przesuniecie = d.s - (d.t + teraz) / 2; }
-    } else if (d.typ === "witaj") this.zmien({ telefony: d.telefony || [], komputerJest: !!d.komputer, agent: d.agent, przydzialy: d.przydzialy || {} });
+    if (d.typ === "witaj") this.zmien({ telefony: d.telefony || [], komputerJest: !!d.komputer, agent: d.agent, przydzialy: d.przydzialy || {} });
     else if (d.typ === "agent") this.zmien({ agent: d.agent });
     else if (d.typ === "stan") this.zmien({ u: d.u, stan: d.stan, opis: d.opis || "" });
     else if (d.typ === "ekran") this.zmien({ ekran: { wlaczony: d.wlaczony, zablokowany: d.zablokowany, szer: d.szer, wys: d.wys } });
@@ -103,9 +99,9 @@ class PolaczeniePodgladu {
     else if (d.typ === "klatka") this.zmien({ komputer: { szer: d.w_css, wys: d.h_css, tytul: d.tytul } });
   }
   binarne(buf) {
-    const v = new DataView(buf), typ = v.getUint8(0), czas = v.getFloat64(1), pts = Number(v.getBigInt64(9));
+    const v = new DataView(buf), typ = v.getUint8(0), pts = Number(v.getBigInt64(9));
     const dane = new Uint8Array(buf, 17);
-    if (typ === 4) return this.jpeg(dane, czas);
+    if (typ === 4) return this.jpeg(dane);
     if (typ === 1) {
       this.config = dane.slice();
       const sps = spsZKonfiguracji(this.config), kodek = sps && kodekAvc(sps);
@@ -125,8 +121,6 @@ class PolaczeniePodgladu {
       this.czekaKlucza = true;
       return undefined;
     }
-    this.czasy.set(pts, czas);
-    if (this.czasy.size > 300) this.czasy.delete(this.czasy.keys().next().value);
     d.decode(new EncodedVideoChunk({ type: typ === 2 ? "key" : "delta", timestamp: pts, data: dane2 }));
     return undefined;
   }
@@ -135,7 +129,7 @@ class PolaczeniePodgladu {
     if (typeof VideoDecoder === "undefined") { this.zmien({ bladObrazu: true }); return; }
     this.kodek = kodek;
     const d = this.dekoder = new VideoDecoder({
-      output: (f) => { const czas = this.czasy.get(f.timestamp); this.czasy.delete(f.timestamp); this.rysuj(f, f.displayWidth, f.displayHeight, czas); f.close(); },
+      output: (f) => { this.rysuj(f, f.displayWidth, f.displayHeight); f.close(); },
       // błąd dekodera: od nowa od serwera (sesja, konfiguracja i klatka kluczowa z pamięci strumienia)
       error: () => { if (this.dekoder === d) { this.dekoder = null; this.kodek = null; this.wyslij({ typ: "patrz", u: this.u }); } },
     });
@@ -148,28 +142,23 @@ class PolaczeniePodgladu {
     this.czekaKlucza = true;
     try { if (d && d.state !== "closed") d.close(); } catch (_) { /* już zamknięty */ }
   }
-  jpeg(dane, czas) {
-    if (this.jpegZajety) { this.jpegNastepny = [dane, czas]; return; }
+  jpeg(dane) {
+    if (this.jpegZajety) { this.jpegNastepny = dane; return; }
     this.jpegZajety = true;
-    createImageBitmap(new Blob([dane], { type: "image/jpeg" })).then((b) => { this.rysuj(b, b.width, b.height, czas); b.close(); },
+    createImageBitmap(new Blob([dane], { type: "image/jpeg" })).then((b) => { this.rysuj(b, b.width, b.height); b.close(); },
       () => {}).finally(() => {
       this.jpegZajety = false;
       const n = this.jpegNastepny;
       this.jpegNastepny = null;
-      if (n) this.jpeg(n[0], n[1]);
+      if (n) this.jpeg(n);
     });
   }
-  rysuj(obraz, w, h, czas) {
+  rysuj(obraz, w, h) {
     const c = this.canvas;
     if (!c || this.koniec) return;
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; this.zmien({ obraz: { w, h } }); }
     c.getContext("2d").drawImage(obraz, 0, 0);
-    const teraz = Date.now();
     if (!this.maKlatke) { this.maKlatke = true; this.zmien({ klatka: true }); }
-    if (czas != null && teraz - this.ostatniZnak > 250) {
-      this.ostatniZnak = teraz;
-      this.zmien({ klatka: true, opoznienie: Math.max(0, Math.round(teraz + this.przesuniecie - czas)) });
-    }
   }
   zamknij() {
     this.koniec = true;
@@ -297,7 +286,7 @@ function PodgladOkno({ stan, biezacy }) {
         <button type="button" class="j-ma-tip" aria-pressed=${String(zaAgentem)} aria-label=${L("Za agentem", "Follow agent")}
           onClick=${() => setZaAgentem(!zaAgentem)}><${Ikona} n="pin" r=${16}/><${Podpowiedz} tekst=${L("Za agentem: przełączam sam na urządzenie, na którym pracuje", "Follow agent: switch to the device it works on")}/></button>
       </nav>` : html`<b class="j-pz-n">${nazwa}</b>`}
-      ${naZywo && html`<span class="j-pz-zywo" role="status"><span class="j-na-zywo-k" aria-hidden="true"></span>${L("NA ŻYWO", "LIVE")}${s.opoznienie != null ? ` ${s.opoznienie} ms` : ""}</span>`}
+      ${naZywo && html`<span class="j-pz-zywo" role="status"><span class="j-na-zywo-k" aria-hidden="true"></span>${L("NA ŻYWO", "LIVE")}</span>`}
       ${pelny && !szeroki && html`<${Przycisk} maly rodzaj="cichy" ikona="down" etykieta=${L("Mniejszy podgląd", "Smaller view")} onClick=${() => setPelny(false)}/>`}
       <${Przycisk} maly rodzaj="cichy" ikona="x" etykieta=${L("Zamknij podgląd", "Close live view")} onClick=${() => NaZywo.zamknij()}/>
     </header>

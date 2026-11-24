@@ -1611,7 +1611,7 @@ z tekstem i jakieś edytuj”). Pakiet `mozg` ładuje się dopiero po wejściu w
   szerokość z uchwytu na lewej krawędzi, 320 px do 70% okna, zapamiętana w localStorage), wężej pływający podgląd
   w rogu (stuknięcie = pełny ekran, zrzucenie w dół = zamknij); w nagłówku małe ikony urządzeń (telefon z numerem,
   glob = przeglądarka Komputera, kropka przy urządzeniu agenta) i pinezka „Za agentem”, pod nim nazwa i ruch
-  agenta albo tytuł strony; NA ŻYWO z ms, krąg stuknięcia, stany słowami (łączę, ekran wygaszony, poza siecią,
+  agenta albo tytuł strony; znak NA ŻYWO (bez liczby ms), krąg stuknięcia, stany słowami (łączę, ekran wygaszony, poza siecią,
   skończył N s temu; po 30 s okno się chowa). Przycisk jest też przy pasku „Podagenci”. Obraz telefonu (H.264,
   WebCodecs) działa tylko po https: `jarvo panel siec https on` (rozdział 2g).
   Ustawienia › Powiadomienia: „Otwieraj podgląd sam” (localStorage, domyślnie wyłączone).
