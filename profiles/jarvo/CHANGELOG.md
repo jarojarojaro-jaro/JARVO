@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Pod wiadomością agenta pasek „Podagenci: 2 z 3 gotowe” z celem każdego podagenta i końcem jego dziennika na klik, odświeżany, dopóki pracują.
 - Panel pokazuje na żywo ekran telefonu i przeglądarki Jarva, gdy agent na nich pracuje: przycisk „Podgląd na żywo” przy kroku otwiera obraz po prawej (na telefonie w rogu), z opóźnieniem w ms i kropką przy urządzeniu agenta.
 - Panel budzi agenta, gdy jego podagenci w tle skończą (Hermes przez api_server zapisywał ich wynik bez budzenia), i zostawia w rozmowie notkę „Podagenci skończyli: N z N”.
 - Panel otwiera pliki z załączników kart (`kanban/attachments`), które Jarvo wysyła w czacie; dotąd pokazywał „Nie udało się wczytać pliku”.

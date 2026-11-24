@@ -37,7 +37,7 @@ const NaZywo = (() => {
   return {
     urzadzenie, teraz, rowne, stan: () => stan, ustaw,
     sluchaj: (f) => { sluchacze.add(f); return () => sluchacze.delete(f); },
-    otworz: (u) => ustaw({ otwarte: true, u: u || null, od: Date.now() }),
+    otworz: (u) => ustaw({ otwarte: true, u: u || null, karta: null, wid: null, od: Date.now() }),
     zamknij: () => ustaw({ otwarte: false }),
   };
 })();

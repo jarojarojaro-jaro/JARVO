@@ -165,6 +165,8 @@ function WiadomoscAgenta({ x, ctx, ostatniaPrzebiegu, tak }) {
     ${x.kroki && x.kroki.length > 0 && html`<${Kroki} kroki=${x.kroki} szczegoly=${ctx.szczegoly} watek=${ctx.watek}/>`}
     <${TrescMd} tekst=${tekst} pomin=${pomin} klasa="j-msg-t"/>
     ${x.pliki && x.pliki.length > 0 && html`<div class="j-pliki">${x.pliki.map((p) => html`<${KartaPliku} key=${p.path} plik=${p}/>`)}</div>`}
+    ${x.przebieg_id && ctx.watek && (x.kroki || []).some((k) => k.narzedzie === "delegate_task") && html`<${Leniwy} pakiet="podglad"
+      nazwa="PodagenciLinia" watek=${ctx.watek} pidy=${x.przebiegi || [x.przebieg_id]} agent=${x.agent}/>`}
     ${tak && html`<${TakNie} tak=${tak} ctx=${ctx}/>`}
     ${ostatniaPrzebiegu && x.przebieg_id && html`<${ZgodaPoKoncu} pid=${x.przebieg_id} ctx=${ctx}/>`}
     ${ostatniaPrzebiegu && x.przebieg_id && ctx.rozmowca && html`<${LustroNie} pid=${x.przebieg_id}/>`}

@@ -2723,3 +2723,17 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   animation: j-pz-krag .9s ease-out forwards; }
 @keyframes j-pz-krag { from { transform: scale(.4); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .j-pz-krag { animation-duration: .01s; } }
+/* podagenci w tle pod wiadomością agenta (42-podglad.js PodagenciLinia) */
+.j-pa { margin-top: 8px; font-size: 12.5px; }
+.j-pa-g { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 0; cursor: pointer;
+  background: var(--j-tlo-karta); color: var(--j-tresc); font: 600 12px var(--j-font-mono); box-shadow: inset 2px 0 0 var(--j-tekst-3); }
+.j-pa.is-trwa .j-pa-g { box-shadow: inset 2px 0 0 var(--j-praca); color: var(--j-tekst); }
+.j-pa-g:hover, .j-pa-g:focus-visible { background: var(--j-tlo-hover); }
+.j-na-zywo-k.is-stoi { animation: none; background: var(--j-tekst-3); }
+.j-pa-l { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+.j-pa-z { width: 100%; display: block; padding: 6px 10px; border: 0; text-align: left; cursor: pointer; background: var(--j-tlo-karta);
+  color: var(--j-tresc); font: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.j-pa-z b { font: 600 10.5px var(--j-font-mono); text-transform: uppercase; margin-right: 6px; color: var(--j-tekst-3); }
+.j-pa-z.is-pracuje b { color: var(--j-praca); }
+.j-pa-log { margin: 0; max-height: 260px; overflow: auto; padding: 8px 10px; background: var(--j-tlo-2, var(--j-tlo-karta));
+  font: 400 11px/1.45 var(--j-font-mono); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--j-tresc); }

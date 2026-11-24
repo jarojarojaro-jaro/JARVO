@@ -7,6 +7,9 @@ więc każda trasa zapisu dostaje ochronę CSRF z `ochrona.Trasa`).
   już jest w zapisie sesji: omp z offsetów czytnika, Hermes z linii członka wątku; `ochrona.utajnij_krok`, krok przy
   pliku z poświadczeniami bez wyniku, przycięte jak `scalanie.WIDOK_KROKU`); obcy adres albo krok spoza wątku = 404.
 - Eksport: `GET /rozmowy/{id}/eksport` (cała oś jako plik Markdown, przez `ochrona.utajnij`); agenci: `GET /agenci`.
+- Podagenci w tle: `GET /rozmowy/{id}/podagenci` (delegacje `deleg_…` z kroków przebiegów wątku z ostatnich 24 h ze
+  stanem zadań z manifestów `profiles/<agent>/cache/delegation/live/<id>/`), `GET /rozmowy/{id}/podagenci/{deleg}/{nr}`
+  (ostatnie 40 linii `task-<nr>.log` przez `ochrona.utajnij`; delegacja spoza wątku albo plik poza jej katalogiem = 404).
 - Wysyłka: `POST /rozmowy/{id}/wiadomosci` (wzmianki, załączniki przez `safe_path`, obrazy sprawdzane po magicznych
   bajtach i limit 7 000 000 bajtów zakodowanych data URL → 413 `za_duze` zanim cokolwiek pójdzie do bramy). Tekst
   będący komendą `/…` (także po wzmiance) = 409 `komenda`: brama nie wykonuje komend, robi to `POST /komendy`
@@ -879,6 +882,40 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
         if krok is None:
             raise BladTrasy(404, "brak", "Nie ma takiego kroku.", "No such step.")
         return {"krok": {**krok, "ref": ref}}
+
+    async def delegacje_watku(sil, wid: str) -> list[dict]:
+        """Przebiegi wątku z ostatnich 24 h, których kroki niosą `deleg_…` (nowsze niż okno budzenia obserwatora)."""
+        return await asyncio.to_thread(sil.db.przebiegi_watku_z_podagentami, wid,
+                                       zegar() - m.obserwator.PODAGENCI_OKNO_S)
+
+    @trasa("GET", "/rozmowy/{wid}/podagenci")
+    @obsluga
+    async def podagenci_watku(wid: str, request: Request):
+        """Podagenci w tle wątku: delegacje ze stanem każdego zadania (panel odpytuje, dopóki któraś trwa)."""
+        tylko_ta_strona(request)
+        sil = s()
+        await watek_lub_404(sil, wid)
+        przeb = await delegacje_watku(sil, wid)
+        return {"delegacje": await asyncio.to_thread(m.obserwator.delegacje_przebiegow, sil.home, przeb,
+                                                     utajnij=ochrona.utajnij)}
+
+    @trasa("GET", "/rozmowy/{wid}/podagenci/{did}/{nr}")
+    @obsluga
+    async def dziennik_podagenta(wid: str, did: str, nr: str, request: Request):
+        """Koniec dziennika jednego podagenta (`task-<nr>.log`); tylko delegacja z kroków tego wątku."""
+        tylko_ta_strona(request)
+        sil = s()
+        await watek_lub_404(sil, wid)
+        nie_ma = BladTrasy(404, "brak", "Nie ma takiego podagenta.", "No such subagent.")
+        if not m.obserwator.DELEGACJA.fullmatch(did or "") or not re.fullmatch(r"\d{1,4}", nr or ""):
+            raise nie_ma
+        agent = next((p["agent"] for p in await delegacje_watku(sil, wid)
+                      if did in m.obserwator.DELEGACJA.findall(str(p.get("kroki") or ""))), None)
+        katalog = m.obserwator.katalog_delegacji(sil.home, agent or "", did)
+        linie = await asyncio.to_thread(m.obserwator.ogon_dziennika, katalog, int(nr)) if katalog else None
+        if linie is None:
+            raise nie_ma
+        return {"linie": ochrona.utajnij("\n".join(linie)).split("\n") if linie else []}
 
     @trasa("GET", "/rozmowy/{wid}/eksport")
     @obsluga

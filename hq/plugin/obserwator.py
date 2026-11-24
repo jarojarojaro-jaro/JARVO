@@ -44,21 +44,86 @@ KONCOWE_PODAGENTA = {"completed", "failed", "error", "interrupted", "cancelled",
 
 
 def stan_delegacji(katalog: Path) -> dict | None:
-    """Manifest podagentów w tle (Hermes `cache/delegation/live/<id>/manifest.json`): {id, zadania [{cel, stan}],
-    gotowe, razem, koniec, mtime}; None bez manifestu albo zadań."""
+    """Manifest podagentów w tle (Hermes `cache/delegation/live/<id>/manifest.json`): {id, zadania [{nr, cel, stan}],
+    gotowe, razem, koniec, start, mtime}; None bez manifestu albo zadań. `nr` to `index` zadania (plik `task-<nr>.log`)."""
     plik = katalog / "manifest.json"
     try:
         dane = json.loads(plik.read_text(encoding="utf-8"))
         mtime = plik.stat().st_mtime
     except (OSError, ValueError):
         return None
-    zadania = [{"cel": str(t.get("goal") or "")[:200], "stan": str(t.get("status") or "")}
-               for t in dane.get("tasks") or [] if isinstance(t, dict)]
+    if not isinstance(dane, dict):
+        return None
+    zadania = [{"nr": t["index"] if type(t.get("index")) is int else i, "cel": str(t.get("goal") or "")[:200],
+                "stan": str(t.get("status") or "")}
+               for i, t in enumerate(dane.get("tasks") or []) if isinstance(t, dict)]
     if not zadania:
         return None
     gotowe = sum(z["stan"] in KONCOWE_PODAGENTA for z in zadania)
+    start = next((float(dane[k]) for k in ("started_at", "created_at")
+                  if isinstance(dane.get(k), (int, float)) and not isinstance(dane.get(k), bool)), None)
     return {"id": str(dane.get("delegation_id") or katalog.name), "zadania": zadania, "gotowe": gotowe,
-            "razem": len(zadania), "koniec": gotowe == len(zadania), "mtime": mtime, "katalog": str(katalog)}
+            "razem": len(zadania), "koniec": gotowe == len(zadania), "start": start, "mtime": mtime,
+            "katalog": str(katalog)}
+
+
+def katalog_delegacji(home: Path | str, agent: str, did: str) -> Path | None:
+    """Katalog `<dane>/profiles/<agent>/cache/delegation/live/<did>`; None dla złego id albo katalogu, który po
+    rozwiązaniu dowiązań wychodzi poza `live` tego agenta."""
+    if not DELEGACJA.fullmatch(did or "") or not re.fullmatch(r"[a-z0-9-]+", agent or ""):
+        return None
+    live = Path(home) / "profiles" / agent / "cache" / "delegation" / "live"
+    k = live / did
+    try:
+        if k.resolve().parent != live.resolve():
+            return None
+    except OSError:
+        return None
+    return k
+
+
+def delegacje_przebiegow(home: Path | str, przebiegi: list[dict], *,
+                         utajnij: Callable[[str], str] = lambda t: t) -> list[dict]:
+    """Podagenci w tle z kroków przebiegów (`deleg_…`) ze stanem z manifestów: [{id, agent, przebieg_id, start,
+    gotowe, razem, koniec, zadania [{nr, cel, stan, koniec}]}] w kolejności przebiegów; bez manifestu = pominięta."""
+    wynik, byly = [], set()
+    for p in przebiegi:
+        for did in sorted(set(DELEGACJA.findall(json.dumps(p.get("kroki") or [], ensure_ascii=False)))):
+            if did in byly:
+                continue
+            byly.add(did)
+            k = katalog_delegacji(home, p.get("agent") or "", did)
+            d = stan_delegacji(k) if k is not None else None
+            if d is None:
+                continue
+            wynik.append({"id": did, "agent": p["agent"], "przebieg_id": p["id"],
+                          "start": d["start"] or p.get("utworzony_at"), "gotowe": d["gotowe"], "razem": d["razem"],
+                          "koniec": d["koniec"],
+                          "zadania": [{"nr": z["nr"], "cel": utajnij(z["cel"]), "stan": z["stan"],
+                                       "koniec": z["stan"] in KONCOWE_PODAGENTA} for z in d["zadania"]]})
+    return wynik
+
+
+def ogon_dziennika(katalog: Path, nr: int, *, linie: int = 40, bajty: int = 65536) -> list[str] | None:
+    """Ostatnie `linie` linii `task-<nr>.log` z katalogu delegacji (czytane tylko ostatnie `bajty`); None, gdy plik
+    po rozwiązaniu dowiązań nie leży wprost w tym katalogu; [] bez pliku."""
+    plik = katalog / f"task-{int(nr)}.log"
+    try:
+        if plik.resolve().parent != katalog.resolve():
+            return None
+        if not plik.is_file():
+            return []
+        with plik.open("rb") as f:
+            f.seek(0, 2)
+            rozmiar = f.tell()
+            f.seek(max(0, rozmiar - bajty))
+            dane = f.read()
+    except OSError:
+        return []
+    tekst = dane.decode("utf-8", errors="replace")
+    if rozmiar > bajty:                              # pierwsza linia urwana w środku
+        tekst = tekst.split("\n", 1)[-1]
+    return tekst.rstrip("\n").split("\n")[-linie:] if tekst.strip() else []
 
 
 def tekst_budzenia_podagentow(d: dict) -> str:

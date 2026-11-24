@@ -271,4 +271,60 @@ function PodgladOkno({ stan, biezacy }) {
   </aside>`;
 }
 
-Zasoby.daj({ PodgladOkno, spsZKonfiguracji, kodekAvc, punktNaObrazie, napisPodgladu });
+// Podagenci w tle (delegate_task) pod wiadomością agenta: „Podagenci Jarva: 2 z 3 gotowe”, lista z celem i stanem,
+// klik pokazuje koniec dziennika podagenta. Odpytuje co 3 s tylko, dopóki któraś delegacja trwa (24.11: właściciel
+// nie widział w panelu pracy podagentów, bo agent skończył turę, a oni pracowali dalej).
+function stanPodagentow(delegacje) {
+  const zad = (delegacje || []).flatMap((d) => d.zadania || []);
+  return { gotowe: zad.filter((z) => z.koniec).length, razem: zad.length, trwa: (delegacje || []).some((d) => !d.koniec) };
+}
+
+function DziennikPodagenta({ watek, did, nr, trwa }) {
+  const [linie, setLinie] = useState(null);
+  useEffect(() => {
+    let zyje = true, t = null;
+    const pobierz = () => zadanie("GET", `/rozmowy/${encodeURIComponent(watek)}/podagenci/${did}/${nr}`)
+      .then((d) => { if (zyje) setLinie(d.linie || []); }).catch(() => { if (zyje) setLinie([]); })
+      .finally(() => { if (zyje && trwa) t = setTimeout(pobierz, 3000); });
+    pobierz();
+    return () => { zyje = false; clearTimeout(t); };
+  }, [watek, did, nr, trwa]);
+  return html`<pre class="j-pa-log">${linie == null ? L("Wczytuję…", "Loading…") : linie.length ? linie.join("\n") : L("Dziennik jest pusty.", "The log is empty.")}</pre>`;
+}
+
+function PodagenciLinia({ watek, pidy, agent }) {
+  const [delegacje, setDelegacje] = useState(null);
+  const [otwarte, setOtwarte] = useState(false);
+  const [log, setLog] = useState(null);
+  const klucz = (pidy || []).join(",");
+  useEffect(() => {
+    let zyje = true, t = null;
+    const pobierz = () => zadanie("GET", `/rozmowy/${encodeURIComponent(watek)}/podagenci`)
+      .then((d) => {
+        if (!zyje) return;
+        const moje = (d.delegacje || []).filter((x) => (pidy || []).includes(x.przebieg_id));
+        setDelegacje(moje);
+        if (moje.some((x) => !x.koniec)) t = setTimeout(pobierz, 3000);
+      })
+      .catch(() => { if (zyje) t = setTimeout(pobierz, 10000); });
+    pobierz();
+    return () => { zyje = false; clearTimeout(t); };
+  }, [watek, klucz]);
+  if (!delegacje || !delegacje.length) return null;
+  const s = stanPodagentow(delegacje);
+  return html`<div class=${cx("j-pa", s.trwa && "is-trwa")}>
+    <button type="button" class="j-pa-g" aria-expanded=${String(otwarte)} onClick=${() => setOtwarte(!otwarte)}>
+      <span class=${cx("j-na-zywo-k", !s.trwa && "is-stoi")} aria-hidden="true"></span>
+      ${L(`Podagenci: ${s.gotowe} z ${s.razem} gotowe`, `Subagents: ${s.gotowe} of ${s.razem} done`)}
+    </button>
+    ${otwarte && html`<ul class="j-pa-l">${delegacje.flatMap((d) => d.zadania.map((z) => {
+      const k = `${d.id}:${z.nr}`;
+      return html`<li key=${k}><button type="button" class=${cx("j-pa-z", z.koniec ? "is-gotowe" : "is-pracuje")}
+          aria-expanded=${String(log === k)} onClick=${() => setLog(log === k ? null : k)}>
+          <b>${z.koniec ? L("gotowe", "done") : L("pracuje", "working")}</b> ${z.cel}</button>
+        ${log === k && html`<${DziennikPodagenta} watek=${watek} did=${d.id} nr=${z.nr} trwa=${!z.koniec}/>`}</li>`;
+    }))}</ul>`}
+  </div>`;
+}
+
+Zasoby.daj({ PodgladOkno, PodagenciLinia, stanPodagentow, spsZKonfiguracji, kodekAvc, punktNaObrazie, napisPodgladu });

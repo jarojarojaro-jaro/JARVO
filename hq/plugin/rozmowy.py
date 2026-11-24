@@ -926,6 +926,10 @@ class Rozmowy:
         obserwator budzi agenta, gdy jego podagenci skończą (Hermes przez api_server nie budzi sam)."""
         return self._przebiegi("zakonczony_at >= ? AND kroki LIKE '%deleg\\_%' ESCAPE '\\'", (od,))
 
+    def przebiegi_watku_z_podagentami(self, wid: str, od: float) -> list[dict]:
+        """Przebiegi wątku zlecone od `od` (także trwające), których kroki niosą `deleg_…`: pasek podagentów w panelu."""
+        return self._przebiegi("watek_id = ? AND utworzony_at >= ? AND kroki LIKE '%deleg\\_%' ESCAPE '\\'", (wid, od))
+
     def nasze_wiersze(self, wid: str) -> dict[str, dict]:
         """Przebiegi wątku, które wysłały turę: po czym scalanie rozpozna nasze wiersze użytkownika w state.db
         (`user_msg_id`, a przed nim `payload_sha` od `wyslany_at − 2 s`) i wiersze tury w toku."""
