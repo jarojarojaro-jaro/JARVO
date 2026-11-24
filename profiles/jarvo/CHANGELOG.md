@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Przycisk „Na żywo” stoi na stałe w pasku pracy z ikoną urządzenia i działa jak przełącznik, zamiast skakać po liście kroków.
 - `jarvo update --po-kartach` czeka też na trwające tury rozmów w panelu (24.11 wgranie przerwało odpowiedź Jarva dla właściciela).
 - Podgląd na żywo stoi obok rozmowy jako panel z uchwytem szerokości i małymi ikonami telefonów i przeglądarki, a `jarvo panel siec https on` daje panel pod https (obraz telefonu), stary adres przekierowuje.
 - Pod wiadomością agenta pasek „Podagenci: 2 z 3 gotowe” z celem każdego podagenta i końcem jego dziennika na klik, odświeżany, dopóki pracują.

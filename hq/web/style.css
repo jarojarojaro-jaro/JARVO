@@ -2674,12 +2674,18 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   .j-pig-w .j-pig { flex: 0 1 auto; min-width: 0; overflow: hidden; }
 }
 /* @@pakiet rdzen */
-/* przycisk „Telefon second · Podgląd na żywo” (41-na-zywo.js) w pasku pracy i przy kroku rozmowy, kropka pulsuje */
-.j-na-zywo { display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 12px; border: 0; background: var(--j-tlo-3); box-shadow: inset 0 1px 0 var(--j-hi);
-  font: 400 12px var(--j-font-mono); color: var(--j-tekst); white-space: nowrap; cursor: pointer; }
-.j-na-zywo:hover, .j-na-zywo:focus-visible { background: var(--j-praca); color: var(--j-akcent-na); }
-.j-zywo > .j-na-zywo { height: 40px; padding: 0 14px; background: var(--j-stal), var(--j-tlo-karta); }
-.j-kroki-l li > .j-na-zywo { margin: 4px 0 2px; }
+/* przycisk „Na żywo” (41-na-zywo.js): stały w pasku pracy i przy pasku podagentów; ikona urządzenia, napis, nazwa
+   telefonu, kropka; wciśnięty = okno otwarte; wąsko sama ikona z kropką */
+.j-na-zywo { position: relative; display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px; border: 0; background: var(--j-tlo-3);
+  box-shadow: inset 0 1px 0 var(--j-hi); font: 600 11px var(--j-font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--j-tekst);
+  white-space: nowrap; cursor: pointer; transition: background .15s var(--j-ease, ease), color .15s var(--j-ease, ease); }
+.j-na-zywo:hover, .j-na-zywo:focus-visible { background: var(--j-tlo-karta); color: var(--j-tekst); box-shadow: inset 0 1px 0 var(--j-hi), inset 0 -2px 0 var(--j-praca); }
+.j-na-zywo[aria-pressed="true"] { background: var(--j-praca); color: var(--j-akcent-na); box-shadow: none; }
+.j-na-zywo[aria-pressed="true"] .j-na-zywo-k { background: currentColor; }
+.j-na-zywo-u { font-weight: 400; text-transform: none; letter-spacing: 0; opacity: .7; }
+.j-zywo > .j-na-zywo { height: 40px; padding: 0 16px; }
+.j-zywo > .j-na-zywo:not([aria-pressed="true"]) { background: var(--j-stal), var(--j-tlo-karta); }
+@container app (max-width: 639px) { .j-zywo > .j-na-zywo { padding: 0 13px; } .j-zywo .j-na-zywo-t, .j-zywo .j-na-zywo-u { display: none; } }
 .j-na-zywo-k { width: 7px; height: 7px; border-radius: 50%; background: var(--j-praca); flex: none; animation: j-na-zywo 1.6s ease-in-out infinite; }
 @keyframes j-na-zywo { 50% { opacity: .3; } }
 @media (prefers-reduced-motion: reduce) { .j-na-zywo-k { animation: none; } }

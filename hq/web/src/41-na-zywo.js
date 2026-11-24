@@ -36,6 +36,8 @@ const NaZywo = (() => {
   const ustaw = (z) => { stan = { ...stan, ...z }; sluchacze.forEach((f) => f(stan)); };
   return {
     urzadzenie, teraz, rowne, stan: () => stan, ustaw,
+    // ostatnie urządzenie w krokach przebiegu: przycisk stoi w pasku od pierwszego kroku na urządzeniu, nie skacze
+    ostatnie: (kroki) => { for (let i = (kroki || []).length - 1; i >= 0; i--) { const u = urzadzenie(kroki[i]); if (u) return u; } return null; },
     sluchaj: (f) => { sluchacze.add(f); return () => sluchacze.delete(f); },
     otworz: (u) => ustaw({ otwarte: true, u: u || null, karta: null, wid: null, od: Date.now() }),
     zamknij: () => ustaw({ otwarte: false }),
@@ -50,11 +52,15 @@ function useNaZywo() {
 
 const nazwaUrzadzenia = (u) => (u === "komputer" ? T("podglad.komputer") : u ? T("podglad.telefon_n", { n: u }) : T("podglad.telefon"));
 
+// jeden stały przycisk (pasek pracy, pasek podagentów): ikona urządzenia, „Na żywo” i nazwa; drugi klik zamyka okno
 function PrzyciskNaZywo({ urz }) {
+  const s = useNaZywo();
   if (!urz) return null;
-  return html`<button type="button" class="j-na-zywo" data-urzadzenie=${urz.u || "telefon"}
-    onClick=${(e) => { e.stopPropagation(); NaZywo.otworz(urz.u); }}><span class="j-na-zywo-k" aria-hidden="true"></span>
-    ${nazwaUrzadzenia(urz.u)} · ${T("podglad.na_zywo")}</button>`;
+  const opis = `${nazwaUrzadzenia(urz.u)} · ${T("podglad.na_zywo")}`;
+  return html`<button type="button" class="j-na-zywo" aria-pressed=${String(s.otwarte)} title=${opis} aria-label=${opis}
+    onClick=${(e) => { e.stopPropagation(); if (s.otwarte) NaZywo.zamknij(); else NaZywo.otworz(urz.u); }}>
+    <${Ikona} n=${urz.u === "komputer" ? "globe" : "phone"} r=${15}/><span class="j-na-zywo-t">${L("Na żywo", "Live")}</span>
+    ${urz.u && urz.u !== "komputer" && html`<span class="j-na-zywo-u">${urz.u}</span>`}<span class="j-na-zywo-k" aria-hidden="true"></span></button>`;
 }
 
 // okno w korzeniu aplikacji; „Otwieraj podgląd sam” (Ustawienia › Powiadomienia) otwiera je przy nowym przebiegu,

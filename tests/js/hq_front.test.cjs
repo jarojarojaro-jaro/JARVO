@@ -1012,7 +1012,7 @@ test("Mózg: teksty interfejsu bez myślników „—” i „–”", () => {
 const NA_ZYWO = (() => {
   const ctx = vm.createContext({ React: {}, html: (s, ...v) => ({ s: s.join("|"), v }), cx: (...x) => x.filter(Boolean).join(" "),
     T: (k, p) => (p ? `${k}:${JSON.stringify(p)}` : k), L: (pl) => pl, useState: (v) => [typeof v === "function" ? v() : v, () => {}],
-    useEffect: () => {}, useRef: (v) => ({ current: v }), useSklep: () => null, Leniwy: () => null, Zasoby: { daj(o) { ctx.Z = o; } },
+    useEffect: () => {}, useRef: (v) => ({ current: v }), useSklep: () => null, Leniwy: () => null, Ikona: () => null, Zasoby: { daj(o) { ctx.Z = o; } },
     Date, Math, JSON, Map, Set, Object, Array, Number, String, RegExp, isFinite, Uint8Array });
   vm.runInContext(fs.readFileSync(path.join(SRC, "41-na-zywo.js"), "utf8") + "\n;globalThis.M = { NaZywo, PrzyciskNaZywo, nazwaUrzadzenia };", ctx);
   vm.runInContext(fs.readFileSync(path.join(SRC, "42-podglad.js"), "utf8"), ctx);
@@ -1038,21 +1038,25 @@ test("Podgląd na żywo: urządzenie z bieżącego kroku (telefon z argumentem p
   assert.strictEqual(NA_ZYWO.NaZywo.teraz([p("d", "pracuje", [{ ts: 1, narzedzie: "read_file" }])]), null);
   assert.ok(NA_ZYWO.NaZywo.rowne(teraz, { ...teraz }));
 });
-test("Podgląd na żywo: przycisk tylko przy krokach na urządzeniu, z nazwą urządzenia", () => {
+test("Podgląd na żywo: przycisk tylko przy urządzeniu, z nazwą; stoi od kroku na urządzeniu; drugi klik zamyka", () => {
   const { NaZywo, PrzyciskNaZywo } = NA_ZYWO;
   assert.strictEqual(PrzyciskNaZywo({ urz: NaZywo.urzadzenie({ narzedzie: "write_file" }) }), null);
   const b = PrzyciskNaZywo({ urz: NaZywo.urzadzenie({ narzedzie: "mcp__phone__act", args: { phone: "second" } }) });
-  assert.ok(b && b.v.includes("second") && b.v.includes('podglad.telefon_n:{"n":"second"}') && b.v.includes("podglad.na_zywo"));
-  assert.ok(PrzyciskNaZywo({ urz: NaZywo.urzadzenie({ narzedzie: "computer_use" }) }).v.includes("podglad.komputer"));
+  assert.ok(b && JSON.stringify(b).includes('"second"') && b.v.includes('podglad.telefon_n:{"n":"second"} · podglad.na_zywo'));
+  assert.ok(PrzyciskNaZywo({ urz: NaZywo.urzadzenie({ narzedzie: "computer_use" }) }).v.includes("podglad.komputer · podglad.na_zywo"));
   let otwarte = null;
   const stop = NaZywo.sluchaj((s) => { otwarte = s; });
   b.v.find((x) => typeof x === "function")({ stopPropagation() {} });
   eq([otwarte.otwarte, otwarte.u], [true, "second"]);
-  NaZywo.zamknij();
+  // przycisk czyta stan okna: otwarte = wciśnięty, klik zamyka
+  const b2 = PrzyciskNaZywo({ urz: NaZywo.urzadzenie({ narzedzie: "mcp__phone__act", args: { phone: "second" } }) });
+  b2.v.find((x) => typeof x === "function")({ stopPropagation() {} });
+  assert.strictEqual(otwarte.otwarte, false);
   stop();
-  // wpięcia: pasek pracy i krok rozmowy rysują ten sam przycisk
-  assert.ok(/PrzyciskNaZywo\} urz=\$\{NaZywo\.urzadzenie\(krok\)\}/.test(fs.readFileSync(path.join(SRC, "33-kompozytor.js"), "utf8")));
-  assert.ok(/PrzyciskNaZywo\} urz=\$\{urz\}/.test(fs.readFileSync(path.join(SRC, "32-wiadomosc.js"), "utf8")));
+  // 24.11 właściciel: przycisk przy krokach skakał; pasek bierze ostatnie urządzenie z całego przebiegu, nie z bieżącego kroku
+  const kroki = [{ narzedzie: "mcp__phone__act", args: { phone: "third" } }, { narzedzie: "read_file" }, { komentarz: "patrzę" }];
+  eq(NaZywo.ostatnie(kroki).u, "third");
+  assert.strictEqual(NaZywo.ostatnie([{ narzedzie: "read_file" }]), null);
 });
 test("Podgląd na żywo: kodek z SPS, punkt stuknięcia na obrazie (obrót), napisy stanów bez czarnego ekranu", () => {
   const { spsZKonfiguracji, kodekAvc, punktNaObrazie, napisPodgladu } = NA_ZYWO;

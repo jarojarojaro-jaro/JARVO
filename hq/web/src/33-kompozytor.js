@@ -117,7 +117,7 @@ function PasekNaZywo({ przebiegi, watek }) {
     <span class="j-zywo-t" title=${krok && krok.detail ? `${czasownik(krok)} ${krok.detail}` : undefined}>${krok
       ? html`<b>${czasownik(krok)}</b>${krok.detail ? ` ${krok.detail}` : "…"}` : stanPracy(p)}${przebiegi.length > 1 ? ` · ${T("zywo.i_inni", { n: przebiegi.length - 1 })}` : ""}</span>
     ${od ? html`<span class="j-zywo-c" aria-hidden="true">${Czas.trwanie(teraz - od)}</span>` : null}
-    <${PrzyciskNaZywo} urz=${NaZywo.urzadzenie(krok)}/>
+    <${PrzyciskNaZywo} urz=${przebiegi.map((x) => NaZywo.ostatnie(x.kroki)).find(Boolean) || null}/>
     <${Przycisk} maly rodzaj="cichy" ikona="stop" disabled=${zatrzymuje} onClick=${zatrzymaj} podpowiedz=${T("zywo.esc")}>
       ${T(zatrzymuje ? "zywo.zatrzymuje" : "zywo.zatrzymaj")}</${Przycisk}>
   </div>`;

@@ -260,9 +260,6 @@ function KrokiLista({ kroki, szczegoly, watek, zywe }) {
   const widoczne = wszystkie ? kroki : kroki.slice(-KROKI_NAJPIERW);
   let trwa = -1;
   if (zywe) for (let i = widoczne.length - 1; i >= 0; i--) if (widoczne[i].komentarz == null) { if (widoczne[i].czas_ms == null) trwa = i; break; }
-  // podgląd na żywo: przycisk przy ostatnim kroku na telefonie albo w Komputerze, dopóki praca trwa
-  let urzI = -1, urz = null;
-  if (zywe) for (let i = widoczne.length - 1; i >= 0 && !urz; i--) if ((urz = NaZywo.urzadzenie(widoczne[i]))) urzI = i;
   return html`<div class="j-kroki-l">
     ${widoczne.length < kroki.length && html`<button type="button" class="j-link" onClick=${() => setWszystkie(true)}>
       ${T("kroki.wczesniejsze", { n: kroki.length - widoczne.length })}</button>`}
@@ -279,7 +276,6 @@ function KrokiLista({ kroki, szczegoly, watek, zywe }) {
       ${moze ? html`<button type="button" class="j-kroki-o j-kroki-k" aria-expanded=${String(otwarty)} aria-controls=${`${id}-${i}`}
           onClick=${() => przelacz(k.ref)}><span>${opis}</span><${Ikona} n="right" r=${12}/></button>`
         : html`<span class="j-kroki-o">${opis}</span>`}
-      ${i === urzI && html`<${PrzyciskNaZywo} urz=${urz}/>`}
       ${(szczegoly || i === trwa) && k.podglad && !otwarty && html`<${PodgladKroku} tekst=${k.podglad}/>`}
       ${otwarty && html`<${KrokSzczegoly} id=${`${id}-${i}`} watek=${watek} krokRef=${k.ref}/>`}</li>`;
     })}</ol></div>`;

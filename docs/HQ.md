@@ -1601,9 +1601,10 @@ z tekstem i jakieś edytuj”). Pakiet `mozg` ładuje się dopiero po wejściu w
   ekran; przeciąganie przesuwa, dwa palce przybliżają.
 ### Podgląd na żywo (telefony i Komputer)
 
-- **Wejście.** Krok agenta na telefonie (`mcp__phone__act|batch|screen|shot|ping|wait`, argument `phone`) albo w
-  Komputerze (`computer_use`, `komputer`) ma w pasku pracy i w kroku rozmowy przycisk „Telefon second · Podgląd na
-  żywo” (`41-na-zywo.js`). Kroki niosą tylko bezpieczne argumenty `args` {phone, cmd, x, y, index}
+- **Wejście.** Gdy przebieg choć raz pracował na telefonie (`mcp__phone__act|batch|screen|shot|ping|wait`, argument
+  `phone`) albo w Komputerze (`computer_use`, `komputer`), pasek pracy ma stały przycisk „Na żywo” z ikoną
+  urządzenia (`41-na-zywo.js`, `NaZywo.ostatnie`; wciśnięty = okno otwarte, drugi klik zamyka; wąsko sama ikona);
+  ten sam przycisk stoi przy pasku „Podagenci”. Lista kroków go nie ma (24.11 skakał między krokami). Kroki niosą tylko bezpieczne argumenty `args` {phone, cmd, x, y, index}
   (`czytnik_omp.argumenty_urzadzenia`, nigdy `text`). Krok Hermesa na żywo nie ma argumentów (tool.started z
   `/v1/runs`): który telefon jest w użyciu, mówi serwer z plików PhoneUse `<stan>/<nazwa>.busy`.
 - **Okno** (pakiet `podglad`, `42-podglad.js`): ≥ 900 px panel obok rozmowy po prawej (rozmowa się zwęża,
