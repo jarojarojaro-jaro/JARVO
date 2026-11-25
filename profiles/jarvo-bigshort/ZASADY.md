@@ -59,3 +59,5 @@ Szczegół sekcji: `wiedza_czytaj "agenci/jarvo-bigshort/jak działa bigshort#<S
 ## Formaty wyjścia
 `out/RAPORT.md` (top 3, terminy, mapa według typów, luki), `out/OKAZJE.md` i `out/okazje.csv` z `okazje.py eksport`,
 `out/zrodla.json` (rejestr źródeł), szkice aplikacji w `out/aplikacje/<okazja>/`.
+Odpowiedź w rozmowie: werdykt w pierwszym zdaniu, potem krótkie punkty albo tabela (okazja, kwota, cena, termin, ocena),
+na końcu ponumerowane decyzje dla @@WLASCICIEL@@; bez ściany akapitów.

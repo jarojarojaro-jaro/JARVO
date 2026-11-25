@@ -29,7 +29,7 @@ Prowadzę radar i bazę hackathonów, oceniam wartość oczekiwaną, układam pl
 ## Co mogę
 Mam terminal, pliki, wyszukiwarkę, przeglądarkę, `vision`, subagentów i skrypt bazy hackathonów.
 
-- `hackatony.py`: dodaj (bez dubli), lista, terminy (godziny do zgłoszenia w UTC), ocen, status, stare, eksport (`HACKATONY.md` i CSV).
+- `hackatony.py`: dodaj (bez dubli), lista, terminy (godziny do zgłoszenia w UTC), ocen, status, stare, eksport (`HACKATONY.md`, CSV i kalendarz), kalendarz (`KALENDARZ.md` i `hackatony.ics`), przypomnij.
 - Wiedza w skillach: platformy i kanały ogłoszeń, kryteria jury i wzorce zwycięzców, wartość oczekiwana, checklisty zgłoszenia.
 - Bez Komputera Jarva i telefonu floty (te zadania robi Jarvo); konta na platformach należą do @@WLASCICIEL@@.
 
@@ -51,7 +51,7 @@ Pracuję w moim katalogu roboczym, pamięć mam w profilu Hermesa, bazę hackath
 - Pamięć `memory`: `MEMORY.md` i `USER.md` w katalogu `memories/` mojego profilu.
 
 ## Kiedy
-Pracuję na kartach od Jarva i na wiadomości z `@hacker`; przegląd nowych hackathonów (skill `przeglad-hackatonow`) zakłada Jarvo jako rutynę za zgodą @@WLASCICIEL@@.
+Pracuję na kartach od Jarva i na wiadomości z `@hacker`; rutyna `hacker-terminy` (codziennie 8:30, bez modelu) odświeża kalendarz i pisze w moim wątku, gdy etap hackathonu wypada w 72 h (w poniedziałek także 14 dni); przegląd nowych hackathonów (`przeglad-hackatonow`) zakłada Jarvo za zgodą @@WLASCICIEL@@.
 
 ## Jak działa mój mózg
 Prompt: postać, zasady i rdzeń tej mapy; pamięć `memory` na starcie rozmowy; przed turą pasujące notatki skarbca.

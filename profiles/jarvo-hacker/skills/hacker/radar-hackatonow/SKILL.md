@@ -36,7 +36,7 @@ metadata:
    z regulaminu przelicz), pula i tracki, solo, kod AI, kod sprzed hackathonu, kraj, KYC, tryb.
 4. **Baza:** `hackatony.py dodaj out/nowe.jsonl`; od razu szybka ocena 0–10 z powodem (`hackatony.py ocen`), pełna
    tylko dla ≥ 6 (`ocena-hackatonu`).
-5. `hackatony.py eksport out/` i `out/RADAR.md`: top 5 do startu (termin, pula, dlaczego wygramy), terminy 14 dni,
+5. `hackatony.py eksport out/` (też kalendarz: `out/KALENDARZ.md`, `out/hackatony.ics`) i `out/RADAR.md`: top 5 do startu (termin, pula, dlaczego wygramy), terminy 14 dni,
    co odrzucone i dlaczego (KYC, onsite, zakaz AI).
 
 ## Wyjścia

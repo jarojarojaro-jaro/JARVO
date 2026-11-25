@@ -1,0 +1,14 @@
+# Rutyny Hackera. scripts/build.py zamienia ten plik na cron/jobs.json przez API crona Hermesa (stałe `id`).
+# Z dystrybucji zadania instalują się WSTRZYMANE; włączasz je świadomie (`hermes -p jarvo-hacker cron resume <id>`).
+# 25.11 właściciel: „kalendarz, który trzyma terminy”; skrypt odświeża kalendarz i pisze tylko, gdy coś jest blisko.
+
+jobs:
+  - id: hacker-terminy
+    name: "Hacker: terminy hackathonów"
+    schedule: "30 8 * * *"
+    # etapy w 72 h (rejestracja, start, zgłoszenie, wyniki, nasze zamrożenie i gotowe), w poniedziałek też 14 dni;
+    # 0 tokenów, puste wyjście = cisza; przy okazji odświeża out/KALENDARZ.md i out/hackatony.ics
+    script: terminy_rano.py
+    no_agent: true
+    deliver: "@@AGENT_ROUTINE_DELIVER@@"
+    attach_to_session: true

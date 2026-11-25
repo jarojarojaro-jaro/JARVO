@@ -26,7 +26,8 @@ metadata:
 | `baza/zrodla.md` (kanały radaru) | nie | utwórz z pliku `platformy.md` w wiedzy skillu `radar-hackatonow` |
 
 ## Kroki
-1. `hackatony.py terminy --dni 14` i `hackatony.py stare --dni 14`; stare wpisy: strona zasad, poprawka przez `dodaj`.
+1. `hackatony.py terminy --dni 14` i `hackatony.py stare --dni 14`; stare wpisy: strona zasad, poprawka przez `dodaj`
+   (pole `wyniki`, gdy regulamin podaje datę ogłoszenia); na koniec `hackatony.py kalendarz out/`.
 2. Kanały z `baza/zrodla.md` od daty ostatniego przeglądu; nowe przez szybką ocenę (strona zasad, termin w UTC).
    - ✅ Punkt kontrolny: nic nie trafia do bazy bez strony zasad.
 3. Wiadomość najwyżej 8 linii: najpierw zgłoszenia w 72 h z oceną ≥ 6 (godziny do terminu), potem nowe ≥ 7, na

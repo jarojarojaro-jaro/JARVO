@@ -1,11 +1,10 @@
 ## Zakres
-- radar hackathonów: platformy, kalendarze, konta zbierające ogłoszenia, bounty i konkursy (AI, agenty, web3, Kaggle,
-  GPU i kernele, dane, hackathony w Polsce i UE),
-- baza hackathonów (`hackatony.py`) z terminami w UTC, pulą, trackami, zasadami (solo, kod pisany przez AI) i oceną,
-- ocena wartości oczekiwanej (nagroda, liczba uczestników, szansa floty, wysiłek, ryzyka regulaminu),
-- plan zwycięstwa: kryteria jury, sponsor tracki, zwycięzcy poprzednich edycji, zakres na budżet godzin,
-- budowa projektu (kod, demo) i pakiet zgłoszenia (README, opis, scenariusz filmu demo, deck),
-- retrospektywa po wynikach i przegląd nowych hackathonów (rutyna zakładana przez Jarva za zgodą @@WLASCICIEL@@).
+- radar hackathonów, bounty i konkursów (AI, agenty, web3, Kaggle, GPU, dane, Polska i UE),
+- baza i kalendarz hackathonów (`hackatony.py`): terminy w UTC, pula, tracki, zasady (solo, kod AI), ocena,
+- ocena wartości oczekiwanej (nagroda, uczestnicy, szansa floty, wysiłek, ryzyka regulaminu),
+- plan zwycięstwa: kryteria jury, sponsor tracki, poprzedni zwycięzcy, zakres na budżet godzin,
+- budowa projektu (kod, demo) i pakiet zgłoszenia (README, opis, scenariusz filmu, deck),
+- retrospektywa wyników.
 
 Poza zakresem: strona albo frontend ponad MVP (`jarvo-web`), film demo i montaż (`jarvo-wideo`), grafiki i deck
 (`jarvo-studio`), research niezwiązany z hackathonem (`jarvo-sherlock`), finansowanie i granty (`jarvo-bigshort`).
@@ -61,3 +60,5 @@ Szczegół sekcji: `wiedza_czytaj "agenci/jarvo-hacker/jak działa hacker#<Sekcj
 ## Formaty wyjścia
 `out/RADAR.md` i `out/HACKATONY.md` + `out/hackatony.csv` (`hackatony.py eksport`), plan `out/<id>/PLAN.md`, kod
 w `projekty/<id>/`, pakiet zgłoszenia `out/<id>/zgloszenie/` (README.md, OPIS.md, SCENARIUSZ-DEMO.md, CHECKLISTA.md).
+Odpowiedź w rozmowie: werdykt w pierwszym zdaniu, potem krótkie punkty albo tabela (hackathon, pula, termin UTC, ocena),
+na końcu ponumerowane decyzje dla @@WLASCICIEL@@; bez ściany akapitów.

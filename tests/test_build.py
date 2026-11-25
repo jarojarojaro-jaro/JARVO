@@ -26,7 +26,7 @@ ENV = {"TELEGRAM_OWNER_ID": "111111111", "TELEGRAM_HQ_CHAT_ID": "-1002222222222"
        "TELEGRAM_TOPIC_SHERLOCK": "11", "TELEGRAM_TOPIC_WEB": "12", "TELEGRAM_TOPIC_STUDIO": "13",
        "TELEGRAM_TOPIC_REKA": "14", "TELEGRAM_TOPIC_WIDEO": "15", "TELEGRAM_TOPIC_ADS": "16",
        "TELEGRAM_TOPIC_LOWCA": "17", "TELEGRAM_TOPIC_MOBILE": "18",
-       "TELEGRAM_TOPIC_SKLEP": "19"}
+       "TELEGRAM_TOPIC_SKLEP": "19", "TELEGRAM_TOPIC_BIGSHORT": "20", "TELEGRAM_TOPIC_HACKER": "21"}
 
 
 @pytest.fixture(scope="module")
@@ -253,8 +253,8 @@ def test_agent_deliver_token_watek_w_grupie_hq():
 
 
 def test_host_routes(tmp_path):
-    """Trasy bramy: DM i General do Jarva; specjaliści floty bez własnych wątków (16.11: grupa ma tylko Jarva, agentów
-    biznesowych i Kernela), więc w publicznej flocie innych tras nie ma; agent z wątkiem dostaje trasę z thread_id."""
+    """Trasy bramy: DM i General do Jarva; specjaliści floty bez własnych wątków (16.11), poza tymi, którym właściciel
+    dał wątek (25.11: Bigshort i Hacker); agent z wątkiem dostaje trasę z thread_id."""
     fleet = fl.load_fleet()
     notes = build.build_host(fleet, tmp_path, ENV)
     cfg = fl.load_yaml(tmp_path / "config.yaml")
@@ -263,7 +263,8 @@ def test_host_routes(tmp_path):
     assert routes["owner-dm"] == {"name": "owner-dm", "platform": "telegram", "chat_id": "111111111",
                                   "profile": fleet.orchestrator}
     assert routes["hq-jarvo"]["chat_id"] == "-1002222222222" and "thread_id" not in routes["hq-jarvo"]
-    assert set(routes) == {"owner-dm", "hq-jarvo"}
+    assert set(routes) == {"owner-dm", "hq-jarvo", "hq-jarvo-bigshort", "hq-jarvo-hacker"}
+    assert routes["hq-jarvo-hacker"]["thread_id"] == "21" and routes["hq-jarvo-hacker"]["profile"] == "jarvo-hacker"
     assert cfg["gateway"]["multiplex_profiles"] is True
     # wiadomość wysłana w trakcie restartu bramy nie ginie (Hermes domyślnie wyrzuca kolejkę Telegrama przy starcie)
     assert cfg["platforms"]["telegram"]["drop_pending_on_cold_boot"] is False
