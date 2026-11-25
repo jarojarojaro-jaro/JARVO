@@ -274,6 +274,7 @@ class Dziennik:
         self.koniec_at: float | None = None
         self.zaplanowana = False
         self.dopisane: dict[str, str] = {}        # dopiski tego celu po końcu tury: id → wrocil | wlaczony | sprawdz
+        self.ciecia: list[dict] = []               # dopiski właściciela w trakcie tury: {wpis, tekst (długość), ts}
 
     def dopisz(self, tekst: str) -> None:
         if not tekst:
@@ -392,8 +393,16 @@ class Rejestr:
             # bez tekstu czekającego na wspólną deltę (≤ 50 ms): ten przyjdzie jako `przebieg.delta` z seq > `seq`
             out["tekst_dotad"] = (dz.tekst[:len(dz.tekst) - len(dz.oczekuje)] if dz.oczekuje else dz.tekst) if dz else ""
             out["kroki_dotad"] = list(dz.kroki) if dz else list(p.get("kroki") or [])
+            out["ciecia"] = list(dz.ciecia) if dz else []
             out["seq"] = self.hub.kursor()
         return out
+
+    def zaznacz_ciecie(self, pid: str, wpis: Mapping) -> None:
+        """Dopisek właściciela do trwającej tury tnie jej żywy dymek w panelu (15-os.js `ciecie`): tekst do tej chwili
+        stoi nad dopiskiem. Cięcia idą w migawce (`widok`), żeby przeładowana karta dzieliła dymek tak samo."""
+        dz = self._dzienniki.get(pid)
+        if dz is not None and not any(c["wpis"] == wpis["id"] for c in dz.ciecia):
+            dz.ciecia.append({"wpis": wpis["id"], "tekst": len(dz.tekst) - len(dz.oczekuje), "ts": wpis["utworzony_at"]})
 
     def _nadaj(self, p: Mapping, typ: str, dane: dict) -> None:
         if p.get("zrodlo") == "nadzor" and typ in ("przebieg.delta", "przebieg.komentarz", "przebieg.mysl"):

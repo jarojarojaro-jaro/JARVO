@@ -408,27 +408,31 @@ function MetaPrzebiegu({ p }) {
 
 const Pisze = () => html`<p class="j-pisze" aria-hidden="true"><i></i><i></i><i></i></p>`;
 
-// żywy dymek przebiegu: tekst z delt (po przeładowaniu z tekst_dotad migawki), kroki, zgoda, błąd, stan
-function ZywyDymek({ p, ctx }) {
-  const trwa = !Os.KONCOWE.has(p.stan);
+// żywy dymek przebiegu: tekst z delt (po przeładowaniu z tekst_dotad migawki), kroki, zgoda, błąd, stan. Odcinek
+// (`odcinek`, Os.widok: tura z dopiskami właściciela) pokazuje swój kawałek tekstu i kroków; wcześniejsze odcinki
+// stoją nad dopiskami jak zwykła wiadomość, stan, zgoda i akcje ma tylko ostatni.
+function ZywyDymek({ p, ctx, odcinek = null }) {
+  const ostatni = !odcinek || odcinek.ostatni;
+  const trwa = ostatni && !Os.KONCOWE.has(p.stan);
+  const tekstP = odcinek ? odcinek.tekst : p.tekst, kroki = odcinek ? odcinek.kroki : p.kroki;
   const z = p.zgoda;
-  const zgoda = p.stan === "czeka_na_zgode" && z && !z.wygasla;
-  const wygasla = !zgoda && (p.zgoda_wygasla || (z && z.wygasla ? z : null));
-  const blad = p.stan === "blad" || p.stan === "przerwane" || p.stan === "zgubione";
+  const zgoda = ostatni && p.stan === "czeka_na_zgode" && z && !z.wygasla;
+  const wygasla = ostatni && !zgoda && (p.zgoda_wygasla || (z && z.wygasla ? z : null));
+  const blad = ostatni && (p.stan === "blad" || p.stan === "przerwane" || p.stan === "zgubione");
   const od = p.przyjety_at || p.utworzony_at;
   const bezposrednio = p.agent !== ctx.koordynator && (p.zrodlo || "wlasciciel") === "wlasciciel";
-  return html`<article class="j-msg j-msg-ag is-zywy" data-przebieg=${p.id} data-agent=${p.agent} aria-busy=${String(trwa)}>
+  return html`<article class=${cx("j-msg j-msg-ag", ostatni && "is-zywy")} data-przebieg=${ostatni ? p.id : undefined} data-agent=${p.agent} aria-busy=${String(trwa)}>
     <h3 class="j-sr">${nazwaAgenta(p.agent)}, ${Czas.godzina(od)}</h3>
     <${NaglowekAgenta} agent=${p.agent} ts=${od} bezposrednio=${bezposrednio}/>
-    ${p.kroki && p.kroki.length > 0 && html`<${Kroki} kroki=${p.kroki} szczegoly=${ctx.szczegoly} zywe=${trwa} watek=${ctx.watek}/>`}
-    ${p.tekst ? html`<${TrescMd} tekst=${bezZnacznika(p.tekst)} zywy=${trwa} klasa="j-msg-t"/>`
+    ${kroki && kroki.length > 0 && html`<${Kroki} kroki=${kroki} szczegoly=${ctx.szczegoly} zywe=${trwa} watek=${ctx.watek}/>`}
+    ${tekstP ? html`<${TrescMd} tekst=${bezZnacznika(tekstP)} zywy=${trwa} klasa="j-msg-t"/>`
       : trwa && !zgoda && p.stan !== "kolejka" ? html`<${Pisze}/>` : null}
     ${zgoda && html`<${Zgoda} key=${z.request_id} p=${p}/>`}
     ${wygasla && html`<${ZgodaWygasla} p=${p} z=${wygasla} ctx=${ctx}/>`}
-    ${!zgoda && !wygasla && p.zgoda_odp && html`<${ZgodaOdpowiedz} odp=${p.zgoda_odp} pid=${p.id}/>`}
+    ${ostatni && !zgoda && !wygasla && p.zgoda_odp && html`<${ZgodaOdpowiedz} odp=${p.zgoda_odp} pid=${p.id}/>`}
     ${blad && html`<${BladPrzebiegu} p=${p}/>`}
-    <${MetaPrzebiegu} p=${p}/>
-    ${!trwa && p.tekst && html`<${AkcjeWiadomosci} tekst=${p.tekst} agent=${p.agent} watek=${ctx.watek} koordynator=${ctx.koordynator}/>`}
+    ${ostatni && html`<${MetaPrzebiegu} p=${p}/>`}
+    ${ostatni && !trwa && p.tekst && html`<${AkcjeWiadomosci} tekst=${p.tekst} agent=${p.agent} watek=${ctx.watek} koordynator=${ctx.koordynator}/>`}
   </article>`;
 }
 
@@ -476,7 +480,7 @@ const ElementOsi = React.memo(function ElementOsiW({ x, ctx, ostatniaPrzebiegu, 
     case "wlasciciel": return html`<${WiadomoscWlasciciela} x=${x} k=${ctx.k} rozmowca=${ctx.rozmowca}/>`;
     case "agent": return html`<${WiadomoscAgenta} x=${x} ctx=${ctx} ostatniaPrzebiegu=${ostatniaPrzebiegu} tak=${tak}/>`;
     case "rutyna": return html`<${WiadomoscAgenta} x=${x} ctx=${ctx}/>`;
-    case "zywy": return html`<${ZywyDymek} p=${x.przebieg} ctx=${ctx}/>`;
+    case "zywy": return html`<${ZywyDymek} p=${x.przebieg} odcinek=${x.odcinek || null} ctx=${ctx}/>`;
     case "kroki": return html`<div class="j-msg-kroki"><${Kroki} kroki=${x.kroki || []} szczegoly=${ctx.szczegoly} watek=${ctx.watek}/></div>`;
     case "obca": return html`<${WiadomoscObca} x=${x}/>`;
     case "blad_tury": return html`<${BladTury} x=${x}/>`;

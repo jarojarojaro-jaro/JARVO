@@ -231,7 +231,7 @@ const akcje = {
       const odp = await api.rozmowy.wyslij(watek, cialo);
       sklep.ustaw((s) => ({ ...s, wysylane: zmienO(s, () => []),
         os: s.os[watek] && odp.wpis ? { ...s.os, [watek]: Os.osWpis(s.os[watek], odp.wpis) } : s.os,
-        przebiegi: Os.dodajPrzebiegi(s.przebiegi, odp.przebiegi) }));
+        przebiegi: Os.dodajPrzebiegi(Os.ciecie(s.przebiegi, odp.wpis), odp.przebiegi) }));
       akcje.ostrzezenia(odp.ostrzezenia, koordynator);
       return watek;
     } catch (e) {

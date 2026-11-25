@@ -240,9 +240,13 @@ def _czlonek(agent: str, rola: str, linia: list[dict], przebiegi: list[dict], wp
                     continue
                 nasz = po_id.get(int(m.get("id") or 0))
                 if nasz is None and po_sha:
+                    # bez `user_msg_id` (zanim go znamy) albo kopia naszej prośby w nowej sesji po kompresji w trakcie
+                    # tury (25.11: inne id wiersza, więc prośba stała drugi raz, a tura bez `w_toku` dublowała dymek)
                     sha = _sha(tresc)
-                    nasz = next((p for p in po_sha if p["payload_sha"] == sha and p.get("user_msg_id") is None
-                                 and float(m["ts"]) >= float(p.get("wyslany_at") or 0) - OKNO_SHA), None)
+                    pasuja = [p for p in po_sha if p["payload_sha"] == sha
+                              and float(m["ts"]) >= float(p.get("wyslany_at") or 0) - OKNO_SHA]
+                    nasz = next((p for p in pasuja if p.get("user_msg_id") is None), None) or max(
+                        pasuja, key=lambda p: float(p.get("wyslany_at") or 0), default=None)
                 if nasz is not None:
                     biezacy = nasz
                     if nasz.get("aktywny") and od_ponownie is None:

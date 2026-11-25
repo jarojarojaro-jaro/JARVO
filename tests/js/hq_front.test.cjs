@@ -371,6 +371,29 @@ test("Os.widok: trwająca praca pod ostatnim dopiskiem właściciela, nie wyżej
   eq(Os.widok([e1, e2, odp], [{ ...zywy, stan: "gotowe", tekst: "Wnioski" }, q]).map((x) => x.id), ["e1", "e2", "a1"]);
 });
 
+test("Os.widok: dopiski tną żywy dymek, praca sprzed dopisku zostaje nad nim (25.11)", () => {
+  // 25.11 właściciel: dymek tury z 01:11 stał w całości pod dopiskami z 01:12 i 01:17, więc nowsze wiadomości
+  // wyglądały na wcześniejsze. Cięcie zapisane przy dopisku dzieli tekst (długość) i kroki (czas) na odcinki.
+  const e1 = { id: "e1", rodzaj: "wlasciciel", ts: 0 };
+  const wpis = (id, ts) => ({ id, rodzaj: "wlasciciel", ts, wpis: { id, utworzony_at: ts, dane: { dopisane_do: "r1" } } });
+  const e2 = wpis("e2", 10), e3 = wpis("e3", 20);
+  let przebiegi = { r1: { id: "r1", stan: "pracuje", wpis_id: "e1", agent: "jarvo", tekst: "Odpalam YouTube.", kroki: [{ ts: 5, narzedzie: "a" }] } };
+  przebiegi = Os.ciecie(przebiegi, e2.wpis);
+  assert.strictEqual(Os.ciecie(przebiegi, e2.wpis), przebiegi);         // ten sam wpis z POST i ze strumienia: jedno cięcie
+  przebiegi = { r1: { ...przebiegi.r1, tekst: przebiegi.r1.tekst + " Robię zadania.", kroki: przebiegi.r1.kroki.concat([{ ts: 12, narzedzie: "b" }]) } };
+  przebiegi = Os.ciecie(przebiegi, e3.wpis);
+  przebiegi = { r1: { ...przebiegi.r1, tekst: przebiegi.r1.tekst + " Gaszę.", kroki: przebiegi.r1.kroki.concat([{ ts: 25, narzedzie: "c" }]) } };
+  const v = Os.widok([e1, e2, e3], [przebiegi.r1]);
+  eq(v.map((x) => x.id), ["e1", "z:r1:0", "e2", "z:r1:1", "e3", "z:r1:2"]);
+  eq(v.filter((x) => x.odcinek).map((x) => [x.odcinek.tekst, x.odcinek.kroki.map((k) => k.narzedzie), x.odcinek.ostatni]),
+    [["Odpalam YouTube.", ["a"], false], [" Robię zadania.", ["b"], false], [" Gaszę.", ["c"], true]]);
+  // pusty odcinek (dopisek, zanim agent cokolwiek zrobił) nie stoi pustym dymkiem; skończona tura nie dostaje cięć
+  const r = Os.ciecie({ r1: { id: "r1", stan: "pracuje", wpis_id: "e1", agent: "jarvo", tekst: "", kroki: [] } }, e2.wpis);
+  eq(Os.widok([e1, e2], [r.r1]).map((x) => x.id), ["e1", "e2", "z:r1:1"]);
+  const g = { r1: { id: "r1", stan: "gotowe", tekst: "x" } };
+  assert.strictEqual(Os.ciecie(g, e2.wpis), g);
+});
+
 test("Os.widok: tura z Telegrama to jedna wiadomość, komentarze między narzędziami w krokach", () => {
   // 19.11: link z Telegrama, Jarvo komentował każdy krok („Sprawdzam…”, „Działa…”) i panel pokazał 15 wiadomości
   const wl = { id: "w1", rodzaj: "wlasciciel", ts: 0 };

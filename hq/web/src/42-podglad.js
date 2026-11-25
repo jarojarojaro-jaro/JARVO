@@ -232,7 +232,7 @@ function PodgladOkno({ stan, biezacy }) {
     onPointerUp: (e) => { delete e.currentTarget.dataset.ciagnie; localStorage.setItem(SZER_KLUCZ, String(szerPodgladu(window.innerWidth - e.clientX - 8))); },
   };
   // telefon: przeciąganie po rogach, stuknięcie = pełny ekran, zrzucenie na dół = zamknij
-  const [rog, setRog] = useState("pd");
+  const [rog, setRog] = useState("dp");     // dół prawo; klasy rogów: gl, gp, dl, dp (25.11: „pd” bez klasy = okno pod ekranem)
   const [przes, setPrzes] = useState(null);
   const ruch = useRef(null);
   const dotyk = szeroki || pelny ? {} : {

@@ -34,14 +34,17 @@ function utworzSklep(poczatek) {
 
 // powiadomienia przeglądarki domyślnie włączone (centrum D9): „czeka na Ciebie” i koniec długiej pracy rozmówcy;
 // motyw TARS (22.11) domyślnie ciemny; `tars: 1` = ustawienia zapisane już w nim (motyw z nich obowiązuje);
-// `podglad_sam`: podgląd na żywo telefonu i Komputera otwiera się sam, gdy agent na nich pracuje (41-na-zywo.js)
+// `podglad_sam`: podgląd na żywo telefonu i Komputera otwiera się sam, gdy agent na nich pracuje (41-na-zywo.js),
+// domyślnie włączony od 25.11 (właściciel: „nie pokazały się same live”); `zywo: 1` = zapis po tej zmianie, więc
+// wcześniejsze `false` (stara domyślna, nie wybór) nie przechodzi, a wyłączenie w Ustawieniach zostaje
 const USTAWIENIA_DOMYSLNE = { motyw: "ciemny", szczegoly: false, gestosc: "wygodna", dzwiek: false, powiadomienia: true,
-  zapytano_o_powiadomienia: false, tars: 1, podglad_sam: false };
+  zapytano_o_powiadomienia: false, tars: 1, podglad_sam: true, zywo: 1 };
 // wybór motywu zapisany przed TARS (jasny albo „jak w systemie” starego wyglądu) nie przechodzi: każdy zaczyna od TARS
 // ciemnego, a własny wybór z Ustawień zostaje już na stałe (zapis niesie `tars`)
 function ustawieniaZPamieci() {
   const z = Pamiec.wez("jarvo.ustawienia.v1", null) || {};
-  return { ...USTAWIENIA_DOMYSLNE, ...z, ...(z.tars ? {} : { motyw: USTAWIENIA_DOMYSLNE.motyw, tars: 1 }) };
+  return { ...USTAWIENIA_DOMYSLNE, ...z, ...(z.tars ? {} : { motyw: USTAWIENIA_DOMYSLNE.motyw, tars: 1 }),
+    ...(z.zywo ? {} : { podglad_sam: true, zywo: 1 }) };
 }
 
 function stanPoczatkowy() {

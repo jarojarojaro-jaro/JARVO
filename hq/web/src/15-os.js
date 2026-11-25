@@ -86,6 +86,16 @@ const Os = (() => {
     return { ...os, pozycje };
   }
 
+  // dopisek właściciela do trwającej tury (`dane.dopisane_do`) tnie jej żywy dymek: tekst i kroki do tej chwili
+  // stoją nad dopiskiem, dalsza praca pod nim (25.11 właściciel: „nowsza wiadomość pokazuje się wcześniej”, bo cały
+  // dymek tury od 01:11 stał pod dopiskami z 01:12 i 01:17). Migawka serwera niesie te same cięcia (`ciecia`).
+  function ciecie(przebiegi, wpis) {
+    const pid = wpis && wpis.dane && wpis.dane.dopisane_do, p = pid && przebiegi[pid];
+    if (!p || KONCOWE.has(p.stan) || (p.ciecia || []).some((c) => c.wpis === wpis.id)) return przebiegi;
+    const c = { wpis: wpis.id, tekst: (p.tekst || "").length, ts: wpis.utworzony_at };
+    return { ...przebiegi, [pid]: { ...p, ciecia: (p.ciecia || []).concat([c]) } };
+  }
+
   // ------------------------------------------------------------------------------------------- przebiegi
   // migawka GET /przebiegi/{id}: tekst i kroki do chwili `seq`; późniejsze zdarzenia dochodzą po kursorze
   const zMigawki = (p) => {
@@ -201,7 +211,9 @@ const Os = (() => {
       case "watek.usuniety": return { ...s, lista: listaUsun(s.lista, d.id) };
       case "watek.wpis": {
         const os = s.os[d.watek_id];
-        return os && d.wpis ? { ...s, os: { ...s.os, [d.watek_id]: osWpis(os, d.wpis) } } : s;
+        if (!d.wpis) return s;
+        const przebiegi = ciecie(s.przebiegi, d.wpis);
+        return os || przebiegi !== s.przebiegi ? { ...s, przebiegi, os: os ? { ...s.os, [d.watek_id]: osWpis(os, d.wpis) } : s.os } : s;
       }
       case "rozmowca.stan": {
         const zm = {};
@@ -317,18 +329,40 @@ const Os = (() => {
     }
     for (const o of oczekujaceWidoczne(pozycje, oczekujace)) out.push({ rodzaj: "wlasciciel", id: `o:${o.klucz}`, ts: o.ts, tekst: o.tekst, oczekuje: o });
     // dopiski do trwającej tury (wpis z `dane.dopisane_do` albo przebieg z `dopisany_do` = ten przebieg) stoją na osi
-    // pod wpisem tury, więc żywy dymek idzie pod ostatni z nich: pracę widać pod najnowszą wiadomością właściciela,
-    // nie wyżej w wątku (24.11)
+    // pod wpisem tury. Z cięciami (`ciecia`) dymek dzieli się na odcinki: odcinek j stoi pod swoją kotwicą (wpis tury,
+    // potem kolejne dopiski), a żywy jest tylko ostatni, jak na osi po końcu tury. Bez cięć (dopisek innej karty
+    // przed migawką) cały dymek idzie pod ostatni dopisek: pracę widać pod najnowszą wiadomością właściciela (24.11).
     const dopiski = new Map();
     const dopisz = (pid, wid) => { if (pid && wid) dopiski.set(pid, (dopiski.get(pid) || []).concat(wid)); };
     for (const q of lista) dopisz(q.dopisany_do, q.wpis_id);
     for (const x of out) if (x.rodzaj === "wlasciciel" && x.wpis && x.wpis.dane) dopisz(x.wpis.dane.dopisane_do, x.id);
-    for (const p of zywe) {
-      let i = out.findIndex((x) => x.id === p.wpis_id);
-      if (!KONCOWE.has(p.stan)) for (const wid of dopiski.get(p.id) || []) i = Math.max(i, out.findIndex((x) => x.id === wid));
-      if (i < 0) { out.push({ rodzaj: "zywy", id: `z:${p.id}`, przebieg: p }); continue; }
+    const wstaw = (kotwica, z) => {
+      let i = out.findIndex((x) => x.id === kotwica);
+      if (i < 0) { out.push(z); return; }
       while (i + 1 < out.length && out[i + 1].rodzaj === "zywy") i++;
-      out.splice(i + 1, 0, { rodzaj: "zywy", id: `z:${p.id}`, przebieg: p });
+      out.splice(i + 1, 0, z);
+    };
+    for (const p of zywe) {
+      const ciecia = (p.ciecia || []).filter((c) => out.some((x) => x.id === c.wpis));
+      if (ciecia.length) {
+        const kotwice = [p.wpis_id, ...ciecia.map((c) => c.wpis)];
+        const tekst = p.tekst || "", kroki = p.kroki || [];
+        kotwice.forEach((kotwica, j) => {
+          const od = j ? ciecia[j - 1] : null, d = ciecia[j] || null, ostatni = j === ciecia.length;
+          const odcinek = {
+            tekst: tekst.slice(od ? Math.min(od.tekst, tekst.length) : 0, d ? Math.min(d.tekst, tekst.length) : tekst.length),
+            kroki: kroki.filter((k) => (!od || (k.ts || 0) >= od.ts) && (!d || (k.ts || 0) < d.ts)),
+            ostatni,
+          };
+          if (ostatni || odcinek.tekst.trim() || odcinek.kroki.length) wstaw(kotwica, { rodzaj: "zywy", id: `z:${p.id}:${j}`, przebieg: p, odcinek });
+        });
+        continue;
+      }
+      let kotwica = p.wpis_id;
+      if (!KONCOWE.has(p.stan)) for (const wid of dopiski.get(p.id) || []) {
+        if (out.findIndex((x) => x.id === wid) > out.findIndex((x) => x.id === kotwica)) kotwica = wid;
+      }
+      wstaw(kotwica, { rodzaj: "zywy", id: `z:${p.id}`, przebieg: p });
     }
     return out;
   }
@@ -454,7 +488,7 @@ const Os = (() => {
 
   return { KONCOWE, PONOWIALNE, DO_ZATRZYMANIA, porownaj, FILTRY, listaStrona, listaZmiana, listaUsun, osStrona, osWpis,
     zWpisu, zMigawki, przebieg, dodajPrzebiegi, scalPrzebieg, zastosujZdarzenie, widok, stabilny, rowneAktywne, kartyWatku,
-    noweOdTad, ryzyko, wyboryZgody, krokiPodsumowanie, doZatrzymania, klasaBledu, agenciRozmowcow, rozmowcaWatku };
+    noweOdTad, ryzyko, wyboryZgody, krokiPodsumowanie, doZatrzymania, klasaBledu, agenciRozmowcow, rozmowcaWatku, ciecie };
 })();
 
 // ------------------------------------------------------------------------------------------------- kompozytor

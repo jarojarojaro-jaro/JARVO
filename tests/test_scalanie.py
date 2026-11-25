@@ -111,6 +111,24 @@ def test_podglad_krokow_tylko_na_stronie_z_redakcja_poczatku_i_pamiecia():
     assert len(wejscia) == 3                                   # ten sam wynik drugi raz: z pamięci
 
 
+def test_kopia_prosby_po_kompresji_w_trakcie_tury_jest_nasza():
+    """25.11: Hermes skompresował rozmowę w trakcie tury i skopiował prośbę do nowej sesji z nowym id wiersza; oś
+    pokazała prośbę drugi raz, a dalsza praca straciła `w_toku` i stała obok żywego dymka."""
+    w1 = wpis(1, tekst="wejdź na stronę", ts=100.9)
+    sha = hashlib.sha256("wejdź na stronę".encode()).hexdigest()
+    p1 = przebieg("p_1", stan="pracuje", aktywny=True, payload_sha=sha, wyslany_at=101.0, user_msg_id=1, wpis_id=w1["id"])
+    linia = [{"sesja_id": "s1", "stan": "ok", "wiersze": [wiersz(1, "user", "wejdź na stronę", ts=101.0),
+                                                         wiersz(2, "assistant", "Wchodzę.")]},
+             {"sesja_id": "s2", "stan": "ok", "wiersze": [wiersz(3, "user", "streszczenie", podsumowanie=True),
+                                                         wiersz(4, "user", "wejdź na stronę", ts=101.0),
+                                                         wiersz(5, "assistant", "Gra wystartowała.")]}]
+    wynik = sc.os_watku(Baza([w1], [p1], {"web": ["s1", "s2"]}), Czytnik({"web": linia}), WID, budzenia=bz)
+    poz = wynik["pozycje"]
+    assert [p["rodzaj"] for p in poz].count("wlasciciel") == 1
+    assert [(p["tekst"], p["przebieg_id"], p["w_toku"]) for p in poz if p["rodzaj"] == "agent"] == [
+        ("Wchodzę.", "p_1", True), ("Gra wystartowała.", "p_1", True)]
+
+
 def test_rodzaje_pozycji_i_ukrywanie_naszych():
     w1 = wpis(1, tekst="@web zrób stopkę", ts=100.9, tryb="bezposrednio")
     p1 = przebieg("p_1", payload_sha=hashlib.sha256(BLOK.encode()).hexdigest(), wyslany_at=101.0, wpis_id=w1["id"],

@@ -472,6 +472,9 @@ def test_enter_w_trakcie_pracy_dopisuje(swiat):
     (q,) = d["przebiegi"]
     assert q["stan"] == "dopisany" and q["dopisany_do"] == pid and not d["ostrzezenia"]
     assert d["wpis"]["dane"]["dopisane_do"] == pid and swiat.p(q["id"])["wpis_id"] == d["wpis"]["id"]
+    # migawka tury niesie cięcie dymka w miejscu dopisku (przeładowany panel dzieli dymek tak samo, 25.11)
+    m = swiat.k.get(f"{P}/przebiegi/{pid}").json()["przebieg"]
+    assert [c["wpis"] for c in m["ciecia"]] == [d["wpis"]["id"]] and m["ciecia"][0]["tekst"] <= len(m["tekst_dotad"])
     swiat.do_stanu(pid, "gotowe")
     swiat.do_stanu(q["id"], "wlaczony")
     assert "dodaj NIP" in swiat.brama.przebiegi[swiat.p(pid)["run_id"]].odpowiedz

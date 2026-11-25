@@ -1,6 +1,8 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Podgląd na żywo otwiera się sam (domyślnie), na telefonie pływające okno jest widoczne w rogu zamiast pod ekranem, a dopiski w trakcie pracy tną dymek agenta, więc nowsze wiadomości nie stoją nad starszą pracą.
+- Oś rozmowy po kompresji w trakcie tury nie pokazuje prośby drugi raz i trzyma dalszą pracę w żywym dymku.
 - Podgląd na żywo należy do rozmowy, z której go otwarto: przejście do innej rozmowy (np. z Jarva do Kernela) go zamyka.
 - Wgranie czeka też na podagentów w tle, a podagenci zabici restartem bramy są w panelu „przerwani” i budzą Jarva, żeby ich wznowił (24.11 wgranie zabiło trzech zakładających konta, a pasek stał na „0 z 3”).
 - „Odpowiedz” przy raporcie wstawia samo „> Odpowiadam na „Poranny brief” B-2026-11-24 (07:54)”, bez początku treści raportu.

@@ -595,6 +595,8 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
             usun_obrazy(obrazy)
             return {"wpis": w, "przebiegi": [], "ostrzezenia": []}
         # dalej bez `await`: nic nie wejdzie między wpis a zlecenia (DELETE wątku czeka na swoją kolej na pętli)
+        if dane.get("dopisane_do"):
+            rej.zaznacz_ciecie(dane["dopisane_do"], w)
         hub.nadaj("watek.wpis", {"watek_id": wid, "wpis": w}, watek_id=wid)
         if przed:
             for a in adresaci:
@@ -1162,6 +1164,7 @@ def dolacz(router, *, m: SimpleNamespace, silnik: Callable[[], Any], hub, agenci
             w = db.dodaj_wpis(wid, **wpis, klucz=body.klucz)
             if w.get("powtorzony"):     # klucz zajęła w trakcie steera inna wiadomość: steer już poszedł, wpis bez klucza
                 w = db.dodaj_wpis(wid, **wpis)
+            rej.zaznacz_ciecie(pid, w)
             hub.nadaj("watek.wpis", {"watek_id": wid, "wpis": w}, watek_id=wid)
             q = db.zmien_przebieg(q["id"], wpis_id=w["id"])
             nowy = db.aktywnosc(wid, at=w["utworzony_at"], podglad=f"Ty: {body.tekst}")
