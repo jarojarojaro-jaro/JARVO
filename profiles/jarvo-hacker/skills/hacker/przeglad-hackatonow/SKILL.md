@@ -23,12 +23,12 @@ metadata:
 | Wejście | Wymagane | Jeśli brak |
 |---|---|---|
 | baza hackathonów | tak | najpierw `radar-hackatonow` |
-| `baza/zrodla.md` (kanały radaru) | nie | utwórz z pliku `platformy.md` w wiedzy skillu `radar-hackatonow` |
 
 ## Kroki
-1. **Szukaj nowych hackathonów:** kanały z `baza/zrodla.md` od daty ostatniego przeglądu; każdy nowy ze stroną zasad
-   do bazy (`dodaj`, `ocen` z powodem); wpisy z `hackatony.py stare --dni 14` sprawdź u źródła, a te, w które już nie
-   wejdziemy, `status … odpuszczony` z powodem.
+1. **Szukaj nowych hackathonów:** `"$HERMES_HOME/scripts/zrodla.py"` (dzienne agregatory porównane z bazą); z listy
+   „do sprawdzenia” każdy hackathon z AI albo pulą od 20 000 USD sprawdź na stronie zasad i wpisz do bazy (`dodaj`,
+   `ocen` z powodem); wpisy z `hackatony.py stare --dni 14` sprawdź u źródła, a te, w które już nie wejdziemy,
+   `status … odpuszczony` z powodem.
    - ✅ Punkt kontrolny: nic nie trafia do bazy bez strony zasad.
 2. **Raportuj, co jest do wzięcia:** `hackatony.py raport`; do 5 najlepszych: numer, nazwa z linkiem, pula, termin
    wejścia w UTC, ocena i jedno zdanie, czemu możemy wygrać, nowe oznacz „nowy”; na końcu pytanie, w który wchodzimy.

@@ -61,5 +61,5 @@ Szczegół sekcji: `wiedza_czytaj "agenci/jarvo-hacker/jak działa hacker#<Sekcj
 ## Formaty wyjścia
 `out/RADAR.md` i `out/HACKATONY.md` + `out/hackatony.csv` (`hackatony.py eksport`), plan `out/<id>/PLAN.md`, kod
 w `projekty/<id>/`, pakiet zgłoszenia `out/<id>/zgloszenie/` (README.md, OPIS.md, SCENARIUSZ-DEMO.md, CHECKLISTA.md).
-Odpowiedź w rozmowie: werdykt w pierwszym zdaniu, potem krótkie punkty albo tabela (hackathon, pula, termin UTC, ocena),
-na końcu ponumerowane decyzje dla @@WLASCICIEL@@; bez ściany akapitów.
+Odpowiedź: werdykt w pierwszym zdaniu, potem tabela (hackathon z linkiem, pula, termin UTC, tryb, ocena), na końcu
+ponumerowane decyzje dla @@WLASCICIEL@@. Liczby biorę z `zrodla.py` i bazy, bez opisu, jak liczyłem.

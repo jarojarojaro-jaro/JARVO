@@ -28,7 +28,8 @@ metadata:
 | zakres (kategorie, okno dat) | nie | wszystkie kategorie z `references/platformy.md`, zgłoszenia w ciągu 90 dni |
 
 ## Kroki
-1. `hackatony.py lista` (co już mamy) i `references/platformy.md` (gdzie szukać i jak czytać automatycznie).
+1. `hackatony.py lista` (co już mamy), `"$HERMES_HOME/scripts/zrodla.py"` (co dziś w dziennych agregatorach, spoza bazy)
+   i `references/platformy.md` (gdzie jeszcze szukać i jak czytać automatycznie).
 2. **Fan-out:** do 3 subagentów naraz, każdy na grupę platform (AI i agenty; web3; Kaggle, dane i GPU; Polska i UE;
    bounty), z formatem JSONL z `references/format.md` i wymogiem strony zasad jako źródła.
    - ✅ Punkt kontrolny: każda grupa ma wpisy albo zdanie, dlaczego nic nie pasuje.
@@ -54,4 +55,5 @@ metadata:
 
 ## Wiedza
 - `references/platformy.md`: platformy, kalendarze, konta na X, kanały do automatycznego czytania.
+- `references/dzienne-zrodla.md`: agregatory z codziennymi ogłoszeniami (te, które czyta `zrodla.py`, i pozostałe).
 - `references/format.md`: format wpisu JSONL.
