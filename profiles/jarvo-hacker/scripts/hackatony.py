@@ -374,9 +374,7 @@ def zapisz_kalendarz(db: sqlite3.Connection, katalog: Path, teraz: dt.datetime, 
     ev = wydarzenia(db, teraz - dt.timedelta(days=1), teraz + dt.timedelta(days=dni))
     md = [f"# Kalendarz hackathonów (stan na {lokalnie(teraz):%d.%m.%Y %H:%M}, czas {STREFA})", "",
           "Etapy otwartych hackathonów z bazy, nasze kamienie (zamrożenie, gotowe) przy startach w toku. "
-          "Subskrypcja w telefonie: plik `hackatony.ics`.", ""]
-    pilne = [e for e in ev if teraz <= e["kiedy"] <= teraz + dt.timedelta(hours=72)]
-    md += ["## W ciągu 72 godzin", ""] + ([f"- {linia(e, teraz)}" for e in pilne] or ["- nic"])
+          "Subskrypcja w telefonie: plik `hackatony.ics`."]
     md += miesiace(ev, teraz, "##")
     (katalog / "KALENDARZ.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     stamp = teraz.strftime("%Y%m%dT%H%M%SZ")

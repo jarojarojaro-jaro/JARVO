@@ -410,7 +410,7 @@ def cmd_eksport(db: sqlite3.Connection, katalog: Path, dzis: dt.date) -> int:
 
 # ------------------------------------------------------------------------------------------- kalendarz
 # 25.11 właściciel: kalendarz jak u Hackera. Terminy naborów otwartych okazji i nasze kroki w aplikacjach w toku; same
-# daty (bez godzin), więc wydarzenia całodniowe; przypomnienie 7 dni wcześniej, bo wniosek pisze się dłużej niż projekt.
+# daty (bez godzin), więc wydarzenia całodniowe; alarm w telefonie 7 dni wcześniej, bo wniosek pisze się dłużej niż projekt.
 MIESIACE = ("styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "lipiec", "sierpień", "wrzesień", "październik",
             "listopad", "grudzień")
 DNI = ("pn", "wt", "śr", "cz", "pt", "sb", "nd")
@@ -467,11 +467,9 @@ def zwin(l: str) -> list[str]:
 def zapisz_kalendarz(db: sqlite3.Connection, katalog: Path, dzis: dt.date, dni: int = 180) -> list[dict]:
     katalog.mkdir(parents=True, exist_ok=True)
     ev = wydarzenia(db, dzis, dzis + dt.timedelta(days=dni))
-    pilne = [e for e in ev if e["kiedy"] <= dzis + dt.timedelta(days=7)]
     md = [f"# Kalendarz finansowania (stan na {dzis:%d.%m.%Y})", "",
           "Terminy naborów otwartych okazji i nasze kroki w aplikacjach w toku. Subskrypcja w telefonie: plik "
-          "`finansowanie.ics`.", "", "## W ciągu 7 dni", ""]
-    md += [f"- {linia(e, dzis)}" for e in pilne] or ["- nic"]
+          "`finansowanie.ics`."]
     md += miesiace(ev, dzis, "##")
     (katalog / "KALENDARZ.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Jarvo//Bigshort//PL", "CALSCALE:GREGORIAN",

@@ -14,7 +14,5 @@ jobs:
     deliver: "@@AGENT_ROUTINE_DELIVER@@"
     attach_to_session: true
     prompt: >-
-      Raport hackathonów dla właściciela. Powyżej masz stan bazy. Najpierw przegląd według skilla
-      `przeglad-hackatonow`: kanały radaru od ostatniego przeglądu, nowe hackathony ze stroną zasad i oceną do bazy,
-      nieaktualne poprawione. Potem uruchom `hackatony.py raport` jeszcze raz i na nim oprzyj wiadomość według kroku 3
-      skilla. Po polsku, najwyżej 15 linii, zawsze z raportem (nigdy [SILENT]).
+      Raport hackathonów dla właściciela według skilla `przeglad-hackatonow`; powyżej masz stan bazy. Po polsku,
+      najwyżej 15 linii, zawsze z raportem (nigdy [SILENT]).

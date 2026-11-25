@@ -83,8 +83,8 @@ def test_ocena_z_powodem_i_eksport(tmp_path, capsys):
 
 
 def test_kalendarz_etapy_kamienie_i_ics(tmp_path, capsys):
-    """25.11 właściciel: kalendarz trzyma wszystkie terminy: etapy otwartych hackathonów, nasze kamienie przy budowie,
-    plik .ics do subskrypcji (linie najwyżej 75 bajtów) i przypomnienia, które milczą, gdy nic nie jest blisko."""
+    """25.11 właściciel: kalendarz trzyma wszystkie terminy: etapy otwartych hackathonów w miesiącach i tygodniach,
+    nasze kamienie przy budowie i plik .ics do subskrypcji (linie najwyżej 75 bajtów)."""
     uruchom(tmp_path, "dodaj", jsonl(tmp_path, wpis(rejestracja_do="2026-11-26T10:00", wyniki="2026-12-15"),
                                      wpis(nazwa="Odpuszczony", zgloszenie_do="2026-11-28"),
                                      wpis(nazwa="Daleki ze średnikiem; i przecinkiem, " + "x" * 80, zgloszenie_do="2027-01-20")))
@@ -93,10 +93,11 @@ def test_kalendarz_etapy_kamienie_i_ics(tmp_path, capsys):
     capsys.readouterr()
     uruchom(tmp_path, "kalendarz", str(tmp_path / "out"))
     md = (tmp_path / "out" / "KALENDARZ.md").read_text(encoding="utf-8")
-    pilne = md.split("## W ciągu 72 godzin")[1].split("\n## ")[0]
+    listopad = md.split("## Listopad 2026")[1].split("\n## ")[0]
     # 26.11 10:00 UTC = 11:00 w Warszawie; zamrożenie 8 h i gotowe 6 h przed zgłoszeniem 27.11 17:00 UTC
-    assert [l.split(" · ")[1] for l in pilne.strip().splitlines()] == ["Rejestracja do", "Zamrożenie projektu", "Gotowe do wysłania", "Zgłoszenie do"]
-    assert "**cz 26.11 11:00** (22 h)" in pilne and "Odpuszczony" not in md and "## Grudzień 2026" in md and "Wyniki" in md
+    assert [l.split(" · ")[1] for l in listopad.splitlines() if l.startswith("- ")] == \
+        ["Rejestracja do", "Zamrożenie projektu", "Gotowe do wysłania", "Zgłoszenie do"]
+    assert "**cz 26.11 11:00** (22 h)" in listopad and "Odpuszczony" not in md and "## Grudzień 2026" in md and "Wyniki" in md
     ics = (tmp_path / "out" / "hackatony.ics").read_bytes().decode()
     assert ics.count("BEGIN:VEVENT") == 6 and all(len(l.encode()) <= 75 for l in ics.split("\r\n"))
     assert "Daleki ze średnikiem\\; i przecinkiem\\," in ics.replace("\r\n ", "")
