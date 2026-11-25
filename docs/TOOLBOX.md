@@ -232,7 +232,7 @@ przygotowuje filtry i sprawdza wyniki ([narzedzia-i-bazy.md](../profiles/jarvo-b
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
-| `hackatony.py` | baza hackathonów w SQLite (biblioteka standardowa): dodaj bez dubli z walidacją zasad i dat UTC, terminy w godzinach, oceny, eksport `HACKATONY.md` i CSV | własny kod | n/d | skrypt |
+| `hackatony.py`, `terminy_rano.py` | baza hackathonów w SQLite (biblioteka standardowa): dodaj bez dubli z walidacją zasad i dat UTC, terminy w godzinach, oceny, eksport `HACKATONY.md` i CSV, kalendarz `KALENDARZ.md` i `hackatony.ics`, rutyna przypomnień bez modelu | własny kod | n/d | skrypt, cron `hacker-terminy` |
 
 Kanały radaru (platformy, agregatory, API i kanały RSS bez logowania, regulaminy): [platformy.md](../profiles/jarvo-hacker/skills/hacker/radar-hackatonow/references/platformy.md).
 
