@@ -1,6 +1,6 @@
 ---
 name: baza-okazji
-description: "Baza okazji: dopisz, status, terminy, eksport (okazje.py)."
+description: "Baza okazji i aplikacji: zapis, etapy, terminy (okazje.py)."
 version: 1.0.0
 author: Jarvo
 license: MIT
@@ -21,6 +21,7 @@ Jedyna pamięć okazji to `baza/okazje.db` w katalogu roboczym, obsługiwana wy�
 
 ## Kiedy użyć
 - Nowe okazje z researchu, posta od właściciela, newslettera; zmiana statusu (aplikujemy, złożone, odrzucone).
+- Każda nasza aplikacja i wszystko, co się przy niej dzieje (etap, kwota, następny krok, mail, rozmowa, decyzja).
 - Pytanie „co mamy”, „jakie terminy”, „pokaż bazę”, eksport dla właściciela.
 
 ## Kiedy NIE używać
@@ -47,8 +48,13 @@ Jedyna pamięć okazji to `baza/okazje.db` w katalogu roboczym, obsługiwana wy�
    - ✅ Punkt kontrolny: skrypt nie zgłosił błędu (brak źródła, zły typ, zła data); błąd poprawiasz, nie omijasz.
 2. Dla projektu: `okazje.py ocen <id> <projekt> <0-10> "dlaczego"` (powód obowiązkowy, jedno zdanie).
 3. Zmiana stanu: `okazje.py status <id> <status> "notatka"` (status zmienia tylko to polecenie, nie `dodaj`).
-4. Przegląd: `okazje.py terminy --dni 30`, `okazje.py lista --projekt <p> --min-ocena 7`, `okazje.py stare --dni 60`.
-5. Dla właściciela: `okazje.py eksport out/` → `out/OKAZJE.md` (terminy 45 dni, ranking projektów) i `out/okazje.csv`.
+4. Aplikacja: `okazje.py aplikuj <id> <projekt> kwota=… krok="…" krok_do=RRRR-MM-DD`, potem `okazje.py etap
+   <id>--<projekt> <etap> "notatka"` (etap przesuwa status okazji), `okazje.py ustaw <aplikacja> pole=wartość` i
+   `okazje.py notuj <id> "co się stało"` po każdym mailu, rozmowie i decyzji; każda aplikacja w toku ma krok z terminem.
+5. Przegląd: `okazje.py aplikacje`, `okazje.py terminy --dni 30`, `okazje.py historia [<id>]`,
+   `okazje.py lista --projekt <p> --min-ocena 7`, `okazje.py stare --dni 60`.
+6. Dla właściciela: `okazje.py eksport out/` → `out/OKAZJE.md`, `out/okazje.csv`, `out/KALENDARZ.md`,
+   `out/finansowanie.ics`; notatka „kalendarz finansowania” w Mózgu odświeża się sama po każdej zmianie bazy.
 
 ## Definition of Done
 - [ ] każda nowa okazja w bazie ma `url`, `zrodlo`, `sprawdzone`, typ i termin albo zdanie o terminie,

@@ -119,3 +119,32 @@ def test_przypomnienie_milczy_bez_terminow_i_migruje_stara_baze(tmp_path, capsys
     assert capsys.readouterr().out == ""
     uruchom(tmp_path, "przypomnij", "--tydzien")
     assert capsys.readouterr().out == ""
+
+
+def test_udzial_historia_i_notatka_w_mozgu(tmp_path, capsys, monkeypatch):
+    """25.11 właściciel: wszystko śledzone (nasz udział, następny krok, historia każdej zmiany) i zapisywane w Mózgu,
+    w notatce „kalendarz hackathonów” sekcji Hacker; notatka odświeża się po każdej zmianie bazy."""
+    (tmp_path / "dane" / "knowledge" / "agenci").mkdir(parents=True)
+    monkeypatch.setenv("JARVO_DATA_DIR", str(tmp_path / "dane"))
+    monkeypatch.delenv("JARVO_KNOWLEDGE_DIR", raising=False)
+    uruchom(tmp_path, "dodaj", jsonl(tmp_path, wpis(), wpis(nazwa="Kaggle Gemma", zgloszenie_do="2026-12-10")))
+    uruchom(tmp_path, "ocen", "kaggle-gemma", "7", "nasz kernel")
+    uruchom(tmp_path, "status", "gemini-agents-challenge", "zapisani", "konto Devpost gotowe")
+    uruchom(tmp_path, "ustaw", "gemini-agents-challenge", "konto=Devpost jaro", "krok=nagrać demo", "krok_do=2026-11-26T20:00")
+    uruchom(tmp_path, "notuj", "gemini-agents-challenge", "mentor potwierdził track agents")
+    with pytest.raises(SystemExit, match="pole z konto"):
+        uruchom(tmp_path, "ustaw", "gemini-agents-challenge", "status=wygrany")
+    capsys.readouterr()
+    uruchom(tmp_path, "historia", "gemini-agents-challenge")
+    hist = capsys.readouterr().out.splitlines()
+    assert [l.split("  ")[2].split(":")[0] for l in hist[:-1]] == ["notatka", "udział", "status", "dodany"]
+    assert "nowy → zapisani: konto Devpost gotowe" in hist[2] and hist[-1] == "wpisów w 30 dni: 4"
+    uruchom(tmp_path, "lista", "--szukaj", "mentor", "--json")
+    assert [w["id"] for w in json.loads(capsys.readouterr().out)] == ["gemini-agents-challenge"]
+    md = (tmp_path / "dane" / "knowledge" / "agenci" / "jarvo-hacker" / "kalendarz hackathonów.md").read_text(encoding="utf-8")
+    assert "status: generowane" in md and "sekcje: true" in md and "utworzono: 2026-11-25" in md
+    sekcja = lambda n: md.split(f"## {n}\n")[1].split("\n## ")[0]            # noqa: E731
+    assert "Nasz krok: nagrać demo" in sekcja("W ciągu 72 godzin")       # 26.11 20:00 UTC = 21:00 w Warszawie
+    assert "**zapisani** · zgłoszenie 2026-11-27T17:00 UTC · następny krok: nagrać demo do 2026-11-26T20:00 UTC · konto: Devpost jaro" in sekcja("Nasze starty")
+    assert "Kaggle Gemma" in sekcja("Najlepsze kandydaty") and "mentor potwierdził" in sekcja("Historia z 30 dni")
+    assert "### Grudzień 2026" in sekcja("Terminy na 120 dni") and "[[agenci/jarvo-hacker/_hub-hacker|Hacker]]" in md

@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""Baza hackathonów Hackera (SQLite): hackathony, bounty, konkursy Kaggle i GPU, z terminami, zasadami i oceną.
+"""Baza hackathonów Hackera (SQLite): hackathony, bounty, konkursy Kaggle i GPU, z terminami, zasadami, oceną,
+naszym udziałem i historią każdej zmiany.
 
     hackatony.py dodaj plik.jsonl [...]               # dopisz albo uaktualnij (klucz: id, inaczej slug z nazwy)
     hackatony.py lista [--status S] [--platforma P] [--min-ocena N] [--szukaj FRAZA] [--json]
     hackatony.py terminy [--dni 14]                   # otwarte, zgłoszenie w oknie, najbliższe pierwsze (czas UTC)
     hackatony.py ocen <id> <0-10> "dlaczego"          # wartość oczekiwana dla floty: nagroda, szansa, wysiłek, zasady
     hackatony.py status <id> <status> ["notatka"]     # nowy|kandydat|zapisani|budujemy|zgloszony|wygrany|przegrany|odpuszczony|zamkniety
+    hackatony.py ustaw <id> pole=wartość [...]        # nasz udział: konto, projekt, zgloszenie_url, demo_url, nagroda,
+                                                      # krok (następny krok), krok_do (jego termin UTC); pusta wartość czyści
+    hackatony.py notuj <id> "co się stało"            # wpis do historii (mail, rozmowa, decyzja, feedback jury)
+    hackatony.py historia [<id>] [--dni 30]           # historia zmian, najnowsze pierwsze
     hackatony.py stare [--dni 14]                     # otwarte wpisy do ponownego sprawdzenia (pole sprawdzone)
     hackatony.py eksport <katalog>                    # HACKATONY.md (terminy, ranking, wyniki) + hackatony.csv + kalendarz
     hackatony.py kalendarz <katalog> [--dni 120]      # KALENDARZ.md (miesiące i tygodnie) + hackatony.ics do subskrypcji
@@ -13,10 +18,11 @@
 
 Baza: --baza (domyślnie baza/hackatony.db w katalogu roboczym). Wpis JSONL: nazwa, platforma, url i zrodlo (strona
 hackathonu z zasadami) są obowiązkowe; zgloszenie_do = termin zgłoszenia projektu w UTC (RRRR-MM-DDTHH:MM albo
-RRRR-MM-DD), rejestracja_do, start i wyniki jak wyżej; ai_kod: tak | nie | niejasne (czy regulamin dopuszcza kod pisany
-przez AI); solo: tak | nie | niejasne. Kalendarz: rejestracja, start, zgłoszenie i wyniki każdego otwartego wpisu, a przy
-statusie zapisani/budujemy także nasze kamienie (zamrożenie 8 h i gotowe 6 h przed zgłoszeniem). Skrypt niczego nie
-wysyła ani nie rejestruje.
+RRRR-MM-DD), rejestracja_do, start, wyniki i krok_do jak wyżej; ai_kod: tak | nie | niejasne (czy regulamin dopuszcza
+kod pisany przez AI); solo: tak | nie | niejasne. Kalendarz: rejestracja, start, zgłoszenie i wyniki każdego otwartego
+wpisu, nasz następny krok, a przy statusie zapisani/budujemy także nasze kamienie (zamrożenie 8 h i gotowe 6 h przed
+zgłoszeniem). Każda zmiana bazy odświeża notatkę „kalendarz hackathonów” w Mózgu (skarbiec Jarva,
+`agenci/jarvo-hacker/`). Skrypt niczego nie wysyła ani nie rejestruje.
 """
 
 from __future__ import annotations
@@ -37,11 +43,14 @@ OTWARTE = ("nowy", "kandydat", "zapisani", "budujemy")
 TRZY = ("tak", "nie", "niejasne")
 POLA = ("id", "nazwa", "platforma", "url", "zrodlo", "start", "rejestracja_do", "zgloszenie_do", "wyniki", "tryb", "miejsce",
         "pula", "waluta", "tracki", "sponsorzy", "solo", "ai_kod", "wymagania", "kryteria", "kwalifikowalnosc",
-        "sprawdzone", "status", "notatki")
-DATY = ("start", "rejestracja_do", "zgloszenie_do", "wyniki")
+        "sprawdzone", "status", "notatki", "konto", "projekt", "zgloszenie_url", "demo_url", "nagroda", "krok", "krok_do")
+DATY = ("start", "rejestracja_do", "zgloszenie_do", "wyniki", "krok_do")
+UDZIAL = ("konto", "projekt", "zgloszenie_url", "demo_url", "nagroda", "krok", "krok_do")   # pola `ustaw`
 SCHEMAT = f"""
 CREATE TABLE IF NOT EXISTS hackatony ({', '.join(f'{p} {"REAL" if p == "pula" else "TEXT"}' for p in POLA)},
   ocena INTEGER, dlaczego TEXT, dodane TEXT NOT NULL, zmienione TEXT NOT NULL, PRIMARY KEY (id));
+CREATE TABLE IF NOT EXISTS historia (nr INTEGER PRIMARY KEY AUTOINCREMENT, kiedy TEXT NOT NULL, id TEXT NOT NULL,
+  co TEXT NOT NULL, opis TEXT NOT NULL);
 """
 
 
@@ -56,10 +65,14 @@ def polacz(sciezka: Path) -> sqlite3.Connection:
     db.row_factory = sqlite3.Row
     db.executescript(SCHEMAT)
     jest = {r[1] for r in db.execute("PRAGMA table_info(hackatony)")}
-    for p in POLA:                                  # baza sprzed nowego pola (25.11: `wyniki`) dostaje kolumnę
+    for p in POLA:                                  # baza sprzed nowego pola (25.11: `wyniki`, pola udziału) dostaje kolumnę
         if p not in jest:
             db.execute(f"ALTER TABLE hackatony ADD COLUMN {p} {'REAL' if p == 'pula' else 'TEXT'}")
     return db
+
+
+def zapisz_historie(db: sqlite3.Connection, teraz: dt.datetime, hid: str, co: str, opis: str) -> None:
+    db.execute("INSERT INTO historia (kiedy, id, co, opis) VALUES (?, ?, ?, ?)", (f"{teraz:%Y-%m-%dT%H:%M}", hid, co, opis))
 
 
 def czas(tekst: str | None, pole: str) -> str | None:
@@ -102,7 +115,8 @@ def sprawdz(w: dict) -> dict:
     return out
 
 
-def cmd_dodaj(db: sqlite3.Connection, pliki: list[str], dzis: dt.date) -> int:
+def cmd_dodaj(db: sqlite3.Connection, pliki: list[str], teraz: dt.datetime) -> int:
+    dzis = teraz.date()
     nowe = zmienione = 0
     for plik in pliki:
         for nr, linia in enumerate(Path(plik).read_text(encoding="utf-8").splitlines(), 1):
@@ -117,12 +131,14 @@ def cmd_dodaj(db: sqlite3.Connection, pliki: list[str], dzis: dt.date) -> int:
                 w["status"] = w["status"] or "nowy"
                 db.execute(f"INSERT INTO hackatony ({', '.join(POLA)}, dodane, zmienione) VALUES ({', '.join('?' * len(POLA))}, ?, ?)",
                            (*[w[p] for p in POLA], dzis.isoformat(), dzis.isoformat()))
+                zapisz_historie(db, teraz, w["id"], "dodany", f"{w['nazwa']} ({w['platforma']}), status {w['status']}")
                 nowe += 1
             else:                       # nowe dane uzupełniają wpis; status i notatki zmienia się osobno
                 zm = {p: w[p] for p in POLA if p not in ("id", "status", "notatki") and w[p] is not None and w[p] != jest[p]}
                 if zm:
                     db.execute(f"UPDATE hackatony SET {', '.join(f'{p} = ?' for p in zm)}, zmienione = ? WHERE id = ?",
                                (*zm.values(), dzis.isoformat(), w["id"]))
+                    zapisz_historie(db, teraz, w["id"], "dane", ", ".join(f"{p}: {jest[p] or '-'} → {v}" for p, v in zm.items()))
                     zmienione += 1
     db.commit()
     print(json.dumps({"nowe": nowe, "zmienione": zmienione, "razem": db.execute("SELECT count(*) FROM hackatony").fetchone()[0]}))
@@ -142,7 +158,8 @@ def cmd_lista(db: sqlite3.Connection, a: argparse.Namespace) -> int:
     if a.min_ocena:
         q += " AND ocena >= ?"; arg.append(a.min_ocena)
     if a.szukaj:
-        q += " AND (nazwa LIKE ? OR tracki LIKE ? OR sponsorzy LIKE ? OR notatki LIKE ?)"; arg += [f"%{a.szukaj}%"] * 4
+        q += (" AND (nazwa LIKE ? OR tracki LIKE ? OR sponsorzy LIKE ? OR notatki LIKE ? OR krok LIKE ? "
+              "OR id IN (SELECT id FROM historia WHERE opis LIKE ?))"); arg += [f"%{a.szukaj}%"] * 6
     w = [dict(r) for r in db.execute(q + " ORDER BY zgloszenie_do IS NULL, zgloszenie_do, nazwa", arg)]
     if a.json:
         print(json.dumps(w, ensure_ascii=False, indent=1))
@@ -186,23 +203,67 @@ def jest_id(db: sqlite3.Connection, hid: str) -> sqlite3.Row:
     return r
 
 
-def cmd_ocen(db: sqlite3.Connection, hid: str, ocena: int, dlaczego: str, dzis: dt.date) -> int:
+def cmd_ocen(db: sqlite3.Connection, hid: str, ocena: int, dlaczego: str, teraz: dt.datetime) -> int:
     jest_id(db, hid)
     if not 0 <= ocena <= 10 or not dlaczego.strip():
         raise SystemExit("ocena 0–10 i powód są obowiązkowe")
-    db.execute("UPDATE hackatony SET ocena = ?, dlaczego = ?, zmienione = ? WHERE id = ?", (ocena, dlaczego.strip(), dzis.isoformat(), hid))
+    db.execute("UPDATE hackatony SET ocena = ?, dlaczego = ?, zmienione = ? WHERE id = ?", (ocena, dlaczego.strip(), teraz.date().isoformat(), hid))
+    zapisz_historie(db, teraz, hid, "ocena", f"{ocena}/10: {dlaczego.strip()}")
     db.commit()
     return 0
 
 
-def cmd_status(db: sqlite3.Connection, hid: str, status: str, notatka: str, dzis: dt.date) -> int:
+def cmd_status(db: sqlite3.Connection, hid: str, status: str, notatka: str, teraz: dt.datetime) -> int:
     if status not in STATUSY:
         raise SystemExit(f"status spoza {', '.join(STATUSY)}")
-    notatki = jest_id(db, hid)["notatki"] or ""
-    if notatka.strip():
-        notatki = (notatki + "\n" if notatki else "") + f"{dzis.isoformat()} {status}: {notatka.strip()}"
-    db.execute("UPDATE hackatony SET status = ?, notatki = ?, zmienione = ? WHERE id = ?", (status, notatki, dzis.isoformat(), hid))
+    byl = jest_id(db, hid)["status"]
+    db.execute("UPDATE hackatony SET status = ?, zmienione = ? WHERE id = ?", (status, teraz.date().isoformat(), hid))
+    zapisz_historie(db, teraz, hid, "status", f"{byl} → {status}" + (f": {notatka.strip()}" if notatka.strip() else ""))
     db.commit()
+    return 0
+
+
+def cmd_ustaw(db: sqlite3.Connection, hid: str, pary: list[str], teraz: dt.datetime) -> int:
+    """Pola naszego udziału (konto, projekt, linki, nagroda, następny krok z terminem); `pole=` czyści pole."""
+    jest = jest_id(db, hid)
+    zm = {}
+    for para in pary:
+        pole, znak, wartosc = para.partition("=")
+        if not znak or pole not in UDZIAL:
+            raise SystemExit(f"„{para}”: podaj pole=wartość, pole z {', '.join(UDZIAL)}")
+        zm[pole] = czas(wartosc, pole) if pole == "krok_do" else (wartosc.strip() or None)
+    zm = {p: v for p, v in zm.items() if v != jest[p]}
+    if zm:
+        db.execute(f"UPDATE hackatony SET {', '.join(f'{p} = ?' for p in zm)}, zmienione = ? WHERE id = ?",
+                   (*zm.values(), teraz.date().isoformat(), hid))
+        zapisz_historie(db, teraz, hid, "udział", ", ".join(f"{p}: {v or '(puste)'}" for p, v in zm.items()))
+        db.commit()
+    return 0
+
+
+def cmd_notuj(db: sqlite3.Connection, hid: str, tekst: str, teraz: dt.datetime) -> int:
+    jest_id(db, hid)
+    if not tekst.strip():
+        raise SystemExit("pusta notatka")
+    zapisz_historie(db, teraz, hid, "notatka", tekst.strip())
+    db.commit()
+    return 0
+
+
+def historia(db: sqlite3.Connection, hid: str | None, od: dt.datetime) -> list[dict]:
+    q, arg = "SELECT h.*, k.nazwa FROM historia h LEFT JOIN hackatony k ON k.id = h.id WHERE h.kiedy >= ?", [f"{od:%Y-%m-%dT%H:%M}"]
+    if hid:
+        q += " AND h.id = ?"; arg.append(hid)
+    return [dict(r) for r in db.execute(q + " ORDER BY h.nr DESC", arg)]
+
+
+def cmd_historia(db: sqlite3.Connection, hid: str | None, dni: int, teraz: dt.datetime) -> int:
+    if hid:
+        jest_id(db, hid)
+    w = historia(db, hid, teraz - dt.timedelta(days=dni))
+    for x in w:
+        print(f"{x['kiedy']} UTC  {x['nazwa'] or x['id']}  {x['co']}: {x['opis']}")
+    print(f"wpisów w {dni} dni: {len(w)}")
     return 0
 
 
@@ -262,17 +323,22 @@ def chwila(tekst: str, koniec_dnia: bool) -> dt.datetime:
 
 
 def wydarzenia(db: sqlite3.Connection, od: dt.datetime, do: dt.datetime) -> list[dict]:
-    """Etapy otwartych hackathonów (zgłoszony: tylko wyniki) i nasze kamienie przy zapisanych i budowanych."""
+    """Etapy otwartych hackathonów (zgłoszony: tylko wyniki), nasze kamienie przy zapisanych i budowanych oraz nasz
+    następny krok (`krok_do`) przy każdym wpisie poza odpuszczonymi i zamkniętymi (wygrany: odbiór nagrody, KYC)."""
     out = []
-    for r in db.execute("SELECT * FROM hackatony WHERE status IN ('nowy','kandydat','zapisani','budujemy','zgloszony')"):
+    for r in db.execute("SELECT * FROM hackatony WHERE status NOT IN ('odpuszczony', 'zamkniety')"):
         x = dict(r)
-        for pole, nazwa, koniec in ETAPY:
-            if x[pole] and (x["status"] != "zgloszony" or pole == "wyniki"):
-                out.append({"kiedy": chwila(x[pole], koniec), "etap": nazwa, "pole": pole, "dzien": len(x[pole]) == 10, "h": x})
+        if x["status"] in ("nowy", "kandydat", "zapisani", "budujemy", "zgloszony"):
+            for pole, nazwa, koniec in ETAPY:
+                if x[pole] and (x["status"] != "zgloszony" or pole == "wyniki"):
+                    out.append({"kiedy": chwila(x[pole], koniec), "etap": nazwa, "pole": pole, "dzien": len(x[pole]) == 10, "h": x})
         if x["status"] in ("zapisani", "budujemy") and x["zgloszenie_do"]:
             t = chwila(x["zgloszenie_do"], True)
             out += [{"kiedy": t - dt.timedelta(hours=8), "etap": "Zamrożenie projektu", "pole": "zamrozenie", "dzien": False, "h": x},
                     {"kiedy": t - dt.timedelta(hours=6), "etap": "Gotowe do wysłania", "pole": "gotowe", "dzien": False, "h": x}]
+        if x["krok_do"]:
+            out.append({"kiedy": chwila(x["krok_do"], True), "etap": f"Nasz krok: {x['krok'] or 'bez opisu'}", "pole": "krok",
+                        "dzien": len(x["krok_do"]) == 10, "h": x})
     return sorted((e for e in out if od <= e["kiedy"] <= do), key=lambda e: (e["kiedy"], e["h"]["nazwa"]))
 
 
@@ -311,17 +377,7 @@ def zapisz_kalendarz(db: sqlite3.Connection, katalog: Path, teraz: dt.datetime, 
           "Subskrypcja w telefonie: plik `hackatony.ics`.", ""]
     pilne = [e for e in ev if teraz <= e["kiedy"] <= teraz + dt.timedelta(hours=72)]
     md += ["## W ciągu 72 godzin", ""] + ([f"- {linia(e, teraz)}" for e in pilne] or ["- nic"])
-    miesiac = tydzien = None
-    for e in ev:
-        lok = lokalnie(e["kiedy"])
-        if (lok.year, lok.month) != miesiac:
-            miesiac, tydzien = (lok.year, lok.month), None
-            md += ["", f"## {MIESIACE[lok.month - 1].capitalize()} {lok.year}"]
-        if lok.isocalendar()[1] != tydzien:
-            tydzien = lok.isocalendar()[1]
-            pon = lok.date() - dt.timedelta(days=lok.weekday())
-            md += ["", f"### Tydzień {pon:%d.%m} do {pon + dt.timedelta(days=6):%d.%m}", ""]
-        md.append(f"- {linia(e, teraz)}")
+    md += miesiace(ev, teraz, "##")
     (katalog / "KALENDARZ.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     stamp = teraz.strftime("%Y%m%dT%H%M%SZ")
     ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Jarvo//Hacker//PL", "CALSCALE:GREGORIAN",
@@ -337,12 +393,28 @@ def zapisz_kalendarz(db: sqlite3.Connection, katalog: Path, teraz: dt.datetime, 
             f", ocena {x['ocena']}: {x['dlaczego']}" if x["ocena"] is not None else "") + f"\n{x['url']}"
         ics += ["BEGIN:VEVENT", f"UID:{x['id']}-{e['pole']}@jarvo-hacker", f"DTSTAMP:{stamp}", *czasy,
                 f"SUMMARY:{ics_tekst(e['etap'] + ': ' + x['nazwa'])}", f"DESCRIPTION:{ics_tekst(opis)}", f"URL:{x['url']}"]
-        if e["pole"] in ("zgloszenie_do", "rejestracja_do", "gotowe"):
+        if e["pole"] in ("zgloszenie_do", "rejestracja_do", "gotowe", "krok"):
             ics += ["BEGIN:VALARM", "ACTION:DISPLAY", f"DESCRIPTION:{ics_tekst(e['etap'])}", "TRIGGER:-P1D", "END:VALARM"]
         ics.append("END:VEVENT")
     ics.append("END:VCALENDAR")
     (katalog / "hackatony.ics").write_text("\r\n".join(z for l in ics for z in zwin(l)) + "\r\n", encoding="utf-8")
     return ev
+
+
+def miesiace(ev: list[dict], teraz: dt.datetime, poziom: str) -> list[str]:
+    """Wydarzenia w miesiącach (nagłówek `poziom`) i tygodniach (poziom niżej), czas właściciela."""
+    md, miesiac, tydzien = [], None, None
+    for e in ev:
+        lok = lokalnie(e["kiedy"])
+        if (lok.year, lok.month) != miesiac:
+            miesiac, tydzien = (lok.year, lok.month), None
+            md += ["", f"{poziom} {MIESIACE[lok.month - 1].capitalize()} {lok.year}"]
+        if lok.isocalendar()[1] != tydzien:
+            tydzien = lok.isocalendar()[1]
+            pon = lok.date() - dt.timedelta(days=lok.weekday())
+            md += ["", f"{poziom}# Tydzień {pon:%d.%m} do {pon + dt.timedelta(days=6):%d.%m}", ""]
+        md.append(f"- {linia(e, teraz)}")
+    return md
 
 
 def cmd_kalendarz(db: sqlite3.Connection, katalog: Path, dni: int, teraz: dt.datetime) -> int:
@@ -371,6 +443,72 @@ def cmd_przypomnij(db: sqlite3.Connection, katalog: Path | None, tydzien: bool, 
     return 0
 
 
+# ------------------------------------------------------------------------------------------- Mózg
+# 25.11 właściciel: „w Mózgu w sekcji Hacker notatka kalendarz i tam wszystko zapisywane”. Notatkę pisze ten skrypt po
+# każdej zmianie bazy i w porannej rutynie (własny format skryptu jak briefy, SCHEMA zasada 9): status `generowane`,
+# sekcje osobno w indeksie, więc przypomnienie przed turą trafia w „nasze starty” albo „72 godziny”.
+NOTATKA_MOZGU = Path("agenci") / "jarvo-hacker" / "kalendarz hackathonów.md"
+NASZE = ("budujemy", "zapisani", "zgloszony", "wygrany", "przegrany")
+
+
+def skarbiec() -> Path | None:
+    """Skarbiec Jarva (`JARVO_KNOWLEDGE_DIR`, inaczej `JARVO_DATA_DIR/knowledge`), gdy jest zasiany; poza instalacją
+    (testy, kopia bazy) brak notatki."""
+    dane = os.environ.get("JARVO_DATA_DIR")
+    k = os.environ.get("JARVO_KNOWLEDGE_DIR") or (str(Path(dane) / "knowledge") if dane else "")
+    return Path(k) if k and (Path(k) / "agenci").is_dir() else None
+
+
+def udzial(x: dict) -> str:
+    czesci = [f"[{x['nazwa']}]({x['url']})", f"**{x['status']}**", f"zgłoszenie {x['zgloszenie_do'] or '?'} UTC"]
+    if x["krok"] or x["krok_do"]:
+        czesci.append(f"następny krok: {x['krok'] or '?'}" + (f" do {x['krok_do']} UTC" if x["krok_do"] else ""))
+    czesci += [f"{p.replace('_', ' ')}: {x[p]}" for p in ("konto", "projekt", "zgloszenie_url", "demo_url", "nagroda") if x[p]]
+    return " · ".join(czesci)
+
+
+def zapisz_mozg(db: sqlite3.Connection, teraz: dt.datetime) -> Path | None:
+    k = skarbiec()
+    if k is None:
+        return None
+    p = k / NOTATKA_MOZGU
+    stara = p.read_text(encoding="utf-8") if p.is_file() else ""
+    utworzono = (re.search(r"^utworzono: (\S+)$", stara, re.M) or [None, teraz.date().isoformat()])[1]
+    w = [dict(r) for r in db.execute("SELECT * FROM hackatony ORDER BY zgloszenie_do IS NULL, zgloszenie_do, nazwa")]
+    ev = wydarzenia(db, teraz - dt.timedelta(days=1), teraz + dt.timedelta(days=120))
+    pilne = [e for e in ev if teraz <= e["kiedy"] <= teraz + dt.timedelta(hours=72)]
+    nasze = sorted((x for x in w if x["status"] in NASZE), key=lambda x: NASZE.index(x["status"]))
+    top = sorted((x for x in w if x["status"] in OTWARTE and x["ocena"] is not None), key=lambda x: -x["ocena"])[:10]
+    hist = historia(db, None, teraz - dt.timedelta(days=30))[:40]
+    md = ["---", "typ: fakt", "tagi: [hackathony, kalendarz, terminy]", f"utworzono: {utworzono}",
+          f"zmieniono: {teraz.date().isoformat()}", "status: generowane", "zrodlo: workspaces/jarvo-hacker/baza/hackatony.db",
+          "agent: jarvo-hacker", "sekcje: true", "---", "# Kalendarz hackathonów", "",
+          f"**Wszystkie terminy hackathonów z bazy Hackera, nasze starty z następnym krokiem i historia zmian; stan na "
+          f"{lokalnie(teraz):%d.%m.%Y %H:%M} ({STREFA}): w bazie {len(w)}, otwarte {sum(x['status'] in OTWARTE for x in w)}, "
+          f"nasze starty {len(nasze)}.**", "",
+          "Notatkę pisze skrypt `hackatony.py` po każdej zmianie bazy i co rano; zmiany przez Hackera (`status`, `ustaw`, "
+          "`notuj`), nie ręcznie. Czas w strefie właściciela, terminy w bazie w UTC.", "",
+          "## W ciągu 72 godzin", ""]
+    md += [f"- {linia(e, teraz)}" for e in pilne] or ["- nic"]
+    md += ["", "## Nasze starty", ""] + ([f"- {udzial(x)}" for x in nasze] or ["- jeszcze żaden"])
+    md += ["", "## Terminy na 120 dni"] + (miesiace(ev, teraz, "###") or ["", "- brak"])
+    md += ["", "## Najlepsze kandydaty", ""]
+    md += [f"- [{x['nazwa']}]({x['url']}) · {pula(x)} · zgłoszenie {x['zgloszenie_do'] or '?'} UTC · ocena {x['ocena']}: "
+           f"{x['dlaczego']}" for x in top] or ["- brak ocenionych"]
+    md += ["", "## Historia z 30 dni", ""]
+    md += [f"- {lokalnie(dt.datetime.fromisoformat(h['kiedy'])):%d.%m %H:%M} · {h['nazwa'] or h['id']} · {h['co']}: {h['opis']}"
+           for h in hist] or ["- brak zmian"]
+    md += ["", "## Powiązane", "", "- hub: [[agenci/jarvo-hacker/_hub-hacker|Hacker]]",
+           "- [[agenci/jarvo-hacker/jak działa hacker|Hacker od A do Z]]",
+           "- [[agenci/jarvo-hacker/zasady pracy hacker|Zasady pracy: Hacker]]", "- [[orzeczenia/hacker|Orzeczenia: Hacker]]",
+           "- [[agenci/jarvo-bigshort/kalendarz finansowania|Kalendarz finansowania (Bigshort)]]"]
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_name(p.name + ".tmp")
+    tmp.write_text("\n".join(md) + "\n", encoding="utf-8")
+    tmp.replace(p)
+    return p
+
+
 def domyslna_baza() -> str:
     """Katalog roboczy Hackera w danych Jarva (JARVO_DATA_DIR), niezależnie od katalogu, w którym stoi terminal
     (25.11: tura z panelu zapisała bazę w katalogu profilu zamiast w katalogu roboczym)."""
@@ -390,31 +528,42 @@ def main(argv: list[str] | None = None, teraz: dt.datetime | None = None) -> int
     s = sub.add_parser("terminy"); s.add_argument("--dni", type=int, default=14)
     s = sub.add_parser("ocen"); s.add_argument("id"); s.add_argument("ocena", type=int); s.add_argument("dlaczego")
     s = sub.add_parser("status"); s.add_argument("id"); s.add_argument("status"); s.add_argument("notatka", nargs="?", default="")
+    s = sub.add_parser("ustaw"); s.add_argument("id"); s.add_argument("pary", nargs="+")
+    s = sub.add_parser("notuj"); s.add_argument("id"); s.add_argument("tekst")
+    s = sub.add_parser("historia"); s.add_argument("id", nargs="?"); s.add_argument("--dni", type=int, default=30)
     s = sub.add_parser("stare"); s.add_argument("--dni", type=int, default=14)
     s = sub.add_parser("eksport"); s.add_argument("katalog")
     s = sub.add_parser("kalendarz"); s.add_argument("katalog"); s.add_argument("--dni", type=int, default=120)
     s = sub.add_parser("przypomnij"); s.add_argument("--katalog"); s.add_argument("--tydzien", action="store_true")
     a = ap.parse_args(argv)
     db = polacz(Path(a.baza))
-    dzis = teraz.date()
     try:
-        if a.cmd == "dodaj":
-            return cmd_dodaj(db, a.pliki, dzis)
         if a.cmd == "lista":
             return cmd_lista(db, a)
         if a.cmd == "terminy":
             return cmd_terminy(db, a.dni, teraz)
-        if a.cmd == "ocen":
-            return cmd_ocen(db, a.id, a.ocena, a.dlaczego, dzis)
-        if a.cmd == "status":
-            return cmd_status(db, a.id, a.status, a.notatka, dzis)
+        if a.cmd == "historia":
+            return cmd_historia(db, a.id, a.dni, teraz)
         if a.cmd == "stare":
-            return cmd_stare(db, a.dni, dzis)
-        if a.cmd == "kalendarz":
-            return cmd_kalendarz(db, Path(a.katalog), a.dni, teraz)
-        if a.cmd == "przypomnij":
-            return cmd_przypomnij(db, Path(a.katalog) if a.katalog else None, a.tydzien, teraz)
-        return cmd_eksport(db, Path(a.katalog), teraz)
+            return cmd_stare(db, a.dni, teraz.date())
+        if a.cmd == "dodaj":
+            wynik = cmd_dodaj(db, a.pliki, teraz)
+        elif a.cmd == "ocen":
+            wynik = cmd_ocen(db, a.id, a.ocena, a.dlaczego, teraz)
+        elif a.cmd == "status":
+            wynik = cmd_status(db, a.id, a.status, a.notatka, teraz)
+        elif a.cmd == "ustaw":
+            wynik = cmd_ustaw(db, a.id, a.pary, teraz)
+        elif a.cmd == "notuj":
+            wynik = cmd_notuj(db, a.id, a.tekst, teraz)
+        elif a.cmd == "kalendarz":
+            wynik = cmd_kalendarz(db, Path(a.katalog), a.dni, teraz)
+        elif a.cmd == "przypomnij":
+            wynik = cmd_przypomnij(db, Path(a.katalog) if a.katalog else None, a.tydzien, teraz)
+        else:
+            wynik = cmd_eksport(db, Path(a.katalog), teraz)
+        zapisz_mozg(db, teraz)          # każda zmiana i każde odświeżenie kalendarza = aktualna notatka w Mózgu
+        return wynik
     finally:
         db.close()
 

@@ -20,3 +20,6 @@ reviewed: "2026-11-25"
 - `tryb`: `online`, `onsite`, `hybryda`; finał na miejscu opisz w `notatki`.
 - `id` opcjonalne (slug z nazwy); nowa edycja = nowa nazwa z rokiem albo sezonem.
 - Status zmienia tylko `hackatony.py status`; `dodaj` uzupełnia dane.
+- Nasz udział: `hackatony.py ustaw <id> konto=… projekt=… krok="…" krok_do=RRRR-MM-DDTHH:MM` (też `zgloszenie_url`,
+  `demo_url`, `nagroda`), każde zdarzenie `hackatony.py notuj <id> "…"`; historia: `hackatony.py historia [<id>]`.
+- Każda zmiana bazy odświeża notatkę „kalendarz hackathonów” w Mózgu (sekcja Hacker); nie edytuj jej ręcznie.

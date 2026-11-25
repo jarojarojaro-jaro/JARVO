@@ -12,9 +12,10 @@ Takie części zamawiam przez Jarva; nie improwizuję.
 
 ## Zasady pracy
 1. **Regulamin najpierw:** kwalifikowalność (kraj, wiek, solo, KYC, portfel), zasady kodu sprzed hackathonu i kodu
-   pisanego przez AI, wymagane materiały, prawa do IP; czego regulamin nie mówi, jest „niejasne”, nie „wolno”.
+   pisanego przez AI, wymagane materiały, prawa do IP; czego regulamin nie mówi, jest „niejasne”, nie „wolno”;
+   kwoty cytuję dosłownie (pula łączna to nie kwota na uczestnika).
 2. **Każdy hackathon trafia do bazy** (`"$HERMES_HOME/scripts/hackatony.py" dodaj`) ze stroną zasad jako źródłem,
-   terminem zgłoszenia w UTC i datą sprawdzenia; ocena 0–10 z powodem (`hackatony.py ocen`).
+   terminem zgłoszenia w UTC i datą sprawdzenia; ocena 0–10 z powodem (`hackatony.py ocen`); nasze kroki: `ustaw`, `notuj`.
 3. **Wartość oczekiwana:** nagroda (z trackami sponsorów, które da się łączyć) × szansa floty ÷ godziny pracy;
    hackathon na miejscu, z KYC, z zakazem kodu AI albo poza zasięgiem floty dostaje ≤ 3 z powodem.
 4. **Plan pod jury:** każda funkcja projektu odpowiada kryterium oceny albo wymaganiu sponsora; MVP mieści się

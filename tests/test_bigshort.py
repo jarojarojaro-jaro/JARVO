@@ -43,7 +43,8 @@ def test_dodaj_bez_dubli_uzupelnia_i_nie_rusza_statusu(tmp_path, capsys):
     w = {x["id"]: x for x in json.loads(capsys.readouterr().out)}
     assert set(w) == {"vercel-x", "lodzki-grant"}
     assert (w["vercel-x"]["kwota_max"], w["vercel-x"]["status"]) == (40000, "aplikujemy")
-    assert "2026-11-25 aplikujemy: JARO chce" in w["vercel-x"]["notatki"]
+    uruchom(tmp_path, "historia", "vercel-x")
+    assert "status: nowa → aplikujemy: JARO chce" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("zly, blad", [
@@ -95,3 +96,40 @@ def test_stare_wpisy_do_ponownego_sprawdzenia(tmp_path, capsys):
     uruchom(tmp_path, "stare", "--dni", "60")
     out = capsys.readouterr().out
     assert "vercel-x" in out and "swiezy" not in out and "zamkniety" not in out
+
+
+def test_aplikacje_etapy_historia_kalendarz_i_notatka_w_mozgu(tmp_path, capsys, monkeypatch):
+    """25.11 właściciel: śledzimy, gdzie aplikujemy, i wszystko inne; kalendarz jak u Hackera i notatka w Mózgu."""
+    (tmp_path / "dane" / "knowledge" / "agenci").mkdir(parents=True)
+    monkeypatch.setenv("JARVO_DATA_DIR", str(tmp_path / "dane"))
+    monkeypatch.delenv("JARVO_KNOWLEDGE_DIR", raising=False)
+    uruchom(tmp_path, "dodaj", jsonl(tmp_path, wpis(), wpis(nazwa="NVIDIA Inception", typ="kredyty", termin="rolling")))
+    uruchom(tmp_path, "ocen", "nvidia-inception", "enigma-labz", "9", "GPU")
+    uruchom(tmp_path, "aplikuj", "vercel-x", "Jarvo", "kwota=30 000", "krok=wideo 1 min", "krok_do=2026-11-27",
+            "kontakt=partner programu")
+    with pytest.raises(SystemExit, match="już jest"):
+        uruchom(tmp_path, "aplikuj", "vercel-x", "jarvo")
+    with pytest.raises(SystemExit, match="pole z kwota"):
+        uruchom(tmp_path, "ustaw", "vercel-x--jarvo", "etap=przyznana")
+    uruchom(tmp_path, "etap", "vercel-x--jarvo", "zlozona", "formularz wysłany")
+    uruchom(tmp_path, "notuj", "vercel-x--jarvo", "mail z potwierdzeniem")
+    capsys.readouterr()
+    uruchom(tmp_path, "lista", "--json")
+    assert {x["id"]: x["status"] for x in json.loads(capsys.readouterr().out)} == {"vercel-x": "zlozone", "nvidia-inception": "nowa"}
+    uruchom(tmp_path, "aplikacje")
+    (linia, razem) = capsys.readouterr().out.splitlines()
+    assert "**zlozona** · wnioskujemy 30 000 USD · złożona 2026-11-25 · następny krok: wideo 1 min do 2026-11-27" in linia
+    uruchom(tmp_path, "historia", "vercel-x")
+    co = [l.split("  ")[2].split(":")[0] for l in capsys.readouterr().out.splitlines()[:-1]]
+    assert co == ["notatka", "status", "etap", "status", "aplikacja", "dodana"]
+    uruchom(tmp_path, "przypomnij")
+    out = capsys.readouterr().out
+    assert "**pt 27.11** (2 dni) · Nasz krok: wideo 1 min · [Vercel X (jarvo)]" in out and "Termin naboru" not in out
+    md = (tmp_path / "dane" / "knowledge" / "agenci" / "jarvo-bigshort" / "kalendarz finansowania.md").read_text(encoding="utf-8")
+    sekcja = lambda n: md.split(f"## {n}\n")[1].split("\n## ")[0]            # noqa: E731
+    assert "status: generowane" in md and "partner programu" not in md
+    assert "Vercel X" in sekcja("Nasze aplikacje w toku") and "NVIDIA Inception" in sekcja("Najlepsze otwarte okazje")
+    assert "mail z potwierdzeniem" in sekcja("Historia z 30 dni") and "### Listopad 2026" in sekcja("Terminy naborów na 180 dni")
+    uruchom(tmp_path, "kalendarz", str(tmp_path / "out"))
+    ics = (tmp_path / "out" / "finansowanie.ics").read_bytes().decode()
+    assert ics.count("BEGIN:VEVENT") == 1 and "DTSTART;VALUE=DATE:20261127" in ics and all(len(l.encode()) <= 75 for l in ics.split("\r\n"))
