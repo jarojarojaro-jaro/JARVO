@@ -81,7 +81,7 @@ agents:
     model_tier: frontier
     delegation_tier: fast
     autonomy_max: A1
-    telegram_topic: general       # wątek ogólny grupy „Jarvo HQ” + Twój DM; specjaliści bez wątków: pracują przez Jarva (16.11)
+    telegram_topic: general       # wątek ogólny grupy „Jarvo HQ” + Twój DM; specjaliści pracują przez Jarva (16.11), wątek pod własnym uchwytem tylko z decyzji właściciela (25.11: Bigshort, Hacker)
     hq_room: bridge    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Mostek dowodzenia"
     hq_short: "Jarvo"
@@ -298,6 +298,7 @@ agents:
     model_tier: strong
     delegation_tier: fast
     autonomy_max: A1
+    telegram_topic: bigshort      # rozmówca w panelu i wątek BIGSHORT w Jarvo HQ (właściciel 25.11: „w sekcji co reszta”)
     hq_room: control    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Sala transakcji"
     hq_short: "Bigshort"
@@ -323,6 +324,7 @@ agents:
     model_tier: strong
     delegation_tier: fast
     autonomy_max: A1
+    telegram_topic: hacker        # rozmówca w panelu i wątek HACKER w Jarvo HQ (właściciel 25.11)
     hq_room: workshop    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
     hq_label: "Warsztat hakerski"
     hq_short: "Hacker"

@@ -18,6 +18,7 @@ solo: tak | nie | niejasne. Skrypt niczego nie wysyła ani nie rejestruje.
 from __future__ import annotations
 
 import argparse
+import os
 import csv
 import datetime as dt
 import json
@@ -232,10 +233,17 @@ def cmd_eksport(db: sqlite3.Connection, katalog: Path, teraz: dt.datetime) -> in
     return 0
 
 
+def domyslna_baza() -> str:
+    """Katalog roboczy Hackera w danych Jarva (JARVO_DATA_DIR), niezależnie od katalogu, w którym stoi terminal
+    (25.11: tura z panelu zapisała bazę w katalogu profilu zamiast w katalogu roboczym)."""
+    dane = os.environ.get("JARVO_DATA_DIR")
+    return str(Path(dane) / "workspaces" / "jarvo-hacker" / "baza" / "hackatony.db") if dane else "baza/hackatony.db"
+
+
 def main(argv: list[str] | None = None, teraz: dt.datetime | None = None) -> int:
     teraz = teraz or dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--baza", default="baza/hackatony.db")
+    ap.add_argument("--baza", default=domyslna_baza())
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("dodaj"); s.add_argument("pliki", nargs="+")
     s = sub.add_parser("lista")

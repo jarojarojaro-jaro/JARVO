@@ -17,6 +17,7 @@ Kwoty liczbami w walucie z pola waluta; equity słownie ("0%", "7%", "SAFE uncap
 from __future__ import annotations
 
 import argparse
+import os
 import csv
 import datetime as dt
 import json
@@ -231,10 +232,17 @@ def cmd_eksport(db: sqlite3.Connection, katalog: Path, dzis: dt.date) -> int:
     return 0
 
 
+def domyslna_baza() -> str:
+    """Katalog roboczy Bigshorta w danych Jarva (JARVO_DATA_DIR), niezależnie od katalogu, w którym stoi terminal
+    (25.11: Hacker z tury w panelu zapisał swoją bazę w katalogu profilu zamiast w katalogu roboczym)."""
+    dane = os.environ.get("JARVO_DATA_DIR")
+    return str(Path(dane) / "workspaces" / "jarvo-bigshort" / "baza" / "okazje.db") if dane else "baza/okazje.db"
+
+
 def main(argv: list[str] | None = None, dzis: dt.date | None = None) -> int:
     dzis = dzis or dt.date.today()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--baza", default="baza/okazje.db")
+    ap.add_argument("--baza", default=domyslna_baza())
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("dodaj"); s.add_argument("pliki", nargs="+")
     s = sub.add_parser("lista")
