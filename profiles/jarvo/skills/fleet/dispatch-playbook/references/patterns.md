@@ -104,3 +104,12 @@ mały skrypt bez specjalisty robisz sam w rozmowie (skille `dokumenty`, `konwers
 3. `jarvo-bigshort` / `aplikacja` (parents: mapa): szkic aplikacji na okazję; opcjonalnie `jarvo-studio` / `deck`
    i `jarvo-web` / `strona` (parents: aplikacja), gdy program wymaga decku albo strony.
 Wysłanie aplikacji, konto na platformie, kontakt z funduszem = decyzja człowieka (A2); przegląd terminów jako rutyna tylko za zgodą.
+
+## 14. Hackathon („znajdź hackathony”, link do konkursu, „startujemy”)
+1. `jarvo-hacker` / `radar` albo `ocena`: baza hackathonów z oceną (skill `radar-hackatonow`) albo werdykt dla jednego linku (`ocena-hackatonu`).
+2. Jarvo → decyzja użytkownika: startujemy (rejestracja na jego koncie = A2).
+3. `jarvo-hacker` / `plan` (parents: ocena): plan pod jury z harmonogramem w UTC i podziałem pracy.
+4. `jarvo-hacker` / `budowa` (parents: plan); równolegle według planu: `jarvo-web` / `frontend`, `jarvo-studio` / `grafiki`
+   (parents: plan), potem `jarvo-wideo` / `demo` (parents: budowa) ze scenariusza i przebiegu demo.
+5. `jarvo-hacker` / `zgloszenie` (parents: budowa, demo): pakiet gotowy 6 h przed terminem; wysłanie po zgodzie użytkownika.
+Po wynikach: `jarvo-hacker` / `retro`. KYC, portfele i odbiór nagrody zawsze użytkownik.

@@ -74,6 +74,24 @@
     "aplikacje"
    ],
    "nazwa": "Aplikacje"
+  },
+  {
+   "name": "jarvo-bigshort",
+   "handle": "bigshort",
+   "aliasy": [
+    "bigshort",
+    "jarvo-bigshort"
+   ],
+   "nazwa": "Bigshort"
+  },
+  {
+   "name": "jarvo-hacker",
+   "handle": "hacker",
+   "aliasy": [
+    "hacker",
+    "jarvo-hacker"
+   ],
+   "nazwa": "Hacker"
   }
  ],
  "wektory": [

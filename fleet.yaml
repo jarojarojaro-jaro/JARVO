@@ -312,6 +312,31 @@ agents:
     oddaj_gdy: "pieniądze dla projektu: fundusze, aniołowie, akceleratory, granty, kredyty chmurowe, konkursy, ulgi, terminy naborów, szkic aplikacji"
     status: active
 
+  - name: jarvo-hacker
+    kind: specialist
+    title: "Łowca hackathonów"
+    emoji: "🏴"
+    description: >-
+      Hackathony, bounty i konkursy do wygrania: radar platform i kalendarzy, baza z terminami w UTC, pulą, trackami
+      i zasadami (solo, kod AI, KYC), ocena wartości oczekiwanej, plan zwycięstwa pod jury i sponsorów, budowa projektu
+      z demo i pakiet zgłoszenia, retrospektywa wyników.
+    model_tier: strong
+    delegation_tier: fast
+    autonomy_max: A1
+    hq_room: workshop    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
+    hq_label: "Warsztat hakerski"
+    hq_short: "Hacker"
+    rola: "hackathony, konkursy i bounty"
+    handle: hacker
+    en:
+      title: "Hackathon hunter"
+      rola: "hackathons, contests and bounties"
+      hq_label: "Hacker workshop"
+      description: >-
+        Hackathons, bounties and contests to win: radar of platforms and calendars, a database with UTC deadlines, prize pools, tracks and rules (solo, AI-written code, KYC), expected-value scoring, a win plan for judges and sponsors, building the project with a demo and the submission package, results retrospective.
+    oddaj_gdy: "hackathon, bounty, konkurs Kaggle albo GPU: znajdź, oceń, czy startujemy, plan pod jury, budowa projektu na konkurs, zgłoszenie przed terminem"
+    status: active
+
 shared:
   user_memory: builtin          # MVP: pamięć wbudowana + wspólny profil użytkownika; faza 3: honcho
   user_profile: knowledge/user/USER.md      # w skarbcu: @@KNOWLEDGE_DIR@@/user/USER.md

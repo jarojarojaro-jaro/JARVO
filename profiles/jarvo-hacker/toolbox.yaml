@@ -1,0 +1,17 @@
+# Manifest narzędzi Hackera. hackatony.py używa tylko biblioteki standardowej Pythona; kod projektów hackathonowych
+# instaluje swoje zależności w katalogu projektu (npm, uv), więc agent nie ma własnych narzędzi do instalacji.
+
+agent: jarvo-hacker
+
+tools: []
+sidecars: []
+hermes_skills:
+  - skills/software-development/systematic-debugging
+  - skills/web/blocked-page-recovery
+  - optional-skills/research/searxng-search
+  - optional-skills/research/duckduckgo-search
+  - optional-skills/research/rss-feeds
+  - optional-skills/social-media/reddit-reading
+hermes_plugins: []
+mcp_servers: []
+env_requires: []

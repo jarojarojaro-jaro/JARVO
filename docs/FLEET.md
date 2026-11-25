@@ -1,6 +1,6 @@
 # Flota Jarvo: specyfikacja agentów v1
 
-Flota: **Jarvo (szef floty) + 8 agentów**. Każdy agent to osobny profil Hermesa
+Flota: **Jarvo (szef floty) + 9 agentów**. Każdy agent to osobny profil Hermesa
 (osobna dystrybucja w `profiles/<nazwa>/`). Rejestr maszynowy jest w [`fleet.yaml`](../fleet.yaml).
 
 Każdy agent jest budowany według [PROFILE-SPEC.md](PROFILE-SPEC.md) (main prompt, workflowy,
@@ -20,6 +20,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 | `jarvo-lowca` | [SOUL](../profiles/jarvo-lowca/SOUL.md) | [7 w `skills/lowca/`](../profiles/jarvo-lowca/skills/lowca) | 3 (wspólne `konwersja-plikow`, `odczyt-ekranu` i `ostrozna-przegladarka`) | krs, ceidg, przetargi, strona, leady, zrodlo | [16](../evals/jarvo-lowca/scenarios.yaml) |
 | `jarvo-mobile` | [SOUL](../profiles/jarvo-mobile/SOUL.md) | [10 w `skills/mobile/`](../profiles/jarvo-mobile/skills/mobile) | 23 (Expo, React Native, ASO; wspólne `konwersja-plikow`, `odczyt-ekranu` i `warsztat-3d`; `vendor/skills.lock.yaml`) | audyt_mobilny, decyzja, zgodnosc, aplikacja, ikony, zrzuty, wrogie, urzadzenie, ios_ci, bramka, sklep_check, pakiet, kadry, wydanie, odrzucenie, ze_strony, utrzymanie, paczki (+ mobile_lib, szablon `expo-jarvo`, workflow iOS) | [34](../evals/jarvo-mobile/scenarios.yaml) |
 | `jarvo-bigshort` | [SOUL](../profiles/jarvo-bigshort/SOUL.md) | [6 w `skills/bigshort/`](../profiles/jarvo-bigshort/skills/bigshort) | 7 (wyszukiwarki, strony blokowane, RSS; wspólne `konwersja-plikow` i `odczyt-ekranu`; `vendor/skills.lock.yaml`) | okazje | [14](../evals/jarvo-bigshort/scenarios.yaml) |
+| `jarvo-hacker` | [SOUL](../profiles/jarvo-hacker/SOUL.md) | [7 w `skills/hacker/`](../profiles/jarvo-hacker/skills/hacker) | 9 (debugowanie, wyszukiwarki, strony blokowane, RSS, Reddit; wspólne `konwersja-plikow`, `odczyt-ekranu`, `graf-kodu`; `vendor/skills.lock.yaml`) | hackatony | [14](../evals/jarvo-hacker/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
 
@@ -39,6 +40,7 @@ Legenda przy skillach:
 | `jarvo-lowca` | Łowca leadów: firmy z sygnałem zakupowym i opublikowanym kontaktem | snajper | A1 (szuka i ocenia; wysyłka = decyzja człowieka) |
 | `jarvo-mobile` | Twórca aplikacji: natywna czy PWA, audyt mobilny, aplikacje Expo do sklepów | snajper | A1 (audyty i rekomendacje; konta sklepów i wysyłka = A2) |
 | `jarvo-bigshort` | Łowca finansowania: fundusze, akceleratory, granty, kredyty, baza okazji z terminami | snajper | A1 (research, baza, szkice aplikacji; wysłanie, konta i kontakt z funduszem = A2) |
+| `jarvo-hacker` | Łowca hackathonów: radar, ocena, plan pod jury, budowa projektu i zgłoszenie | snajper | A1 (radar, plany, kod i pakiet zgłoszenia; rejestracja, wysłanie, publikacja = A2) |
 
 ---
 
@@ -62,6 +64,7 @@ bez polskich znaków (`@łowca` = `@lowca`) i opcjonalne pole `aliasy` (lista). 
 | `jarvo-lowca` | `@lowca` | nowi klienci z KRS i CEIDG |
 | `jarvo-mobile` | `@mobile` | aplikacje na telefon |
 | `jarvo-bigshort` | `@bigshort` | finansowanie, granty i inwestorzy |
+| `jarvo-hacker` | `@hacker` | hackathony, konkursy i bounty |
 
 Pole `rola` (i `en.rola`) to krótka rola agenta, najwyżej 8 słów: aplikacja pokazuje ją w Ustawieniach › Zespół
 i w podpowiedzi kompozytora po wyborze adresata. `scripts/validate.py` pilnuje, żeby każdy aktywny agent miał
@@ -203,6 +206,7 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 | Leady, nowi klienci, „komu sprzedać”, przetargi do wzięcia, nowe firmy w branży, kontakt do firm | `jarvo-lowca` |
 | Aplikacja mobilna, „czy potrzebujemy aplikacji”, PWA czy natywna, audyt aplikacji w App Store i Google Play, aplikacja z naszej strony, aktualizacja albo poprawka aplikacji w sklepie | `jarvo-mobile` |
 | Pieniądze dla projektu: fundusz VC, aniołowie, akcelerator (YC itp.), grant PL albo UE, kredyty chmurowe, konkurs, ulga, termin naboru, link do programu „czy to dla nas”, szkic aplikacji | `jarvo-bigshort` |
+| Hackathon, bounty, konkurs Kaggle albo GPU: znajdź, „czy startujemy”, plan pod jury, budowa projektu na konkurs, zgłoszenie przed terminem | `jarvo-hacker` |
 | Zadanie na ekranie albo telefonie: kliknij w panelu albo programie w przeglądarce, wypełnij formularz, przejdź stronę jak klient, przepisz dane z ekranu, załóż konto, zaloguj się, gdzie nie ma API | `jarvo` sam (wymaga włączonego Komputera: `jarvo komputer on`; telefon: `jarvo telefon on`); dłuższe niż kilka minut: karta kanbana przypisana do siebie (`assignee: jarvo`), żeby czat był wolny |
 | Szybkie sprawy, dokumenty, konwersje, sklejanie wyników, prototyp, „ogarnij to”, zadanie bez oczywistego snajpera | `jarvo` sam (`warsztat/`: `dokumenty`, `szybki-prototyp`) |
 | Praca ogólna do zrobienia naraz: przesiew długiej listy, sprawdzanie wielu stron, zbieranie danych | `jarvo` przez swoich podagentów `delegate_task` (do 3 naraz); nigdy na karty specjalistów spoza ich dziedziny |
@@ -558,6 +562,22 @@ do złożenia najpierw. Wysłanie aplikacji, konto na platformie i kontakt z fun
 `baza-okazji`, `ocena-okazji`, `lista-inwestorow`, [A2] `pakiet-aplikacji`, `przeglad-okazji` (+ źródła obserwowane);
 7 skilli zewnętrznych. Skrypt: `okazje.py` (dodaj bez dubli z walidacją źródła i dat, lista, terminy, ocen, status,
 stare, eksport `OKAZJE.md` i `okazje.csv`).
+
+## `jarvo-hacker`: Łowca hackathonów
+
+Znajduje hackathony, bounty i konkursy, w których flota może wygrać, i doprowadza start do zgłoszenia przed terminem.
+Radar obejmuje platformy (Devpost, DoraHacks, ETHGlobal, lablab, Kaggle, MLH, Devfolio i inne), meta-agregatory,
+kalendarze polskie i europejskie, Lumę i konta na X; każdy hackathon idzie do bazy SQLite (`hackatony.py`) ze stroną
+zasad, terminem zgłoszenia w UTC, pulą, trackami i zasadami (solo, kod pisany przez AI, KYC, obecność). Ocena to
+wartość oczekiwana (nagroda × szansa floty ÷ godziny) z bramką regulaminu. Plan zwycięstwa mapuje każdą funkcję na
+kryterium jury albo track sponsora, MVP mieści się w 60% czasu, a zgłoszenie jest gotowe 6 h przed terminem; frontend,
+film demo i grafiki zamawia przez Jarva u Weba, Wideografa i Studia. Rejestracja, wysłanie, publikacja repo i filmu
+tylko za zgodą właściciela; KYC, portfele i odbiór nagrody zawsze właściciel. Po wynikach retrospektywa do skarbca.
+
+**Skille:** `radar-hackatonow` (+ platformy, format wpisu), `ocena-hackatonu` (+ wartość oczekiwana),
+`plan-zwyciestwa` (+ jak wygrywać), `budowa-projektu`, [A2] `zgloszenie`, `po-hackatonie`, `przeglad-hackatonow`;
+9 skilli zewnętrznych. Skrypt: `hackatony.py` (dodaj bez dubli z walidacją zasad i dat UTC, lista, terminy
+w godzinach, ocen, status, stare, eksport `HACKATONY.md` i `hackatony.csv`).
 
 ---
 

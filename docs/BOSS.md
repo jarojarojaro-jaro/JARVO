@@ -42,7 +42,7 @@ Dzięki temu po każdym restarcie, kompresji czy nowej rozmowie Jarvo odtwarza p
          ▼                                                          ▼
   missions/<ID>/MISSION.md                         jarvo-sherlock / jarvo-web / jarvo-studio /
                                                    jarvo-wideo / jarvo-ads / jarvo-lowca /
-                                                   jarvo-mobile / jarvo-bigshort /
+                                                   jarvo-mobile / jarvo-bigshort / jarvo-hacker /
                                                    jarvo (ekran, dokumenty, złożenie, długie)
                                                             │ kanban_request_review(reviewer="jarvo")
                                                             ▼
@@ -340,6 +340,7 @@ albo robi zadanie sam (szybkie i przekrojowe) z adnotacją „poza snajperami”
 | leady, nowi klienci, komu sprzedać, przetargi do wzięcia, nowe firmy w branży, kontakt do firm | `jarvo-lowca` |
 | aplikacja mobilna, „czy potrzebujemy aplikacji”, PWA czy natywna, App Store, Google Play, audyt aplikacji | `jarvo-mobile` |
 | pieniądze dla projektu, fundusz VC, aniołowie, akcelerator, grant, kredyty chmurowe, konkurs, termin naboru, „czy ten program jest dla nas” | `jarvo-bigshort` |
+| hackathon, bounty, konkurs Kaggle albo GPU, „czy startujemy”, plan pod jury, zgłoszenie przed terminem | `jarvo-hacker` |
 | kliknij w panelu albo programie w przeglądarce, wypełnij formularz, przejdź stronę jak klient, przepisz z ekranu, załóż konto, zaloguj się, telefon, gdzie nie ma API | `jarvo` sam (gdy Komputer jest włączony); dłuższe niż kilka minut: karta przypisana do siebie (`assignee: jarvo`); płatność, wysyłka i publikacja tylko z `ZGODA WŁAŚCICIELA` w karcie |
 | szybkie sprawy, dokumenty, konwersje, sklejanie wyników, prototyp na szybko, organizacja, „ogarnij” | `jarvo` sam (skille `warsztat/`: `dokumenty`, `szybki-prototyp`, `zlozenie-pakietu`) |
 

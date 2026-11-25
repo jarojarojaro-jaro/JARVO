@@ -673,7 +673,7 @@ Każdy etap to mały, osobny commit (albo krótka seria), wypchnięty od razu, z
 ### E4. Flota natywnie, czat i zgody
 - **Co:** build.py z tokenami i wartościami per system (S06), install_fleet.py (S07), wtyczki jako kopie albo junction (H27), healthchecki argv i `jarvo doctor` (S02), wtyczka zgód z trzema trybami (sekcja d), home_mode, zakazy per system (F15), kwarantanna paczek (H25), shim python3 (F12), Git Bash (B04).
 - **CI:** atrapa modelu (scripts/atrapa_modelu.py): `jarvo chat` w trzech trybach (zgoda, odmowa, zapis w folderze i poza nim); karta kanbana do agenta, która przeżywa restart bramy; jednorazowa rutyna; delegate_task. W logach pracowników nie może być „runs without a user present”. 5 nóg.
-- **Gotowe, gdy:** 8 agentów zainstalowanych, healthchecki zielone (poza jawnymi brakami platform).
+- **Gotowe, gdy:** 10 agentów zainstalowanych, healthchecki zielone (poza jawnymi brakami platform).
 
 ### E5. Przeglądarki i wyszukiwarka (potrzebne do pierwszej sesji)
 - **Co:** C01–C07, nakładka agent-browsera w Pythonie, audit.py i brand_extract.py (F02), wyszukiwarka z U01 i search_fanout.py (F03), har.cjs i Łowca (F04), MCP inspo (P06), Lighthouse.

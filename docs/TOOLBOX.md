@@ -228,6 +228,16 @@ przygotowuje filtry i sprawdza wyniki ([narzedzia-i-bazy.md](../profiles/jarvo-b
 
 ---
 
+## `jarvo-hacker`: Łowca hackathonów
+
+| Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
+|---|---|---|---|---|
+| `hackatony.py` | baza hackathonów w SQLite (biblioteka standardowa): dodaj bez dubli z walidacją zasad i dat UTC, terminy w godzinach, oceny, eksport `HACKATONY.md` i CSV | własny kod | n/d | skrypt |
+
+Kanały radaru (platformy, agregatory, API i kanały RSS bez logowania, regulaminy): [platformy.md](../profiles/jarvo-hacker/skills/hacker/radar-hackatonow/references/platformy.md).
+
+---
+
 ## `jarvo`: szef floty
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |

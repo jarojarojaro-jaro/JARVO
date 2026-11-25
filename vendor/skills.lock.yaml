@@ -503,3 +503,13 @@ agents:
     - {source: hermes, path: optional-skills/research/duckduckgo-search, dest: research/duckduckgo-search}
     - {source: hermes, path: optional-skills/research/rss-feeds, dest: research/rss-feeds}
     - {source: hermes, path: optional-skills/research/blogwatcher, dest: research/blogwatcher}
+  jarvo-hacker:
+    - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
+    - {source: jarvo, path: shared/skills/odczyt-ekranu, dest: pliki/odczyt-ekranu}
+    - {source: jarvo, path: shared/skills/graf-kodu, dest: kod/graf-kodu}
+    - {source: hermes, path: skills/software-development/systematic-debugging, dest: kod/systematic-debugging}
+    - {source: hermes, path: skills/web/blocked-page-recovery, dest: research/blocked-page-recovery}
+    - {source: hermes, path: optional-skills/research/searxng-search, dest: research/searxng-search}
+    - {source: hermes, path: optional-skills/research/duckduckgo-search, dest: research/duckduckgo-search}
+    - {source: hermes, path: optional-skills/research/rss-feeds, dest: research/rss-feeds}
+    - {source: hermes, path: optional-skills/social-media/reddit-reading, dest: research/reddit-reading}

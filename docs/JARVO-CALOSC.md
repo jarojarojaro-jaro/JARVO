@@ -59,10 +59,10 @@ Poziomy autonomii: **A0** odczyt · **A1** szkice we własnym workspace · **A2*
 ## 2. Flota agentów (8 profili w repo)
 
 Każdy agent to osobna **dystrybucja Hermesa**: `SOUL.md` (osobowość + zasady), `config.yaml`
-(model, toolset, deny), skille, skrypty, rubryka jakości, toolbox, dystrybucja. Rejestr: `fleet.yaml` (8 agentów:
-Jarvo i 7 specjalistów) i profil hosta `profiles/_host/`. Prywatna nakładka właściciela
+(model, toolset, deny), skille, skrypty, rubryka jakości, toolbox, dystrybucja. Rejestr: `fleet.yaml` (10 agentów:
+Jarvo i 9 specjalistów) i profil hosta `profiles/_host/`. Prywatna nakładka właściciela
 (`<root>/nakladka`, §2a°°) dokłada swoich agentów; na komputerze właściciela to `jarvo-jarodev` i `jarvo-translator`,
-razem 10 profili w `<dane>/profiles/`. Liczba skilli w tabeli = pliki `SKILL.md` w `profiles/<agent>/skills/`
+razem 12 profili w `<dane>/profiles/`. Liczba skilli w tabeli = pliki `SKILL.md` w `profiles/<agent>/skills/`
 (Jarvo: 17 `fleet/` + 5 `ekran/` + 1 `social/` + 3 `warsztat/`; roster i skille zewnętrzne dochodzą przy buildzie).
 
 | Agent | Rola | Uchwyt | Pokój HQ | Temat Telegram | Skille |
@@ -76,6 +76,7 @@ razem 10 profili w `<dane>/profiles/`. Liczba skilli w tabeli = pliki `SKILL.md`
 | 🎯 `jarvo-lowca` | **Łowca leadów** — sygnały zakupowe (KRS, CEIDG, przetargi BZP/TED, strony firm, oferty pracy), kwalifikacja wg profilu klienta, ranking z „dlaczego teraz”, kontakt opublikowany ze źródłem, monitoring, rozpoznanie nowego źródła; nic nie wysyła | `@lowca` | Radar sprzedaży (`radar`) | — (przez Jarva) | 7 |
 | 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go, bramka jakości (Android, iOS w CI), pakiet do sklepów z listą 44 punktów, wydanie za zgodą i nauka z odrzuceń, aplikacja ze strony firmy, utrzymanie (terminy, opinie, SDK, poprawki OTA za zgodą), kontrola paczek npm; konta zawsze właściciela | `@mobile` | Pracownia aplikacji (`apps`) | — (przez Jarva) | 10 |
 | 💰 `jarvo-bigshort` | **Łowca finansowania**: mapa pieniędzy dla projektu (fundusze VC i aniołowie, akceleratory, granty PL i UE, fellowshipy, kredyty chmurowe i na modele, konkursy, ulgi, dług), baza okazji `okazje.py` z terminami, ceną i oceną dopasowania, lista inwestorów pod tezę, szkice aplikacji; wysłanie i kontakt z funduszem tylko za zgodą | `@bigshort` | Sala transakcji (`control`) | — (przez Jarva) | 6 |
+| 🏴 `jarvo-hacker` | **Łowca hackathonów**: radar platform i kalendarzy, baza `hackatony.py` z terminami w UTC, pulą, trackami i zasadami (solo, kod AI, KYC), ocena wartości oczekiwanej, plan pod jury i sponsorów, budowa projektu z demo, pakiet zgłoszenia, retrospektywa; rejestracja i wysłanie tylko za zgodą | `@hacker` | Warsztat hakerski (`workshop`) | — (przez Jarva) | 7 |
 
 **Telegram** (`jarvo telegram status`): jeden bot, grupa **JARVO HQ** z tematami: **JARVO** (General: Jarvo, jego dom:
 rutyny, karty, powiadomienia), **JARODEV** (agent `jarvo-jarodev`), **TRANSLATOR** (agent `jarvo-translator`),

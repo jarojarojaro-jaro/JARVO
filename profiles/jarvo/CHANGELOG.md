@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Dwóch nowych specjalistów: Bigshort (`@bigshort`, finansowanie: fundusze, granty, akceleratory, kredyty) i Hacker (`@hacker`, hackathony: radar, ocena, plan pod jury, budowa, zgłoszenie); wzorce misji 13 i 14.
 - Podgląd na żywo otwiera się sam (domyślnie), na telefonie pływające okno jest widoczne w rogu zamiast pod ekranem, a dopiski w trakcie pracy tną dymek agenta, więc nowsze wiadomości nie stoją nad starszą pracą.
 - Oś rozmowy po kompresji w trakcie tury nie pokazuje prośby drugi raz i trzyma dalszą pracę w żywym dymku.
 - Podgląd na żywo należy do rozmowy, z której go otwarto: przejście do innej rozmowy (np. z Jarva do Kernela) go zamyka.

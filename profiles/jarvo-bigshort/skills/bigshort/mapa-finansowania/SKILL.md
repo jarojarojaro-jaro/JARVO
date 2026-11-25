@@ -89,3 +89,5 @@ Odpowiedź w 2–3 zdaniach: ile realnie da się zdobyć, skąd najszybciej, jak
 - `references/zrodla-global.md`: akceleratory, granty, fellowshipy, kredyty na świecie.
 - `references/narzedzia-i-bazy.md`: bazy inwestorów, API, narzędzia AI do fundraisingu, ograniczenia regulaminów.
 - `references/metody.md`: zasady wyboru i aplikowania (top 3, dopasowanie tezy, granty zamiast rundy).
+- `references/katalog-zrodel.md`: katalog agregatorów, trackerów terminów, baz VC, PE i hedge fundów, newsletterów i pułapek.
+- `references/katalog-regiony.md`: Polska (uzupełnienia), Europa (programy krajowe), Ameryka Północna, Bliski Wschód i MENA.

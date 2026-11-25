@@ -1,0 +1,9 @@
+name: jarvo-hacker
+version: 0.1.0
+description: "Hacker: radar hackathonów, baza z terminami i zasadami, ocena, plan pod jury, budowa i zgłoszenie."
+author: "Jarvo fleet"
+license: MIT
+env_requires:
+  - name: OPENROUTER_API_KEY
+    description: "Klucz OpenRouter dla Hackera (osobny klucz z limitem kredytów)"
+    required: true

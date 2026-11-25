@@ -16,7 +16,7 @@ Czas: ok. 1,5 h przy pierwszym razie (z czego ~20 min to budowa obrazu).
 | Klucz SSH (ed25519) | logowanie na serwer | hasła będą wyłączone |
 | Konto [Tailscale](https://tailscale.com) (darmowe) | prywatny dostęp do serwera i paneli | nic nie wystawiamy publicznie |
 | Konto ChatGPT (z dostępem do Codex) | domyślne modele floty (`openai-codex`, gpt-6-luna) | logowanie OAuth w dashboardzie: Models → Login przy profilu „default” |
-| Konto [OpenRouter](https://openrouter.ai) z kredytami | obrazy i wideo AI (modele tylko przy zestawie `openrouter`) | **9 kluczy**: host + 8 agentów, każdy z limitem kredytów |
+| Konto [OpenRouter](https://openrouter.ai) z kredytami | obrazy i wideo AI (modele tylko przy zestawie `openrouter`) | **11 kluczy**: host + 10 agentów, każdy z limitem kredytów |
 | Klucz [Pexels](https://www.pexels.com/api/) albo [Pixabay](https://pixabay.com/api/docs/) (darmowy) | ujęcia stock dla Wideografa | `PEXELS_API_KEY` / `PIXABAY_API_KEY` w Keys (profil główny) |
 | Token [CEIDG](https://dane.biznes.gov.pl) (darmowy, opcjonalny) | jednoosobowe działalności dla Łowcy | `CEIDG_TOKEN` w Keys przy profilu `jarvo-lowca` (Własne klucze); kroki: [LEADY.md](LEADY.md#token-ceidg) |
 | Konto Telegram | główny kanał | bot + supergrupa „Jarvo HQ” z tematami |
@@ -234,7 +234,7 @@ sudo systemctl start jarvo-updater
    ```
    Po kilku–kilkunastu minutach: recenzja Jarva (status `review` → `done` albo prośba o poprawki) i raport w DM.
 4. **Aplikacja Jarvo:** `http://<ip-tailscale>:9119/jarvo` (zakładka **Jarvo**, pierwsza w menu, nad CHAT; adres `/` prowadzi tam sam; obok **Wiedza** z grafem skarbca: po wdrożeniu
-   widać huby 8 agentów), login `jarvo` + `DASHBOARD_PASSWORD`
+   widać huby 10 agentów), login `jarvo` + `DASHBOARD_PASSWORD`
    z `compose/.env`. To aplikacja czatu: ekran startu (powitanie, jedno zdanie gotowości, gdy brakuje modelu albo profilu
    właściciela), rozmowy z Jarvem i agentami, ustawienia w szufladzie (pozycja **Ustawienia** w pasku); budynek floty z pokojami agentów,
    decyzjami i misjami jest w **Ustawienia › Stara Baza** ([HQ.md](HQ.md)). Na `/jarvo` menu Hermesa jest schowane;

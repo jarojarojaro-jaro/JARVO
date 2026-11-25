@@ -9,6 +9,11 @@ To są tropy: każda okazja z nich idzie do bazy dopiero po sprawdzeniu strony p
 w `baza/zrodla.md` (dopisujesz własne, usuwasz martwe z datą).
 
 ## Agregatory i konta zbierające okazje
+- Trackery terminów i nowych pieniędzy: Causo Hub https://hub.causo.ai/deadlines (akceleratory, fellowshipy, kredyty),
+  FundMomentum https://fundmomentum.vc/ i Dealroom https://dealroom.co/vc-fundraising/ (świeżo zamknięte fundusze),
+  SEC EDGAR Form D https://www.sec.gov/edgar/search/ , Portal Funduszy Europejskich https://funduszeeuropejskie.gov.pl/nabory-wnioskow/ ,
+  harmonogram NCBR https://www.gov.pl/web/ncbr/harmonogram-konkursow-2026 , OpenGrants https://ops.opengrants.io/grants .
+- Newslettery z dealflow: StrictlyVC, EU-Startups, Sifted, FinSMEs, MamStartup (linki w `katalog-zrodel.md` skillu `mapa-finansowania`).
 - X: https://x.com/suraj_sharma14 (codzienne programy, granty, kredyty, listy funduszy; bez PE i hedge fundów),
   https://x.com/StephNass (OpenVC), https://x.com/davj (Fondo), https://x.com/natiakourdadze.
 - Bazy z otwartym dostępem: https://www.openvc.app, https://signal.nfx.com, https://www.vcsheet.com.
