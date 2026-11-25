@@ -709,6 +709,12 @@ test("Md: tabela najwyżej 50 kolumn i 10 000 komórek, brakujące komórki pust
   eq(krotki.wiersze[0][1], []);
   eq(krotki.wiersze[0][2], []);
 });
+test("Md: kolumna liczb (mono bez łamania) tylko, gdy wszystkie komórki to liczby", () => {
+  // 25.11 właściciel: tabela Kernela z opisem w ostatniej kolumnie ścisnęła resztę do jednej litery w linii
+  const t = MD("| Obciążenie | Prędkość | Pomiar |\n| :-- | :-- | --: |\n| Czat T=0,7 | **114,1–114,3 t/s** | 24.11, nasz test rep2 (K-147) |\n"
+    + "| Prefill 2k | ok. 3330 t/s | 24.11 |\n| Kod | 299 t/s | 24.11, przed łatkami DPP i sufiksu, więc dziś pewnie odrobinę więcej |\n")[0];
+  eq(t.liczby, [false, true, false]);
+});
 test("Md.granica: stały początek do ostatniej pustej linii poza blokiem kodu", () => {
   eq(Md.granica("a\n\nb"), 3);
   eq(Md.granica("a\n\nb\n\n```\nx\n\ny"), 6);

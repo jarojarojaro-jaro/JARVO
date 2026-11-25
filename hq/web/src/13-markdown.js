@@ -209,6 +209,8 @@ const Md = (() => {
   // tabela: najwyżej TAB_KOLUMNY kolumn i TAB_KOMORKI komórek (dłuższa reszta zostaje tekstem), żeby wklejony
   // ogromny plik nie zawiesił karty
   const TAB_KOLUMNY = 50, TAB_KOMORKI = 10000;
+  // komórka-liczba: „114,3 t/s”, „**1,9×**”, „ok. 3330 t/s”, „~70%”, „$400k” (pogrubienie dozwolone, bez zdań)
+  const LICZBA_KOMORKI = /^\**\s*(?:ok\.\s*|[~≈<>±+\-−$€]\s*)?\d[\d\s.,:'–\-−/×]*\s*(?:[%×x]|[\p{L}$€]{1,4}(?:\/\p{L}{1,3})?)?\s*\**$/u;
   const tabelaOd = (linie, i) => linie[i].includes("|") && linie[i].length < 4000 && i + 1 < linie.length && linie[i + 1].includes("-")
     && SEP_TABELI.test(linie[i + 1]) && komorki(linie[i + 1]).length === komorki(linie[i]).length && komorki(linie[i]).length <= TAB_KOLUMNY;
   const zaczynaBlok = (linie, i) => {
@@ -293,15 +295,18 @@ const Md = (() => {
       if (tabelaOd(linie, i)) {
         zamknijAkapit();
         const nag = komorki(l), wyr = komorki(linie[i + 1]).map((k) => (/^:-+:$/.test(k) ? "center" : /-:$/.test(k) ? "right" : /^:-/.test(k) ? "left" : null));
-        const wiersze = [];
+        const wiersze = [], liczby = nag.map(() => true);
         i += 2;
         const maxWierszy = Math.min(500, Math.floor(TAB_KOMORKI / nag.length) - 1);
         while (i < n && !pusta(linie[i]) && linie[i].includes("|") && wiersze.length < maxWierszy) {
           const k = komorki(linie[i]);
           wiersze.push(nag.map((_, x) => (k[x] ? inline(k[x]) : [])));   // brakująca komórka: pusta, bez parsowania
+          k.forEach((c, x) => { if (x < nag.length && c && !LICZBA_KOMORKI.test(c)) liczby[x] = false; });
           i++;
         }
-        out.push({ t: "tabela", wyr, nag: nag.map((k) => inline(k)), wiersze });
+        // 25.11: mono bez łamania tylko dla kolumny samych liczb; tekst w ostatniej kolumnie dostawał nowrap i ściskał
+        // pozostałe kolumny do jednej litery w linii
+        out.push({ t: "tabela", wyr, nag: nag.map((k) => inline(k)), wiersze, liczby: liczby.map((v) => v && wiersze.length > 0) });
         continue;
       }
       const m = LISTA.exec(l);
@@ -441,8 +446,8 @@ function renderujBloki(bloki, opcje = {}, k = "b") {
           : html`<ul key=${key} class=${klasa}>${el}</ul>`;
       }
       case "tabela": return html`<div key=${key} class="j-md-tab" role="region" tabIndex="0" aria-label=${T("md.tabela")}><table>
-        <thead><tr>${b.nag.map((c, j) => html`<th key=${j} style=${b.wyr[j] ? { textAlign: b.wyr[j] } : undefined}>${renderujInline(c, `${key}h${j}`)}</th>`)}</tr></thead>
-        <tbody>${b.wiersze.map((w, r) => html`<tr key=${r}>${w.map((c, j) => html`<td key=${j} style=${b.wyr[j] ? { textAlign: b.wyr[j] } : undefined}>${renderujInline(c, `${key}r${r}c${j}`)}</td>`)}</tr>`)}</tbody>
+        <thead><tr>${b.nag.map((c, j) => html`<th key=${j} class=${b.liczby?.[j] ? "is-liczba" : undefined} style=${b.wyr[j] ? { textAlign: b.wyr[j] } : undefined}>${renderujInline(c, `${key}h${j}`)}</th>`)}</tr></thead>
+        <tbody>${b.wiersze.map((w, r) => html`<tr key=${r}>${w.map((c, j) => html`<td key=${j} class=${b.liczby?.[j] ? "is-liczba" : undefined} style=${b.wyr[j] ? { textAlign: b.wyr[j] } : undefined}>${renderujInline(c, `${key}r${r}c${j}`)}</td>`)}</tr>`)}</tbody>
       </table></div>`;
       case "pliki": {
         const sciezki = b.sciezki.filter((s) => !(opcje.pomin && opcje.pomin.has(s)));
