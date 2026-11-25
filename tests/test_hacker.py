@@ -103,8 +103,9 @@ def test_kalendarz_etapy_kamienie_i_ics(tmp_path, capsys):
     assert "DTSTART:20261127T170000Z" in ics and "DTSTART;VALUE=DATE:20261215" in ics
 
 
-def test_przypomnienie_codziennie_z_nastepnymi_i_migruje_stara_baze(tmp_path, capsys):
-    """25.11 właściciel: rutyna nie milczy; bez etapów w 72 h podaje następne terminy (do 5, w 30 dniach)."""
+def test_raport_do_wziecia_i_nasze_starty_migruje_stara_baze(tmp_path, capsys):
+    """25.11 właściciel: raport mówi, który hackathon jest do wzięcia (najlepsza ocena, termin wejścia przed nami),
+    a potem śledzi nasze starty; nie okna terminów."""
     import sqlite3
     baza = tmp_path / "baza" / "h.db"
     baza.parent.mkdir()
@@ -114,14 +115,22 @@ def test_przypomnienie_codziennie_z_nastepnymi_i_migruje_stara_baze(tmp_path, ca
               "zmienione TEXT NOT NULL, PRIMARY KEY (id))")
     c.commit()
     c.close()
-    uruchom(tmp_path, "dodaj", jsonl(tmp_path, wpis(zgloszenie_do="2027-02-01", wyniki="2027-02-20")))
+    uruchom(tmp_path, "dodaj", jsonl(tmp_path, wpis(nazwa="Daleki", zgloszenie_do="2027-02-01"),
+                                     wpis(nazwa="Słaby", zgloszenie_do="2026-12-05"), wpis(nazwa="Minął", zgloszenie_do="2026-11-20"),
+                                     wpis(nazwa="Nasz", zgloszenie_do="2026-12-10")))
+    uruchom(tmp_path, "ocen", "daleki", "8", "agenci to nasz rdzeń")
+    uruchom(tmp_path, "ocen", "slaby", "3", "web3 i KYC")
+    uruchom(tmp_path, "ocen", "minal", "9", "za późno")
+    uruchom(tmp_path, "status", "nasz", "budujemy")
+    uruchom(tmp_path, "ustaw", "nasz", "krok=demo", "krok_do=2026-12-08")
     capsys.readouterr()
-    uruchom(tmp_path, "dodaj", jsonl(tmp_path, wpis(nazwa="Bliski", zgloszenie_do="2026-12-05")))
-    capsys.readouterr()
-    uruchom(tmp_path, "przypomnij")                    # środa 25.11: 72 h puste, następne do 5
+    uruchom(tmp_path, "raport")
     out = capsys.readouterr().out.splitlines()
-    assert out[:2] == ["Hackathony: w ciągu 72 godzin", "- nic"] and out[2] == "Hackathony: następne terminy"
-    assert "Zgłoszenie do · [Bliski]" in out[3] and "Gemini" not in "\n".join(out) and out[-1] == "W bazie otwartych: 2"
+    assert out[0] == "Hackathony do wzięcia teraz (najlepsze z 2 otwartych):"
+    assert out[1].startswith("1. [Daleki](https://gemini.devpost.com) · 100 000 USD · zgłoszenie do 2027-02-01 UTC (")
+    assert out[1].endswith("ocena 8: agenci to nasz rdzeń · nowy") and out[2].startswith("2. [Słaby]")
+    assert out[3] == "Nasze starty:" and "**budujemy**" in out[4] and "następny krok: demo do 2026-12-08 UTC" in out[4]
+    assert "Minął" not in "\n".join(out)
 
 
 def test_udzial_historia_i_notatka_w_mozgu(tmp_path, capsys, monkeypatch):
@@ -147,7 +156,7 @@ def test_udzial_historia_i_notatka_w_mozgu(tmp_path, capsys, monkeypatch):
     md = (tmp_path / "dane" / "knowledge" / "agenci" / "jarvo-hacker" / "kalendarz hackathonów.md").read_text(encoding="utf-8")
     assert "status: generowane" in md and "sekcje: true" in md and "utworzono: 2026-11-25" in md
     sekcja = lambda n: md.split(f"## {n}\n")[1].split("\n## ")[0]            # noqa: E731
-    assert "Nasz krok: nagrać demo" in sekcja("W ciągu 72 godzin")       # 26.11 20:00 UTC = 21:00 w Warszawie
+    assert "Nasz krok: nagrać demo" in sekcja("Terminy na 120 dni")
     assert "**zapisani** · zgłoszenie 2026-11-27T17:00 UTC · następny krok: nagrać demo do 2026-11-26T20:00 UTC · konto: Devpost jaro" in sekcja("Nasze starty")
-    assert "Kaggle Gemma" in sekcja("Najlepsze kandydaty") and "mentor potwierdził" in sekcja("Historia z 30 dni")
+    assert "Kaggle Gemma" in sekcja("Do wzięcia teraz") and "mentor potwierdził" in sekcja("Historia z 30 dni")
     assert "### Grudzień 2026" in sekcja("Terminy na 120 dni") and "[[agenci/jarvo-hacker/_hub-hacker|Hacker]]" in md

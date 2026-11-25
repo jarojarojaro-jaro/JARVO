@@ -122,13 +122,15 @@ def test_aplikacje_etapy_historia_kalendarz_i_notatka_w_mozgu(tmp_path, capsys, 
     uruchom(tmp_path, "historia", "vercel-x")
     co = [l.split("  ")[2].split(":")[0] for l in capsys.readouterr().out.splitlines()[:-1]]
     assert co == ["notatka", "status", "etap", "status", "aplikacja", "dodana"]
-    uruchom(tmp_path, "przypomnij")
-    out = capsys.readouterr().out
-    assert "**pt 27.11** (2 dni) · Nasz krok: wideo 1 min · [Vercel X (jarvo)]" in out and "Termin naboru" not in out
+    uruchom(tmp_path, "raport")
+    out = capsys.readouterr().out.splitlines()
+    assert out[:2] == ["Finansowanie do wzięcia teraz: enigma-labz",
+                       "1. [NVIDIA Inception](https://vercel.com/x) · kredyty · 30 000 USD · equity 0% · nabór ciągły · ocena 9: GPU"]
+    assert out[2] == "Nasze aplikacje:" and "**zlozona**" in out[3] and "następny krok: wideo 1 min do 2026-11-27" in out[3]
     md = (tmp_path / "dane" / "knowledge" / "agenci" / "jarvo-bigshort" / "kalendarz finansowania.md").read_text(encoding="utf-8")
     sekcja = lambda n: md.split(f"## {n}\n")[1].split("\n## ")[0]            # noqa: E731
     assert "status: generowane" in md and "partner programu" not in md
-    assert "Vercel X" in sekcja("Nasze aplikacje w toku") and "NVIDIA Inception" in sekcja("Najlepsze otwarte okazje")
+    assert "Vercel X" in sekcja("Nasze aplikacje w toku") and "NVIDIA Inception" in sekcja("Do wzięcia teraz: enigma-labz")
     assert "mail z potwierdzeniem" in sekcja("Historia z 30 dni") and "### Listopad 2026" in sekcja("Terminy naborów na 180 dni")
     uruchom(tmp_path, "kalendarz", str(tmp_path / "out"))
     ics = (tmp_path / "out" / "finansowanie.ics").read_bytes().decode()

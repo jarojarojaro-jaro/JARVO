@@ -1,6 +1,6 @@
 ---
 name: przeglad-hackatonow
-description: "Przegląd: nowe hackathony, terminy 14 dni, stare wpisy."
+description: "Raport dnia: nowe hackathony, do wzięcia, nasze starty."
 version: 1.0.0
 author: Jarvo
 license: MIT
@@ -17,7 +17,8 @@ metadata:
 # Przegląd hackathonów
 
 ## Kiedy użyć
-- Rutyna (zakłada ją Jarvo za zgodą właściciela, np. dwa razy w tygodniu) albo „co nowego”, „jakie terminy”.
+- Codzienna rutyna `hacker-terminy` (8:30) albo „co nowego”, „w co wchodzimy”, „jak idą nasze hackathony”.
+- Cel (właściciel 25.11): jest hackathon, do którego możemy wejść i wygrać, to działamy; w którym startujemy, ten śledzisz.
 
 ## Wejścia
 | Wejście | Wymagane | Jeśli brak |
@@ -26,16 +27,20 @@ metadata:
 | `baza/zrodla.md` (kanały radaru) | nie | utwórz z pliku `platformy.md` w wiedzy skillu `radar-hackatonow` |
 
 ## Kroki
-1. `hackatony.py terminy --dni 14` i `hackatony.py stare --dni 14`; stare wpisy: strona zasad, poprawka przez `dodaj`
-   (pole `wyniki`, gdy regulamin podaje datę ogłoszenia); na koniec `hackatony.py kalendarz out/`.
-2. Kanały z `baza/zrodla.md` od daty ostatniego przeglądu; nowe przez szybką ocenę (strona zasad, termin w UTC).
+1. `hackatony.py stare --dni 14`; stare wpisy: strona zasad, poprawka przez `dodaj` (zmieniony termin, pula,
+   tracki, pole `wyniki`); hackathon po terminie wejścia albo poza naszym zasięgiem → `status … odpuszczony` z powodem.
+2. Kanały z `baza/zrodla.md` od daty ostatniego przeglądu; nowe przez szybką ocenę (strona zasad, termin w UTC,
+   `ocen` z powodem).
    - ✅ Punkt kontrolny: nic nie trafia do bazy bez strony zasad.
-3. Wiadomość najwyżej 8 linii: najpierw zgłoszenia w 72 h z oceną ≥ 6 (godziny do terminu), potem nowe ≥ 7, na
-   końcu liczby; nic ważnego → jedna linia „bez zmian, najbliższy termin: …”.
+3. `hackatony.py raport` i wiadomość najwyżej 15 linii:
+   - **Do wzięcia teraz:** do 5 najlepszych z raportu, numer, nazwa z linkiem, pula, termin wejścia w UTC, ocena
+     i jedno zdanie, czemu możemy wygrać; nowe z doby oznacz „nowy”;
+   - **Nasze starty:** każdy z następnym krokiem i terminem (`ustaw krok=… krok_do=…` przed raportem, gdy brak);
+   - na końcu jedno pytanie: w który wchodzimy (numer), albo decyzja potrzebna w naszym starcie.
 
 ## Wyjścia
 - zaktualizowana baza, `out/PRZEGLAD-<data>.md`, wiadomość.
 
 ## Definition of Done
 - [ ] terminy i stare wpisy sprawdzone, każdy kanał przejrzany albo zapisany powód,
-- [ ] wiadomość w limicie 8 linii.
+- [ ] wiadomość w limicie 15 linii, z listą do wzięcia i naszymi startami.

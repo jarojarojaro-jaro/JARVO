@@ -220,7 +220,7 @@ Wszystkie źródła bez kluczy. Odmowa źródła = blokada, bez obchodzenia; opi
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
-| `okazje.py`, `terminy_rano.py` | baza okazji finansowania w SQLite (biblioteka standardowa): dodaj bez dubli z walidacją źródła i dat, terminy, oceny projektów, aplikacje z etapami i następnym krokiem, historia każdej zmiany, eksport `OKAZJE.md` i CSV, kalendarz `KALENDARZ.md` i `finansowanie.ics`, notatka „kalendarz finansowania” w Mózgu, rutyna przypomnień bez modelu | własny kod | n/d | skrypt, cron `bigshort-terminy` |
+| `okazje.py`, `raport_rano.py` | baza okazji finansowania w SQLite (biblioteka standardowa): dodaj bez dubli z walidacją źródła i dat, terminy, oceny projektów, aplikacje z etapami i następnym krokiem, historia każdej zmiany, eksport `OKAZJE.md` i CSV, kalendarz `KALENDARZ.md` i `finansowanie.ics`, notatka „kalendarz finansowania” w Mózgu, raport dnia bez modelu (do wzięcia, nasze aplikacje) | własny kod | n/d | skrypt, cron `bigshort-terminy` |
 | [EU Funding & Tenders API](https://ec.europa.eu/info/funding-tenders/opportunities/portal), [EDGAR](https://www.sec.gov/edgar/search/), [grants.gov](https://www.grants.gov/api) | nabory UE, świeże rundy funduszy (Form D), granty USA bez klucza | dane publiczne | n/d | `web_extract` / terminal |
 
 Bazy z zakazem automatyzacji w regulaminie (Crunchbase, Signal NFX, OpenVC) tylko ręcznie przez właściciela; agent
@@ -232,7 +232,7 @@ przygotowuje filtry i sprawdza wyniki ([narzedzia-i-bazy.md](../profiles/jarvo-b
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
 |---|---|---|---|---|
-| `hackatony.py`, `terminy_rano.py` | baza hackathonów w SQLite (biblioteka standardowa): dodaj bez dubli z walidacją zasad i dat UTC, terminy w godzinach, oceny, nasz udział z następnym krokiem, historia każdej zmiany, eksport `HACKATONY.md` i CSV, kalendarz `KALENDARZ.md` i `hackatony.ics`, notatka „kalendarz hackathonów” w Mózgu, rutyna przypomnień bez modelu | własny kod | n/d | skrypt, cron `hacker-terminy` |
+| `hackatony.py`, `raport_rano.py` | baza hackathonów w SQLite (biblioteka standardowa): dodaj bez dubli z walidacją zasad i dat UTC, terminy w godzinach, oceny, nasz udział z następnym krokiem, historia każdej zmiany, eksport `HACKATONY.md` i CSV, kalendarz `KALENDARZ.md` i `hackatony.ics`, notatka „kalendarz hackathonów” w Mózgu, dane raportu dnia (do wzięcia, nasze starty) dla rutyny z przeglądem | własny kod | n/d | skrypt, cron `hacker-terminy` |
 
 Kanały radaru (platformy, agregatory, API i kanały RSS bez logowania, regulaminy): [platformy.md](../profiles/jarvo-hacker/skills/hacker/radar-hackatonow/references/platformy.md).
 

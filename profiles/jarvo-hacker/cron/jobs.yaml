@@ -1,14 +1,20 @@
 # Rutyny Hackera. scripts/build.py zamienia ten plik na cron/jobs.json przez API crona Hermesa (stałe `id`).
 # Z dystrybucji zadania instalują się WSTRZYMANE; włączasz je świadomie (`hermes -p jarvo-hacker cron resume <id>`).
-# 25.11 właściciel: „kalendarz, który trzyma terminy”, a raport codziennie (cisza wyglądała jak awaria).
+# 25.11 właściciel: „ma raportować na temat hackathonów: jest jakiś dostępny, to działamy; potem tylko trackować,
+# w którym bierzemy udział”. Codziennie: przegląd nowych hackathonów do bazy, potem raport do wzięcia i nasze starty.
 
 jobs:
   - id: hacker-terminy
-    name: "Hacker: terminy hackathonów"
+    name: "Hacker: raport hackathonów"
     schedule: "30 8 * * *"
-    # etapy w 72 h (rejestracja, start, zgłoszenie, wyniki, nasze kroki, zamrożenie i gotowe) i 5 następnych,
-    # w poniedziałek 14 dni; 0 tokenów; przy okazji odświeża out/KALENDARZ.md, out/hackatony.ics i notatkę w Mózgu
-    script: terminy_rano.py
-    no_agent: true
+    # skrypt odświeża kalendarz i notatkę w Mózgu i daje stan bazy (do wzięcia teraz, nasze starty); model robi
+    # przegląd kanałów radaru (nowe hackathony ze stroną zasad i oceną) i pisze raport
+    script: raport_rano.py
+    skills: [przeglad-hackatonow, ocena-hackatonu]
     deliver: "@@AGENT_ROUTINE_DELIVER@@"
     attach_to_session: true
+    prompt: >-
+      Raport hackathonów dla właściciela. Powyżej masz stan bazy. Najpierw przegląd według skilla
+      `przeglad-hackatonow`: kanały radaru od ostatniego przeglądu, nowe hackathony ze stroną zasad i oceną do bazy,
+      nieaktualne poprawione. Potem uruchom `hackatony.py raport` jeszcze raz i na nim oprzyj wiadomość według kroku 3
+      skilla. Po polsku, najwyżej 15 linii, zawsze z raportem (nigdy [SILENT]).

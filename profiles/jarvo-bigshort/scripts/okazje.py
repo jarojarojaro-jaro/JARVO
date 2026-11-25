@@ -16,7 +16,7 @@ nasze aplikacje z etapami i historia każdej zmiany.
     okazje.py stare [--dni 60]                       # wpisy do ponownego sprawdzenia (pole sprawdzone)
     okazje.py eksport <katalog>                      # OKAZJE.md (terminy, ranking projektów) + okazje.csv + kalendarz
     okazje.py kalendarz <katalog> [--dni 180]        # KALENDARZ.md + finansowanie.ics: terminy naborów i nasze kroki
-    okazje.py przypomnij [--katalog K] [--tydzien]   # rutyna co rano: 7 dni i 5 następnych (w poniedziałek 30 dni)
+    okazje.py raport [--katalog K]                   # raport dnia: najlepsze do wzięcia dla projektów i nasze aplikacje
 
 Baza: --baza (domyślnie baza/okazje.db w katalogu roboczym). Wpis JSONL: nazwa, typ, url i zrodlo (link do źródła
 pierwotnego) są obowiązkowe; sprawdzone = data sprawdzenia źródła (RRRR-MM-DD). termin: RRRR-MM-DD albo "rolling".
@@ -494,20 +494,35 @@ def cmd_kalendarz(db: sqlite3.Connection, katalog: Path, dni: int, dzis: dt.date
     return 0
 
 
-def cmd_przypomnij(db: sqlite3.Connection, katalog: Path | None, tydzien: bool, dzis: dt.date) -> int:
-    """Rutyna bez modelu: odświeża kalendarz i codziennie pisze raport (25.11 właściciel: cisza wyglądała jak awaria):
-    terminy i nasze kroki w 7 dniach, potem 5 następnych w 30 dniach, w poniedziałek całe 30 dni."""
+def do_wziecia(db: sqlite3.Connection, dzis: dt.date, projekt: str, ile: int) -> list[str]:
+    """Najlepsze otwarte okazje dla projektu (ocena, potem termin; nabór ciągły po datowanych), z terminem przed nami."""
+    w = [x for x in wiersze(db, argparse.Namespace()) if x["status"] in ("nowa", "kandydat") and projekt in x["oceny"]
+         and (not x["termin"] or x["termin"] == "rolling" or x["termin"] >= dzis.isoformat())]
+    w.sort(key=lambda x: (-x["oceny"][projekt]["ocena"], x["termin"] if x["termin"] and x["termin"] != "rolling" else "9999"))
+    out = []
+    for nr, x in enumerate(w[:ile], 1):
+        termin = (f"termin {x['termin']} ({zostalo(dt.date.fromisoformat(x['termin']), dzis)})"
+                  if x["termin"] and x["termin"] != "rolling" else "nabór ciągły")
+        out.append(f"{nr}. [{x['nazwa']}]({x['url']}) · {x['typ']} · {kwota(x)} · equity {x['equity'] or '?'} · {termin} · "
+                   f"ocena {x['oceny'][projekt]['ocena']}: {x['oceny'][projekt]['dlaczego']}")
+    return out
+
+
+def cmd_raport(db: sqlite3.Connection, katalog: Path | None, dzis: dt.date) -> int:
+    """Raport dnia (25.11 właściciel: Bigshort szuka pieniędzy dla Jarvo albo Enigmy; jest okazja, to działamy, potem
+    śledzimy aplikację): najlepsze do wzięcia dla każdego ocenianego projektu i nasze aplikacje w toku. Nigdy pusty."""
     if katalog:
         zapisz_kalendarz(db, katalog, dzis)
-    pilne = wydarzenia(db, dzis, dzis + dt.timedelta(days=7))
-    dalej = wydarzenia(db, dzis + dt.timedelta(days=8), dzis + dt.timedelta(days=30))
-    dalej, tytul = (dalej, "dalsze 30 dni") if tydzien or dzis.weekday() == 0 else (dalej[:5], "następne terminy")
-    w_toku = len(aplikacje(db, wszystkie=False))
-    otwarte = db.execute(f"SELECT count(*) FROM okazje WHERE status IN ({', '.join('?' * len(OTWARTE))})", OTWARTE).fetchone()[0]
-    out = ["Finansowanie: w ciągu 7 dni"] + ([f"- {linia(e, dzis)}" for e in pilne] or ["- nic"])
-    out += [f"Finansowanie: {tytul}"] + ([f"- {linia(e, dzis)}" for e in dalej] or ["- brak terminów w 30 dniach"])
-    out.append(f"Aplikacji w toku: {w_toku}, otwartych okazji: {otwarte}"
-               + (f". Cały kalendarz: {katalog / 'KALENDARZ.md'} (subskrypcja: finansowanie.ics)" if katalog else ""))
+    projekty = [r[0] for r in db.execute("SELECT DISTINCT projekt FROM oceny ORDER BY projekt")]
+    out = []
+    for p in projekty:
+        out += [f"Finansowanie do wzięcia teraz: {p}"] + (do_wziecia(db, dzis, p, 3) or ["- brak otwartych z oceną"])
+    if not projekty:
+        out.append("Finansowanie: brak ocenionych okazji, potrzebna mapa finansowania")
+    w_toku = aplikacje(db, wszystkie=False)
+    out += ["Nasze aplikacje:"] + ([f"- {opis_aplikacji(x)}" for x in w_toku] or ["- jeszcze żadna: wybierz numer z listy, aplikujemy"])
+    if katalog:
+        out.append(f"Kalendarz: {katalog / 'KALENDARZ.md'} (telefon: finansowanie.ics), w Mózgu: kalendarz finansowania")
     print("\n".join(out))
     return 0
 
@@ -538,24 +553,21 @@ def zapisz_mozg(db: sqlite3.Connection, teraz: dt.datetime) -> Path | None:
     ap = aplikacje(db)
     w_toku = [x for x in ap if x["etap"] in W_TOKU]
     ev = wydarzenia(db, dzis, dzis + dt.timedelta(days=180))
-    top = sorted(((max(o["ocena"] for o in x["oceny"].values()), x) for x in w if x["status"] in OTWARTE and x["oceny"]),
-                 key=lambda t: -t[0])[:10]
+    projekty = sorted({p for x in w for p in x["oceny"]})
     hist = historia(db, None, teraz - dt.timedelta(days=30))[:40]
     md = ["---", "typ: fakt", "tagi: [finansowanie, kalendarz, aplikacje]", f"utworzono: {utworzono}",
           f"zmieniono: {dzis.isoformat()}", "status: generowane", "zrodlo: workspaces/jarvo-bigshort/baza/okazje.db",
           "agent: jarvo-bigshort", "sekcje: true", "---", "# Kalendarz finansowania", "",
-          f"**Nasze aplikacje o finansowanie z etapem i następnym krokiem, terminy naborów i historia zmian z bazy Bigshorta; "
-          f"stan na {dzis:%d.%m.%Y}: okazji {len(w)}, otwartych {sum(x['status'] in OTWARTE for x in w)}, aplikacji w toku "
-          f"{len(w_toku)}.**", "",
+          f"**Okazje finansowania do wzięcia dla każdego projektu, nasze aplikacje z etapem i następnym krokiem, terminy "
+          f"naborów i historia zmian z bazy Bigshorta; stan na {dzis:%d.%m.%Y}: okazji {len(w)}, otwartych "
+          f"{sum(x['status'] in OTWARTE for x in w)}, aplikacji w toku {len(w_toku)}.**", "",
           "Notatkę pisze skrypt `okazje.py` po każdej zmianie bazy i co rano; zmiany przez Bigshorta (`aplikuj`, `etap`, "
-          "`ustaw`, `notuj`), nie ręcznie.", "", "## W ciągu 7 dni", ""]
-    md += [f"- {linia(e, dzis)}" for e in ev if e["kiedy"] <= dzis + dt.timedelta(days=7)] or ["- nic"]
+          "`ustaw`, `notuj`), nie ręcznie."]
+    for proj in projekty:
+        md += ["", f"## Do wzięcia teraz: {proj}", ""] + (do_wziecia(db, dzis, proj, 10) or ["- brak otwartych z oceną"])
     md += ["", "## Nasze aplikacje w toku", ""] + ([f"- {opis_aplikacji(x)}" for x in w_toku] or ["- jeszcze żadna"])
     md += ["", "## Terminy naborów na 180 dni"] + (miesiace(ev, dzis, "###") or ["", "- brak"])
     md += ["", "## Zakończone aplikacje", ""] + ([f"- {opis_aplikacji(x)}" for x in ap if x["etap"] not in W_TOKU] or ["- brak"])
-    md += ["", "## Najlepsze otwarte okazje", ""]
-    md += [f"- [{x['nazwa']}]({x['url']}) · {x['typ']} · {kwota(x)} · equity {x['equity'] or '?'} · termin {x['termin'] or '?'} · "
-           + ", ".join(f"{p} {o['ocena']}" for p, o in sorted(x["oceny"].items())) for _, x in top] or ["- brak ocenionych"]
     md += ["", "## Historia z 30 dni", ""]
     md += [f"- {h['kiedy'][8:10]}.{h['kiedy'][5:7]} {h['kiedy'][11:]} UTC · {h['nazwa']} · {h['co']}: {bez_kontaktu(h['opis'])}"
            for h in hist] or ["- brak zmian"]
@@ -605,7 +617,7 @@ def main(argv: list[str] | None = None, dzis: dt.date | None = None, teraz: dt.d
     s = sub.add_parser("stare"); s.add_argument("--dni", type=int, default=60)
     s = sub.add_parser("eksport"); s.add_argument("katalog")
     s = sub.add_parser("kalendarz"); s.add_argument("katalog"); s.add_argument("--dni", type=int, default=180)
-    s = sub.add_parser("przypomnij"); s.add_argument("--katalog"); s.add_argument("--tydzien", action="store_true")
+    s = sub.add_parser("raport"); s.add_argument("--katalog")
     a = ap.parse_args(argv)
     db = polacz(Path(a.baza))
     try:
@@ -637,8 +649,8 @@ def main(argv: list[str] | None = None, dzis: dt.date | None = None, teraz: dt.d
             wynik = cmd_notuj(db, a.id, a.tekst, teraz)
         elif a.cmd == "kalendarz":
             wynik = cmd_kalendarz(db, Path(a.katalog), a.dni, dzis)
-        elif a.cmd == "przypomnij":
-            wynik = cmd_przypomnij(db, Path(a.katalog) if a.katalog else None, a.tydzien, dzis)
+        elif a.cmd == "raport":
+            wynik = cmd_raport(db, Path(a.katalog) if a.katalog else None, dzis)
         else:
             wynik = cmd_eksport(db, Path(a.katalog), dzis)
         zapisz_mozg(db, teraz)          # każda zmiana i każde odświeżenie kalendarza = aktualna notatka w Mózgu
