@@ -625,9 +625,10 @@ def stan(w: Wpis) -> dict:
     term = s.get("terminal") if isinstance(s.get("terminal"), dict) else None
     term_zyje = bool(term and zyje(term.get("pid")))
     if rpc is None and (blokada_zajeta(w) or dzierzawa(w, pamiec=DZIERZAWA_S)):
-        # skrzynka bierze wiadomość: blokada już jej, a procesu RPC jeszcze nie ma (hak przed turą, start omp); bez
-        # żywego terminala to praca, nie terminal (25.11: wiadomość z panelu na chwilę pokazała „w terminalu”)
-        if not term_zyje and (nowe or komendy_czekajace(w)) and blokada_zajeta(w):
+        # blokadę trzyma skrzynka, a procesu RPC jeszcze nie ma (hak przed turą, start omp): to praca, nie terminal
+        # (25.11: wiadomość z panelu na chwilę pokazała „w terminalu”)
+        sk = s.get("skrzynka") if isinstance(s.get("skrzynka"), dict) else None
+        if not term_zyje and sk and zyje(sk.get("pid")):
             wynik["stan"] = "pracuje"
             return wynik
         wynik["stan"] = "terminal"

@@ -1048,12 +1048,17 @@ def skrzynka(w, wyslij=telegram) -> int:
         if not wez_blokade(blok):
             blok.close()
             return _zajeta(w, wyslij)
-        _sprzatnij_po_poprzedniej(w)
-        if rdzen.dzierzawa(w):       # sesję trzyma omp spoza blokady (np. zwykłe `omp --resume`): nigdy odgałęzienia
-            fcntl.flock(blok, fcntl.LOCK_UN)
-            return _zajeta(w, wyslij)
-        rdzen.zapisz_stan(w, powiadomiono=None)
-        return Sesja(w, wyslij).petla()
+        # skrzynka trzyma blokadę: panel pokazuje „pracuje” od razu, zanim wstanie proces RPC (25.11: chwilowe „terminal”)
+        rdzen.zapisz_stan(w, skrzynka={"pid": os.getpid(), "od": time.time()})
+        try:
+            _sprzatnij_po_poprzedniej(w)
+            if rdzen.dzierzawa(w):   # sesję trzyma omp spoza blokady (np. zwykłe `omp --resume`): nigdy odgałęzienia
+                fcntl.flock(blok, fcntl.LOCK_UN)
+                return _zajeta(w, wyslij)
+            rdzen.zapisz_stan(w, powiadomiono=None)
+            return Sesja(w, wyslij).petla()
+        finally:
+            rdzen.zapisz_stan(w, skrzynka=None)
 
 
 def uruchom_skrzynke_w_tle(w, korzen: Path | None = None) -> None:
