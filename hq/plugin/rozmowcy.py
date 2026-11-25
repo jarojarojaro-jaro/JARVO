@@ -10,6 +10,11 @@
   (zgoda albo pytanie `[[czeka-na-tak]]` = czeka); omp z `omp_sesje.stan` (blokada, dzierżawa, skrzynka). Zmiana
   idzie zdarzeniem `rozmowca.stan` w strumieniu (bez odpytywania przeglądarki); `czeka`/`kolejka` dłużej niż 2 min
   (D2: „nigdy ciche czekanie”) dostaje w zdarzeniu `powiadom: true` raz.
+- **Raporty rutyn** (`raporty`, z archiwum Aktualizacji): rutyna z `attach_to_session` trafia do sesji tematu
+  lustrem Hermesa (`[Cron delivery: …]`, oś: `rutyna`). Temat bez trasy bramy (nikt w nim jeszcze nie pisał) nie ma
+  sesji, więc lustro przepada; wtedy raport rozmówcy floty (bez koordynatora, temat General) idzie do jego wątku jako
+  wpis systemu `{typ: rutyna, agent, nazwa}` (oś: ta sama pozycja `rutyna`), raz na raport (klucz `raport:<id>`),
+  z aktywnością i nieprzeczytanymi jak odpowiedź agenta.
 Testy: tests/test_rozmowcy.py.
 """
 
@@ -17,7 +22,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterable, Mapping
 
 STANY = ("pracuje", "czeka", "wolny", "terminal", "kolejka", "offline")
 AKTYWNE = ("wysylanie", "przyjety", "pracuje", "czeka_na_ture", "zatrzymywanie")
@@ -113,6 +118,55 @@ class Serwis:
             zmiany += 1
         self._temat_at = self.zegar()
         return zmiany
+
+    # ------------------------------------------------------------------------------------------- raporty rutyn
+    def _lustro_hermesa(self, r: dict) -> bool:
+        """Raport z `attach_to_session` jest już na osi wątku: temat ma trasę bramy, a jej sesja należy do tego wątku
+        albo jeszcze do żadnego (`sesje_tematow` przejmie ją w ciągu TEMAT_S)."""
+        if not (r.get("czat") and r.get("watek_tg")):
+            return False
+        try:
+            s = self.tematy.sesja_tematu(self.dane, r["cel"], r["czat"], r["watek_tg"])
+        except ValueError:
+            return False
+        if not s:
+            return False
+        gdzie = self.db.watek_sesji(r["cel"], s["session_id"])
+        return gdzie is None or gdzie[0] == r["watek_id"]
+
+    def raporty(self, raporty: Iterable[Mapping]) -> int:
+        """Raporty rutyn (raporty.Archiwum: {id, profil, nazwa, ts, tekst, blad}) do wątków rozmówców floty, gdy lustro
+        Hermesa nie miało dokąd trafić. Zwraca liczbę dodanych wpisów."""
+        rozmowcy = {r["profil"]: r for r in self._lista
+                    if r.get("zaplecze") == "hermes" and r.get("profil") and r.get("temat") != "general"}
+        dodane = 0
+        for rap in sorted(raporty, key=lambda x: float(x["ts"])):
+            k = rozmowcy.get(rap.get("profil"))
+            r = self.db.rozmowca(k["klucz"]) if k else None
+            if not r or not r.get("watek_id") or r.get("usuniety_at") or self._lustro_hermesa(r):
+                continue
+            wid = r["watek_id"]
+            ostatni = self.db.wpisy(wid, limit=1)            # czas rośnie z `seq`: oś scala wpisy po czasie
+            at = max([float(rap["ts"])] + [float(w["utworzony_at"]) for w in ostatni])
+            profil, zadanie, stem = str(rap["id"]).split("/", 2)
+            w = self.db.dodaj_wpis(wid, rodzaj="system", tekst=rap["tekst"], klucz=f"raport:{rap['id']}", at=at,
+                                   dane={"typ": "rutyna", "agent": r["cel"], "nazwa": rap["nazwa"],
+                                         "blad": bool(rap.get("blad")),
+                                         "plik": str(self.dane / "profiles" / profil / "cron" / "output" / zadanie
+                                                     / f"{stem}.md")})
+            if w.get("powtorzony"):
+                continue
+            dodane += 1
+            self.hub.nadaj("watek.os", {"watek_id": wid, "agent": r["cel"]}, watek_id=wid)
+            otwarty = wid in self.hub.subskrybowane_watki()
+            w_ = self.db.aktywnosc(wid, at=at, nieprzeczytane_plus=0 if otwarty else 1,
+                                   podglad=f"{r['nazwa']} · {rap['nazwa']}: {' '.join(rap['tekst'].split())[:120]}")
+            if w_:
+                self.hub.nadaj("watek.zmiana", {"watek": {k_: w_.get(k_) for k_ in (
+                    "id", "aktywnosc_at", "nieprzeczytane", "status", "podglad")}})
+        if dodane:
+            self.log(f"jarvo-hq: raporty rutyn w wątkach rozmówców: {dodane}")
+        return dodane
 
     # ------------------------------------------------------------------------------------------- stan
     def _stan_hermes(self, r: dict) -> dict:

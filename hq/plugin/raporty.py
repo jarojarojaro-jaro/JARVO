@@ -19,7 +19,8 @@ W kodzie „raporty”, bo „aktualizacja” to już aktualizacja Jarva (odznak
   z `od` (okno dnia) też poprzedni / nastepny: czas najbliższego raportu przed i po oknie, w obrębie rodzaju};
   `GET /raporty/kalendarz?od=<ts>&do=<ts>` (okno ≤ 62 dni) → {wpisy [{ts, rodzaj, nowy, blad}] bez treści, rodzaje,
   najnowszy}; `POST /raporty/przeczytane` {do: ts} → {nieprzeczytane, przeczytane_do} (znacznik tylko rośnie).
-Rozmowa o raporcie zostaje w rozmowie z Jarvem: rutyna z `attach_to_session` wpisuje go też do sesji tematu JARVO.
+Rozmowa o raporcie zostaje w rozmowie z agentem: rutyna z `attach_to_session` wpisuje go też do sesji tematu agenta
+(lustro Hermesa), a gdy temat nie ma jeszcze sesji bramy, silnik wpisuje go do wątku rozmówcy (`rozmowcy.raporty`).
 Testy: tests/test_raporty.py.
 """
 
@@ -160,8 +161,9 @@ class Archiwum:
                 self._katalogi[str(kat)] = znak
         return nowe
 
-    def runda(self) -> dict | None:
-        """Wątek tła silnika (co 2 s, zbiera co RUNDA_S): {nieprzeczytane, nowe: [{id, rodzaj, nazwa, ts}]} albo None."""
+    def runda(self, po_nowych: Callable[[list[dict]], object] | None = None) -> dict | None:
+        """Wątek tła silnika (co 2 s, zbiera co RUNDA_S): {nieprzeczytane, nowe: [{id, rodzaj, nazwa, ts}]} albo None.
+        `po_nowych` dostaje pełne nowe raporty (z profilem i treścią): silnik wpisuje je do wątków rozmówców."""
         teraz = self.zegar()
         if teraz - self._runda_at < RUNDA_S:
             return None
@@ -169,6 +171,8 @@ class Archiwum:
         nowe = self.zbierz()
         if not nowe:
             return None
+        if po_nowych is not None:
+            po_nowych(nowe)
         return {"nieprzeczytane": self.licznik()["nieprzeczytane"],
                 "nowe": [{k: r[k] for k in ("id", "rodzaj", "nazwa", "ts")} for r in nowe]}
 

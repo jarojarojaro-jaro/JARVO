@@ -37,6 +37,7 @@ from typing import Any, Callable
 
 STRAZNIK = "jarvo_hq_silnik_instancja"
 RESTARTY = (2.0, 4.0, 8.0)
+RAPORTY_WSTECZ_S = 86400.0       # po starcie: raporty rutyn tej doby do wątków rozmówców (rozmowcy.raporty)
 DZIENNIK_MAKS = 2 * 1024 * 1024
 DZIENNIK_KOPIE = 4
 
@@ -159,6 +160,7 @@ class Silnik:
         self.odstep_odpytania = odstep_odpytania
         self.plik = plik
         self.raporty = raporty            # archiwum raportów rutyn (raporty.Archiwum, kanał Aktualizacje)
+        self._raporty_po_starcie = False
         self.stan = "start"
         self.blad: str | None = None
         self.start_at = time.time()
@@ -275,7 +277,8 @@ class Silnik:
 
     async def _petla_rozmowcow(self) -> None:
         """Co 2 s: stan rozmówców (`rozmowca.stan`), sesje tematów, zaległe lustro do Telegrama, nowe raporty rutyn
-        (archiwum Aktualizacji zbiera co 30 s, nowe idą zdarzeniem `raporty.nowe`), wszystko w wątku tła."""
+        (archiwum Aktualizacji zbiera co 30 s, nowe idą zdarzeniem `raporty.nowe` i do wątków rozmówców:
+        `rozmowcy.raporty`), wszystko w wątku tła."""
         while True:
             for zadanie in (self.rozmowcy.stany, self.lustro.runda, self._raporty):
                 try:
@@ -287,9 +290,22 @@ class Silnik:
             await asyncio.sleep(2.0)
 
     def _raporty(self) -> None:
-        nowe = self.raporty.runda() if self.raporty is not None else None
+        if self.raporty is None:
+            return
+        if not self._raporty_po_starcie:     # raporty z ostatniej doby zebrane przed startem (klucz wpisu: bez dubla)
+            self._raporty_po_starcie = True
+            self._raporty_do_rozmow(self.raporty.lista(od=self.raporty.zegar() - RAPORTY_WSTECZ_S,
+                                                       limit=100)["raporty"])
+        nowe = self.raporty.runda(po_nowych=self._raporty_do_rozmow)
         if nowe:
             self.hub.nadaj("raporty.nowe", nowe)
+
+    def _raporty_do_rozmow(self, raporty: list[dict]) -> None:
+        """Raport rozmówcy bez lustra Hermesa do jego wątku; błąd nie wstrzymuje kanału Aktualizacje."""
+        try:
+            self.rozmowcy.raporty(raporty)
+        except Exception as exc:
+            self.log(f"jarvo-hq: raporty w rozmowach: {type(exc).__name__}")
 
     def zamknij(self, czekaj: float = 5.0) -> None:
         """Koniec wątku (testy); w dashboardzie wątek kończy się z procesem."""

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Rutyna Bigshorta bez modelu (cron `bigshort-terminy`): odświeża kalendarz finansowania w katalogu roboczym
-(`out/KALENDARZ.md`, `out/finansowanie.ics`) i notatkę w Mózgu, a wypisuje tylko to, co wymaga uwagi: terminy naborów
-i nasze kroki w ciągu 7 dni, w poniedziałek także dalsze 30 dni. Puste wyjście = cisza (Hermes nic nie wysyła).
+(`out/KALENDARZ.md`, `out/finansowanie.ics`) i notatkę w Mózgu, a codziennie pisze raport: terminy naborów i nasze
+kroki w ciągu 7 dni i 5 następnych, w poniedziałek całe 30 dni.
 
     terminy_rano.py [--tydzien]
 """

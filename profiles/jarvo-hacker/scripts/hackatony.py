@@ -14,7 +14,7 @@ naszym udziałem i historią każdej zmiany.
     hackatony.py stare [--dni 14]                     # otwarte wpisy do ponownego sprawdzenia (pole sprawdzone)
     hackatony.py eksport <katalog>                    # HACKATONY.md (terminy, ranking, wyniki) + hackatony.csv + kalendarz
     hackatony.py kalendarz <katalog> [--dni 120]      # KALENDARZ.md (miesiące i tygodnie) + hackatony.ics do subskrypcji
-    hackatony.py przypomnij [--katalog K] [--tydzien] # rutyna: co w 72 h (i w poniedziałek 14 dni); nic = puste wyjście
+    hackatony.py przypomnij [--katalog K] [--tydzien] # rutyna co rano: 72 h i 5 następnych (w poniedziałek 14 dni)
 
 Baza: --baza (domyślnie baza/hackatony.db w katalogu roboczym). Wpis JSONL: nazwa, platforma, url i zrodlo (strona
 hackathonu z zasadami) są obowiązkowe; zgloszenie_do = termin zgłoszenia projektu w UTC (RRRR-MM-DDTHH:MM albo
@@ -424,21 +424,20 @@ def cmd_kalendarz(db: sqlite3.Connection, katalog: Path, dni: int, teraz: dt.dat
 
 
 def cmd_przypomnij(db: sqlite3.Connection, katalog: Path | None, tydzien: bool, teraz: dt.datetime) -> int:
-    """Rutyna bez modelu: odświeża kalendarz i wypisuje tylko to, co wymaga uwagi; puste wyjście = cisza."""
+    """Rutyna bez modelu: odświeża kalendarz i codziennie pisze raport (25.11 właściciel: „Hacker nie dał żadnego
+    info”, cisza wyglądała jak awaria): etapy w 72 h, potem 5 następnych w 30 dniach, w poniedziałek całe 14 dni."""
     if katalog:
         zapisz_kalendarz(db, katalog, teraz)
     pilne = wydarzenia(db, teraz, teraz + dt.timedelta(hours=72))
-    tydzien = tydzien or lokalnie(teraz).weekday() == 0
-    dalsze = [e for e in wydarzenia(db, teraz + dt.timedelta(hours=72), teraz + dt.timedelta(days=14))] if tydzien else []
-    if not pilne and not dalsze:
-        return 0
-    out = []
-    if pilne:
-        out += ["Hackathony: w ciągu 72 godzin"] + [f"- {linia(e, teraz)}" for e in pilne]
-    if dalsze:
-        out += ["Hackathony: dalsze 14 dni"] + [f"- {linia(e, teraz)}" for e in dalsze]
-    if katalog:
-        out.append(f"Cały kalendarz: {katalog / 'KALENDARZ.md'} (subskrypcja: hackatony.ics)")
+    dalej = wydarzenia(db, teraz + dt.timedelta(hours=72), teraz + dt.timedelta(days=30))
+    if tydzien or lokalnie(teraz).weekday() == 0:
+        dalej, tytul = [e for e in dalej if e["kiedy"] <= teraz + dt.timedelta(days=14)], "dalsze 14 dni"
+    else:
+        dalej, tytul = dalej[:5], "następne terminy"
+    otwarte = db.execute(f"SELECT count(*) FROM hackatony WHERE status IN ({', '.join('?' * len(OTWARTE))})", OTWARTE).fetchone()[0]
+    out = ["Hackathony: w ciągu 72 godzin"] + ([f"- {linia(e, teraz)}" for e in pilne] or ["- nic"])
+    out += [f"Hackathony: {tytul}"] + ([f"- {linia(e, teraz)}" for e in dalej] or ["- brak terminów w 30 dniach"])
+    out.append(f"W bazie otwartych: {otwarte}" + (f". Cały kalendarz: {katalog / 'KALENDARZ.md'} (subskrypcja: hackatony.ics)" if katalog else ""))
     print("\n".join(out))
     return 0
 

@@ -8,7 +8,8 @@ wierszami sesji Hermesa każdego członka (czytnik.py: projekcja Hermesa albo za
   dopasowanie całymi liniami po zdjęciu znacznika Hermesa, `czytnik.dopisek_w_steerze`), obcy = `dopisano` (tekst bez
   znacznika); `async_delegation_complete`/`process_complete` = `dostawa`; `failed_turn` = `blad_tury`; inne
   rodzaje = `system`; użytkownik: nasz = ukryty, `[kanban] Task …` = `budzenie`, `[Cron delivery: <rutyna>]` = `rutyna`
-  (raport rutyny wpisany przez Hermesa do sesji tematu: wiadomość agenta z nazwą rutyny, `rutyna: {nazwa}`),
+  (raport rutyny wpisany przez Hermesa do sesji tematu: wiadomość agenta z nazwą rutyny, `rutyna: {nazwa}`; ta sama
+  pozycja z wpisu systemu `{typ: rutyna, agent, nazwa}`, gdy temat nie miał sesji: rozmowcy.raporty),
   streszczenie kompresji = `kompresja`,
   reszta = `obca` (w wątku `import` dymek właściciela); asystent z `tool_calls` = grupa `kroki` przed następnym
   tekstem (czas kroku z zapisanych `kroki` przebiegu), `kanban_create` dodatkowo `przekazanie`; asystent z tekstem =
@@ -141,6 +142,13 @@ def _pozycja(**pola) -> dict:
 def _wpisy(wpisy: list[dict], plik: Callable[[str], dict | None] | None) -> list[dict]:
     out = []
     for i, w in enumerate(wpisy):
+        d = w.get("dane") or {}
+        if w["rodzaj"] == "system" and d.get("typ") == "rutyna":   # raport rutyny bez lustra Hermesa (rozmowcy.raporty)
+            tekst = w.get("tekst") or ""
+            out.append(_pozycja(id=w["id"], rodzaj="rutyna", ts=float(w["utworzony_at"]), agent=d.get("agent"),
+                                rola="rozmowa", tekst=tekst, rutyna={"nazwa": d.get("nazwa") or ""},
+                                pliki=_pliki(tekst, plik), wpis=w, _i=i))
+            continue
         pliki = []
         for z in w.get("zalaczniki") or []:
             e = plik(z.get("path", "")) if plik else None
@@ -661,6 +669,10 @@ def pozycje_kontekstu(db, czytnik, wid: str, **kw) -> list[dict]:
             if (p["wpis"].get("dane") or {}).get("typ") in ("dolaczyl", "kompresja", "komenda"):   # komenda: komendy.py
                 continue
             out.append({"ts": p["ts"], "rodzaj": "system", "tekst": p.get("tekst") or ""})
+        elif r == "rutyna" and p.get("wpis"):     # raport spoza sesji agenta: agent go nie zna, więc linia systemu
+            d = p["wpis"].get("dane") or {}
+            out.append({"ts": p["ts"], "rodzaj": "system", "tekst": f"raport rutyny „{d.get('nazwa') or ''}”: "
+                        f"{p.get('tekst') or ''}", "pliki": [d["plik"]] if d.get("plik") else []})
         elif r == "agent":
             out.append({"ts": p["ts"], "rodzaj": "agent", "agent": p["agent"], "rola": p.get("rola") or "rozmowa",
                         "tekst": p.get("tekst") or ""})

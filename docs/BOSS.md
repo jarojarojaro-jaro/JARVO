@@ -169,9 +169,10 @@ bez grupy DM właściciela; decyzje 17.11 i 18.11). Cel bez wątku z `attach_to_
 przebiegu temat „Hermes — <rutyna>”; z wątkiem 1 raport trafia do General i do sesji tematu JARVO (Hermes
 `mirror_to_session`: wiadomość `[Cron delivery: <rutyna>]` w historii), więc odpowiedź „1 ok, 2 nie” w JARVO albo w panelu
 Jarvo rozumie bez cytowania. UPDATES to archiwum do przeglądania (w panelu kanał „Aktualizacje”, `docs/HQ.md`).
-Rutyny agentów biznesowych idą do ich wątku w grupie (`@@AGENT_ROUTINE_DELIVER@@` w
-`cron/jobs.yaml` profilu: `telegram:<TELEGRAM_HQ_CHAT_ID>:<TELEGRAM_TOPIC_<temat>>` i kopia w UPDATES); bez
-tematu w `.env` do domu Jarva. Specjaliści wątków nie mają: ich wyniki przekazuje Jarvo (16.11). Do domu Jarva idą też
+Rutyny agentów z własnym wątkiem idą tylko do tego wątku (`@@AGENT_ROUTINE_DELIVER@@` w `cron/jobs.yaml` profilu:
+`telegram:<TELEGRAM_HQ_CHAT_ID>:<TELEGRAM_TOPIC_<temat>>`; bez kopii w UPDATES, bo profil agenta nie ma do niej trasy
+bramy) i do jego rozmowy w panelu; bez tematu w `.env` do domu Jarva. Specjaliści bez wątku wyniki oddają przez Jarva.
+Do domu Jarva idą też
 wyniki kart i blokady `needs_input` (karta założona z DM budzi Jarva w temacie JARVO, `cisza_tablicy.py`) i
 powiadomienia bramy (`TELEGRAM_HOME_CHANNEL`). DM jest wejściem zapasowym: Jarvo odpowiada tam, ale sam do DM nie pisze.
 

@@ -52,7 +52,7 @@ Pracuję w moim katalogu roboczym, pamięć mam w profilu Hermesa, bazę okazji 
 - Pamięć `memory`: `MEMORY.md` i `USER.md` w katalogu `memories/` mojego profilu.
 
 ## Kiedy
-Pracuję na kartach od Jarva i na wiadomości z `@bigshort`; rutyna `bigshort-terminy` (codziennie 8:35, bez modelu) odświeża kalendarz i notatkę w Mózgu, a pisze w moim wątku, gdy termin naboru albo nasz krok wypada w 7 dniach (w poniedziałek także 30 dni); przegląd okazji (skill `przeglad-okazji`) zakłada Jarvo jako rutynę za zgodą @@WLASCICIEL@@.
+Pracuję na kartach od Jarva i na wiadomości z `@bigshort`; rutyna `bigshort-terminy` (codziennie 8:35, bez modelu) odświeża kalendarz i notatkę w Mózgu i pisze raport w moim wątku i rozmowie w panelu: terminy naborów i nasze kroki w 7 dniach i 5 następnych (w poniedziałek 30 dni); przegląd okazji (skill `przeglad-okazji`) zakłada Jarvo jako rutynę za zgodą @@WLASCICIEL@@.
 
 ## Jak działa mój mózg
 Prompt: postać, zasady i rdzeń tej mapy; pamięć `memory` na starcie rozmowy; przed turą pasujące notatki skarbca.

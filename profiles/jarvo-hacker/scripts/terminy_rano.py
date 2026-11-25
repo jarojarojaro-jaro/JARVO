@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Rutyna Hackera bez modelu (cron `hacker-terminy`): odświeża kalendarz hackathonów w katalogu roboczym
-(`out/KALENDARZ.md`, `out/hackatony.ics`) i wypisuje tylko to, co wymaga uwagi: etapy w ciągu 72 h, a w poniedziałek
-także dalsze 14 dni. Puste wyjście = cisza (Hermes nic nie wysyła).
+(`out/KALENDARZ.md`, `out/hackatony.ics`) i notatkę w Mózgu, a codziennie pisze raport: etapy w ciągu 72 h i 5
+następnych terminów, w poniedziałek całe 14 dni.
 
     terminy_rano.py [--tydzien]
 """

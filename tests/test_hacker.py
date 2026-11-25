@@ -103,7 +103,8 @@ def test_kalendarz_etapy_kamienie_i_ics(tmp_path, capsys):
     assert "DTSTART:20261127T170000Z" in ics and "DTSTART;VALUE=DATE:20261215" in ics
 
 
-def test_przypomnienie_milczy_bez_terminow_i_migruje_stara_baze(tmp_path, capsys):
+def test_przypomnienie_codziennie_z_nastepnymi_i_migruje_stara_baze(tmp_path, capsys):
+    """25.11 właściciel: rutyna nie milczy; bez etapów w 72 h podaje następne terminy (do 5, w 30 dniach)."""
     import sqlite3
     baza = tmp_path / "baza" / "h.db"
     baza.parent.mkdir()
@@ -115,10 +116,12 @@ def test_przypomnienie_milczy_bez_terminow_i_migruje_stara_baze(tmp_path, capsys
     c.close()
     uruchom(tmp_path, "dodaj", jsonl(tmp_path, wpis(zgloszenie_do="2027-02-01", wyniki="2027-02-20")))
     capsys.readouterr()
-    uruchom(tmp_path, "przypomnij")
-    assert capsys.readouterr().out == ""
-    uruchom(tmp_path, "przypomnij", "--tydzien")
-    assert capsys.readouterr().out == ""
+    uruchom(tmp_path, "dodaj", jsonl(tmp_path, wpis(nazwa="Bliski", zgloszenie_do="2026-12-05")))
+    capsys.readouterr()
+    uruchom(tmp_path, "przypomnij")                    # środa 25.11: 72 h puste, następne do 5
+    out = capsys.readouterr().out.splitlines()
+    assert out[:2] == ["Hackathony: w ciągu 72 godzin", "- nic"] and out[2] == "Hackathony: następne terminy"
+    assert "Zgłoszenie do · [Bliski]" in out[3] and "Gemini" not in "\n".join(out) and out[-1] == "W bazie otwartych: 2"
 
 
 def test_udzial_historia_i_notatka_w_mozgu(tmp_path, capsys, monkeypatch):

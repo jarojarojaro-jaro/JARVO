@@ -1470,10 +1470,16 @@ otwiera ostatni dzień z raportami (tego rodzaju przy filtrze).
   rośnie); GET tylko z karty panelu. `GET /app` ma `raporty: {nieprzeczytane, przeczytane_do}`; strumień:
   `raporty.nowe` (nowy raport, otwarty widok wczytuje się na nowo) i `raporty.licznik`.
 - **Pakiet** `raporty` (`hq/web/src/64-raporty.js`, style w bloku „@@pakiet raporty”) ładuje się po wejściu w widok.
-- **Raport w rozmowie**: rutyna z `attach_to_session` wpisuje raport do sesji tematu JARVO jako wiadomość użytkownika
-  `[Cron delivery: <rutyna>]`; oś (`scalanie.py`, rodzaj `rutyna`) pokazuje ją jako wiadomość Jarva ze znacznikiem
-  „↻ <rutyna>”, a podgląd w lewej kolumnie jako „Jarvo · <rutyna>: …”. Telegram: temat UPDATES dostaje kopię
+- **Raport w rozmowie**: rutyna z `attach_to_session` wpisuje raport do sesji tematu agenta jako wiadomość użytkownika
+  `[Cron delivery: <rutyna>]`; oś (`scalanie.py`, rodzaj `rutyna`) pokazuje ją jako wiadomość agenta ze znacznikiem
+  „↻ <rutyna>”, a podgląd w lewej kolumnie jako „<agent> · <rutyna>: …”. Telegram: temat UPDATES dostaje kopię
   (`ROUTINE_DELIVER`, `docs/BOSS.md`).
+- **Temat bez sesji** (25.11, Bigshort): lustro Hermesa szuka trasy bramy tematu; temat, w którym nikt jeszcze nie
+  pisał, jej nie ma, więc raport nie trafia do żadnej sesji. Wtedy silnik (`rozmowcy.raporty`, przy każdym nowym
+  raporcie archiwum i po starcie dla raportów z ostatniej doby) wpisuje raport rozmówcy floty (bez koordynatora) do
+  jego wątku: wpis systemu `{typ: rutyna, agent, nazwa, plik}` z kluczem `raport:<id>` (raz), na osi ta sama pozycja
+  `rutyna`, z `watek.os`, podglądem i nieprzeczytanymi. Temat z trasą (sesja w tym wątku albo jeszcze w żadnym)
+  zostaje lustru Hermesa, bez dubla. Agent dostaje raport w bloku kontekstu jako linię systemu ze ścieżką pliku.
 
 ### Mózg (`#/mozg`)
 

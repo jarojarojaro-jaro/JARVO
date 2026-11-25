@@ -16,7 +16,7 @@ nasze aplikacje z etapami i historia każdej zmiany.
     okazje.py stare [--dni 60]                       # wpisy do ponownego sprawdzenia (pole sprawdzone)
     okazje.py eksport <katalog>                      # OKAZJE.md (terminy, ranking projektów) + okazje.csv + kalendarz
     okazje.py kalendarz <katalog> [--dni 180]        # KALENDARZ.md + finansowanie.ics: terminy naborów i nasze kroki
-    okazje.py przypomnij [--katalog K] [--tydzien]   # rutyna: co w 7 dniach (w poniedziałek 30 dni); nic = puste wyjście
+    okazje.py przypomnij [--katalog K] [--tydzien]   # rutyna co rano: 7 dni i 5 następnych (w poniedziałek 30 dni)
 
 Baza: --baza (domyślnie baza/okazje.db w katalogu roboczym). Wpis JSONL: nazwa, typ, url i zrodlo (link do źródła
 pierwotnego) są obowiązkowe; sprawdzone = data sprawdzenia źródła (RRRR-MM-DD). termin: RRRR-MM-DD albo "rolling".
@@ -495,20 +495,19 @@ def cmd_kalendarz(db: sqlite3.Connection, katalog: Path, dni: int, dzis: dt.date
 
 
 def cmd_przypomnij(db: sqlite3.Connection, katalog: Path | None, tydzien: bool, dzis: dt.date) -> int:
-    """Rutyna bez modelu: odświeża kalendarz i wypisuje tylko to, co wymaga uwagi; puste wyjście = cisza."""
+    """Rutyna bez modelu: odświeża kalendarz i codziennie pisze raport (25.11 właściciel: cisza wyglądała jak awaria):
+    terminy i nasze kroki w 7 dniach, potem 5 następnych w 30 dniach, w poniedziałek całe 30 dni."""
     if katalog:
         zapisz_kalendarz(db, katalog, dzis)
     pilne = wydarzenia(db, dzis, dzis + dt.timedelta(days=7))
-    dalsze = wydarzenia(db, dzis + dt.timedelta(days=8), dzis + dt.timedelta(days=30)) if tydzien or dzis.weekday() == 0 else []
-    if not pilne and not dalsze:
-        return 0
-    out = []
-    if pilne:
-        out += ["Finansowanie: w ciągu 7 dni"] + [f"- {linia(e, dzis)}" for e in pilne]
-    if dalsze:
-        out += ["Finansowanie: dalsze 30 dni"] + [f"- {linia(e, dzis)}" for e in dalsze]
-    if katalog:
-        out.append(f"Cały kalendarz: {katalog / 'KALENDARZ.md'} (subskrypcja: finansowanie.ics)")
+    dalej = wydarzenia(db, dzis + dt.timedelta(days=8), dzis + dt.timedelta(days=30))
+    dalej, tytul = (dalej, "dalsze 30 dni") if tydzien or dzis.weekday() == 0 else (dalej[:5], "następne terminy")
+    w_toku = len(aplikacje(db, wszystkie=False))
+    otwarte = db.execute(f"SELECT count(*) FROM okazje WHERE status IN ({', '.join('?' * len(OTWARTE))})", OTWARTE).fetchone()[0]
+    out = ["Finansowanie: w ciągu 7 dni"] + ([f"- {linia(e, dzis)}" for e in pilne] or ["- nic"])
+    out += [f"Finansowanie: {tytul}"] + ([f"- {linia(e, dzis)}" for e in dalej] or ["- brak terminów w 30 dniach"])
+    out.append(f"Aplikacji w toku: {w_toku}, otwartych okazji: {otwarte}"
+               + (f". Cały kalendarz: {katalog / 'KALENDARZ.md'} (subskrypcja: finansowanie.ics)" if katalog else ""))
     print("\n".join(out))
     return 0
 

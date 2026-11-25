@@ -558,8 +558,10 @@ def base_tokens(fleet: fl.Fleet, agent: fl.Agent, runtime_build_dir: str, env: d
         "ROUTINE_DELIVER": z_aktualizacjami(home_deliver, aktualizacje),
         # rutyny agentów (nie Jarva): ich wątek w grupie Jarvo HQ, a bez grupy albo tematu jak HOME_DELIVER
         "AGENT_DELIVER": cel_watku(agent, env) or home_deliver,
-        # raporty rutyn agenta: jego wątek i kopia w temacie UPDATES
-        "AGENT_ROUTINE_DELIVER": z_aktualizacjami(cel_watku(agent, env) or home_deliver, aktualizacje),
+        # raporty rutyn agenta: tylko jego wątek (25.11: kopia w UPDATES z profilu bez własnego połączenia Telegrama
+        # kończyła się „platform 'telegram' not configured/enabled”, bo trasa bramy łączy z profilem tylko jego wątek;
+        # archiwum raportów to i tak kanał „Aktualizacje” panelu)
+        "AGENT_ROUTINE_DELIVER": cel_watku(agent, env) or home_deliver,
     }
 
 

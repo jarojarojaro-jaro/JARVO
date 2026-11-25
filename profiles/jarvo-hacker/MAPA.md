@@ -52,7 +52,7 @@ Pracuję w moim katalogu roboczym, pamięć mam w profilu Hermesa, bazę hackath
 - Pamięć `memory`: `MEMORY.md` i `USER.md` w katalogu `memories/` mojego profilu.
 
 ## Kiedy
-Pracuję na kartach od Jarva i na wiadomości z `@hacker`; rutyna `hacker-terminy` (codziennie 8:30, bez modelu) odświeża kalendarz i notatkę w Mózgu, a pisze w moim wątku, gdy etap hackathonu albo nasz krok wypada w 72 h (w poniedziałek także 14 dni); przegląd nowych hackathonów (`przeglad-hackatonow`) zakłada Jarvo za zgodą @@WLASCICIEL@@.
+Pracuję na kartach od Jarva i na wiadomości z `@hacker`; rutyna `hacker-terminy` (codziennie 8:30, bez modelu) odświeża kalendarz i notatkę w Mózgu i pisze raport w moim wątku i rozmowie w panelu: etapy w 72 h i 5 następnych terminów (w poniedziałek 14 dni); przegląd nowych hackathonów (`przeglad-hackatonow`) zakłada Jarvo za zgodą @@WLASCICIEL@@.
 
 ## Jak działa mój mózg
 Prompt: postać, zasady i rdzeń tej mapy; pamięć `memory` na starcie rozmowy; przed turą pasujące notatki skarbca.

@@ -206,7 +206,8 @@ def test_home_deliver_token():
 
 def test_routine_deliver_z_tematem_updates():
     """Raporty rutyn (18.11): dom Jarva i kopia w temacie UPDATES grupy (archiwum); bez tematu UPDATES sam dom,
-    bez grupy (DM, lokalnie) bez kopii, bo temat jest tylko w grupie."""
+    bez grupy (DM, lokalnie) bez kopii, bo temat jest tylko w grupie. Rutyny agentów (25.11) tylko do ich wątku:
+    profil agenta nie ma trasy do UPDATES, więc kopia psuła dostawę."""
     fleet = fl.load_fleet()
     jarvo = fleet.agent(fleet.orchestrator)
     z_updates = {**ENV, "TELEGRAM_TOPIC_UPDATES": "30"}
@@ -218,8 +219,7 @@ def test_routine_deliver_z_tematem_updates():
     assert build.base_tokens(fleet, jarvo, "/b", bez_grupy)["ROUTINE_DELIVER"] == "telegram:111111111"
     assert build.base_tokens(fleet, jarvo, "/b", {"TELEGRAM_TOPIC_UPDATES": "30"})["ROUTINE_DELIVER"] == "local"
     web = _z_watkiem(fleet, "jarvo-web", "web").agent("jarvo-web")
-    assert build.base_tokens(fleet, web, "/b", z_updates)["AGENT_ROUTINE_DELIVER"] == \
-        "telegram:-1002222222222:12,telegram:-1002222222222:30"
+    assert build.base_tokens(fleet, web, "/b", z_updates)["AGENT_ROUTINE_DELIVER"] == "telegram:-1002222222222:12"
     jobs = (fl.REPO_ROOT / "profiles" / "jarvo" / "cron" / "jobs.yaml").read_text(encoding="utf-8")
     spec = fl.load_yaml(fl.REPO_ROOT / "profiles" / "jarvo" / "cron" / "jobs.yaml")
     assert "@@HOME_DELIVER@@" not in jobs

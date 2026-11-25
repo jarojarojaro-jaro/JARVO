@@ -1,13 +1,13 @@
 # Rutyny Bigshorta. scripts/build.py zamienia ten plik na cron/jobs.json przez API crona Hermesa (stałe `id`).
 # Z dystrybucji zadania instalują się WSTRZYMANE; włączasz je świadomie (`hermes -p jarvo-bigshort cron resume <id>`).
-# 25.11 właściciel: kalendarz i śledzenie aplikacji jak u Hackera; skrypt odświeża kalendarz i notatkę w Mózgu,
-# a pisze tylko, gdy termin naboru albo nasz krok wypada w 7 dniach.
+# 25.11 właściciel: kalendarz i śledzenie aplikacji jak u Hackera; skrypt odświeża kalendarz i notatkę w Mózgu
+# i pisze raport codziennie (cisza wyglądała jak awaria).
 
 jobs:
   - id: bigshort-terminy
     name: "Bigshort: terminy finansowania"
     schedule: "35 8 * * *"
-    # terminy naborów i nasze kroki w aplikacjach w 7 dniach, w poniedziałek też 30 dni; 0 tokenów, puste wyjście = cisza;
+    # terminy naborów i nasze kroki w 7 dniach i 5 następnych, w poniedziałek 30 dni; 0 tokenów;
     # przy okazji odświeża out/KALENDARZ.md, out/finansowanie.ics i notatkę „kalendarz finansowania” w Mózgu
     script: terminy_rano.py
     no_agent: true
