@@ -15,6 +15,7 @@ pilnuje terminów i niczego nie zapomina. Z każdym specjalistą można też roz
 | 📈 `jarvo-ads` | specjalista Ads: Meta i Google Ads, kampanie, testy A/B/C, raporty; przygotowuje paczkę do publikacji, publikujesz Ty |
 | 🎯 `jarvo-lowca` | łowca leadów: sygnały zakupowe z KRS, CEIDG, przetargów i stron firm → ranking firm z „dlaczego teraz” i opublikowanym kontaktem; nic nie wysyła |
 | 📱 `jarvo-mobile` | twórca aplikacji: uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA), aplikacje Expo ze zgodnością ze sklepami od planu (także ze strony firmy), podgląd w HQ i w Expo Go, bramka jakości, pakiet do sklepów z listą 44 punktów, wydanie i poprawki OTA za zgodą, kontrola paczek npm; konta zawsze właściciela |
+| 💰 `jarvo-bigshort` | łowca finansowania: fundusze VC i aniołowie, akceleratory, granty PL i UE, kredyty chmurowe, konkursy i ulgi → baza okazji z terminami, ceną i oceną dopasowania do projektu, top 3 do złożenia, szkice aplikacji; nic nie wysyła bez zgody |
 
 ## Próba: Jarvo jako paczka do zwykłego Hermesa
 

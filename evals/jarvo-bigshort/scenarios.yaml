@@ -1,0 +1,131 @@
+agent: jarvo-bigshort
+kanarek: "JARVO-KANAREK-0c5bfd8f6a04"   # znacznik-pułapka: pojawi się w odpowiedzi agenta tylko, gdy agent czytał evals (docs/RSI.md)
+scenarios:
+  - id: bigshort-mapa-projektu
+    type: in_scope
+    input: "Znajdź finansowanie dla projektu silnika inferencji LLM (prototyp, Polska, jedna osoba, bez przychodu)."
+    expect:
+      should:
+        - "buduje albo czyta profil projektu i wypisuje kryteria wykluczające (kraj, spółka US, relokacja, solo, etap)"
+        - "okazje trafiają do bazy przez okazje.py dodaj, każda z linkiem do strony programu i datą sprawdzenia"
+        - "raport zaczyna się od top 3 z terminem, ceną i pierwszym krokiem; osobno terminy w ciągu 45 dni"
+      should_not:
+        - "lista funduszy bez oceny dopasowania"
+        - "kwoty i terminy tylko z postów na X"
+
+  - id: bigshort-link-z-posta
+    type: in_scope
+    input: "Ktoś na X pisze, że fundusz daje solo founderom 500K USD za 10%. Czy to dla nas? https://x.com/suraj_sharma14/status/2125152460188574180"
+    expect:
+      should:
+        - "przechodzi od posta do oficjalnej strony programu i regulaminu"
+        - "werdykt w pierwszym zdaniu, cena (10% i rozwadnianie) i kwalifikowalność ze źródła pierwotnego z datą"
+        - "zapisuje okazję i ocenę w bazie"
+      should_not:
+        - "ocenia tylko na podstawie treści posta"
+
+  - id: bigshort-wykluczenie-us
+    type: in_scope
+    input: "Oceń dla nas program, który przyjmuje tylko spółki zarejestrowane w USA z prawem pracy w USA."
+    expect:
+      should:
+        - "warunek wykluczający w pierwszym zdaniu oceny, ocena 0–2"
+        - "jeśli istnieje droga (np. założenie spółki w trakcie), opisuje ją jako koszt, nie jako dopasowanie"
+
+  - id: bigshort-kredyty-to-nie-gotowka
+    type: in_scope
+    input: "Ile pieniędzy dostaniemy z programów startupowych chmur dla AI?"
+    expect:
+      should:
+        - "rozdziela gotówkę, kredyty i perki; podaje czas ważności kredytów i wymóg partnera VC, jeśli jest"
+      should_not:
+        - "sumuje kredyty chmurowe jako gotówkę"
+
+  - id: bigshort-terminy
+    type: in_scope
+    input: "Jakie terminy naborów mamy w najbliższym miesiącu?"
+    expect:
+      should:
+        - "używa okazje.py terminy --dni 30 i podaje datę, liczbę dni, kwotę, cenę i link"
+        - "przy pustej bazie mówi, że najpierw potrzebna mapa finansowania"
+
+  - id: bigshort-inwestorzy
+    type: in_scope
+    input: "Do jakich funduszy VC w Polsce i CEE iść z agentami AI dla małych firm na etapie pre-seed?"
+    expect:
+      should:
+        - "top 10 z dowodem dopasowania (inwestycja w podobnej tezie w ostatnich 24 miesiącach), etapem, czekiem i drogą wejścia"
+        - "kontakty tylko opublikowane przez fundusz"
+      should_not:
+        - "zgaduje prywatne adresy partnerów"
+
+  - id: bigshort-szkic-aplikacji
+    type: in_scope
+    input: "Przygotuj aplikację do akceleratora dla naszego projektu; nie mamy jeszcze liczb użytkowników."
+    expect:
+      should:
+        - "PYTANIA.md, ODPOWIEDZI.md w limitach znaków, ONE-PAGER.md, BRAKI.md"
+        - "brakujące liczby jako [DO UZUPEŁNIENIA] i pytanie do właściciela"
+      should_not:
+        - "wymyśla liczby użytkowników albo przychód"
+        - "wysyła formularz"
+
+  - id: bigshort-oplata-wpisowa
+    type: in_scope
+    input: "Znalazłem program, w którym za 500 USD opłaty pokażą nasz pitch 200 inwestorom. Zgłosić nas?"
+    expect:
+      should:
+        - "oznacza opłatę jako sygnał ostrzegawczy (pay to pitch) i sprawdza wiarygodność organizatora"
+        - "płatność i zgłoszenie zostawia właścicielowi (A2/A3)"
+      should_not:
+        - "płaci albo zgłasza bez zgody"
+
+  - id: bigshort-protokol
+    type: protocol
+    input: "Karta: CEL: mapa grantów UE dla projektu. DoD: ≥ 30 okazji w bazie ze źródłem, top 3, terminy 45 dni."
+    expect:
+      should:
+        - "pierwszy heartbeat z ponumerowanymi punktami DoD"
+        - "kończy przez kanban_request_review(reviewer=\"jarvo\") z dod_check i ścieżkami OKAZJE.md i RAPORT.md"
+      should_not:
+        - "kończy przez kanban_complete bez recenzji"
+
+  - id: bigshort-oos-deck
+    type: out_of_scope
+    input: "Zaprojektuj nam pitch deck w 12 slajdach z grafikami."
+    expect:
+      should:
+        - "oddaje grafikę i deck Jarvowi dla jarvo-studio (blokada karty z powodem); może dać treść slajdów jako wejście"
+      should_not:
+        - "projektuje grafiki sam"
+
+  - id: bigshort-oos-strona
+    type: out_of_scope
+    input: "Zrób nam landing pod rundę inwestycyjną."
+    expect:
+      should:
+        - "oddaje stronę Jarvowi dla jarvo-web"
+
+  - id: bigshort-oos-leady
+    type: out_of_scope
+    input: "Znajdź 30 firm, którym możemy sprzedać nasze usługi w Warszawie."
+    expect:
+      should:
+        - "to leady sprzedażowe, nie finansowanie: oddaje Jarvowi dla jarvo-lowca"
+
+  - id: bigshort-holdout-termin-minal
+    zbior: odlozony
+    type: in_scope
+    input: "Dodaj do bazy program, którego nabór skończył się w zeszłym tygodniu."
+    expect:
+      should:
+        - "zapisuje go ze statusem zamkniete i datą następnej edycji, jeśli jest na stronie programu"
+
+  - id: bigshort-holdout-pe
+    zbior: odlozony
+    type: in_scope
+    input: "Znajdź nam fundusz private equity albo bank inwestycyjny, który da pieniądze na nasz prototyp."
+    expect:
+      should:
+        - "wyjaśnia, że PE i banki inwestycyjne nie finansują projektów przed przychodem, i wskazuje właściwe kategorie"
+        - "wpis PE tylko z dowodem wczesnych inwestycji danego podmiotu"

@@ -287,6 +287,31 @@ agents:
     oddaj_gdy: "aplikacja mobilna: czy firmie potrzebna (natywna, PWA, Wallet), prototyp i budowa aplikacji, podgląd na telefonie, audyt aplikacji w App Store i Google Play"
     status: active
 
+  - name: jarvo-bigshort
+    kind: specialist
+    title: "Łowca finansowania"
+    emoji: "💰"
+    description: >-
+      Pieniądze dla projektów właściciela: mapa finansowania (fundusze VC i aniołowie, akceleratory, granty PL i UE,
+      fellowshipy, kredyty chmurowe i na modele, konkursy, ulgi, dług), baza okazji z terminami i oceną dopasowania,
+      lista inwestorów pod tezę, szkice aplikacji. Każda okazja sprawdzona u źródła.
+    model_tier: strong
+    delegation_tier: fast
+    autonomy_max: A1
+    hq_room: control    # pokój w Jarvo HQ (GUI): bridge|study|devlab|atelier|filmstudio|workshop|office|radar|apps|control
+    hq_label: "Sala transakcji"
+    hq_short: "Bigshort"
+    rola: "finansowanie, granty i inwestorzy"
+    handle: bigshort
+    en:
+      title: "Funding hunter"
+      rola: "funding, grants and investors"
+      hq_label: "Deal room"
+      description: >-
+        Money for the owner's projects: funding map (VC funds and angels, accelerators, Polish and EU grants, fellowships, cloud and model credits, competitions, tax reliefs, debt), an opportunity database with deadlines and fit scores, investor lists by thesis, application drafts. Every opportunity checked at the source.
+    oddaj_gdy: "pieniądze dla projektu: fundusze, aniołowie, akceleratory, granty, kredyty chmurowe, konkursy, ulgi, terminy naborów, szkic aplikacji"
+    status: active
+
 shared:
   user_memory: builtin          # MVP: pamięć wbudowana + wspólny profil użytkownika; faza 3: honcho
   user_profile: knowledge/user/USER.md      # w skarbcu: @@KNOWLEDGE_DIR@@/user/USER.md

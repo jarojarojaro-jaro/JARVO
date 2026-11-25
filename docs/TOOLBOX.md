@@ -216,6 +216,18 @@ Wszystkie źródła bez kluczy. Odmowa źródła = blokada, bez obchodzenia; opi
 
 ---
 
+## `jarvo-bigshort`: Łowca finansowania
+
+| Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
+|---|---|---|---|---|
+| `okazje.py` | baza okazji finansowania w SQLite (biblioteka standardowa): dodaj bez dubli z walidacją źródła i dat, terminy, oceny projektów, eksport `OKAZJE.md` i CSV | własny kod | n/d | skrypt |
+| [EU Funding & Tenders API](https://ec.europa.eu/info/funding-tenders/opportunities/portal), [EDGAR](https://www.sec.gov/edgar/search/), [grants.gov](https://www.grants.gov/api) | nabory UE, świeże rundy funduszy (Form D), granty USA bez klucza | dane publiczne | n/d | `web_extract` / terminal |
+
+Bazy z zakazem automatyzacji w regulaminie (Crunchbase, Signal NFX, OpenVC) tylko ręcznie przez właściciela; agent
+przygotowuje filtry i sprawdza wyniki ([narzedzia-i-bazy.md](../profiles/jarvo-bigshort/skills/bigshort/mapa-finansowania/references/narzedzia-i-bazy.md)).
+
+---
+
 ## `jarvo`: szef floty
 
 | Narzędzie | Po co | Licencja | Ostatni commit | Integracja |

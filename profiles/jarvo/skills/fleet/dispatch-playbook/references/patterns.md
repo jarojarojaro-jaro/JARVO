@@ -96,3 +96,11 @@ Jedna karta na ekranie naraz (jeden ekran); kolejne ustaw jako `parents`. Haseł
 ## 12. Szybkie zadanie (pojedyncze)
 Jedna karta dla właściwego agenta, bez MISSION.md (tylko wpis w INDEX.md z ID `Z-…`). Dokument, konwersja pliku albo
 mały skrypt bez specjalisty robisz sam w rozmowie (skille `dokumenty`, `konwersja-plikow`, `szybki-prototyp`).
+
+## 13. Finansowanie projektu („szukaj pieniędzy”, link do programu albo funduszu)
+1. `jarvo-bigshort` / `mapa`: mapa finansowania projektu (skill `mapa-finansowania`): baza okazji z oceną, top 3, terminy 45 dni.
+   Pojedynczy link albo pytanie „czy to dla nas” → jedna karta `jarvo-bigshort` / `ocena` (skill `ocena-okazji`).
+2. Jarvo → decyzja użytkownika: do których okazji aplikujemy (domyślnie top 3).
+3. `jarvo-bigshort` / `aplikacja` (parents: mapa): szkic aplikacji na okazję; opcjonalnie `jarvo-studio` / `deck`
+   i `jarvo-web` / `strona` (parents: aplikacja), gdy program wymaga decku albo strony.
+Wysłanie aplikacji, konto na platformie, kontakt z funduszem = decyzja człowieka (A2); przegląd terminów jako rutyna tylko za zgodą.

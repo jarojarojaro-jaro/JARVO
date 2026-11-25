@@ -19,6 +19,7 @@ każdego agenta są w [TOOLBOX.md](TOOLBOX.md), a infrastruktura w [VPS.md](VPS.
 | `jarvo-ads` | [SOUL](../profiles/jarvo-ads/SOUL.md) | [11 w `skills/ads/`](../profiles/jarvo-ads/skills/ads) | 8 (marketingskills, wspólne `hooki`, `konwersja-plikow` i `odczyt-ekranu`) | ads, planer, eksperyment, eksport, paczka | [14](../evals/jarvo-ads/scenarios.yaml) |
 | `jarvo-lowca` | [SOUL](../profiles/jarvo-lowca/SOUL.md) | [7 w `skills/lowca/`](../profiles/jarvo-lowca/skills/lowca) | 3 (wspólne `konwersja-plikow`, `odczyt-ekranu` i `ostrozna-przegladarka`) | krs, ceidg, przetargi, strona, leady, zrodlo | [16](../evals/jarvo-lowca/scenarios.yaml) |
 | `jarvo-mobile` | [SOUL](../profiles/jarvo-mobile/SOUL.md) | [10 w `skills/mobile/`](../profiles/jarvo-mobile/skills/mobile) | 23 (Expo, React Native, ASO; wspólne `konwersja-plikow`, `odczyt-ekranu` i `warsztat-3d`; `vendor/skills.lock.yaml`) | audyt_mobilny, decyzja, zgodnosc, aplikacja, ikony, zrzuty, wrogie, urzadzenie, ios_ci, bramka, sklep_check, pakiet, kadry, wydanie, odrzucenie, ze_strony, utrzymanie, paczki (+ mobile_lib, szablon `expo-jarvo`, workflow iOS) | [34](../evals/jarvo-mobile/scenarios.yaml) |
+| `jarvo-bigshort` | [SOUL](../profiles/jarvo-bigshort/SOUL.md) | [6 w `skills/bigshort/`](../profiles/jarvo-bigshort/skills/bigshort) | 7 (wyszukiwarki, strony blokowane, RSS; wspólne `konwersja-plikow` i `odczyt-ekranu`; `vendor/skills.lock.yaml`) | okazje | [14](../evals/jarvo-bigshort/scenarios.yaml) |
 
 Mechanika szefa (misje, kolejka decyzji, patrol, sędziowanie): [BOSS.md](BOSS.md).
 
@@ -37,6 +38,7 @@ Legenda przy skillach:
 | `jarvo-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy | snajper | A1 (renderuje; publikacja i zakupy = A2) |
 | `jarvo-lowca` | Łowca leadów: firmy z sygnałem zakupowym i opublikowanym kontaktem | snajper | A1 (szuka i ocenia; wysyłka = decyzja człowieka) |
 | `jarvo-mobile` | Twórca aplikacji: natywna czy PWA, audyt mobilny, aplikacje Expo do sklepów | snajper | A1 (audyty i rekomendacje; konta sklepów i wysyłka = A2) |
+| `jarvo-bigshort` | Łowca finansowania: fundusze, akceleratory, granty, kredyty, baza okazji z terminami | snajper | A1 (research, baza, szkice aplikacji; wysłanie, konta i kontakt z funduszem = A2) |
 
 ---
 
@@ -59,6 +61,7 @@ bez polskich znaków (`@łowca` = `@lowca`) i opcjonalne pole `aliasy` (lista). 
 | `jarvo-ads` | `@ads` | reklamy Meta i Google |
 | `jarvo-lowca` | `@lowca` | nowi klienci z KRS i CEIDG |
 | `jarvo-mobile` | `@mobile` | aplikacje na telefon |
+| `jarvo-bigshort` | `@bigshort` | finansowanie, granty i inwestorzy |
 
 Pole `rola` (i `en.rola`) to krótka rola agenta, najwyżej 8 słów: aplikacja pokazuje ją w Ustawieniach › Zespół
 i w podpowiedzi kompozytora po wyborze adresata. `scripts/validate.py` pilnuje, żeby każdy aktywny agent miał
@@ -199,6 +202,7 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 | Film, reels, short, montaż, napisy, lektor, klipy, żywy schemat (animowany przepływ na post), explainer z wykresem albo tablicą, film w stylu malarza (Van Gogh, Klimt, jaskinia) | `jarvo-wideo` |
 | Leady, nowi klienci, „komu sprzedać”, przetargi do wzięcia, nowe firmy w branży, kontakt do firm | `jarvo-lowca` |
 | Aplikacja mobilna, „czy potrzebujemy aplikacji”, PWA czy natywna, audyt aplikacji w App Store i Google Play, aplikacja z naszej strony, aktualizacja albo poprawka aplikacji w sklepie | `jarvo-mobile` |
+| Pieniądze dla projektu: fundusz VC, aniołowie, akcelerator (YC itp.), grant PL albo UE, kredyty chmurowe, konkurs, ulga, termin naboru, link do programu „czy to dla nas”, szkic aplikacji | `jarvo-bigshort` |
 | Zadanie na ekranie albo telefonie: kliknij w panelu albo programie w przeglądarce, wypełnij formularz, przejdź stronę jak klient, przepisz dane z ekranu, załóż konto, zaloguj się, gdzie nie ma API | `jarvo` sam (wymaga włączonego Komputera: `jarvo komputer on`; telefon: `jarvo telefon on`); dłuższe niż kilka minut: karta kanbana przypisana do siebie (`assignee: jarvo`), żeby czat był wolny |
 | Szybkie sprawy, dokumenty, konwersje, sklejanie wyników, prototyp, „ogarnij to”, zadanie bez oczywistego snajpera | `jarvo` sam (`warsztat/`: `dokumenty`, `szybki-prototyp`) |
 | Praca ogólna do zrobienia naraz: przesiew długiej listy, sprawdzanie wielu stron, zbieranie danych | `jarvo` przez swoich podagentów `delegate_task` (do 3 naraz); nigdy na karty specjalistów spoza ich dziedziny |
@@ -537,6 +541,23 @@ wysłaniem i wyuczone z odrzuceń), `pakiet.py` (szkic karty, grafiki, zrzuty), 
 Submit i Metadata za zgodą), `odrzucenie.py` (wytyczne, odpowiedź, nauka), `ze_strony.py` (strona firmy → plan i szkice konfiguracji), `utrzymanie.py`
 (stan, kalendarz terminów, EAS Update za zgodą, plan SDK), `paczki.py` (paczki npm przed instalacją); szablony `templates/expo-jarvo/`
 i `templates/ci/jarvo-ios.yml`.
+
+## `jarvo-bigshort`: Łowca finansowania
+
+Szuka pieniędzy dla projektów właściciela i pilnuje, żeby żadne nie przeszły obok. Pracuje na profilu projektu
+(`projekty/<projekt>.yaml`: etap, kraj, forma prawna, zespół, potrzeba, zgoda na udziały, relokacja) i zaczyna od
+warunków wykluczających (spółka w USA, relokacja, etap, solo). Mapa finansowania obejmuje 14 kategorii: granty PL
+(PARP, NCBR, regiony) i UE (EIC, Horizon, EIT), fundusze VC PL, CEE i globalne z otwartym formularzem, aniołów
+i syndykaty, akceleratory, fellowshipy, granty open source, kredyty chmurowe i na modele, konkursy, ulgi (IP Box, B+R),
+dług i finansowanie przychodem, crowdfunding; PE i banki inwestycyjne tylko z dowodem wczesnych inwestycji. Każda
+okazja idzie do bazy SQLite (`okazje.py`) ze stroną programu jako źródłem, datą sprawdzenia, kwotą, ceną (equity,
+SAFE, wkład własny) i terminem, z oceną dopasowania 0–10 i powodem dla każdego projektu. Raport zaczyna się od top 3
+do złożenia najpierw. Wysłanie aplikacji, konto na platformie i kontakt z funduszem tylko za zgodą właściciela.
+
+**Skille:** `mapa-finansowania` (+ kategorie, źródła PL i UE, źródła globalne, narzędzia i bazy, metody),
+`baza-okazji`, `ocena-okazji`, `lista-inwestorow`, [A2] `pakiet-aplikacji`, `przeglad-okazji` (+ źródła obserwowane);
+7 skilli zewnętrznych. Skrypt: `okazje.py` (dodaj bez dubli z walidacją źródła i dat, lista, terminy, ocen, status,
+stare, eksport `OKAZJE.md` i `okazje.csv`).
 
 ---
 

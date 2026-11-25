@@ -1,0 +1,16 @@
+# Manifest narzędzi Bigshorta. okazje.py używa tylko biblioteki standardowej Pythona (sqlite3, csv, json),
+# więc agent nie ma własnych narzędzi do instalacji; wyszukiwarka i przeglądarka to narzędzia Hermesa.
+
+agent: jarvo-bigshort
+
+tools: []
+sidecars: []
+hermes_skills:
+  - skills/web/blocked-page-recovery
+  - optional-skills/research/searxng-search
+  - optional-skills/research/duckduckgo-search
+  - optional-skills/research/rss-feeds
+  - optional-skills/research/blogwatcher
+hermes_plugins: []
+mcp_servers: []
+env_requires: []
