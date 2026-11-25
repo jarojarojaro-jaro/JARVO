@@ -2466,7 +2466,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-rap-data small { grid-column: 1; color: var(--j-tekst-2); font: 400 11px/16px var(--j-font-mono); }
 .j-rap-data-i { display: none; grid-row: 1 / span 2; grid-column: 2; color: var(--j-tekst-3); }
 .j-rap-uklad { display: grid; grid-template-columns: minmax(0, 1fr) 296px; gap: 8px; align-items: start; }
-.j-rap-lista { min-width: 0; display: grid; gap: 8px; }
+.j-rap-lista { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }   /* kolumna auto rosła do nagłówka raportu: telefon przesuwał się w bok */
 .j-rap-bok { position: sticky; top: 0; display: grid; gap: 8px; }
 /* raport: moduł z nagłówkiem, treścią w sekcjach i stopką za rowkiem */
 .j-rap-r { position: relative; padding: 0 24px; background: var(--j-stal), var(--j-tlo-pasek); box-shadow: var(--j-cien-1); --j-nr: "03"; }
