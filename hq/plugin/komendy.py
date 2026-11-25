@@ -70,7 +70,8 @@ MODELE_NA_DOSTAWCE = 8
 DOSTAWCY_MAKS = 8
 KANDYDACI_MAKS = 12
 DO_ZATRZYMANIA = ("wysylanie", "przyjety", "pracuje", "czeka_na_ture", "czeka_na_zgode", "zatrzymywanie")
-KOMENDA_CZEKAJ_S = 20.0          # tyle trasa czeka na wynik komendy skrzynki omp, potem wynik przychodzi drugim wpisem
+KOMENDA_CZEKAJ_S = 2.0           # tyle trasa czeka na wynik komendy skrzynki omp (wpis „trwa” widać od razu), potem
+                                 # wynik przychodzi drugim wpisem (25.11: przy 20 s kliknięcie nic nie pokazywało)
 KOMENDA_MAKS_S = 900.0           # dłużej komenda skrzynki nie może trwać (potem wpis „nie skończyła się”)
 OKNO_PAMIEC_S = 600.0            # okno kontekstu modelu pamiętane 10 min (metadane Hermesa mogą pytać sieci)
 KATALOG_OMP_S = 6 * 3600.0       # katalog modeli omp (okna, poziomy myślenia) odświeżany co 6 h, w tle
@@ -387,6 +388,7 @@ class Wykonawca:
         self._okna: dict[tuple, tuple[float, dict]] = {}
         self._omp_katalog: dict[str, dict] = {}      # selektor modelu omp → {okno, myslenie, nazwa, provider}
         self._omp_katalog_at, self._omp_katalog_trwa = 0.0, False
+        self._omp_trwa: set[tuple] = set()          # (sesja omp, komenda) w toku: druga taka sama nie idzie do skrzynki
 
     def katalog_omp(self) -> dict[str, dict]:
         """Katalog modeli omp z pamięci (okno kontekstu, poziomy myślenia, lista do wyboru); `omp models --json`
@@ -450,17 +452,26 @@ class Wykonawca:
         omp, w = self.m.omp_sesje, k.wpis_omp
         if w is None or getattr(w, "blad", ""):
             return blad("Sesja omp tej rozmowy jest niedostępna.", "This conversation's omp session is unavailable.")
+        trwa = (getattr(w, "klucz", "") or id(w), nazwa)
+        if trwa in self._omp_trwa:            # druga ta sama komenda w trakcie pierwszej (25.11: dwa /compact naraz)
+            return Wynik().linia(f"{_kod('/' + nazwa)} już trwa w sesji omp {k.nazwa}; wynik pojawi się tutaj.",
+                                 f"{_kod('/' + nazwa)} is already running in {k.nazwa}'s omp session; the result will "
+                                 "appear here.")
         klucz = k.klucz or os.urandom(8).hex()
         try:
             await asyncio.to_thread(omp.komenda, w, nazwa, args, klucz)
         except Exception as exc:
             return blad(f"Skrzynka sesji nie przyjęła {_kod('/' + nazwa)} ({str(exc)[:120] or type(exc).__name__}).",
                         f"The session inbox did not accept {_kod('/' + nazwa)} ({str(exc)[:120] or type(exc).__name__}).")
+        self._omp_trwa.add(trwa)
         st = await self._czekaj_na_komende(w, klucz, self.czekaj_s)
         if st is not None:
+            self._omp_trwa.discard(trwa)
             return self._wynik_omp(nazwa, st)
-        if k.po_czasie is not None:
-            k.sil.rejestr.zadanie(self._dokoncz_omp(k, nazwa, klucz))
+        if k.po_czasie is None:
+            self._omp_trwa.discard(trwa)
+        else:
+            k.sil.rejestr.zadanie(self._dokoncz_omp(k, nazwa, klucz, trwa))
         return Wynik().linia(f"{_kod('/' + nazwa)} trwa w sesji omp {k.nazwa}; wynik pojawi się tutaj, gdy się skończy.",
                              f"{_kod('/' + nazwa)} is running in {k.nazwa}'s omp session; the result will appear here "
                              "when it finishes.")
@@ -478,8 +489,11 @@ class Wykonawca:
                 return None
             await asyncio.sleep(self.odstep_s)
 
-    async def _dokoncz_omp(self, k: Kontekst, nazwa: str, klucz: str) -> None:
-        st = await self._czekaj_na_komende(k.wpis_omp, klucz, self.maks_s)
+    async def _dokoncz_omp(self, k: Kontekst, nazwa: str, klucz: str, trwa: tuple) -> None:
+        try:
+            st = await self._czekaj_na_komende(k.wpis_omp, klucz, self.maks_s)
+        finally:
+            self._omp_trwa.discard(trwa)
         wynik = self._wynik_omp(nazwa, st) if st is not None else blad(
             f"{_kod('/' + nazwa)} nie skończyła się w {int(self.maks_s // 60)} min. Stan sesji: {_kod('/context')}.",
             f"{_kod('/' + nazwa)} did not finish within {int(self.maks_s // 60)} min. Session state: {_kod('/context')}.")
@@ -1142,7 +1156,7 @@ def dolacz(router, *, m, trasy, silnik: Callable[[], Any], agenci, hub, log: Cal
             return {"wynik": {**wynik.dane(), "polecenie": polecenie, "agent": k.agent}, "wpis": w}
 
         async def _raz():
-            # ten sam klucz w trakcie wykonania (ponowione żądanie, gdy komenda skrzynki czeka do 20 s): to samo
+            # ten sam klucz w trakcie wykonania (ponowione żądanie, gdy komenda skrzynki czeka do 2 s): to samo
             # wykonanie, bez drugiej komendy
             if not k.watek:
                 return await _r()

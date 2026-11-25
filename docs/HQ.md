@@ -1219,8 +1219,9 @@ innych kanałów etap 6.
   `/status`, `/help`. omp: `/model` (`omp models --json`, wybór w `<skrzynka>/model.json` dla tur skrzynki), `/effort`
   i `/fast` (`myslenie`, `fast` w tym samym pliku; skrzynka wysyła `set_thinking_level` i `set_fast_mode` do procesu
   RPC przed turą, poziomy z katalogu omp), `/compact` (`/compress`,
-  opcjonalnie instrukcje: komenda RPC skrzynki `omp_sesje.komenda`, także w trakcie tury; wynik po najwyżej 20 s,
-  dłuższa kompresja dopisuje drugi wpis z wynikiem po końcu), komendy zgłoszone przez skrzynkę (`komendy_omp`),
+  opcjonalnie instrukcje: komenda RPC skrzynki `omp_sesje.komenda`, także w trakcie tury; wynik po najwyżej 2 s,
+  dłuższa kompresja od razu wpis „trwa”, a po końcu drugi wpis z wynikiem; druga taka sama komenda w trakcie
+  pierwszej nie idzie do skrzynki, tylko odpowiada „już trwa”), komendy zgłoszone przez skrzynkę (`komendy_omp`),
   `/stop`, `/usage`, `/context` i `/status`, `/help`. Niedostępne: `/compress` dla Hermesa (brama API nie ma
   kompresji na żądanie, a ręczna kompresja `_run_manual_compression` żyje tylko w GatewayRunnerze kanałów: tymczasowy
   AIAgent z poświadczeniami profilu, blokada kompresji, rotacja sesji; potrzebna trasa bramy, np.

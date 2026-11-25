@@ -290,17 +290,20 @@ def test_omp_compact_komendy_skrzynki_i_licznik(tmp_path, monkeypatch):
         d1 = (await wyk.wykonaj(k, *K.parsuj("/compress skup się na GPU"))).dane()
         k.klucz = "kC2"
         d2 = (await wyk.wykonaj(k, *K.parsuj("/compact"))).dane()          # dłużej niż czekaj_s: wynik drugim wpisem
+        k.klucz = "kC2b"
+        d2b = (await wyk.wykonaj(k, *K.parsuj("/compact"))).dane()         # drugie kliknięcie w trakcie: bez drugiej kompresji
         wyniki["kC2"] = {"stan": "blad", "wynik": "", "blad": "lock held"}
         await asyncio.gather(*zadania)
         k.klucz, wyniki["kC3"] = "kC3", {"stan": "gotowe", "wynik": "plik.md", "blad": None}
         d3 = (await wyk.wykonaj(k, *K.parsuj("/export"))).dane()
         pomoc = (await wyk.wykonaj(k, "help", "")).dane()
-        return d1, d2, d3, pomoc, await wyk.licznik(k), (await wyk.wykonaj(k, "context", "")).dane()
+        return d1, d2, d2b, d3, pomoc, await wyk.licznik(k), (await wyk.wykonaj(k, "context", "")).dane()
 
-    d1, d2, d3, pomoc, lic, ctx = asyncio.run(scenariusz())
+    d1, d2, d2b, d3, pomoc, lic, ctx = asyncio.run(scenariusz())
     assert komendy[0] == ("compact", "skup się na GPU", "kC1")
     assert d1["ok"] and "skompresowany" in d1["wynik"] and "120k" in d1["wynik"]
     assert d2["ok"] and "trwa" in d2["wynik"] and len(po) == 1
+    assert "już trwa" in d2b["wynik"] and [c[2] for c in komendy].count("kC2b") == 0
     assert not po[0].ok and "lock held" in po[0].dane()["wynik"]
     assert komendy[2][0] == "export" and "plik.md" in d3["wynik"] and "/export" in pomoc["wynik"]
     assert lic["zaplecze"] == "omp" and lic["procent"] == 25.0 and lic["okno"] == 200_000 and not lic["szacunek"]

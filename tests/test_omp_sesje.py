@@ -81,8 +81,11 @@ def test_stan(w, tmp_path, monkeypatch):
     assert s["stan"] == "kolejka" and s["czeka"] == 1
     with w.blokada.open("a") as f:
         fcntl.flock(f, fcntl.LOCK_EX)
-        assert om.stan(w)["stan"] == "terminal"
+        assert om.stan(w)["stan"] == "pracuje"           # skrzynka bierze wiadomość, procesu RPC jeszcze nie ma
+        om.zapisz_stan(w, terminal={"pid": os.getpid(), "omp": os.getpid(), "od": time.time()})
+        assert om.stan(w)["stan"] == "terminal"          # blokadę trzyma żywy terminal
         assert om.przebieg(w, "k1")["terminal"] is True
+        om.zapisz_stan(w, terminal=None)
     (tmp_path / "atrapa" / "held.json").write_text(json.dumps([w.sesja]))
     om._dzierzawy.clear()
     assert om.stan(w)["stan"] == "terminal"
