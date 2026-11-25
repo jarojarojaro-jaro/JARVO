@@ -58,7 +58,9 @@ const Os = (() => {
 
   // ------------------------------------------------------------------------------------------- oś wątku
   // strona osi: `kierunek` "przed" (starsze, na początek), "po" (nowsze, na koniec) albo brak (najnowsza strona).
-  // Pozycje o znanym id podmieniane w miejscu; `pelny` (kompresja) zastępuje wszystko.
+  // Pozycje o znanym id podmieniane w miejscu; `pelny` (kompresja) zastępuje wszystko. Nowe wiersze agenta ze strony
+  // „po” stają przed wpisami panelu o późniejszym czasie, jak w scalaniu serwera (25.11: odpowiedź Jarva z 876,25
+  // przyszła po wpisie właściciela z 876,37, który osWpis dał już na koniec, i stała pod nim).
   function osStrona(os, odp, kierunek) {
     const stare = (os && !odp.pelny && kierunek) ? os.pozycje : [];
     const wgId = new Map(stare.map((p, i) => [p.id, i]));
@@ -67,7 +69,16 @@ const Os = (() => {
       if (wgId.has(p.id)) pozycje[wgId.get(p.id)] = p;
       else { wgId.set(p.id, -1); nowe.push(p); }
     }
-    const out = kierunek === "przed" ? nowe.concat(pozycje) : pozycje.concat(nowe);
+    if (kierunek !== "po") return strona(os, odp, kierunek, kierunek === "przed" ? nowe.concat(pozycje) : pozycje.concat(nowe));
+    const out = pozycje;
+    for (const p of nowe) {
+      let j = out.length;
+      if (!p.wpis) while (j > 0 && out[j - 1].wpis && (out[j - 1].ts || 0) > (p.ts || 0)) j--;
+      out.splice(j, 0, p);
+    }
+    return strona(os, odp, kierunek, out);
+  }
+  function strona(os, odp, kierunek, out) {
     return {
       pozycje: out, laduje: false,
       przed: kierunek === "po" && os ? os.przed : odp.przed || null,

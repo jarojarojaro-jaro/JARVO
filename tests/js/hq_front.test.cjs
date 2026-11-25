@@ -263,6 +263,14 @@ test("Os.osStrona: najnowsza, starsze, nowsze, podmiana po id, pełna", () => {
   os = Os.osStrona(os, { pozycje: [p("q")], pelny: true, po: "kn3" }, "po");
   eq(os.pozycje.map((x) => x.id), ["q"]);
 });
+test("Os.osStrona: spóźniona odpowiedź agenta staje przed późniejszą wiadomością właściciela (25.11)", () => {
+  // 25.11: pytanie wysłane 0,1 s po odpowiedzi Jarva stało nad nią, bo wpis był już na końcu, a odpowiedź przyszła
+  // stroną „po” później; kolejność jak na osi serwera, czyli po czasie
+  let os = Os.osStrona(null, { pozycje: [{ id: "e1", rodzaj: "wlasciciel", ts: 867.22, wpis: {} }], po: "k1" });
+  os = Os.osWpis(os, { id: "e2", rodzaj: "wlasciciel", tekst: "dysk?", utworzony_at: 876.37 });
+  os = Os.osStrona(os, { pozycje: [p("k1", { rodzaj: "kroki", ts: 869.89 }), p("a1", { ts: 876.25 }), p("a2", { ts: 880.59 })], po: "k2" }, "po");
+  eq(os.pozycje.map((x) => x.id), ["e1", "k1", "a1", "e2", "a2"]);
+});
 test("Os.osWpis: nowy wpis na koniec, znany podmieniony", () => {
   const os = Os.osStrona(null, { pozycje: [p("a")] });
   const wpis = { id: "m1", rodzaj: "wlasciciel", tekst: "hej", utworzony_at: 5 };
