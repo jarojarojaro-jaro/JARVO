@@ -541,7 +541,7 @@ function MozgWidok() {
   }, [hash]);
   const wGore = (stan) => {
     const h = mozgHash(stan);
-    if (h === poprz) history.back();
+    if (h === poprz && !Trasa.bezHistorii) history.back();    // iPhone: panel bez wpisów historii (03-trasa.js)
     else { wGoreZ.current = poprz; location.replace(h); }
   };
 
@@ -588,7 +588,12 @@ function MozgWidok() {
   };
   const cofnij = mapa && mozgWstecz(poprz, s, !!(kat && kat.grupy.length > 1));
   const wstecz = cofnij && { napis: nazwaStanu(cofnij.stan), href: cofnij.historia ? poprz : mozgHash(cofnij.stan),
-    klik: (e) => { e.preventDefault(); if (cofnij.historia) history.back(); else wGore(cofnij.stan); } };
+    klik: (e) => {
+      e.preventDefault();
+      if (cofnij.historia && Trasa.bezHistorii) Trasa.idz(poprz);
+      else if (cofnij.historia) history.back();
+      else wGore(cofnij.stan);
+    } };
   const centrum = z.klucz === "jarvo" ? "JARVO" : z.klucz.toUpperCase();
   klik.current = {
     centrum, podpis: mapa ? `${mapa.kat.reduce((a, d) => a + d.ile, 0)} ${L("notatek", "notes")}` : "",

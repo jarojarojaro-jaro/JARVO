@@ -67,12 +67,30 @@ const Trasa = (() => {
   const powiadom = () => sluchacze.forEach((f) => f());
   const biezaca = () => parsuj(location.hash);
 
+  // iPhone i iPad: przesunięcie od lewej krawędzi to systemowe „wstecz” Safari, którego strona nie zatrzyma; z wpisami
+  // historii w panelu ten sam ruch otwierał pasek i cofał widok naraz (26.11: „double swipe”). Tam przejścia w panelu
+  // zastępują wpis zamiast dokładać nowy, więc krawędź otwiera tylko pasek.
+  const bezHistorii = typeof navigator !== "undefined" && (/iPad|iPhone|iPod/.test(navigator.userAgent || "")
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+
   // przejście: obiekt trasy, zmiana częściowa ({...biezaca, ...zmiana}) albo gotowy hash
   function idz(cel, { zastap = false, scal = false } = {}) {
     const hash = typeof cel === "string" ? cel : zbuduj(scal ? { ...biezaca(), ...cel } : cel);
     if (hash === (location.hash || "#/")) return;
-    if (zastap) { history.replaceState(history.state, "", location.pathname + location.search + hash); powiadom(); }
-    else location.hash = hash;
+    if (zastap || bezHistorii) {
+      history.replaceState(zastap ? history.state : null, "", location.pathname + location.search + hash);
+      powiadom();
+    } else location.hash = hash;
+  }
+  // linki panelu (#/…) na iPhonie też zastępują wpis: przechwycenie kliknięcia, zanim przeglądarka doda wpis historii
+  if (bezHistorii && typeof document !== "undefined") {
+    document.addEventListener("click", (e) => {
+      const a = e.target && e.target.closest && e.target.closest("a[href^='#/']");
+      if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey
+        || (a.target && a.target !== "_self")) return;
+      e.preventDefault();
+      idz(a.getAttribute("href"));
+    });
   }
 
   function sluchaj(f) {
@@ -105,7 +123,7 @@ const Trasa = (() => {
     if (h && h !== "#/" && (!location.hash || location.hash === "#/")) idz(zbuduj(parsuj(h)), { zastap: true });
   }
 
-  return { parsuj, zbuduj, biezaca, idz, sluchaj, zapamietaj, przywroc };
+  return { parsuj, zbuduj, biezaca, idz, sluchaj, zapamietaj, przywroc, bezHistorii };
 })();
 
 // trasa w komponencie: przerysowanie przy każdej zmianie hasha
