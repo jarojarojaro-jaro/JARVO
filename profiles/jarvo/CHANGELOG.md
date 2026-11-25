@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Aktualizacje na telefonie mieszczą się w szerokości ekranu: długi tytuł raportu skraca się wielokropkiem, a strona nie przesuwa się w bok.
 - Na iPhonie i iPadzie przejścia w panelu nie dokładają wpisów historii Safari, więc przesunięcie od lewej krawędzi otwiera tylko pasek rozmów, bez drugiego „wstecz”.
 - „Skompresuj teraz” w panelu od razu pokazuje w rozmowie, że kompresja trwa, a drugie kliknięcie w trakcie nie zaczyna drugiej kompresji; rozmówca omp, który bierze wiadomość z panelu, ma stan „pracuje”, nie „w terminalu”.
 - Wiadomość właściciela w panelu stoi po prawej, na jaśniejszej, chłodniejszej płycie z białą krawędzią z prawej, więc nie ginie między odpowiedziami agenta po lewej.
