@@ -25,7 +25,7 @@ metadata:
 | baza hackathonów | tak | najpierw `radar-hackatonow` |
 
 ## Kroki
-1. **Szukaj nowych hackathonów:** `"$HERMES_HOME/scripts/zrodla.py"` (dzienne agregatory porównane z bazą); z listy
+1. **Szukaj nowych hackathonów:** `"$HERMES_HOME/scripts/agregatory.py"` (dzienne agregatory porównane z bazą); z listy
    „do sprawdzenia” każdy hackathon z AI albo pulą od 20 000 USD sprawdź na stronie zasad i wpisz do bazy (`dodaj`,
    `ocen` z powodem); wpisy z `hackatony.py stare --dni 14` sprawdź u źródła, a te, w które już nie wejdziemy,
    `status … odpuszczony` z powodem.

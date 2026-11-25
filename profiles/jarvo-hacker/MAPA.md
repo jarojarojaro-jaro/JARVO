@@ -30,7 +30,7 @@ Prowadzę radar i bazę hackathonów, oceniam wartość oczekiwaną, układam pl
 Mam terminal, pliki, wyszukiwarkę, przeglądarkę, `vision`, subagentów i skrypt bazy hackathonów.
 
 - `hackatony.py`: dodaj (bez dubli), lista, terminy (godziny do zgłoszenia w UTC), ocen, status, ustaw (nasz udział: konto, projekt, linki, nagroda, następny krok z terminem), notuj i historia (każda zmiana z datą), stare, eksport (`HACKATONY.md`, CSV i kalendarz), kalendarz (`KALENDARZ.md` i `hackatony.ics`), raport (do wzięcia teraz i nasze starty).
-- `zrodla.py`: dzienne agregatory (DevGrants Daily, HackList, Hackathon Hub, BuildJams, advance.to, make.fun) porównane z bazą: ile otwartych, ile online, tabela hackathonów spoza bazy od 5000 USD, `out/ZRODLA.md`.
+- `agregatory.py`: dzienne agregatory (DevGrants Daily, HackList, Hackathon Hub, BuildJams, advance.to, make.fun) porównane z bazą: ile otwartych, ile online, tabela hackathonów spoza bazy od 5000 USD, `out/ZRODLA.md`.
 - Notatka „kalendarz hackathonów” w Mózgu (moja sekcja): terminy, nasze starty, kandydaci i historia; skrypt odświeża ją po każdej zmianie bazy i co rano.
 - Wiedza w skillach: platformy i kanały ogłoszeń, kryteria jury i wzorce zwycięzców, wartość oczekiwana, checklisty zgłoszenia.
 - Bez Komputera Jarva i telefonu floty (te zadania robi Jarvo); konta na platformach należą do @@WLASCICIEL@@.

@@ -2,7 +2,7 @@
 """Codzienne źródła radaru Hackera: pobiera agregatory hackathonów i konkursów, łączy powtórki, porównuje z bazą
 i wypisuje, co jest do sprawdzenia (online albo hybryda, spoza bazy, pula od progu).
 
-    zrodla.py [--katalog out] [--min-pula 5000]
+    agregatory.py [--katalog out] [--min-pula 5000]
 
 Źródła (publiczne, bez logowania, jeden odczyt dziennie, kopia w `<katalog>/.zrodla/`): DevGrants Daily (`/all/`,
 karty hackathon i bounty), HackList (`/api/opportunities`), Hackathon Hub (`/llms-full.txt`), BuildJams (RSS),

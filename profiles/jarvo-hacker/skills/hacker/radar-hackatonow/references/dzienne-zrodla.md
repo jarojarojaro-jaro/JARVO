@@ -7,7 +7,7 @@ reviewed: "2026-11-25"
 
 Jedno żądanie na źródło dziennie, UA przeglądarki; przy 429 albo 503 źródło jest „niesprawdzone”, bez ponawiania.
 
-## Czyta `zrodla.py` (codziennie, z porównaniem z bazą)
+## Czyta `agregatory.py` (codziennie, z porównaniem z bazą)
 
 | Źródło | Adres | Format | Uwaga |
 |---|---|---|---|

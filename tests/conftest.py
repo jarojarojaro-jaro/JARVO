@@ -141,6 +141,15 @@ def _bez_starej_instalacji(monkeypatch):
     monkeypatch.setattr(instalator, "wykryj_stara", lambda u, ot: None)
 
 
+@pytest.fixture(autouse=True)
+def _bez_danych_jarva(monkeypatch):
+    """Test nie widzi danych i skarbca żywego Jarva z otoczenia terminala (25.11: `JARVO_KNOWLEDGE_DIR` w powłoce
+    operatora i testy Hackera i Bigshorta nadpisały notatki kalendarzy w Mózgu danymi testowymi); kto ich potrzebuje,
+    ustawia je w teście na `tmp_path`."""
+    monkeypatch.delenv("JARVO_DATA_DIR", raising=False)
+    monkeypatch.delenv("JARVO_KNOWLEDGE_DIR", raising=False)
+
+
 # Obsługa sygnałów to stan całego procesu testów: test, który ją zmienia i nie przywraca, psuje wszystkie następne.
 # 18.11: zrodlo.main() w teście ustawiało SIGPIPE=SIG_DFL; potem pierwszy zapis do zamkniętego potoku zabijał worker
 # xdist bez śladu („node down: Not properly terminated” w losowym teście, ~95% biegów -n 4). SIGKILL i SIGSTOP

@@ -1,4 +1,4 @@
-"""Hacker: codzienne źródła radaru (zrodla.py) na danych testowych, bez sieci."""
+"""Hacker: codzienne agregatory radaru (agregatory.py) na danych testowych, bez sieci."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "profiles" / "jarvo-hacker" / "scripts"))
 import hackatony  # noqa: E402
-import zrodla  # noqa: E402
+import agregatory  # noqa: E402
 
 DZIS = dt.date(2026, 11, 25)
 
@@ -26,7 +26,7 @@ DZIS = dt.date(2026, 11, 25)
     ("Prizes: See official page", None),
 ])
 def test_pula_w_usd_z_tekstu_agregatora(tekst, usd):
-    assert zrodla.pula_usd(tekst) == usd
+    assert agregatory.pula_usd(tekst) == usd
 
 
 @pytest.mark.parametrize("tekst, dzien", [
@@ -36,7 +36,7 @@ def test_pula_w_usd_z_tekstu_agregatora(tekst, usd):
     ("Varies", None),
 ])
 def test_termin_z_tekstu_agregatora(tekst, dzien):
-    assert zrodla.data(tekst) == dzien
+    assert agregatory.data(tekst) == dzien
 
 
 def karta(href: str, typ: str, tytul: str, kwota: str, termin: str, opis: str) -> str:
@@ -83,7 +83,7 @@ def uruchom(tmp_path: Path, odpowiedzi: dict[str, str], wolania: list[str] | Non
                 return tresc
         raise OSError("brak odpowiedzi")
 
-    assert zrodla.main(["--baza", str(baza), "--katalog", str(tmp_path / "out")], dzis=DZIS, pobieracz=pobieracz) == 0
+    assert agregatory.main(["--baza", str(baza), "--katalog", str(tmp_path / "out")], dzis=DZIS, pobieracz=pobieracz) == 0
     return json.loads((tmp_path / "out" / "zrodla.json").read_text(encoding="utf-8"))
 
 
