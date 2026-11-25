@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Wiadomość właściciela w panelu stoi po prawej, na jaśniejszej, chłodniejszej płycie z białą krawędzią z prawej, więc nie ginie między odpowiedziami agenta po lewej.
 - Tabela w czacie z tekstem w ostatniej kolumnie nie ściska już pozostałych kolumn do jednej litery w linii: czcionkę liczb i brak łamania dostają tylko kolumny z samymi liczbami.
 - Raport rutyny agenta z własnym wątkiem trafia też do jego rozmowy w panelu (także zanim ktoś napisze w temacie), bez nieudanej kopii w UPDATES, a Hacker i Bigshort raportują codziennie, co jest do wzięcia.
 - Odpowiedź agenta w panelu stoi na stalowej płycie z krawędzią w kolorze agenta i jasnym tekstem, więc wynik nie wygląda już jak szary tekst myślenia.

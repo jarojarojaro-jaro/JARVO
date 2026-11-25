@@ -554,7 +554,11 @@ def test_file_i_siec_lokalna_zablokowane(przegl):
     serwer.settimeout(0.5)
     try:
         otworz(st, f"http://127.0.0.1:{port}/panel")
-        time.sleep(1.5)
+        # czekamy na blokadę w filtrze, nie stałą chwilę: pod obciążeniem (6 procesów testów na 4 vCPU) Chrome wysyła
+        # żądanie później niż po 1,5 s (25.11: zablokowane 0 > 0)
+        koniec = time.monotonic() + 20
+        while proxy.statystyki.zablokowane <= przed and time.monotonic() < koniec:
+            time.sleep(0.1)
         with pytest.raises((TimeoutError, socket.timeout)):
             serwer.accept()                         # przeglądarka nie dotarła do serwera na pętli zwrotnej
     finally:
