@@ -248,6 +248,17 @@ def test_dopisek_w_trakcie_tury(w, at):
     assert om.dopisz(w, "po wszystkim", "k4")["tryb"] == "kolejka"
 
 
+def test_tura_bez_wiadomosci_przyjmuje_dopisek(w):
+    """26.11: Kernel był 1,5 h w turze, którą omp zaczął sam (wynik zadania w tle), a wiadomość właściciela z panelu
+    czekała w kolejce. Taka tura bierze dopisek i miejsce odpowiedzi z niego; zwykła wiadomość nadal czeka."""
+    s = type("S", (), {"w": w, "rpc": None})()
+    t = so.Tura(s, [], None)
+    om.wyslij(w, "zwykła", "k1")
+    om.dopisz(w, "dawaj, działaj", "k2")
+    t._zbierz_dopiski()
+    assert list(t.dopiski) == [f"{om._plik_klucza('k2')}"] and t.gdzie == so.cel(w, {})
+
+
 def test_niedostarczony_dopisek_wraca_jako_tura(w, at):
     (at / "tryb").write_text("nie_dostarczaj")
     om.wyslij(w, "pierwsza", "k1")

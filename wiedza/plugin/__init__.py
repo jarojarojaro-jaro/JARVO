@@ -156,7 +156,8 @@ def blokada_bez_ciszy(**kwargs) -> Optional[str]:
         logger.warning("jarvo-wiedza: filtr briefu niedostępny: %s", e)
     try:
         if isinstance(wynik, str):
-            wynik = _modul("jarvo_styl", "styl.py").bez_myslnikow(wynik)
+            styl = _modul("jarvo_styl", "styl.py")
+            wynik = styl.bez_karty(styl.bez_myslnikow(wynik))
     except Exception as e:
         logger.warning("jarvo-wiedza: styl odpowiedzi niedostępny: %s", e)
     return wynik if isinstance(wynik, str) and wynik and wynik != tekst else None

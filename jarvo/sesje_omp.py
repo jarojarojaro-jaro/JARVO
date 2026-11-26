@@ -578,7 +578,7 @@ class Tura:
             self.sigterm = True
             log(self.w, f"tura {self.id}: omp nie kończy tury po stopie, SIGTERM")
             self.s.rpc.proc.terminate()
-        if self.wynik is None and self.zatrzymana is None and self.gdzie is not None:
+        if self.wynik is None and self.zatrzymana is None:
             self._zbierz_dopiski()
         while True:
             try:
@@ -596,7 +596,9 @@ class Tura:
 
     def _zbierz_dopiski(self) -> None:
         """Wiadomość z `steer` (panel: dopisz) albo z Telegrama, na to samo miejsce odpowiedzi co tura. Skrypty
-        (czuwanie, turbo) i zwykłe wiadomości panelu czekają na własną turę."""
+        (czuwanie, turbo) i zwykłe wiadomości panelu czekają na własną turę. Tura, którą omp zaczął sam (wynik zadania
+        w tle), bierze miejsce odpowiedzi z pierwszego dopisku (26.11: Kernel w takiej turze 1,5 h, wiadomość
+        właściciela czekała w kolejce)."""
         znane = {p.name for p, _ in self.partia} | set(self.dopiski) | self.pominiete
         for p in rdzen.czekajace(self.w):
             if p.name in znane:
@@ -605,11 +607,13 @@ class Tura:
                 m = json.loads(p.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 continue
-            if not isinstance(m, dict) or cel(self.w, m) != self.gdzie \
+            if not isinstance(m, dict) or (self.gdzie is not None and cel(self.w, m) != self.gdzie) \
                     or not (m.get("steer") or str(m.get("zrodlo") or "telegram") == "telegram"):
                 self.pominiete.add(p.name)
                 continue
             self.dopiski[p.name] = {"p": p, "m": m, "tekst": "", "stan": "przygotowanie"}
+            if self.gdzie is None:
+                self.gdzie = cel(self.w, m)
             if URL.search(str(m.get("tekst") or "") + " " + str(m.get("odpowiedz_na") or "")) and self.w.pobierz_linki:
                 threading.Thread(target=self._przygotuj, args=(p.name, m), daemon=True).start()   # linki: do 4 min
             else:

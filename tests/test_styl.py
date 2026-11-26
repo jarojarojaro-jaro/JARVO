@@ -34,3 +34,16 @@ def test_brief_z_20_11_bez_myslnikow():
               "$1 (wpis @Jasperli0122) | zakończona |")
     wynik = st.bez_myslnikow(wiersz)
     assert "—" not in wynik and "(Reddit, LinkedIn, G2), ocena przed wydaniem $1" in wynik
+
+
+@pytest.mark.parametrize("przed, po", [
+    ("Karta wróciła do oceny. Sprawdzam dowody.", "Zadanie wróciło do oceny. Sprawdzam dowody."),   # panel 26.11
+    ("Zakładam kartę dla Wideografa, karta `t_e2666e55`.", "Zakładam zadanie dla Wideografa, zadanie `t_e2666e55`."),
+    ("Nowa karta stoi.", "Nowe zadanie stoi."),
+    ("Rozdane: 3 karty w toku, w kartach są dowody.", "Rozdane: 3 zadania w toku, w zadaniach są dowody."),
+    ("Jak w karcie Hackera.", "Jak w zadaniu Hackera."),
+    ("Karta graficzna Intela koduje, płacę kartą kredytową.", "Karta graficzna Intela koduje, płacę kartą kredytową."),
+    ("Plik `karta.md` i https://x.pl/karta zostają.", "Plik `karta.md` i https://x.pl/karta zostają."),
+])
+def test_bez_karty(przed, po):
+    assert st.bez_karty(przed) == po

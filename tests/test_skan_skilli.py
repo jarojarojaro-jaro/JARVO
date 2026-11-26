@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import struct
 import zlib
 from pathlib import Path
@@ -153,3 +154,14 @@ def test_validate_rejects_bad_waiver(repo_copy):
     assert any("brak pola powod" in e for e in r.errors)
     assert any("nie ma w locku" in e for e in r.errors) and any("rev „*”" in e for e in r.errors)
     assert fl.REPO_ROOT == repo_copy
+
+
+def test_wlasne_skille_bez_sudo():
+    """26.11: `sudo apt-get install` w skillu voxel-ascii przeszedł testy i zatrzymał wgranie na skanerze Hermesa
+    (hermes:sudo_usage), a serwis został wyłączony. Własne skille floty nie mają sudo (instalacje robi instalator)."""
+    katalogi = [p.parent for p in (fl.REPO_ROOT / "shared/skills").glob("*/SKILL.md")]
+    katalogi += [p.parent for p in fl.REPO_ROOT.glob("profiles/*/skills/*/*/SKILL.md")]
+    sudo = [f"{p.relative_to(fl.REPO_ROOT)}:{n}" for k in katalogi for p in k.rglob("*")
+            if p.is_file() and p.suffix in (".md", ".sh", ".py", ".mjs", ".js")
+            for n, l in enumerate(p.read_text(encoding="utf-8", errors="ignore").splitlines(), 1) if re.search(r"\bsudo\b", l)]
+    assert not sudo, sudo

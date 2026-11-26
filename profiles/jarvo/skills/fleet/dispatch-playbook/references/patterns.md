@@ -39,6 +39,8 @@ Publikacja = decyzja użytkownika (A2), potem Studio ustawia kolejkę.
 2. `jarvo-wideo` / `film` (parents: fakty): scenariusz → ujęcia → lektor → napisy → montaż, kontrola ≥ 85.
 Nagranie użytkownika (📎) albo długi materiał: jedna karta `jarvo-wideo` (montaż / klipy), bez researchu.
 Decyzje przed rozdaniem tylko, gdy zmieniają wynik: platforma/format, długość, głos (M/K), muzyka marki.
+Długość bez wskazania właściciela: krótki, dynamiczny film (social, promo, „retention”, pierwszy film nowym silnikiem)
+ma 15–20 s, najwyżej 6 ujęć; budżet zadania 30 min, poprawki po renderze tylko w zmienionym ujęciu.
 
 ## 7. Leady → pierwsza wiadomość
 1. `jarvo-lowca` / `leady`: ICP (oferta, kogo szukamy, region) → sygnały z KRS, przetargów, stron firm → ranking z

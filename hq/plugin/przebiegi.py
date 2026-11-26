@@ -780,7 +780,10 @@ class Rejestr:
             r = self.db.rozmowca_watku(p["watek_id"]) or {}
             tekst = payload.get("tekst") or payload.get("prosba") or ""
             media = [str(o["path"]) for o in payload.get("obrazy") or [] if o.get("path")]
-            await self._w_tle(lambda: self.omp.wyslij(w, tekst, pid, media, lustro=bool(r.get("lustro", True))))
+            # zawsze jako dopisek (steer): tura sesji zaczęta poza panelem (budzik, Telegram, zadanie w tle) bierze
+            # wiadomość od razu, a bez tury skrzynka traktuje ją jak zwykłą (26.11: Kernel w turze 1,5 h, wiadomość
+            # właściciela czekała w kolejce)
+            await self._w_tle(lambda: self.omp.dopisz(w, tekst, pid, media, lustro=bool(r.get("lustro", True))))
         except Exception as exc:
             self.log(f"jarvo-hq: przebieg {pid}: skrzynka sesji {type(exc).__name__}")
             self._koniec(self.db.przebieg(pid), "blad", blad={"kod": "wewnetrzny",
