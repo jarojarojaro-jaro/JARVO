@@ -1437,6 +1437,12 @@ innych kanałów etap 6.
   sięgać do nazw z pakietów inaczej niż przez `Zasoby.wez`, a pakiety nie zmieniają `let` rdzenia (język ustawia
   `ustawJezyk`).
 
+### Limity planów (pasek)
+
+Nad stopką paska: każde konto z `omp usage --json` (Claude z planem, Command Code…) z oknem 5 godzin i tygodnia jako
+cienki pasek z procentem; od 80% żółty, od 95% czerwony, w dymku czas odnowienia. Serwer (`hq/plugin/limity.py`,
+`GET /limity`) pyta omp najwyżej raz na 5 minut, karta odświeża co 5 minut i po powrocie do niej; bez omp sekcji nie ma.
+
 ### Aktualizacje (`#/aktualizacje`)
 
 Kanał na górze paska, pod „+ Nowa rozmowa” (pozycja „↻ Aktualizacje” z licznikiem nieprzeczytanych; na telefonie na
@@ -1828,8 +1834,8 @@ brutalistyczny minimalizm). Jedno miejsce prawdy to blok tokenów na początku s
 `hq/web/style.css`; stare tokeny `--j-*` zostały przemapowane, nowe doszły tylko tam, gdzie TARS ich potrzebuje.
 
 - **Moduły.** Aplikacja to płyty ze szczotkowanej stali (`--j-stal`, jeden obraz SVG) na czarnej próżni z odstępem
-  8 px: pasek (moduł 01), belka widoku (02), kompozytor, raport, lista Mózgu (03), kalendarz, mapa (04). Numer modułu
-  rysuje CSS (`--j-nr` i `::after` z pustym tekstem dla czytnika). Kąty proste w całej aplikacji (jedna reguła;
+  8 px: pasek, belka widoku, kompozytor, raport, lista Mózgu, kalendarz, mapa; bez numerów modułów (26.11 właściciel:
+  „02” w rogu rozbijał układ). Kąty proste w całej aplikacji (jedna reguła;
   koło zostaje kręciołkowi i Gargantui bez WebGL, klasa `j-okr`). Rowki 2 px (`--j-rowek`) dzielą segmenty.
 - **Tła, cztery poziomy:** próżnia `--j-tlo`, moduł `--j-tlo-pasek`, blok `--j-tlo-karta`/`--j-tlo-2`, aktywny
   `--j-tlo-3`; wnęka `--j-wneka` pod pola, kroki i kod.

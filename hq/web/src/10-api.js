@@ -331,6 +331,8 @@ Object.assign(liveApi, {
     lista: () => zadanie("GET", "/rozmowcy"),
     zmien: (klucz, zmiana) => zadanie("PATCH", `/rozmowcy/${kodujUrl(klucz)}`, zmiana),   // {lustro?, kolejnosc?}
   },
+  // limity planów modeli w pasku (limity.py)
+  limity: () => zadanie("GET", "/limity"),
   // Aktualizacje (raporty.py): archiwum raportów rutyn i znacznik przeczytanych
   raporty: {
     lista: (p) => zadanie("GET", `/raporty${zapytanieUrl(p)}`),                // {rodzaj, od, przed, limit}

@@ -2237,6 +2237,9 @@ trasy_aplikacji.dolacz(router, m=roz, trasy=trasy_rozmow, silnik=_silnik, agenci
 _load("jarvo_hq_mozg_zrodla", "mozg_zrodla.py").dolacz(router, konfig=core.JARVO_DIR / "konfig" / "mozg.json", log=_log_hq)
 # Aktualizacje (#/aktualizacje): GET /raporty, POST /raporty/przeczytane
 roz.raporty.dolacz(router, archiwum=RAPORTY, hub=HUB, log=_log_hq)
+# limity planów modeli w pasku (limity.py, docs/HQ.md „Limity planów”): GET /limity z `omp usage --json`
+_limity = _load("jarvo_hq_limity", "limity.py")
+_limity.dolacz(router, limity=_limity.Limity(), log=_log_hq)
 # Podgląd na żywo (podglad_zywo.py, docs/HQ.md „Podgląd na żywo”): telefony floty (scrcpy-server przez adb) i Komputer
 # Jarva jednym WebSocketem /podglad/ws z uwierzytelnieniem WebSocketów dashboardu; strumień tylko, gdy ktoś patrzy
 podglad_zywo = _load("jarvo_hq_podglad_zywo", "podglad_zywo.py")

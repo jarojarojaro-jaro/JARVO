@@ -56,12 +56,12 @@ function AkcjeWiadomosci({ tekst, agent, watek, koordynator }) {
 const OBRAZ_DATA = /^data:image\/(png|jpeg|gif|webp);base64,/;
 
 // ------------------------------------------------------------------------------------------------- właściciel
-// odznaka źródła w rozmowie z rozmówcą (centrum §2.1): „z Telegrama”, „z terminala”, „z panelu” (etykieta mono nad treścią;
-// godzina stoi na osi rozmowy)
-const ZRODLA = new Set(["telegram", "terminal", "panel"]);
+// odznaka źródła w rozmowie z rozmówcą (centrum §2.1): „z Telegrama”, „z terminala” (etykieta mono nad treścią; godzina
+// stoi na osi rozmowy); wiadomość z panelu jest zwykłą wiadomością i odznaki nie ma
+const ZRODLA_OBCE = new Set(["telegram", "terminal"]);
 function Zrodlo({ zrodlo }) {
-  const z = ZRODLA.has(zrodlo) ? zrodlo : "panel";
-  return html`<span class="j-zrodlo" data-zrodlo=${z}>${T(`zrodlo.${z}`)}</span>`;
+  if (!ZRODLA_OBCE.has(zrodlo)) return null;
+  return html`<span class="j-zrodlo" data-zrodlo=${zrodlo}>${T(`zrodlo.${zrodlo}`)}</span>`;
 }
 
 // stan przebiegu wiadomości właściciela (wpis_id → stan): jedna mapa na stan sklepu zamiast przeglądu wszystkich

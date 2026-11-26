@@ -202,7 +202,9 @@ def test_odczyty_hq_bez_skutkow(monkeypatch):
         "/rozmowy/{wid}/opcje",
         # Aktualizacje (raporty.py lista, kalendarz): odczyt archiwum raportów; brak pliku = pusta lista (archiwum
         # zakłada silnik)
-        "/raporty", "/raporty/kalendarz"}
+        "/raporty", "/raporty/kalendarz",
+        # limity planów (limity.py): `omp usage --json`, wynik w pamięci procesu, bez zapisu panelu
+        "/limity"}
     zapis = {t.path for t in _trasy(api.router) if "POST" in t.methods}
     assert "/anim/info" in zapis
 

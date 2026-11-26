@@ -224,18 +224,18 @@ function BanerRozmowcy({ klucz }) {
     <b><${LiniaStanu} r=${r} podglad=${false}/></b><span>${tekst}</span></div>`;
 }
 
-// nagłówek rozmowy z rozmówcą (moduł 02 TARS): znak agenta ze stanem, nazwa w kroju nagłówków, opis, z prawej sygnał
-// stanu (kwadrat i słowo, czerwień = pracuje) i „wspólna rozmowa” z kanałami jednej historii (panel, Telegram, terminal)
+// nagłówek rozmowy z rozmówcą: znak agenta ze stanem, nazwa w kroju nagłówków, opis, z prawej sygnał stanu (kwadrat
+// i słowo, czerwień = pracuje) i „wspólna rozmowa” z kanałami jednej historii, gdy poza panelem jest Telegram albo terminal
 function NaglowekRozmowcy({ klucz }) {
   const r = useSklep((s) => s.rozmowcy.find((x) => x.klucz === klucz));
   if (!r) return null;
   const opis = (!isPL() && r.opis_en) || r.opis, st = stanRozmowcy(r);
-  const kanaly = ["panel", r.temat && "telegram", r.zaplecze === "omp" && "terminal"].filter(Boolean).join(" · ");
+  const kanaly = ["panel", r.temat && "telegram", r.zaplecze === "omp" && "terminal"].filter(Boolean);
   return html`<${AwatarRozmowcy} r=${r} rozmiar=${32}/>
     <div class="j-gora-rozm"><h1 class="j-gora-t" tabIndex="-1">${nazwaRozmowcy(r)}</h1>
       ${opis && html`<p class="j-gora-opis">${opis}</p>`}</div>
     <span class=${`j-sygn is-${st}`}><i aria-hidden="true"></i>${slowoStanu(r)}</span>
-    <span class="j-wspolna" title=${T("rozm.wspolna_opis")}><span class="j-wspolna-t">${T("rozm.wspolna")}</span><small>${kanaly}</small></span>`;
+    ${kanaly.length > 1 && html`<span class="j-wspolna" title=${T("rozm.wspolna_opis")}><span class="j-wspolna-t">${T("rozm.wspolna")}</span><small>${kanaly.join(" · ")}</small></span>`}`;
 }
 
 // ------------------------------------------------------------------------------------------------- nagłówek wątku

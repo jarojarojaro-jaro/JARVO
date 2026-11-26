@@ -49,12 +49,19 @@ function akcjePliku(plik, host, uwaga) {
       akcja: wykonaj(() => copyText(hostPathOf(plik.path, host)), T("plik.skopiowano")) },
   ];
   if (plik.kind === "html") p.unshift({ id: "odpal", ikona: "play", tekst: T("plik.odpal"), akcja: wykonaj(() => openSite(plik.path)) });
+  if (plik.kind === "video") p.unshift({ id: "edytuj", ikona: "pen", tekst: T("plik.edytuj"), akcja: () => otworzEdytor(plik.path) });
   if (plik.kind === "image" && !jestSvg(plik.path)) {
     p.push({ id: "obraz", ikona: "copy", tekst: T("plik.kopiuj_obraz"), akcja: wykonaj(() => copyImage(plik), T("plik.obraz_w_schowku")) });
   }
   p.push({ id: "karta", ikona: "ext", tekst: T("plik.nowa_karta"), akcja: wykonaj(() => otworzPlik(plik.path)) });
   if (host.explorer) p.push({ id: "folder", ikona: "folder", tekst: T("plik.w_folderze"), akcja: wykonaj(() => api.reveal(plik.path), T("plik.otwieram_folder")) });
   return p;
+}
+
+// edytor filmów (pakiet „edytor”) nad bieżącym widokiem: `?n=edytor&p=<film>` w adresie, więc link i odświeżenie go otwierają
+function otworzEdytor(sciezka) {
+  akcje.podglad(null);
+  Trasa.idz({ n: "edytor", p: sciezka }, { scal: true });
 }
 
 function useUwaga() {
@@ -69,7 +76,7 @@ function useUwaga() {
   return [uwaga, pokaz];
 }
 
-// karta pliku: miniatura i nazwa otwierają podgląd; obok Pobierz (albo Odpal dla HTML) i menu z resztą akcji
+// karta pliku: miniatura i nazwa otwierają podgląd; obok Pobierz (Odpal dla HTML, Edytuj dla filmu) i menu z resztą akcji
 function KartaPliku({ plik, kompakt = false }) {
   const host = useHost();
   const [menu, setMenu] = useState(null);
@@ -77,7 +84,7 @@ function KartaPliku({ plik, kompakt = false }) {
   const src = useObrazPliku(plik && plik.kind === "image" ? plik.path : null);
   if (!plik || !plik.path) return null;
   const pozycje = akcjePliku(plik, host, pokazUwage);
-  const glowna = pozycje.find((x) => x.id === (plik.kind === "html" ? "odpal" : "pobierz"));
+  const glowna = pozycje.find((x) => x.id === ({ html: "odpal", video: "edytuj" }[plik.kind] || "pobierz"));
   const opis = src === false ? T("plik.nie_wczytano")
     : [T(`plik.r_${plik.kind || "other"}`), plik.size != null ? bytes(plik.size) : null].filter(Boolean).join(" · ");
   return html`<div class=${cx("j-plik", kompakt && "is-kompakt", plik.kind === "image" && !kompakt && src !== false && "is-obraz")} data-plik=${plik.path}>

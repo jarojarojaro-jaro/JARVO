@@ -128,6 +128,26 @@ function OknoStarejBazy() {
   </div>`;
 }
 
+// ---- edytor filmów (`?n=edytor&p=<film>`, „Edytuj film” przy pliku): pakiet „edytor” na cały ekran nad widokiem;
+// zamknięcie zdejmuje parametry z adresu, skróty aplikacji milkną (edytor ma własne)
+function OknoEdytora({ sciezka }) {
+  const pakiet = usePakiet("edytor");
+  const Edytor = pakiet === "ok" ? Zasoby.wez("VideoEditor") : null;
+  const zamknij = useCallback(() => Trasa.idz({ n: null, p: null }, { scal: true }), []);
+  useEffect(() => {
+    Skroty.wstrzymaj(true);
+    return () => Skroty.wstrzymaj(false);
+  }, []);
+  if (!Edytor) {
+    return html`<div class="j-stara" role="dialog" aria-modal="true" aria-label=${T("plik.edytuj")}>
+      <div class="j-stara-g"><${Przycisk} maly ikona="back" onClick=${zamknij}>${T("stara.wroc")}</${Przycisk}><span>${T("plik.edytuj")}</span></div>
+      <div class="j-stara-t">${pakiet === "blad" ? html`<p role="status">${T("blad.ogolny")}</p>` : html`<${Spinner}/>`}</div>
+    </div>`;
+  }
+  return html`<div class="thq-root j-edytor"><${FileCtx.Provider} value=${akcje.podglad}>
+    <${Edytor} key=${sciezka} path=${sciezka} onClose=${zamknij}/></${FileCtx.Provider}></div>`;
+}
+
 // widoki z własną belką `NaglowekWidoku` (ta sama wysokość i krój co belka rozmowy): pusta belka nad nimi spychała
 // ich tytuł 56 px niżej niż u rozmówcy
 const WLASNY_NAGLOWEK = new Set(["aktualizacje", "mozg", "ustawienia"]);
@@ -448,6 +468,7 @@ function AplikacjaJarvo() {
       </main>
     </div>
     ${staraBaza && html`<${OknoStarejBazy}/>`}
+    ${trasa.n === "edytor" && trasa.p && html`<${OknoEdytora} sciezka=${trasa.p}/>`}
     <${PodgladPliku}/>
     <${NaZywoOkno}/>
     <${OknoPytania}/>

@@ -55,6 +55,8 @@ PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "ochrona.py", "e
                 "mozg_zrodla.py",
                 # kanał Aktualizacje (docs/HQ.md „Aktualizacje”): archiwum raportów rutyn z cron/output profili
                 "raporty.py",
+                # limity planów modeli w pasku (docs/HQ.md „Limity planów”): `omp usage --json`
+                "limity.py",
                 # podgląd na żywo telefonów floty i Komputera Jarva (docs/HQ.md „Podgląd na żywo”): WebSocket z obrazem
                 "podglad_zywo.py")
 # wspólny graf wiedzy (canvas, układ sił): zakładka Wiedza (Mózg aplikacji HQ ma od 22.11 własną mapę-neuron)

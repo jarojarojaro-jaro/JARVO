@@ -1179,10 +1179,6 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 @keyframes j-modul { from { opacity: 0; transform: translateY(var(--j-dy, 12px)); } }
 .j-gora { animation: j-modul .42s var(--j-serwo) backwards; --j-dy: -12px; }
 .j-komp, .j-rap-r, .j-kal, .j-rap-rodzaje, .j-mozg-nav, .j-ust > .j-sz-glowna { animation: j-modul .42s var(--j-serwo) .06s backwards; }
-/* numer modułu (01, 02…): mono, cicho; treść generowana bez tekstu dla czytnika */
-.j-pasek-g::after, .j-gora::after, .j-komp::after, .j-nr::after { content: var(--j-nr) / ""; font: 500 10.5px/16px var(--j-font-mono);
-  letter-spacing: .1em; color: var(--j-tekst-3); flex: none; pointer-events: none; }
-.j-pasek-g { --j-nr: "01"; } .j-gora { --j-nr: "02"; } .j-komp { --j-nr: "03"; }
 /* etykieta (sekcja, moduł): mono, wersaliki, z włosem do końca rzędu */
 .j-et { display: flex; align-items: center; gap: 10px; font: 500 10.5px/16px var(--j-font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--j-tekst-3); }
 .j-et::after { content: ""; flex: 1; height: 1px; background: var(--j-linia); }
@@ -1204,7 +1200,6 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-zaslona-paska { display: none; position: absolute; inset: 0; z-index: 30; background: var(--j-zaslona); }
 .j-glowna { position: relative; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; height: 100%; }
 .j-gora { position: relative; height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 0 0 12px; flex: none; }
-.j-gora::after { align-self: stretch; display: grid; place-items: center; width: 48px; box-shadow: inset 2px 0 0 var(--j-rowek); }
 .j-gora-t { font: 700 20px/24px var(--j-font-naglowek) !important; font-stretch: 125% !important; letter-spacing: -.005em !important; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; min-width: 0; color: var(--j-tekst); }
 .j-uklad .j-menu-btn, .j-uklad .j-zamknij-pasek, .jarvo-app .j-na-telefonie, .j-uklad .j-pisz, .j-nawig .j-tylko-telefon { display: none; }
@@ -1253,6 +1248,18 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 /* stan połączenia na dole paska, za rowkiem */
 .j-stopka { display: flex; align-items: center; gap: 8px; min-height: 40px; margin: 0 -8px; padding: 8px 16px; flex: none;
   box-shadow: inset 0 2px 0 var(--j-rowek), inset 0 3px 0 var(--j-linia); }
+/* limity planów nad stopką: konto w rzędzie nazwy, pod nim okna 5 h i tygodnia obok siebie (cienki pasek i procent) */
+.j-limity { display: grid; gap: 10px; margin: 0 -8px; padding: 12px 16px; flex: none; box-shadow: inset 0 2px 0 var(--j-rowek), inset 0 3px 0 var(--j-linia); }
+.j-limit { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; row-gap: 4px; }
+.j-limit-n { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 8px; margin: 0; min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--j-tekst); }
+.j-limit-n small { font: 500 10px/16px var(--j-font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--j-tekst-3); white-space: nowrap; }
+.j-limit-o { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px; min-width: 0; font: 500 10px/16px var(--j-font-mono); color: var(--j-tekst-3); cursor: default; }
+.j-limit-e { white-space: nowrap; }
+.j-limit-pasek { height: 4px; min-width: 16px; background: var(--j-wneka); box-shadow: inset 0 0 0 1px var(--j-linia); overflow: hidden; }
+.j-limit-pasek i { display: block; height: 100%; background: var(--j-tekst-2); transition: width .6s var(--j-ease); }
+.j-limit-o b { font-weight: 500; color: var(--j-tekst-2); font-variant-numeric: tabular-nums; }
+.j-limit-o.is-uwaga i { background: var(--j-uwaga); } .j-limit-o.is-uwaga b { color: var(--j-uwaga); }
+.j-limit-o.is-blad i { background: var(--j-blad); } .j-limit-o.is-blad b { color: var(--j-blad); }
 .j-odznaka { position: relative; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; flex: none;
   font: 600 11px var(--j-font-mono); color: var(--j-akcent-na); background: var(--j-uwaga); border: 0; margin-right: 2px; }
 .j-odznaka.is-zle { color: var(--j-akcent-na); background: var(--j-blad); }
@@ -1919,7 +1926,6 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-komp-w { max-width: 776px; margin: 0 auto; width: 100%; }
 .j-komp { position: relative; background: var(--j-stal), var(--j-tlo-karta); box-shadow: inset 0 1px 0 var(--j-hi), inset 0 0 0 1px var(--j-linia);
   transition: box-shadow .28s var(--j-ease), margin .32s var(--j-serwo); }
-.j-komp::after { position: absolute; right: 16px; top: 18px; }
 .j-komp:focus-within { box-shadow: inset 0 1px 0 var(--j-linia-mocna), inset 0 0 0 1px var(--j-linia-mocna); }
 .j-komp.is-nad { box-shadow: inset 0 0 0 1px var(--j-tekst); }
 .j-komp-pole { display: block; width: 100%; border: 0; outline: 0; resize: none; padding: 15px 56px 8px 16px; font-size: 14px; line-height: 1.6; min-height: 52px;
@@ -2041,6 +2047,8 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-stara-g { display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 12px; box-shadow: inset 0 -1px 0 var(--j-linia); flex: none; font-size: 14px; font-weight: 600; }
 .j-stara-t { flex: 1; min-height: 0; overflow: auto; position: relative; padding: 16px; font-size: 15px; line-height: 1.5; }
 .j-stara-laduje { color: var(--j-tekst-2); }
+/* edytor filmów nad aplikacją: opakowanie daje tylko zmienne motywu .thq-root, układ ma sam edytor (position: fixed) */
+.j-edytor.thq-root { display: contents; }
 
 /* ---- szerokości (zapytania kontenera: ta sama logika w ramce telefonu i na wąskim oknie) */
 @container app (max-width: 1279px) { .j-uklad { --j-pasek-w: 248px; } .j-os { padding-right: 16px; } .j-dok { padding-left: 16px; padding-right: 16px; } }
@@ -2061,7 +2069,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   .j-uklad { padding: 0; gap: 0; }
   .j-glowna { gap: 0; }
   .j-gora { height: 52px; padding: 0 0 0 4px; gap: 6px; }
-  .j-gora::after, .j-gora .j-wspolna, .j-pasek-g::after, .j-komp::after { display: none; }
+  .j-gora .j-wspolna { display: none; }
   /* pasek na telefonie: nowa rozmowa jako ikona w belce, Aktualizacje, Mózg i Ustawienia w lewym dolnym rogu */
   .j-pasek { width: min(320px, 86%); padding: 0 10px; }
   .j-pasek-g { height: 60px; padding: 0 4px 0 8px; }
@@ -2452,7 +2460,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
    decyzje jako wiersze z numerem, pytaniem pogrubionym i rekomendacją w bursztynie), z prawej kalendarz (04) i rodzaje;
    kolor rodzaju: --j-rap-kolor z --j-barwa-N; telefon: kalendarz pod przyciskiem z datą, rodzaje w rzędzie */
 .j-rap { display: flex; flex-direction: column; gap: 8px; height: 100%; min-height: 0; }
-.j-rap-tresc { flex: 1; min-height: 0; overflow: auto; }
+.j-rap-tresc { flex: 1; min-height: 0; overflow: auto; container-type: size; }
 .j-rap-nawig { align-self: stretch; display: flex; align-items: stretch; box-shadow: inset 2px 0 0 var(--j-rowek); }
 .j-rap-nawig > .j-btn { height: auto; width: 40px; }
 /* „Najnowsze” (dzień inny niż ostatni): osobny segment z rowkiem, nie 40 px jak strzałki (22.11: wystawał poza moduł) */
@@ -2467,11 +2475,10 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-rap-data-i { display: none; grid-row: 1 / span 2; grid-column: 2; color: var(--j-tekst-3); }
 .j-rap-uklad { display: grid; grid-template-columns: minmax(0, 1fr) 296px; gap: 8px; align-items: start; }
 .j-rap-lista { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }   /* kolumna auto rosła do nagłówka raportu: telefon przesuwał się w bok */
-.j-rap-bok { position: sticky; top: 0; display: grid; gap: 8px; }
+/* bok (kalendarz i rodzaje) stoi przy przewijaniu raportów; wyższy niż okno przewija się sam, więc żaden rodzaj nie ginie */
+.j-rap-bok { position: sticky; top: 0; display: grid; gap: 8px; max-height: 100cqh; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 /* raport: moduł z nagłówkiem, treścią w sekcjach i stopką za rowkiem */
-.j-rap-r { position: relative; padding: 0 24px; background: var(--j-stal), var(--j-tlo-pasek); box-shadow: var(--j-cien-1); --j-nr: "03"; }
-.j-rap-r::after { position: absolute; right: 24px; top: 18px; }
-.j-rap-r-g { padding-right: 40px; }
+.j-rap-r { position: relative; padding: 0 24px; background: var(--j-stal), var(--j-tlo-pasek); box-shadow: var(--j-cien-1); }
 .j-rap-r.is-nowy { box-shadow: var(--j-cien-1), inset 2px 0 0 var(--j-akcent); }
 .j-rap-r.is-blad { box-shadow: var(--j-cien-1), inset 2px 0 0 var(--j-uwaga); }
 .j-rap-r-g { display: flex; align-items: center; gap: 12px; min-height: 52px; }
@@ -2512,9 +2519,8 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-rap-r-t .j-md > ol > li em { font-style: normal; font-weight: 500; color: var(--j-uwaga); }
 .j-rap-r-s { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; min-height: 52px; margin: 0 -24px; padding: 0 16px 0 24px; box-shadow: inset 0 2px 0 var(--j-rowek), inset 0 3px 0 var(--j-linia); }
 .j-rap-kopiuj { margin-left: auto; }
-/* kalendarz (moduł 04): dzień z raportem jasny, bez raportu szary, poza miesiącem przygaszony, wybrany = biały blok */
-.j-kal { position: relative; padding: 0 8px 8px; background: var(--j-stal), var(--j-tlo-pasek); box-shadow: var(--j-cien-1); --j-nr: "04"; }
-.j-kal::after { position: absolute; right: 16px; top: 16px; }
+/* kalendarz: dzień z raportem jasny, bez raportu szary, poza miesiącem przygaszony, wybrany = biały blok */
+.j-kal { position: relative; padding: 0 8px 8px; background: var(--j-stal), var(--j-tlo-pasek); box-shadow: var(--j-cien-1); }
 .j-kal-g { display: flex; align-items: center; min-height: 48px; padding: 0 8px; }
 .j-kal-t { font: 600 13px/20px var(--j-font-naglowek); font-stretch: 125%; color: var(--j-tekst); }
 .j-kal-siatka { display: grid; grid-template-columns: repeat(7, 1fr); }
@@ -2556,12 +2562,14 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   .j-rap-data-i { display: block; }
   .j-rap-data[aria-expanded="true"] .j-rap-data-i { transform: rotate(180deg); }
   .j-rap-uklad { display: flex; flex-direction: column-reverse; gap: 8px; padding: 0 0 24px; }
-  .j-rap-bok { position: static; gap: 0; }
+  .j-rap-bok { position: static; gap: 0; max-height: none; overflow: visible; }
   .j-rap-bok .j-kal { display: none; }
   .j-rap-bok.is-otwarty .j-kal { display: block; }
-  .j-rap-rodzaje { padding: 8px; overflow-x: auto; scrollbar-width: none; }
-  .j-rap-rodzaje ul { display: flex; gap: 1px; background: var(--j-rowek); width: max-content; }
-  .j-rap-f { height: 36px; background: var(--j-tlo-karta); }
+  /* telefon: rodzaje jako zwarte etykiety w kilku rzędach, wszystkie widoczne bez przewijania w bok */
+  .j-rap-rodzaje { padding: 8px; }
+  .j-rap-rodzaje ul { display: flex; flex-wrap: wrap; gap: 6px; }
+  .j-rap-f { height: 32px; gap: 8px; padding: 0 10px; font-size: 12.5px; background: var(--j-tlo-karta); box-shadow: inset 0 0 0 1px var(--j-linia); }
+  .j-rap-f.is-aktywny { box-shadow: inset 0 0 0 1px var(--j-linia-mocna), inset 2px 0 0 var(--j-akcent); }
   .j-rap-r { padding: 0 14px; }
   .j-rap-r-s { margin: 0 -14px; padding: 0 8px 0 14px; }
   .j-rap-r-t .j-md > p:has(> strong:first-child) { padding-left: 0; }

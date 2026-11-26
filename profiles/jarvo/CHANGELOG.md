@@ -1,6 +1,11 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Pasek panelu pokazuje limity planów (Claude, Command Code): zużycie okna 5 godzin i tygodnia z czasem odnowienia w dymku.
+- Wiadomość pisana w panelu nie ma już odznaki „z panelu”, a nagłówek rozmowy pokazuje „wspólna rozmowa” tylko wtedy, gdy rozmowa idzie też przez Telegram albo terminal.
+- Film w rozmowie ma przycisk „Edytuj film”, który otwiera edytor filmów nad bieżącym widokiem (adres `?n=edytor&p=<film>` też go otwiera).
+- Aktualizacje: poranny brief stoi pierwszy w dniu i w filtrach, filtry na telefonie zawijają się w widoczne etykiety, boczna kolumna na komputerze przewija się, a numery modułów (01, 02, 03, 04) zniknęły z całej aplikacji.
+- Aplikacja na komputerze i telefonie ma ikonę Jarva z jarvo.pl.
 - Aktualizacje na telefonie mieszczą się w szerokości ekranu: długi tytuł raportu skraca się wielokropkiem, a strona nie przesuwa się w bok.
 - Na iPhonie i iPadzie przejścia w panelu nie dokładają wpisów historii Safari, więc przesunięcie od lewej krawędzi otwiera tylko pasek rozmów, bez drugiego „wstecz”.
 - „Skompresuj teraz” w panelu od razu pokazuje w rozmowie, że kompresja trwa, a drugie kliknięcie w trakcie nie zaczyna drugiej kompresji; rozmówca omp, który bierze wiadomość z panelu, ma stan „pracuje”, nie „w terminalu”.

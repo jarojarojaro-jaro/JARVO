@@ -10,6 +10,9 @@
 
 const RAPORT_ZWINIETY = 1600;           // dłuższy raport pokazuje się zwinięty (fragment i „Pokaż całość”)
 const DZIEN_MAKS = 100;                 // raportów jednego dnia na jedną odpowiedź (rutyny dają kilka dziennie)
+// poranny brief to główny raport dnia: pierwszy na liście dnia i w filtrach, reszta od najnowszej
+const RODZAJ_GLOWNY = "jarvo-daily-brief";
+const briefNajpierw = (lista, klucz) => lista.slice().sort((a, b) => (klucz(b) === RODZAJ_GLOWNY) - (klucz(a) === RODZAJ_GLOWNY));
 
 // ------------------------------------------------------------------------------------------------- daty (czyste)
 const dwa = (n) => String(n).padStart(2, "0");
@@ -131,7 +134,7 @@ function Raport({ r, rozmowca, kolor }) {
     try { await copyText(r.tekst); setOk(true); setTimeout(() => setOk(false), 1500); } catch (e) { Komunikaty.pokaz(e.message || String(e), { rodzaj: "blad" }); }
   };
   const kto = rozmowca ? nazwaRozmowcy(rozmowca) : "";
-  return html`<article class=${cx("j-rap-r", "j-nr", r.nowy && "is-nowy", r.blad && "is-blad", !caly && "is-zwiniety")} data-raport=${r.id}
+  return html`<article class=${cx("j-rap-r", r.nowy && "is-nowy", r.blad && "is-blad", !caly && "is-zwiniety")} data-raport=${r.id}
       style=${{ "--j-rap-kolor": kolor }} aria-labelledby=${`j-rap-r-${r.id}`}>
     <header class="j-rap-r-g">
       <i class="j-rap-kropka" aria-hidden="true"></i>
@@ -159,7 +162,7 @@ function Kalendarz({ miesiac, wybrany, dni, rodzaj, idzDo, dzis, kolory }) {
   const pl = isPL() ? "pl-PL" : "en-GB";
   const tytul = new Date(miesiac.r, miesiac.m, 1).toLocaleDateString(pl, { month: "long", year: "numeric" }).replace(/^./, (z) => z.toUpperCase());
   const naglowki = DNI_TYGODNIA[isPL() ? "pl" : "en"];
-  return html`<div class="j-kal j-nr" role="group" aria-label=${T("rap.kalendarz")}>
+  return html`<div class="j-kal" role="group" aria-label=${T("rap.kalendarz")}>
     <div class="j-kal-g"><b class="j-kal-t" aria-live="polite">${tytul}</b></div>
     <div class="j-kal-siatka">
       ${naglowki.map((n) => html`<span key=${n} class="j-kal-dt" aria-hidden="true">${n}</span>`)}
@@ -273,7 +276,8 @@ function Aktualizacje({ trasa }) {
 
   const dni = useMemo(() => dniKalendarza(kal.wpisy), [kal.wpisy]);
   const kolory = useMemo(() => koloryRodzajow(kal.rodzaje.map((x) => x.rodzaj).concat(st.raporty.map((r) => r.rodzaj))), [kal.rodzaje, st.raporty]);
-  const rodzaje = useMemo(() => kal.rodzaje.slice().sort((a, b) => b.liczba - a.liczba || a.nazwa.localeCompare(b.nazwa)), [kal.rodzaje]);
+  const rodzaje = useMemo(() => briefNajpierw(kal.rodzaje.slice().sort((a, b) => b.liczba - a.liczba || a.nazwa.localeCompare(b.nazwa)), (x) => x.rodzaj), [kal.rodzaje]);
+  const raportyDnia = useMemo(() => briefNajpierw(st.raporty, (r) => r.rodzaj), [st.raporty]);
   const rozmowcaRaportu = (r) => rozmowcy.find((x) => x.zaplecze === "hermes" && x.cel === r.profil) || null;
   const nd = dzien ? nazwaDnia(dzien) : null;
   const nowe = st.raporty.filter((r) => r.nowy).length;
@@ -294,7 +298,7 @@ function Aktualizacje({ trasa }) {
     </${NaglowekWidoku}>
     <div class="j-rap-tresc" ref=${lista}><div class="j-rap-uklad">
       <div class="j-rap-lista">
-        ${st.raporty.map((r) => html`<${Raport} key=${r.id} r=${r} rozmowca=${rozmowcaRaportu(r)} kolor=${kolory[r.rodzaj]}/>`)}
+        ${raportyDnia.map((r) => html`<${Raport} key=${r.id} r=${r} rozmowca=${rozmowcaRaportu(r)} kolor=${kolory[r.rodzaj]}/>`)}
         ${st.blad && html`<p class="j-pasek-pusto" role="alert">${st.blad}
           <button type="button" class="j-link" onClick=${() => wczytajDzien()}>${T("ui.ponow")}</button></p>`}
         ${!st.blad && !st.laduje && !st.raporty.length && (pusto
