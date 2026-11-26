@@ -127,7 +127,15 @@ function StanWysylki({ o, k }) {
 // widoku; pod ostatnią taką odpowiedzią bez odpowiedzi właściciela stoją „Tak, wykonaj” i „Nie” (zwykła wiadomość
 // „tak”/„nie”, wykonanie przychodzi w następnej turze), a po odpowiedzi jedna spokojna linia z nią.
 const ZNACZNIK_TAK = "[[czeka-na-tak]]";
-const bezZnacznika = (t) => (t && t.includes(ZNACZNIK_TAK) ? t.split(ZNACZNIK_TAK).join("").trim() : t);
+// tekst agenta w panelu: bez znacznika zgody i bez „karta” (też komentarze w trakcie tury, których nie przepuszcza hak
+// odpowiedzi; ta sama zamiana co wiedza/plugin/styl.py `bez_karty`: odmiana, czasownik -ła → -ło, kod w `…` bez zmian)
+const KARTA = { karta: "zadanie", karty: "zadania", "kartę": "zadanie", "kartą": "zadaniem", karcie: "zadaniu", kart: "zadań",
+  kartom: "zadaniom", kartami: "zadaniami", kartach: "zadaniach" };
+const KARTA_RE = /(^|[^\p{L}`/.-])(karta|karty|kartę|kartą|karcie|kartami|kartach|kartom|kart)(?![\p{L}])(?!\s+(?:graficzn|kredytow|płatnicz|debetow|SIM|pamięci|sieciow|przeglądark|telefon|NFC))(\s+\p{L}+ła(?![\p{L}]))?/giu;
+const zJak = (wzor, s) => (wzor[0] === wzor[0].toUpperCase() ? s[0].toUpperCase() + s.slice(1) : s);
+const bezKarty = (t) => (!t || !/kar(t|ci)/i.test(t) ? t : t.split(/(`[^`\n]*`)/).map((c, i) => (i % 2 ? c : c.replace(KARTA_RE,
+  (_, przed, r, czas) => przed + zJak(r, KARTA[r.toLowerCase()]) + (czas && r.toLowerCase() === "karta" ? czas.slice(0, -1) + "o" : czas || "")))).join(""));
+const bezZnacznika = (t) => bezKarty(t && t.includes(ZNACZNIK_TAK) ? t.split(ZNACZNIK_TAK).join("").trim() : t);
 const czekaNaTak = (x) => !!(x && (x.czeka_na_tak || String(x.tekst || "").includes(ZNACZNIK_TAK)
   || (x.przebieg && String(x.przebieg.tekst || "").includes(ZNACZNIK_TAK))));
 
