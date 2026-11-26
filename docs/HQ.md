@@ -1448,12 +1448,13 @@ innych kanałów etap 6.
   sięgać do nazw z pakietów inaczej niż przez `Zasoby.wez`, a pakiety nie zmieniają `let` rdzenia (język ustawia
   `ustawJezyk`).
 
-### Limity planów (pasek)
+### Limity planów (stopka kompozytora)
 
-Nad stopką paska: konto, na którym pracuje Jarvo (Command Code z kluczem profilu jarvo i planem z subskrypcji), i konta
-z `omp usage --json` (np. Claude z planem), każde z oknem 5 godzin i tygodnia jako cienki pasek z procentem; dostawca
-floty z omp odpada. Od 80% żółty, od 95% czerwony, w dymku czas odnowienia. Serwer (`hq/plugin/limity.py`,
-`GET /limity`) pyta źródła najwyżej raz na 5 minut, karta odświeża co 5 minut i po powrocie do niej; bez kont sekcji nie ma.
+W stopce bloczka wpisywania, obok pierścienia kontekstu: limit konta, na którym pracuje rozmówca (`dostawca` z licznika:
+Hermes z modelu profilu, omp z prefiksu modelu), dwa cienkie paski 5 h i tygodnia z procentami, od 80% bursztyn, od 95%
+czerwień; klik = wysuwka z planem i czasem odnowienia. Konta: Command Code z kluczem profilu jarvo (z planem
+z subskrypcji) i konta z `omp usage --json` (np. Claude); dostawca floty z omp odpada. Serwer (`hq/plugin/limity.py`,
+`GET /limity`) pyta źródła najwyżej raz na 5 minut, karta trzyma jedną odpowiedź dla wszystkich rozmów.
 
 ### Aktualizacje (`#/aktualizacje`)
 

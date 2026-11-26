@@ -258,40 +258,6 @@ function StanPolaczenia({ klasa }) {
     <i aria-hidden="true">${ok ? "" : "⚠"}</i><span>${ok ? T("polaczenie.krotko") : T(`polaczenie.${stan}`)}</span></p>`;
 }
 
-// Limity planów modeli (GET /limity, docs/HQ.md „Limity planów”): okno 5 godzin i tygodnia każdego konta, cienki
-// pasek zużycia z procentem, w dymku czas odnowienia; bez danych sekcji nie ma. Odświeżenie co 5 min i po powrocie
-// do karty.
-const LIMITY_CO_MS = 5 * 60 * 1000;
-function poziomLimitu(p) { return p >= 95 ? "is-blad" : p >= 80 ? "is-uwaga" : ""; }
-function LimityPlanow() {
-  const [dostawcy, setDostawcy] = useState([]);
-  useEffect(() => {
-    let zywy = true;
-    const wczytaj = () => (api.limity ? api.limity() : Promise.resolve(null)).then((d) => zywy && setDostawcy((d && d.dostawcy) || []), () => {});
-    wczytaj();
-    const t = setInterval(wczytaj, LIMITY_CO_MS);
-    const widocznosc = () => { if (document.visibilityState === "visible") wczytaj(); };
-    document.addEventListener("visibilitychange", widocznosc);
-    return () => { zywy = false; clearInterval(t); document.removeEventListener("visibilitychange", widocznosc); };
-  }, []);
-  if (!dostawcy.length) return null;
-  return html`<section class="j-limity" aria-label=${T("limity.etykieta")}>
-    ${dostawcy.map((d) => html`<div key=${d.id} class="j-limit">
-      <p class="j-limit-n"><span>${d.nazwa}</span>${d.plan && html`<small>${d.plan}</small>`}</p>
-      ${d.okna.map((o) => {
-        const p = Math.round(o.procent);
-        const reset = o.reset ? T("limity.reset", { kiedy: `${Czas.data(o.reset)}, ${Czas.godzina(o.reset)}` }) : "";
-        const opis = `${T(`limity.${o.id}_pelna`)}: ${T("limity.zuzyte", { p })}${reset}`;
-        return html`<div key=${o.id} class=${cx("j-limit-o", poziomLimitu(p))} title=${opis}>
-          <span class="j-limit-e" aria-hidden="true">${T(`limity.${o.id}`)}</span>
-          <span class="j-limit-pasek" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow=${p} aria-label=${opis}>
-            <i style=${{ width: `${Math.min(100, p)}%` }}></i></span>
-          <b aria-hidden="true">${p}%</b></div>`;
-      })}
-    </div>`)}
-  </section>`;
-}
-
 // Stopka paska: bez drugiego wejścia do Ustawień (jest pozycja „Ustawienia” w nawigacji, ⌘,), stan połączenia
 // i odznaka aktualizacji (22.11 właściciel: bez mierników „szczerość, humor”, ma być profesjonalnie)
 function StopkaPaska() {
@@ -397,7 +363,6 @@ function Pasek({ trasa, warstwa = false }) {
     </div>`}
     </div>
     <${NawigacjaCentrum} trasa=${trasa}/>
-    <${LimityPlanow}/>
     <${StopkaPaska}/>
     ${menu && html`<${Menu} kotwica=${menu.kotwica} etykieta=${menu.w.tytul || T("watek.bez_tytulu")} onZamknij=${() => setMenu(null)}
       pozycje=${pozycjeMenuWatku(menu.w, { onZmienNazwe: () => setEdycja(menu.w.id) })}/>`}

@@ -4,7 +4,7 @@
 - Obraz malowany, krótki film rysowany i kadr voxel ASCII robisz sam (skille `pracownia-malarza`, `film-rysowany`, `voxel-ascii`), a dłuższe filmy zlecasz Wideografowi.
 - Rozmówca z nieprzeczytaną odpowiedzią ma stan „odpowiedź” (jasnoniebieski) zamiast „wolny”; wolny jest zielony, pracuje czerwony, w terminalu magenta.
 - Strażnik rutyn w każdym trybie: agent nie uruchamia rutyny na próbę i nie zakłada rutyny próbnej ani drugiej o tej samej nazwie, tylko poprawia albo wznawia istniejącą.
-- Pasek panelu pokazuje limity planów: konto Command Code, na którym pracuje flota (z planem), i subskrypcje z omp (Claude), czyli zużycie okna 5 godzin i tygodnia z czasem odnowienia w dymku.
+- Stopka bloczka wpisywania pokazuje limit planu tego rozmówcy (Jarvo: Command Code, Kernel i Operator: Claude), czyli zużycie okna 5 godzin i tygodnia, a po kliknięciu plan i czas odnowienia.
 - Wiadomość pisana w panelu nie ma już odznaki „z panelu”, a nagłówek rozmowy pokazuje „wspólna rozmowa” tylko wtedy, gdy rozmowa idzie też przez Telegram albo terminal.
 - Film w rozmowie ma przycisk „Edytuj film”, który otwiera edytor filmów nad bieżącym widokiem (adres `?n=edytor&p=<film>` też go otwiera).
 - Aktualizacje: poranny brief stoi pierwszy w dniu i w filtrach, filtry na telefonie zawijają się w widoczne etykiety, boczna kolumna na komputerze przewija się, a numery modułów (01, 02, 03, 04) zniknęły z całej aplikacji.

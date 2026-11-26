@@ -222,11 +222,49 @@ function KontekstWybor({ d, onKomenda }) {
   </div>`;
 }
 
+// Limit planu rozmówcy (GET /limity, 26.11 właściciel: „pod danym chatem, Jarvo to DeepSeek, Kernel to Claude”): konto
+// dostawcy z licznika (`dostawca`: commandcode…, anthropic), dwa cienkie paski (5 h, tydzień) z procentem; klik =
+// wysuwka z planem i czasem odnowienia. Jedna odpowiedź serwera na wszystkie rozmowy, świeża co 5 min.
+const LIMITY_CO_MS = 5 * 60 * 1000;
+const LIMITY = { t: 0, d: null, w: null, sluchacze: new Set() };
+function useLimity() {
+  const [d, setD] = useState(LIMITY.d);
+  useEffect(() => {
+    const pokaz = () => setD(LIMITY.d);
+    LIMITY.sluchacze.add(pokaz);
+    const wczytaj = () => {
+      if (document.hidden || LIMITY.w || Date.now() - LIMITY.t < LIMITY_CO_MS) return;
+      LIMITY.w = (api.limity ? api.limity() : Promise.resolve(null)).then((x) => { LIMITY.d = (x && x.dostawcy) || []; LIMITY.t = Date.now(); },
+        () => {}).finally(() => { LIMITY.w = null; LIMITY.sluchacze.forEach((f) => f()); });
+    };
+    wczytaj();
+    const t = setInterval(wczytaj, 60000);
+    return () => { LIMITY.sluchacze.delete(pokaz); clearInterval(t); };
+  }, []);
+  return d;
+}
+const kontoLimitu = (limity, dostawca) => (limity || []).find((x) => x.id === (String(dostawca || "").startsWith("commandcode") ? "commandcode" : dostawca));
+const poziomLimitu = (p) => (p >= 95 ? "is-blad" : p >= 80 ? "is-duzo" : "");
+
+function LimitWybor({ konto }) {
+  return html`<div class="j-wl">
+    <div class="j-wys-g"><span class="j-wys-t">${konto.nazwa}</span>${konto.plan && html`<span class="j-wys-teraz">${konto.plan}</span>`}</div>
+    ${konto.okna.map((o) => {
+      const p = Math.round(o.procent);
+      return html`<div key=${o.id} class=${cx("j-wl-o", poziomLimitu(p))}>
+        <span class="j-wl-n">${T(`limity.${o.id}_pelna`)}</span><b>${p}%</b>
+        <span class="j-wl-pasek" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow=${p}><i style=${{ width: `${Math.min(100, p)}%` }}></i></span>
+        <small>${o.reset ? T("limity.reset", { kiedy: `${Czas.data(o.reset)}, ${Czas.godzina(o.reset)}` }).replace(/^, /, "") : ""}</small></div>`;
+    })}
+  </div>`;
+}
+
 function Stopka({ watek }) {
   const praca = useSklep((s) => Os.doZatrzymania(Object.values(s.przebiegi).filter((p) => p.watek_id === watek)).length > 0);
   const [d, setD] = useState(null);
   const [nr, setNr] = useState(0);
-  const [menu, setMenu] = useState(null);           // {co: model|wysilek|kontekst, kotwica, o}
+  const [menu, setMenu] = useState(null);           // {co: model|wysilek|kontekst|limit, kotwica, o}
+  const limity = useLimity();
   useEffect(() => {
     let zywy = true, t = 0, w = 0, ostatnio = 0;
     const tik = async () => {
@@ -265,10 +303,11 @@ function Stopka({ watek }) {
     const kotwica = e.currentTarget;
     if (menu && menu.kotwica === kotwica) { setMenu(null); return; }
     if (co === "fast") { kom(`/fast ${d.fast ? "off" : "on"}`); return; }
-    if (co === "kontekst") { setMenu({ co, kotwica }); return; }
+    if (co === "kontekst" || co === "limit") { setMenu({ co, kotwica }); return; }
     try { setMenu({ co, kotwica, o: (await api.rozmowy.opcje(watek)).opcje }); } catch (er) { akcje._blad(er); }
   };
   const zaj = d.okno ? Math.round(d.procent) : null;
+  const konto = kontoLimitu(limity, d.dostawca);
   const dymek = `${L("Kontekst", "Context")}: ${d.szacunek ? "≈" : ""}${krotko(d.kontekst)}${d.okno ? ` / ${krotko(d.okno)} (${zaj}%)` : ""}`;
   const pig = (co, tresc, tip, klasa) => html`<button type="button" class=${cx("j-pig", klasa, menu && menu.co === co && "is-otw")} title=${tip}
     aria-haspopup=${co === "fast" ? undefined : "dialog"} aria-expanded=${co === "fast" ? undefined : String(!!(menu && menu.co === co))}
@@ -282,8 +321,15 @@ function Stopka({ watek }) {
         L(`Tryb szybki ${d.fast ? "włączony" : "wyłączony"}: kliknij, żeby przełączyć`, `Fast mode ${d.fast ? "on" : "off"}: click to toggle`),
         cx("is-zb", "is-fast", !d.fast && "is-wyc"))}
     </span><span class="j-rozpych"></span>
+    ${konto && pig("limit", html`<span class="j-lim" aria-hidden="true">${konto.okna.map((o) => html`<i key=${o.id}
+        class=${poziomLimitu(o.procent)}><b style=${{ width: `${Math.min(100, o.procent)}%` }}></b></i>`)}</span>
+      <span>${konto.okna.map((o) => `${Math.round(o.procent)}%`).join(" · ")}</span>`,
+      `${konto.nazwa}${konto.plan ? ` ${konto.plan}` : ""}: ${konto.okna.map((o) => `${T(`limity.${o.id}_pelna`)} ${T("limity.zuzyte", { p: Math.round(o.procent) })}`).join(", ")}`,
+      cx("j-pig-l", poziomLimitu(Math.max(...konto.okna.map((o) => o.procent)))))}
     ${pig("kontekst", html`<${Pierscien} p=${d.procent}/><span>${zaj != null ? `${zaj}%` : krotko(d.kontekst)}</span>`,
       dymek, cx("j-pig-k", zaj >= 80 && "is-duzo"))}
+    ${menu && menu.co === "limit" && konto && html`<${Wysuwka} kotwica=${menu.kotwica} onZamknij=${zamknij} etykieta=${T("limity.etykieta")} klasa="is-limit">
+      <${LimitWybor} konto=${konto}/></${Wysuwka}>`}
     ${menu && menu.co === "model" && html`<${Wysuwka} kotwica=${menu.kotwica} onZamknij=${zamknij} etykieta=${L("Wybór modelu", "Model picker")} klasa="is-model">
       <${ModelWybor} o=${menu.o} onWybierz=${(m) => (m.biezacy ? zamknij() : kom(Komendy.komendaModelu(m)))}/></${Wysuwka}>`}
     ${menu && menu.co === "wysilek" && html`<${Wysuwka} kotwica=${menu.kotwica} onZamknij=${zamknij} etykieta=${L("Wysiłek myślenia", "Thinking effort")} klasa="is-wysilek">

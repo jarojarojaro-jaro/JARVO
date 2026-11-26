@@ -408,7 +408,7 @@ def test_stopka_paska_bez_drugiego_wejscia_do_ustawien():
     assert pasek.count("<${NawigacjaCentrum} trasa=${trasa}/>") == 1
     srodek = pasek.split('<div class="j-pasek-s"', 1)[1].split("<${NawigacjaCentrum}", 1)[0]
     assert "<${ListaRozmowcow}" in srodek and 'class="j-lista"' in srodek and 'class="j-inne"' in srodek
-    assert "<${NawigacjaCentrum} trasa=${trasa}/>\n    <${LimityPlanow}/>\n    <${StopkaPaska}/>" in pasek
+    assert "<${NawigacjaCentrum} trasa=${trasa}/>\n    <${StopkaPaska}/>" in pasek
     assert '["ustawienia", T("pasek.ustawienia"), "Mod+,"]' in t
     assert 'ikona="gear"' not in _tekst("90-app.js") and "j-gora-ust" not in _tekst("90-app.js")   # telefon też
 

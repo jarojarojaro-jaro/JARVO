@@ -528,6 +528,7 @@ class Wykonawca:
             return {**out, "wysilek": str(d.get("myslenie") or ""),
                     "fast": d.get("fast") if isinstance(d.get("fast"), bool) else None,
                     "fast_dostepny": True, "zaplecze": "omp", "szacunek": False,
+                    "dostawca": str(out["model"] or "").split("/", 1)[0] if "/" in str(out["model"] or "") else "",
                     "kompresja": d.get("kompresja") if isinstance(d.get("kompresja"), dict) else None}
         wid = k.watek["id"] if k.watek else None
         wybrany = k.sil.db.model_czlonka(wid, k.agent) if wid else None
@@ -551,7 +552,7 @@ class Wykonawca:
                 "kontekst": kontekst, "okno": okno, "procent": round(100.0 * kontekst / okno, 1) if okno else 0.0,
                 **{x: max(int(z.get(x) or 0), int(u.get(x) or 0)) for x in ("wejscie", "wyjscie", "cache_odczyt", "cache_zapis")},
                 "koszt": float(z.get("koszt") or 0), "czas": time.time(), "wysilek": o["wysilek"], "fast": o["fast"],
-                "fast_dostepny": bool(m.get("fast_dostepny"))}
+                "fast_dostepny": bool(m.get("fast_dostepny")), "dostawca": str(m.get("provider") or "")}
 
     def _zuzycie_hermes(self, k: Kontekst) -> tuple[dict, dict]:
         rodowod = [s["sesja_id"] for s in k.sil.db.sesje_watku(k.watek["id"], agent=k.agent, rola="rozmowa")]
