@@ -76,7 +76,8 @@ function useUwaga() {
   return [uwaga, pokaz];
 }
 
-// karta pliku: miniatura i nazwa otwierają podgląd; obok Pobierz (Odpal dla HTML, Edytuj dla filmu) i menu z resztą akcji
+// karta pliku: miniatura i nazwa otwierają podgląd; obok Pobierz (Odpal dla HTML) i menu z resztą akcji; film ma
+// wyraźny przycisk z napisem „Edytuj film” (26.11 właściciel: mały długopis był niewidoczny)
 function KartaPliku({ plik, kompakt = false }) {
   const host = useHost();
   const [menu, setMenu] = useState(null);
@@ -94,7 +95,9 @@ function KartaPliku({ plik, kompakt = false }) {
       <span class="j-plik-t"><span class="j-plik-n">${plik.name}</span><span class="j-plik-o">${opis}</span></span>
     </button>
     <span class="j-plik-akcje">
-      <${Przycisk} rodzaj="cichy" maly ikona=${glowna.ikona} etykieta=${glowna.tekst} podpowiedz=${glowna.tekst} onClick=${glowna.akcja}/>
+      ${plik.kind === "video"
+        ? html`<${Przycisk} rodzaj="glowny" maly ikona=${glowna.ikona} klasa="j-plik-edytuj" onClick=${glowna.akcja}>${glowna.tekst}</${Przycisk}>`
+        : html`<${Przycisk} rodzaj="cichy" maly ikona=${glowna.ikona} etykieta=${glowna.tekst} podpowiedz=${glowna.tekst} onClick=${glowna.akcja}/>`}
       <${Przycisk} rodzaj="cichy" maly ikona="more" etykieta=${T("plik.wiecej", { nazwa: plik.name })}
         aria-haspopup="menu" aria-expanded=${menu ? "true" : "false"} onClick=${(e) => setMenu(e.currentTarget)}/>
     </span>

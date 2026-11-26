@@ -1888,6 +1888,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-plik-n { font: 500 13px/1.4 var(--j-font-mono); color: var(--j-tekst); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .j-plik-o { font-size: 12px; color: var(--j-tekst-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .j-plik-akcje { display: flex; align-items: center; gap: 2px; padding-right: 6px; flex: none; }
+.j-btn.is-maly.j-plik-edytuj { height: 36px; padding: 0 16px; margin-right: 4px; font-size: 13.5px; font-weight: 600; }
 .j-plik-uwaga { flex-basis: 100%; padding: 0 14px 10px; font-size: 12.5px; color: var(--j-tresc); }
 .j-plik-uwaga.is-zle { color: var(--j-blad); }
 .j-plik.is-obraz .j-plik-otworz { flex-direction: column; align-items: stretch; gap: 0; padding: 0; }
