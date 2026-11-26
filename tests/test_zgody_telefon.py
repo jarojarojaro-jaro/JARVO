@@ -104,6 +104,10 @@ def test_mapa_z_telefon_json(tmp_path, monkeypatch):
     "for S in a b; do adb -s $S shell sh -c 'rm -rf /sdcard/Download'; done",
     "adb shell settings delete global x",
     "adb reboot recovery",
+    "adb -s $S shell cmd connectivity airplane-mode enable",
+    "adb shell settings put global airplane_mode_on 1",
+    "adb shell svc wifi disable",
+    "adb shell 'cmd wifi set-wifi-enabled disabled'",
 ])
 def test_adb_niszczace_blokowane(straz, polecenie):
     w = hak("terminal", command=polecenie)
@@ -113,6 +117,7 @@ def test_adb_niszczace_blokowane(straz, polecenie):
 @pytest.mark.parametrize("polecenie", [
     '$A -s $S shell "pm list packages"',
     "adb -s 100.99.0.1:5555 shell am start -n com.android.chrome/.Main",
+    "adb -s $S shell cmd connectivity airplane-mode disable",
 ])
 def test_adb_odczyt_i_start_przechodza(straz, polecenie):
     assert hak("terminal", command=polecenie) is None

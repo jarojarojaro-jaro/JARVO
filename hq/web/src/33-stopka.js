@@ -12,8 +12,11 @@
 // albo myślenia w terminalu), co 2 s w trakcie pracy panelu, inaczej co 30 s; w ukrytej karcie przeglądarki nie pyta.
 
 const krotko = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(/\.0$/, "")}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k` : String(n || 0));
-// „anthropic/claude-opus-5-5” → „opus-5-5” (dostawca i rodzina w wysuwce i w dymku)
-const krotkiModel = (m) => String(m || "?").split("/").pop().replace(/^claude-/, "");
+// krótka nazwa modelu w stopce (26.11 właściciel: „skróty modeli”): „anthropic/claude-opus-5-5” → „Opus 5.5”,
+// „deepseek/deepseek-v4.1-flash” → „DS 4.1 Flash”; pełna nazwa w dymku i w wysuwce
+const krotkiModel = (m) => String(m || "?").split("/").pop().replace(/^claude-/, "").replace(/^deepseek-v?/i, "DS ")
+  .replace(/(\d)-(?=\d)/g, "$1.").replace(/-/g, " ").replace(/\b[a-z]/g, (c) => c.toUpperCase())
+  .replace(/\b(Gpt|Glm|Ds)\b/g, (s) => s.toUpperCase());
 const dolary = (x) => `$${Number(x || 0).toFixed(2)}`;
 const godzina = (s) => new Date(s * 1000).toLocaleTimeString(isPL() ? "pl-PL" : "en-GB", { hour: "2-digit", minute: "2-digit" });
 

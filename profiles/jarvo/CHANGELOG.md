@@ -4,8 +4,10 @@
 - Telefon floty: zadanie zaczęte na jednym telefonie zostaje na nim (strażnik blokuje drugi telefon, także przez adb), a numer i konta każdego telefonu są w skarbcu `fleet/telefony.md` z pomiaru `jarvo telefon spis`.
 - Strażnik blokuje wpisanie albo wysłanie prywatnego numeru właściciela w każdym narzędziu.
 - Czyszczenie danych, odinstalowanie, wyłączenie aplikacji i kasowanie plików na telefonie floty przez adb strażnik blokuje do wyraźnego polecenia właściciela.
-- Hacker zakłada konta i loguje się na telefonie bez pytania właściciela o zgodę, a pyta tylko o płatności, publikację, zgłoszenia na hackathon, kontakt z ludźmi i pobrane programy.
-- Na telefonie stopka wpisywania pokazuje pełną nazwę modelu, a wysiłek, limit i kontekst jako same znaki (liczby po stuknięciu).
+- Hacker robi bez pytania wszystko, czego wymaga praca (konta, logowania, formularze, telefon, publikacja, zgłoszenia), a o zgodę pyta tylko przy płatności.
+- Stopka wpisywania pokazuje krótką nazwę modelu (np. „DS 4.1 Flash”, „Opus 5.5”), a na telefonie wysiłek, limit i kontekst jako same znaki (liczby po stuknięciu).
+- Film w rozmowie ma wyraźny przycisk „Edytuj film”.
+- Rozmowa agenta kompresuje się od 64 tys. tokenów i po 30 minutach przerwy, więc kontekst nie puchnie do setek tysięcy.
 - Obraz malowany, krótki film rysowany i kadr voxel ASCII robisz sam (skille `pracownia-malarza`, `film-rysowany`, `voxel-ascii`), a dłuższe filmy zlecasz Wideografowi.
 - Rozmówca z nieprzeczytaną odpowiedzią ma stan „odpowiedź” (jasnoniebieski) zamiast „wolny”; wolny jest zielony, pracuje czerwony, w terminalu magenta.
 - Strażnik rutyn w każdym trybie: agent nie uruchamia rutyny na próbę i nie zakłada rutyny próbnej ani drugiej o tej samej nazwie, tylko poprawia albo wznawia istniejącą.

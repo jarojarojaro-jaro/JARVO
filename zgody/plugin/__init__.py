@@ -3144,14 +3144,16 @@ def _prywatny_numer(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[str, 
     return None
 
 
-# 26.11 Hacker zrobił `adb -s … shell pm clear com.android.chrome` na telefonie floty i skasował loginy Chrome:
-# czyszczenie, odinstalowanie, wyłączanie aplikacji i kasowanie plików przez adb blokujemy w każdym trybie.
+# 26.11 Hacker zrobił `adb -s … shell pm clear com.android.chrome` i skasował loginy Chrome, a o 21:10 tryb
+# samolotowy przez adb odciął second od sieci: takie polecenia adb blokujemy w każdym trybie.
 _ADB_KONTEKST = re.compile(r"\badb\b|ANDROID_SERIAL|-s\s+\S+\s+shell\b", re.I)
 ADB_NISZCZACE = re.compile(
     r"\bpm\s+(?:clear|uninstall|disable(?:-user)?|hide|suspend|reset-permissions|revoke)\b|"
     r"\bcmd\s+package\s+(?:clear|uninstall|disable(?:-user)?|hide|suspend)\b|"
     r"\badb\b[^;&|\n]*?\buninstall\b|\bshell\b[^;&|\n]*?(?<![\w.-])rm(?![\w.-])|"
-    r"\bwipe\b|\brecovery\b|\bsettings\s+delete\b|\bcmd\s+appops\s+reset\b", re.I)
+    r"\bwipe\b|\brecovery\b|\bsettings\s+delete\b|\bcmd\s+appops\s+reset\b|"
+    r"\bcmd\s+connectivity\s+airplane-mode\s+enable\b|\bsettings\s+put\s+global\s+airplane_mode_on\s+1\b|"
+    r"\bsvc\s+wifi\s+disable\b|\bcmd\s+wifi\s+set-wifi-enabled\s+disabled\b", re.I)
 
 
 def _adb_niszczace(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[str, str]]:
@@ -3160,8 +3162,8 @@ def _adb_niszczace(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[str, s
     if not (_ADB_KONTEKST.search(tekst) and ADB_NISZCZACE.search(tekst)):
         return None
     logger.warning("jarvo-zgody: zablokowane niszczące polecenie adb (%s)", tool_name)
-    return _blok("Czyszczenie danych, odinstalowanie, wyłączenie aplikacji i kasowanie plików na telefonie floty tylko "
-                 "na wyraźne polecenie JARO: zapytaj go jednym zdaniem.")
+    return _blok("Czyszczenie danych, odinstalowanie, wyłączenie aplikacji i kasowanie plików na telefonie floty albo "
+                 "to, co odcina telefon od sieci, tylko na wyraźne polecenie JARO: zapytaj go jednym zdaniem.")
 
 
 def _blok_werdyktow(werdykty: List[_Werdykt], m: _Miejsca, co: str) -> Dict[str, str]:

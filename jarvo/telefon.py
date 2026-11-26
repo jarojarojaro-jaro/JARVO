@@ -570,6 +570,12 @@ POMIJANE_TYPY = {"com.google.android.apps.tachyon", "USIM Account", "com.android
 POMIJANE_NAZWY = {"Reddit for Android", "Meet", "USIM1", "USIM2", "SIM1", "SIM2"}
 KONTO = re.compile(r"Account \{name=(.*?), type=([^}]*)\}")
 NIE_ODPOWIADA = "- nie odpowiada, dane z poprzedniego spisu"
+# subskrypcja w `dumpsys isub` (Android 13: `{id=…`, nowsze: `[SubscriptionInfoInternal: id=…`); wiersze dziennika
+# („… - Active subscription info list changed. [{id=…”) zaczynają się datą i są pomijane; iccId się nie czyta
+SUBSKRYPCJA = re.compile(r"^\s*(?:\{|\[SubscriptionInfoInternal:\s*)id=(\d+)\b")
+SLOT = re.compile(r"\bsimSlotIndex=(-?\d+)")
+NAZWA_SIM = re.compile(r"\bdisplayName=(.*?)\s+\w+=")
+WIDOCZNA = {"READY", "LOADED"}
 
 
 def _powloka(adb: str, adres: str, polecenie: str) -> str | None:
@@ -600,6 +606,36 @@ def konta_z_dumpsys(tekst: str) -> tuple[list[str], list[dict]]:
     return google, aplikacje
 
 
+def subskrypcje_z_isub(tekst: str) -> list[dict]:
+    """Subskrypcje SIM z `dumpsys isub`: [{"id", "slot", "nazwa"}] bez powtórzeń; przy kilku wpisach jednej
+    subskrypcji wygrywa ten z gniazdem (slot ≥ 0)."""
+    subs: dict[str, dict] = {}
+    for linia in tekst.splitlines():
+        m = SUBSKRYPCJA.match(linia)
+        if not m:
+            continue
+        slot, nazwa = SLOT.search(linia), NAZWA_SIM.search(linia)
+        wpis = {"id": m.group(1), "slot": int(slot.group(1)) if slot else -1,
+                "nazwa": nazwa.group(1).strip() if nazwa else ""}
+        if m.group(1) not in subs or (subs[m.group(1)]["slot"] < 0 <= wpis["slot"]):
+            subs[m.group(1)] = wpis
+    return list(subs.values())
+
+
+def opis_sim(subs: list[dict], stany: list[str], operator: str) -> str | None:
+    """Tekst SIM: „SIM X”, „SIM X, telefon jej teraz nie widzi (…)” albo None (bez SIM). `stany` = gsm.sim.state
+    po gniazdach."""
+    opisy = []
+    for s in subs:
+        nazwa = s["nazwa"] or "bez nazwy"
+        stan = stany[s["slot"]] if 0 <= s["slot"] < len(stany) else ""
+        opisy.append(f"SIM {nazwa}" if s["slot"] >= 0 and stan in WIDOCZNA
+                     else f"SIM {nazwa}, telefon jej teraz nie widzi (sprawdź SIM w gnieździe)")
+    if not opisy and WIDOCZNA & set(stany):
+        opisy.append(f"SIM {operator or 'bez nazwy'}")
+    return "; ".join(opisy) or None
+
+
 def zmierz_telefon(adb: str, nazwa: str, adres: str, numer: str | None) -> dict:
     wynik = {"nazwa": nazwa, "adres": adres, "numer": numer, "odpowiada": False, "model": None, "sim": None,
              "google": [], "aplikacje": [], "kiedy": time.strftime("%Y-%m-%d %H:%M")}
@@ -607,19 +643,20 @@ def zmierz_telefon(adb: str, nazwa: str, adres: str, numer: str | None) -> dict:
     props = _powloka(adb, adres, "getprop gsm.sim.state; getprop gsm.operator.alpha; getprop ro.product.model")
     if konta is None or props is None:
         return wynik
+    isub = _powloka(adb, adres, "dumpsys isub") or ""
     linie = [*props.splitlines(), "", "", ""]
-    stan_sim = {s.strip() for s in linie[0].split(",") if s.strip()}
+    stany = [s.strip() for s in linie[0].split(",")]
     operator = next((o.strip() for o in linie[1].split(",") if o.strip()), "")
     wynik["google"], wynik["aplikacje"] = konta_z_dumpsys(konta)
     wynik.update(odpowiada=True, model=linie[2].strip() or None,
-                 sim=(operator or "SIM bez operatora") if stan_sim & {"READY", "LOADED"} else None)
+                 sim=opis_sim(subskrypcje_z_isub(isub), stany, operator))
     return wynik
 
 
 def _sekcja(t: dict) -> str:
     apl = "; ".join(f"{a['usluga']}: {a['login']}" for a in t["aplikacje"]) or "brak"
     return "\n".join([f"### {t['nazwa']}", f"- adres adb: {t['adres']}", f"- model: {t['model'] or 'nieznany'}",
-                      f"- SIM: {t['sim'] or 'bez SIM'}", f"- numer: {t['numer'] or 'numer nieustalony'}",
+                      f"- {t['sim'] or 'bez SIM'}", f"- numer: {t['numer'] or 'numer nieustalony'}",
                       f"- konta Google: {', '.join(t['google']) or 'brak'}", f"- konta w aplikacjach: {apl}",
                       f"- pomiar: {t['kiedy']}"])
 

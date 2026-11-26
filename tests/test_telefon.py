@@ -258,37 +258,51 @@ DUMPSYS = """Accounts: 6
     Account {name=zygmacias@gmail.com, type=com.google}
 """
 
+ISUB = {   # dumpsys isub: SIM w gnieździe (Android 13), SIM znana bez gniazda (nowszy format), brak subskrypcji
+    "1.": "Subscriptions:\n  {id=1 iccId=8948000000000000001 simSlotIndex=0 carrierId=1658 displayName=CrossMobile "
+          "carrierName=CrossMobile nameSource=1}\n2026-11-23T02:15:32.678797 - Active subscription info list "
+          "changed. [{id=7 iccId=8948000000000000009 simSlotIndex=0 displayName=Stara carrierName=x}]\n",
+    "2.": "  [SubscriptionInfoInternal: id=2 iccId=8948000000000000002 simSlotIndex=-1 carrierId=1 "
+          "displayName=FONIA carrierName=Tylko połączenia alarmowe – FONIA nameSource=1]\n",
+    "3.": "Subscriptions:\n",
+}
+
 
 def test_spis_telefonow_notatka_z_pomiaru(inst, monkeypatch, capsys):
-    """`jarvo telefon spis`: konta i SIM z dumpsys/getprop (adb podstawiony), ręczna część notatki zostaje,
-    telefon niedostępny zachowuje swój blok z poprzedniego spisu."""
-    telefon.zapisz_stan(inst.u, {"adresy": {"first": "1.1.1.1:5555", "second": "2.2.2.2:5555"},
-                                 "numery": {"first": "+48500100200"}})
-    zywe = {"1.1.1.1:5555", "2.2.2.2:5555"}
+    """`jarvo telefon spis`: konta z dumpsys account i SIM z dumpsys isub i getprop (adb podstawiony), ręczna część
+    notatki zostaje, telefon niedostępny zachowuje swój blok z poprzedniego spisu."""
+    telefon.zapisz_stan(inst.u, {"adresy": {"first": "1.1.1.1:5555", "second": "2.2.2.2:5555",
+                                            "third": "3.3.3.3:5555"}, "numery": {"first": "+48500100200"}})
+    zywe = {"1.1.1.1:5555", "2.2.2.2:5555", "3.3.3.3:5555"}
 
     def powloka(_adb, adres, polecenie):
         if adres not in zywe:
             return None
         if polecenie == "dumpsys account":
             return DUMPSYS
-        return "READY,ABSENT\nCrossMobile,\nPixel 7\n" if adres.startswith("1.") else "ABSENT\n\nPixel 6\n"
+        if polecenie == "dumpsys isub":
+            return ISUB[adres[:2]]
+        return "LOADED,ABSENT\nCrossMobile,\nPixel 7\n" if adres.startswith("1.") else "ABSENT\n\nPixel 6\n"
     monkeypatch.setattr(telefon, "_powloka", powloka)
 
     assert jarvo(inst, "spis", "--json", "--bez-zapisu") == 0
-    pomiar = json.loads(capsys.readouterr().out)
+    wyjscie = capsys.readouterr().out
+    pomiar = json.loads(wyjscie)
     notatka = inst.u.dane / "jarvo" / "knowledge" / "fleet" / "telefony.md"
-    assert not notatka.exists()
-    first, second = pomiar
+    assert not notatka.exists() and "8948" not in wyjscie                 # iccId nigdy w wyniku
+    first, second, third = pomiar
     assert first["google"] == ["zygmacias@gmail.com", "manadzmajaro@gmail.com"]
     assert first["aplikacje"] == [{"usluga": "Reddit", "login": "Complete-Reveal-1114"},
                                   {"usluga": "GitHub", "login": "zygmacias-ctrl"}]
-    assert (first["sim"], first["numer"], first["model"]) == ("CrossMobile", "+48500100200", "Pixel 7")
-    assert (second["sim"], second["numer"]) == (None, None)
+    assert (first["sim"], first["numer"], first["model"]) == ("SIM CrossMobile", "+48500100200", "Pixel 7")
+    assert second["sim"] == "SIM FONIA, telefon jej teraz nie widzi (sprawdź SIM w gnieździe)"
+    assert (third["sim"], third["numer"]) == (None, None)
 
     assert jarvo(inst, "spis") == 0
     tekst = notatka.read_text(encoding="utf-8")
     assert tekst.startswith("---\ntyp: fakt") and "numer do SMS tylko z tego spisu" in tekst
-    assert "- SIM: CrossMobile" in tekst and "- SIM: bez SIM" in tekst and "numer nieustalony" in tekst
+    assert "- SIM CrossMobile\n" in tekst and "- bez SIM\n" in tekst and "numer nieustalony" in tekst
+    assert "- SIM FONIA, telefon jej teraz nie widzi" in tekst
     assert "- konta w aplikacjach: Reddit: Complete-Reveal-1114; GitHub: zygmacias-ctrl" in tekst
     notatka.write_text(tekst + "- Allegro, sklep@x.pl, first, 2026-11-26\n", encoding="utf-8")
 
