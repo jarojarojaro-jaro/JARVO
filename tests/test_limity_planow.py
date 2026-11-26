@@ -32,3 +32,16 @@ def test_bez_omp_pusto_i_jedno_zapytanie_na_okres(monkeypatch):
     monkeypatch.setattr(l, "_zapytaj", lambda: wywolania.append(1) or [])
     l.pobierz(); l.pobierz()
     assert len(wywolania) == 1
+
+
+def test_konto_floty_command_code_zamiast_konta_z_omp(monkeypatch):
+    """26.11: omp miał stare konto Command Code (0%), a flota pracuje na nowym (GOAT): pasek pokazuje konto floty."""
+    cc = limity.z_commandcode({"windowLimits": {"fiveHour": {"used": 0.13, "cap": 14, "resetAt": 1_795_711_938_940},
+                                                "weekly": {"used": 7.34, "cap": 35}}},
+                              {"data": {"planId": "individual-goat"}})
+    assert cc == {"id": "commandcode", "nazwa": "Command Code", "plan": "GOAT", "okna": [
+        {"id": "5h", "procent": 0.9, "reset": 1_795_711_938.94}, {"id": "7d", "procent": 21.0, "reset": None}]}
+    assert limity.z_commandcode({"windowLimits": {}}, None) is None
+    l = limity.Limity(program=lambda: "omp", flota=lambda: [cc])
+    monkeypatch.setattr(l, "_omp", lambda: [{"id": "commandcode", "plan": None, "okna": []}, {"id": "anthropic", "okna": []}])
+    assert [(d["id"], d.get("plan")) for d in l.pobierz()["dostawcy"]] == [("commandcode", "GOAT"), ("anthropic", None)]

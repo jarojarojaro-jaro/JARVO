@@ -1439,9 +1439,10 @@ innych kanałów etap 6.
 
 ### Limity planów (pasek)
 
-Nad stopką paska: każde konto z `omp usage --json` (Claude z planem, Command Code…) z oknem 5 godzin i tygodnia jako
-cienki pasek z procentem; od 80% żółty, od 95% czerwony, w dymku czas odnowienia. Serwer (`hq/plugin/limity.py`,
-`GET /limity`) pyta omp najwyżej raz na 5 minut, karta odświeża co 5 minut i po powrocie do niej; bez omp sekcji nie ma.
+Nad stopką paska: konto, na którym pracuje Jarvo (Command Code z kluczem profilu jarvo i planem z subskrypcji), i konta
+z `omp usage --json` (np. Claude z planem), każde z oknem 5 godzin i tygodnia jako cienki pasek z procentem; dostawca
+floty z omp odpada. Od 80% żółty, od 95% czerwony, w dymku czas odnowienia. Serwer (`hq/plugin/limity.py`,
+`GET /limity`) pyta źródła najwyżej raz na 5 minut, karta odświeża co 5 minut i po powrocie do niej; bez kont sekcji nie ma.
 
 ### Aktualizacje (`#/aktualizacje`)
 
