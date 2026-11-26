@@ -7,7 +7,7 @@ z `scope.tier`), jako procent zużycia i czas odnowienia. Wynik w pamięci przez
 a dostawcy dostają najwyżej jedno zapytanie na CZAS_S.
 
 Trasa: `GET /limity` (tylko z karty panelu: `Sec-Fetch-Site` same-origin/none) → {dostawcy: [{id, nazwa, plan,
-okna: [{id, procent, reset}]}], czas}. Testy: tests/test_limity.py.
+okna: [{id, procent, reset}]}], czas}. Testy: tests/test_limity_planow.py.
 """
 
 import asyncio
