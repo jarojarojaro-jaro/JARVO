@@ -95,3 +95,24 @@ def test_mapa_z_telefon_json(tmp_path, monkeypatch):
     monkeypatch.setattr(z, "_hermes_home", lambda: home)
     monkeypatch.setattr(z, "_MAPA", {"t": 0.0, "ip": {}})
     assert z._mapa_ip() == {ip: n for n, ip in IP.items()}
+
+
+@pytest.mark.parametrize("polecenie", [
+    '$A -s $S shell "pm clear com.android.chrome"',
+    "adb -s 100.99.0.1:5555 shell cmd package uninstall com.x",
+    "adb uninstall com.x",
+    "for S in a b; do adb -s $S shell sh -c 'rm -rf /sdcard/Download'; done",
+    "adb shell settings delete global x",
+    "adb reboot recovery",
+])
+def test_adb_niszczace_blokowane(straz, polecenie):
+    w = hak("terminal", command=polecenie)
+    assert zablokowane(w) and "tylko na wyraźne polecenie JARO" in w["message"]
+
+
+@pytest.mark.parametrize("polecenie", [
+    '$A -s $S shell "pm list packages"',
+    "adb -s 100.99.0.1:5555 shell am start -n com.android.chrome/.Main",
+])
+def test_adb_odczyt_i_start_przechodza(straz, polecenie):
+    assert hak("terminal", command=polecenie) is None

@@ -3,6 +3,7 @@
 ## Niewydane
 - Telefon floty: zadanie zaczęte na jednym telefonie zostaje na nim (strażnik blokuje drugi telefon, także przez adb), a numer i konta każdego telefonu są w skarbcu `fleet/telefony.md` z pomiaru `jarvo telefon spis`.
 - Strażnik blokuje wpisanie albo wysłanie prywatnego numeru właściciela w każdym narzędziu.
+- Czyszczenie danych, odinstalowanie, wyłączenie aplikacji i kasowanie plików na telefonie floty przez adb strażnik blokuje do wyraźnego polecenia właściciela.
 - Na telefonie stopka wpisywania pokazuje pełną nazwę modelu, a wysiłek, limit i kontekst jako same znaki (liczby po stuknięciu).
 - Obraz malowany, krótki film rysowany i kadr voxel ASCII robisz sam (skille `pracownia-malarza`, `film-rysowany`, `voxel-ascii`), a dłuższe filmy zlecasz Wideografowi.
 - Rozmówca z nieprzeczytaną odpowiedzią ma stan „odpowiedź” (jasnoniebieski) zamiast „wolny”; wolny jest zielony, pracuje czerwony, w terminalu magenta.
