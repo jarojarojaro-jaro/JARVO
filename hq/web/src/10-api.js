@@ -173,6 +173,11 @@ const liveApi = {
     return res.blob();
   },
   editJob: (id) => jsonFetch(`${API_ROOT}/edit/job/${encodeURIComponent(id)}`),
+  // „Edytuj ujęcie”: parametry strony + render tylko zakresu strony klipu (zadanie jak eksport, postęp z editJob)
+  async editUjecie(path, id, wartosci) {
+    const res = await rawFetch(`${API_ROOT}/edit/ujecie`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, id, wartosci }) });
+    return res.json();
+  },
   // POST: wydaje link podglądu z tokenem (zapis w state/preview-links.json), więc idzie przez ochronę zapisu
   animInfo: (path) => jsonFetch(`${API_ROOT}/anim/info`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) }),
   animCheck: (path) => jsonFetch(`${API_ROOT}/anim/check?path=${encodeURIComponent(path)}`),

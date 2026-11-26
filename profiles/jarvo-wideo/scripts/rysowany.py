@@ -452,7 +452,7 @@ def cmd_film(a, z_kodu: list[str]) -> int:
                 "-o", str(obraz), *(["--arkusz", a.arkusz] if a.arkusz else [])])
     glos_plik = katalog / "glos" / "voice.json"
     glos = json.loads(glos_plik.read_text(encoding="utf-8")) if glos_plik.is_file() and os_["zdania"] else None
-    cmd = [sys.executable, str(HERE / "projekt.py"), "z-kodu", a.o, "--obraz", str(obraz)]
+    cmd = [sys.executable, str(HERE / "projekt.py"), "z-kodu", a.o, "--obraz", str(obraz), "--strona", str(strona_html)]
     tn = ciecia(os_, glos)
     if tn:
         wl.write_json(katalog / "ciecia.json", tn)

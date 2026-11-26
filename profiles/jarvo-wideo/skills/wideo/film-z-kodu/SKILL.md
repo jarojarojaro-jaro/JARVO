@@ -121,7 +121,10 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
    gdy go wybrałeś: firmy powyżej 3 osób potrzebują licencji Remotion).
 13. **Film = projekt edytora:** każdy film z kodu oddajesz jako projekt HQ (`projekt.py z-kodu`, `references/projekt-edytora.md`):
    obraz bez wypalonych napisów, głos i efekty przypięte do obrazu, muzyka osobno, napisy tekstem; film to render
-   projektu. Właściciel sam wytnie ujęcie, zdejmie muzykę albo poprawi napis.
+   projektu. Właściciel sam wytnie ujęcie, zdejmie muzykę albo poprawi napis. `z-kodu` zawsze z `--ciecia` na ujęcia
+   i przy animacji HTML z `--strona <anim.html>` (teksty i kolory planszy z parametrów: kontrakt HTML, reguła 8);
+   poprawka po renderze to `projekt.py popraw-ujecie <film> <id>` (render tylko zakresu strony tego ujęcia, podmiana
+   w projekcie, film z projektu) albo `projekt.py podmien <film> <id> --plik ujecie.mp4`; całego filmu drugi raz nie renderujesz.
 14. **Długi film z odcinków: najpierw szkielet.** Wspólne stałe (linia gruntu, wzrost postaci, prędkość, paleta),
    interfejs odcinka i czas z osi całego filmu, potem odcinki, także równolegle (`delegate_task`: każdy dostaje
    szkielet, wzorcowe ujęcie i samokontrolę). Zdarzenia liczysz od osi filmu albo początku interakcji, nie „sekundę X

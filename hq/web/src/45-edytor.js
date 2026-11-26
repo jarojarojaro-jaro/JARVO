@@ -776,6 +776,8 @@ function VideoEditor({ path, onClose }) {
   const [saved, setSaved] = useState("");
   const [job, setJob] = useState(null);
   const [ask, setAsk] = useState(null);
+  const [ujecie, setUjecie] = useState(null);  // id klipu w „Edytuj ujęcie” (film z kodu)
+  const ujecieRun = useRef(false);             // render ujęcia trwa: zmiany projektu wczyta on sam, nie pętla stempla
   const [shot, setShot] = useState(null);      // zaznaczanie kadru: {a, b} w ułamkach podglądu (null = wyłączone)
   const [noteHi, setNoteHi] = useState(null);  // uwaga podświetlona na osi i w panelu prośby
   // strefy platformy na podglądzie kadru pionowego: wybór zapamiętany w tej przeglądarce, nie w projekcie
@@ -861,7 +863,7 @@ function VideoEditor({ path, onClose }) {
   const dirtyRef = useRef(false);
   const [conflict, setConflict] = useState(null);
   const [toast, setToast] = useState("");
-  async function reloadProject(who) {
+  async function reloadProject(who, msg) {
     const d = await api.editInfo(path);
     const proj = await prepare(d);
     baseRef.current = d.project_mtime || 0;
@@ -870,15 +872,15 @@ function VideoEditor({ path, onClose }) {
     H.apply(() => proj);
     setInfo(d);
     setConflict(null);
-    setToast(who === "jarvo-wideo" ? L("Wideograf zmienił projekt: wczytano jego wersję (↶ cofa).", "The video agent changed the project: loaded (undo reverts).")
-      : L("Wczytano nowszą wersję projektu.", "Loaded the newer project version."));
+    setToast(msg || (who === "jarvo-wideo" ? L("Wideograf zmienił projekt: wczytano jego wersję (↶ cofa).", "The video agent changed the project: loaded (undo reverts).")
+      : L("Wczytano nowszą wersję projektu.", "Loaded the newer project version.")));
     setTimeout(() => setToast(""), 6000);
   }
   useEffect(() => {
     if (!info || !api.editStamp) return undefined;
     let alive = true;
     const id = setInterval(async () => {
-      if (conflict || document.hidden) return;              // ukryta karta: zmiany agenta wczytamy po powrocie
+      if (conflict || document.hidden || ujecieRun.current) return;   // ukryta karta: zmiany agenta wczytamy po powrocie
       try {
         const st = await api.editStamp(path);
         if (!alive || !(st.mtime > baseRef.current + 1e-3)) return;
@@ -1957,6 +1959,8 @@ function VideoEditor({ path, onClose }) {
       ${c.kind !== "image" && act(c.muted ? "mute" : "volume", c.muted ? L("Włącz dźwięk", "Unmute") : L("Wycisz", "Mute"), () => upd("clip", c.id, { muted: !c.muted }))}
       ${c.kind !== "image" && act("extract", L("Wyodrębnij dźwięk", "Extract audio"), () => wyodrebnijKlip(c), { disabled: !mozeWyodrebnic(c),
         title: Math.abs((c.speed || 1) - 1) > 1e-6 ? L("Działa przy tempie 1×", "Works at 1× speed") : L("Dźwięk klipu jako osobne audio, klip wyciszony", "The clip's sound as a separate audio; the clip is muted") })}
+      ${ujZakres(p, c) && act("sliders", L("Edytuj ujęcie", "Edit shot"), () => { player.stop(); setUjecie(c.id); }, { disabled: Math.abs((c.speed || 1) - 1) > 1e-6,
+        title: L("Teksty i kolory planszy z kodu: podgląd na żywo, render tylko tego ujęcia", "Texts and colors of the coded board: live preview, renders only this shot") })}
       ${act("trash", L("Usuń", "Delete"), remove, { bad: true, disabled: p.clips.length <= 1 })}
     </div>`}
     ${jest(only, "kadr") && html`<label>${L("Kadr", "Framing")}${seg(ED_FITS.map(([k2, pl, en]) => [k2, L(pl, en)]), c.fit || "contain", (v) => upd("clip", c.id, { fit: v }))}</label>`}
@@ -2534,6 +2538,19 @@ function VideoEditor({ path, onClose }) {
     onOpen=${(f) => { onClose(); openFile && openFile(f); }} notes=${notes} addNote=${addNote} removeNote=${removeNote} noteHi=${noteHi}
     onSeek=${(x) => player.seek(x)} startShot=${startShot} urls=${shotUrls}/>`;
   const exportBox = job && html`<${ExportBox} job=${job} onClose=${() => setJob(null)} onOpen=${(f) => { onClose(); openFile && openFile(f); }}/>`;
+  // „Edytuj ujęcie”: projekt zapisany przed renderem (serwer pracuje na pliku), po renderze wczytany jako krok ↶
+  const ujKlip = ujecie && p.clips.find((x) => x.id === ujecie);
+  const ujecieBox = ujKlip && ujZakres(p, ujKlip) && html`<${UjecieStudio} key=${ujKlip.id + ujKlip.src} P=${p} c=${ujKlip} nr=${p.clips.indexOf(ujKlip) + 1}
+    onClose=${() => setUjecie(null)}
+    onApply=${async (wartosci) => { ujecieRun.current = true; await saveNow(); return api.editUjecie(path, ujKlip.id, wartosci); }}
+    onDone=${async (j) => {
+      ujecieRun.current = false;
+      if (!j || j.state !== "done") return;
+      const sek = j.ended && j.started ? Math.max(1, Math.round(j.ended - j.started)) : null;
+      await reloadProject("ujecie", L(`Ujęcie podmienione${sek ? ` (render ${sek} s)` : ""}: reszta filmu bez zmian. ↶ cofa.`,
+        `Shot replaced${sek ? ` (rendered in ${sek} s)` : ""}; the rest of the film is unchanged. Undo reverts.`));
+      setUjecie(null);
+    }}/>`;
   const exportBtn = html`<button type="button" class="thq-ed-btn is-main" disabled=${running || !info.ffmpeg} onClick=${doExport}
     title=${info.ffmpeg ? L("Zapisz nową wersję filmu (oryginał zostaje)", "Save a new version (the original stays)") : L("Brak ffmpeg w kontenerze", "ffmpeg is missing in the container")}>${L("Eksportuj", "Export")}</button>`;
 
@@ -2565,6 +2582,7 @@ function VideoEditor({ path, onClose }) {
         c.kind !== "image" && ["extract", L("Wyodrębnij", "Extract"), () => wyodrebnijKlip(c), !mozeWyodrebnic(c)],
         ["crop", L("Kadr", "Framing"), "clip:kadr"],
         ["kolor", L("Kolor", "Color"), "clip:kolor"],
+        ujZakres(p, c) && ["sliders", L("Ujęcie", "Shot"), () => { player.stop(); setUjecie(c.id); }, Math.abs((c.speed || 1) - 1) > 1e-6],
         p.clips[p.clips.length - 1].id !== c.id && ["trans", L("Przejście", "Transition"), () => { setSel({ type: "tr", id: c.id }); setTool("tr"); }],
         ["copy", L("Duplikuj", "Duplicate"), duplicate],
         ["trash", L("Usuń", "Delete"), remove, p.clips.length <= 1, true],
@@ -2619,7 +2637,7 @@ function VideoEditor({ path, onClose }) {
           class=${cx(typeof fn === "string" && tool === fn && "is-on", bad && "is-bad")}
           onClick=${() => (typeof fn === "string" ? setTool(tool === fn ? null : fn) : fn())}>${ED_ICON[ic]}<span>${label}</span></button>`)}</div>
       </nav>` : html`<nav class="thq-ed-nav">${TOOLS.map(([k2, label]) => html`<button type="button" key=${k2} class=${cx(tool === k2 && "is-on")} onClick=${() => openTool(k2)}>${ED_ICON[k2]}<span>${label}</span></button>`)}</nav>`}
-      ${exportBox}
+      ${exportBox}${ujecieBox}
     </div>`;
   }
 
@@ -2689,7 +2707,7 @@ function VideoEditor({ path, onClose }) {
       <button type="button" class="thq-ed-ico is-sm" onClick=${() => setPps((x) => clamp(x * 1.4, 4, 400))} aria-label=${L("Przybliż", "Zoom in")} title=${L("Przybliż", "Zoom in")}>${ED_ICON.plus}</button>
     </div>
     ${timeline}
-    ${exportBox}
+    ${exportBox}${ujecieBox}
   </div>`;
 }
 

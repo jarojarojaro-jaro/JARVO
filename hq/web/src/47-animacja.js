@@ -66,48 +66,15 @@ function AnField({ p, value, saved, onChange }) {
     ${p.opis && html`<p class="thq-ed-note">${p.opis}</p>`}${control}</div>`;
 }
 
-function AnimStudio({ path, onClose }) {
-  const me = useRef({});
-  const frameRef = useRef(null), boxRef = useRef(null);
-  const [info, setInfo] = useState(null);
-  const [err, setErr] = useState(null);
+// Rozmowa z animacją w ramce przez mostek /_jarvo/most.js: jedna klatka naraz; gdy strona rysuje, czekamy i wysyłamy
+// tylko najnowszy czas (z parametrami, gdy się zmieniły). Wspólna dla „◐ Animacja” i „Edytuj ujęcie” w edytorze filmu.
+// onReady({W, H, DUR, parametry}) po wczytaniu strony; start = pierwsza chwila osi strony.
+function useAnimMost(frameRef, valsRef, start, onReady) {
   const [ready, setReady] = useState(null);       // {W, H, DUR, parametry} z mostka strony
   const [pageErr, setPageErr] = useState(null);
-  const [t, setT] = useState(0);
-  const [dur, setDur] = useState(10);
-  const [playing, setPlaying] = useState(false);
-  const [vals, setVals] = useState({});
-  const [base, setBase] = useState({});
-  const [note, setNote] = useState("");
-  const [busySave, setBusySave] = useState(false);
-  const [ask, setAsk] = useState({ text: "", reply: "", busy: false, error: null });
-  const [box, setBox] = useState({ w: 0, h: 0 });
-  const tRef = useRef(0), valsRef = useRef({}), seek = useRef({ busy: false, next: null, id: 0 }), play = useRef({ raf: 0, t0: 0, s0: 0 });
-  valsRef.current = vals;
-
-  useEffect(() => { MODAL_STACK.push(me.current); return () => { const i = MODAL_STACK.indexOf(me.current); if (i >= 0) MODAL_STACK.splice(i, 1); }; }, []);
-  useOverDashboard();
-  useEffect(() => {
-    let alive = true;
-    api.animInfo(path).then((d) => {
-      if (!alive) return;
-      setInfo(d);
-      const v = anValuesOf(d.parametry && d.parametry.pola);
-      setVals(v); setBase(v);
-      const dl = d.pomiar && d.pomiar.pokrycie && d.pomiar.pokrycie.do;
-      if (dl) setDur(dl);
-    }).catch((e) => alive && setErr(e.message || String(e)));
-    return () => { alive = false; cancelAnimationFrame(play.current.raf); };
-  }, [path]);
-  useEffect(() => {
-    const el = boxRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return undefined;
-    const ro = new ResizeObserver(() => setBox({ w: el.clientWidth, h: el.clientHeight }));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [info]);
-
-  // ---- rozmowa ze stroną: jedna klatka naraz; gdy strona rysuje, czekamy i wysyłamy tylko najnowszy czas
+  const [t, setT] = useState(start || 0);
+  const tRef = useRef(start || 0), seek = useRef({ busy: false, next: null, id: 0 }), gotowe = useRef(onReady);
+  gotowe.current = onReady;
   const post = (m) => { const w = frameRef.current && frameRef.current.contentWindow; if (w) w.postMessage({ jarvo: "hq", ...m }, "*"); };
   function seekTo(x, withParams) {
     tRef.current = x; setT(x);
@@ -123,8 +90,9 @@ function AnimStudio({ path, onClose }) {
       if (d.jarvo !== "anim") return;
       const S = seek.current;
       if (d.typ === "gotowe") {
-        setReady({ W: +d.W || 1920, H: +d.H || 1080, DUR: +d.DUR || null, parametry: !!d.parametry });
-        if (+d.DUR > 0) setDur((x) => (info && info.pomiar && info.pomiar.pokrycie ? x : +d.DUR));
+        const r = { W: +d.W || 1920, H: +d.H || 1080, DUR: +d.DUR || null, parametry: !!d.parametry };
+        setReady(r);
+        if (gotowe.current) gotowe.current(r);
         S.busy = false; S.next = null;
         seekTo(tRef.current, true);
       } else if (d.typ === "klatka" || d.typ === "blad") {
@@ -135,7 +103,63 @@ function AnimStudio({ path, onClose }) {
     };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
-  }, [info]);
+  }, []);
+  return { ready, pageErr, t, tRef, seekTo };
+}
+
+// Kadr strony w skali pola (iframe w pełnym rozmiarze kadru, pomniejszony transformacją)
+function AnKadr({ src, ready, frameRef, title }) {
+  const boxRef = useRef(null);
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(() => setBox({ w: el.clientWidth, h: el.clientHeight }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const W = (ready && ready.W) || 1920, H = (ready && ready.H) || 1080;
+  const k = box.w && box.h ? Math.min(box.w / W, box.h / H) : 0.3;
+  return html`<div class="thq-an-stage" ref=${boxRef}>
+    <div class="thq-an-frame" style=${{ width: `${W * k}px`, height: `${H * k}px` }}>
+      <iframe ref=${frameRef} src=${src} title=${title} sandbox="allow-scripts"
+        style=${{ width: `${W}px`, height: `${H}px`, transform: `scale(${k})` }}></iframe>
+    </div>
+    ${!ready && html`<p class="thq-an-wait"><span class="thq-ed-spin is-small"></span> ${L("Wczytuję animację…", "Loading the animation…")}</p>`}
+  </div>`;
+}
+
+function AnimStudio({ path, onClose }) {
+  const me = useRef({});
+  const frameRef = useRef(null);
+  const [info, setInfo] = useState(null);
+  const [err, setErr] = useState(null);
+  const [dur, setDur] = useState(10);
+  const [playing, setPlaying] = useState(false);
+  const [vals, setVals] = useState({});
+  const [base, setBase] = useState({});
+  const [note, setNote] = useState("");
+  const [busySave, setBusySave] = useState(false);
+  const [ask, setAsk] = useState({ text: "", reply: "", busy: false, error: null });
+  const valsRef = useRef({}), play = useRef({ raf: 0, t0: 0, s0: 0 });
+  valsRef.current = vals;
+  const { ready, pageErr, t, tRef, seekTo } = useAnimMost(frameRef, valsRef, 0,
+    (r) => { if (r.DUR > 0) setDur((x) => (info && info.pomiar && info.pomiar.pokrycie ? x : r.DUR)); });
+
+  useEffect(() => { MODAL_STACK.push(me.current); return () => { const i = MODAL_STACK.indexOf(me.current); if (i >= 0) MODAL_STACK.splice(i, 1); }; }, []);
+  useOverDashboard();
+  useEffect(() => {
+    let alive = true;
+    api.animInfo(path).then((d) => {
+      if (!alive) return;
+      setInfo(d);
+      const v = anValuesOf(d.parametry && d.parametry.pola);
+      setVals(v); setBase(v);
+      const dl = d.pomiar && d.pomiar.pokrycie && d.pomiar.pokrycie.do;
+      if (dl) setDur(dl);
+    }).catch((e) => alive && setErr(e.message || String(e)));
+    return () => { alive = false; cancelAnimationFrame(play.current.raf); };
+  }, [path]);
 
   const stop = () => { cancelAnimationFrame(play.current.raf); setPlaying(false); };
   const start = () => {
@@ -209,8 +233,6 @@ function AnimStudio({ path, onClose }) {
     <button type="button" class="thq-ed-btn" onClick=${onClose}>${L("Zamknij", "Close")}</button></div></div>`;
   if (!info) return html`<div class="thq-ed thq-an" role="dialog" aria-modal="true"><div class="thq-ed-msg"><span class="thq-ed-spin"></span></div></div>`;
 
-  const W = (ready && ready.W) || 1920, H = (ready && ready.H) || 1080;
-  const k = box.w && box.h ? Math.min(box.w / W, box.h / H) : 0.3;
   const src = `${location.protocol}//${location.hostname}:${info.podglad.port}${info.podglad.path}`;
   const pm = info.pomiar;
   const name = path.split("/").pop();
@@ -227,13 +249,7 @@ function AnimStudio({ path, onClose }) {
     ${note && html`<div class=${cx("thq-ed-banner", !note.startsWith("✗") && "is-ok")} role="status"><span>${note}</span></div>`}
     <div class="thq-an-body">
       <section class="thq-an-main">
-        <div class="thq-an-stage" ref=${boxRef}>
-          <div class="thq-an-frame" style=${{ width: `${W * k}px`, height: `${H * k}px` }}>
-            <iframe ref=${frameRef} src=${src} title=${L("Podgląd animacji", "Animation preview")} sandbox="allow-scripts"
-              style=${{ width: `${W}px`, height: `${H}px`, transform: `scale(${k})` }}></iframe>
-          </div>
-          ${!ready && html`<p class="thq-an-wait"><span class="thq-ed-spin is-small"></span> ${L("Wczytuję animację…", "Loading the animation…")}</p>`}
-        </div>
+        <${AnKadr} src=${src} ready=${ready} frameRef=${frameRef} title=${L("Podgląd animacji", "Animation preview")}/>
         ${pageErr && html`<p class="thq-ed-bad">${L("Błąd na stronie:", "Page error:")} ${pageErr}</p>`}
         <div class="thq-an-transport">
           <button type="button" class="thq-ed-play" onClick=${toggle} disabled=${!ready} aria-label=${playing ? L("Pauza", "Pause") : L("Odtwórz", "Play")}>${playing ? ED_ICON.pause : ED_ICON.play}</button>

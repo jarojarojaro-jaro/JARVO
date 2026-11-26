@@ -3,7 +3,7 @@
 z instalacji natywnej Jarva, bez pobierania).
 
     python3 html_wideo.py klatki anim.html --czasy 0,1.5,3 [--preset iart] [--out katalog] [--arkusz arkusz.jpg]
-    python3 html_wideo.py wideo  anim.html --dlugosc 6 [--fps 30] -o film.mp4 [--preset …] [--alfa]
+    python3 html_wideo.py wideo  anim.html --dlugosc 6 [--fps 30] -o film.mp4 [--preset …] [--alfa] [--od 12.4]
     python3 html_wideo.py lottie scena/lottie.json [-o film.mp4|.mov|.webm|.gif] [--alfa] [--tlo "#101010"]
     python3 html_wideo.py lottie scena/lottie.json --klatki 0,45,89 --arkusz arkusz.jpg
     python3 html_wideo.py pomiar anim.html --dlugosc 6 [--preset jarvo] [--platforma tiktok] [--tryb pelny|szybki] [--napisy auto|tak|nie]
@@ -118,6 +118,7 @@ TIMEOUT_MS = 60_000
 KROK_GOTOWOSCI_MS = 500         # gotowość sprawdzana co pół sekundy
 PO_BLEDZIE_JS_MS = 3_000        # błąd JS, a strony dalej brak: koniec czekania po 3 s, nie po minucie
 HZ_POMIARU = {"pelny": 10.0, "szybki": 4.0}
+POSTEP = os.environ.get("JARVO_HTML_POSTEP") == "1"     # „klatka” na stdout po każdej klatce (projekt.py popraw-ujecie)
 
 
 # ---------------------------------------------------------------- czyste funkcje (testowane bez przeglądarki)
@@ -371,6 +372,9 @@ def _run_capture(sync_playwright, src, times, names, out_dir, o, fps, size, size
                 target = page.locator(o["selektor"]).first if o["selektor"] else page
                 target.screenshot(path=str(path), omit_background=alfa)
             frames.append(path)
+            if POSTEP:                                   # pasek postępu renderu ujęcia w edytorze HQ (popraw-ujecie --postep)
+                sys.stdout.write("klatka\n")
+                sys.stdout.flush()
         browser.close()
 
 
@@ -719,6 +723,9 @@ def main(argv: list[str] | None = None) -> int:
         s.add_argument("--fps", type=float, default=30.0)
         s.add_argument("--czekaj", type=int, default=0, help="dodatkowe ms po ustawieniu czasu (animacje CSS z opóźnieniem)")
         s.add_argument("--serwer", action="store_true", help="strona z lokalnego serwera (fetch, moduły ES, /_lib/)")
+        if name != "pomiar":
+            s.add_argument("--od", type=float, default=0.0, help="początek odcinka osi strony w s (klatki: --czasy liczone "
+                           "od niego; wideo: render [od, od+dlugosc], np. jedno ujęcie do podmiany w projekcie)")
         if name == "pomiar":
             s.add_argument("--dlugosc", type=float, required=True, help="sekundy (cały film)")
             s.add_argument("--tryb", choices=sorted(HZ_POMIARU), default="pelny", help="pelny 10 próbek/s (do oddania), szybki 4/s")
@@ -788,7 +795,7 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "pomiar":
         return cmd_pomiar(a, o, size)
     if a.cmd == "klatki":
-        times = parse_times(a.czasy)
+        times = [round(a.od + t, 6) for t in parse_times(a.czasy)]
         names = [f"t{t:08.3f}.png" for t in times]
         frames = capture(a.zrodlo, times, names, Path(a.out), o, a.fps, size, bool(a.rozmiar), a.skala, a.alfa, a.czekaj)
         result = {"klatki": [f.as_posix() for f in frames]}
@@ -797,7 +804,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(result, ensure_ascii=False))
         return 0
 
-    times = frame_times(a.dlugosc, a.fps)
+    times = [round(a.od + t, 6) for t in frame_times(a.dlugosc, a.fps)]
     work = wl.katalog_roboczy("jarvo-html-klatki-")     # natywnie na dysku instalacji, nie w %TEMP% właściciela
     n = max(1, a.subklatki)
     przegladarki = ile_przegladarek(len(times) * n, a.rownolegle)

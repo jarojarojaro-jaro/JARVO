@@ -1,6 +1,7 @@
 # Changelog: jarvo-wideo
 
 ## Niewydane
+- Film z kodu z `projekt.py z-kodu --strona` właściciel poprawia w HQ (**Edytuj ujęcie**: teksty i kolory planszy z `parametry.json`, render tylko tego ujęcia); pliki robocze kontroli w `out/wideo/qa/`.
 - Nowe skille z silnikjava: `film-rysowany` (ręka rysuje i pisze pod lektora, 21 stylów, `rysowany.py`), `pracownia-malarza` (obraz malowany i film z pracowni, `pracownia.py`) i `voxel-ascii` (diorama z klocków w ASCII, `voxel.py`); instalacja `narzedzia.py instaluj silnikjava`.
 - Film rysowany sprawdza `rysowany.py sprawdz` (lint i audyt silnika), a każdy z trzech filmów oddajesz jako projekt edytora.
 - SOUL w układzie Jarva: postać (SOUL), procedury (ZASADY), mapa (MAPA); zasada pamięci w `memory`; zbudowany prompt przed/po: 11 856 → 11 859 znaków (ok. 3388 → 3389 tokenów, budżet 3400).

@@ -36,12 +36,15 @@ w pętli) i do renderu klatka po klatce: `html_wideo.py --preset jarvo` woła `w
    (`#RRGGBB`), `tekst`, `przelacznik`, `wybor` (`opcje`), `krzywa` (`[x1, y1, x2, y2]` jak cubic-bezier). Najwyżej
    kilkanaście pól, nazwy po polsku dla właściciela; po zmianie parametrów pomiar trzeba powtórzyć. Wartości zapisane
    przez właściciela w HQ to jego decyzje: zmieniasz je tylko na jego prośbę, a nowe pole dopisujesz z obecną wartością.
+8. **Teksty i kolory planszy z parametrów:** każdy tekst widoczny na planszy i każdy kolor marki to pole `parametry.json`
+   czytane z `window.__params`, a pole tekstu ma `"czas": [od, do]` (sekundy osi strony, kiedy go widać): właściciel
+   zmienia je w edytorze filmu (**Edytuj ujęcie**, render tylko tego ujęcia; projekt z `projekt.py z-kodu --strona`).
 
 ## Parametry (reguła 7)
 ```json
 {"pola": [
   {"klucz": "tlo", "typ": "kolor", "etykieta": "Tło", "wartosc": "#0B1220"},
-  {"klucz": "tytul", "typ": "tekst", "etykieta": "Tytuł", "wartosc": "Kawa z palarni Jarvo"},
+  {"klucz": "tytul", "typ": "tekst", "etykieta": "Tytuł", "wartosc": "Kawa z palarni Jarvo", "czas": [0, 3.2]},
   {"klucz": "tempo", "typ": "liczba", "etykieta": "Tempo", "min": 0.5, "max": 2, "krok": 0.05, "wartosc": 1},
   {"klucz": "wejscie", "typ": "krzywa", "etykieta": "Wejście tytułu", "wartosc": [0.16, 1, 0.3, 1]},
   {"klucz": "logo", "typ": "przelacznik", "etykieta": "Logo na końcu", "wartosc": true}]}
@@ -178,7 +181,7 @@ const napis = O.napis(t);                             // grupa napisów w chwili
 ## Render
 ```bash
 H="$HERMES_HOME/scripts/html_wideo.py"
-@@PY@@ "$H" klatki out/wideo/src/<nazwa>/index.html --preset jarvo --czasy 0,1.5,3,6,9,11.9 --arkusz out/wideo/qa-look.jpg
+@@PY@@ "$H" klatki out/wideo/src/<nazwa>/index.html --preset jarvo --czasy 0,1.5,3,6,9,11.9 --arkusz out/wideo/qa/look.jpg
 @@PY@@ "$H" pomiar out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc 12 --platforma tiktok   # przed finałem
 @@PY@@ "$H" wideo  out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc 12 --fps 30 -o out/wideo/<nazwa>.mp4
 ```

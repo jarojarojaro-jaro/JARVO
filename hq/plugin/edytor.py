@@ -140,6 +140,30 @@ def project_path(video: Path) -> Path:
     return video.with_name(f"{video.stem}.edycja.json")
 
 
+# pliki robocze kontroli i stopklatek (arkusze, klatki, zrzuty telefonu, wzory stylów): nie są materiałem filmu, więc
+# lista „Z katalogu filmu” ich nie pokazuje (kontrola-wideo i tak trzyma je w podkatalogu roboczym)
+ROBOCZE = re.compile(r"^(qa|arkusz|klatk[ai]|kandydaci|porownanie|galeria|wzor)\b|[-_](qa|arkusz|telefon|pasek)\b", re.I)
+
+
+def plik_roboczy(p: Path | str) -> bool:
+    return bool(ROBOCZE.search(Path(p).stem))
+
+
+def zakres_strony(proj: dict, c: dict) -> tuple[float, float] | None:
+    """Odcinek osi strony animacji [od, do] (s), z którego powstał obraz klipu filmu z kodu: chwila strony, od której
+    liczy się plik źródła (`zKodu.ujecia`: obraz z `projekt.py z-kodu --strona` od 0, plik z `popraw-ujecie` od początku
+    swojego renderu) plus zakres klipu w pliku. None = projekt nie zna strony albo klip ma inne źródło."""
+    zk = proj.get("zKodu") or {}
+    uj = zk.get("ujecia") or {}
+    if not (zk.get("strona") or {}).get("plik") or c.get("kind") != "video" or str(c.get("src")) not in uj:
+        return None
+    try:
+        od = float(uj[str(c["src"])]) + float(c["in"])
+        return round(od, 3), round(od + float(c["out"]) - float(c["in"]), 3)
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 def _num(v: Any, lo: float, hi: float, default: float) -> float:
     try:
         x = float(v)

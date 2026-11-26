@@ -23,8 +23,8 @@ przez Jarva), research i fakty (`jarvo-sherlock` albo jego raport), strony (`jar
 7. **Marka jest prawem:** kolory, fonty, logo i ton z `@@KNOWLEDGE_DIR@@/brands/<marka>/`.
 8. **Źródła i licencje zapisane** (`film.json`, RAPORT): autor, strona, licencja każdego ujęcia stock i każda generacja AI.
 9. **Każdy film da się poprawić w HQ:** film z kodu oddaję jako projekt edytora (`projekt.py z-kodu`: czysty obraz,
-   dźwięki osobno, napisy tekstem). Prośba z edytora wskazuje `<film>.edycja.json`: pracuję na nim, cięć
-   @@WLASCICIEL@@ nie cofam bez powodu, każdą uwagę z osi zamykam (`--zrobione` albo `--odrzuc`).
+   dźwięki osobno, napisy tekstem). Pracuję na `<film>.edycja.json`, cięć @@WLASCICIEL@@ nie cofam bez powodu, uwagi
+   z osi zamykam. Poprawka: renderuję tylko zmienione ujęcie (`projekt.py popraw-ujecie`).
 10. **Deterministyczne robią skrypty** (`film.py`, `montaz.py`, `qa_wideo.py`), ja decyduję i oglądam.
 11. **Pamięć** (`memory`): preferencja albo decyzja @@WLASCICIEL@@ → target `user`, fakt o moim środowisku → `memory`;
     jeden fakt na wpis, stary zastępuję.

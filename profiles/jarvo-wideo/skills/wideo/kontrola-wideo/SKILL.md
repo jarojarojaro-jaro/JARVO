@@ -112,12 +112,14 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
    `krytyka.py ocena kontrola.json` = 0 dopiero, gdy **każda oś ≥ 8**. Maks. 3 rundy; potem oddajesz
    z uczciwie nazwanymi brakami. Historia rund (osie + problemy) w `out/wideo/<film>/krytyka.md`.
 5. **Poprawki:** REVISE → popraw plan/pliki wg `roznice`, render, nowa runda (`runda` + 1). Najwyżej 2 rundy poprawek;
-   potem oddaję z wynikiem i nazwanymi brakami w `metadata.risks` (bez podbijania wyniku).
+   potem oddaję z wynikiem i nazwanymi brakami w `metadata.risks` (bez podbijania wyniku). Film z kodu poprawiasz
+   ujęciem (`projekt.py popraw-ujecie`, `film-z-kodu` krok 13).
 6. **Dowód do oddania karty:** w `dod_check` wynik `qa_wideo.py` (liczby: sek, LUFS, rozdzielczość), `kontrola.json`
    i przy animacji HTML `pomiar.json` (werdykt i odcisk).
 
 ## Wyjścia
 - `out/wideo/<film>/qa.jpg`, `out/wideo/<film>/kontrola.json` (ostatnia runda), historia rund w RAPORT.md.
+- Inne pliki robocze kontroli (arkusze, klatki, zrzuty, `qa-*.jpg`) tylko w `out/wideo/qa/`: katalog filmu to lista mediów edytora HQ.
 
 ## Definition of Done
 - [ ] `qa_wideo.py` bez błędów (JSON w raporcie), arkusz obejrzany,

@@ -66,6 +66,13 @@ def pasek(film: Path, t: float, n: int, out: Path) -> dict:
             "szukaj": "wyskoki (pop), nachodzący tekst, przejazd bez wyhamowania, zła strona ruchu"}
 
 
+def roboczy(o: str | None, film: Path, nazwa: str) -> Path:
+    """Plik roboczy kontroli: -o albo <katalog filmu>/qa/<film>-<nazwa> (katalog filmu to lista mediów edytora HQ)."""
+    out = Path(o) if o else film.parent / "qa" / f"{film.stem}-{nazwa}"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    return out
+
+
 def eval_fps(film: Path) -> float:
     return float((wl.probe(film).get("video") or {}).get("fps") or 0) or 30.0
 
@@ -570,9 +577,9 @@ def main(argv: list[str] | None = None) -> int:
         print("✗ brak pliku", file=sys.stderr)
         return 2
     if a.cmd == "telefon":
-        f = Path(a.film); r = telefon(f, Path(a.o or f.with_name(f.stem + "-telefon.jpg")))
+        f = Path(a.film); r = telefon(f, roboczy(a.o, f, "telefon.jpg"))
     elif a.cmd == "pasek":
-        f = Path(a.film); r = pasek(f, a.t, a.klatek, Path(a.o or f.with_name(f"{f.stem}-pasek-{a.t:g}.jpg")))
+        f = Path(a.film); r = pasek(f, a.t, a.klatek, roboczy(a.o, f, f"pasek-{a.t:g}.jpg"))
     elif a.cmd == "martwe":
         r = martwe(Path(a.film), a.prog)
     elif a.cmd == "puls":

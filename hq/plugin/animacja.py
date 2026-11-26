@@ -61,8 +61,17 @@ def _pole(p: Any, i: int) -> dict:
         if len(opcje) < 2:
             raise ParamError(f"pole {klucz}: wybór potrzebuje co najmniej 2 opcji")
         out["opcje"] = opcje
+    cz = p.get("czas")
+    if cz is not None:   # kiedy pole widać na osi strony: edytor HQ pokazuje je przy ujęciach z tego odcinka
+        if not (isinstance(cz, list) and len(cz) == 2 and all(_liczba(x) for x in cz) and 0 <= cz[0] < cz[1]):
+            raise ParamError(f"pole {klucz}: czas [od, do] w sekundach osi strony (od < do)")
+        out["czas"] = [round(float(cz[0]), 3), round(float(cz[1]), 3)]
     out["wartosc"] = wartosc(out, p.get("wartosc"))
     return out
+
+
+def _liczba(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
 
 
 def wartosc(pole: dict, v: Any) -> Any:

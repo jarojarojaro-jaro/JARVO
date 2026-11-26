@@ -34,9 +34,15 @@ w edytorze. Użytkownik po otwarciu edytora widzi Twoje zmiany osobno i może je
     projekt.py z-kodu <film> --obraz czysty.mp4 [--ciecia 5.4,9.6|events.json|os_czasu.json] [--glos lektor.wav[@od]]
                       [--efekty fx.wav] [--muzyka muzyka.wav] [--z-muzyki plan.muzyka.json] [--audio NAZWA=plik[@od]]
                       [--napisy film.srt | --slowa lektor.slowa.json[@od]] [--karaoke] [--kroj Caveat] [--styl box]
-                      [--kolor #hex] [--tlo #hex] [--render]
+                      [--kolor #hex] [--tlo #hex] [--strona anim.html [--preset jarvo] [--html-opcje "…"]] [--render]
                                     # film z kodu jako projekt: obraz w ujęciach, głos i efekty przypięte do obrazu,
-                                    # muzyka osobno, napisy tekstem, suma −14 LUFS; --render: film = render projektu
+                                    # muzyka osobno, napisy tekstem, suma −14 LUFS; --render: film = render projektu;
+                                    # --strona: z niej powstał obraz (HQ „Edytuj ujęcie”, popraw-ujecie bez --strona)
+    projekt.py popraw-ujecie <film> <id> [--strona anim.html] [--preset jarvo] [--bez-renderu] [--html-opcje "--rozmiar …"]
+                                    # poprawka po renderze: render tylko zakresu strony tego ujęcia, podmiana w projekcie,
+                                    # film z projektu (montaż bez renderu stron); długość ujęcia bez zmian; strona,
+                                    # preset i opcje domyślnie z projektu (z-kodu --strona)
+    projekt.py podmien <film> <id> --plik nowe.mp4 [--bez-renderu]   # ujęcie zrobione inaczej, ta sama długość
     projekt.py sprawdz <film>                      # walidacja jak przy eksporcie
     projekt.py render <film> [--out plik.mp4]      # nowa wersja obok oryginału, na końcu linia MEDIA:
     (typografia słowo po słowie, klucz `typo`: plan i poprawki robi typografia.py; render rysuje ją tak jak edytor)
@@ -301,11 +307,16 @@ def cmd_pokaz(film: Path, a) -> int:
     cv = proj["canvas"]
     print(f"Kadr {cv['w']}×{cv['h']} @ {cv['fps']} fps · długość {total(proj):.2f} s")
     print("Klipy (ścieżka główna, jeden za drugim):")
+    strona = ((proj.get("zKodu") or {}).get("strona") or {}).get("plik")
+    if strona:
+        print(f"  (obraz ze strony {strona}; „strona od–do” = odcinek jej osi, popraw-ujecie renderuje tylko go)")
     trs = ed.przejscia_osi(proj["clips"], cv["fps"])
     for (c, s, e), tr in zip(layout(proj["clips"]), trs):
+        zs = ed.zakres_strony(proj, c)
         extra = "".join([f" · tempo {c.get('speed', 1)}×" if c.get("speed", 1) != 1 else "", " · wyciszony" if c.get("muted") else "",
                          f" · głośność {c.get('volume', 1):.2f}" if c.get("volume", 1) != 1 else "",
-                         f" · czysty głos {c['voice']}" if c.get("voice") else ""])
+                         f" · czysty głos {c['voice']}" if c.get("voice") else "",
+                         f" · strona {zs[0]:.2f}–{zs[1]:.2f}" if zs else ""])
         print(f"  [{c.get('id')}] {s:6.2f}–{e:6.2f}  {Path(c['src']).name} (źródło {c['in']:.2f}–{c['out']:.2f}){extra}{opis_zaniku(c)}{opis_koloru(c.get('color'))}")
         if tr:
             print(f"      ↳ przejście {tr['type']} {tr['d']:.2f} s ({e - tr['d'] / 2:.2f}–{e + tr['d'] / 2:.2f})")
@@ -1682,6 +1693,16 @@ def projekt_z_kodu(film: Path, a) -> dict:
         zrodla["napisy"] = str(Path(a.napisy or _od(a.slowa)[0]).resolve())
     proj["zKodu"] = {"zrodla": zrodla, "sciezki": str(kat), "ciecia": granice[1:-1],
                      **({"lufs_przed": lufs, "lufs": a.lufs} if lufs is not None else {})}
+    if getattr(a, "strona", None):
+        strona = Path(a.strona).resolve()
+        if not strona.is_file():
+            raise SystemExit(f"--strona: nie ma strony {strona}")
+        # źródło ujęć: edytor HQ („Edytuj ujęcie”) i popraw-ujecie renderują z niej zakres strony jednego klipu
+        proj["zKodu"].update(strona={"plik": str(strona), "preset": a.preset, **({"opcje": a.html_opcje} if a.html_opcje else {})},
+                             ujecia={str(cel): 0.0})
+        wart = wartosci_strony(strona)
+        if wart:
+            proj["zKodu"]["parametry"] = {str(cel): wart}
     try:
         ed.normalize(proj, resolve)                    # ta sama walidacja co eksport z edytora
     except ed.ProjectError as exc:
@@ -1711,6 +1732,128 @@ def cmd_z_kodu(film: Path, a) -> int:
     else:
         print(f"Film = render projektu: projekt.py render {film} --out {film}")
     return 0
+
+
+def klip_po_id(proj: dict, id_: str) -> dict:
+    c = next((x for x in proj["clips"] if x.get("id") == id_), None)
+    if c is None:
+        raise SystemExit(f"nie ma klipu o id {id_} (lista: projekt.py pokaz)")
+    if c.get("kind") != "video" or float(c.get("speed") or 1) != 1:
+        raise SystemExit(f"klip {id_}: podmienić da się ujęcie wideo w zwykłym tempie (speed 1)")
+    return c
+
+
+def chwila_strony(proj: dict, c: dict) -> float:
+    """Chwila osi strony, od której liczy się plik klipu: obraz z `z-kodu` zaczyna się w 0, plik podmieniony przez
+    `popraw-ujecie` tam, gdzie zaczął się jego render (zKodu.ujecia)."""
+    return float(((proj.get("zKodu") or {}).get("ujecia") or {}).get(str(c["src"]), 0.0))
+
+
+def wartosci_strony(strona: Path) -> dict | None:
+    """Wartości `parametry.json` obok strony ({klucz: wartość}): z nimi powstał render ujęcia (edytor HQ pokazuje je
+    przy „Edytuj ujęcie”, także po cofnięciu do starszego pliku ujęcia)."""
+    try:
+        pola = json.loads((strona.parent / "parametry.json").read_text(encoding="utf-8")).get("pola") or []
+    except (OSError, ValueError, AttributeError):
+        return None
+    return {p["klucz"]: p.get("wartosc") for p in pola if isinstance(p, dict) and p.get("klucz")} or None
+
+
+def wstaw_ujecie(film: Path, proj: dict, c: dict, plik: Path, od_strony: float | None = None) -> Path:
+    """Nowy obraz ujęcia w miejsce źródła klipu: kopia strumienia bez dźwięku w <film>-sciezki/ (jak obraz z `z-kodu`),
+    klip bierze ją od 0 na tę samą długość, więc oś, dźwięki przypięte i napisy stoją jak stały."""
+    dl = round(float(c["out"]) - float(c["in"]), 3)
+    nowy, stary = ed.probe(plik), ed.probe(c["src"])
+    if not nowy.get("ok") or not nowy.get("duration"):
+        raise SystemExit(f"nie mogę odczytać {plik}")
+    klatka = 1.0 / float(stary.get("fps") or nowy.get("fps") or 30)
+    jest = float(nowy["duration"])
+    if not dl - klatka / 2 <= jest <= dl + 2 * klatka + 0.02:
+        raise SystemExit(f"ujęcie {c['id']} trwa {dl:.3f} s, a {plik.name} {jest:.3f} s: zrób plik tej samej długości "
+                         "(render tego zakresu strony: projekt.py popraw-ujecie); inną długość ujęcia ustawiasz "
+                         "w edytorze albo `tnij`/`wytnij`, potem podmiana")
+    if (nowy.get("w"), nowy.get("h")) != (stary.get("w"), stary.get("h")):
+        raise SystemExit(f"{plik.name} ma {nowy.get('w')}×{nowy.get('h')}, ujęcie {stary.get('w')}×{stary.get('h')}: "
+                         "ten sam rozmiar kadru (np. ten sam --preset i --rozmiar co pierwszy render)")
+    kat = sciezki_dir(film)
+    kat.mkdir(parents=True, exist_ok=True)
+    k = 1
+    while (kat / f"ujecie-{c['id']}-{k}{plik.suffix.lower()}").exists():
+        k += 1
+    cel = kat / f"ujecie-{c['id']}-{k}{plik.suffix.lower()}"
+    ff = ed.tools()["ffmpeg"] or "ffmpeg"
+    r = subprocess.run([ff, "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", str(plik), "-map", "0:v:0",
+                        "-c:v", "copy", "-an", *(["-movflags", "+faststart"] if cel.suffix in (".mp4", ".mov", ".m4v") else []),
+                        str(cel)], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if r.returncode != 0:
+        raise SystemExit(f"nie umiem skopiować ujęcia: {r.stderr.strip()[-300:]}")
+    if od_strony is not None:
+        proj.setdefault("zKodu", {}).setdefault("ujecia", {})[str(cel)] = round(od_strony, 3)
+    c.update({"src": str(cel), "in": 0.0, "out": round(min(dl, jest), 3)})
+    return cel
+
+
+def _po_podmianie(film: Path, proj: dict, c: dict, cel: Path, bez_renderu: bool) -> int:
+    try:
+        ed.normalize(proj, resolve)
+    except ed.ProjectError as exc:
+        raise SystemExit(f"projekt po podmianie nie przechodzi walidacji: {exc}")
+    save(film, proj)
+    print(f"  [{c['id']}] nowe źródło: {cel.name} ({c['out']:.2f} s), oś bez zmian: {total(proj):.2f} s")
+    if bez_renderu:
+        print(f"Film = render projektu: projekt.py render {film} --out {film}")
+        return 0
+    return cmd_render(film, argparse.Namespace(out=str(film)))
+
+
+def cmd_podmien(film: Path, a) -> int:
+    """Podmiana obrazu jednego ujęcia gotowym plikiem tej samej długości, potem render projektu (bez renderu stron)."""
+    proj = load(film)
+    c = klip_po_id(proj, a.id)
+    cel = wstaw_ujecie(film, proj, c, Path(a.plik).resolve())
+    return _po_podmianie(film, proj, c, cel, a.bez_renderu)
+
+
+def cmd_popraw_ujecie(film: Path, a) -> int:
+    """Poprawka po renderze: html_wideo.py renderuje tylko zakres strony tego ujęcia (--od), plik idzie w miejsce
+    źródła klipu, a film składa `render` z projektu. Reszta filmu nie jest renderowana drugi raz. Strona, preset
+    i opcje renderu domyślnie z projektu (`z-kodu --strona`)."""
+    proj = load(film)
+    c = klip_po_id(proj, a.id)
+    zk = proj.get("zKodu") or {}
+    zs = zk.get("strona") or {}
+    if not (a.strona or zs.get("plik")):
+        raise SystemExit("podaj --strona anim.html (projekt nie zna strony: zbudowany bez z-kodu --strona)")
+    if zs.get("plik") and str(c["src"]) not in (zk.get("ujecia") or {}):
+        raise SystemExit(f"klip {a.id}: jego obraz nie pochodzi ze strony animacji (np. klip dodany w edytorze)")
+    strona = Path(a.strona or zs["plik"]).resolve()
+    if not strona.is_file():
+        raise SystemExit(f"nie ma strony: {strona}")
+    preset = a.preset or zs.get("preset") or "jarvo"
+    opcje = a.html_opcje if a.html_opcje is not None else zs.get("opcje", "")
+    fps = float(ed.probe(c["src"]).get("fps") or proj["canvas"].get("fps") or 30)
+    od = round(chwila_strony(proj, c) + float(c["in"]), 4)
+    dl = round(float(c["out"]) - float(c["in"]) + 1.0 / fps, 4)     # klatka zapasu: plik nie wyjdzie krótszy od ujęcia
+    kat = sciezki_dir(film)
+    kat.mkdir(parents=True, exist_ok=True)
+    tmp = kat / f".render-{c['id']}.mp4"
+    import shlex
+    html = shlex.split(opcje or "")
+    cmd = [sys.executable, str(HERE / "html_wideo.py"), "wideo", str(strona), "--preset", preset, "--od", f"{od:g}",
+           "--dlugosc", f"{dl:g}", "--fps", f"{fps:g}", "-o", str(tmp), *html]
+    print(f"▶ ujęcie {c['id']}: strona {od:.2f}–{od + dl:.2f} s", flush=True)
+    # --postep: html_wideo.py pisze linię „klatka” po każdej klatce (pasek postępu „Zastosuj w filmie” w edytorze HQ)
+    env = {**os.environ, "JARVO_HTML_POSTEP": "1"} if a.postep else None
+    try:
+        if subprocess.run(cmd, env=env).returncode != 0:
+            raise SystemExit("render ujęcia nie wyszedł (html_wideo.py)")
+        cel = wstaw_ujecie(film, proj, c, tmp, od)
+    finally:
+        tmp.unlink(missing_ok=True)
+    wart = wartosci_strony(strona)
+    if wart:
+        proj["zKodu"].setdefault("parametry", {})[str(cel)] = wart
+    return _po_podmianie(film, proj, c, cel, a.bez_renderu)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1883,6 +2026,23 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--lufs", type=float, default=Z_KODU_LUFS, help="głośność sumy dźwięków (domyślnie −14)")
     sp.add_argument("--nadpisz", action="store_true", help="nadpisz projekt zmieniony w edytorze")
     sp.add_argument("--render", action="store_true", help="od razu złóż film z projektu (film = render projektu)")
+    sp.add_argument("--strona", help="strona animacji, z której powstał obraz (html_wideo.py wideo od 0 s): edytor HQ "
+                                     "i popraw-ujecie renderują z niej jedno ujęcie")
+    sp.add_argument("--preset", default="jarvo", help="z --strona: preset html_wideo.py renderu obrazu (domyślnie jarvo)")
+    sp.add_argument("--html-opcje", default="", help="z --strona: dodatkowe opcje html_wideo.py renderu obrazu, "
+                                                     "np. \"--rozmiar 1080x1920\"")
+    sp = film_cmd("popraw-ujecie", cmd_popraw_ujecie, "poprawka po renderze: render tylko tego ujęcia strony i podmiana")
+    sp.add_argument("id", help="id klipu (projekt.py pokaz)")
+    sp.add_argument("--strona", help="strona animacji (domyślnie ta z projektu: z-kodu --strona)")
+    sp.add_argument("--preset", help="preset html_wideo.py (domyślnie z projektu, inaczej jarvo)")
+    sp.add_argument("--bez-renderu", action="store_true", help="tylko podmiana w projekcie, bez składania filmu")
+    sp.add_argument("--html-opcje", help="dodatkowe opcje html_wideo.py w cudzysłowie, np. \"--rozmiar 1080x1920\" "
+                                         "(domyślnie z projektu)")
+    sp.add_argument("--postep", action="store_true", help="linia „klatka” po każdej klatce renderu (edytor HQ)")
+    sp = film_cmd("podmien", cmd_podmien, "podmień obraz ujęcia gotowym plikiem tej samej długości")
+    sp.add_argument("id", help="id klipu (projekt.py pokaz)")
+    sp.add_argument("--plik", required=True, help="nowy obraz ujęcia (wideo)")
+    sp.add_argument("--bez-renderu", action="store_true", help="tylko podmiana w projekcie, bez składania filmu")
     film_cmd("sprawdz", cmd_sprawdz, "walidacja projektu")
     film_cmd("render", cmd_render, "złóż film (jak „Eksportuj”)").add_argument("--out")
     a = ap.parse_args(argv)

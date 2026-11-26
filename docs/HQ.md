@@ -172,6 +172,17 @@ pakiecie co HQ, a eksport robi ffmpeg, który już jest w kontenerze.
   180/390/60/120 px, Reels według zalecenia Meta 14% / 35% / 6%; te same liczby ma kontrola Wideografa
   (`wideo_lib.STREFY_UI`: arkusz `qa_wideo.py`, `pomiar.py`). Nowy tekst i napisy w kadrze pionowym startują
   na wysokości 0,68 i z szerokością 74% (nad opisem, obok przycisków), tak samo u Wideografa (`projekt.py dodaj-tekst` i `napisy`). Test: `tests/test_edytor_strefy.py`.
+- **Edytuj ujęcie (film z kodu):** klip, którego obraz powstał ze strony animacji (`projekt.py z-kodu --strona`:
+  projekt trzyma stronę, preset i w `zKodu.ujecia` chwilę strony każdego pliku obrazu, więc odcinek strony klipu to
+  ta chwila plus jego zakres), ma w pasku klipu **Edytuj ujęcie** (`47-ujecie.js`). Okno pokazuje pola
+  `parametry.json` z `czas` zachodzącym na odcinek ujęcia i pola wspólne bez `czas` (bez przypisań: wszystkie),
+  z wartościami, z którymi powstał obecny obraz klipu (`zKodu.parametry`), i podgląd strony na żywo przewijany tylko
+  w odcinku ujęcia (mostek jak w 2b). **Zastosuj w filmie** zapisuje projekt, `POST /edit/ujecie` zapisuje zmienione
+  pola do `parametry.json` i uruchamia w tle `projekt.py popraw-ujecie --bez-renderu --postep` Pythonem narzędzi
+  (postęp z linii „klatka” `html_wideo.py`, zadanie w `/edit/job`); błąd albo przerwanie przywraca `parametry.json`.
+  Nowy plik ujęcia trafia do `<film>-sciezki/`, edytor wczytuje projekt jako krok, więc ↶ wraca do starego pliku;
+  film składa **Eksportuj**. Lista „Z katalogu filmu” pomija pliki robocze kontroli (`edytor.plik_roboczy`: `qa-*`,
+  arkusze, klatki, `*-telefon`). Testy: `tests/test_edytor_ujecie.py`.
 - **Podgląd** gra w przeglądarce z plików pobranych raz (blob), bez serwera w pętli. Dwa elementy `<video>` na zmianę:
   następny klip czeka przewinięty na swój początek, więc przejścia są płynne. Miniatury osi czasu robi przeglądarka
   (jedna kanwa na źródło), a muzyka na osi ma falę dźwięku w skali dB (szczyty liczone raz na plik, dekodowanie

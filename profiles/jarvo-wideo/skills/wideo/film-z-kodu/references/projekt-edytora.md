@@ -14,7 +14,8 @@ i poprawił sam: wyciął ujęcie, podmienił albo wyciszył muzykę, poprawił 
 | napisy | SRT albo słowa lektora | napisy jako tekst (karaoke ze słów) |
 
 Tekst, który jest częścią animacji (tytuł, liczba na wykresie, logo), zostaje w obrazie. Do projektu idą tylko
-napisy lektora.
+napisy lektora. Z `--strona <anim.html>` (strona, z której render obrazu ruszył od 0 s) projekt zna źródło ujęć:
+właściciel zmienia teksty i kolory planszy w HQ (**Edytuj ujęcie**), a `popraw-ujecie` nie potrzebuje `--strona`.
 
 ## Polecenie
 ```bash
@@ -42,7 +43,7 @@ H="$HERMES_HOME/scripts/html_wideo.py"
 @@PY@@ "$H" wideo out/wideo/src/<nazwa>/index.html --preset jarvo --dlugosc N -o out/wideo/src/obraz.mp4
 @@PY@@ "$HERMES_HOME/scripts/muzyka.py" zrob out/wideo/src/obraz.mp4 -o out/wideo/src/final.mp4 --lektor src/lektor.wav --cues cues.json
 @@PY@@ "$P" z-kodu out/wideo/<film>.mp4 --obraz out/wideo/src/obraz.mp4 --z-muzyki out/wideo/src/final.muzyka.json \
-  --ciecia out/wideo/src/os_czasu.json --slowa out/wideo/src/lektor.slowa.json --karaoke --render
+  --ciecia out/wideo/src/os_czasu.json --slowa out/wideo/src/lektor.slowa.json --karaoke --strona out/wideo/src/<nazwa>/index.html --render
 ```
 `muzyka.py zrob` zostawia warstwy miksu w `<wynik>.muzyka.sciezki/` (muzyka, efekty, głos) i podaje je w planie
 (`"sciezki"`), więc `--z-muzyki` bierze wszystkie trzy. Muzyka w warstwie jest już ściszona pod lektora: gdy

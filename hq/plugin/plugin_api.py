@@ -286,8 +286,9 @@ async def edit_info(path: str):
         raise HTTPException(503, "Brak ffprobe w kontenerze: edytor potrzebuje ffmpeg")
 
     def gather():
-        sib = sorted((x for x in p.parent.iterdir() if x.is_file() and ed.media_kind(x) and not x.name.startswith(".")),
-                     key=lambda x: -x.stat().st_mtime)[:60]
+        # pliki robocze kontroli (qa-*.jpg, arkusze, zrzuty telefonu) to nie materiał filmu: lista ich nie pokazuje
+        sib = sorted((x for x in p.parent.iterdir() if x.is_file() and ed.media_kind(x) and not x.name.startswith(".")
+                      and not ed.plik_roboczy(x)), key=lambda x: -x.stat().st_mtime)[:60]
         media = [_media_entry(x) for x in sib]
         proj = None
         pp = ed.project_path(p)
@@ -968,6 +969,96 @@ async def edit_cancel(jid: str):
         proc = job.get("proc")
         if proc is not None:                     # Windows: całe zadanie (TerminateJobObject), poza nim kill()
             ed.zabij_drzewo(proc)
+    return _job_view(job)
+
+
+# ------------------------------------------------------------------ edytor: „Edytuj ujęcie” filmu z kodu
+# Klip, którego obraz powstał ze strony animacji (projekt.py z-kodu --strona): nowe wartości parametrów strony idą do
+# parametry.json, a projekt.py popraw-ujecie w tle renderuje tylko odcinek strony tego klipu i podmienia jego obraz
+# w projekcie. Stary plik zostaje w <film>-sciezki/, więc „Cofnij” w edytorze wraca do niego; film składa eksport.
+async def _run_ujecie(job: dict, cmd: list[str], parametry: Path | None, stare: str | None) -> None:
+    def start(proc) -> None:
+        ed.przypnij_drzewo(proc)
+        job.update(proc=proc)
+
+    def postep(line: bytes) -> None:             # w wątku programu: html_wideo.py pisze „klatka” po każdej klatce
+        if line.strip() == b"klatka":
+            job["klatki"] = job.get("klatki", 0) + 1
+            job["progress"] = min(0.95, job["klatki"] / max(1, job["klatek"]))
+
+    try:
+        code, _out, err = await przenosne.uruchom(cmd, na_linie=postep, przy_starcie=start)
+        if job.get("state") == "cancelled":
+            return
+        if code != 0:
+            linie = [x for x in err.decode("utf-8", "replace").splitlines() if x.strip()]
+            job.update(state="error", error=(linie or [f"projekt.py zakończył się kodem {code}"])[-1][:400])
+            return
+        job.update(state="done", progress=1.0)
+    except Exception as exc:  # zadanie ma skończyć się stanem, nie wiszącym „w toku”
+        job.update(state="error", error=str(exc)[:400])
+    finally:
+        proc = job.pop("proc", None)
+        if proc is not None:
+            ed.zabij_drzewo(proc)
+        job["ended"] = time.time()
+        if job.get("state") != "done" and parametry is not None and stare is not None:
+            # ujęcie zostało stare: parametry.json też wraca, żeby strona dalej opisywała obraz z filmu
+            tmp = parametry.with_name(f".{parametry.name}.part")
+            tmp.write_text(stare, encoding="utf-8", newline="\n")
+            anim._zastap(tmp, parametry)
+
+
+@router.post("/edit/ujecie")
+async def edit_ujecie(request: Request):
+    """{path, id, wartosci}: parametry strony → parametry.json, render tylko zakresu strony klipu `id` (zapisany
+    projekt) i podmiana jego obrazu; postęp przez /edit/job, błąd albo przerwanie przywraca parametry.json."""
+    import uuid
+
+    body = await request.json()
+    film = _film(str(body.get("path") or ""))
+    try:
+        proj = json.loads(ed.project_path(film).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise HTTPException(404, "Film nie ma zapisanego projektu edytora")
+    c = next((x for x in proj.get("clips") or [] if isinstance(x, dict) and x.get("id") == body.get("id")), None)
+    if c is None:
+        raise HTTPException(404, "Nie ma tego klipu w zapisanym projekcie")
+    zakres = ed.zakres_strony(proj, c)
+    if zakres is None:
+        raise HTTPException(400, "Ten klip nie powstał ze strony animacji (projekt.py z-kodu --strona)")
+    if abs(float(c.get("speed") or 1) - 1) > 1e-6:
+        raise HTTPException(400, "Ujęcie da się przerenderować tylko w tempie 1×")
+    strona = core.safe_path(str(proj["zKodu"]["strona"]["plik"]), ROOTS)
+    if strona is None:
+        raise HTTPException(404, "Strona animacji poza katalogami floty albo nie istnieje")
+    skrypt = _wideo_skrypt("projekt.py")
+    if skrypt is None:
+        raise HTTPException(503, "Brak projekt.py (profil Wideografa nie jest zainstalowany)")
+    if any(j.get("state") == "running" and j.get("kind") == "ujecie" for j in _edit.jobs.values()):
+        raise HTTPException(409, "Trwa render innego ujęcia: poczekaj, aż się skończy")
+    wartosci = body.get("wartosci") or {}
+    parametry, stare = None, None
+    if wartosci:
+        parametry = strona.parent / anim.PARAMETRY
+        if not parametry.is_file():
+            raise HTTPException(400, "Strona nie ma parametry.json")
+        stare = await asyncio.to_thread(parametry.read_text, encoding="utf-8")
+        try:
+            await asyncio.to_thread(anim.zapisz, strona, wartosci)
+        except anim.ParamError as exc:
+            raise HTTPException(400, str(exc))
+    for jid in [k for k, j in _edit.jobs.items() if j.get("ended") and time.time() - j["ended"] > 3600]:
+        _edit.jobs.pop(jid, None)
+    fps = float((proj.get("canvas") or {}).get("fps") or 30)
+    jid = uuid.uuid4().hex[:12]
+    job = {"id": jid, "kind": "ujecie", "state": "running", "progress": 0.0, "started": time.time(), "klip": c["id"],
+           "zakres": list(zakres), "klatek": max(1, round((zakres[1] - zakres[0]) * fps) + 1)}
+    _edit.jobs[jid] = job
+    # Python venvu narzędzi (@@PY@@ skilli: Playwright do renderu strony); bez niego ten sam Python co panel
+    py = os.environ.get("JARVO_TOOLS_PYTHON") or sys.executable
+    cmd = [py, str(skrypt), "popraw-ujecie", str(film), str(c["id"]), "--bez-renderu", "--postep"]
+    job["task"] = asyncio.create_task(_run_ujecie(job, cmd, parametry, stare))
     return _job_view(job)
 
 
