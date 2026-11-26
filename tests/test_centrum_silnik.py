@@ -394,6 +394,8 @@ def test_omp_enter_w_trakcie_tury_dopisuje(c, monkeypatch):
         return {"nowy": True}
 
     def dopisz(w, tekst, klucz, media=(), lustro=True):
+        if not stany:                       # bez tury: panel kładzie dopisek, skrzynka bierze go jak zwykłą wiadomość
+            return wyslij(w, tekst, klucz, media, lustro)
         tryb = "kolejka" if "osobno" in tekst else "steer"
         dopiski.append((tekst, tryb))
         stany[klucz] = {"stan": "wlaczony", "tura": "t1"} if tryb == "steer" else {"stan": "kolejka"}
