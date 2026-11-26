@@ -46,13 +46,13 @@ metadata:
 ## Definition of Done
 - [ ] werdykt w pierwszym zdaniu (startujemy / nie i dlaczego / czekamy na decyzję o koncie lub zespole),
 - [ ] twarde warunki z cytatami z regulaminu,
-- [ ] termin zgłoszenia w UTC i godziny do niego,
+- [ ] termin zgłoszenia w bazie w UTC, w odpowiedzi w czasie polskim, i godziny do niego,
 - [ ] wpis i ocena w bazie.
 
 ## Format odpowiedzi
 ```
 <Werdykt jednym zdaniem>.
-Nagroda: <pula>, tracki: <…>. Zgłoszenie do <RRRR-MM-DD HH:MM UTC> (<ile h/dni>), tryb <online/onsite>.
+Nagroda: <pula>, tracki: <…>. Zgłoszenie do <RRRR-MM-DD HH:MM czasu polskiego> (<ile h/dni>), tryb <online/onsite>.
 Zasady: solo <tak/nie/niejasne>, kod AI <…>, KYC <…>, kraj <…>. Ocena <n>/10: <dlaczego>.
 Pierwszy krok: <rejestracja (zgoda), plan, czego brakuje>. Źródło: <link do zasad> (sprawdzone <data>).
 ```

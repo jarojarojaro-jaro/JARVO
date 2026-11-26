@@ -34,7 +34,7 @@ metadata:
 2. **3 pomysły**, każdy z mapą „funkcja → kryterium / track”; wybierz jeden: największe pokrycie kryteriów, demo
    widoczne w 30 sekund, wykonalny w 60% czasu.
    - ✅ Punkt kontrolny: każda funkcja MVP ma kryterium albo track; funkcje bez nich wypadają.
-3. **Harmonogram w UTC** od teraz do terminu: MVP (60%), demo i film (20%), README, opis, zgłoszenie (20%);
+3. **Harmonogram w czasie polskim** od teraz do terminu: MVP (60%), demo i film (20%), README, opis, zgłoszenie (20%);
    zgłoszenie gotowe 6 h przed terminem.
 4. **Podział pracy:** co buduję sam (`budowa-projektu`), co zamawiam przez Jarva (Web: frontend; Wideograf: film demo
    ze scenariusza; Studio: deck i grafiki); każda część z terminem.
@@ -45,11 +45,11 @@ metadata:
    decyduje, ile tracków ma sens.
 
 ## Wyjścia
-- `out/<id>/PLAN.md` (pomysł, mapa kryteriów, harmonogram UTC, podział, cięcia).
+- `out/<id>/PLAN.md` (pomysł, mapa kryteriów, harmonogram w czasie polskim, podział, cięcia).
 
 ## Definition of Done
 - [ ] mapa funkcja → kryterium/track,
-- [ ] harmonogram w UTC z buforem 6 h,
+- [ ] harmonogram w czasie polskim z buforem 6 h,
 - [ ] podział pracy z terminami i lista cięć.
 
 ## Wiedza

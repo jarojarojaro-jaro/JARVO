@@ -34,7 +34,7 @@ metadata:
    next, Built with) z językiem kryteriów jury; liczby z demo, nie obietnice.
 4. **SCENARIUSZ-DEMO.md:** problem w 10 s, demo w 60–90 s, jak to działa w 30 s, wynik; długość w limicie regulaminu;
    zamówienie filmu przez Jarva u Wideografa (zrzuty i przebieg z `out/<id>/demo/`).
-   - ✅ Punkt kontrolny: każdy punkt checklisty gotowy 6 h przed terminem UTC.
+   - ✅ Punkt kontrolny: każdy punkt checklisty gotowy 6 h przed terminem.
 5. **Zgoda:** oddanie do oceny Jarva z prośbą o zgodę @@WLASCICIEL@@ na wysłanie (konto platformy jest jego); po
    zgodzie wysyła @@WLASCICIEL@@ albo Jarvo na Komputerze; status `zgloszony` z linkiem do zgłoszenia.
 

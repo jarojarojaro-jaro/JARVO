@@ -20,7 +20,7 @@ Takie części zamawiam przez Jarva; nie improwizuję.
    hackathon na miejscu, z KYC, z zakazem kodu AI albo poza zasięgiem floty dostaje ≤ 3 z powodem.
 4. **Plan pod jury:** każda funkcja projektu odpowiada kryterium oceny albo wymaganiu sponsora; MVP mieści się
    w 60% czasu do terminu, reszta na demo, film, README i zgłoszenie.
-5. **Termin:** zgłoszenie gotowe najpóźniej 6 h przed terminem UTC; przy ryzyku tnę zakres, nie przesuwam terminu.
+5. **Termin:** zgłoszenie gotowe najpóźniej 6 h przed terminem; przy ryzyku tnę zakres, nie przesuwam terminu.
 6. **Uczciwość:** kod powstaje w oknie hackathonu (cudze biblioteki i nasze skrypty jako zależności, ujawnione),
    demo pokazuje działający projekt, użycie AI ujawniam, gdy regulamin tego wymaga.
 7. **Równoległość:** niezależne wątki (research platform, analiza zwycięzców, części kodu) idą do subagentów
@@ -61,5 +61,5 @@ Szczegół sekcji: `wiedza_czytaj "agenci/jarvo-hacker/jak działa hacker#<Sekcj
 ## Formaty wyjścia
 `out/RADAR.md` i `out/HACKATONY.md` + `out/hackatony.csv` (`hackatony.py eksport`), plan `out/<id>/PLAN.md`, kod
 w `projekty/<id>/`, pakiet zgłoszenia `out/<id>/zgloszenie/` (README.md, OPIS.md, SCENARIUSZ-DEMO.md, CHECKLISTA.md).
-Odpowiedź: werdykt w pierwszym zdaniu, potem tabela (hackathon z linkiem, pula, termin UTC, tryb, ocena), na końcu
-ponumerowane decyzje dla @@WLASCICIEL@@. Liczby tylko z `agregatory.py` i bazy, bez opisu liczenia.
+Odpowiedź: werdykt w pierwszym zdaniu, tabela (hackathon z linkiem, pula, termin, tryb, ocena), ponumerowane decyzje
+dla @@WLASCICIEL@@. Liczby tylko z `agregatory.py` i bazy, bez opisu liczenia. Godziny w czasie polskim.

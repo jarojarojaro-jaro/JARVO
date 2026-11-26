@@ -190,7 +190,7 @@ def zostalo(termin: str, teraz: dt.datetime) -> str:
 def cmd_terminy(db: sqlite3.Connection, dni: int, teraz: dt.datetime) -> int:
     w = nadchodzace(db, teraz, dni)
     for x in w:
-        print(f"{x['zgloszenie_do']} UTC ({zostalo(x['zgloszenie_do'], teraz)})  {x['nazwa']}  {pula(x)}  "
+        print(f"{termin_pl(x['zgloszenie_do'])} ({zostalo(x['zgloszenie_do'], teraz)})  {x['nazwa']}  {pula(x)}  "
               f"{x['tryb'] or '?'}  ocena {x['ocena'] if x['ocena'] is not None else '-'}  {x['url']}")
     print(f"w oknie {dni} dni: {len(w)}")
     return 0
@@ -262,7 +262,7 @@ def cmd_historia(db: sqlite3.Connection, hid: str | None, dni: int, teraz: dt.da
         jest_id(db, hid)
     w = historia(db, hid, teraz - dt.timedelta(days=dni))
     for x in w:
-        print(f"{x['kiedy']} UTC  {x['nazwa'] or x['id']}  {x['co']}: {x['opis']}")
+        print(f"{termin_pl(x['kiedy'])}  {x['nazwa'] or x['id']}  {x['co']}: {x['opis']}")
     print(f"wpisów w {dni} dni: {len(w)}")
     return 0
 
@@ -286,15 +286,15 @@ def cmd_eksport(db: sqlite3.Connection, katalog: Path, teraz: dt.datetime) -> in
         for x in w:
             pis.writerow([x[p] if x[p] is not None else "" for p in (*POLA, "ocena", "dlaczego")])
     term = nadchodzace(db, teraz, 30)
-    md = [f"# Hackathony (stan na {teraz:%Y-%m-%d %H:%M} UTC)", "",
+    md = [f"# Hackathony (stan na {lokalnie(teraz):%Y-%m-%d %H:%M}, czas {STREFA})", "",
           f"W bazie: {len(w)}; otwarte: {sum(x['status'] in OTWARTE for x in w)}. Pełna tabela: `hackatony.csv`.", "",
           "## Zgłoszenia w ciągu 30 dni", ""]
-    md += [f"- **{x['zgloszenie_do']} UTC** ({zostalo(x['zgloszenie_do'], teraz)}): [{x['nazwa']}]({x['url']}), {pula(x)}, "
+    md += [f"- **{termin_pl(x['zgloszenie_do'])}** ({zostalo(x['zgloszenie_do'], teraz)}): [{x['nazwa']}]({x['url']}), {pula(x)}, "
            f"{x['tryb'] or '?'}, AI: {x['ai_kod'] or '?'}, ocena {x['ocena'] if x['ocena'] is not None else '-'}" for x in term] or ["- brak"]
     top = sorted((x for x in w if x["status"] in OTWARTE and x["ocena"] is not None), key=lambda x: -x["ocena"])[:15]
-    md += ["", "## Najlepsze dla floty", "", "| Hackathon | Platforma | Pula | Zgłoszenie do (UTC) | Tryb | AI | Ocena | Dlaczego |",
+    md += ["", "## Najlepsze dla floty", "", "| Hackathon | Platforma | Pula | Zgłoszenie do | Tryb | AI | Ocena | Dlaczego |",
            "|---|---|---|---|---|---|---|---|"]
-    md += [f"| [{x['nazwa']}]({x['url']}) | {x['platforma']} | {pula(x)} | {x['zgloszenie_do'] or '?'} | {x['tryb'] or '?'} | "
+    md += [f"| [{x['nazwa']}]({x['url']}) | {x['platforma']} | {pula(x)} | {termin_pl(x['zgloszenie_do'])} | {x['tryb'] or '?'} | "
            f"{x['ai_kod'] or '?'} | {x['ocena']} | {x['dlaczego']} |" for x in top]
     wyniki = [x for x in w if x["status"] in ("zgloszony", "wygrany", "przegrany")]
     if wyniki:
@@ -345,6 +345,13 @@ def wydarzenia(db: sqlite3.Connection, od: dt.datetime, do: dt.datetime) -> list
 def lokalnie(t: dt.datetime) -> dt.datetime:
     from zoneinfo import ZoneInfo
     return t.replace(tzinfo=dt.timezone.utc).astimezone(ZoneInfo(STREFA))
+
+
+def termin_pl(tekst: str | None) -> str:
+    """Chwila z bazy (UTC) dla człowieka: data z godziną w strefie STREFA; sama data bez zmian, brak = „?”."""
+    if not tekst:
+        return "?"
+    return tekst if len(tekst) == 10 else f"{lokalnie(dt.datetime.fromisoformat(tekst)):%Y-%m-%d %H:%M}"
 
 
 def linia(e: dict, teraz: dt.datetime) -> str:
@@ -439,7 +446,7 @@ def do_wziecia(db: sqlite3.Connection, teraz: dt.datetime, ile: int) -> tuple[li
     w = sorted(((x, we) for x, we in w if we), key=lambda t: (-(t[0]["ocena"] if t[0]["ocena"] is not None else -1), t[1][1] or "9999"))
     linie = []
     for nr, (x, (etap, termin)) in enumerate(w[:ile], 1):
-        kiedy = f"{etap} {termin} UTC ({zostalo(termin, teraz)})" if termin else etap
+        kiedy = f"{etap} {termin_pl(termin)} ({zostalo(termin, teraz)})" if termin else etap
         linie.append(f"{nr}. [{x['nazwa']}]({x['url']}) · {pula(x)} · {kiedy} · ocena "
                      f"{x['ocena'] if x['ocena'] is not None else '?'}" + (f": {x['dlaczego']}" if x["dlaczego"] else "")
                      + (" · nowy" if x["id"] in nowe else ""))
@@ -482,9 +489,9 @@ def skarbiec() -> Path | None:
 
 
 def udzial(x: dict) -> str:
-    czesci = [f"[{x['nazwa']}]({x['url']})", f"**{x['status']}**", f"zgłoszenie {x['zgloszenie_do'] or '?'} UTC"]
+    czesci = [f"[{x['nazwa']}]({x['url']})", f"**{x['status']}**", f"zgłoszenie {termin_pl(x['zgloszenie_do'])}"]
     if x["krok"] or x["krok_do"]:
-        czesci.append(f"następny krok: {x['krok'] or '?'}" + (f" do {x['krok_do']} UTC" if x["krok_do"] else ""))
+        czesci.append(f"następny krok: {x['krok'] or '?'}" + (f" do {termin_pl(x['krok_do'])}" if x["krok_do"] else ""))
     czesci += [f"{p.replace('_', ' ')}: {x[p]}" for p in ("konto", "projekt", "zgloszenie_url", "demo_url", "nagroda") if x[p]]
     return " · ".join(czesci)
 

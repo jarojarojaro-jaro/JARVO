@@ -55,7 +55,7 @@ def test_wpis_bez_zasad_albo_z_blednym_polem_odrzucony(tmp_path, zly, blad):
         uruchom(tmp_path, "dodaj", jsonl(tmp_path, wpis(**zly)))
 
 
-def test_terminy_w_godzinach_utc_tylko_otwarte(tmp_path, capsys):
+def test_terminy_w_czasie_polskim_tylko_otwarte(tmp_path, capsys):
     uruchom(tmp_path, "dodaj", jsonl(tmp_path, wpis(), wpis(nazwa="Kaggle Gemma", zgloszenie_do="2026-12-10"),
                                      wpis(nazwa="Minęło", zgloszenie_do="2026-11-25T08:00"), wpis(nazwa="Odpuszczony", zgloszenie_do="2026-11-30"),
                                      wpis(nazwa="Daleko", zgloszenie_do="2027-02-01")))
@@ -63,8 +63,8 @@ def test_terminy_w_godzinach_utc_tylko_otwarte(tmp_path, capsys):
     capsys.readouterr()
     uruchom(tmp_path, "terminy", "--dni", "20")
     linie = capsys.readouterr().out.splitlines()
-    assert linie[0].startswith("2026-11-27T17:00 UTC (53 h)  Gemini Agents Challenge")
-    assert linie[1].startswith("2026-12-10 UTC (15 dni)  Kaggle Gemma") and linie[-1] == "w oknie 20 dni: 2"
+    assert linie[0].startswith("2026-11-27 18:00 (53 h)  Gemini Agents Challenge")     # w bazie 17:00 UTC
+    assert linie[1].startswith("2026-12-10 (15 dni)  Kaggle Gemma") and linie[-1] == "w oknie 20 dni: 2"
 
 
 def test_ocena_z_powodem_i_eksport(tmp_path, capsys):
@@ -76,7 +76,7 @@ def test_ocena_z_powodem_i_eksport(tmp_path, capsys):
     capsys.readouterr()
     uruchom(tmp_path, "eksport", str(tmp_path / "out"))
     md = (tmp_path / "out" / "HACKATONY.md").read_text(encoding="utf-8")
-    assert "**2026-11-27T17:00 UTC** (53 h): [Gemini Agents Challenge]" in md
+    assert "**2026-11-27 18:00** (53 h): [Gemini Agents Challenge]" in md
     assert "| [Gemini Agents Challenge](https://gemini.devpost.com) | Devpost | 100 000 USD |" in md
     assert "- ETHGlobal Online: **zgloszony**" in md
     assert len(list(csv.DictReader((tmp_path / "out" / "hackatony.csv").open(encoding="utf-8")))) == 2
@@ -128,9 +128,9 @@ def test_raport_do_wziecia_i_nasze_starty_migruje_stara_baze(tmp_path, capsys):
     uruchom(tmp_path, "raport")
     out = capsys.readouterr().out.splitlines()
     assert out[0] == "Hackathony do wzięcia teraz (najlepsze z 2 otwartych):"
-    assert out[1].startswith("1. [Daleki](https://gemini.devpost.com) · 100 000 USD · zgłoszenie do 2027-02-01 UTC (")
+    assert out[1].startswith("1. [Daleki](https://gemini.devpost.com) · 100 000 USD · zgłoszenie do 2027-02-01 (")
     assert out[1].endswith("ocena 8: agenci to nasz rdzeń · nowy") and out[2].startswith("2. [Słaby]")
-    assert out[3] == "Nasze starty:" and "**budujemy**" in out[4] and "następny krok: demo do 2026-12-08 UTC" in out[4]
+    assert out[3] == "Nasze starty:" and "**budujemy**" in out[4] and "następny krok: demo do 2026-12-08" in out[4]
     assert "Minął" not in "\n".join(out)
 
 
@@ -158,6 +158,6 @@ def test_udzial_historia_i_notatka_w_mozgu(tmp_path, capsys, monkeypatch):
     assert "status: generowane" in md and "sekcje: true" in md and "utworzono: 2026-11-25" in md
     sekcja = lambda n: md.split(f"## {n}\n")[1].split("\n## ")[0]            # noqa: E731
     assert "Nasz krok: nagrać demo" in sekcja("Terminy na 120 dni")
-    assert "**zapisani** · zgłoszenie 2026-11-27T17:00 UTC · następny krok: nagrać demo do 2026-11-26T20:00 UTC · konto: Devpost jaro" in sekcja("Nasze starty")
+    assert "**zapisani** · zgłoszenie 2026-11-27 18:00 · następny krok: nagrać demo do 2026-11-26 21:00 · konto: Devpost jaro" in sekcja("Nasze starty")
     assert "Kaggle Gemma" in sekcja("Do wzięcia teraz") and "mentor potwierdził" in sekcja("Historia z 30 dni")
     assert "### Grudzień 2026" in sekcja("Terminy na 120 dni") and "[[agenci/jarvo-hacker/_hub-hacker|Hacker]]" in md

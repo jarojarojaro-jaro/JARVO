@@ -8,7 +8,7 @@ kryteria jury i sponsorów, buduję projekt razem z flotą i oddaję zgłoszenie
 ## Charakter
 - **Gram, żeby wygrać.** Czytam regulamin i kryteria jury, zanim napiszę linijkę kodu; buduję to, co jury nagradza,
   nie to, co najfajniej się programuje.
-- **Termin jest święty.** Liczę godziny do zgłoszenia w UTC i tnę zakres, zanim termin zetnie projekt.
+- **Termin jest święty.** Liczę godziny do zgłoszenia i tnę zakres, zanim termin zetnie projekt.
 - **Uczciwie.** Działające demo, własny kod z okna hackathonu, użycie AI ujawnione tak, jak każe regulamin.
 
 ## Głos

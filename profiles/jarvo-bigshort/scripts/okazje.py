@@ -365,7 +365,7 @@ def historia(db: sqlite3.Connection, xid: str | None, od: dt.datetime) -> list[d
 def cmd_historia(db: sqlite3.Connection, xid: str | None, dni: int, teraz: dt.datetime) -> int:
     w = historia(db, xid, teraz - dt.timedelta(days=dni))
     for x in w:
-        print(f"{x['kiedy']} UTC  {x['nazwa']}  {x['co']}: {x['opis']}")
+        print(f"{czas_pl(x['kiedy'])}  {x['nazwa']}  {x['co']}: {x['opis']}")
     print(f"wpisów w {dni} dni: {len(w)}")
     return 0
 
@@ -567,7 +567,7 @@ def zapisz_mozg(db: sqlite3.Connection, teraz: dt.datetime) -> Path | None:
     md += ["", "## Terminy naborów na 180 dni"] + (miesiace(ev, dzis, "###") or ["", "- brak"])
     md += ["", "## Zakończone aplikacje", ""] + ([f"- {opis_aplikacji(x)}" for x in ap if x["etap"] not in W_TOKU] or ["- brak"])
     md += ["", "## Historia z 30 dni", ""]
-    md += [f"- {h['kiedy'][8:10]}.{h['kiedy'][5:7]} {h['kiedy'][11:]} UTC · {h['nazwa']} · {h['co']}: {bez_kontaktu(h['opis'])}"
+    md += [f"- {czas_pl(h['kiedy'], '%d.%m %H:%M')} · {h['nazwa']} · {h['co']}: {bez_kontaktu(h['opis'])}"
            for h in hist] or ["- brak zmian"]
     md += ["", "## Powiązane", "", "- hub: [[agenci/jarvo-bigshort/_hub-bigshort|Bigshort]]",
            "- [[agenci/jarvo-bigshort/jak działa bigshort|Bigshort od A do Z]]",
@@ -578,6 +578,13 @@ def zapisz_mozg(db: sqlite3.Connection, teraz: dt.datetime) -> Path | None:
     tmp.write_text("\n".join(md) + "\n", encoding="utf-8")
     tmp.replace(p)
     return p
+
+
+def czas_pl(kiedy: str, wzor: str = "%Y-%m-%d %H:%M") -> str:
+    """Chwila historii z bazy (UTC, RRRR-MM-DDTHH:MM) w czasie polskim (JARVO_STREFA, domyślnie Europe/Warsaw)."""
+    from zoneinfo import ZoneInfo
+    t = dt.datetime.fromisoformat(kiedy).replace(tzinfo=dt.timezone.utc)
+    return t.astimezone(ZoneInfo(os.environ.get("JARVO_STREFA", "Europe/Warsaw"))).strftime(wzor)
 
 
 def bez_kontaktu(opis: str) -> str:

@@ -31,7 +31,8 @@ metadata:
    `status … odpuszczony` z powodem.
    - ✅ Punkt kontrolny: nic nie trafia do bazy bez strony zasad.
 2. **Raportuj, co jest do wzięcia:** `hackatony.py raport`; do 5 najlepszych: numer, nazwa z linkiem, pula, termin
-   wejścia w UTC, ocena i jedno zdanie, czemu możemy wygrać, nowe oznacz „nowy”; na końcu pytanie, w który wchodzimy.
+   wejścia w czasie polskim (tak jak wypisuje skrypt), ocena i jedno zdanie, czemu możemy wygrać, nowe oznacz „nowy”;
+   na końcu pytanie, w który wchodzimy.
 3. **Pilnuj naszych startów:** w hackathonie, w którym bierzemy udział, przypominasz nasz następny krok z terminem
    (`ustaw krok=… krok_do=…`), żeby nic nie umknęło.
 
