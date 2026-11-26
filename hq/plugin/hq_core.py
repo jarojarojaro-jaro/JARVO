@@ -751,19 +751,26 @@ KROJE_ROOT = next((d for d in (_TU / "dist" / "fonts" / "kroje", _TU.parent / "w
                    if (d / "kroje.css").is_file()), _TU / "dist" / "fonts" / "kroje")
 # /_lib/huashu/… = silnik huashu-art-motion (style malarskie, gramatyki explainera), instalacja narzedzia.py instaluj huashu
 HUASHU_ROOT = LIB_ROOT.parent.parent / "huashu-art-motion" / "scripts" / "engine"
+# /_lib/silnikjava/… = silnik rysowanych filmów (src/, kroje stylów), /_lib/malarz/… = jego malarz (pracownia), bez
+# kropki w adresie (.claude/skills/malarz); instalacja narzedzia.py instaluj silnikjava
+SILNIKJAVA_ROOT = LIB_ROOT.parent.parent / "silnikjava"
+MALARZ_ROOT = SILNIKJAVA_ROOT / ".claude" / "skills" / "malarz"
 
 
 def lib_file(rel: str, root: Path | None = None, jarvo_root: Path | None = None,
-             kroje_root: Path | None = None, huashu_root: Path | None = None) -> Path | None:
-    """Plik biblioteki spod node_modules narzędzi, `jarvo/…` z modułów Wideografa, `kroje/…` z krojów edytora albo
-    `huashu/…` z silnika huashu-art-motion (bez ukrytych, bez wyjścia poza katalog, także symlinkiem)."""
+             kroje_root: Path | None = None, huashu_root: Path | None = None,
+             silnikjava_root: Path | None = None, malarz_root: Path | None = None) -> Path | None:
+    """Plik biblioteki spod node_modules narzędzi, `jarvo/…` z modułów Wideografa, `kroje/…` z krojów edytora,
+    `huashu/…` z silnika huashu-art-motion, `silnikjava/…` z silnika rysowanych filmów albo `malarz/…` z jego
+    malarza (bez ukrytych, bez wyjścia poza katalog, także symlinkiem)."""
     root = (root or LIB_ROOT)
     parts = [x for x in rel.split("/") if x]
     if not parts or any(x.startswith(".") or "\x00" in x or "\\" in x for x in parts):
         return None
-    if parts[0] in ("jarvo", "kroje", "huashu"):
+    if parts[0] in ("jarvo", "kroje", "huashu", "silnikjava", "malarz"):
         root = {"jarvo": jarvo_root or JARVO_JS_ROOT, "kroje": kroje_root or KROJE_ROOT,
-                "huashu": huashu_root or HUASHU_ROOT}[parts[0]]
+                "huashu": huashu_root or HUASHU_ROOT, "silnikjava": silnikjava_root or SILNIKJAVA_ROOT,
+                "malarz": malarz_root or MALARZ_ROOT}[parts[0]]
         parts = parts[1:]
         if not parts:
             return None

@@ -1,17 +1,17 @@
 ---
 name: kontrola-wideo
 description: "Przed oddaniem filmu: kontrola techniczna i ocena 0–100."
-version: 1.9.0
+version: 1.10.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
     tags: [video, qa, quality-gate, rubric, loudness, safe-zones]
-    related_skills: [krotki-film, montaz-nagran, clipmaker, napisy, formaty-wideo, dobor-ujec]
+    related_skills: [krotki-film, montaz-nagran, clipmaker, napisy, formaty-wideo, dobor-ujec, film-rysowany]
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-10-18"
+    reviewed: "2026-11-26"
 ---
 
 # Kontrola wideo (bramka jakości)
@@ -46,6 +46,11 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
    strony). Ustalenia to fakty, nie opinie: poprawiasz albo zapisujesz świadomy wyjątek z powodem (`--wyjatek`).
    **„Gotowe” tylko z pełnym i aktualnym raportem** (`html_wideo.py aktualny <strona>` = 0); po każdej zmianie
    pliku animacji raport jest nieaktualny. Ostrzeżenia (martwy odcinek, rytm, kompozycja) sprawdzasz okiem w kroku 4a.
+1b'. **Film rysowany (silnikjava, skill `film-rysowany`):** `@@PY@@ "$HERMES_HOME/scripts/rysowany.py" sprawdz <katalog
+   strony>` to lint i audyt silnika (zasady rysownika i płynność): fizyka ręki, obiekt w całości, kotwice lektora,
+   przestoje, strefa rolki (lint), skoki ręki i czas klatki (audyt). Dla tego silnika zastępuje pomiar HTML z kroku 1b.
+   Błędy i uwagi lintu poprawiasz w `scena.js` (uwaga ze świadomym powodem idzie do raportu), wynik w `sprawdzenie.json`.
+   - ✅ Punkt kontrolny: `✓ zasady rysownika i płynność OK` (kod 0).
 1c. **Cięcia** (każdy film z cięciami: montaż nagrania, rolka, projekt edytora): `@@PY@@ "$HERMES_HOME/scripts/krytyka.py"
    ciecia <film.mp4> --projekt <oryginał>` (film z `projekt.py render`; rolka clipmakera ma projekt obok i nie
    potrzebuje opcji), `--czasy` z listy `ciecia` z `montaz.py`, bez nich cięcia z obrazu. Na każde cięcie jeden obraz:
@@ -122,6 +127,7 @@ Dwie części: technika mierzona skryptem (musi być czysta) i ocena redakcyjna 
 - [ ] cięcia pod muzykę: `rytm.py sprawdz` bez ✗ (siatka „niepewna”: sprawdzone uchem),
 - [ ] film z efektami: `projekt.py slychac` z wynikiem OK (muzyka z `muzyka.py`: jej „Wynik: OK”),
 - [ ] animacja HTML: `html_wideo.py aktualny` = 0 (pomiar pełny, aktualny, bez błędów; wyjątki z powodem w raporcie),
+- [ ] film rysowany: `rysowany.py sprawdz` = 0 (lint bez błędów, uwagi poprawione albo z powodem, audyt bez skoków),
 - [ ] `kontrola.json` z wynikiem ≥ 85 i PASS albo nazwane braki po 2 rundach,
 - [ ] każda różnica ma najmniejszą poprawkę; wynik nie jest zawyżany,
 - [ ] film z kodu / animacja: `krytyka.py ocena` = 0 (7 osi ≥ 8) albo nazwane braki po 3 rundach, zero chwytów z `zakazane.md` bez uzasadnienia,

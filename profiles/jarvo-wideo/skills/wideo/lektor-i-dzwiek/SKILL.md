@@ -1,17 +1,17 @@
 ---
 name: lektor-i-dzwiek
 description: "Lektor PL, muzyka pod głos i głośność −14 LUFS."
-version: 1.14.0
+version: 1.15.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
     tags: [video, voiceover, tts, music, loudness, audio]
-    related_skills: [krotki-film, montaz-nagran, warianty-ab, kontrola-wideo]
+    related_skills: [krotki-film, montaz-nagran, warianty-ab, kontrola-wideo, film-rysowany]
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-10-05"
+    reviewed: "2026-11-26"
 ---
 
 # Lektor i dźwięk
@@ -68,6 +68,8 @@ Brief Sherlocka `fakty.json` obok narracji albo katalog wyżej (albo `--fakty`):
 = błąd i bez syntezy, liczba bez pokrycia w briefie = ostrzeżenie (dopisz źródło albo usuń). Słowniczek briefu
 (`wymowa`) i `--wymowa wymowa.json` (`{"Next.js": "nekst dżej es"}`) zmieniają tylko to, co czyta lektor:
 napisy, `slowa.json` i chwile `{nazwa}` zostają w pisowni z tekstu.
+Film rysowany (`film-rysowany`, silnikjava) bierze ten sam lektor: `rysowany.py glos <strona> os_czasu.json` zamienia
+zdania i czasy słów na zdania silnika (ręka trafia w słowa), a `rysowany.py film` układa nagranie pod oś silnika.
 
 ## Wymowa
 - Liczby tak, jak mają zabrzmieć („trzydzieści procent” gdy „30%” brzmi źle), skróty rozwinięte („między innymi”).

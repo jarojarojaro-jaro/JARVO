@@ -1,6 +1,8 @@
 # Changelog: jarvo-wideo
 
 ## Niewydane
+- Nowe skille z silnikjava: `film-rysowany` (ręka rysuje i pisze pod lektora, 21 stylów, `rysowany.py`), `pracownia-malarza` (obraz malowany i film z pracowni, `pracownia.py`) i `voxel-ascii` (diorama z klocków w ASCII, `voxel.py`); instalacja `narzedzia.py instaluj silnikjava`.
+- Film rysowany sprawdza `rysowany.py sprawdz` (lint i audyt silnika), a każdy z trzech filmów oddajesz jako projekt edytora.
 - SOUL w układzie Jarva: postać (SOUL), procedury (ZASADY), mapa (MAPA); zasada pamięci w `memory`; zbudowany prompt przed/po: 11 856 → 11 859 znaków (ok. 3388 → 3389 tokenów, budżet 3400).
 - HyperFrames 0.9.69 (było 0.9.56; polecenia i flagi, których używasz, bez zmian). Nowe w `render`: skrypty .js spoza katalogu projektu są domyślnie pomijane z ostrzeżeniem (`--include-outside-files` je dołącza); obrazy, filmy, dźwięk, fonty i CSS spoza katalogu dalej wchodzą. Skille HyperFrames zostają z v0.9.52, `npx hyperframes` dalej bierze przypiętą kopię bez sieci.
 - Wtyczka `jarvo-zgody` w każdym trybie blokuje `kill`, `pkill` i `killall` pracownika karty kanbana albo Hermesa (16.11 zabity pracownik karty wracał trzy razy jako „protocol violation”): swoją kartę kończysz `kanban_block` albo `kanban_complete`, a własne procesy (render, serwer) zatrzymujesz jak dotąd. Odrzuca też tekst narzędzi kanbana i zapis w misjach albo skarbcu, który przypisuje decyzję właścicielowi („decyzja właściciela”, „właściciel zdecydował”) bez jego słów w cudzysłowie i godziny; bez cytatu to decyzja agenta.

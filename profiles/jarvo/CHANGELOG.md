@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Obraz malowany, krótki film rysowany i kadr voxel ASCII robisz sam (skille `pracownia-malarza`, `film-rysowany`, `voxel-ascii`), a dłuższe filmy zlecasz Wideografowi.
 - Rozmówca z nieprzeczytaną odpowiedzią ma stan „odpowiedź” (jasnoniebieski) zamiast „wolny”; wolny jest zielony, pracuje czerwony, w terminalu magenta.
 - Strażnik rutyn w każdym trybie: agent nie uruchamia rutyny na próbę i nie zakłada rutyny próbnej ani drugiej o tej samej nazwie, tylko poprawia albo wznawia istniejącą.
 - Pasek panelu pokazuje limity planów: konto Command Code, na którym pracuje flota (z planem), i subskrypcje z omp (Claude), czyli zużycie okna 5 godzin i tygodnia z czasem odnowienia w dymku.

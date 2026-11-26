@@ -1,17 +1,17 @@
 ---
 name: rodzaje-filmu
 description: "Rodzaj filmu → jeden plik: silnik, struktura, rzemiosło."
-version: 1.9.0
+version: 1.10.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
     tags: [video, explainer, motion-graphics, 3d, product, typography, data, logo, story]
-    related_skills: [krotki-film, film-z-kodu, losowanie-ruchow, style-motion, gramatyki-explainera, style-malarskie, montaz-nagran, clipmaker, scenariusz, formaty-wideo, kontrola-wideo]
+    related_skills: [krotki-film, film-z-kodu, losowanie-ruchow, style-motion, gramatyki-explainera, style-malarskie, film-rysowany, pracownia-malarza, voxel-ascii, montaz-nagran, clipmaker, scenariusz, formaty-wideo, kontrola-wideo]
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-10-06"
+    reviewed: "2026-11-26"
 ---
 
 # Rodzaje filmu
@@ -19,7 +19,6 @@ metadata:
 Każde zlecenie filmu zaczyna się od **rodzaju**: od niego zależą struktura, silnik i to, co sprawdzić przed oddaniem.
 Czytasz **tylko plik swojego rodzaju** (dwa, gdy prośba wyraźnie łączy rodzaje, np. explainer z wykresami).
 Pozostałych nie otwieraj: to półka, nie lektura.
-
 ## Indeks
 | Rodzaj | Sygnały w prośbie | Plik albo skill |
 |---|---|---|
@@ -32,6 +31,7 @@ Pozostałych nie otwieraj: to półka, nie lektura.
 | Interaktywne i gry | gra, playable, trailer gry, zapis rozgrywki, interaktywna animacja | `references/interaktywne.md` |
 | Logo i intro | animacja logo, intro, outro, sting, belka z nazwiskiem, ikona albo loader Lottie | `references/logo-intro.md` |
 | Historia | krótka animowana historia, bohater, bajka, reklama fabularna, „w stylu Pixara” | `references/fabula.md` |
+| Rysunek, obraz, ASCII | „narysuj na tablicy”, whiteboard, „namaluj”, „jak powstaje obraz”, „w stylu Van Gogha”, „ASCII” | skill `film-rysowany` (ręka rysuje i pisze pod lektora), `pracownia-malarza` (OBRAZ MALOWANY kreska po kresce i film, jak powstaje), `style-malarskie` (RUCH: scena w stylu epoki, nikt jej nie maluje), `voxel-ascii` (diorama z klocków w ASCII); wybór z przykładami: tabela w `film-z-kodu` |
 | Reels z tematu | „zrób reelsa o…”, faceless, stock + lektor, lista faktów | skill `krotki-film` |
 | Nagranie użytkownika | „zmontuj”, „wytnij”, gadająca głowa, długi materiał na klipy | skill `montaz-nagran`, `clipmaker` |
 

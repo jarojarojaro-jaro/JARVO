@@ -1,17 +1,17 @@
 ---
 name: film-z-kodu
 description: "Film z kodu: wybór silnika, B-roll, style kina, rysunek."
-version: 3.14.0
+version: 3.15.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
     tags: [video, hyperframes, manim, manimgx, motion-graphics, animation, code]
-    related_skills: [rodzaje-filmu, style-motion, gramatyki-explainera, style-malarskie, zywy-schemat, motion-design, video-lessons, claude-animation, motion-broll, lemo-opuscar, anidoodle, hyperframes, hyperframes-cli, remotion-best-practices, bang-motion, pixel2motion, text-to-lottie, kinetic-typography, chart-animation, manim-video, scenariusz, napisy, kontrola-wideo]
+    related_skills: [rodzaje-filmu, style-motion, gramatyki-explainera, style-malarskie, film-rysowany, pracownia-malarza, voxel-ascii, zywy-schemat, motion-design, video-lessons, claude-animation, motion-broll, lemo-opuscar, anidoodle, hyperframes, hyperframes-cli, remotion-best-practices, bang-motion, pixel2motion, text-to-lottie, kinetic-typography, chart-animation, manim-video, scenariusz, napisy, kontrola-wideo]
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-10-11"
+    reviewed: "2026-11-26"
 ---
 
 # Film z kodu
@@ -26,6 +26,15 @@ Oddanie filmu jako projektu edytora HQ (wszystkie silniki): `references/projekt-
 ## Wybór silnika
 Najpierw rodzaj filmu (`rodzaje-filmu`): jego plik mówi, który silnik i dlaczego. Ta tabela to pełna lista silników.
 
+**Rysunek, malarstwo, ASCII: cztery podobne silniki, cztery różne rzeczy**
+
+| Skill | Co to jest | Przykład zlecenia |
+|---|---|---|
+| `film-rysowany` | film objaśniający: ręka rysuje schematy i pisze odręcznie pod lektora (21 stylów: tablica, zeszyt, blueprint, neon…) | „wyjaśnij na tablicy, jak działa agent AI” |
+| `pracownia-malarza` | OBRAZ MALOWANY: pociągnięcia pędzla albo kreski kredką, pastelem, węglem, tuszem, akwarelą, kreska po kresce, ze zdjęcia albo motywu z kodu, i film z pracowni, jak powstaje | „namaluj to zdjęcie olejem i pokaż, jak powstaje” |
+| `style-malarskie` | RUCH: animowana scena w jednym z 35 stylów historii sztuki (Van Gogh, Egipt, Klimt), obraz się porusza, nikt go nie maluje | „historia marki od jaskini do dziś w stylach epok” |
+| `voxel-ascii` | diorama z klocków 3D pokazana znakami ASCII, nastrój bez lektora, rolka 9:16 | „rolka ASCII: latarnia na klifie nocą” |
+
 | Chcę… | Silnik (skill) | Czas pracy |
 |---|---|---|
 | **własna animacja** w Canvas, SVG, Three.js, GSAP (dowolny pomysł, pełna kontrola) | HTML wg `rodzaje-filmu/references/kontrakt-html.md` + `html_wideo.py --preset jarvo` | 20–60 min |
@@ -33,6 +42,9 @@ Najpierw rodzaj filmu (`rodzaje-filmu`): jego plik mówi, który silnik i dlacze
 | **styl motion design** (wrząca linia, izometria, płaski wektor, morph, HUD, kolaż, Bauhaus, synthwave, pixel art, zorza i szkło, płyn, napisy show…): karta stylu z cechami do sprawdzenia, film-wzór 10 s, moduły `/_lib/jarvo/` | **`style-motion`** (HTML + `html_wideo.py --preset jarvo`) | 30–90 min |
 | **fragment explainera z lektorem** w jednej z 8 gramatyk (wykresy jak The Economist, rysowana tablica, 3Blue1Brown, kolaż Vox, prezentacja z premiery, historyjka z postacią, typografia kinetyczna, Kurzgesagt): klip z jednego spec, cue na słowach lektora, 16:9, 9:16, alfa | **`gramatyki-explainera`** (`gramatyka.py`, silnik huashu-art-motion) | 15–40 min |
 | **żywy obraz w stylu malarza** (35 stylów: jaskinia, Egipt, mozaika, gotyk, Van Gogh, Klimt, tusz, Hopper, Ghibli, Haring, piksel 8-bit…): karta stylu, scena-wzór do przerobienia, przejście-podpis, odcinki na siatce bitów, 16:9 | **`style-malarskie`** (`malarz.py`, silnik huashu-art-motion) | 30–90 min |
+| **film rysowany z lektorem**: jedna ręka rysuje schematy, koloruje i pisze odręcznie, rysunek trafia w słowa lektora; 21 stylów, kamera, ścieranie tablicy, rolka 9:16; lint i audyt silnika | **`film-rysowany`** (`rysowany.py`, silnikjava) | 20 do 60 min |
+| **obraz malowany** pędzlem albo na papierze (kredki, pastele, węgiel, ołówek, tusz, akwarela) ze zdjęcia albo motywu z kodu i **film z pracowni** (obraz powstaje pociągnięcie po pociągnięciu) | **`pracownia-malarza`** (`maluj.mjs`, `pracownia.py`, silnikjava) | 10 do 40 min |
+| **diorama z klocków w ASCII**: świat 3D z cieniami, woda, światła, najazd kamery, filtr znaków; rolka 9:16 bez lektora | **`voxel-ascii`** (`voxel.py`; pełny render na InstaBox) | 20 do 60 min |
 | **strona klienta w filmie**: zrzut 2× z mapą elementów i wycinkami, kolory i kroje marki; kamera przewija z postojami, jedzie po elementach, lupa, zakreślacz, uderzenie; wycinek ląduje w swoim miejscu | HTML wg `references/strona-filmowana.md` (zrzut `assety.py --film`, kamera `/_lib/jarvo/strona.js`) | 30–60 min |
 | **ujęcie z karty shotcraft w HTML** (karty rozdane z talii, stos z dociskiem, wiersz wpada w tabelę, wyszukiwarka i klik, tytuł w papierze, licznik bębnowy, cięcia na bit, zwolnienie i stop-klatka, głębia, finał zdjęcie grupowe, reflektor na bohaterze) | HTML wg `references/ujecia.md` (`/_lib/jarvo/ujecia.js`: liczby z kart, bez Remotion) | 20–40 min |
 | **UI morph**: jeden kontener przechodzi przez 8–12 stanów produktu, kursor klika, zero cięć, pętla | HTML wg spec `references/jeden-ksztalt.md` (zrzuty z `assety.py`) | 30–60 min |
@@ -129,7 +141,7 @@ Zwykły reels: `krotki-film` (minuty). Wybór silnika z jednym zdaniem uzasadnie
 2. **Scenariusz** (`scenariusz`): hook, beat sheet sekunda po sekundzie; lektor PL najpierw: film z lektorem =
    `film.py narracja` (pauzy z akapitów, `os_czasu.json` z chwilami po nazwie: `rodzaje-filmu/references/kontrakt-html.md`,
    „Film z lektorem”), krótki tekst = `film.py lektor` → czasy słów; animacje pod te chwile, nie pod wpisane sekundy.
-3. **Środowisko:** `@@PY@@ "$HERMES_HOME/scripts/narzedzia.py" instaluj <motion|lemo|anidoodle|remotion|shotcraft|html|lottie|mg>`
+3. **Środowisko:** `@@PY@@ "$HERMES_HOME/scripts/narzedzia.py" instaluj <motion|lemo|anidoodle|remotion|shotcraft|html|lottie|mg|huashu|silnikjava>`
    (raz; dalej z cache), programy silnika przez `@@PY@@ "$HERMES_HOME/scripts/narzedzia.py" uruchom <narzędzie> -- <polecenie>`.
    Skill silnika każe coś doinstalować, pobrać przeglądarkę (`npx playwright install`, `npm i puppeteer`) albo
    zaktualizować skille lub program (`remotion-upgrade`, `npx skills add`, `hyperframes skills update`,

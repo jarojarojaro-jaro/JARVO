@@ -1,8 +1,8 @@
 # Silniki zewnętrzne u nas
 
-motion-broll, lemo-opuscar, anidoodle, Remotion (+ iart), video-shotcraft, mg-styles-15, huashu-art-motion, bang-motion,
-pixel2motion, Lottie. Skille silników są w profilu (`skills/video/<nazwa>`, przypięte commity w `vendor/skills.lock.yaml`;
-video-shotcraft, mg-styles-15, huashu-art-motion i player Lottie instaluje `narzedzia.py`). Ich instrukcje zakładają laptopa z Claude Code; poniżej różnice u nas.
+motion-broll, lemo-opuscar, anidoodle, Remotion (+ iart), video-shotcraft, mg-styles-15, huashu-art-motion, silnikjava,
+bang-motion, pixel2motion, Lottie. Skille silników są w profilu (`skills/video/<nazwa>`, przypięte commity w `vendor/skills.lock.yaml`;
+video-shotcraft, mg-styles-15, huashu-art-motion, silnikjava i player Lottie instaluje `narzedzia.py`). Ich instrukcje zakładają laptopa z Claude Code; poniżej różnice u nas.
 Ścieżka skilla: `SK="$HERMES_HOME/skills/video/<nazwa>"` (zmienne nie przeżywają między wywołaniami terminala:
 wklejaj przypisanie w każdym).
 
@@ -226,6 +226,21 @@ ls "$HUASHU/scripts/engine/"{lib,scenes,clips}          # biblioteki, sceny-wzor
   nigdy w filmie klienta. `instaluj huashu` nie pobiera `assets/` (filmy pokazowe, plansze, rysunki postaci) ani
   kresek chińskiego kroju AR PL (`strokes.js`, licencja Arphic). Ich `render.py`, `qa.py` i uv nie są nam potrzebne:
   render, pomiar i kontrola są nasze (`html_wideo.py`, `krytyka.py`, `qa_wideo.py`).
+
+## silnikjava (rysowany film, malarz, voxel ASCII; repo właściciela, MIT)
+```bash
+N="$HERMES_HOME/scripts/narzedzia.py"; SILNIKJAVA="@@TOOLS_DIR@@/silnikjava"; @@PY@@ "$N" instaluj silnikjava
+ls "$SILNIKJAVA"/{src,examples/scenes/styles,docs} "$SILNIKJAVA/.claude/skills"/{malarz,voxel-ascii}
+```
+- Trzy narzędzia, trzy skille: `film-rysowany` (`rysowany.py`: strona i scena, lint i audyt, film jako projekt
+  edytora), `pracownia-malarza` (`maluj.mjs` przez `uruchom silnikjava -- node {MALARZ}/…`, film z pracowni przez
+  `pracownia.py`), `voxel-ascii` (`voxel.py`, pełny render na InstaBox). Zmienne `uruchom silnikjava`:
+  `{SILNIKJAVA}`, `{MALARZ}`, `{VOXEL}`, `{PYTHON}` (venv narzędzi ze scipy).
+- Strony serwuje `html_wideo.py --preset jarvo`: silnik pod `/_lib/silnikjava/` (kroje stylów lokalnie:
+  `/_lib/silnikjava/kroje/fonts.css`, google/fonts), pracownia malarza pod `/_lib/malarz/`.
+- `instaluj silnikjava` nie pobiera obrazków i GIF-ów dokumentacji, nagrań głosów przykładów (czasy słów `voice.json`
+  zostają), `tools/` (ich Playwright, render, galeria i Piper) ani `film.mjs` malarza: render, lint i audyt są nasze,
+  głos robi `lektor-i-dzwiek`. Ich `npm run …` i `node tools/…` u nas nie działają i nie są potrzebne.
 
 ## Animacja HTML → wideo: `html_wideo.py` (nasza animacja, iart kinetic-typography, bang-motion, pixel2motion)
 ```bash

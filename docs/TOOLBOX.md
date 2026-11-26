@@ -135,6 +135,7 @@ Wideo: sekcja [`jarvo-wideo`](#jarvo-wideo-wideograf).
 | [mg-styles-15](https://github.com/Vincentwei1021/mg-styles-15) | wzory 15 stylów motion design dla skilla `style-motion` (kreska, izometria, morph, HUD, VHS, napisy show…): kod, notatki stylów, okładki, tekstury, kroje wzorów z google/fonts | MIT | 2026-10 | `narzedzia.py instaluj mg`, `html_wideo.py --preset mg` |
 | mgaudio (z [mg-styles-15](https://github.com/Vincentwei1021/mg-styles-15)) | muzyka i efekty pisane kodem: 15 przepisów gatunków (synthwave, lofi, explainer, chiptune…), forma pod kulminację i logo filmu, mastering −14 LUFS; sample VCSL (15 instrumentów) | MIT (sample CC0) | 2026-10 | dodatek `narzedzia.py instaluj mgaudio` (venv ~390 MB + sample 56 MB), `muzyka.py` |
 | [huashu-art-motion](https://github.com/alchaincyf/huashu-art-motion) | silnik kanwy 2D: 35 stylów malarskich (od jaskini po Picassa), 8 gramatyk explainera (Kurzgesagt, Vox, tablica, historyjka, kinetyczna typografia, 3Blue1Brown, prezentacja, wykresy finansowe), wykresy, schematy, typografia, przejścia; polska nakładka (kroje z ą–ż, liczby, napisy, neutralna postać) | MIT (kroje OFL) | 2026-10 | `narzedzia.py instaluj huashu`, `/_lib/huashu/` + `/_lib/jarvo/huashu_pl.js` (`--preset jarvo`), `html_wideo.py --preset huashu` (ich strony-wzory); skille `gramatyki-explainera` (`gramatyka.py`) i `style-malarskie` (`malarz.py`); `kadry.py wzor` (mapa ruchu i siatka przejść, port `breakdown.py`) |
+| [silnikjava](https://github.com/jarojarojaro-jaro/silnikjava) | repo właściciela: film rysowany (ręka rysuje i pisze pod lektora, 21 stylów, rolki 9:16), obraz malowany pędzlem albo na papierze z filmem z pracowni, diorama z klocków w ASCII; kroje stylów z google/fonts lokalnie | MIT | 2026-11 | `narzedzia.py instaluj silnikjava` + `rysowany.py`, `pracownia.py`, `voxel.py` (skille `film-rysowany`, `pracownia-malarza`, `voxel-ascii`, też u Jarva) |
 | [bang-motion](https://github.com/bangtutorial/bang-motion) | openery, promo, explainery z wyglądem z marki | MIT | 2026-09 | skill |
 | [pixel2motion](https://github.com/nolangz/pixel2motion) | logo z obrazka → animacja SVG / GIF / MP4 | MIT | 2026-09 | skill |
 | [live-panel](https://github.com/ythx-101/live-panel-skill) | żywy schemat z JSON: układ stoi, kropki po strzałkach, kroki, log, liczniki; strona offline i MP4 | MIT | 2026-10 | skill + `zywy_schemat.py`, `html_wideo.py --preset livepanel` |
@@ -370,6 +371,28 @@ może później jako dodatek obrazu).
 | [three.js](https://github.com/mrdoob/three.js) 0.187.0 | podgląd PNG i klatki filmu obrotu (GLTFLoader, RoomEnvironment, krawędzie) | MIT | `9b4a2ac` (r186) | npm w obrazie ([`package.json`](../infra/node/package.json)) |
 | Chromium + playwright-core (Node, z obrazu) | strona podglądu `cad_podglad.html` (SwiftShader) | BSD / Apache-2.0 | n/d | `cad_render.cjs` |
 | FFmpeg (z obrazu) | klatki → MP4 (H.264, yuv420p, faststart) | LGPL/GPL | n/d | `cad.py obrot` |
+
+---
+
+## Wideograf i Jarvo: skille `film-rysowany`, `pracownia-malarza`, `voxel-ascii`
+
+Wspólne skille (`shared/skills/`) na silnikjava właściciela (`f63c094`, MIT), instalowanym na żądanie
+(`narzedzia.py instaluj silnikjava`, bez obrazków dokumentacji, nagrań głosów przykładów i `tools/`). Jarvo robi sam
+obraz i krótki filmik, Wideograf filmy do publikacji. Cztery podobne rzeczy, cztery skille:
+
+| Skill | Co to jest | Przykład zlecenia |
+|---|---|---|
+| `film-rysowany` | film objaśniający: ręka rysuje schematy i pisze odręcznie pod lektora (21 stylów) | „wyjaśnij na tablicy, jak działa agent AI” |
+| `pracownia-malarza` | obraz malowany: pociągnięcia pędzla albo kreski kredką, pastelem, węglem, tuszem, akwarelą, i film z pracowni, jak powstaje | „namaluj to zdjęcie olejem i pokaż, jak powstaje” |
+| `style-malarskie` (Wideograf, huashu) | ruch: animowana scena w stylu epoki, obraz się porusza, nikt go nie maluje | „historia marki w stylach epok” |
+| `voxel-ascii` | diorama z klocków 3D w znakach ASCII (pełny render na InstaBox) | „rolka ASCII: latarnia nocą” |
+
+| Narzędzie | Po co | Licencja | Ostatni commit | Integracja |
+|---|---|---|---|---|
+| silnik rysowany (`src/` silnikjava) | ręka z fizyką, pismo kreskami liter, kamera, ścieranie, lint zasad rysownika | MIT | 2026-11 | `rysowany.py` (strona w kontrakcie jarvo, render `html_wideo.py`, lint i audyt w naszej przeglądarce, lektor z `film.py narracja`, projekt edytora) |
+| malarz (`.claude/skills/malarz`) | obraz z tysięcy pociągnięć pędzla albo kresek na papierze, pracownia, szkicownik | MIT | 2026-11 | Node przez `narzedzia.py uruchom silnikjava`, film `pracownia.py` |
+| voxel ASCII (`.claude/skills/voxel-ascii`) + numpy, scipy 1.16.3, Pillow | świat z klocków, światło, animacja, filtr ASCII | MIT / BSD / HPND | 2026-11 | `voxel.py` (`nice -n 15`, 2 procesy), pełny film przez `zapas-mocy` |
+| kroje stylów (31 rodzin z google/fonts) | pismo stylów bez sieci w renderze | OFL / Apache-2.0 | n/d | `/_lib/silnikjava/kroje/fonts.css` |
 
 ---
 

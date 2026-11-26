@@ -164,6 +164,11 @@ zrodla:
     repo: https://github.com/jtydhr88/screenwriting-skills
     status: uzywane
     przejrzane: 357d1348ccaa1ab75f2f51ef7c90a7f00a686c76
+  silnikjava:
+    repo: https://github.com/jarojarojaro-jaro/silnikjava
+    status: uzywane
+    przejrzane: f63c0947d5ca055a039183e5fe53f3a75b7eab35
+    notatka: "MIT (repo właściciela, publiczne od 26.11): rysowane filmy objaśniające z ręką i lektorem w 21 stylach, malarz obrazów z pracownią, voxel ASCII; instaluj silnikjava (bez docs/img, nagrań głosów przykładów, tools/ i film.mjs), render html_wideo.py, lint i audyt rysowany.py; wersja we flocie to rev w skills.lock.yaml i SILNIKJAVA_REV w narzedzia.py (ten sam commit); zatwierdzone 2026-11-26"
   threejs-skills:
     repo: https://github.com/CloudAI-X/threejs-skills
     status: uzywane

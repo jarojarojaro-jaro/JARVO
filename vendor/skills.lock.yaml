@@ -153,6 +153,19 @@ sources:
     # plansze, rysunki postaci autora: poza MIT) i strokes.js (kreski kroju AR PL, licencja Arphic) (HUASHU_POMIN).
     # Klatki postaci autora w demos/_shared/hero i demos/long_scroll/frames: tylko podgląd ich filmów-wzorów.
     # Polska nakładka (kroje z ą–ż, liczby, napisy, neutralna postać, kontrakt jarvo): scripts/huashu_pl.js.
+  silnikjava:
+    type: git
+    repo: https://github.com/jarojarojaro-jaro/silnikjava
+    rev: f63c0947d5ca055a039183e5fe53f3a75b7eab35
+    license: MIT
+    license_file: LICENSE
+    # repo właściciela: silnik rysowanych filmów objaśniających (src/: ręka, pismo odręczne, 21 stylów, kamera, rolki
+    # 9:16), malarz (.claude/skills/malarz: obrazy pędzlem i na papierze, pracownia) i voxel ASCII
+    # (.claude/skills/voxel-ascii, Python). Nie kopiujemy do profilu: ten sam commit instaluje na żądanie
+    # scripts/narzedzia.py Wideografa (`instaluj silnikjava`), bez docs/img (obrazki i GIF-y), nagrań głosów przykładów,
+    # tools/ i film.mjs malarza (SILNIKJAVA_POMIN); render, lint i audyt robią rysowany.py, pracownia.py i voxel.py.
+    # Nasze skille na nim: shared/skills/film-rysowany, pracownia-malarza, voxel-ascii (Wideograf i Jarvo, niżej);
+    # film-rysowany/references/zasady-rysownika.md = docs/ZASADY.md z tego commitu (test pilnuje zgodności).
   lottie:
     type: git
     repo: https://github.com/diffusionstudio/lottie
@@ -273,6 +286,10 @@ agents:
   jarvo:
     - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     - {source: jarvo, path: shared/skills/odczyt-ekranu, dest: pliki/odczyt-ekranu}
+    # proste obrazy i krótkie filmy robi sam (silnikjava); dłuższe filmy zleca Wideografowi
+    - {source: jarvo, path: shared/skills/film-rysowany, dest: wideo/film-rysowany}
+    - {source: jarvo, path: shared/skills/pracownia-malarza, dest: wideo/pracownia-malarza}
+    - {source: jarvo, path: shared/skills/voxel-ascii, dest: wideo/voxel-ascii}
     - {source: mattpocock-skills, path: skills/productivity/writing-for-agents, dest: meta/writing-for-agents}
   jarvo-sherlock:
     - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
@@ -398,6 +415,10 @@ agents:
     - {source: jarvo, path: shared/skills/odczyt-ekranu, dest: pliki/odczyt-ekranu}
     - {source: jarvo, path: shared/skills/hooki, dest: marketing/hooki}
     - {source: jarvo, path: shared/skills/transkrypcja-filmu, dest: media/transkrypcja-filmu}
+    # silnikjava (narzedzia.py instaluj silnikjava): rysowany film z ręką i lektorem, obraz malowany z pracownią, voxel ASCII
+    - {source: jarvo, path: shared/skills/film-rysowany, dest: wideo/film-rysowany}
+    - {source: jarvo, path: shared/skills/pracownia-malarza, dest: wideo/pracownia-malarza}
+    - {source: jarvo, path: shared/skills/voxel-ascii, dest: wideo/voxel-ascii}
     - {source: jarvo, path: shared/skills/izometria, dest: design/izometria}
     - {source: gsap-skills, path: skills/gsap-core, dest: gsap/gsap-core}
     - {source: gsap-skills, path: skills/gsap-timeline, dest: gsap/gsap-timeline}

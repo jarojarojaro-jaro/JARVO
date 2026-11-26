@@ -68,6 +68,7 @@ CATEGORY_DESCRIPTIONS = {
     "bezpieczenstwo": "Bezpieczeństwo aplikacji (CC BY-SA, bez zmian): przegląd kodu wg OWASP (getsentry), ryzyko zależności (Trail of Bits).",
     "kod": "Praca na kodzie: mapa repo (graf wywołań), wpływ zmian przed refaktorem, debugowanie od przyczyny.",
     "warsztat": "Warsztat Jarva: dokumenty i konwersje, szybkie prototypy, pakiet końcowy misji.",
+    "wideo": "Wideo i obrazy kodem: filmy z kodu, montaż, lektor, kontrola; rysowany film z ręką, obraz malowany, voxel ASCII.",
     # kategorie skilli zewnętrznych
     "research": "Narzędzia researchu z Hermesa (MIT): wyszukiwarki, cytowanie, arXiv, YouTube, Reddit, RSS, OSINT firm.",
     "market": "Research rynku (marketingskills, MIT): profile konkurencji, research klientów.",

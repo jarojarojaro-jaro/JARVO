@@ -21,7 +21,9 @@ strona czyta go przy wczytaniu i pauzuje) albo funkcja seek w JS (--seek "t => t
 Presety (flagi je nadpisują):
   jarvo          nasz kontrakt (rodzaje-filmu/references/kontrakt-html.md): window.__seek(t), window.__ready,
                 rozmiar z window.__W/__H, strona z lokalnego serwera: biblioteki z /_lib/ (three, gsap), bez CDN;
-                /_lib/huashu/ = silnik huashu-art-motion (`narzedzia.py instaluj huashu`), /_lib/jarvo/huashu_pl.js
+                /_lib/huashu/ = silnik huashu-art-motion (`narzedzia.py instaluj huashu`), /_lib/jarvo/huashu_pl.js;
+                /_lib/silnikjava/ = silnik rysowanych filmów, /_lib/malarz/ = jego malarz (`narzedzia.py instaluj
+                silnikjava`; strony robią rysowany.py i pracownia.py)
   huashu        strony silnika huashu-art-motion (index.html ?film=gallery|demos/<gramatyka>, clip.html):
                 window.prepare(t) + renderFrame(t), gotowe: window.__ready, rozmiar z window.__size (domyślnie 1920×1080)
   iart          ?t=<s>, gotowe: window.__ready        (kinetic-typography, chart-animation, lower-thirds…)
@@ -461,6 +463,8 @@ class _Quiet(http.server.SimpleHTTPRequestHandler):
     jarvo_root: Path | None = None    # /_lib/jarvo/… → nasze moduły (ruch.js, kreska.js…)
     kroje_root: Path | None = None    # /_lib/kroje/… → kroje OFL z polskimi znakami (kroje.css, te same co edytor HQ)
     huashu_root: Path | None = None   # /_lib/huashu/… → silnik huashu-art-motion (scripts/engine: lib, scenes, clips)
+    silnikjava_root: Path | None = None   # /_lib/silnikjava/… → silnik rysowanych filmów (src/, kroje stylów)
+    malarz_root: Path | None = None   # /_lib/malarz/… → malarz silnikjava (pracownia, lib), adres bez .claude/
     aliasy: dict[str, Path] = {}      # preset mg: /assets/, /demos/, /node_modules/ spoza katalogu strony
 
     def translate_path(self, path: str) -> str:
@@ -473,6 +477,10 @@ class _Quiet(http.server.SimpleHTTPRequestHandler):
                 root, rel = self.kroje_root.resolve(), rel[len("kroje/"):]
             elif self.huashu_root is not None and rel.startswith("huashu/"):
                 root, rel = self.huashu_root.resolve(), rel[len("huashu/"):]
+            elif self.silnikjava_root is not None and rel.startswith("silnikjava/"):
+                root, rel = self.silnikjava_root.resolve(), rel[len("silnikjava/"):]
+            elif self.malarz_root is not None and rel.startswith("malarz/"):
+                root, rel = self.malarz_root.resolve(), rel[len("malarz/"):]
             target = (root / rel).resolve()
             return str(target) if root in target.parents else str(root / "__poza_lib__")
         for prefiks, katalog in self.aliasy.items():
@@ -499,6 +507,7 @@ def serve(root: Path, lib: bool = False, alias: dict[str, Path] | None = None) -
     if lib:
         handler = type("_Lib", (_Quiet,), {"lib_root": nz.NODE / "node_modules", "jarvo_root": nz.sync_jarvo_js(),
                                            "kroje_root": KROJE, "huashu_root": nz.HUASHU / "scripts" / "engine",
+                                           "silnikjava_root": nz.SILNIKJAVA, "malarz_root": nz.MALARZ,
                                            "aliasy": alias or {}})
     else:
         handler = type("_Alias", (_Quiet,), {"aliasy": alias}) if alias else _Quiet

@@ -1,20 +1,27 @@
 ---
 name: style-malarskie
 description: "35 stylów malarskich: żywy obraz od jaskini do Van Gogha."
-version: 1.0.0
+version: 1.1.0
 author: Jarvo
 license: MIT
 metadata:
   hermes:
     tags: [video, painting, art-history, style, animation, canvas, procedural]
-    related_skills: [rodzaje-filmu, film-z-kodu, style-motion, gramatyki-explainera, lektor-i-dzwiek, kontrola-wideo]
+    related_skills: [rodzaje-filmu, film-z-kodu, style-motion, gramatyki-explainera, pracownia-malarza, film-rysowany, lektor-i-dzwiek, kontrola-wideo]
   jarvo:
     agent: jarvo-wideo
     autonomy: A1
-    reviewed: "2026-10-06"
+    reviewed: "2026-11-26"
 ---
 
 # Style malarskie
+
+**Co to jest:** RUCH: animowana scena w jednym z 35 stylów historii sztuki (Van Gogh, Egipt, Klimt, tusz, Hopper),
+obraz się porusza, nikt go nie maluje na oczach widza.
+**Kiedy użyć:** spot albo ujęcie w stylu epoki lub malarza, przegląd epok, puenta z humorem, tło pod lektora.
+**Przykład zlecenia:** „historia naszej marki od jaskini do dziś, każda epoka w swoim stylu, 30 s”.
+Obraz malowany pociągnięcie po pociągnięciu (pędzel, kredki, pastele, węgiel, tusz, akwarela) i film, jak powstaje, to
+`pracownia-malarza`; ręka rysująca schemat pod lektora to `film-rysowany`.
 
 Żywy obraz w jednym z 35 stylów: malowidło jaskiniowe, Egipt, mozaika rzymska, gotycki rękopis, Van Gogh, Klimt,
 tusz, piksel 8-bit, Hopper, Ghibli, Haring i inne. Kadr maluje kod: płaski podkład, renderer stylu (pociągnięcia,
@@ -31,7 +38,9 @@ obraz cały czas żyje. Silnik i 35 scen-wzorów to huashu-art-motion (MIT, 花�
 ## Nie do
 - Styl motion design (wrząca linia, izometria, HUD, płaski wektor) → `style-motion`; styl kina na gotowym
   silniku (akwarela, anime, miedzioryt) w 30–75 s → `lemo-opuscar` (`film-z-kodu`).
-- Fragment explainera z lektorem (wykres, tablica, 3b1b) → `gramatyki-explainera`.
+- Fragment explainera z lektorem (wykres, tablica, 3b1b) → `gramatyki-explainera`; ręka rysuje i pisze pod lektora
+  (whiteboard, zeszyt, tablica kredowa) → `film-rysowany`.
+- Obraz malowany na oczach widza, kreska po kresce, ze zdjęcia albo motywu, i film z pracowni → `pracownia-malarza`.
 - Kopia cudzego obrazu, postaci albo logo (Marvel, Ghibli, plakat z prawami): bierzesz gramatykę formy, nie dzieło.
 
 ## Przebieg (wszystko samo, bez zatwierdzania po drodze)

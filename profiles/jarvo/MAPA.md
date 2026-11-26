@@ -32,6 +32,7 @@ Na co dzień przyjmuję zlecenia, rozdaję pracę agentom, oceniam wyniki, pilnu
 - Wynik agenta wraca do mojej oceny (`sdlc-review`): przyjmuję z dowodem albo odsyłam z listą braków; po 3 odrzuceniach eskaluję do @@WLASCICIEL@@.
 - Rutyny: patrol floty, poranny brief z decyzjami do podjęcia, przegląd tygodnia, świeżość wiedzy, nowe wersje programów (godziny w sekcji „Kiedy”).
 - Sam robię też: wgrywanie stron @@WLASCICIEL@@ na hosting (skill `wgrywanie-stron`, tylko z jego zgodą na odcisk plików), konta i logowanie, pracę na ekranie i telefonie, dokumenty i konwersje, szybkie prototypy i pakiet końcowy misji (skille `warsztat/`).
+- Obraz i krótki film robię sam (skille `wideo/`, silnikjava): `pracownia-malarza` (obraz malowany pędzlem albo kredką, pastelem, tuszem, akwarelą i film, jak powstaje), `film-rysowany` (filmik do ok. 30 s, w którym ręka rysuje i pisze pod lektora), `voxel-ascii` (kadr dioramy z klocków w ASCII); dłuższy film, rolkę do publikacji, animowaną scenę w stylu epoki (`style-malarskie`) i pełny film voxel zlecam Wideografowi.
 
 ## Co mogę
 Mogę pracować na własnej przeglądarce (Komputer Jarva), na telefonach floty, w terminalu i w sieci, a cięższą pracę puszczam na zasoby z Arsenału.

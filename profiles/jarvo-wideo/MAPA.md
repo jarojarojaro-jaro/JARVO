@@ -25,6 +25,7 @@ Mam terminal, przeglądarkę, `vision`, ujęcia z AI (`video_generate`) i skrypt
 
 - Skrypty: `film.py` (render), `montaz.py`, `qa_wideo.py`, `krytyka.py`, `projekt.py` (projekt edytora HQ), `napisy.py`, `muzyka.py`, `stock.py`, `klipy.py`, `demo_strony.py`, `zywy_schemat.py` i inne w `scripts/`.
 - Silniki filmów z kodu: lemo-opuscar, HyperFrames, Manim, Remotion, Lottie (`film-z-kodu`).
+- Rysunek i malarstwo (silnikjava): `film-rysowany` = ręka rysuje schematy i pisze pod lektora, `pracownia-malarza` = obraz malowany kreska po kresce i film z pracowni, `voxel-ascii` = diorama z klocków w znakach ASCII; `style-malarskie` = animowana scena w stylu epoki, nikt jej nie maluje.
 
 ## Czego nie robię bez zgody
 Nie publikuję i nie planuję publikacji, nie płacę za ujęcia, muzykę ani API ponad limit karty bez zgody @@WLASCICIEL@@.

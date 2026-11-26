@@ -2,7 +2,7 @@
 """Narzędzia „wideo z kodu”: sprawdzenie i instalacja raz, we wspólnym katalogu.
 
     python3 narzedzia.py sprawdz                 # co jest gotowe, czego brak (JSON)
-    python3 narzedzia.py instaluj [motion|lemo|anidoodle|animacja|remotion|shotcraft|html|lottie|mg|mgaudio|huashu|wszystko]
+    python3 narzedzia.py instaluj [motion|lemo|anidoodle|animacja|remotion|shotcraft|html|lottie|mg|mgaudio|huashu|silnikjava|wszystko]
     python3 narzedzia.py env <narzedzie>         # zmienne środowiska do wklejenia: eval "$(python3 narzedzia.py env motion)"
     python3 narzedzia.py uruchom <narzedzie> -- <polecenie> [argumenty]   # to samo bez eval (każda powłoka i system)
     python3 narzedzia.py link <katalog>          # <katalog>/node_modules → wspólne (skrypty .mjs nie czytają NODE_PATH)
@@ -14,7 +14,9 @@ bang-motion), lottie (oficjalny player Skottie do text-to-lottie + eksport przez
 mg (mg-styles-15: kod 15 filmów-wzorów stylów motion design, notatki stylów, okładki, tekstury, kroje wzorów),
 mgaudio (dodatek: muzyka i efekty pisane kodem z mg-styles-15 dla muzyka.py; własny venv ok. 390 MB i sample 56 MB),
 huashu (huashu-art-motion: silnik kanwy 2D z 35 stylami malarskimi i 8 gramatykami explainera, ok. 45 MB z gitem;
-podawany stronom pod /_lib/huashu/, polska nakładka /_lib/jarvo/huashu_pl.js).
+podawany stronom pod /_lib/huashu/, polska nakładka /_lib/jarvo/huashu_pl.js), silnikjava (rysowane filmy objaśniające
+z ręką i lektorem w 21 stylach, malarz obrazów pędzlem i na papierze, voxel ASCII; ok. 40 MB z gitem i krojami stylów;
+podawany stronom pod /_lib/silnikjava/, zmienne SILNIKJAVA, MALARZ, VOXEL).
 
 Zasady (VPS 8 GB, bez dubli):
 - przeglądarka: Chromium headless z obrazu Hermesa (PLAYWRIGHT_BROWSERS_PATH), nic nie pobieramy; wersja
@@ -26,6 +28,8 @@ Zasady (VPS 8 GB, bez dubli):
   mg-styles-15 bez filmów (okładki zostają), strony pokazowej, zdjęć bez opisanego źródła i modeli do Blendera,
   z krojami wzorów z google/fonts (OFL, Apache-2.0; chińskie spoza google/fonts zastępuje Noto Sans SC);
   huashu-art-motion bez assets/ (filmy pokazowe, plansze, rysunki postaci autora) i danych kresek kroju AR PL (Arphic);
+  silnikjava bez obrazków dokumentacji, nagrań głosów przykładów i tools/ (render, lint i audyt robią skrypty Jarva),
+  z krojami stylów z google/fonts i scipy dla voxel ASCII;
   HDRI do stylów 3D lemo (~12 MB) zawsze; ciężkie assety lemo (głos Kokoro ~340 MB, sample ~1,4 GB) tylko
   z JARVO_EXTRAS „lemo”; mgaudio w `wszystko` tylko z JARVO_EXTRAS „mgaudio” (osobno: `instaluj mgaudio`).
 - Linux, macOS i Windows: venv w bin/ albo Scripts\\, programy .cmd (npm) przez PATH, node_modules projektu jako
@@ -101,6 +105,22 @@ HUASHU = ROOT / "huashu-art-motion"
 HUASHU_REPO = "https://github.com/alchaincyf/huashu-art-motion.git"
 HUASHU_REV = "26dba25b2b495c2138848c29a2c90df356a20325"     # vendor/skills.lock.yaml → huashu-art-motion
 HUASHU_POMIN = ["/assets/", "/scripts/engine/reference_films/spacex/spacex_wb/assets/strokes.js"]
+# silnikjava (MIT): rysowane filmy objaśniające (src/: ręka, pismo odręczne, 21 stylów, kamera, rolki 9:16; strona
+# filmu z rysowany.py, render przez html_wideo.py), malarz (.claude/skills/malarz: obrazy pędzlem i na papierze, film
+# z pracowni przez pracownia.py) i voxel ASCII (.claude/skills/voxel-ascii: Python, voxel.py). Bez obrazków i GIF-ów
+# dokumentacji (docs/img), nagrań głosów przykładów (examples/voice/*/*.ogg; czasy słów voice.json zostają: z nich
+# ruszają filmy-wzory stylów i testy silnika), tools/ (ich Playwright, render, galeria GIF-ów i Piper: render robi
+# html_wideo.py, lint i audyt rysowany.py sprawdz, głos lektor-i-dzwiek) i film.mjs malarza (jego Playwright).
+SILNIKJAVA = ROOT / "silnikjava"
+SILNIKJAVA_REPO = "https://github.com/jarojarojaro-jaro/silnikjava.git"
+SILNIKJAVA_REV = "f63c0947d5ca055a039183e5fe53f3a75b7eab35"   # vendor/skills.lock.yaml → silnikjava
+SILNIKJAVA_POMIN = ["/docs/img/", "/examples/voice/*/*.ogg", "/tools/", "/.claude/skills/malarz/film.mjs"]
+MALARZ = SILNIKJAVA / ".claude" / "skills" / "malarz"
+VOXEL = SILNIKJAVA / ".claude" / "skills" / "voxel-ascii"
+# kroje stylów silnika (google/fonts, OFL albo Apache-2.0) obok klonu: strona filmu ładuje /_lib/silnikjava/kroje/fonts.css
+SILNIKJAVA_KROJE = "kroje"
+# voxel ASCII: numpy i Pillow z PY_BASE, scipy w tej samej wersji co mgaudio (requirements.txt skilla: scipy>=1.11)
+VOXEL_PY = ["scipy==1.16.3"]
 LOTTIE = ROOT / "lottie-player"
 LOTTIE_REPO = "https://github.com/diffusionstudio/lottie.git"
 LOTTIE_REV = "3c72912fad543897f90045ed4d355813837927fc"      # vendor/skills.lock.yaml → lottie
@@ -577,6 +597,22 @@ def huashu_gotowe() -> bool:
             and (silnik / "scenes" / "index.js").exists() and (silnik / "clip.js").exists())
 
 
+def install_silnikjava() -> None:
+    install_html()
+    ensure_venv(PY_BASE + PY_HTML + VOXEL_PY)
+    clone_pinned(SILNIKJAVA_REPO, SILNIKJAVA_REV, SILNIKJAVA, SILNIKJAVA_POMIN)
+    for uwaga in kroje_silnikjava(SILNIKJAVA):
+        print(f"! {uwaga}", file=sys.stderr)
+
+
+def silnikjava_gotowe() -> bool:
+    """Przypięty commit z silnikiem rysowanym, malarzem i voxel ASCII, kroje stylów i scipy w venvie narzędzi."""
+    return ((SILNIKJAVA / ".git").exists() and git_head(SILNIKJAVA) == SILNIKJAVA_REV
+            and (SILNIKJAVA / "src" / "index.js").exists() and (MALARZ / "maluj.mjs").exists()
+            and (VOXEL / "run.py").exists() and (SILNIKJAVA / SILNIKJAVA_KROJE / "fonts.css").exists()
+            and venv_has("scipy"))
+
+
 def sample_mg() -> Path:
     return MGSTYLES / MG_SAMPLE.strip("/")
 
@@ -700,11 +736,14 @@ def status() -> dict:
         "mgaudio": mgaudio_gotowe(),
         # style malarskie i gramatyki explainera: przypięty commit silnika
         "huashu": huashu_gotowe(),
+        # rysowane filmy, malarz i voxel ASCII: przypięty commit, kroje stylów, scipy
+        "silnikjava": silnikjava_gotowe(),
         "pelne_lemo": full_extras(),
     }
 
 
-TOOLS = ("motion", "lemo", "anidoodle", "animacja", "remotion", "shotcraft", "html", "lottie", "mg", "mgaudio", "huashu")
+TOOLS = ("motion", "lemo", "anidoodle", "animacja", "remotion", "shotcraft", "html", "lottie", "mg", "mgaudio", "huashu",
+         "silnikjava")
 
 
 def _path_z_venv() -> str:
@@ -719,13 +758,15 @@ def env_for(tool: str) -> dict:
     shell = headless_shell() or ""
     chrome = str(CHROME_WRAPPER) if shell and CHROME_WRAPPER.exists() else shell     # dla puppeteer i CHROME_BIN
     real = {"JARVO_CHROME_REAL": shell} if shell else {}
-    if tool in ("motion", "html", "mg", "huashu"):
+    if tool in ("motion", "html", "mg", "huashu", "silnikjava"):
         env = {**base, "NODE_PATH": str(NODE / "node_modules"), "PYTHON": py(), "PATH": _path_z_venv()}
         if tool == "motion":
             return env
         env = {**env, **real, "CHROME_BIN": chrome, "PUPPETEER_EXECUTABLE_PATH": chrome}
         if tool == "huashu":
             return {**env, "HUASHU": str(HUASHU)}
+        if tool == "silnikjava":
+            return {**env, "SILNIKJAVA": str(SILNIKJAVA), "MALARZ": str(MALARZ), "VOXEL": str(VOXEL)}
         return {**env, "MGSTYLES": str(MGSTYLES)} if tool == "mg" else env
     if tool == "lemo":
         return {**base, "LEMO_OPUSCAR_HOME": str(LEMO), "LIB": str(LEMO), **({"PLAYWRIGHT_CHROME": shell} if shell else {})}
@@ -948,6 +989,68 @@ def kroje_mg(mg: Path, zrodlo: GoogleFonts | None = None) -> list[str]:
     return uwagi
 
 
+def rodziny_stylow(themes_js: str) -> list[str]:
+    """Rodziny krojów stylów silnikjava z src/themes.js (`fonts: { hand: '"Kalam", "Caveat", cursive', … }`)."""
+    out: list[str] = []
+    for blok in re.findall(r"fonts:\s*\{([^}]*)\}", themes_js):
+        out += re.findall(r'"([^"]+)"', blok)
+    return list(dict.fromkeys(out))
+
+
+def pliki_rodziny(pliki: list[str]) -> list[tuple[str, str]]:
+    """(plik w google/fonts, grubość w @font-face) dla rodziny: krój zmienny (100 do 900) albo Regular i Bold; bez
+    kursyw. Rodzina z jednym plikiem bez nazwy stylu (np. VT323-Regular) też wchodzi jako 400."""
+    ttf = sorted(p for p in pliki if p.lower().endswith((".ttf", ".otf")) and "italic" not in p.lower())
+    zmienne = [p for p in ttf if "[" in p]
+    if zmienne:
+        return [(zmienne[0], "100 900")]
+    regular = next((p for p in ttf if p.rsplit(".", 1)[0].endswith("-Regular")), ttf[0] if len(ttf) == 1 else None)
+    bold = next((p for p in ttf if p.rsplit(".", 1)[0].endswith("-Bold")), None)
+    return [(p, w) for p, w in ((regular, "400"), (bold, "700")) if p]
+
+
+def kroje_silnikjava(sj: Path, zrodlo: GoogleFonts | None = None) -> list[str]:
+    """Kroje stylów silnikjava (autor ładuje je z Google Fonts przez sieć, a render ma działać offline): każda rodzina
+    z src/themes.js z google/fonts (OFL albo Apache-2.0) do <klon>/kroje razem z licencją, krój zmienny albo Regular
+    i Bold, i fonts.css z @font-face dla strony filmu (/_lib/silnikjava/kroje/fonts.css). fonts.css z tą samą listą
+    rodzin i wszystkimi plikami = gotowe, bez sieci. Zwraca uwagi (rodzina, której nie ma, kroje bez polskich liter)."""
+    katalog = sj / SILNIKJAVA_KROJE
+    css_plik = katalog / "fonts.css"
+    rodziny = rodziny_stylow((sj / "src" / "themes.js").read_text(encoding="utf-8"))
+    naglowek = f"/* rodziny: {' | '.join(rodziny)} */"
+    if css_plik.exists():
+        css = css_plik.read_text(encoding="utf-8")
+        if css.startswith(naglowek + "\n") and all((katalog / p).exists() for p in re.findall(r'url\("([^"]+)"\)', css)):
+            return []
+    zrodlo = zrodlo or GoogleFonts()
+    katalog.mkdir(parents=True, exist_ok=True)
+    uwagi, css = [], [naglowek]
+    for rodzina in rodziny:
+        nazwa_gf = re.sub(r"[^a-z0-9]", "", rodzina.lower())
+        wybor, licencja = [], "ofl"
+        for licencja in ("ofl", "apache"):
+            wybor = pliki_rodziny(zrodlo.pliki(nazwa_gf, licencja))
+            if wybor:
+                break
+        if not wybor:
+            uwagi.append(f"{rodzina}: nie ma jej w google/fonts; styl weźmie następny krój ze swojej listy (zwykle Kalam)")
+            continue
+        for plik, waga in wybor:
+            cel = katalog / plik.replace("[", "-").replace("]", "").replace(",", "-")
+            if not cel.exists():
+                cel.write_bytes(zrodlo.plik(nazwa_gf, plik, licencja))
+                print(f"↓ {cel.name} ← google/fonts {licencja}/{nazwa_gf}/{plik}", flush=True)
+            lic = "OFL.txt" if licencja == "ofl" else "LICENSE.txt"
+            if not (katalog / f"{lic[:-4]}-{nazwa_gf}.txt").exists():
+                (katalog / f"{lic[:-4]}-{nazwa_gf}.txt").write_bytes(zrodlo.plik(nazwa_gf, lic, licencja))
+            brak = [z for z in POLSKIE if ord(z) not in znaki_kroju(cel)]
+            if brak and waga != "700":
+                uwagi.append(f"{rodzina}: bez polskich liter {''.join(brak)}; te litery rysuje następny krój stylu")
+            css.append(f'@font-face{{font-family:"{rodzina}";src:url("{cel.name}");font-weight:{waga};font-display:block}}')
+    css_plik.write_text("\n".join(css) + "\n", encoding="utf-8")
+    return uwagi
+
+
 def msys(sciezka: str) -> str:
     """Ścieżka Windows w zapisie Git Bash (MSYS): C:\\Users\\x → /c/Users/x."""
     m = re.match(r"([A-Za-z]):[\\/]?(.*)", sciezka)
@@ -1014,8 +1117,10 @@ def main(argv: list[str] | None = None) -> int:
         steps = {"motion": [install_motion], "lemo": [install_lemo], "anidoodle": [install_anidoodle], "animacja": [install_animacja],
                  "remotion": [install_remotion], "shotcraft": [install_shotcraft], "html": [install_html],
                  "lottie": [install_lottie], "mg": [install_mg], "mgaudio": [install_mgaudio], "huashu": [install_huashu],
+                 "silnikjava": [install_silnikjava],
                  "wszystko": [install_motion, install_html, install_anidoodle, install_animacja, install_lemo, install_shotcraft,
-                              install_lottie, install_mg, install_huashu, *([install_mgaudio] if dodatek("mgaudio") else [])]}.get(what)
+                              install_lottie, install_mg, install_huashu, install_silnikjava,
+                              *([install_mgaudio] if dodatek("mgaudio") else [])]}.get(what)
         if not steps:
             raise SystemExit(f"instaluj: {' | '.join(TOOLS)} | wszystko")
         if not headless_shell():
