@@ -56,6 +56,9 @@ jego słów („…”) i godziny albo daty obok = block z radą: cytat z czasem
 Strażnik nagrywania ekranu (w każdym trybie, z człowiekiem, bez niego i pod YOLO): surowe `ffmpeg -f x11grab`
 (gdigrab, avfoundation, kmsgrab) i programy nagrywające pulpit w terminalu, procesie w tle i execute_code = block
 z radą: nagraj.py ze skilla praca-na-ekranie (krótkie odcinki udanych kroków; 16.11 ~20 min nagrania pętli błędów).
+Strażnik rutyn (w każdym trybie, z człowiekiem, bez niego i pod YOLO): cronjob_manage `run` (przebieg na próbę trafia do
+Aktualizacji właściciela) oraz `create` rutyny próbnej (test, próba w nazwie) albo o nazwie już istniejącej w profilu
+(także wstrzymanej) = block z radą: sprawdź prompt i skrypty w rozmowie, istniejącą rutynę popraw albo wznów.
 
 Jak to działa w Hermesie f97608f (sprawdzone w kodzie, plik:linia):
   - hermes_cli/plugins.py:1854-1906: dyrektywy pre_tool_call; block (z niepustym message) wygrywa z approve, a z wielu
@@ -3376,6 +3379,43 @@ def _przypisanie_w_zapisie(tool_name: str, args: Dict[str, Any], m: _Miejsca, ta
     return _blok_przypisania(f"{tool_name} {_pokaz(realne[0], 60)}", fragmenty) if fragmenty else None
 
 
+# Strażnik rutyn (w każdym trybie, z człowiekiem, bez niego i pod YOLO; 26.11 właściciel: „nie może być więcej takich
+# błędów” po 4 rodzajach raportów Bigshorta z prób i kopii rutyny): każdy przebieg rutyny trafia do Aktualizacji
+# właściciela, więc `run` (przebieg na próbę) = block, a `create` rutyny próbnej albo o nazwie już istniejącej w profilu
+# (także wstrzymanej) = block z radą: popraw albo wznów istniejącą.
+RUTYNA_PROBNA = re.compile(r"\b(test\w*|prob[aye]\w*|próba|próbn\w*|sprawdz\w*|dry[ -]?run)\b", re.I)
+
+
+def _rutyny_profilu() -> List[Dict[str, Any]]:
+    home = os.environ.get("HERMES_HOME")
+    try:
+        dane = json.loads((Path(home) / "cron" / "jobs.json").read_text(encoding="utf-8")) if home else {}
+    except (OSError, ValueError):
+        return []
+    jobs = dane.get("jobs") if isinstance(dane, dict) else dane
+    return [j for j in jobs or [] if isinstance(j, dict)]
+
+
+def _straznik_rutyn(args: Dict[str, Any]) -> Optional[Dict[str, str]]:
+    akcja = str(args.get("action") or "").strip().lower()
+    if akcja == "run":
+        return _blok("rutyny nie uruchamiam na próbę: każdy przebieg trafia do Aktualizacji właściciela. Sprawdź prompt "
+                     "i skrypty rutyny tutaj, tymi samymi poleceniami, a rutyna ruszy sama o swojej porze.")
+    if akcja != "create":
+        return None
+    nazwa = str(args.get("name") or "").strip()
+    if RUTYNA_PROBNA.search(nazwa):
+        return _blok(f"rutyna próbna („{_pokaz(nazwa, 40)}”) dałaby raport w Aktualizacjach właściciela. Sprawdź prompt "
+                     "i skrypty tutaj, a rutynę zakładaj od razu docelową.")
+    takie = [j for j in _rutyny_profilu() if nazwa and str(j.get("name") or "").strip().casefold() == nazwa.casefold()]
+    if takie:
+        j = takie[0]
+        stan = "wstrzymana" if j.get("enabled") is False or j.get("state") == "paused" else "włączona"
+        return _blok(f"rutyna „{_pokaz(nazwa, 40)}” już jest ({stan}, job_id={j.get('id')}): druga dałaby drugi raport "
+                     "w Aktualizacjach. Popraw ją przez cronjob_manage update albo resume z tym job_id.")
+    return None
+
+
 def _decyzja(tool_name: str, args: Dict[str, Any], task_id: str) -> Optional[Dict[str, str]]:
     yolo = _yolo()
     if yolo and (tool_name in NARZEDZIA_EKRANU or tool_name.startswith(f"mcp__{TELEFON}__")):
@@ -3391,6 +3431,10 @@ def _decyzja(tool_name: str, args: Dict[str, Any], task_id: str) -> Optional[Dic
         return _werdykt_z_rozmowy(tool_name, args)
     if tool_name not in OBSLUGIWANE:
         return None
+    if tool_name == "cronjob_manage":
+        straznik = _straznik_rutyn(args)
+        if straznik:
+            return straznik
     bez_czl = bez_czlowieka()
     tryb, _ = tryb_zgod()
     m = _miejsca(tryb, bez_czl, yolo and not bez_czl)

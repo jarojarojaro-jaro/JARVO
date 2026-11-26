@@ -1,6 +1,8 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Rozmówca z nieprzeczytaną odpowiedzią ma stan „odpowiedź” (jasnoniebieski) zamiast „wolny”; wolny jest zielony, pracuje czerwony, w terminalu magenta.
+- Strażnik rutyn w każdym trybie: agent nie uruchamia rutyny na próbę i nie zakłada rutyny próbnej ani drugiej o tej samej nazwie, tylko poprawia albo wznawia istniejącą.
 - Pasek panelu pokazuje limity planów (Claude, Command Code): zużycie okna 5 godzin i tygodnia z czasem odnowienia w dymku.
 - Wiadomość pisana w panelu nie ma już odznaki „z panelu”, a nagłówek rozmowy pokazuje „wspólna rozmowa” tylko wtedy, gdy rozmowa idzie też przez Telegram albo terminal.
 - Film w rozmowie ma przycisk „Edytuj film”, który otwiera edytor filmów nad bieżącym widokiem (adres `?n=edytor&p=<film>` też go otwiera).

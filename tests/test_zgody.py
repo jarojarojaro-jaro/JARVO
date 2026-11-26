@@ -215,6 +215,25 @@ def test_tryb_domyslny_to_auto_bez_prosb(sr, monkeypatch):
     assert hak("cronjob_manage", action="create", schedule="every 1h", prompt="x") is None
 
 
+def test_straznik_rutyn_bez_prob_i_kopii(sr, monkeypatch):
+    """26.11 właściciel („nie może być więcej takich błędów”): Bigshort dał 4 rodzaje raportów w Aktualizacjach z nocnych
+    prób rutyny i własnej kopii wstrzymanej rutyny z repo. W każdym trybie: przebieg na próbę i rutyna próbna albo
+    o nazwie istniejącej (także wstrzymanej) to block z job_id do poprawy; nowa docelowa rutyna przechodzi."""
+    ustaw_tryb(monkeypatch, "auto")
+    (sr.home / "cron").mkdir()
+    (sr.home / "cron" / "jobs.json").write_text(json.dumps({"jobs": [
+        {"id": "bigshort-terminy", "name": "Bigshort: raport finansowania", "enabled": False, "state": "paused"}]}),
+        encoding="utf-8")
+    w = hak("cronjob_manage", action="run", job_id="bigshort-terminy")
+    assert akcja(w) == "block" and "Aktualizacji" in w["message"]
+    w = hak("cronjob_manage", action="create", name="bigshort: raport finansowania", schedule="35 8 * * *", prompt="x")
+    assert akcja(w) == "block" and "job_id=bigshort-terminy" in w["message"] and "wstrzymana" in w["message"]
+    assert akcja(hak("cronjob_manage", action="create", name="test-raport-rano", schedule="in 1m", prompt="x")) == "block"
+    assert hak("cronjob_manage", action="create", name="Bigshort: przypomnienie o skrzynkach", schedule="0 9 * * *",
+               prompt="x") is None
+    assert hak("cronjob_manage", action="resume", job_id="bigshort-terminy") is None
+
+
 def test_tryb_auto_zostawia_strazniki(sr, monkeypatch):
     ustaw_tryb(monkeypatch, "auto")
     assert akcja(hak("write_file", path=str(sr.home / "config.yaml"), content="x")) == "block"   # config Hermesa

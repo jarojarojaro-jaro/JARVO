@@ -115,7 +115,11 @@ function OdznakaAktualizacji({ otworz }) {
 const STANY_ROZMOWCY = new Set(["pracuje", "czeka", "wolny", "terminal", "kolejka", "offline"]);
 const nazwaRozmowcy = (r) => (r ? (!isPL() && r.nazwa_en) || r.nazwa || r.klucz : "");
 const agentRozmowcy = (r) => (r.zaplecze === "omp" ? r.klucz : r.cel);
-const stanRozmowcy = (r) => (STANY_ROZMOWCY.has(r && r.stan) ? r.stan : "offline");
+// wolny rozmówca z nieprzeczytaną odpowiedzią = „odpowiedź” (26.11 właściciel: ma być widać, że odpowiedź czeka)
+const stanRozmowcy = (r) => {
+  const st = STANY_ROZMOWCY.has(r && r.stan) ? r.stan : "offline";
+  return st === "wolny" && (r.nieprzeczytane || 0) > 0 ? "odpowiedz" : st;
+};
 function slowoStanu(r) {
   const st = stanRozmowcy(r);
   return st === "kolejka" ? T("rozm.kolejka", { n: Math.max(1, r.czeka || 0) }) : T(`rozm.${st}`);
