@@ -2697,6 +2697,12 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   .j-pig-w .j-pig.is-fast, .j-do + .j-pig-w .j-pig.is-zb, .j-komp-pasek .j-do-l { display: none; }
   .j-pig { padding: 0 8px; height: 40px; }
   .j-pig-w .j-pig { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+  /* telefon: model ma pierwszeństwo (pełna nazwa albo wielokropek), wysiłek, limit i kontekst same znaki, liczby w dymku */
+  .j-pig-w .j-pig:first-child { flex: 0 1 auto; display: block; padding: 0 6px; line-height: 40px; font-size: 11px; text-overflow: ellipsis; }
+  .j-pig-w .j-pig.is-zb { flex: none; }
+  .j-pig.is-zb > span:not(.j-sr), .j-pig-l > span:last-child, .j-pig-k > span { display: none; }
+  .j-pig-l, .j-pig-k { padding: 0 6px; }
+  .j-komp-pasek { gap: 4px; }
 }
 /* @@pakiet rdzen */
 /* przycisk „Na żywo” (41-na-zywo.js): stały w pasku pracy i przy pasku podagentów; ikona urządzenia, napis, nazwa

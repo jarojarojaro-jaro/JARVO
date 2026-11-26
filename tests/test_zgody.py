@@ -87,6 +87,7 @@ def sr(tmp_path, monkeypatch):
     monkeypatch.setattr(z, "_domy", lambda: [str(s.dom)])                 # strażnik kasowania: tylko dom testu
     monkeypatch.setattr(z, "_tymczasowe", lambda: [str(tmp_path / "temp")])
     monkeypatch.setattr(z, "_podagent", lambda: bool(os.environ.get("HERMES_DELEGATED_CHILD_CONTEXT")))
+    monkeypatch.setattr(z, "_TELEFON_ZADANIA", type(z._TELEFON_ZADANIA)())     # wiązanie telefonu per test
     monkeypatch.setattr(z, "_env_sesji", lambda nazwa: os.environ.get(nazwa, ""))
     monkeypatch.setattr(z, "_TRYB_W_PROCESIE", {})
     monkeypatch.setattr(z, "_STAN_CACHE", {})

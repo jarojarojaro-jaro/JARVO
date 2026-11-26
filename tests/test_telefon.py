@@ -243,3 +243,61 @@ def test_przydzial_tylko_agent_biznesowy_i_tylko_wlasciciel(inst, monkeypatch, c
     assert jarvo(inst, "przydziel", BIZNES, "fb") == 1 and jarvo(inst, "zabierz", "jarvo-ok") == 1
     assert capsys.readouterr().err.count("tylko właściciel") == 2
     assert telefon.przydzialy(telefon.stan_telefonu(inst.u)) == {"jarvo-ok": "fb"}
+
+
+DUMPSYS = """Accounts: 6
+    Account {name=zygmacias@gmail.com, type=com.google}
+    Account {name=manadzmajaro@gmail.com, type=com.google}
+    Account {name=Reddit for Android, type=com.reddit.account}
+    Account {name=Complete-Reveal-1114, type=com.reddit.account}
+    Account {name=Meet, type=com.google.android.apps.tachyon}
+    Account {name=zygmacias-ctrl, type=com.github.android}
+    Account {name=USIM1, type=USIM Account}
+
+  RegisteredServicesCache: 3
+    Account {name=zygmacias@gmail.com, type=com.google}
+"""
+
+
+def test_spis_telefonow_notatka_z_pomiaru(inst, monkeypatch, capsys):
+    """`jarvo telefon spis`: konta i SIM z dumpsys/getprop (adb podstawiony), ręczna część notatki zostaje,
+    telefon niedostępny zachowuje swój blok z poprzedniego spisu."""
+    telefon.zapisz_stan(inst.u, {"adresy": {"first": "1.1.1.1:5555", "second": "2.2.2.2:5555"},
+                                 "numery": {"first": "+48500100200"}})
+    zywe = {"1.1.1.1:5555", "2.2.2.2:5555"}
+
+    def powloka(_adb, adres, polecenie):
+        if adres not in zywe:
+            return None
+        if polecenie == "dumpsys account":
+            return DUMPSYS
+        return "READY,ABSENT\nCrossMobile,\nPixel 7\n" if adres.startswith("1.") else "ABSENT\n\nPixel 6\n"
+    monkeypatch.setattr(telefon, "_powloka", powloka)
+
+    assert jarvo(inst, "spis", "--json", "--bez-zapisu") == 0
+    pomiar = json.loads(capsys.readouterr().out)
+    notatka = inst.u.dane / "jarvo" / "knowledge" / "fleet" / "telefony.md"
+    assert not notatka.exists()
+    first, second = pomiar
+    assert first["google"] == ["zygmacias@gmail.com", "manadzmajaro@gmail.com"]
+    assert first["aplikacje"] == [{"usluga": "Reddit", "login": "Complete-Reveal-1114"},
+                                  {"usluga": "GitHub", "login": "zygmacias-ctrl"}]
+    assert (first["sim"], first["numer"], first["model"]) == ("CrossMobile", "+48500100200", "Pixel 7")
+    assert (second["sim"], second["numer"]) == (None, None)
+
+    assert jarvo(inst, "spis") == 0
+    tekst = notatka.read_text(encoding="utf-8")
+    assert tekst.startswith("---\ntyp: fakt") and "numer do SMS tylko z tego spisu" in tekst
+    assert "- SIM: CrossMobile" in tekst and "- SIM: bez SIM" in tekst and "numer nieustalony" in tekst
+    assert "- konta w aplikacjach: Reddit: Complete-Reveal-1114; GitHub: zygmacias-ctrl" in tekst
+    notatka.write_text(tekst + "- Allegro, sklep@x.pl, first, 2026-11-26\n", encoding="utf-8")
+
+    zywe.discard("2.2.2.2:5555")
+    assert jarvo(inst, "spis") == 0
+    nowy = notatka.read_text(encoding="utf-8")
+    assert "- Allegro, sklep@x.pl, first, 2026-11-26\n" in nowy and "## Konta założone w serwisach" in nowy
+    blok_second = nowy.split("### second", 1)[1].split(telefon.KONIEC_SPISU, 1)[0]
+    assert "- adres adb: 2.2.2.2:5555" in blok_second and "- model: Pixel 6" in blok_second
+    assert blok_second.count("nie odpowiada, dane z poprzedniego spisu") == 1
+    assert jarvo(inst, "spis") == 0                                     # druga próba: nadal jedna linia
+    assert notatka.read_text(encoding="utf-8").count("nie odpowiada") == 1

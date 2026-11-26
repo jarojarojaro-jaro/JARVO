@@ -3025,6 +3025,125 @@ def _nagrywanie_ekranu(narzedzie: str, tekst: str) -> Optional[Dict[str, str]]:
                  "kroków. Przy pierwszej blokadzie przestań nagrywać.")
 
 
+# 26.11 Hacker zaczął weryfikację maila HF na telefonie first i przeskoczył (surowym adb) na third i second, a każdy
+# telefon ma inne konta Google: zadanie (karta kanbana albo rozmowa) pracuje na pierwszym użytym telefonie floty.
+TELEFON_DOMYSLNY = "first"
+TELEFON_ODCZYT = frozenset({f"mcp__{TELEFON}__list_phones", f"mcp__{TELEFON}__ping"})
+_ADB = re.compile(r"\badb\b|ANDROID_SERIAL", re.I)
+_IP = re.compile(r"(?<![\d.])\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?![\d.])")
+_MAPA_TTL = 60.0
+_MAPA: Dict[str, Any] = {"t": 0.0, "ip": {}}                 # IP adb telefonu → nazwa
+_TELEFON_ZADANIA: "collections.OrderedDict[str, str]" = collections.OrderedDict()
+
+
+def _mapa_ip() -> Dict[str, str]:
+    """IP adb telefonu floty → nazwa, z klucza `adresy` w <stan>/telefon.json ({"first": "100.x.y.z:5555"}, ten sam
+    plik co `stan_telefonu` w jarvo/telefon.py; <stan> = <korzeń>/stan obok <korzeń>/dane). Cache _MAPA_TTL s."""
+    teraz = time.monotonic()
+    if _MAPA["ip"] and teraz - _MAPA["t"] < _MAPA_TTL:
+        return _MAPA["ip"]
+    mapa: Dict[str, str] = {}
+    try:
+        plik = _korzen_danych(_hermes_home()).parent / "stan" / "telefon.json"
+        adresy = json.loads(plik.read_text(encoding="utf-8")).get("adresy") or {}
+        for nazwa, adres in adresy.items():
+            ip = str(adres).rsplit(":", 1)[0].strip()
+            if ip:
+                mapa[ip] = str(nazwa)
+    except (OSError, ValueError, AttributeError):
+        pass
+    _MAPA.update(t=teraz, ip=mapa)
+    return mapa
+
+
+def _telefony_wywolania(tool_name: str, args: Dict[str, Any]) -> List[str]:
+    """Telefony floty, których dotyczy wywołanie (nazwa albo IP, gdy nazwa nieznana); [] = nie dotyczy telefonu."""
+    if tool_name.startswith(f"mcp__{TELEFON}__"):
+        if tool_name in TELEFON_ODCZYT:
+            return []
+        p = str(args.get("phone") or "").strip()
+        return [p or os.environ.get("PHONEUSE_ONLY", "").strip() or TELEFON_DOMYSLNY]
+    pole = {"terminal": "command", "execute_code": "code", "process_manage": "data"}.get(tool_name)
+    tekst = str(args.get(pole) or "")[:_MAX_POLECENIA] if pole else ""
+    if not _ADB.search(tekst):
+        return []
+    mapa = _mapa_ip()
+    wynik: List[str] = []
+    for ip in _IP.findall(tekst):
+        if ip in mapa and mapa[ip] not in wynik:
+            wynik.append(mapa[ip])
+    return wynik
+
+
+def _klucz_zadania(task_id: str, session_id: str) -> str:
+    karta = os.environ.get("HERMES_KANBAN_TASK", "").strip()
+    return f"karta:{karta}" if karta else f"sesja:{session_id or task_id or 'default'}"
+
+
+def _jeden_telefon(tool_name: str, args: Dict[str, Any], task_id: str, session_id: str) -> Optional[Dict[str, str]]:
+    """Pierwszy telefon zadania wiąże je do końca (karta kanbana albo sesja rozmowy); inny telefon = block."""
+    telefony = _telefony_wywolania(tool_name, args)
+    if not telefony:
+        return None
+    klucz = _klucz_zadania(task_id, session_id)
+    with _ZAMEK:
+        x = _TELEFON_ZADANIA.get(klucz)
+        if x is None:
+            x = telefony[0]
+            _TELEFON_ZADANIA[klucz] = x
+            while len(_TELEFON_ZADANIA) > 256:
+                _TELEFON_ZADANIA.popitem(last=False)
+    if all(t == x for t in telefony):
+        return None
+    logger.warning("jarvo-zgody: przeskok telefonu %s -> %s (%s)", x, telefony, tool_name)
+    return _blok(f"To zadanie pracuje na telefonie {x}; inny telefon tylko na wyraźne polecenie JARO, więc dokończ "
+                 f"na {x} albo zapytaj go jednym zdaniem.")
+
+
+# 26.11 20:40 Jarvo wpisał w formularz weryfikacji SMS prywatny numer JARO: numery z listy sha256 ostatnich 9 cyfr
+# (<korzeń danych>/jarvo/konfig/prywatne-numery.json) blokujemy w każdym trybie, także pod YOLO.
+PRYWATNE_NUMERY = ("jarvo", "konfig", "prywatne-numery.json")
+NARZEDZIA_TEKSTU = frozenset({"terminal", "execute_code", "process_manage", "browser_type", "browser_fill",
+                              "send_message", "computer_use", "komputer", "write_file", "patch"})
+_CIAG_CYFR = re.compile(r"\d[\d\s().\-]{7,}\d")
+_NUMERY_CACHE: Dict[str, Tuple[Tuple[int, int], frozenset]] = {}
+
+
+def _hashe_prywatnych() -> frozenset:
+    plik = _korzen_danych(_hermes_home()).joinpath(*PRYWATNE_NUMERY)
+    try:
+        st = plik.stat()
+    except OSError:
+        return frozenset()
+    sygn = (st.st_mtime_ns, st.st_size)
+    stare = _NUMERY_CACHE.get(str(plik))
+    if stare and stare[0] == sygn:
+        return stare[1]
+    try:
+        lista = json.loads(plik.read_text(encoding="utf-8")).get("sha256_9") or []
+        hashe = frozenset(str(h).strip().lower() for h in lista if str(h).strip())
+    except (OSError, ValueError, AttributeError):
+        hashe = frozenset()
+    _NUMERY_CACHE[str(plik)] = (sygn, hashe)
+    return hashe
+
+
+def _prywatny_numer(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[str, str]]:
+    if tool_name not in NARZEDZIA_TEKSTU and not tool_name.startswith(f"mcp__{TELEFON}__"):
+        return None
+    hashe = _hashe_prywatnych()
+    if not hashe:
+        return None
+    tekst = json.dumps(args, ensure_ascii=False, default=str)[:_MAX_POLECENIA]
+    for mm in _CIAG_CYFR.finditer(tekst):
+        cyfry = re.sub(r"\D", "", mm.group(0))
+        if len(cyfry) >= 9 and hashlib.sha256(cyfry[-9:].encode()).hexdigest() in hashe:
+            logger.warning("jarvo-zgody: zablokowany prywatny numer JARO (%s)", tool_name)
+            return _blok("To prywatny numer JARO: nigdy go nie wpisuj ani nie wysyłaj; numer telefonu floty bierz z "
+                         "SIM tego telefonu, na którym pracuje zadanie.")
+    return None
+
+
 def _blok_werdyktow(werdykty: List[_Werdykt], m: _Miejsca, co: str) -> Dict[str, str]:
     flota = [w for w in werdykty if w.powod.startswith(KOD_FLOTY)]
     if flota:
@@ -3513,7 +3632,10 @@ def straznik_zgod(tool_name: str = "", args: Optional[Dict[str, Any]] = None, ta
     """Hak pre_tool_call: None (dalej), {"action": "approve", "message", "rule_key"} albo {"action": "block", "message"}.
     Wyjątek = block (fail-closed, bez treści argumentów w komunikacie)."""
     try:
-        wynik = _decyzja(str(tool_name or ""), args if isinstance(args, dict) else {}, str(task_id or ""))
+        tool_name, args = str(tool_name or ""), args if isinstance(args, dict) else {}
+        wynik = _prywatny_numer(tool_name, args) or _decyzja(tool_name, args, str(task_id or ""))
+        if not wynik or wynik.get("action") != "block":     # zablokowane wywołanie nie wiąże telefonu
+            wynik = _jeden_telefon(tool_name, args, str(task_id or ""), str(session_id or "")) or wynik
         if wynik and wynik.get("action") == "approve" and bez_czlowieka():
             # bez człowieka Hermes odpowiedziałby BLOCKED od razu; nigdy nie zwracamy approve (sekcja d)
             return _blok("praca bez człowieka, a to wywołanie wymaga zgody. Zapisz wynik w katalogu karty, w skarbcu "

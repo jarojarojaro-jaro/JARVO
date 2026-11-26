@@ -1,4 +1,4 @@
-"""Telefony właściciela dla floty przez serwer MCP PHONEUSE: `jarvo telefon on|off|status|przydziel|zabierz`
+"""Telefony właściciela dla floty przez serwer MCP PHONEUSE: `jarvo telefon on|off|status|przydziel|zabierz|spis`
 (docs/MOBILE.md „Telefon przez PHONEUSE”).
 
 PHONEUSE (osobne repo właściciela) steruje telefonem z Androidem przez usługę dostępności na telefonie; jego serwer
@@ -24,6 +24,9 @@ w żadnym configu nie ma wpisu `phone` (repo go nie zawiera); bez przydziału ag
         przy włączonym telefonie od razu wpis phone z PHONEUSE_ONLY w tym profilu (ta sama zasada restartu)
   jarvo telefon zabierz PROFIL
         zdejmuje przydział: mcp_servers.phone.enabled: false w tym profilu, następne jarvo update usuwa wpis
+  jarvo telefon spis [--json] [--bez-zapisu]
+        spis telefonów floty z pomiaru adb (konta, SIM, model; numer z `numery` w telefon.json) w notatce
+        <dane>/jarvo/knowledge/fleet/telefony.md między znacznikami spis; to odczyt, więc może każdy
 
 Wpis przeżywa `jarvo update`: `flota.ustawienia_profili` bierze go z `klucze_profili` (jeden wzór, ten moduł), a
 install_fleet.py ustawia go w tym samym przebiegu co `profile update --force-config`. `env` serwera: ADB = adb
@@ -553,6 +556,149 @@ def polecenie_status(u: Uklad, a, _reszta=(), _ot=None) -> int:
     return 0
 
 
+# ---------------------------------------------------------------- spis telefonów floty
+
+NOTATKA_SPISU = ("jarvo", "knowledge", "fleet", "telefony.md")          # pod <dane>
+POCZATEK_SPISU, KONIEC_SPISU = "<!-- spis:start -->", "<!-- spis:koniec -->"
+CZAS_SPISU = 20.0                                                       # sekundy na jedno polecenie adb
+USLUGI = {"com.google": "Google", "com.github.android": "GitHub", "com.reddit.account": "Reddit",
+          "com.twitter.android.auth.login": "X", "com.facebook.auth.login": "Facebook",
+          "www.instagram.com": "Instagram", "com.linkedin.android": "LinkedIn", "org.telegram.messenger": "Telegram",
+          "com.whatsapp": "WhatsApp", "com.microsoft.workaccount": "Microsoft"}
+POMIJANE_TYPY = {"com.google.android.apps.tachyon", "USIM Account", "com.android.localphone",
+                 "com.android.sim", "com.google.android.apps.meetings"}
+POMIJANE_NAZWY = {"Reddit for Android", "Meet", "USIM1", "USIM2", "SIM1", "SIM2"}
+KONTO = re.compile(r"Account \{name=(.*?), type=([^}]*)\}")
+NIE_ODPOWIADA = "- nie odpowiada, dane z poprzedniego spisu"
+
+
+def _powloka(adb: str, adres: str, polecenie: str) -> str | None:
+    """`adb -s ADRES shell POLECENIE`: wyjście albo None (telefon nie odpowiada, błąd, przekroczony czas)."""
+    try:
+        r = subprocess.run([adb, "-s", adres, "shell", polecenie], capture_output=True, text=True,
+                           errors="replace", timeout=CZAS_SPISU)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return r.stdout if r.returncode == 0 else None
+
+
+def konta_z_dumpsys(tekst: str) -> tuple[list[str], list[dict]]:
+    """Konta Google i konta w aplikacjach z `dumpsys account` (bez powtórzeń i kont systemowych)."""
+    google: list[str] = []
+    aplikacje: list[dict] = []
+    for nazwa, typ in KONTO.findall(tekst):
+        nazwa, typ = nazwa.strip(), typ.strip()
+        if typ in POMIJANE_TYPY or nazwa in POMIJANE_NAZWY:
+            continue
+        if typ == "com.google":
+            if nazwa not in google:
+                google.append(nazwa)
+            continue
+        wpis = {"usluga": USLUGI.get(typ, typ), "login": nazwa}
+        if wpis not in aplikacje:
+            aplikacje.append(wpis)
+    return google, aplikacje
+
+
+def zmierz_telefon(adb: str, nazwa: str, adres: str, numer: str | None) -> dict:
+    wynik = {"nazwa": nazwa, "adres": adres, "numer": numer, "odpowiada": False, "model": None, "sim": None,
+             "google": [], "aplikacje": [], "kiedy": time.strftime("%Y-%m-%d %H:%M")}
+    konta = _powloka(adb, adres, "dumpsys account")
+    props = _powloka(adb, adres, "getprop gsm.sim.state; getprop gsm.operator.alpha; getprop ro.product.model")
+    if konta is None or props is None:
+        return wynik
+    linie = [*props.splitlines(), "", "", ""]
+    stan_sim = {s.strip() for s in linie[0].split(",") if s.strip()}
+    operator = next((o.strip() for o in linie[1].split(",") if o.strip()), "")
+    wynik["google"], wynik["aplikacje"] = konta_z_dumpsys(konta)
+    wynik.update(odpowiada=True, model=linie[2].strip() or None,
+                 sim=(operator or "SIM bez operatora") if stan_sim & {"READY", "LOADED"} else None)
+    return wynik
+
+
+def _sekcja(t: dict) -> str:
+    apl = "; ".join(f"{a['usluga']}: {a['login']}" for a in t["aplikacje"]) or "brak"
+    return "\n".join([f"### {t['nazwa']}", f"- adres adb: {t['adres']}", f"- model: {t['model'] or 'nieznany'}",
+                      f"- SIM: {t['sim'] or 'bez SIM'}", f"- numer: {t['numer'] or 'numer nieustalony'}",
+                      f"- konta Google: {', '.join(t['google']) or 'brak'}", f"- konta w aplikacjach: {apl}",
+                      f"- pomiar: {t['kiedy']}"])
+
+
+def _stare_sekcje(notatka: str) -> dict[str, str]:
+    """Sekcje `### nazwa` z poprzedniego bloku spisu (bez starej linii „nie odpowiada”)."""
+    if POCZATEK_SPISU not in notatka or KONIEC_SPISU not in notatka:
+        return {}
+    blok = notatka.split(POCZATEK_SPISU, 1)[1].split(KONIEC_SPISU, 1)[0]
+    sekcje = {}
+    for kawalek in re.split(r"(?m)^(?=### )", blok):
+        if kawalek.startswith("### "):
+            linie = [x for x in kawalek.strip().splitlines() if not x.startswith(NIE_ODPOWIADA)]
+            sekcje[linie[0][4:].strip()] = "\n".join(linie)
+    return sekcje
+
+
+def blok_spisu(pomiar: list[dict], stara_notatka: str = "") -> str:
+    stare = _stare_sekcje(stara_notatka)
+    czesci = []
+    for t in pomiar:
+        if t["odpowiada"]:
+            czesci.append(_sekcja(t))
+        else:
+            czesci.append((stare.get(t["nazwa"]) or f"### {t['nazwa']}\n- adres adb: {t['adres']}")
+                          + f"\n{NIE_ODPOWIADA} (próba {t['kiedy']})")
+    return (f"{POCZATEK_SPISU}\n_Blok generuje `jarvo telefon spis` z pomiaru adb; nie edytuj go ręcznie._\n\n"
+            + "\n\n".join(czesci) + f"\n{KONIEC_SPISU}")
+
+
+def nowa_notatka(blok: str) -> str:
+    dzis = time.strftime("%Y-%m-%d")
+    return (f"---\ntyp: fakt\ntagi: [telefony, flota, konta, sim]\nutworzono: {dzis}\nzmieniono: {dzis}\n"
+            "status: aktualna\nzrodlo: pomiar `jarvo telefon spis` (adb dumpsys account, getprop) i wpisy agentów\n"
+            "---\n# Telefony floty\n\n**Całe zadanie robisz na jednym telefonie: tym, którego konto jest potrzebne; "
+            "numer do SMS tylko z tego spisu.**\n\n## Spis z pomiaru\n" + blok + "\n\n## Konta założone w serwisach\n"
+            "Każde konto założone na telefonie floty dopisujesz tu od razu: serwis, login lub mail, telefon, data.\n")
+
+
+def zapisz_spis(sciezka: Path, pomiar: list[dict]) -> None:
+    stara = sciezka.read_text(encoding="utf-8") if sciezka.is_file() else ""
+    blok = blok_spisu(pomiar, stara)
+    if POCZATEK_SPISU in stara and KONIEC_SPISU in stara:
+        przed, reszta = stara.split(POCZATEK_SPISU, 1)
+        nowa = przed + blok + reszta.split(KONIEC_SPISU, 1)[1]
+    elif stara:
+        nowa = stara.rstrip("\n") + "\n\n## Spis z pomiaru\n" + blok + "\n"
+    else:
+        nowa = nowa_notatka(blok)
+    sciezka.parent.mkdir(parents=True, exist_ok=True)
+    przenosne.zapisz_atomowo(sciezka, nowa)
+
+
+def polecenie_spis(u: Uklad, a, _reszta=(), _ot=None) -> int:
+    st = stan_telefonu(u)
+    adresy = st.get("adresy") if isinstance(st.get("adresy"), dict) else {}
+    numery = st.get("numery") if isinstance(st.get("numery"), dict) else {}
+    if not adresy:
+        print("BŁĄD: brak adresów telefonów (klucz `adresy` w <stan>/telefon.json, np. {\"first\": "
+              "\"100.99.219.95:5555\"}).", file=sys.stderr)
+        return 1
+    adb = adb_floty(u)
+    if not adb:
+        print("BŁĄD: brak adb Jarva (jarvo android on).", file=sys.stderr)
+        return 1
+    pomiar = [zmierz_telefon(str(adb), n, str(adr), numery.get(n)) for n, adr in sorted(adresy.items())]
+    sciezka = Path(u.dane).joinpath(*NOTATKA_SPISU)
+    if not getattr(a, "bez_zapisu", False):
+        zapisz_spis(sciezka, pomiar)
+    if getattr(a, "json", False):
+        print(json.dumps(pomiar, ensure_ascii=False, indent=2))
+    else:
+        for t in pomiar:
+            print(_sekcja(t) if t["odpowiada"] else f"### {t['nazwa']}\n{NIE_ODPOWIADA[2:]}")
+        if not getattr(a, "bez_zapisu", False):
+            print(f"\nZapisane w {sciezka}")
+    return 0
+
+
 # ---------------------------------------------------------------- jarvo doctor
 
 def sprawdzenia(u: Uklad, ot=None) -> list[dict]:
@@ -600,6 +746,10 @@ def dodaj_polecenia(sub) -> None:
     k = t.add_parser("zabierz", help="zdejmij przydział: enabled: false w profilu agenta")
     k.add_argument("profil", metavar="PROFIL")
     k.set_defaults(funkcja=polecenie_zabierz)
+    k = t.add_parser("spis", help="spis telefonów floty z pomiaru adb do notatki fleet/telefony.md")
+    k.add_argument("--json", action="store_true", help="wypisz wynik pomiaru jako JSON")
+    k.add_argument("--bez-zapisu", action="store_true", help="nie zapisuj notatki")
+    k.set_defaults(funkcja=polecenie_spis)
 
 
 def main(argv: list[str] | None = None) -> int:
