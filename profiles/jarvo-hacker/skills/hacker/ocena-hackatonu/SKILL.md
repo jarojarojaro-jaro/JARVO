@@ -31,10 +31,13 @@ metadata:
 1. **Od tropu do zasad:** strona hackathonu, regulamin (rules, official rules, terms), FAQ, strona sponsora tracku.
 2. **Twarde warunki:** kraj (Polska i UE), wiek, solo albo minimalny zespół, KYC, portfel, obecność na miejscu (także
    finał i odbiór nagrody), kod sprzed hackathonu, kod pisany przez AI, licencja i prawa do IP, wymagane konta.
-   - ✅ Punkt kontrolny: każdy warunek ma cytat z regulaminu albo „niejasne”; warunek wykluczający kończy ocenę (≤ 3).
-3. **Nagroda:** pula, tracki i nagrody sponsorów, które da się łączyć, nagrody w kredytach osobno od gotówki.
+   - ✅ Punkt kontrolny: każdy warunek ma cytat z regulaminu albo „niejasne”; tylko taki warunek albo wynik testu daje ≤ 3.
+3. **Nagroda:** pula, tracki i nagrody sponsorów, które da się łączyć, nagrody w kredytach osobno od gotówki; brak puli
+   w agregatorze sprawdzasz u organizatora, a wygrana bez gotówki (finał, oferta pracy, sprzęt) też jest nagrodą.
 4. **Szansa floty:** dopasowanie tematu do tego, co flota umie (agenci, web, wideo, research, telefony, Komputer, GPU
-   Enigmy), liczba uczestników poprzedniej edycji, kryteria jury i to, czy demo flota zrobi w czasie.
+   Enigmy, Mac właściciela), liczba uczestników poprzedniej edycji, kryteria jury i to, czy demo flota zrobi w czasie;
+   „nie mamy sprzętu” piszesz tylko po teście na naszym sprzęcie.
+   - ✅ Punkt kontrolny: edycja na stronie to bieżący rok i termin w przyszłości (strona z poprzedniej edycji to nie hackathon).
 5. **Wartość oczekiwana** 0–10 (`references/wartosc.md`), `hackatony.py dodaj` + `ocen`, odpowiedź w formacie niżej.
 
 ## Wyjścia

@@ -35,7 +35,8 @@ metadata:
 2. **Fakty:** kwota (gotówka osobno od kredytów i perków), cena (equity, SAFE: cap, discount, MFN; wkład własny,
    zwrot), kwalifikowalność (kraj, forma prawna, spółka US, relokacja, solo, etap, przychód), termin i najbliższa
    kohorta, czas aplikacji, wymagane materiały, prawa do IP i wyłączności.
-   - ✅ Punkt kontrolny: każdy fakt ma link i datę; czego regulamin nie mówi, jest „nie podano”.
+   - ✅ Punkt kontrolny: każdy fakt ma link i datę; czego regulamin nie mówi, jest „nie podano”; status naboru (otwarty,
+     wstrzymany, zamknięty) to cytat z bieżącej strony programu, a termin z serwisu wtórnego ma dopisek „[źródło wtórne]”.
 3. **Dopasowanie** 0–10 dla projektu: najpierw warunki wykluczające (0–2), potem teza i etap, potem rachunek
    (kwota netto wobec ceny i czasu aplikacji).
 4. **Ryzyka:** opłaty wpisowe, programy „pay to pitch”, wyłączność, przeniesienie IP, oszustwa (nowa domena, brak
