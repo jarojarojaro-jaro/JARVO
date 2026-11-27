@@ -52,10 +52,11 @@ APP = Path(__file__).resolve().parent.parent          # kod tej wersji Jarva (za
 ORKIESTRATOR = "jarvo"                                # jak install_fleet.py: jego profil = flota już zainstalowana
 ZNACZNIK_PANELU = ".odcisk-panelu"                    # <dane>/plugins: odcisk wtyczek panelu po jego restarcie
 USTAWIENIA_PROFILI = "flota-ustawienia.json"          # <stan>: klucze configu profili zależne od instalacji
-# compression: rozmowa w panelu rosła do 150–440 tys. tokenów, bo Hermes kompresuje dopiero przy połowie okna (1M:
-# 500 tys.); 26.11 właściciel: kontekst agenta nigdy rozdęty. Próg 64 tys. i kompresja po 30 min przerwy.
+# compression (27.11 decyzja właściciela): modele DeepSeek (okno 1M) kompresują rozmowę przy 700 tys. tokenów, bez
+# kompresji po przerwie; klucze są jawne, bo instalacja dopisuje wartości i nie usuwa starych.
 KLUCZE_WSZYSTKICH = {"updates.check": False,          # jak hermes.BEZPIECZNE dla hosta (build ich nie ustawia)
-                     "compression.threshold_tokens": 64000, "compression.idle_compact_after_seconds": 1800}
+                     "compression.model_thresholds.deepseek": 0.7, "compression.threshold_tokens": 700000,
+                     "compression.idle_compact_after_seconds": 0}
 CZAS_BUILDU = 3600.0             # pierwszy build klonuje 34 repo skilli (ok. 0,9 GB), kolejne biorą je z <cache>/build
 CZAS_INSTALACJI = 3600.0         # profile update kopiuje skille 10 profili, zasiew skarbca, lint
 # Tokeny ścieżek E4 (wspólny kontrakt build.py, install_fleet.py i skilli; docs/NATYWNIE.md S06, F12, F14, F17)

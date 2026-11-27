@@ -503,8 +503,8 @@ def test_flota_przekazuje_ustawienia_profili(tmp_path):
                                         encoding="utf-8")
     assert flota.agenci_buildu(u) == ["jarvo", "jarvo-web"]
     ust = flota.ustawienia_profili(u, ["jarvo"])
-    assert ust["wszystkie"] == {"updates.check": False, "compression.threshold_tokens": 64000,
-                                "compression.idle_compact_after_seconds": 1800}
+    assert ust["wszystkie"] == {"updates.check": False, "compression.model_thresholds.deepseek": 0.7,
+                                "compression.threshold_tokens": 700000, "compression.idle_compact_after_seconds": 0}
     assert ust["profile"] == ({"jarvo": {"terminal.shell_init_files": [str(u.stan / "powloka" / "jarvo.sh")]}}
                               if WINDOWS else {})
     argv = flota.argv_instalacji(u, tmp_path / "app", Path(sys.executable), pierwsza=False, wznow_rutyny=False,

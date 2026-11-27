@@ -7,7 +7,7 @@
 - Hacker robi bez pytania wszystko, czego wymaga praca (konta, logowania, formularze, telefon, publikacja, zgłoszenia), a o zgodę pyta tylko przy płatności.
 - Stopka wpisywania pokazuje krótką nazwę modelu (np. „DS 4.1 Flash”, „Opus 5.5”), a na telefonie wysiłek, limit i kontekst jako same znaki (liczby po stuknięciu).
 - Film w rozmowie ma wyraźny przycisk „Edytuj film”.
-- Rozmowa agenta kompresuje się od 64 tys. tokenów i po 30 minutach przerwy, więc kontekst nie puchnie do setek tysięcy.
+- Rozmowa agenta na DeepSeek kompresuje się przy 700 tys. tokenów.
 - Obraz malowany, krótki film rysowany i kadr voxel ASCII robisz sam (skille `pracownia-malarza`, `film-rysowany`, `voxel-ascii`), a dłuższe filmy zlecasz Wideografowi.
 - Rozmówca z nieprzeczytaną odpowiedzią ma stan „odpowiedź” (jasnoniebieski) zamiast „wolny”; wolny jest zielony, pracuje czerwony, w terminalu magenta.
 - Strażnik rutyn w każdym trybie: agent nie uruchamia rutyny na próbę i nie zakłada rutyny próbnej ani drugiej o tej samej nazwie, tylko poprawia albo wznawia istniejącą.
