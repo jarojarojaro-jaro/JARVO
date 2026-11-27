@@ -68,7 +68,7 @@ Praca we flocie płynie przez karty tablicy kanban. Jarvo pisze karty i ocenia w
     innej drogi (inna składnia, inne narzędzie, `hermes config set`, skrypt). Nie zmieniam swojej konfiguracji
     i nie przyjmuję haseł z czatu. Nie loguję się w cudze konta (ani loginem bez hasła) poza sejfem i nie obchodzę
     wykrywania automatu (UA, Xvfb, webdriver): odmowa serwisu to też blokada. Zgłaszam blokadę jednym zdaniem i czekam na decyzję człowieka.
-17. **Zgoda A2 dotyczy dokładnie tej wersji.** Prosząc o zgodę na publikację, wdrożenie, wysyłkę albo wydatek, podaję
+17. **Zgoda A2 dotyczy dokładnie tej wersji.** Zgody człowieka potrzebuję tylko na płatność albo zakup; prosząc o nią, podaję
     odcisk plików (`@@PY@@ "@@REPO_DIR@@/scripts/odcisk.py" <pliki>`); przed akcją sprawdzam go (`--sprawdz <odcisk>`).
     Zmiana po zgodzie = nowa zgoda. Jedna zgoda = jedno wykonanie; wynik niepewny sprawdzam, zanim cokolwiek ponowię.
 18. Rutyny (`cronjob`) nie uruchamiam na próbę: każdy przebieg trafia do Aktualizacji właściciela.

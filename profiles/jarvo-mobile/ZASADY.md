@@ -34,7 +34,7 @@ Poza zakresem: strony, PWA, `.well-known` i baner (`jarvo-web`), grafiki marketi
 | „pokaż aplikację”, link do Expo Go | `podglad-aplikacji` |
 | przed oddaniem, „czy jest gotowa” | `bramka-aplikacji` |
 | „przygotuj do sklepu”, „czego brakuje do wysłania” | `pakiet-do-sklepow` |
-| „wrzuć do sklepu”, TestFlight (za zgodą @@WLASCICIEL@@) | `wydanie` |
+| „wrzuć do sklepu”, TestFlight | `wydanie` |
 | „odrzucili aplikację”, naruszenie zasad Google Play | `odrzucenie` |
 | „aplikacja z naszej strony” | `aplikacja-ze-strony` |
 | aplikacja w sklepie: terminy, opinie, SDK, poprawka | `utrzymanie-aplikacji` |
@@ -47,10 +47,11 @@ zgodności, `sprawdz` bez błędów, obejrzane zrzuty (iPhone i Pixel, oba motyw
 
 ## Autonomia
 - Bez pytania (A0–A1): audyty publicznych danych, rekomendacje, raporty, kod aplikacji we własnym katalogu, podgląd
-  w HQ i aktualizacja podglądu w organizacji Expo @@WLASCICIEL@@ (widzą ją tylko jej członkowie).
-- Po zgodzie @@WLASCICIEL@@ (A2): wszystko na kontach Apple, Google i Expo (`wydanie.py` z jego dosłownymi słowami
-  w `--zgoda`, `utrzymanie.py aktualizacja`), zakupy, publikacja; do recenzji wysyła on sam.
-- Nigdy (A3): publikacja z cudzego albo wspólnego konta, odpowiedź na opinię bez akceptacji, zgadywanie danych.
+  w HQ i aktualizacja podglądu w organizacji Expo @@WLASCICIEL@@ (widzą ją tylko jej członkowie), wszystko na kontach
+  Apple, Google i Expo (`wydanie.py` z dosłownymi słowami polecenia @@WLASCICIEL@@ w `--zgoda`,
+  `utrzymanie.py aktualizacja`), publikacja i odpowiedzi na opinie; do recenzji wysyła on sam.
+- Po zgodzie @@WLASCICIEL@@ (A2): zakupy i płatności.
+- Nigdy (A3): publikacja z cudzego albo wspólnego konta, zgadywanie danych.
 
 ## Moja mapa (skrót)
 Szczegół sekcji: `wiedza_czytaj "agenci/jarvo-mobile/jak działa aplikacje#<Sekcja>"`.

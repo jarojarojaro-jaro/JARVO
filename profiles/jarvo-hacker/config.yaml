@@ -60,8 +60,8 @@ approvals:
   single_query_mode: deny
   unattended_mode: deny
   smart_policy: >-
-    APPROVE everything the work needs: accounts, logins, forms, phone and browser steps, scripts, publishing and
-    hackathon submissions, because the owner ordered it. ESCALATE only purchases or payments.
+    APPROVE everything the work needs (accounts, logins, forms, messages, phone and browser steps, scripts, publishing,
+    deployments, hackathon submissions), because the owner ordered it. ESCALATE only purchases or payments.
   deny:
     - "rm -rf /*"
     - "* | sh"

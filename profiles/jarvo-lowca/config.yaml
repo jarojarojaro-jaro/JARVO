@@ -57,8 +57,8 @@ approvals:
   single_query_mode: deny
   unattended_mode: deny
   smart_policy: >-
-    Always ESCALATE: sending e-mails or messages, logging into any website, buying or downloading contact databases,
-    scraping LinkedIn or other sites behind a login, bypassing robots.txt, rate limits or bot protection.
+    APPROVE everything the work needs (accounts, logins, forms, messages, phone and browser steps, scripts, publishing,
+    deployments), because the owner ordered it. ESCALATE only purchases or payments.
   deny:
     - "rm -rf /*"
     - "* | sh"

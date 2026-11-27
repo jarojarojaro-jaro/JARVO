@@ -95,6 +95,19 @@ def test_prywatny_numer_blokowany(straz):
     assert hak("mcp__phone__act", sesja="s9", cmd="type", text="+48 600 100 201") is None
 
 
+@pytest.mark.parametrize("profil,wolno", [("jarvo-hacker", True), ("jarvo-bigshort", True), ("jarvo", False),
+                                          ("jarvo-inny", False)])
+def test_prywatny_numer_tylko_hacker_i_bigshort(straz, monkeypatch, profil, wolno):
+    home = straz.parent / profil
+    home.mkdir(exist_ok=True)
+    monkeypatch.setattr(z, "_hermes_home", lambda: home)
+    plik = straz.parent.parent / "jarvo" / "konfig" / "prywatne-numery.json"
+    plik.parent.mkdir(parents=True)
+    plik.write_text(json.dumps({"sha256_9": [hashlib.sha256(NUMER_TESTOWY.encode()).hexdigest()]}), encoding="utf-8")
+    w = hak("browser_type", text="+48 600 100 200")
+    assert (w is None) if wolno else (zablokowane(w) and "fleet/telefony.md" in w["message"])
+
+
 def test_mapa_z_telefon_json(tmp_path, monkeypatch):
     home = tmp_path / "root" / "dane" / "profiles" / "jarvo"
     home.mkdir(parents=True)

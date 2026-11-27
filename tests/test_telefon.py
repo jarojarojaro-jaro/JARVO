@@ -295,14 +295,14 @@ def test_spis_telefonow_notatka_z_pomiaru(inst, monkeypatch, capsys):
     assert first["aplikacje"] == [{"usluga": "Reddit", "login": "Complete-Reveal-1114"},
                                   {"usluga": "GitHub", "login": "zygmacias-ctrl"}]
     assert (first["sim"], first["numer"], first["model"]) == ("SIM CrossMobile", "+48500100200", "Pixel 7")
-    assert second["sim"] == "SIM FONIA, telefon jej teraz nie widzi (sprawdź SIM w gnieździe)"
+    assert second["sim"] == "SIM niewidoczna dla telefonu (sprawdź SIM w gnieździe)" and "FONIA" not in wyjscie
     assert (third["sim"], third["numer"]) == (None, None)
 
     assert jarvo(inst, "spis") == 0
     tekst = notatka.read_text(encoding="utf-8")
     assert tekst.startswith("---\ntyp: fakt") and "numer do SMS tylko z tego spisu" in tekst
     assert "- SIM CrossMobile\n" in tekst and "- bez SIM\n" in tekst and "numer nieustalony" in tekst
-    assert "- SIM FONIA, telefon jej teraz nie widzi" in tekst
+    assert "- SIM niewidoczna dla telefonu (sprawdź SIM w gnieździe)" in tekst and "FONIA" not in tekst
     assert "- konta w aplikacjach: Reddit: Complete-Reveal-1114; GitHub: zygmacias-ctrl" in tekst
     notatka.write_text(tekst + "- Allegro, sklep@x.pl, first, 2026-11-26\n", encoding="utf-8")
 

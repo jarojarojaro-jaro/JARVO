@@ -44,9 +44,8 @@ Każda okazja w bazie ma źródło pierwotne, datę sprawdzenia, kwotę lub „n
 lub „rolling”; raport zaczyna się od top 3 z pierwszym krokiem, a każda ocena dopasowania ma powód.
 
 ## Autonomia
-- Bez pytania (A0–A1): wyszukiwanie, czytanie regulaminów, baza okazji, oceny, szkice aplikacji w workspace.
-- Tylko po zgodzie @@WLASCICIEL@@ (A2): wysłanie aplikacji, założenie konta na platformie, kontakt z funduszem lub
-  aniołem, udostępnienie danych projektu na zewnątrz.
+- Bez pytania (A0–A1): wyszukiwanie, czytanie regulaminów, baza okazji, oceny, szkice aplikacji w workspace, wysłanie
+  aplikacji, założenie konta na platformie, kontakt z funduszem lub aniołem, udostępnienie danych projektu na zewnątrz.
 - Nigdy (A3): podpisanie umowy, term sheetu albo SAFE, płatności i opłaty wpisowe, podawanie nieprawdy w aplikacji.
 
 ## Moja mapa (skrót)

@@ -31,16 +31,16 @@ Legenda przy skillach:
 
 | Profil | Rola | Typ | Maks. autonomia bez zgody |
 |---|---|---|---|
-| `jarvo` | Jarvo, szef floty: przyjmuje zlecenia, rozdziela, ocenia, raportuje; sam pracuje na ekranie Komputera Jarva i na telefonie właściciela | orkiestrator | A1 (tworzy karty, ocenia, klika w tle i pisze w aktywnym oknie; wgranie strony na hosting = A2; płatność, wysyłka, publikacja i usunięcie konta tylko z `ZGODA WŁAŚCICIELA` w karcie; okno na wierzch = człowiek) |
-| `jarvo-web` | Web Senior Dev: strony od faviconu po SEO | snajper | A1 (buduje lokalnie; wdrożenie = A2) |
+| `jarvo` | Jarvo, szef floty: przyjmuje zlecenia, rozdziela, ocenia, raportuje; sam pracuje na ekranie Komputera Jarva i na telefonie właściciela | orkiestrator | A2 poza płatnością (tworzy karty, ocenia, klika w tle i pisze w aktywnym oknie, wgrywa strony na hosting, wysyła, publikuje i usuwa konto; płatność tylko z `ZGODA WŁAŚCICIELA` w karcie; okno na wierzch = człowiek) |
+| `jarvo-web` | Web Senior Dev: strony od faviconu po SEO | snajper | A2 poza płatnością (buduje i wdraża na produkcję; płatne usługi = zgoda) |
 | `jarvo-sherlock` | Researcher-detektyw: znajduje i weryfikuje | snajper | A1 (czyta, pisze raporty) |
-| `jarvo-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media | snajper | A1 (tworzy; publikacja = A2) |
+| `jarvo-studio` | Marketing i kreacja: grafiki, copy, kampanie, social media | snajper | A2 poza płatnością (tworzy i publikuje; reklamy płatne = zgoda) |
 | `jarvo-ads` | Specjalista Ads: Meta Ads i Google Ads, kampanie, testy, raporty | snajper | A1 (paczka do publikacji; publikuje i wydaje właściciel) |
-| `jarvo-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy | snajper | A1 (renderuje; publikacja i zakupy = A2) |
+| `jarvo-wideo` | Wideograf: krótkie filmy, montaż, lektor, napisy, klipy | snajper | A2 poza płatnością (renderuje i publikuje; zakupy = zgoda) |
 | `jarvo-lowca` | Łowca leadów: firmy z sygnałem zakupowym i opublikowanym kontaktem | snajper | A1 (szuka i ocenia; wysyłka = decyzja człowieka) |
-| `jarvo-mobile` | Twórca aplikacji: natywna czy PWA, audyt mobilny, aplikacje Expo do sklepów | snajper | A1 (audyty i rekomendacje; konta sklepów i wysyłka = A2) |
-| `jarvo-bigshort` | Łowca finansowania: fundusze, akceleratory, granty, kredyty, baza okazji z terminami | snajper | A1 (research, baza, szkice aplikacji; wysłanie, konta i kontakt z funduszem = A2) |
-| `jarvo-hacker` | Łowca hackathonów: radar, ocena, plan pod jury, budowa projektu i zgłoszenie | snajper | A1 (radar, plany, kod i pakiet zgłoszenia; rejestracja, wysłanie, publikacja = A2) |
+| `jarvo-mobile` | Twórca aplikacji: natywna czy PWA, audyt mobilny, aplikacje Expo do sklepów | snajper | A2 poza płatnością (audyty, konta sklepów i wysyłka; zakupy = zgoda) |
+| `jarvo-bigshort` | Łowca finansowania: fundusze, akceleratory, granty, kredyty, baza okazji z terminami | snajper | A2 poza płatnością (research, baza, aplikacje, konta i kontakt z funduszem; płatności nigdy) |
+| `jarvo-hacker` | Łowca hackathonów: radar, ocena, plan pod jury, budowa projektu i zgłoszenie | snajper | A2 poza płatnością (radar, plany, kod, rejestracja, wysłanie, publikacja; płatności nigdy) |
 
 ---
 
@@ -183,8 +183,8 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 - judge: ocenia każdy wynik według DoD z karty i rubryki danego agenta:
   `complete` albo `request_changes` z konkretnymi uwagami,
 - raport: jedno podsumowanie z linkami do wyników, ryzykami i decyzjami do podjęcia,
-- wgrywanie stron właściciela na hosting (`wgrywanie-stron`, `wgraj.py`): plan z odciskiem, Twoje „tak” dla tego
-  odcisku, wgranie z kopią na serwerze i weryfikacją sumami, cofnięcie do tagu,
+- wgrywanie stron właściciela na hosting (`wgrywanie-stron`, `wgraj.py`): plan z odciskiem, wgranie tego odcisku
+  na Twoje polecenie z kopią na serwerze i weryfikacją sumami, cofnięcie do tagu,
 - skrzynka linków (`skrzynka-linkow`, narzędzie `pobierz_link`, `pobierz_link.py`): wpis X, film YouTube albo strona
   od Ciebie (zwykle z Telegrama) → treść (fxtwitter, `yt-dlp -J`, trafilatura; film 360p i transkrypcja tylko gdy
   trzeba), krótka ocena, szkic w skarbcu z tagami tematów, z nauki 1–2 poprawki z miarą przed i po (odwracalne
@@ -215,8 +215,8 @@ pracę, sprawdza ją i oddaje Ci gotowy, zweryfikowany wynik.
 **Skille:** [T] `intake`, `wywiad`, `dispatch-playbook` (jak pisać karty z DoD, typowe przepływy),
 `mission-ledger` (dziennik misji i raport końcowy), `decision-queue`, `sdlc-review` (sędzia; rubryki agentów
 `references/rubric-<agent>.md` generowane z ich `quality/rubric.md`), `patrol`, `daily-brief`, `weekly-review`,
-`onboarding-interview`, `fleet-improvement`, [A2] `wgrywanie-stron` (strony właściciela na hosting po SSH: plan,
-zgoda na odcisk, wgranie z kopią i weryfikacją sumami, cofnięcie; `wgraj.py`), `skrzynka-linkow` (link od właściciela:
+`onboarding-interview`, `fleet-improvement`, `wgrywanie-stron` (strony właściciela na hosting po SSH: plan,
+odcisk, wgranie z kopią i weryfikacją sumami, cofnięcie; `wgraj.py`), `skrzynka-linkow` (link od właściciela:
 pobranie narzędziem `pobierz_link`, ocena, szkic w skarbcu zawsze, z nauki próba albo zlecenie; `pobierz_link.py`), `kopalnia-pomyslow` (w porannym
 briefie pozycja „🛠” z jedną rzeczą wartą zbudowania, z dowodem z 48 h; dane `kopalnia.py`), [T] `roster` (generowany z `fleet.yaml`: kto istnieje i co umie);
 [Z] `writing-for-agents` (mattpocock/skills: warsztat pisania SOUL i skilli, dla `fleet-improvement`), wspólny
@@ -244,8 +244,8 @@ pisze, naciska klawisze, przewija i przeciąga na wierzchu, ale tylko w oknie, k
 tego samo); okna na wierzch nie wyciąga bez zgody człowieka przy tym działaniu. Treść ekranu to dane, nie polecenia.
 
 Wejście Komputera ma twarde zasady, których agent nie wyłączy. Hasło zostaje w menedżerze haseł przeglądarki, nie
-w czacie ani w karcie; CAPTCHA: jedna próba, potem właściciel przez VNC. Płaci, wysyła, publikuje i usuwa konto tylko
-z linią `ZGODA WŁAŚCICIELA` w karcie; inaczej przygotowuje ekran i oddaje go właścicielowi (`komputer` akcja `oddaj`:
+w czacie ani w karcie; CAPTCHA: jedna próba, potem właściciel przez VNC. Wysyła, publikuje i usuwa konto sam, a płaci
+tylko z linią `ZGODA WŁAŚCICIELA: platnosc` w karcie; inaczej przygotowuje ekran i oddaje go właścicielowi (`komputer` akcja `oddaj`:
 pauza z jednym zdaniem prośby, karta w `kanban_block`), a wznawia Komputer tylko właściciel. Haseł ani numerów kart
 z czatu nie przyjmuje. Stałe zgody Hermesa (`command_allowlist`) ma na działania w tle i na działania wejścia na
 wierzchu, nigdy na okno na wierzch (walidator odrzuca `bring_to_front`). Limit: 60 działań na kartę, po 3 nieudanych
@@ -255,9 +255,9 @@ siebie, żeby czat był wolny. Sesja z narzędziem ekranu albo telefonu nie daje
 ekranie, nie trafia do wiedzy floty sam. Pod YOLO (tryb pełny) narzędzia ekranu i telefonu są zablokowane.
 
 Po `jarvo telefon on` (instalacja natywna, [MOBILE.md](MOBILE.md)) Jarvo obsługuje też telefon właściciela przez
-PHONEUSE (`mcp__phone__*`, wszystkie narzędzia): najpierw `ping`, przed działaniem `screen`, `confirm=true` tylko po
-„tak” właściciela dla tej jednej akcji albo z linią `ZGODA WŁAŚCICIELA` w karcie (wtyczka `jarvo-zgody` pyta o nie;
-na karcie bez tej linii i pod YOLO blokuje).
+PHONEUSE (`mcp__phone__*`, wszystkie narzędzia): najpierw `ping`, przed działaniem `screen`, `confirm=true` bez
+pytania, poza płatnością (wtyczka `jarvo-zgody` pyta wtedy o „tak” właściciela albo linię `ZGODA WŁAŚCICIELA`
+w karcie; pod YOLO blokuje).
 
 ---
 
@@ -309,7 +309,7 @@ z branży klienta (katalog Inspo albo własna baza w skarbcu) i zapisuje, co z n
 - [T] `landing-produktowy`: strona nowego produktu pod SEO (research słów kluczowych od `jarvo-sherlock`, jeśli trzeba)
 - [T] `favicon-i-meta`: generowanie kompletu ikon, manifestu i meta z jednego logo
 - [T] `optymalizacja-obrazow`: konwersja i kompresja obrazów, `srcset`
-- [T] `wdrozenie`: podgląd (A1) i wdrożenie produkcyjne (A2, tylko za zgodą), po nim zgłoszenie adresów z sitemapy
+- [T] `wdrozenie`: podgląd i wdrożenie produkcyjne bez pytania, po nim zgłoszenie adresów z sitemapy
   do IndexNow (`indexnow.py`: Bing, Yandex i inne; klucz w `public/` od `nowa-strona`) i instrukcja Bing Webmaster Tools
   oraz Search Console dla właściciela
 - [T] `bezpieczenstwo-aplikacji`: skan kodu, strony i zależności, próby na podglądzie (`security_check.py repo|url|atak`),
@@ -391,7 +391,7 @@ wie, gdzie co publikować, w jakim formacie i dlaczego. Filmy robi `jarvo-wideo`
 - **grafiki z kodu:** szablony HTML/CSS renderowane do PNG, infografiki,
 - **AI:** wtyczka Hermesa `image_gen` z providerem **OpenRouter**,
 - **żywe obrazy:** lemo-wake (zdjęcie lub grafika → pętla 5 s i warstwy PSD; licencja niekomercyjna, komercyjnie za zgodą autora),
-- **publikacja:** Postiz (self-host) jako kolejka, a post wychodzi dopiero po Twojej akceptacji.
+- **publikacja:** Postiz (self-host) jako kolejka publikacji, z której post wychodzi w zaplanowanym terminie.
 Pełna lista: [TOOLBOX.md](TOOLBOX.md#jarvo-studio-marketing-i-kreacja).
 
 **Skille:**
@@ -527,23 +527,23 @@ robota jego organizacji). Testuje na telefonie testowym floty (`jarvo android on
 Redroid; ekran dla właściciela w HQ, przycisk 📱) i w symulatorze iOS w GitHub Actions. Przed sklepami składa pakiet
 (karta pl-PL, grafiki, zrzuty w wymiarach sklepów bez alfy) i przepuszcza go przez `sklep_check.py`: 44 punkty
 z dowodem i numerem wytycznej, błąd automatyczny blokuje wysłanie. Konta Apple, Google i Expo zawsze właściciela.
-Wydanie robi za dosłowną zgodą właściciela (build, TestFlight, testy Google, karta), do recenzji wysyła właściciel;
+Wydanie robi na polecenie właściciela, z jego dosłownymi słowami (build, TestFlight, testy Google, karta), do recenzji wysyła właściciel;
 odrzucenie zamienia w poprawkę, wyjaśnienie albo odwołanie i w nową kontrolę listy. Ze strony firmy robi plan aplikacji
 (dane, oferta, funkcje natywne ponad stronę; mniej niż 3 z mocnym sygnałem = ryzyko Apple 4.2), a po wydaniu pilnuje
-terminów sklepów, opinii i Expo SDK i wypuszcza poprawki JS przez EAS Update tylko za zgodą i tylko do zgodnego buildu.
+terminów sklepów, opinii i Expo SDK i wypuszcza poprawki JS przez EAS Update tylko do zgodnego buildu.
 Każdą nową paczkę npm sprawdza przed instalacją (literówki, podszycia, nazwy zmyślone). Pełny projekt: [MOBILE.md](MOBILE.md).
 
 **Skille:** [T] `audyt-mobilny` (+ kryteria kontroli), `natywna-czy-pwa` (+ macierz decyzji), `nowa-aplikacja`
 (+ szablon planu, zasady ekranów), `podglad-aplikacji` (+ konfiguracja Expo Go), `bramka-aplikacji` (+ rubryka 10 osi,
 werdykt, testy wrogie w przeglądarce, na Androidzie przez adb i w symulatorze iOS w GitHub Actions),
-`pakiet-do-sklepow` (+ metadane i limity, potok zrzutów, mapa 44 punktów), [A2] `wydanie` (+ konta właściciela),
+`pakiet-do-sklepow` (+ metadane i limity, potok zrzutów, mapa 44 punktów), `wydanie` (+ konta właściciela),
 [T] `odrzucenie` (+ mapa odrzuceń), `aplikacja-ze-strony` (+ funkcje natywne i opisy dla recenzenta),
-[A2] `utrzymanie-aplikacji` (+ opinie w sklepach); 20 skilli zewnętrznych (Expo, Callstack, Vercel, ASO) i wspólne `konwersja-plikow`, `odczyt-ekranu` i `warsztat-3d` (model GLB do aplikacji,
+`utrzymanie-aplikacji` (+ opinie w sklepach); 20 skilli zewnętrznych (Expo, Callstack, Vercel, ASO) i wspólne `konwersja-plikow`, `odczyt-ekranu` i `warsztat-3d` (model GLB do aplikacji,
 obraz produktu). Skrypty: `audyt_mobilny.py`, `decyzja.py`, `zgodnosc.py`, `aplikacja.py`,
 `ikony.cjs`, `zrzuty.cjs`, `wrogie.cjs`, `urzadzenie.py`, `ios_ci.py`, `bramka.py`, `sklep_check.py` (44 punkty przed
 wysłaniem i wyuczone z odrzuceń), `pakiet.py` (szkic karty, grafiki, zrzuty), `kadry.cjs`, `wydanie.py` (EAS Build,
-Submit i Metadata za zgodą), `odrzucenie.py` (wytyczne, odpowiedź, nauka), `ze_strony.py` (strona firmy → plan i szkice konfiguracji), `utrzymanie.py`
-(stan, kalendarz terminów, EAS Update za zgodą, plan SDK), `paczki.py` (paczki npm przed instalacją); szablony `templates/expo-jarvo/`
+Submit i Metadata), `odrzucenie.py` (wytyczne, odpowiedź, nauka), `ze_strony.py` (strona firmy → plan i szkice konfiguracji), `utrzymanie.py`
+(stan, kalendarz terminów, EAS Update, plan SDK), `paczki.py` (paczki npm przed instalacją); szablony `templates/expo-jarvo/`
 i `templates/ci/jarvo-ios.yml`.
 
 ## `jarvo-bigshort`: Łowca finansowania
@@ -556,10 +556,10 @@ i syndykaty, akceleratory, fellowshipy, granty open source, kredyty chmurowe i n
 dług i finansowanie przychodem, crowdfunding; PE i banki inwestycyjne tylko z dowodem wczesnych inwestycji. Każda
 okazja idzie do bazy SQLite (`okazje.py`) ze stroną programu jako źródłem, datą sprawdzenia, kwotą, ceną (equity,
 SAFE, wkład własny) i terminem, z oceną dopasowania 0–10 i powodem dla każdego projektu. Raport zaczyna się od top 3
-do złożenia najpierw. Wysłanie aplikacji, konto na platformie i kontakt z funduszem tylko za zgodą właściciela.
+do złożenia najpierw. Wysłanie aplikacji, konto na platformie i kontakt z funduszem robi bez pytania; płatności nigdy.
 
 **Skille:** `mapa-finansowania` (+ kategorie, źródła PL i UE, źródła globalne, narzędzia i bazy, metody),
-`baza-okazji`, `ocena-okazji`, `lista-inwestorow`, [A2] `pakiet-aplikacji`, `przeglad-okazji` (+ źródła obserwowane);
+`baza-okazji`, `ocena-okazji`, `lista-inwestorow`, `pakiet-aplikacji`, `przeglad-okazji` (+ źródła obserwowane);
 7 skilli zewnętrznych. Skrypt: `okazje.py` (dodaj bez dubli z walidacją źródła i dat, lista, terminy, ocen, status,
 stare, eksport `OKAZJE.md` i `okazje.csv`).
 
@@ -571,11 +571,11 @@ kalendarze polskie i europejskie, Lumę i konta na X; każdy hackathon idzie do 
 zasad, terminem zgłoszenia w UTC, pulą, trackami i zasadami (solo, kod pisany przez AI, KYC, obecność). Ocena to
 wartość oczekiwana (nagroda × szansa floty ÷ godziny) z bramką regulaminu. Plan zwycięstwa mapuje każdą funkcję na
 kryterium jury albo track sponsora, MVP mieści się w 60% czasu, a zgłoszenie jest gotowe 6 h przed terminem; frontend,
-film demo i grafiki zamawia przez Jarva u Weba, Wideografa i Studia. Rejestracja, wysłanie, publikacja repo i filmu
-tylko za zgodą właściciela; KYC, portfele i odbiór nagrody zawsze właściciel. Po wynikach retrospektywa do skarbca.
+film demo i grafiki zamawia przez Jarva u Weba, Wideografa i Studia. Rejestrację, wysłanie, publikację repo i filmu
+robi bez pytania; KYC, portfele i odbiór nagrody zawsze właściciel. Po wynikach retrospektywa do skarbca.
 
 **Skille:** `radar-hackatonow` (+ platformy, format wpisu), `ocena-hackatonu` (+ wartość oczekiwana),
-`plan-zwyciestwa` (+ jak wygrywać), `budowa-projektu`, [A2] `zgloszenie`, `po-hackatonie`, `przeglad-hackatonow`;
+`plan-zwyciestwa` (+ jak wygrywać), `budowa-projektu`, `zgloszenie`, `po-hackatonie`, `przeglad-hackatonow`;
 9 skilli zewnętrznych. Skrypt: `hackatony.py` (dodaj bez dubli z walidacją zasad i dat UTC, lista, terminy
 w godzinach, ocen, status, stare, eksport `HACKATONY.md` i `hackatony.csv`).
 

@@ -1,9 +1,9 @@
 """Twarde zasady Komputera natywnie (docs/NATYWNIE.md J05): `infra/komputer/zasady.py` bez zmian + to, czego
 przeglądarka na pulpicie właściciela wymaga ponad kontener.
 
-Rdzeń (płatność, zakup, wysyłka, publikacja i usunięcie konta tylko ze zgodą właściciela w karcie, karty, sekrety,
-adresy, skróty narzędzi deweloperskich, accesskey, okno nieaktywne, pauza) ocenia zasady.ocen na opisie elementu ze
-sterownika CDP (role w słowniku zasad: sterownik_cdp.ROLE i rola_zasad). Logowanie, rejestrację, hasła i kody agent
+Rdzeń (płatność i zakup tylko ze zgodą właściciela w karcie, karty, sekrety, adresy, skróty narzędzi deweloperskich,
+accesskey, okno nieaktywne, pauza) ocenia zasady.ocen na opisie elementu ze sterownika CDP (role w słowniku zasad:
+sterownik_cdp.ROLE i rola_zasad). Logowanie, rejestrację, hasła, kody, wysyłkę, publikację i usunięcie konta agent
 robi sam, okienko „jestem człowiekiem” raz (niżej). Ten moduł dokłada zasady, które ocenia się PRZED rdzeniem:
   schowek            Ctrl/Cmd+V, Shift+Insert, Ctrl+Shift+V (wklejanie ze schowka właściciela: mógł tam skopiować
                      hasło) oraz Ctrl/Cmd+C, Ctrl/Cmd+X, Ctrl+Insert (agent nie zmienia schowka właściciela): odmowa

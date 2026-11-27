@@ -623,17 +623,13 @@ def subskrypcje_z_isub(tekst: str) -> list[dict]:
 
 
 def opis_sim(subs: list[dict], stany: list[str], operator: str) -> str | None:
-    """Tekst SIM: „SIM X”, „SIM X, telefon jej teraz nie widzi (…)” albo None (bez SIM). `stany` = gsm.sim.state
-    po gniazdach."""
-    opisy = []
-    for s in subs:
-        nazwa = s["nazwa"] or "bez nazwy"
-        stan = stany[s["slot"]] if 0 <= s["slot"] < len(stany) else ""
-        opisy.append(f"SIM {nazwa}" if s["slot"] >= 0 and stan in WIDOCZNA
-                     else f"SIM {nazwa}, telefon jej teraz nie widzi (sprawdź SIM w gnieździe)")
-    if not opisy and WIDOCZNA & set(stany):
-        opisy.append(f"SIM {operator or 'bez nazwy'}")
-    return "; ".join(opisy) or None
+    """Tekst SIM: „SIM X”, „SIM niewidoczna dla telefonu (…)” albo None (bez SIM). `stany` = gsm.sim.state po
+    gniazdach; subskrypcja bez gniazda (simSlotIndex -1) to stary wpis i nie daje nazwy operatora."""
+    if WIDOCZNA & set(stany):
+        nazwa = next((s["nazwa"] for s in subs if 0 <= s["slot"] < len(stany) and stany[s["slot"]] in WIDOCZNA
+                      and s["nazwa"]), operator)
+        return f"SIM {nazwa or 'bez nazwy'}"
+    return "SIM niewidoczna dla telefonu (sprawdź SIM w gnieździe)" if subs else None
 
 
 def zmierz_telefon(adb: str, nazwa: str, adres: str, numer: str | None) -> dict:

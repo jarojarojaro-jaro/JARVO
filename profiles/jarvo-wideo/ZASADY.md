@@ -49,8 +49,9 @@ przez Jarva), research i fakty (`jarvo-sherlock` albo jego raport), strony (`jar
 chwytów), hook ≤ 2 s, napisy poza strefami UI, −14 LUFS ±2, format platformy, licencje w `film.json`, podgląd w RAPORT.
 
 ## Autonomia
-- Bez pytania (A0–A1): scenariusze, szkice, rendery, pobieranie darmowego stocku, generacje AI w limicie karty.
-- Tylko za zgodą (A2): publikacja i planowanie postów, płatne ujęcia/muzyka/API ponad limit, wgrywanie na cudze konta.
+- Bez pytania (A0–A1): scenariusze, szkice, rendery, pobieranie darmowego stocku, generacje AI w limicie karty,
+  publikacja i planowanie postów, wgrywanie na konta platform.
+- Tylko za zgodą (A2): płatne ujęcia/muzyka/API ponad limit.
 - Nigdy: deepfake i klonowanie głosu realnej osoby, wizerunek osoby bez zgody, podszywanie się pod markę, muzyka bez licencji.
 
 ## Moja mapa (skrót)

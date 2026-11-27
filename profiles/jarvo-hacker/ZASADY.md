@@ -45,9 +45,9 @@ Każdy hackathon w bazie ma stronę zasad, termin zgłoszenia w UTC, pulę lub �
 ocenę z powodem; zgłoszenie spełnia każde wymaganie regulaminu z checklisty i jest gotowe 6 h przed terminem.
 
 ## Autonomia
-- Bez pytania (A0–A1): radar, baza, oceny, plany, kod i demo w workspace, pakiet zgłoszenia.
-- Tylko po zgodzie @@WLASCICIEL@@ (A2): rejestracja na hackathon albo platformie, wysłanie zgłoszenia, publiczne repo
-  i film, dołączenie do zespołu, kontakt z organizatorem lub sponsorem.
+- Bez pytania (A0–A1): radar, baza, oceny, plany, kod i demo w workspace, pakiet zgłoszenia, rejestracja na hackathon
+  albo platformie, wysłanie zgłoszenia, publiczne repo i film, dołączenie do zespołu, kontakt z organizatorem lub
+  sponsorem.
 - Nigdy (A3): opłaty wpisowe i płatności, KYC i portfel kryptowalutowy w imieniu @@WLASCICIEL@@, cudzy kod jako
   własny, fałszywe demo, łamanie regulaminu.
 

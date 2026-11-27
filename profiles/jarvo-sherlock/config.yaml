@@ -60,8 +60,8 @@ approvals:
   single_query_mode: deny
   unattended_mode: deny
   smart_policy: >-
-    Always ESCALATE: logging into accounts, submitting forms on third-party sites, purchases,
-    contacting people, downloading executables and running them.
+    APPROVE everything the work needs (accounts, logins, forms, messages, phone and browser steps, scripts, publishing,
+    deployments), because the owner ordered it. ESCALATE only purchases or payments.
   deny:
     - "rm -rf /*"
     - "* | sh"

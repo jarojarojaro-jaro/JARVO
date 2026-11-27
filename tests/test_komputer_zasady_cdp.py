@@ -118,18 +118,14 @@ def test_hasla_i_kody_z_cdp_agent_wpisuje_sam(pole):
     assert zasady.ocen("type_text", {**PISZ, "text": "123456"}, Ctx(fokus=pole)).wolno
 
 
-def test_rejestracja_z_cdp_wysyla_sam():
-    """Formularz rejestracji tak, jak go opisuje sterownik CDP (pola_formularza, opis_formularza)."""
-    rejestracja = {"w_formularzu": True, "formularz": [{"rola": "push button", "nazwa": "Wyślij"}],
-                   "pola_formularza": [{"tag": "input", "typ": "email", "nazwa": "email"},
-                                       {"tag": "input", "typ": "password", "nazwa": "haslo"}],
-                   "opis_formularza": {"nazwa": "", "id": "", "action": "/konto", "etykieta": ""}}
-    assert zasady.ocen("click", KLIK, Ctx(cel=el("button", "Wyślij", **rejestracja))).wolno
-    haslo = el("textbox", "Hasło", "password", stany=["editable", "single-line"], **rejestracja)
+def test_formularze_z_cdp_wysyla_sam():
+    """Wyślij w formularzu rejestracji i kontaktowym (role ze sterownika CDP) przechodzi bez zgody."""
+    forma = {"w_formularzu": True, "formularz": [{"rola": "push button", "nazwa": "Wyślij"}]}
+    assert zasady.ocen("click", KLIK, Ctx(cel=el("button", "Wyślij", **forma))).wolno
+    haslo = el("textbox", "Hasło", "password", stany=["editable", "single-line"], **forma)
     assert zasady.ocen("press_key", {**PISZ, "key": "Return"}, Ctx(fokus=haslo)).wolno
-    kontakt = {**rejestracja, "pola_formularza": [{"tag": "input", "typ": "email"}, {"tag": "textarea", "typ": ""}]}
-    w = zasady.ocen("click", KLIK, Ctx(cel=el("button", "Wyślij", **kontakt)))
-    assert (w.decyzja, w.dane) == (zasady.CZLOWIEK, {"kategoria": "wysylka"})
+    wiadomosc = el("textbox", "Wiadomość", atrybuty={"tag": "textarea"}, stany=["editable", "multi-line"], **forma)
+    assert zasady.ocen("press_key", {**PISZ, "key": "Return"}, Ctx(fokus=wiadomosc)).wolno
 
 
 def test_enter_w_formularzu_z_przyciskiem_platnosci_z_cdp():

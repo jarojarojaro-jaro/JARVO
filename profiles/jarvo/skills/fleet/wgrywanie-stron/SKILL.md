@@ -1,7 +1,7 @@
 ---
 name: wgrywanie-stron
-description: "Wgranie strony na hosting: plan, zgoda na odcisk, cofnięcie."
-version: 1.0.1
+description: "Wgranie strony na hosting: plan, odcisk, wgranie, cofnięcie."
+version: 1.0.2
 author: Jarvo
 license: MIT
 metadata:
@@ -18,8 +18,8 @@ metadata:
 
 Właściciel ma 12 stron na hostingu współdzielonym (SEOHost). Każda strona to prywatne repo
 `jarojarojaro-jaro/<domena>`: korzeń repo to dokładnie `public_html` serwera, a gałąź `main` to strona na żywo.
-Na serwer wgrywasz **tylko Ty** i **tylko** skryptem `@@PY@@ "$HERMES_HOME/scripts/wgraj.py"`, po wyraźnym „tak”
-właściciela dla konkretnego odcisku. Wgranie to akcja A2: zgoda dotyczy jednego planu, nie „wgrywaj od teraz”.
+Na serwer wgrywasz **tylko Ty** i **tylko** skryptem `@@PY@@ "$HERMES_HOME/scripts/wgraj.py"`, na polecenie
+właściciela i bez pytania o „tak”, bo jego polecenie jest zgodą. Każde wgranie dotyczy jednego planu i jego odcisku.
 
 Skrypt potrzebuje narzędzia terminal; masz je w rozmowie (Telegram, czat HQ), w sesji CLI i na karcie. Gdy w tej
 sesji terminala nie ma (np. rutyna), powiedz właścicielowi, że plan i wgranie zrobisz w sesji z terminalem, i nie
@@ -46,18 +46,17 @@ serwera, których skrypt nigdy nie wysyła i nigdy nie usuwa: `api/config.php`, 
 3. **Plan (jedno połączenie, nic nie zapisuje):** `wgraj.py plan <repo> --wersja <gałąź>`: co dojdzie, co się zmieni,
    co zniknie z serwera, liczby i `odcisk`.
 4. **Pokaż właścicielowi** jedną wiadomością: domena, odcisk, liczby (dodane, zmienione, usunięte), lista usuwanych
-   plików (każdy usuwany plik wymień, gdy jest ich do 20), adres podglądu. Zapytaj wprost: „Wgrać ten odcisk?”.
-5. **Czekaj na „tak” dla tego odcisku.** Brak odpowiedzi, „chyba”, „ok, ale popraw X” = nie wgrywasz. Każda zmiana
-   w repo po planie zmienia odcisk: nowy plan i nowe pytanie.
+   plików (każdy usuwany plik wymień, gdy jest ich do 20), adres podglądu.
+5. **Wgrywasz ten odcisk bez pytania.** Każda zmiana w repo po planie zmienia odcisk: nowy plan.
 6. **Wgraj:** `wgraj.py wgraj <repo> --wersja <gałąź> --odcisk <odcisk>`. Skrypt sam: czeka na inne wgrywanie (jedno
    naraz w flocie), sprawdza wersję, robi kopię `~/kopie-stron/<domena>/<RRRRMMDD-HHMMSS>.tar.gz`, wgrywa, porównuje sumy
    sha256 każdego pliku, taguje `wgranie-…` i przewija `main` na GitHubie.
 7. **Raport:** z JSON-a wyniku: domena, odcisk, liczby, nazwa kopii, czas, tag. Kod 3 = sumy się nie zgadzają: skrypt
-   podał gotowe polecenie `cofnij`; pokaż je właścicielowi z listą niezgodnych plików i zapytaj, czy cofnąć.
+   podał gotowe polecenie `cofnij`; uruchom je i pokaż właścicielowi listę niezgodnych plików.
 
 ## Cofnięcie
 `wgraj.py cofnij <repo> --do <tag> --odcisk <odcisk tagu>` tworzy na `main` nowy commit „Cofnięcie do <tag>”
-z plikami z tagu i wgrywa go jak zwykłe wgranie. To też A2: pokaż tag, jego datę i odcisk, czekaj na „tak”.
+z plikami z tagu i wgrywa go jak zwykłe wgranie. Cofasz na polecenie właściciela; w raporcie podaj tag, jego datę i odcisk.
 Tagi: `wgranie-…` (każde udane wgranie) i `zywo-…` (stan początkowy). Kopie na serwerze: `wgraj.py kopie <repo>`.
 
 ## Strony z builda
@@ -71,5 +70,5 @@ Gdy `z_buildu` nie jest puste: `wgraj.py z-buildu <repo> --build <katalog builda
 - Żadnej innej drogi na hosting: bez ręcznego `ssh`, `scp`, `rsync`, FTP, panelu ani serii zapytań HTTP do sprawdzania
   (limit 429). Nigdy nie uruchamiasz `deploy-ftp.py` z repo KERNEL.
 - Nigdy nie commitujesz sekretów (haseł, kluczy, `config.php` z danymi) i nie edytujesz plików z `chronione`.
-- Nie wgrywasz bez zgody na dokładnie ten odcisk, także „drobnej poprawki”.
+- Wgrywasz dokładnie odcisk z ostatniego planu, także przy „drobnej poprawce”.
 - Nie zmieniasz `.strona.json` bez prośby właściciela.

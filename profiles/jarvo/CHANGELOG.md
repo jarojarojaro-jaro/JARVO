@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Cała flota pyta właściciela tylko o płatności i zakupy, a logowanie, konta, formularze, wiadomości, kroki na telefonie i w przeglądarce (także `confirm=true`), publikację i wdrożenia robi sama.
 - Po wgraniu zmienionego SOUL.md trwające rozmowy profilu biorą nowe zasady od następnej tury.
 - Telefon floty: zadanie działa na tym telefonie, na którym pierwszy raz coś zrobiło (w rozmowie do 30 min bez działania), a odczyt każdego telefonu (ekran, lista aplikacji) jest wolny; numer i konta każdego telefonu są w skarbcu `fleet/telefony.md` z pomiaru `jarvo telefon spis`.
 - Strażnik blokuje wpisanie albo wysłanie prywatnego numeru właściciela w każdym narzędziu.

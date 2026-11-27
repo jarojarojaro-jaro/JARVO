@@ -96,7 +96,7 @@ def test_bramki_przed_buildem(app, monkeypatch):
 
 def test_build_wymaga_zgody_i_bramek(gotowa, monkeypatch, tmp_path):
     eas = AtrapaEAS(monkeypatch, tmp_path)
-    with pytest.raises(wy.Blad, match="słowa zgody"):
+    with pytest.raises(wy.Blad, match="słowa polecenia"):
         wy.build(gotowa, "all", "tak")
     (gotowa / "src" / "lib" / "nowe.ts").write_text("// JARVO-TODO: dokończyć\n", encoding="utf-8")
     with pytest.raises(wy.Blad, match="JARVO-TODO"):

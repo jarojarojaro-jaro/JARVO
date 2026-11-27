@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wgrywanie stron właściciela na hosting (SEOHost) przez SSH, tylko za zgodą przypiętą do odcisku (skill `wgrywanie-stron`).
+"""Wgrywanie stron właściciela na hosting (SEOHost) przez SSH, tylko planu przypiętego do odcisku (skill `wgrywanie-stron`).
 
 Każda strona to repo `jarojarojaro-jaro/<domena>`, którego korzeń to dokładnie `public_html` serwera; gałąź `main` = strona
 na żywo. Metadane repo (`.git/`, `.github/`, `.gitignore`, `.strona.json`) nigdy nie trafiają na serwer. Pliki pasujące
@@ -582,8 +582,8 @@ def wdroz(repo: Path, rev: str, odcisk: str, pol: Polaczenie, czekaj: float) -> 
     repo = Path(repo).resolve()
     commit = _rev(repo, rev)
     if odcisk_wersji(repo, commit) != odcisk:
-        raise Odmowa(f"Odcisk {odcisk} nie jest odciskiem wersji {rev} ({odcisk_wersji(repo, commit)}). Zgoda "
-                     f"właściciela dotyczy dokładnie planowanych plików: zrób nowy plan i zapytaj jeszcze raz.")
+        raise Odmowa(f"Odcisk {odcisk} nie jest odciskiem wersji {rev} ({odcisk_wersji(repo, commit)}). Wgranie "
+                     f"dotyczy dokładnie planowanych plików: zrób nowy plan.")
     wymagane_programy(pol)
     with blokada(czekaj):
         stan = sprawdz(repo, commit)
@@ -673,7 +673,7 @@ def cmd_cofnij(a, pol) -> tuple[dict, int]:
         raise Odmowa(f"Nie ma tagu {a.do!r}")
     drzewo = odcisk_wersji(repo, f"refs/tags/{a.do}")
     if drzewo != a.odcisk:
-        raise Odmowa(f"Odcisk {a.odcisk} nie jest odciskiem {a.do} ({drzewo}); zgoda dotyczy dokładnie tych plików")
+        raise Odmowa(f"Odcisk {a.odcisk} nie jest odciskiem {a.do} ({drzewo}); cofnięcie dotyczy dokładnie tych plików")
     brud = git(repo, "status", "--porcelain").strip()
     if brud:
         raise Odmowa("Repo ma niezatwierdzone zmiany; najpierw commit albo przywrócenie:\n" + brud)

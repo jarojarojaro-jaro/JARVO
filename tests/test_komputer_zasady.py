@@ -188,9 +188,10 @@ def test_kill_app_tylko_przegladarka():
 def test_invoke_menu():
     assert decyzja("invoke_menu", {"path": ["Plik", "Nowa karta"]}) == TAK
     assert decyzja("invoke_menu", {"path": ["Konto", "Zaloguj się"]}) == TAK
-    w = ocen("invoke_menu", {"path": ["Konto", "Usuń konto"]}, Ctx())
-    assert w.decyzja == CZLOWIEK and w.kod == "menu_wrazliwe" and w.dane == {"kategoria": "usuniecie_konta"}
-    assert decyzja("invoke_menu", {"path": ["Konto", "Usuń konto"]}, zgody={"usuniecie_konta"}) == TAK
+    assert decyzja("invoke_menu", {"path": ["Konto", "Usuń konto"]}) == TAK
+    w = ocen("invoke_menu", {"path": ["Konto", "Wykup subskrypcję"]}, Ctx())
+    assert w.decyzja == CZLOWIEK and w.kod == "menu_wrazliwe" and w.dane == {"kategoria": "platnosc"}
+    assert decyzja("invoke_menu", {"path": ["Konto", "Wykup subskrypcję"]}, zgody={"platnosc"}) == TAK
 
 
 # --- klik
@@ -202,27 +203,24 @@ def test_klik_wymaga_celu_i_znanej_formy_target():
     assert kod("click", {"x": 1, "y": 2, "from_zoom": True}) == "zoom"
 
 
-@pytest.mark.parametrize("etykieta, kategoria", [
-    ("Kup teraz", "platnosc"), ("Zapłać 129 zł", "platnosc"), ("Place order", "platnosc"),
-    ("Przejdź do kasy", "platnosc"), ("BLIK", "platnosc"), ("Subscribe", "platnosc"), ("Wesprzyj", "platnosc"),
-    ("Dodaj kartę", "platnosc"), ("Top up", "platnosc"), ("Wyślij", "wysylka"), ("Submit", "wysylka"),
-    ("Opublikuj", "publikacja"), ("Post", "publikacja"), ("Udostępnij", "publikacja"),
-    ("Usuń konto", "usuniecie_konta"), ("Delete my account", "usuniecie_konta")])
-def test_klik_nieodwracalny_tylko_ze_zgoda_z_karty(etykieta, kategoria):
+@pytest.mark.parametrize("etykieta", ["Kup teraz", "Zapłać 129 zł", "Place order", "Przejdź do kasy", "BLIK",
+                                      "Subscribe", "Wesprzyj", "Dodaj kartę", "Top up"])
+def test_klik_platnosci_tylko_ze_zgoda_z_karty(etykieta):
     w = ocen("click", {"element_token": "s1:5"}, Ctx(cel=el("push button", etykieta)))
-    assert (w.decyzja, w.kod, w.dane) == (CZLOWIEK, "przycisk_wrazliwy", {"kategoria": kategoria})
-    w = ocen("click", {"element_token": "s1:5"}, Ctx(cel=el("push button", etykieta), zgody={kategoria}))
-    assert w.decyzja == TAK and w.dane == {"zgoda": kategoria}
-    # zgoda innej kategorii nie wystarcza
-    inna = next(k for k in zasady.KATEGORIE if k != kategoria)
-    assert decyzja("click", {"element_token": "s1:5"}, cel=el("push button", etykieta), zgody={inna}) == CZLOWIEK
+    assert (w.decyzja, w.kod, w.dane) == (CZLOWIEK, "przycisk_wrazliwy", {"kategoria": "platnosc"})
+    w = ocen("click", {"element_token": "s1:5"}, Ctx(cel=el("push button", etykieta), zgody={"platnosc"}))
+    assert w.decyzja == TAK and w.dane == {"zgoda": "platnosc"}
+    # zgoda innej kategorii z karty nie wystarcza
+    assert decyzja("click", {"element_token": "s1:5"}, cel=el("push button", etykieta),
+                   zgody={"wysylka", "publikacja", "usuniecie_konta", "konto"}) == CZLOWIEK
 
 
 @pytest.mark.parametrize("etykieta", ["Zaloguj się", "Sign in", "Log in", "Zarejestruj się", "Sign up",
                                       "Utwórz konto", "Create account", "Continue with Google",
                                       "Continue with GitHub", "Kontynuuj z Apple", "Allow", "Zezwól", "Authorize",
-                                      "Autoryzuj"])
-def test_logowanie_rejestracja_i_oauth_bez_zgody(etykieta):
+                                      "Autoryzuj", "Wyślij", "Submit", "Opublikuj", "Post", "Udostępnij",
+                                      "Usuń konto", "Delete my account"])
+def test_logowanie_wysylka_publikacja_i_usuniecie_konta_bez_zgody(etykieta):
     ctx = Ctx(cel=el("push button", etykieta))
     assert ocen("click", {"element_token": "s1:5"}, ctx).decyzja == TAK
     assert ("zgody",) not in ctx.pytania                          # zgody z karty czytane tylko, gdy potrzebne
@@ -235,37 +233,14 @@ def test_zwykle_przyciski_przechodza(etykieta):
     assert decyzja("click", {"element_token": "s1:5"}, cel=el("link", etykieta)) == TAK
 
 
-def test_wyslij_w_formularzu_kontaktowym_i_rejestracji():
-    """Wyślij/Submit w formularzu logowania, rejestracji albo weryfikacji (pole hasła albo kodu, nazwa formularza)
-    przechodzi bez zgody; w formularzu kontaktowym (pole wiadomości) potrzebuje `wysylka`."""
-    kontakt = {"w_formularzu": True, "formularz": [{"rola": "push button", "nazwa": "Wyślij"}],
-               "pola_formularza": [{"tag": "input", "typ": "email", "nazwa": "email"},
-                                   {"tag": "textarea", "typ": "", "nazwa": "wiadomosc"}]}
-    w = ocen("click", {"element_token": "s1:5"}, Ctx(cel=el("push button", "Wyślij", **kontakt)))
-    assert (w.decyzja, w.dane) == (CZLOWIEK, {"kategoria": "wysylka"})
-    assert decyzja("click", {"element_token": "s1:5"}, cel=el("push button", "Wyślij", **kontakt),
-                   zgody={"wysylka"}) == TAK
-    # pole hasła w formularzu z polem wiadomości nie robi z niego formularza logowania
-    podstep = {**kontakt, "pola_formularza": kontakt["pola_formularza"] + [{"tag": "input", "typ": "password"}]}
-    assert decyzja("click", {"element_token": "s1:5"}, cel=el("push button", "Wyślij", **podstep)) == CZLOWIEK
-    for pola, opis_f in (([{"tag": "input", "typ": "email"}, {"tag": "input", "typ": "password"}], {}),
-                         ([{"tag": "input", "typ": "text", "autocomplete": "one-time-code"}], {}),
-                         ([{"tag": "input", "typ": "text", "nazwa": "otp_code"}], {}),
-                         ([{"tag": "input", "typ": "text", "placeholder": "Kod SMS"}], {}),
-                         ([{"tag": "input", "typ": "email"}], {"id": "signup-form"}),
-                         ([{"tag": "input", "typ": "email"}], {"action": "/session"})):
-        rejestracja = {"w_formularzu": True, "formularz": [{"rola": "push button", "nazwa": "Submit"}],
-                       "pola_formularza": pola, "opis_formularza": opis_f}
-        for etykieta in ("Wyślij", "Submit"):
-            assert decyzja("click", {"element_token": "s1:5"}, cel=el("push button", etykieta, **rejestracja)) == TAK
-    # formularz z przyciskiem rejestracji obok (bez pól z CDP, jak AT-SPI w kontenerze)
-    assert decyzja("click", {"element_token": "s1:5"}, cel=el("push button", "Submit", w_formularzu=True, formularz=[
-        {"rola": "push button", "nazwa": "Submit"}, {"rola": "push button", "nazwa": "Zarejestruj się"}])) == TAK
-    # płatność w formularzu logowania dalej potrzebuje zgody
-    logowanie = {"w_formularzu": True, "pola_formularza": [{"tag": "input", "typ": "password"}]}
-    assert decyzja("click", {"element_token": "s1:5"}, cel=el("push button", "Zapłać", **logowanie)) == CZLOWIEK
-    # poza formularzem Wyślij potrzebuje zgody
-    assert decyzja("click", {"element_token": "s1:5"}, cel=el("push button", "Wyślij", w_formularzu=False)) == CZLOWIEK
+def test_wyslij_w_kazdym_formularzu_bez_zgody():
+    """Wyślij/Submit przechodzi bez zgody w formularzu kontaktowym i poza formularzem; płatność w formularzu dalej
+    potrzebuje `platnosc`."""
+    kontakt = {"w_formularzu": True, "formularz": [{"rola": "push button", "nazwa": "Wyślij"}]}
+    for etykieta in ("Wyślij", "Submit"):
+        assert decyzja("click", {"element_token": "s1:5"}, cel=el("push button", etykieta, **kontakt)) == TAK
+        assert decyzja("click", {"element_token": "s1:5"}, cel=el("push button", etykieta, w_formularzu=False)) == TAK
+    assert decyzja("click", {"element_token": "s1:5"}, cel=el("push button", "Zapłać", **kontakt)) == CZLOWIEK
 
 
 PUNKT = {"window_id": 5, "delivery_mode": "foreground"}   # klik w punkt na wierzchu w aktywnym oknie 5
@@ -310,7 +285,7 @@ def test_prawy_klik_i_przewijanie_przechodza():
 
 
 def test_podwojny_klik_jak_klik():
-    assert decyzja("double_click", {"element_token": "s:1"}, cel=el("link", "Opublikuj")) == CZLOWIEK
+    assert decyzja("double_click", {"element_token": "s:1"}, cel=el("link", "Kup teraz")) == CZLOWIEK
     assert decyzja("double_click", {"element_token": "s:1"}, cel=el("link", "Zaloguj się")) == TAK
 
 
@@ -407,13 +382,13 @@ def test_tekst_z_sekretem_karta_i_zlym_adresem():
 
 def test_pisanie_na_przycisku_z_fokusem_to_jego_uruchomienie():
     assert decyzja("type_text", {"pid": 1, "text": " "}, fokus=el("push button", "Zapłać")) == CZLOWIEK
-    assert decyzja("type_text", {"pid": 1, "text": "x"}, fokus=el("link", "Opublikuj")) == CZLOWIEK
+    assert decyzja("type_text", {"pid": 1, "text": "x"}, fokus=el("link", "Opublikuj")) == TAK
     assert decyzja("type_text", {"pid": 1, "text": "x"}, fokus=el("link", "Zaloguj się")) == TAK
     assert decyzja("type_text", {"pid": 1, "text": " "}, fokus=el("push button", "Dalej")) == TAK
 
 
 def test_napisy_z_ukrytymi_znakami_i_ozdobnymi_literami():
-    for etykieta in ("K\u200bup teraz", "Ｋｕｐ teraz", "Zap\u00adłać", "Wyśl\u2060ij", "Kup\u00a0teraz"):
+    for etykieta in ("K\u200bup teraz", "Ｋｕｐ teraz", "Zap\u00adłać", "Przel\u2060ej", "Kup\u00a0teraz"):
         assert decyzja("click", {"element_token": "s:1"}, cel=el("push button", etykieta)) == CZLOWIEK, etykieta
     assert kod("type_text", {"pid": 1, "text": "x"}, fokus=el("entry", "Numer\u200b karty")) == "pole_wrazliwe"
 
@@ -451,16 +426,14 @@ def test_enter_w_formularzu_platnosci_robi_wlasciciel():
     assert decyzja("press_key", {"pid": 1, "key": "Return"}, fokus=pole, zgody={"platnosc"}) == TAK
 
 
-def test_enter_w_formularzu_logowania_i_kontaktowym():
-    haslo = el("password text", "Hasło", w_formularzu=True, formularz=[{"rola": "push button", "nazwa": "Wyślij"}],
-               pola_formularza=[{"tag": "input", "typ": "email"}, {"tag": "input", "typ": "password"}])
+def test_enter_w_formularzu_logowania_i_kontaktowym_bez_zgody():
+    haslo = el("password text", "Hasło", w_formularzu=True, formularz=[{"rola": "push button", "nazwa": "Wyślij"}])
     assert decyzja("press_key", {"pid": 1, "key": "Return"}, fokus=haslo) == TAK
     assert decyzja("type_text", {"pid": 1, "text": "Lato2026!\n"}, fokus=haslo) == TAK
-    email = el("entry", "E-mail", w_formularzu=True, formularz=[{"rola": "push button", "nazwa": "Wyślij"}],
-               pola_formularza=[{"tag": "input", "typ": "email"}, {"tag": "textarea"}])
-    w = ocen("press_key", {"pid": 1, "key": "Return"}, Ctx(fokus=email))
-    assert (w.kod, w.dane) == ("formularz_wrazliwy", {"kategoria": "wysylka"})
-    assert decyzja("press_key", {"pid": 1, "key": "Return"}, fokus=email, zgody={"wysylka"}) == TAK
+    email = el("entry", "E-mail", w_formularzu=True, formularz=[{"rola": "push button", "nazwa": "Wyślij"}])
+    ctx = Ctx(fokus=email)
+    assert ocen("press_key", {"pid": 1, "key": "Return"}, ctx).decyzja == TAK
+    assert ("zgody",) not in ctx.pytania
 
 
 def test_enter_w_formularzu_bez_platnosci_i_w_textarea():
@@ -508,31 +481,30 @@ def test_enter_w_srodku_tekstu_tylko_w_polu_wieloliniowym():
     el("entry", "Komentarz", atrybuty={"tag": "textarea"}, w_formularzu=False),
     el("paragraph", "", atrybuty={"tag": "p"}, stany=["editable"], w_formularzu=False),
 ])
-def test_enter_w_polu_wieloliniowym_bez_formularza_robi_wlasciciel(pole):
-    """Czat, komentarz, edytor bez <form>: Enter zwykle wysyła wiadomość; nowa linia Shift+Enter."""
-    w = ocen("press_key", {"pid": 1, "key": "Return"}, Ctx(fokus=pole))
-    assert w.decyzja == CZLOWIEK and w.kod == "wysylka_bez_formularza"
-    assert decyzja("type_text", {"pid": 1, "text": "Dzień dobry\n"}, fokus=pole) == CZLOWIEK
+def test_enter_w_polu_wieloliniowym_bez_formularza_wysyla_bez_zgody(pole):
+    """Czat, komentarz, edytor bez <form>: Enter wysyła wiadomość, a wysyłka nie potrzebuje zgody właściciela."""
+    assert decyzja("press_key", {"pid": 1, "key": "Return"}, fokus=pole) == TAK
+    assert decyzja("type_text", {"pid": 1, "text": "Dzień dobry\n"}, fokus=pole) == TAK
     assert decyzja("press_key", {"pid": 1, "key": "Return", "modifiers": ["shift"]}, fokus=pole) == TAK
-    assert decyzja("type_text", {"pid": 1, "text": "Dzień dobry"}, fokus=pole) == TAK
 
 
 def test_wyszukiwarka_bez_formularza_enter_przechodzi():
     szukaj = el("entry", "Szukaj", atrybuty={"tag": "input"}, stany=["editable", "single-line"], w_formularzu=False)
     assert decyzja("press_key", {"pid": 1, "key": "Return"}, fokus=szukaj) == TAK
-    assert decyzja("press_key", {"pid": 1, "key": "Return", "modifiers": ["ctrl"]}, fokus=szukaj) == CZLOWIEK
+    assert decyzja("press_key", {"pid": 1, "key": "Return", "modifiers": ["ctrl"]}, fokus=szukaj) == TAK
 
 
 @pytest.mark.parametrize("klawisze", [["ctrl", "Return"], ["super", "Return"], ["Control_L", "KP_Enter"],
                                       ["ctrl", "shift", "Return"]])
 def test_ctrl_enter_wysyla_takze_z_textarea(klawisze):
-    uwagi = el("entry", "Wiadomość", atrybuty={"tag": "textarea"},
-               formularz=[{"rola": "push button", "nazwa": "Wyślij"}])
+    uwagi = el("entry", "Uwagi", atrybuty={"tag": "textarea"}, formularz=[PRZYCISK_ZAPLAC])
     w = ocen("hotkey", {"pid": 1, "keys": klawisze}, Ctx(fokus=uwagi))
     assert w.decyzja == CZLOWIEK and w.kod == "formularz_wrazliwy"
-    # formularz bez wysyłki: Ctrl+Enter wolno
-    notatka = el("entry", "Notatka", atrybuty={"tag": "textarea"}, formularz=[{"rola": "push button", "nazwa": "Dalej"}])
-    assert decyzja("hotkey", {"pid": 1, "keys": klawisze}, fokus=notatka) == TAK
+    # formularz bez płatności (także z Wyślij): Ctrl+Enter wolno
+    for przycisk in ("Dalej", "Wyślij"):
+        notatka = el("entry", "Notatka", atrybuty={"tag": "textarea"},
+                     formularz=[{"rola": "push button", "nazwa": przycisk}])
+        assert decyzja("hotkey", {"pid": 1, "keys": klawisze}, fokus=notatka) == TAK
 
 
 def test_textarea_gdy_formularza_nie_da_sie_sprawdzic():

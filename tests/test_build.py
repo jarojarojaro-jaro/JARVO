@@ -578,7 +578,8 @@ def test_natywny_windows_sciezki_i_wartosci_per_system(natywny_win):
             f'"{WIN_PROGRAM}/bin-floty/jarvo-tts.exe" --plik {{input_path}} -o {{output_path}} --glos {{voice}}'), a.name
         assert "Układ natywny (windows)" in (profile / a.name / "config.yaml").read_text(encoding="utf-8").splitlines()[1]
     jarvo = fl.load_yaml(profile / "jarvo" / "config.yaml")
-    assert f"{WIN_DANE}/jarvo/workspaces" in jarvo["approvals"]["smart_policy"].replace("\n", " ")
+    # 27.11 decyzja właściciela: cała flota pyta tylko o płatności
+    assert jarvo["approvals"]["smart_policy"].endswith("ESCALATE only purchases or payments.")
     host = fl.load_yaml(natywny_win / "host" / "config.yaml")
     # jarvo-sesje także w hoście (wiadomości bez trasy profilu); dostawca pamięci jarvo-wiedza ładuje się dopiero przy
     # pierwszym agencie, więc hak nie może w nim siedzieć (14.11 pierwsza wiadomość po restarcie trafiła do Jarva)

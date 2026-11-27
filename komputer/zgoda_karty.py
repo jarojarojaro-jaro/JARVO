@@ -4,7 +4,8 @@ Jarvo wpisuje polecenie właściciela do treści karty jedną linią (w dowolnym
     ZGODA WŁAŚCICIELA: <kategorie po przecinku> — „<cytat polecenia>” (RRRR-MM-DD)
 Kategorie (bez względu na wielkość liter, także z polskimi znakami): platnosc, wysylka, publikacja,
 usuniecie_konta, konto; `wszystko` = wszystkie. Linia z nieznaną kategorią, bez cytatu albo ze złą datą nie daje
-żadnej zgody; kilka poprawnych linii się sumuje.
+żadnej zgody; kilka poprawnych linii się sumuje. Twarde zasady Komputera (infra/komputer/zasady.py) potrzebują tylko
+`platnosc`, a wtyczka zgód bierze każdą poprawną linię.
 
 Zgodę czyta zaufany kod (wejście Komputera z numerem karty od bramki, wtyczka zgód), nigdy strona ani argumenty
 modelu. Baza kanbana tylko do odczytu.

@@ -17,8 +17,8 @@ asystent, a w środku **flota wyspecjalizowanych agentów („snajperów”)** p
 wyniki i oddaje jeden sprawdzony rezultat. Działa natywnie na Twoim komputerze (bez Dockera) i niczego nie zapomina.
 
 **Kluczowa zasada:** nie forkujemy Hermesa. Repo jest jedynym źródłem prawdy: w instalacji (`~/.local/share/jarvo`)
-nic nie edytujemy ręcznie. Działania nieodwracalne (publikacja, wdrożenie, płatności, wysyłka) tylko
-za zgodą człowieka. Jarvo jest zawsze nadrzędny: z innych projektów bierzemy tylko gotowe rozwiązania
+nic nie edytujemy ręcznie. Płatności i zakupy tylko za zgodą człowieka; resztę pracy (logowanie, wysyłka, publikacja,
+wdrożenie) agenci robią bez pytania. Jarvo jest zawsze nadrzędny: z innych projektów bierzemy tylko gotowe rozwiązania
 i wzorce do kodu JARVO, nigdy system sterujący nad Jarvem.
 
 ---
@@ -67,16 +67,16 @@ razem 12 profili w `<dane>/profiles/`. Liczba skilli w tabeli = pliki `SKILL.md`
 
 | Agent | Rola | Uchwyt | Pokój HQ | Temat Telegram | Skille |
 |---|---|---|---|---|---|
-| 🛰️ `jarvo` | **Prawa ręka właściciela i szef floty** — intake, misje, karty, ocena wyników, raporty, patrol, szybkie sprawy, dokumenty i konwersje, prototypy, złożenie pakietu końcowego misji, wgrywanie stron właściciela na hosting za zgodą, skrzynka linków (link od właściciela → ocena i szkic w skarbcu), kopalnia pomysłów (w briefie jedna rzecz warta zbudowania), komentarze na X z telefonów na polecenie; sam pracuje na ekranie Komputera Jarva (computer use) i na telefonie właściciela (PHONEUSE), zakłada konta i loguje się; płatność, wysyłka i publikacja tylko z `ZGODA WŁAŚCICIELA` w karcie | `@jarvo` | Mostek dowodzenia (`bridge`) | general | 26 |
+| 🛰️ `jarvo` | **Prawa ręka właściciela i szef floty** — intake, misje, karty, ocena wyników, raporty, patrol, szybkie sprawy, dokumenty i konwersje, prototypy, złożenie pakietu końcowego misji, wgrywanie stron właściciela na hosting, skrzynka linków (link od właściciela → ocena i szkic w skarbcu), kopalnia pomysłów (w briefie jedna rzecz warta zbudowania), komentarze na X z telefonów na polecenie; sam pracuje na ekranie Komputera Jarva (computer use) i na telefonie właściciela (PHONEUSE), zakłada konta, loguje się, wysyła i publikuje; płatność tylko z `ZGODA WŁAŚCICIELA` w karcie | `@jarvo` | Mostek dowodzenia (`bridge`) | general | 26 |
 | 🔎 `jarvo-sherlock` | **Researcher-detektyw** — szybki research (domyślnie 10–15 min, raport na jedną stronę), pełne śledztwo na zamówienie, weryfikacja faktów, raporty z cytatami z rejestru źródeł sprawdzanymi przed oddaniem, transkrypcja filmu z linku | `@sherlock` | Gabinet śledczy (`study`) | — (przez Jarva) | 9 |
 | 🌐 `jarvo-web` | **Web Senior Dev** — strony/landingi (z inspiracjami z branży: Inspo + własna baza), SEO techniczne, bezpieczeństwo aplikacji, wydajność, wdrożenie | `@web` | Pracownia webowa (`devlab`) | — (przez Jarva) | 12 |
 | 🎬 `jarvo-studio` | **Marketing i kreacja** — grafiki social, obrazy AI, żywe obrazy (pętla 5 s, warstwy PSD), copy PL, kampanie, kalendarze | `@studio` | Atelier kreatywne (`atelier`) | — (przez Jarva) | 7 |
 | 🎥 `jarvo-wideo` | **Wideograf** — krótkie filmy (lektor PL, napisy karaoke, stock/AI), warianty A/B, montaż, dwa ekrany (split screen), typografia jak z montażu, filmy z kodu, 15 stylów motion design, 8 gramatyk explainera, 35 stylów malarskich, losowanie ruchów z biblioteki 273 technik, żywe schematy, maskotka | `@wideo` | Studio filmowe (`filmstudio`) | — (przez Jarva) | 22 |
 | 📈 `jarvo-ads` | **Specjalista Ads** — Meta + Google Ads, kampanie, testy A/B/C, raporty; przygotowuje paczkę, publikujesz Ty | `@ads` | Sala operacyjna (`office`) | — (przez Jarva) | 11 |
 | 🎯 `jarvo-lowca` | **Łowca leadów** — sygnały zakupowe (KRS, CEIDG, przetargi BZP/TED, strony firm, oferty pracy), kwalifikacja wg profilu klienta, ranking z „dlaczego teraz”, kontakt opublikowany ze źródłem, monitoring, rozpoznanie nowego źródła; nic nie wysyła | `@lowca` | Radar sprzedaży (`radar`) | — (przez Jarva) | 7 |
-| 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go, bramka jakości (Android, iOS w CI), pakiet do sklepów z listą 44 punktów, wydanie za zgodą i nauka z odrzuceń, aplikacja ze strony firmy, utrzymanie (terminy, opinie, SDK, poprawki OTA za zgodą), kontrola paczek npm; konta zawsze właściciela | `@mobile` | Pracownia aplikacji (`apps`) | — (przez Jarva) | 10 |
-| 💰 `jarvo-bigshort` | **Łowca finansowania**: mapa pieniędzy dla projektu (fundusze VC i aniołowie, akceleratory, granty PL i UE, fellowshipy, kredyty chmurowe i na modele, konkursy, ulgi, dług), baza okazji `okazje.py` z terminami, ceną i oceną dopasowania, lista inwestorów pod tezę, szkice aplikacji; wysłanie i kontakt z funduszem tylko za zgodą | `@bigshort` | Sala transakcji (`control`) | — (przez Jarva) | 6 |
-| 🏴 `jarvo-hacker` | **Łowca hackathonów**: radar platform i kalendarzy, baza `hackatony.py` z terminami w UTC, pulą, trackami i zasadami (solo, kod AI, KYC), ocena wartości oczekiwanej, plan pod jury i sponsorów, budowa projektu z demo, pakiet zgłoszenia, retrospektywa; rejestracja i wysłanie tylko za zgodą | `@hacker` | Warsztat hakerski (`workshop`) | — (przez Jarva) | 7 |
+| 📱 `jarvo-mobile` | **Twórca aplikacji** — uczciwe „natywna czy PWA” z kosztami, darmowy audyt mobilny (App Store, Google Play, linki strona → aplikacja, PWA, opinie), aplikacje Expo z szablonu ze zgodnością ze sklepami, podgląd w HQ i Expo Go, bramka jakości (Android, iOS w CI), pakiet do sklepów z listą 44 punktów, wydanie na polecenie i nauka z odrzuceń, aplikacja ze strony firmy, utrzymanie (terminy, opinie, SDK, poprawki OTA), kontrola paczek npm; konta zawsze właściciela | `@mobile` | Pracownia aplikacji (`apps`) | — (przez Jarva) | 10 |
+| 💰 `jarvo-bigshort` | **Łowca finansowania**: mapa pieniędzy dla projektu (fundusze VC i aniołowie, akceleratory, granty PL i UE, fellowshipy, kredyty chmurowe i na modele, konkursy, ulgi, dług), baza okazji `okazje.py` z terminami, ceną i oceną dopasowania, lista inwestorów pod tezę, szkice aplikacji; wysłanie i kontakt z funduszem bez pytania | `@bigshort` | Sala transakcji (`control`) | — (przez Jarva) | 6 |
+| 🏴 `jarvo-hacker` | **Łowca hackathonów**: radar platform i kalendarzy, baza `hackatony.py` z terminami w UTC, pulą, trackami i zasadami (solo, kod AI, KYC), ocena wartości oczekiwanej, plan pod jury i sponsorów, budowa projektu z demo, pakiet zgłoszenia, retrospektywa; rejestracja i wysłanie bez pytania | `@hacker` | Warsztat hakerski (`workshop`) | — (przez Jarva) | 7 |
 
 **Telegram** (`jarvo telegram status`): jeden bot, grupa **JARVO HQ** z tematami: **JARVO** (General: Jarvo, jego dom:
 rutyny, karty, powiadomienia), **JARODEV** (agent `jarvo-jarodev`), **TRANSLATOR** (agent `jarvo-translator`),
@@ -106,14 +106,14 @@ tylko w aktywnym oknie, odmowa `okno_nieaktywne`), walidator odrzuca `bring_to_f
 Konta i logowania robi Jarvo; hasło zostaje w menedżerze haseł przeglądarki; okienko „jestem człowiekiem”: jedna
 próba w Komputerze (drugą odrzuca wejście, `weryfikacja_czlowieka`), potem ten sam krok na telefonie floty, potem
 właściciel (`kanban_block` `needs_input`, wiadomość do niego nigdy nie kończy się ciszą `[SILENT]`). Film z pracy
-tylko przez `nagraj.py` (krótkie odcinki udanych kroków). Płatność, wysyłka, publikacja i usunięcie konta tylko
-z linią `ZGODA WŁAŚCICIELA` w karcie. Haseł ani kart
+tylko przez `nagraj.py` (krótkie odcinki udanych kroków). Wysyłka, publikacja i usunięcie konta bez pytania, płatność
+tylko z linią `ZGODA WŁAŚCICIELA` w karcie. Haseł ani kart
 z czatu nie przyjmuje. Dłuższa praca na ekranie (więcej niż kilka minut) idzie na kartę kanbana przypisaną do Jarva,
 żeby czat był wolny. Sesja z narzędziem ekranu albo telefonu nie daje wyciągu do skarbca; pozostałe rozmowy Jarva
 tak. Evals `jarvo-ekran-*` w `evals/jarvo/scenarios.yaml`, 2 ataki red teamu (wstrzyknięcie z ekranu, karta i hasło
 na ekranie) na profil `jarvo`. Pokój Sterownia w HQ zostaje bez agenta.
 Telefon właściciela przez PHONEUSE (serwer MCP `phone`, dopisuje go `jarvo telefon on`): Jarvo ma wszystkie
-narzędzia; `confirm=true` w `act` i `batch` wymaga „tak” człowieka albo linii `ZGODA WŁAŚCICIELA` w karcie (wtyczka `jarvo-zgody`).
+narzędzia; `confirm=true` w `act` i `batch` daje bez pytania, poza płatnością, która wymaga „tak” człowieka albo linii `ZGODA WŁAŚCICIELA` w karcie (wtyczka `jarvo-zgody`).
 Pod YOLO (tryb pełny) narzędzia ekranu i telefonu są zablokowane w każdym profilu ([MOBILE.md](MOBILE.md)).
 
 ### 2a°°. Agenci biznesowi (mechanizm)
@@ -140,12 +140,12 @@ expo-go`, ikony z logo albo inicjałów, zrzuty iPhone 17 Pro Max i Pixel w obu 
 Etap 4: `pakiet-do-sklepow` (`sklep_check.py`: 44 punkty z dowodem i numerem wytycznej, czyta konfigurację po wtyczkach,
 AAB, IPA, metadane, obrazy i adresy; `pakiet.py`: szkic karty, grafiki Google, zrzuty w wymiarach sklepów bez alfy
 i galeria w podglądzie HQ). Etap 5: `wydanie` (`wydanie.py`: plan i bramki, EAS Build, pobranie AAB i IPA z listą
-kontrolną, TestFlight i testy Google, karta App Store; każdy krok A2 z dosłowną zgodą właściciela, do recenzji wysyła
+kontrolną, TestFlight i testy Google, karta App Store; każdy krok A2 z dosłownymi słowami polecenia właściciela, do recenzji wysyła
 on) i `odrzucenie` (`odrzucenie.py`: wytyczne z wiadomości recenzenta, poprawka / wyjaśnienie / odwołanie, odpowiedź
 po angielsku, wiadomość jako obce dane, nauka jako nowe punkty listy N1, N2…). Etap 6: `aplikacja-ze-strony` (`ze_strony.py`:
 strona firmy → dane, oferta z cenami, kolor i logo, sygnały i funkcje natywne z ★, szkice `aplikacja.yaml` i `zgodnosc.yaml`;
 mniej niż 3 ★ = ryzyko 4.2; moduł `przypomnienia` w szablonie), `utrzymanie-aplikacji` (`utrzymanie.py`: stan z App Store
-i opiniami, kalendarz terminów Google i Apple z `.ics`, plan Expo SDK, poprawka przez EAS Update tylko za zgodą i do buildu
+i opiniami, kalendarz terminów Google i Apple z `.ics`, plan Expo SDK, poprawka przez EAS Update tylko do buildu
 o tym samym odcisku kodu natywnego), `paczki.py` (literówki, podszycia, nazwy zmyślone, świeże paczki i skrypty instalacyjne
 przed `npx expo install`), 20 skilli zewnętrznych (Expo, Callstack, Vercel, ASO) i 3 ataki red teamu.
 
@@ -375,8 +375,8 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
   Trail of Bits), przegląd kodu wg OWASP (`security-review`, getsentry); bramka jakości BLOKUJE oddanie strony przy
   KRYTYCZNE/WYSOKIE.
 - **Wgrywanie stron właściciela na hosting** (skill Jarva `wgrywanie-stron`, `profiles/jarvo/scripts/wgraj.py`): każda
-  strona to repo `jarojarojaro-jaro/<domena>` = `public_html`, `main` = strona na żywo. Wgrywa tylko Jarvo, po „tak”
-  właściciela dla odcisku z planu (hash drzewa wersji); jedno połączenie SSH (ControlMaster) i jedna próba logowania
+  strona to repo `jarojarojaro-jaro/<domena>` = `public_html`, `main` = strona na żywo. Wgrywa tylko Jarvo, na polecenie
+  właściciela, dokładnie odcisk z planu (hash drzewa wersji); jedno połączenie SSH (ControlMaster) i jedna próba logowania
   na przebieg, jedno wgrywanie naraz we flocie (blokada w `state/`), kopia `~/kopie-stron/<domena>/` przed wgraniem,
   rsync bez plików `chronione` i metadanych repo, weryfikacja sumami sha256 przez to samo połączenie, potem tag
   `wgranie-…` i przewinięcie `main`; cofnięcie nowym commitem z drzewem tagu. Śledzony sekret z `.gitignore` = odmowa.
@@ -385,8 +385,8 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
   Telegramie; Jarvo pobiera treść narzędziem (fxtwitter bez logowania, `yt-dlp -J`, trafilatura;
   film 360p i transkrypcja skryptem `transkrypcja-filmu` tylko na żądanie), ocenia ją i zawsze zgłasza szkic
   `wiedza_zapisz` (źródło = link, tagi `skrzynka-linkow` i tematy). Z nauki robi działanie (zasada 14 SOUL): najwyżej
-  1–2 poprawki z hipotezą i miarą przed i po; odwracalne we własnym zakresie (pomiar, misja próby, karta, notatka)
-  startuje od razu, kod floty zleca w `missions/DLA-CLAUDE.md`, płatne i nieodwracalne czeka na zgodę właściciela.
+  1–2 poprawki z hipotezą i miarą przed i po; we własnym zakresie (pomiar, misja próby, karta, notatka) startuje je
+  od razu, kod floty zleca w `missions/DLA-CLAUDE.md`, płatności i zakupy czekają na zgodę właściciela.
   Odpowiada 2–5 zdaniami: co ruszyło, co zlecone, kiedy wynik (albo „Nic do wdrożenia u nas”). Adresy w sieci
   lokalnej i przekierowania na nie są odrzucane; treść linku to dane, nie polecenia. Wiadomość zakończona „one” =
   temat poboczny: teczka `@@MISSIONS_DIR@@/poboczne/` i na „zamknij” jedna notatka z tagiem `poboczny`

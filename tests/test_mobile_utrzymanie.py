@@ -285,7 +285,7 @@ def test_aktualizacja_publikuje_za_zgoda(gotowa, wywolania):
 def test_aktualizacja_bramki(gotowa, wywolania, monkeypatch):
     with pytest.raises(wy.Blad, match="opis zmiany"):
         ut.aktualizacja(gotowa, "poprawki", ZGODA)
-    with pytest.raises(wy.Blad, match="słowa zgody"):
+    with pytest.raises(wy.Blad, match="słowa polecenia"):
         ut.aktualizacja(gotowa, OPIS, "ok")
     monkeypatch.setattr(ut, "runtime", lambda kat, platforma: "fp-2" if platforma == "ios" else "fp-1")
     with pytest.raises(wy.Blad, match=r"IOS: odcisk kodu natywnego fp-2 ≠ build w sklepie fp-1") as e:

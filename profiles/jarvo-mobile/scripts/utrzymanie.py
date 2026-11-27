@@ -11,7 +11,7 @@ poprawka przez EAS Update (A2) i plan podniesienia Expo SDK.
 nadużycia urządzeń): odcisk kodu natywnego (`expo-updates runtimeversion:resolve`) musi być równy runtime ostatniego
 buildu sklepowego z `out/wydanie/buildy.json`, inaczej aktualizacja nie trafiłaby do nikogo albo udawała nową funkcję;
 wtedy nowa wersja przez `wydanie`. Do tego `aplikacja.py sprawdz` bez błędów, zero JARVO-TODO, konkretny opis zmiany
-i dosłowne słowa zgody właściciela (`out/wydanie/zgody.json`); Hermes i tak pyta o polecenie (approvals).
+i dosłowne słowa polecenia właściciela (`out/wydanie/zgody.json`); Hermes zatwierdza je bez pytania (approvals).
 
 Terminy w kalendarzu: docelowe API Google (31 sierpnia każdego roku), wymagany Xcode u Apple (kwiecień), strony
 pamięci 16 KB (1.02.2027), wsparcie Expo SDK (około 3 wersje rocznie), przegląd polityki prywatności. Lata bez

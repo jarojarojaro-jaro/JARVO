@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Wydanie aplikacji: od gotowego pakietu do TestFlight, ścieżki wewnętrznej Google i recenzji, zawsze z kont
-właściciela i za jego zgodą (A2).
+właściciela i na jego polecenie (A2).
 
     wydanie.py plan <app>                                   # bramki, jednorazowe przygotowanie kont, kolejne kroki
     wydanie.py wersja <app> --podnies patch|minor|major     # nowa wersja w sklepie („Co nowego” do uzupełnienia)
@@ -12,10 +12,9 @@ właściciela i za jego zgodą (A2).
 
 Każdy krok A2 sprawdza bramki: bramka aplikacji `PASS`, lista kontrolna bez ✗ w punktach automatycznych (przed buildem
 punkty buildów mogą być „?”; przed testami lista musi przejść na pobranych AAB i IPA), żadnego `JARVO-TODO`,
-projekt EAS w organizacji właściciela i token robota `EXPO_TOKEN`. `--zgoda` to dosłowne słowa właściciela z czatu
-(np. „tak, zbuduj wersję 1.2.0 na oba sklepy”); trafiają z datą do `out/wydanie/zgody.json`. Do tego Hermes pyta
-człowieka o każde polecenie dotykające kont Apple, Google i Expo (approvals: smart_policy), a w pracy bez nadzoru
-(kanban, cron) takie polecenia odrzuca.
+projekt EAS w organizacji właściciela i token robota `EXPO_TOKEN`. `--zgoda` to dosłowne słowa polecenia właściciela
+(np. „zbuduj wersję 1.2.0 na oba sklepy”); trafiają z datą do `out/wydanie/zgody.json`. Hermes zatwierdza te polecenia
+bez pytania (approvals: smart_policy eskaluje tylko płatności i zakupy).
 
 Do recenzji wysyła właściciel jednym kliknięciem w App Store Connect („Dodaj do recenzji”, wydanie ręczne) i Play
 Console (z ścieżki wewnętrznej do produkcji, wydanie stopniowe): `wydanie.py recenzja` daje mu listę kroków.
@@ -120,7 +119,7 @@ def bramki(kat: Path, etap: str) -> list[str]:
 def zapisz_zgode(kat: Path, krok: str, zgoda: str, szczegoly: dict) -> dict:
     zgoda = " ".join((zgoda or "").split())
     if len(zgoda) < 10:
-        raise Blad("A2: potrzebne dosłowne słowa zgody właściciela (--zgoda \"…\", co najmniej 10 znaków)")
+        raise Blad("A2: potrzebne dosłowne słowa polecenia właściciela (--zgoda \"…\", co najmniej 10 znaków)")
     p = _wyd(kat) / "zgody.json"
     dane = ml.czytaj_json(p) or {"zgody": []}
     wpis = {"krok": krok, "zgoda": zgoda, "kiedy": dt.datetime.now().isoformat(timespec="seconds"), **szczegoly}
@@ -355,7 +354,7 @@ PLAN_MD = """# Plan wydania: {nazwa} {wersja}
 - [ ] Pierwszy AAB Google wgrywa właściciel ręcznie (ścieżka wewnętrzna): API Google przyjmuje wersje dopiero potem.
 - [ ] Organizacja Expo właściciela z tokenem robota (`EXPO_TOKEN` w .env profilu) i projektem EAS.
 {konto_demo}
-## Kroki (A2 = zgoda właściciela przy każdym)
+## Kroki (A2 = dosłowne słowa polecenia właściciela w `--zgoda`)
 1. A2 `wydanie.py build <app> --zgoda "…"` → EAS Build production (iOS i Android).
 2. `wydanie.py status <app> --czekaj 40` → pliki do `out/build/`, lista kontrolna na AAB i IPA.
 3. A2 `wydanie.py testy <app> --zgoda "…"` → TestFlight + ścieżka wewnętrzna Google (szkic).
@@ -403,7 +402,7 @@ def main(argv: list[str] | None = None) -> int:
         x = sub.add_parser(n)
         x.add_argument("app")
         if n in ("build", "testy", "karta"):
-            x.add_argument("--zgoda", required=True, help="dosłowne słowa zgody właściciela (A2)")
+            x.add_argument("--zgoda", required=True, help="dosłowne słowa polecenia właściciela (A2)")
         if n in ("build", "testy"):
             x.add_argument("--platforma", default="all", choices=["all", "ios", "android"])
         if n == "status":

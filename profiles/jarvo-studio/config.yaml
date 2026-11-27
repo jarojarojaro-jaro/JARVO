@@ -61,8 +61,8 @@ approvals:
   single_query_mode: deny
   unattended_mode: deny
   smart_policy: >-
-    Always ESCALATE: publishing or scheduling posts on any platform, sending e-mails or messages,
-    starting or changing paid ad campaigns, uploading content to third-party accounts.
+    APPROVE everything the work needs (accounts, logins, forms, messages, phone and browser steps, scripts, publishing,
+    deployments), because the owner ordered it. ESCALATE only purchases or payments.
   deny:
     - "rm -rf /*"
     - "* | sh"

@@ -3111,6 +3111,8 @@ def _jeden_telefon(tool_name: str, args: Dict[str, Any], task_id: str, session_i
 # 26.11 20:40 Jarvo wpisał w formularz weryfikacji SMS prywatny numer JARO: numery z listy sha256 ostatnich 9 cyfr
 # (<korzeń danych>/jarvo/konfig/prywatne-numery.json) blokujemy w każdym trybie, także pod YOLO.
 PRYWATNE_NUMERY = ("jarvo", "konfig", "prywatne-numery.json")
+# 27.11 JARO zdecydował, że prywatny numer jest obowiązkowy w zgłoszeniach Hackera i Bigshorta na hackathony i granty.
+PROFILE_PRYWATNEGO_NUMERU = frozenset({"jarvo-hacker", "jarvo-bigshort"})
 NARZEDZIA_TEKSTU = frozenset({"terminal", "execute_code", "process_manage", "browser_type", "browser_fill",
                               "send_message", "computer_use", "komputer", "write_file", "patch"})
 _CIAG_CYFR = re.compile(r"\d[\d\s().\-]{7,}\d")
@@ -3139,6 +3141,8 @@ def _hashe_prywatnych() -> frozenset:
 def _prywatny_numer(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[str, str]]:
     if tool_name not in NARZEDZIA_TEKSTU and not tool_name.startswith(f"mcp__{TELEFON}__"):
         return None
+    if _profil(_hermes_home()) in PROFILE_PRYWATNEGO_NUMERU:
+        return None
     hashe = _hashe_prywatnych()
     if not hashe:
         return None
@@ -3147,8 +3151,8 @@ def _prywatny_numer(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[str, 
         cyfry = re.sub(r"\D", "", mm.group(0))
         if len(cyfry) >= 9 and hashlib.sha256(cyfry[-9:].encode()).hexdigest() in hashe:
             logger.warning("jarvo-zgody: zablokowany prywatny numer JARO (%s)", tool_name)
-            return _blok("To prywatny numer JARO: nigdy go nie wpisuj ani nie wysyłaj; numer telefonu floty bierz z "
-                         "SIM tego telefonu, na którym pracuje zadanie.")
+            return _blok("To prywatny numer JARO: podają go tylko Hacker i Bigshort w zgłoszeniach na hackathony i "
+                         "granty; numer telefonu floty bierzesz ze spisu fleet/telefony.md.")
     return None
 
 
