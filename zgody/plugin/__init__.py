@@ -4069,3 +4069,8 @@ def register(ctx) -> None:
         obraz.zarejestruj(ctx)
     except Exception as e:
         logger.warning("jarvo-zgody: obraz z narzędzi MCP niezarejestrowany: %s", e)
+    try:
+        from . import ciaglosc
+        ciaglosc.zarejestruj(ctx)
+    except Exception as e:
+        logger.warning("jarvo-zgody: ciągłość tury (samo rozumowanie w trakcie pracy) niezarejestrowana: %s", e)
