@@ -3156,7 +3156,7 @@ def _nagrywanie_ekranu(narzedzie: str, tekst: str) -> Optional[Dict[str, str]]:
 # zrobiło. Odczyt (ekran, lista aplikacji, dumpsys, getprop) nie wiąże i nie jest blokowany (27.11: Jarvo nie mógł
 # sprawdzić, czy na którymś telefonie jest OLX). W rozmowie wiązanie wygasa po 30 min bez działania na telefonie.
 TELEFON_DOMYSLNY = "first"
-TELEFON_AKCJE = frozenset({f"mcp__{TELEFON}__act", f"mcp__{TELEFON}__batch"})
+TELEFON_AKCJE = frozenset({f"mcp__{TELEFON}__act", f"mcp__{TELEFON}__batch", f"mcp__{TELEFON}__run_recipe"})
 _ADB = re.compile(r"\badb\b|ANDROID_SERIAL", re.I)
 _ADB_AKCJA = re.compile(r"\binput\s|\bam\s+(?:start|broadcast|force-stop|kill|startservice)\b|\bmonkey\b|\bsendevent\b"
                         r"|\bsettings\s+put\b|\bcontent\s+(?:insert|update|delete|call)\b|\bpm\s+(?:install|grant|enable)\b"

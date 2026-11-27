@@ -1,7 +1,7 @@
 ---
 name: praca-na-ekranie
 description: "Pętla pracy na ekranie: idź, patrz, kroki paczką, czytaj"
-version: 1.6.0
+version: 1.7.0
 author: Jarvo
 license: MIT
 metadata:
@@ -26,6 +26,9 @@ kartę dla siebie (assignee `jarvo`), żeby rozmowa była wolna.
    `wstrzymane: true` → nic nie klikaj, powiedz, kto i dlaczego wstrzymał (`pauza`), i czekaj.
    `drzewo_dostepnosci: false` → elementy tylko ze zrzutu (`computer_use` `capture` `som`), punkty klikasz ostrożnie.
 2. Plan w `todo`: kroki, które da się sprawdzić na ekranie („w wynikach widać 20 ofert”), nie „kliknij 3 razy”.
+3. Przed powtarzalną ścieżką (logowanie, wyszukanie z filtrem, ulubione, panel, formularz) sprawdź `komputer` `sciezki`
+   i przejdź ją `odtworz` z parametrami, a po udanej nowej ścieżce zapisz ją `zapisz_sciezke` z nazwą celu i parametrami,
+   które się zmieniają (krok, który przy odtworzeniu nie pasuje, robisz sam przez `kroki` i dajesz `odtworz` z `od`).
 
 ## Wzorzec: 3 wartości ze strony z banerem w 4 wywołaniach
 1. `komputer` `{"akcja": "idz", "adres": "https://sklep-przyklad.pl/produkt/42"}` → paragon z tytułem i adresem.

@@ -87,7 +87,7 @@ def przegl():
     log = katalog / "przegladarka.log"
     for bez_piaskownicy in (False, True):            # jak usługa: Linux bez przestrzeni nazw użytkownika (I41)
         b = cdp.Przegladarka(PROGRAM, przegladarka.flagi(profil=profil, port_proxy=proxy.port, okno=False,
-                                                         bez_piaskownicy=bez_piaskownicy), log=log)
+                                                         bez_piaskownicy=bez_piaskownicy, program=PROGRAM), log=log)
         b.start()
         try:
             b.wyslij("Browser.getVersion", czas=30)
@@ -462,6 +462,36 @@ def test_podglad_i_wejscie_wlasciciela(przegl):
     assert st.wejscie_wlasciciela({"typ": "adres", "url": "https://sklep.jarvo.test/sklep.html"})["ok"]
     st.zatrzymaj_podglad()
     assert not st.podglad_wlaczony
+
+
+def test_podglad_limit_klatek_i_zrzuty_ruchomej_strony(przegl):
+    """Podgląd w HQ nie zjada procesora: klatka potwierdzana po 1/klatki s (3 kl./s, nie 50), ruchoma strona przechodzi
+    ze screencastu na zrzuty, a po PODGLAD_SPOKOJ s bez zmian wraca screencast (spokojna strona nie daje klatek)."""
+    st, _, _ = przegl
+    nr = otworz(st, "https://sklep.jarvo.test/sklep.html")
+    st.wywolaj("bring_to_front", {"window_id": nr}, {})
+    js(st, nr, "window.__ruch = true; (function f() { document.body.style.background = "
+               "`hsl(${Math.round(performance.now()) % 360},60%,50%)`; if (window.__ruch) requestAnimationFrame(f); })(); 1")
+    k = st.podglad(klatki=3)
+    t0, klatki = time.monotonic(), 0
+    while time.monotonic() - t0 < 4:
+        nastepna = st.podglad(po=k["nr"], czekaj=1, klatki=3)
+        if not nastepna.get("bez_zmian"):
+            klatki, k = klatki + 1, nastepna
+    assert 6 <= klatki <= 15, klatki                         # ok. 3 kl./s przez 4 s, a bez limitu ok. 200
+    assert st._podglad["tryb"] == "zrzuty" and base64.b64decode(k["dane"])[:2] == b"\xff\xd8"
+    js(st, nr, "window.__ruch = false; 1")
+    koniec = time.monotonic() + sterownik_cdp.PODGLAD_SPOKOJ + 5
+    while st._podglad["tryb"] == "zrzuty" and time.monotonic() < koniec:
+        k = {**k, **st.podglad(po=k["nr"], czekaj=1)}
+    assert st._podglad["tryb"] == "screencast"
+    for _ in range(10):                                     # pierwsza klatka nowego screencastu, potem cisza
+        nastepna = st.podglad(po=k["nr"], czekaj=1)
+        if nastepna.get("bez_zmian"):
+            break
+        k = nastepna
+    assert nastepna.get("bez_zmian") is True
+    st.zatrzymaj_podglad()
 
 
 def test_pasek_adresu_jak_w_chromium_z_pulpitu(przegl):
@@ -965,3 +995,41 @@ def test_dwie_rozmowy_kazda_we_wlasnym_oknie_przegladarki(przegl, wejscie):
             break
         time.sleep(0.05)
     assert wolne() and not wejscie.sesje
+
+
+def test_klik_reka_i_odcisk_przegladarki_w_tle_jak_u_czlowieka(przegl):
+    """Antybot (Turnstile, DataDome, CreepJS): klik dojeżdża kursorem i trzyma przycisk zamiast skoku i wciśnięcia
+    po 3 ms; w tle worker nie zdradza HeadlessChrome, marki jak w tej wersji Chrome, ekran większy od okna z paskiem
+    zadań i mysz z najeżdżaniem."""
+    st, _, _ = przegl
+    nr = otworz(st, "https://sklep.jarvo.test/dluga.html")
+    js(st, nr, "window.__z = []; for (const t of ['mousemove', 'mousedown', 'mouseup']) document.addEventListener(t, "
+               "e => __z.push([t, e.clientX, e.clientY, e.timeStamp]), true); 1")
+    _, el = migawka(st, nr)
+    w = st.wywolaj("click", {"pid": st.pid, "window_id": nr, "element_token": el["Przycisk na górze"]["element_token"]}, {})
+    assert w["structuredContent"]["effect"] == "confirmed", w
+    z = js(st, nr, "__z")
+    ruchy = [e for e in z if e[0] == "mousemove"]
+    wcisniecie, puszczenie = next(e for e in z if e[0] == "mousedown"), next(e for e in z if e[0] == "mouseup")
+    assert len(ruchy) >= 6 and len({(e[1], e[2]) for e in ruchy}) >= 5, z
+    assert wcisniecie[3] - ruchy[-1][3] >= 30 and puszczenie[3] - wcisniecie[3] >= 40, z
+    odcisk = js(st, nr, "(async () => [navigator.userAgentData.brands, "
+                        "matchMedia('(any-pointer: fine) and (hover: hover)').matches, "
+                        "screen.width >= outerWidth && screen.availHeight < screen.height, await new Promise(r => {"
+                        "const k = new Worker(URL.createObjectURL(new Blob(['postMessage(navigator.userAgent)']))); "
+                        "k.onmessage = e => r(e.data)}), (await navigator.userAgentData.getHighEntropyValues("
+                        "['fullVersionList'])).fullVersionList])()", czekaj=True)
+    wersja = st.b.wyslij("Browser.getVersion")["product"].split("/")[1]
+    assert (odcisk[0], odcisk[4]) == sterownik_cdp.marki_chromium(wersja) and "Headless" not in odcisk[3], odcisk
+    if "headless-shell" not in PROGRAM:                       # stary tryb bez okna nie zna --screen-info i blink-settings
+        assert odcisk[1] and odcisk[2], odcisk
+    nr = otworz(st, "https://sklep.jarvo.test/formularz.html")                  # ramka płatności z innej witryny
+    for _ in range(40):
+        if st.okno(nr).ramki:
+            break
+        time.sleep(0.1)
+    ramka = next(iter(st.okno(nr).ramki.values()))
+    w = st.b.wyslij("Runtime.evaluate", {"expression": "navigator.userAgentData.getHighEntropyValues(['fullVersionList'])"
+                                         ".then(h => h.fullVersionList)", "awaitPromise": True, "returnByValue": True},
+                    ramka, czas=30)
+    assert w["result"]["value"] == odcisk[4], w                 # Turnstile w ramce mówi to samo co karta

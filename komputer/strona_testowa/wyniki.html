@@ -1,0 +1,23 @@
+<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Wyniki ogłoszeń Jarvo</title>
+<style>body{font:16px sans-serif;margin:24px}</style></head><body>
+<h1 id="naglowek">Wyniki</h1>
+<p id="ile"></p>
+<ul id="lista"></ul>
+<p id="wynik">Nic nie kliknięto</p>
+<script>
+const p = new URLSearchParams(location.search), q = (p.get('q') || '').toLowerCase();
+const od = Number(p.get('od') || 0), dd = Number(p.get('do') || 1e9);
+const oferty = [['Telefon Nokia', 45], ['Telefon Samsung', 65], ['Telefon Motorola', 75], ['Telefon Apple', 99],
+                ['Rower miejski', 70]];
+const pasuja = oferty.filter(([n, c]) => n.toLowerCase().includes(q) && c >= od && c <= dd);
+document.getElementById('naglowek').textContent = 'Wyniki dla „' + q + '”';
+document.getElementById('ile').textContent = 'Znaleziono ' + pasuja.length + ' ogłoszeń od ' + od + ' do ' + dd + ' zł';
+for (const [n, c] of pasuja) {
+  const li = document.createElement('li');
+  li.innerHTML = n + ', ' + c + ' zł <button type="button">Dodaj do ulubionych: ' + n + '</button> '
+    + '<button type="button">Kup teraz za ' + c + ' zł</button>';
+  li.querySelector('button').onclick = () => document.getElementById('wynik').textContent = 'W ulubionych: ' + n;
+  document.getElementById('lista').appendChild(li);
+}
+</script>
+</body></html>

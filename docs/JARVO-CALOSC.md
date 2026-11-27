@@ -93,7 +93,8 @@ agent `jarvo-operator` wycofany 14.11 (decyzja właściciela), jego narzędzia i
 dziś osobna sesja omp właściciela, nie agent floty.
 Narzędzie `computer_use` Hermesa idzie przez bramkę `komputer/jarvo_cua.py` do wejścia Komputera Jarva (twarde
 zasady, ukrywanie sekretów, dziennik); wtyczka `jarvo-komputer` daje narzędzie `komputer` (`stan`, `dziennik`,
-`oddaj`: prośba do właściciela jako pauza z powodem; natywnie także `idz`, `patrz`, `kroki`, `czekaj`).
+`oddaj`: prośba do właściciela jako pauza z powodem; natywnie także `idz`, `patrz`, `kroki`, `czekaj` i ścieżki
+`sciezki`, `zapisz_sciezke`, `odtworz`: zapamiętane przejścia stron odtwarzane jednym wywołaniem z samonaprawą).
 Pętla z `praca-na-ekranie`: najpierw droga bez ekranu (`web_extract`), potem `capture` `ax` → `som` → `vision`, klik
 po numerze elementu, paragon sterownika po każdym działaniu (`confirmed` ze zmianą = dalej bez `capture`,
 `suspected_noop` i `verify_fresh_state` = najpierw `capture`) i werdykt (`escalate`). Skille w `skills/ekran/`:

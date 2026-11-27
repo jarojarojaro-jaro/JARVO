@@ -2,8 +2,10 @@
 
 Narzędzie `pulpit` daje agentom z `pulpit: true` we [`fleet.yaml`](../fleet.yaml) (Jarvo, Studio, Wideograf) ekran X11
 serwera (`:0`, Xfce): uruchamiają program z oknem, widzą ekran, klikają, piszą, przeciągają i sprawdzają wynik.
-Właściciel ogląda ten sam ekran na żywo przez VNC. Strony robi dalej Komputer Jarva ([KOMPUTER.md](KOMPUTER.md)),
-polecenia narzędzie `terminal`; pulpit jest do programów z oknami i do oceny, jak wynik wygląda.
+Właściciel ogląda ten sam ekran na żywo w HQ (okno „Na żywo”, ikona monitora: zrzut 3 razy na sekundę tylko po zmianie
+obrazu i tylko, gdy ktoś patrzy, [HQ.md](HQ.md#podgląd-na-żywo-telefony-komputer-i-pulpit)) albo przez VNC. Strony robi
+dalej Komputer Jarva ([KOMPUTER.md](KOMPUTER.md)), polecenia narzędzie `terminal`; pulpit jest do programów z oknami
+i do oceny, jak wynik wygląda.
 
 ## Kto ma pulpit i dlaczego
 

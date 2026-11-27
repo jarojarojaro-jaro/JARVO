@@ -18,6 +18,14 @@ zasady:
              zasady oceniają każdy krok przed nim, paczka staje na pierwszej odmowie albo kroku właściciela;
              `obserwuj` dokłada migawkę po ostatnim kroku (z `*` przy nowych elementach),
   czekaj     wait_for: tekst, jego zniknięcie albo adres, do 30 s, liczone w sterowniku.
+Ścieżki (cache przepływów, `sciezki.py` obok): każdy udany krok rozmowy (`idz`, krok `kroki`, `czekaj`) wtyczka
+nagrywa w pamięci tej rozmowy, a
+  sciezki          lista ścieżek agenta (domena, parametry, użycia) i nagranie tej rozmowy,
+  zapisz_sciezke   zapisuje odcinek nagrania jako ścieżkę (nazwa, parametry jako znaczniki, bez haseł i kodów)
+                   w `<HERMES_HOME>/sciezki-komputera.json`,
+  odtworz          przechodzi ścieżkę z parametrami paczkami run_steps tą samą drogą co `kroki` (twarde zasady na
+                   każdym kroku), sprawdzając cel i adres po każdym kroku; krok, który nie pasuje, oddaje agentowi
+                   z widokiem strony, a po jego kroku `odtworz` z `od` kończy i zapisuje poprawioną ścieżkę.
 Rozmowa trwa na sesję Hermesa (snapshot_id ostatniego `patrz` dokłada się do `kroki`) i kończy się po BEZCZYNNOSC s
 bez wywołań. Ekran: każde zadanie agenta (rozmowa Hermesa, karta kanbana) ma natywnie własne okno przeglądarki,
 a w kontenerze dostaje ekran jedno naraz (inne: `zajete` z tym, kto ma ekran, czasem do zwolnienia i miejscem
@@ -40,11 +48,14 @@ from __future__ import annotations
 
 import atexit
 import hashlib
+import importlib.util
 import json
 import os
+import re
 import secrets
 import socket
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -59,7 +70,8 @@ KARTA_EKRANU_ENV = "JARVO_KOMPUTER_KARTA" # karta kanbana procesu dla klucza ekr
 ROZMOWA_ENV = "JARVO_KOMPUTER_ROZMOWA"    # rozmowa Hermesa (skrót id sesji) dla klucza ekranu bramki
 ZNACZNIK = "_jarvo_rozmowa"               # owinięta funkcja Hermesa (zwiaz_computer_use raz na proces)
 BEZCZYNNOSC = 300.0                       # s bez wywołania: rozmowa z wejściem się kończy (sesja i ekran wolne)
-CZASY = {"patrz": 60.0, "idz": 60.0, "czekaj": 45.0, "kroki": 150.0}   # s na odpowiedź wejścia
+CZASY = {"patrz": 60.0, "idz": 60.0, "czekaj": 45.0, "kroki": 150.0, "odtworz": 150.0}   # s na odpowiedź wejścia
+MAKS_POKAZ_NAGRANIA = 20                  # wpisów nagrania rozmowy w akcja=sciezki
 DOMYSLNIE_ELEMENTOW = 150
 MAKS_ELEMENTOW = 400
 STANY = ("offscreen", "checked", "expanded", "selected", "disabled", "focused", "required")
@@ -137,11 +149,17 @@ SCHEMAT: Dict[str, Any] = {
         "akcja=stan: czy działa, czy jest pauza i dlaczego. "
         "akcja=dziennik: ostatnie decyzje twardych zasad. "
         "akcja=oddaj: oddajesz ekran właścicielowi z prośbą (np. „zaloguj się do panelu sklepu”, „kliknij Zapłać”): "
-        "Komputer staje, dopóki właściciel go nie wznowi; potem patrz od nowa. Wznowić możesz tylko poprosić."),
+        "Komputer staje, dopóki właściciel go nie wznowi; potem patrz od nowa. Wznowić możesz tylko poprosić. "
+        "Ścieżki (powtarzalne przejścia, np. logowanie, wyszukanie z filtrem): akcja=sciezki (lista z parametrami i "
+        "nagranie tej rozmowy) → akcja=odtworz (nazwa, parametry: cała ścieżka jednym wywołaniem, zasady na każdym "
+        "kroku; krok, który nie pasuje, wraca z widokiem strony: zrób go sam przez kroki, potem odtworz z `od`, a "
+        "poprawiona ścieżka zapisze się sama). Po udanej nowej ścieżce akcja=zapisz_sciezke (nazwa, parametry "
+        "z wartościami, których użyłeś); hasła i kody nie trafiają do pliku."),
     "parameters": {
         "type": "object",
         "properties": {
-            "akcja": {"type": "string", "enum": ["stan", "dziennik", "oddaj", "idz", "patrz", "kroki", "czekaj"]},
+            "akcja": {"type": "string", "enum": ["stan", "dziennik", "oddaj", "idz", "patrz", "kroki", "czekaj",
+                                                 "sciezki", "zapisz_sciezke", "odtworz"]},
             "prosba": {"type": "string", "description": (
                 "Dla akcja=oddaj: co właściciel ma zrobić w oknie Komputera (VNC do pulpitu serwera, Tailscale), "
                 "jednym zdaniem (gdzie i co kliknąć). "
@@ -172,6 +190,24 @@ SCHEMAT: Dict[str, Any] = {
             "tekst": {"type": "string", "description": "Dla akcja=czekaj: tekst, na który czekasz na stronie."},
             "zniknie": {"type": "boolean", "description": "Dla akcja=czekaj z tekstem: czekaj, aż tekst zniknie."},
             "sekundy": {"type": "number", "description": "Dla akcja=czekaj: najdłużej ile sekund (domyślnie 10, najwyżej 30)."},
+            "nazwa": {"type": "string", "description": (
+                "Dla zapisz_sciezke i odtworz: nazwa ścieżki, cel jak dla człowieka, np. „olx szukaj z ceną”, "
+                "„vinted logowanie”. Dla sciezki: pokaż kroki tej ścieżki.")},
+            "parametry": {"type": "object", "additionalProperties": {"type": "string"}, "description": (
+                "Dla zapisz_sciezke: wartości, których użyłeś i które zmieniają się między razami, np. {\"fraza\": "
+                "\"telefon\", \"cena_od\": \"60\", \"cena_do\": \"80\"} (w ścieżce stają się znacznikami {fraza}). "
+                "Dla odtworz: nowe wartości (bez podanej: przykład z zapisu); hasło tylko, gdy ścieżka go chce "
+                "(parametr tajny), i nigdy nie trafia do pliku.")},
+            "opis": {"type": "string", "description": "Dla zapisz_sciezke: co ścieżka robi, jednym zdaniem."},
+            "sprawdz": {"type": "string", "description": (
+                "Dla zapisz_sciezke: tekst, który jest na stronie na końcu udanej ścieżki (np. „Wyniki”, „Moje "
+                "konto”); odtworz na niego czeka, a gdy wyniki mają własny adres z parametrami, odtworz idzie tam "
+                "od razu (skrót). Może mieć znaczniki parametrów.")},
+            "od": {"type": "integer", "description": (
+                "Dla odtworz: od którego kroku ścieżki (1…), po samonaprawie albo kroku właściciela; z `od` cała "
+                "ścieżka krok po kroku, bez skrótu. Dla zapisz_sciezke: od którego wpisu nagrania (numery "
+                "w akcja=sciezki); bez niego ciągła praca na domenie ostatniego kroku.")},
+            "domena": {"type": "string", "description": "Dla sciezki: tylko ścieżki tej domeny (np. olx.pl)."},
         },
         "required": ["akcja"],
     },
@@ -358,6 +394,10 @@ class _Klient:
         self.lock = threading.Lock()                  # jedno wywołanie naraz (kroki oceniają stronę po poprzednich)
         self.ostatnio = time.monotonic()
         self.migawka: Optional[str] = None            # snapshot_id ostatniego `patrz` albo obserwacji `kroki`
+        self.elementy: Dict[int, Dict[str, Any]] = {} # rola i napis elementów tej migawki (cel numerem → napisem)
+        self.adres = ""                               # adres karty po ostatnim kroku (migawka albo paragon)
+        self.nagranie: List[Dict[str, Any]] = []      # udane kroki rozmowy do zapisu ścieżki (sciezki.py)
+        self.naprawa: Optional[Dict[str, Any]] = None # odtworzenie, które oddało krok agentowi (samonaprawa)
         self._odp: Dict[Any, dict] = {}
         self._warunek = threading.Condition()
         self._koniec = False
@@ -534,8 +574,295 @@ def _maks(args: Dict[str, Any]) -> int:
     return m if isinstance(m, int) and not isinstance(m, bool) and 0 < m <= MAKS_ELEMENTOW else DOMYSLNIE_ELEMENTOW
 
 
+# ---------------------------------------------------------------------- ścieżki: nagranie, zapis, odtworzenie
+
+_TU = Path(__file__).resolve().parent
+MODUL_SCIEZEK = "jarvo_komputer_sciezki"
+ADRES_PARAGONU = re.compile(r"(?:^|; )adres: ([^;\s]+)")
+
+
+def _sciezki():
+    """Moduł ścieżek obok wtyczki (build kopiuje cały katalog); jedna nazwa modułu w procesie."""
+    mod = sys.modules.get(MODUL_SCIEZEK)
+    if mod is not None:
+        return mod
+    spec = importlib.util.spec_from_file_location(MODUL_SCIEZEK, _TU / "sciezki.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[MODUL_SCIEZEK] = mod
+    try:
+        spec.loader.exec_module(mod)
+    except BaseException:
+        sys.modules.pop(MODUL_SCIEZEK, None)        # nieudany import nie zostaje w pamięci jako pusty moduł
+        raise
+    return mod
+
+
+def _adres_z_paragonu(tekst: Any) -> str:
+    """Adres karty po kroku z paragonu (`adres: host/ścieżka`, bez schematu) albo pusty, gdy się nie zmienił."""
+    m = ADRES_PARAGONU.search(str(tekst or ""))
+    return "https://" + m.group(1) if m else ""
+
+
+def _zapamietaj_migawke(c: _Klient, sc: Dict[str, Any]) -> None:
+    c.migawka = sc["snapshot_id"]
+    c.elementy = {e["element_index"]: {"role": e.get("role"), "label": e.get("label")}
+                  for e in sc.get("elements") or [] if isinstance(e, dict) and isinstance(e.get("element_index"), int)}
+    if sc.get("url"):
+        c.adres = str(sc["url"])
+        _dopisz_adres(c, c.adres)
+
+
+def _dopisz_adres(c: _Klient, url: str) -> None:
+    """Adres karty, który strona ustawiła już po paragonie ostatniego działania (OLX zmienia adres po filtrze
+    z opóźnieniem, a paragon skraca długi adres): do tego działania, bo z niego bierze się `po` i skrót ścieżki."""
+    try:
+        S = _sciezki()
+        akcje = [w for w in c.nagranie if S.rozbierz(w["krok"])[0] is not None]
+    except Exception:  # noqa: BLE001 - nagranie nigdy nie psuje wyniku narzędzia
+        return
+    if not akcje or not url:
+        return
+    ostatni = akcje[-1]
+    teraz = S.czysty_adres(url)
+    bez, po = teraz.split("://", 1)[-1], str(ostatni.get("po_adres") or "").split("://", 1)[-1]
+    if (po and bez != po and bez.startswith(po)) or (
+            not po and bez != S.czysty_adres(str(ostatni.get("adres_przed") or "")).split("://", 1)[-1]):
+        ostatni["po_adres"] = teraz
+
+
+def _nagraj(c: _Klient, wpis: Dict[str, Any]) -> None:
+    c.nagranie.append(wpis)
+    nadmiar = len(c.nagranie) - _sciezki().MAKS_NAGRANIE
+    if nadmiar > 0:
+        del c.nagranie[:nadmiar]
+        if c.naprawa:
+            c.naprawa["start"] = max(0, c.naprawa["start"] - nadmiar)
+
+
+def _nagraj_krok(c: _Klient, krok: Dict[str, Any], cel: Optional[Dict[str, Any]],
+                 adres_po: str = "") -> Optional[Dict[str, Any]]:
+    """Udany krok do nagrania rozmowy (wpis albo None); nagranie nigdy nie psuje wyniku narzędzia."""
+    try:
+        wpis = _sciezki().wpis_kroku(krok, cel, c.adres, adres_po)
+    except Exception:  # noqa: BLE001 - krok, którego nie da się zapisać, po prostu nie trafia do nagrania
+        return None
+    _nagraj(c, wpis)
+    return wpis
+
+
+def _nagraj_paczke(c: _Klient, kroki: list, sc: Dict[str, Any], przed: Dict[int, Dict[str, Any]]) -> None:
+    """Udane kroki paczki do nagrania (adres po kroku z paragonu; spóźniony adres dopisuje obserwacja albo patrz)."""
+    S = _sciezki()
+    for r in sc.get("steps") or []:
+        i = r.get("index") if isinstance(r, dict) else None
+        if not r.get("ok") or not isinstance(i, int) or not 0 <= i < len(kroki):
+            continue
+        cel = r.get("target") if isinstance(r.get("target"), dict) else None
+        if cel is None:
+            try:
+                nr = S.rozbierz(kroki[i])[1].get("element_index")
+            except S.BladSciezki:
+                nr = None
+            cel = przed.get(nr) if isinstance(nr, int) else None
+        po = _adres_z_paragonu(r.get("message"))
+        _nagraj_krok(c, kroki[i], cel, po)
+        if po:
+            c.adres = po
+
+
+def _wartosci(args: Dict[str, Any]) -> Dict[str, str]:
+    p = args.get("parametry")
+    if p is None:
+        return {}
+    S = _sciezki()
+    if not isinstance(p, dict) or not all(isinstance(k, str) and S.NAZWA_PARAMU.match(k) for k in p) or not all(
+            isinstance(v, (str, int, float)) and not isinstance(v, bool) for v in p.values()):
+        raise S.BladSciezki("`parametry`: obiekt {nazwa: wartość}, nazwy małymi literami (fraza, cena_od, cena_do)")
+    return {k: str(v) for k, v in p.items()}
+
+
+def _lista(args: Dict[str, Any], c: Optional[_Klient]) -> str:
+    S = _sciezki()
+    sciezki = S.wczytaj()
+    nazwa = " ".join(str(args.get("nazwa") or "").split())
+    if nazwa:
+        if nazwa not in sciezki:
+            return f"BŁĄD sciezka: nie ma ścieżki „{nazwa}” (zapisane: {', '.join(sorted(sciezki)) or 'brak'})"
+        return "\n".join(S.opis_sciezki(sciezki[nazwa], z_krokami=True))
+    d = S.domena("https://" + str(args.get("domena") or "").strip().split("://")[-1]) if args.get("domena") else ""
+    wybrane = sorted((s for s in sciezki.values() if not d or s.get("domena") == d),
+                     key=lambda s: (str(s.get("domena")), str(s.get("nazwa"))))
+    linie = [f"ścieżki{' ' + d if d else ''}: {len(wybrane)}" + ("" if wybrane else
+             " (nowa ścieżka: przejdź ją idz/kroki, potem zapisz_sciezke)")]
+    for s in wybrane:
+        linie += S.opis_sciezki(s)
+    if wybrane:
+        linie.append("odtworz: {\"akcja\": \"odtworz\", \"nazwa\": …, \"parametry\": {…}}")
+    if c is not None and c.nagranie:
+        pokaz = c.nagranie[-MAKS_POKAZ_NAGRANIA:]
+        pierwszy = len(c.nagranie) - len(pokaz) + 1
+        linie.append(f"nagranie tej rozmowy ({len(c.nagranie)} udanych kroków; zapisz_sciezke bierze ciągłą pracę "
+                     "na domenie ostatniego kroku, `od` wybiera wpis):")
+        linie += [f"  {pierwszy + i}. {S.opis_kroku(w['krok'])} [{w.get('domena') or '?'}]"
+                  + (" (opcjonalny)" if w.get("opcjonalny") else "") for i, w in enumerate(pokaz)]
+    return "\n".join(linie)
+
+
+def _zapisz_sciezke(args: Dict[str, Any], c: Optional[_Klient]) -> str:
+    S = _sciezki()
+    nazwa = " ".join(str(args.get("nazwa") or "").split())
+    wartosci = _wartosci(args)
+    od = args.get("od") if isinstance(args.get("od"), int) and not isinstance(args.get("od"), bool) else None
+    nagranie = c.nagranie if c is not None else []
+    if c is not None and nagranie and c.zyje():       # adres karty teraz: strona mogła go zmienić po ostatnim kroku
+        try:
+            w = c.narzedzie("get_window_state", {"include_screenshot": False, "max_elements": 1}, CZASY["patrz"])
+            stan = w.get("structuredContent") if isinstance(w.get("structuredContent"), dict) else {}
+            if not w.get("isError") and stan.get("url"):
+                _dopisz_adres(c, str(stan["url"]))
+        except (ConnectionError, TimeoutError, OSError):
+            pass
+    stara = S.wczytaj().get(nazwa)
+    naprawa = c.naprawa if c is not None and c.naprawa and c.naprawa["nazwa"] == nazwa and od is None else None
+    if naprawa:                                   # agent dokończył sam po kroku, który nie pasował
+        wartosci = {**naprawa["wartosci"], **wartosci}
+        wpisy = nagranie[naprawa["start"]:]
+        kroki = naprawa["prefiks"] + S.kroki_sciezki(wpisy, wartosci, start=False)
+    else:
+        wpisy = S.odcinek(nagranie, od)
+        kroki = S.kroki_sciezki(wpisy, wartosci)
+    tajne = {t for w in wpisy for t in w.get("tajne") or []}
+    sc = S.nowa_sciezka(nazwa, kroki, wartosci, str(args.get("opis") or ""), str(args.get("sprawdz") or ""),
+                        tajne, stara, "" if naprawa else S.skrot(wpisy, wartosci))
+    if naprawa:
+        sc["naprawy"] = int(sc.get("naprawy") or 0) + 1
+    S.zapisz(sc)
+    if c is not None:
+        c.nagranie.clear()
+        c.naprawa = None
+    punkty = [i + 1 for i, k in enumerate(kroki) if k.get("uwaga") == "punkt"]
+    return "\n".join([f"ok: ścieżka {'poprawiona i ' if naprawa else ''}zapisana" + (" (nadpisana)" if stara else ""),
+                      *S.opis_sciezki(sc, z_krokami=True)]
+                     + ([f"uwaga: kroki {', '.join(map(str, punkty))} klikają w punkt; po zmianie układu strony "
+                         "odtworz je odda"] if punkty else []))
+
+
+def _odtworz(args: Dict[str, Any], c: _Klient, cel: Dict[str, Any]) -> str:
+    """Ścieżka paczkami run_steps przez wejście (zasady na każdym kroku); wynik, widok strony i samonaprawa."""
+    S = _sciezki()
+    nazwa = " ".join(str(args.get("nazwa") or "").split())
+    sciezki = S.wczytaj()
+    sc = sciezki.get(nazwa)
+    if sc is None:
+        return f"BŁĄD sciezka: nie ma ścieżki „{nazwa}” (zapisane: {', '.join(sorted(sciezki)) or 'brak'})"
+    kroki = sc.get("kroki") or []
+    od = args.get("od", 1)
+    if not isinstance(od, int) or isinstance(od, bool) or not 1 <= od <= len(kroki):
+        return f"BŁĄD od: numer kroku ścieżki 1–{len(kroki)}"
+    wartosci = _wartosci(args)
+    tajne = {n for n, v in (sc.get("parametry") or {}).items() if isinstance(v, dict) and v.get("tajny")}
+    obserwuj = None if args.get("obserwuj") is False else {"max_elements": _maks(args)}
+    adres_przed = c.adres
+    w = S.odtworz(sc, wartosci, od, lambda a: c.narzedzie("run_steps", {**cel, **a}, CZASY["kroki"]), obserwuj,
+                  ze_skrotem="od" not in args)
+    koniec_agenta = len(c.nagranie)
+    for i in w["wykonane"]:                       # przebieg w nagraniu rozmowy, hasła dalej jako znaczniki
+        k = kroki[i]
+        try:
+            wpis = {"krok": S.wypelnij(k["krok"], w["wartosci"], tajne, zostaw_tajne=True),
+                    "adres_przed": adres_przed if i == w["wykonane"][0] else "", "domena": sc.get("domena") or ""}
+        except S.BladSciezki:
+            continue
+        for pole in ("po", "opcjonalny", "uwaga"):
+            if k.get(pole):
+                wpis[pole] = k[pole]
+        _nagraj(c, wpis)
+    if w.get("skrot"):
+        _nagraj_krok(c, {"navigate": {"url": w["skrot"]}}, None, w["skrot"])
+    ost = w["wynik"].get("structuredContent") if isinstance(w["wynik"].get("structuredContent"), dict) else {}
+    obs = ost.get("observation") if isinstance(ost.get("observation"), dict) else None
+    widok: List[str] = []
+    if obs and obs.get("ok") and obs.get("snapshot_id"):
+        _zapamietaj_migawke(c, obs)
+        widok = _opis_migawki(obs)
+    elif obs:
+        widok = [f"widok strony: BŁĄD {obs.get('message') or ''}"]
+    wykonane = len(w["wykonane"])
+    wart = ", ".join(f"{k}={v}" for k, v in sorted(w["wartosci"].items()))
+    pomin = f", pominięte opcjonalne (nie było celu): {', '.join(str(i + 1) for i in w['pominiete'])}" \
+        if w["pominiete"] else ""
+    naglowek = (f"ścieżka „{nazwa}” skrótem {w['skrot']} (adres i „{sc.get('sprawdz')}” na stronie) w "
+                f"{w['sekundy']:.1f} s" if w.get("skrot") else
+                f"ścieżka „{nazwa}” kroki {od}–{len(kroki)}: {wykonane} zrobione w {w['sekundy']:.1f} s "
+                f"(run_steps × {w['paczki']}{pomin})") + (f"; parametry: {wart}" if wart else "") + (
+        f"; skrót nie pasował ({w['skrot_nie']}), więc cała ścieżka" if w.get("skrot_nie") else "")
+    if w["ok"]:
+        linie = [f"ok: {naglowek}"]
+        n = c.naprawa
+        try:
+            if n and n["nazwa"] == nazwa and od > 1:
+                wartosci_n = {**n["wartosci"], **w["wartosci"]}
+                nowe = n["prefiks"] + S.kroki_sciezki(c.nagranie[n["start"]:koniec_agenta], wartosci_n, start=False) \
+                    + kroki[od - 1:]
+                sc = S.nowa_sciezka(nazwa, nowe, wartosci_n, sc.get("opis") or "", "", set(), sc)
+                sc["naprawy"] = int(sc.get("naprawy") or 0) + 1
+                linie.append(f"samonaprawa: ścieżka poprawiona i zapisana ({len(nowe)} kroków, naprawy: "
+                             f"{sc['naprawy']})")
+            c.naprawa = None
+            sc["uzycia"] = int(sc.get("uzycia") or 0) + 1
+            S.zapisz(sc)
+        except (S.BladSciezki, OSError) as e:
+            linie.append(f"uwaga: ścieżki nie zapisałem: {e}")
+        return "\n".join(linie + (["widok strony po ścieżce:", *widok] if widok else []))
+    k = w["stop"] if isinstance(w["stop"], int) else od - 1
+    rodzaj, powod = w["rodzaj"], w["powod"]
+    opis = S.opis_kroku(kroki[k]["krok"]) if k < len(kroki) else ""
+    dalej = f"potem `odtworz` z \"od\": {k + 2}, żeby dokończyć" if k + 1 < len(kroki) else \
+        "potem `zapisz_sciezke` z tą samą nazwą"
+    linie = [naglowek]
+    if rodzaj == "zasady":
+        c.naprawa = None
+        linie.append(f"krok {k + 1} ({opis}) zatrzymały twarde zasady: {powod}")
+        if DALEJ.get(w.get("next_step")):
+            linie.append(DALEJ[w["next_step"]])
+        if k + 1 < len(kroki) and w.get("next_step") == "ask_owner":
+            linie.append(f"Po kroku właściciela resztę przejdziesz `odtworz` z \"od\": {k + 2}.")
+    elif rodzaj == "parametr" and k >= len(kroki) or rodzaj == "parametr" and not any(
+            n in tajne for n in S.znaczniki(kroki[k]["krok"])):
+        c.naprawa = None
+        linie.append(f"BŁĄD parametr: {powod}; podaj go w `parametry` (akcja=sciezki z nazwą pokazuje kroki)")
+    elif rodzaj == "parametr":
+        c.naprawa = None
+        linie.append(f"krok {k + 1} ({opis}) wpisuje wartość tajną, której nie podałeś: zrób ten krok sam (pole może "
+                     f"już wypełnić menedżer haseł przeglądarki), {dalej}.")
+    else:
+        prefiks = [dict(x) for x in kroki[:k]]
+        if rodzaj == "po" and prefiks:
+            po = S.wzor_po(c.adres, w["wartosci"])
+            if po:
+                prefiks[-1]["po"] = po
+            else:
+                prefiks[-1].pop("po", None)
+        c.naprawa = {"nazwa": nazwa, "prefiks": prefiks, "start": len(c.nagranie), "wartosci": w["wartosci"]}
+        if rodzaj == "po":
+            linie.append(f"po kroku {k} strona nie jest tą z zapisu (adres {kroki[k - 1].get('po') if k else ''}, "
+                         f"jest {c.adres}): {powod}")
+        elif rodzaj == "sprawdz":
+            linie.append(f"po ostatnim kroku nie ma na stronie „{sc.get('sprawdz')}”: {powod}")
+        else:
+            linie.append(f"krok {k + 1} z {len(kroki)} ({opis}) nie pasuje do strony: {powod}")
+        if k < len(kroki):
+            linie.append(f"Samonaprawa: zrób sam na widoku poniżej to, co miał zrobić krok {k + 1} (`kroki`, cel "
+                         f"napisem z widoku), {dalej}; ścieżka zapisze się poprawiona. Gdy dalej też nie pasuje, "
+                         "dokończ sam i `zapisz_sciezke` z tą samą nazwą.")
+        else:
+            linie.append("Samonaprawa: dokończ sam na widoku poniżej i `zapisz_sciezke` z tą samą nazwą (z nowym "
+                         "`sprawdz`, jeśli strona pisze to inaczej); ścieżka zapisze się poprawiona.")
+    return "\n".join(linie + (["widok strony:", *widok] if widok else []))
+
+
 def _strona(akcja: str, args: Dict[str, Any], c: _Klient) -> str:
-    """idz, patrz, kroki, czekaj: jedno wywołanie wejścia i tekst dla modelu."""
+    """idz, patrz, kroki, czekaj, odtworz: wywołania wejścia i tekst dla modelu; udane kroki do nagrania rozmowy."""
     okno = args.get("okno") if isinstance(args.get("okno"), int) and not isinstance(args.get("okno"), bool) else None
     cel = {"window_id": okno} if okno is not None else {}
     if akcja == "patrz":
@@ -544,7 +871,7 @@ def _strona(akcja: str, args: Dict[str, Any], c: _Klient) -> str:
         sc = w.get("structuredContent") if isinstance(w.get("structuredContent"), dict) else {}
         if w.get("isError") or not sc.get("snapshot_id"):
             return _blad(w)
-        c.migawka = sc["snapshot_id"]
+        _zapamietaj_migawke(c, sc)
         return "\n".join(_opis_migawki(sc))
     if akcja == "idz":
         adres = str(args.get("adres") or "").strip()
@@ -554,6 +881,8 @@ def _strona(akcja: str, args: Dict[str, Any], c: _Klient) -> str:
         if w.get("isError"):
             return _blad(w)
         sc = w.get("structuredContent") or {}
+        _nagraj_krok(c, {"navigate": {"url": adres}}, None, str(sc.get("url") or ""))
+        c.adres = str(sc.get("url") or adres)
         return (f"ok: okno {sc.get('window_id', okno or '')} „{sc.get('title') or ''}” {sc.get('url') or ''}\n"
                 f"{sc.get('message') or _tekst(w)}")
     if akcja == "czekaj":
@@ -568,7 +897,15 @@ def _strona(akcja: str, args: Dict[str, Any], c: _Klient) -> str:
         if isinstance(sekundy, (int, float)) and not isinstance(sekundy, bool) and sekundy >= 0:
             a["timeout_ms"] = int(min(sekundy, 30) * 1000)
         w = c.narzedzie("wait_for", a, CZASY[akcja])
-        return _blad(w) if w.get("isError") else f"ok: {_tekst(w)}"
+        if w.get("isError"):
+            return _blad(w)
+        _nagraj_krok(c, {"wait_for": {k: v for k, v in a.items() if k != "window_id"}}, None)
+        return f"ok: {_tekst(w)}"
+    if akcja == "odtworz":
+        try:
+            return _odtworz(args, c, cel)
+        except _sciezki().BladSciezki as e:
+            return f"BŁĄD sciezka: {e}"
     # kroki
     kroki = args.get("kroki")
     if not isinstance(kroki, list) or not kroki:
@@ -580,10 +917,15 @@ def _strona(akcja: str, args: Dict[str, Any], c: _Klient) -> str:
         a["observe"] = {"max_elements": _maks(args)}
     if args.get("stop_on") in ("error", "refusal"):
         a["stop_on"] = args["stop_on"]
+    przed = c.elementy                                # rola i napis celów numerem (do nagrania)
     w = c.narzedzie("run_steps", a, CZASY[akcja])
     sc = w.get("structuredContent") if isinstance(w.get("structuredContent"), dict) else {}
     if "steps" not in sc:                             # paczka odrzucona przed pierwszym krokiem
         return _blad(w)
+    try:
+        _nagraj_paczke(c, kroki, sc, przed)
+    except Exception:  # noqa: BLE001 - nagranie ścieżki nigdy nie psuje wyniku kroków
+        pass
     linie = []
     for linia in _tekst(w).splitlines():
         if linia.startswith("obserwacja:"):
@@ -591,7 +933,7 @@ def _strona(akcja: str, args: Dict[str, Any], c: _Klient) -> str:
         linie.append(linia)
     obs = sc.get("observation") if isinstance(sc.get("observation"), dict) else None
     if obs and obs.get("ok") and obs.get("snapshot_id"):
-        c.migawka = obs["snapshot_id"]
+        _zapamietaj_migawke(c, obs)
         linie += ["obserwacja po krokach:", *_opis_migawki(obs)]
     elif obs:
         linie.append(f"obserwacja: BŁĄD {obs.get('message') or ''}")
@@ -603,6 +945,21 @@ def _strona(akcja: str, args: Dict[str, Any], c: _Klient) -> str:
 def obsluz(args: Dict[str, Any], **kontekst: Any) -> str:
     args = args or {}
     akcja = str(args.get("akcja") or "stan")
+    if akcja in ("sciezki", "zapisz_sciezke"):        # bez wejścia: plik ścieżek i nagranie tej rozmowy
+        klucz = str(kontekst.get("session_id") or kontekst.get("task_id") or "")
+        with _KLIENCI_LOCK:
+            c = _KLIENCI.get(klucz)
+        try:
+            S = _sciezki()
+        except Exception as e:  # noqa: BLE001 - wtyczka bez modułu ścieżek
+            return f"BŁĄD sciezka: brak modułu ścieżek ({type(e).__name__})"
+        try:
+            if c is None:
+                return _lista(args, None) if akcja == "sciezki" else _zapisz_sciezke(args, None)
+            with c.lock:
+                return _lista(args, c) if akcja == "sciezki" else _zapisz_sciezke(args, c)
+        except (S.BladSciezki, OSError) as e:
+            return f"BŁĄD sciezka: {e}"
     if akcja in CZASY:
         klucz = str(kontekst.get("session_id") or kontekst.get("task_id") or "")
         try:
@@ -637,7 +994,8 @@ def obsluz(args: Dict[str, Any], **kontekst: Any) -> str:
             if wynik.get("kto_wstrzymal") == "właściciel":
                 wynik["dalej"] = "Właściciel już wstrzymał Komputer; Twoja prośba nie nadpisała jego pauzy. " + wynik["dalej"]
     else:
-        wynik = {"ok": False, "blad": "akcja: stan, dziennik, oddaj, idz, patrz, kroki albo czekaj"}
+        wynik = {"ok": False, "blad": "akcja: stan, dziennik, oddaj, idz, patrz, kroki, czekaj, sciezki, "
+                                      "zapisz_sciezke albo odtworz"}
     return json.dumps(wynik, ensure_ascii=False)
 
 
@@ -646,8 +1004,8 @@ def register(ctx) -> None:
     zwiaz_computer_use()              # i rozmowę swojej sesji Hermesa (okno Komputera na rozmowę)
     ponawiaj_po_zamknieciu()          # po restarcie Komputera computer_use łączy się od nowa zamiast „Connection closed”
     ctx.register_tool(name="komputer", toolset="komputer", schema=SCHEMAT, handler=obsluz, emoji="🖥️",
-                      description="Komputer Jarva: strony (idz, patrz, kroki, czekaj), stan, dziennik twardych zasad, "
-                                  "oddanie ekranu właścicielowi")
+                      description="Komputer Jarva: strony (idz, patrz, kroki, czekaj), ścieżki (sciezki, "
+                                  "zapisz_sciezke, odtworz), stan, dziennik twardych zasad, oddanie ekranu właścicielowi")
 
 
 if __name__ == "__main__":       # healthcheck toolboxa Jarva: python3 komputer/plugin/__init__.py stan

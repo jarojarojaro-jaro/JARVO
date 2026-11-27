@@ -1051,8 +1051,9 @@ const NA_ZYWO = (() => {
   const ctx = vm.createContext({ React: {}, html: (s, ...v) => ({ s: s.join("|"), v }), cx: (...x) => x.filter(Boolean).join(" "),
     T: (k, p) => (p ? `${k}:${JSON.stringify(p)}` : k), L: (pl) => pl, useState: (v) => [typeof v === "function" ? v() : v, () => {}],
     useEffect: () => {}, useRef: (v) => ({ current: v }), useSklep: () => null, Leniwy: () => null, Ikona: () => null, Zasoby: { daj(o) { ctx.Z = o; } },
+    Czas: { trwanie: (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` },
     Date, Math, JSON, Map, Set, Object, Array, Number, String, RegExp, isFinite, Uint8Array });
-  vm.runInContext(fs.readFileSync(path.join(SRC, "41-na-zywo.js"), "utf8") + "\n;globalThis.M = { NaZywo, PrzyciskNaZywo, nazwaUrzadzenia };", ctx);
+  vm.runInContext(fs.readFileSync(path.join(SRC, "41-na-zywo.js"), "utf8") + "\n;globalThis.M = { NaZywo, PrzyciskNaZywo, nazwaUrzadzenia, ikonaUrzadzenia };", ctx);
   vm.runInContext(fs.readFileSync(path.join(SRC, "42-podglad.js"), "utf8"), ctx);
   return { ...ctx.M, ...ctx.Z };
 })();
@@ -1064,6 +1065,9 @@ test("Podgląd na żywo: urządzenie z bieżącego kroku (telefon z argumentem p
   eq(u({ narzedzie: "mcp__phone__ping" }), { rodzaj: "telefon", u: null, punkt: null, cmd: null });   // bez argumentu: serwer wie, który
   eq(u({ narzedzie: "computer_use", args: { cmd: "click", x: 10, y: 20 } }), { rodzaj: "komputer", u: "komputer", punkt: { x: 10, y: 20 }, cmd: "click" });
   eq(u({ narzedzie: "komputer" }), { rodzaj: "komputer", u: "komputer", punkt: null, cmd: null });
+  eq(u({ narzedzie: "pulpit", args: { cmd: "klik", x: 640, y: 360 } }), { rodzaj: "pulpit", u: "pulpit", punkt: { x: 640, y: 360 }, cmd: "klik" });
+  eq(["komputer", "pulpit", "second"].map(NA_ZYWO.ikonaUrzadzenia), ["globe", "monitor", "phone"]);
+  eq([NA_ZYWO.nazwaUrzadzenia("pulpit"), NA_ZYWO.nazwaUrzadzenia("komputer")], ["podglad.pulpit", "podglad.komputer"]);
   for (const k of [{ narzedzie: "terminal", args: { phone: "first" } }, { narzedzie: "mcp__phone__list_phones" }, { narzedzie: "browser_click" },
     { komentarz: "myśl", narzedzie: "mcp__phone__act" }, null]) assert.strictEqual(u(k), null, JSON.stringify(k));
   // bieżący krok: ostatni krok narzędzia pracującego przebiegu otwartej rozmowy, najnowszy z kilku; komentarze
@@ -1122,10 +1126,65 @@ test("Podgląd na żywo: kodek z SPS, punkt stuknięcia na obrazie (obrót), nap
   assert.strictEqual(napisPodgladu({ ...s, polaczenie: "laczy" }, "x", null), "Łączę…");
   assert.strictEqual(napisPodgladu({ ...s, ekran: { wlaczony: false } }, "x", null), "Ekran wygaszony");
   assert.strictEqual(napisPodgladu({ ...s, stan: "poza_siecia" }, "x", null), "Telefon poza siecią, łączę ponownie");
+  assert.strictEqual(napisPodgladu({ ...s, u: "pulpit", stan: "poza_siecia" }, "x", null), "Pulpit nie odpowiada, łączę ponownie");
   assert.strictEqual(napisPodgladu({ ...s, klatka: false }, "Telefon second", null), "Łączę z: Telefon second");
   assert.strictEqual(napisPodgladu(s, "x", 10), "Skończył 10 s temu");
   assert.strictEqual(napisPodgladu({ ...s, bladObrazu: true }, "x", null).startsWith("Ta przeglądarka"), true);
   for (const f of ["41-na-zywo.js", "42-podglad.js"]) assert.ok(!/[—–]/.test(fs.readFileSync(path.join(SRC, f), "utf8")), f);
+});
+test("Podgląd na żywo: dziennik działań agenta (narzędzie, cel, wynik, czas), zadanie i punkt na pulpicie", () => {
+  const { dziennikDzialan, nazwaZadania, czasKroku, ekranPulpitu } = NA_ZYWO;
+  const k = (ts, narzedzie, z = {}) => ({ ts, narzedzie, verb: narzedzie, detail: `cel ${ts}`, czas_ms: 400, blad: false, ...z });
+  const p = (id, stan, kroki, utworzony_at, watek_id = "w_a") => ({ id, stan, agent: "jarvo", watek_id, wpis_id: `wp_${id}`, utworzony_at, kroki });
+  const przebiegi = [
+    p("stary", "gotowe", [k(1, "read_file")], 1),
+    p("a", "pracuje", [k(10, "computer_use", { args: { cmd: "click", x: 1, y: 2 } }), { ts: 11, komentarz: "patrzę" },
+      k(12, "pulpit", { czas_ms: null }), k(14, "terminal", { blad: true })], 9),
+    p("b", "pracuje", [k(13, "mcp__phone__act", { args: { phone: "third" } })], 9),
+    p("obcy", "pracuje", [k(15, "terminal")], 9, "w_b")];
+  const dz = dziennikDzialan(przebiegi, "w_a", null);
+  // tylko pracujące przebiegi tej rozmowy, bez komentarzy, po czasie; urządzenie, wynik i czas kroku
+  eq(dz.wpisy.map((w) => [w.ts, w.urz, w.wynik, w.czas_ms]),
+    [[10, "komputer", "ok", 400], [12, "pulpit", "trwa", null], [13, "third", "ok", 400], [14, null, "blad", 400]]);
+  eq([dz.agent, dz.wpis_id, dz.wpisy[0].krok.detail], ["jarvo", "wp_b", "cel 10"]);
+  eq(dziennikDzialan(przebiegi, "w_a", null, 2).wpisy.map((w) => w.ts), [13, 14]);
+  // nikt nie pracuje: ostatnia tura z osi rozmowy (kroki tego samego przebiegu) i wiadomość właściciela przed nią;
+  // kroki zapisanej tury bez czasu to „ok”, nie „trwa”
+  const koniec = przebiegi.map((x) => ({ ...x, stan: "gotowe" }));
+  const os = [{ id: "m1", rodzaj: "wlasciciel", tekst: "Pierwsze" }, { id: "k1", rodzaj: "kroki", agent: "jarvo", przebieg_id: "p1", kroki: [k(2, "terminal")] },
+    { id: "m2", rodzaj: "wlasciciel", tekst: "Sprawdź Vinted w przeglądarce" },
+    { id: "k2", rodzaj: "kroki", agent: "jarvo", przebieg_id: "p2", kroki: [k(20, "komputer", { czas_ms: null }), { ts: 21, komentarz: "x" }] },
+    { id: "a2", rodzaj: "agent", agent: "jarvo", przebieg_id: "p2", kroki: [k(22, "pulpit")], tekst: "Gotowe" },
+    { id: "a3", rodzaj: "agent", agent: "jarvo", przebieg_id: "p2", kroki: [], tekst: "PS" }];
+  const zOsi = dziennikDzialan(koniec, "w_a", os);
+  eq([zOsi.agent, zOsi.wpis_id, zOsi.wpisy.map((w) => [w.ts, w.urz, w.wynik])], ["jarvo", "m2", [[20, "komputer", "ok"], [22, "pulpit", "ok"]]]);
+  eq(dziennikDzialan(koniec, "w_a", []), { agent: null, wpis_id: null, wpisy: [] });
+  eq(dziennikDzialan(przebiegi, null, os), { agent: null, wpis_id: null, wpisy: [] });
+  const pozycje = [{ id: "wp_a", tekst: "  Znajdź na otomoto 5 ogłoszeń\nz ceną do 20 tys." }, { id: "wp_b", tekst: "x".repeat(120) }];
+  eq([nazwaZadania(pozycje, "wp_a"), nazwaZadania(pozycje, "wp_b").length, nazwaZadania(pozycje, "brak"), nazwaZadania(null, "wp_a")],
+    ["Znajdź na otomoto 5 ogłoszeń", 90, "", ""]);
+  eq([czasKroku(400), czasKroku(12345), czasKroku(125000), czasKroku(null)], ["0,4 s", "12,3 s", "2:05", ""]);
+  // narzędzie pulpit liczy punkty w obrazie 1280 px; klatka mówi o ekranie 1920 × 1080
+  eq(ekranPulpitu({ szer: 1920, wys: 1080 }), { szer: 1280, wys: 720 });
+  eq(ekranPulpitu({ szer: 1024, wys: 768 }), { szer: 1024, wys: 768 });
+  assert.strictEqual(ekranPulpitu(null), null);
+});
+test("Podgląd na żywo: „Przejmij” zamienia klik i klawisz właściciela na działania sterownika Komputera", () => {
+  const { punktKlikniecia, zdarzenieKlawisza } = NA_ZYWO;
+  const r = { left: 100, top: 50, width: 400, height: 250 };
+  eq(punktKlikniecia(r, 300, 175), { x: 0.5, y: 0.5 });
+  assert.strictEqual(punktKlikniecia(r, 99, 175), null);                         // poza obrazem: nic
+  assert.strictEqual(punktKlikniecia({ ...r, width: 0 }, 300, 175), null);
+  const kl = (key, z = {}) => zdarzenieKlawisza({ key, ctrlKey: false, altKey: false, metaKey: false, shiftKey: false, ...z });
+  eq(kl("a"), { typ: "tekst", tekst: "a" });
+  eq(kl("A", { shiftKey: true }), { typ: "tekst", tekst: "A" });
+  eq(kl("ą", { ctrlKey: true, altKey: true, getModifierState: (m) => m === "AltGraph" }), { typ: "tekst", tekst: "ą" });
+  eq(kl("Enter"), { typ: "klawisz", klawisz: "enter", modyfikatory: [] });
+  eq(kl("ArrowDown", { shiftKey: true }), { typ: "klawisz", klawisz: "down", modyfikatory: ["shift"] });
+  eq(kl("a", { ctrlKey: true }), { typ: "klawisz", klawisz: "a", modyfikatory: ["ctrl"] });
+  eq(kl("F5"), { typ: "klawisz", klawisz: "f5", modyfikatory: [] });
+  eq(kl(" ", { ctrlKey: true }), { typ: "klawisz", klawisz: "space", modyfikatory: ["ctrl"] });
+  for (const m of ["Shift", "Control", "Alt", "Meta", "Dead", "Unidentified"]) assert.strictEqual(kl(m), null, m);
 });
 
 test("Podagenci w tle: licznik gotowych i czy któraś delegacja trwa", () => {

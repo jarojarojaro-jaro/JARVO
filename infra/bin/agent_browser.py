@@ -86,6 +86,12 @@ Jarvo: snapshot jest do klikania, nie do czytania treści.
 # przeglądarka agenta (silnik chrome): flagi startu, profil, widok strony
 FLAGI_CHROME = ("--disable-blink-features=AutomationControlled", "--lang=pl", "--accept-lang=pl-PL,pl,en-US,en",
                 "--disk-cache-size=104857600")
+# przeglądarka w tle (bez --headed): ekran z paskiem zadań zamiast 800×600 przy oknie 1280×720, mysz z najeżdżaniem
+# zamiast (any-pointer: none), a na Linuksie z kartą graficzną WebGL z karty zamiast SwiftShadera (jak Komputer,
+# komputer/przegladarka.py); wszystko to cechy trybu bez okna
+FLAGI_W_TLE = ("--screen-info={0,0 1920x1080 workAreaBottom=48}",
+               "--blink-settings=primaryPointerType=4,availablePointerTypes=4,primaryHoverType=2,availableHoverTypes=2")
+FLAGI_GPU_LINUX = ("--use-gl=angle", "--use-angle=gl-egl")
 KATALOG_PRZEGLADARKI = "przegladarka"      # w HERMES_HOME profilu agenta: profil/, sesje/, wlasciciel, zamek
 ZAJECIE_S = 60.0                           # s: profil zajęty przez sesję, której przeglądarka jeszcze startuje
 WIERSZ_DRZEWA = re.compile(r'^([A-Za-z]+)(?: "((?:[^"\\]|\\.)*)")?(?: \[([^\]]*)\])?(.*)$')
@@ -236,12 +242,20 @@ def user_agent(program: str) -> str | None:
             "Safari/537.36")
 
 
+def gpu_linux() -> bool:
+    """Linux: karta graficzna dostępna dla tego użytkownika (/dev/dri/renderD*, odczyt i zapis)."""
+    if not sys.platform.startswith("linux"):
+        return False
+    return any(os.access(p, os.R_OK | os.W_OK) for p in glob.glob("/dev/dri/renderD*"))
+
+
 def srodowisko(globalne: list[str], env: dict) -> dict:
     """Środowisko binarki. Silnik inny niż Lightpanda dostaje Chromium z instalacji (program_chrome), gdy nikt nie
     podał własnego (AGENT_BROWSER_EXECUTABLE_PATH, --executable-path): bez tego agent-browser szukałby Chrome w systemie
     (np. przeglądarki właściciela) albo prosił o `agent-browser install`. Przeglądarka, którą agent-browser uruchamia
-    sam, dostaje FLAGI_CHROME (bez navigator.webdriver, polski język, pamięć podręczna do 100 MB) i user-agenta bez
-    „HeadlessChrome”, jak Komputer Jarva. Od 0.41.2 agent-browser przy starcie przeglądarki pyta
+    sam, dostaje FLAGI_CHROME (bez navigator.webdriver, polski język, pamięć podręczna do 100 MB), bez okna także
+    FLAGI_W_TLE i na Linuksie z kartą graficzną FLAGI_GPU_LINUX, oraz user-agenta bez „HeadlessChrome”, jak Komputer
+    Jarva. Od 0.41.2 agent-browser przy starcie przeglądarki pyta
     chromereleases.googleblog.com o poprawki CVE nowszego Chrome: w Jarvie wersję Chromium daje manifest instalacji,
     a nowe wydania śledzi Jarvo, więc tego zapytania nie ma (AGENT_BROWSER_NO_VERSION_CHECK)."""
     env = dict(env)
@@ -254,7 +268,10 @@ def srodowisko(globalne: list[str], env: dict) -> dict:
     if zewnetrzna(globalne, env):
         return env
     obecne = env.get("AGENT_BROWSER_ARGS") or env.get("AGENT_BROWSER_CHROME_FLAGS") or ""
-    nowe = [f for f in FLAGI_CHROME if f.split("=", 1)[0] not in obecne]
+    flagi = list(FLAGI_CHROME)
+    if not (wlaczona(globalne, "--headed") or _prawda(env.get("AGENT_BROWSER_HEADED"))):
+        flagi += FLAGI_W_TLE + (FLAGI_GPU_LINUX if gpu_linux() else ())
+    nowe = [f for f in flagi if f.split("=", 1)[0] not in obecne]
     # user-agent flagą Chrome, nie AGENT_BROWSER_USER_AGENT: nadpisanie przez CDP zostawia pustą listę marek
     # (navigator.userAgentData.brands), a to zdradza automat tak samo jak „HeadlessChrome”
     ua = user_agent(env.get("AGENT_BROWSER_EXECUTABLE_PATH") or chrome)

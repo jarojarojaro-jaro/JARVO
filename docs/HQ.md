@@ -1625,30 +1625,51 @@ z tekstem i jakieś edytuj”). Pakiet `mozg` ładuje się dopiero po wejściu w
   szukanie i strony notatek działają.
 - **Telefon (≤ 700 px kontenera):** mapa na cały ekran, szukanie i karta poziomu węższe, strona notatki na cały
   ekran; przeciąganie przesuwa, dwa palce przybliżają.
-### Podgląd na żywo (telefony i Komputer)
+### Podgląd na żywo (telefony, Komputer i pulpit)
 
 - **Wejście.** Gdy przebieg choć raz pracował na telefonie (`mcp__phone__act|batch|screen|shot|ping|wait`, argument
-  `phone`) albo w Komputerze (`computer_use`, `komputer`), pasek pracy ma stały przycisk „Na żywo” z ikoną
-  urządzenia (`41-na-zywo.js`, `NaZywo.ostatnie`; wciśnięty = okno otwarte, drugi klik zamyka; wąsko sama ikona);
-  ten sam przycisk stoi przy pasku „Podagenci”. Lista kroków go nie ma (24.11 skakał między krokami). Kroki niosą tylko bezpieczne argumenty `args` {phone, cmd, x, y, index}
-  (`czytnik_omp.argumenty_urzadzenia`, nigdy `text`). Krok Hermesa na żywo nie ma argumentów (tool.started z
+  `phone`), w Komputerze (`computer_use`, `komputer`) albo na pulpicie (`pulpit`), pasek pracy ma stały przycisk
+  „Na żywo” z ikoną urządzenia (`41-na-zywo.js`, `NaZywo.ostatnie`; wciśnięty = okno otwarte, drugi klik zamyka;
+  wąsko sama ikona); ten sam przycisk stoi przy pasku „Podagenci”. Lista kroków go nie ma (24.11 skakał między
+  krokami). Kroki niosą tylko bezpieczne argumenty `args` {phone, cmd, x, y, index} (`czytnik_omp.argumenty_urzadzenia`,
+  nigdy `text`; pulpit: `akcja`, `xy`, `numer`). Krok Hermesa na żywo nie ma argumentów (tool.started z
   `/v1/runs`): który telefon jest w użyciu, mówi serwer z plików PhoneUse `<stan>/<nazwa>.busy`.
 - **Okno** (pakiet `podglad`, `42-podglad.js`): ≥ 900 px panel obok rozmowy po prawej (rozmowa się zwęża,
   szerokość z uchwytu na lewej krawędzi, 320 px do 70% okna, zapamiętana w localStorage), wężej pływający podgląd
   w rogu (stuknięcie = pełny ekran, zrzucenie w dół = zamknij); w nagłówku małe ikony urządzeń (telefon z numerem,
-  glob = przeglądarka Komputera, kropka przy urządzeniu agenta) i pinezka „Za agentem”, pod nim nazwa i ruch
-  agenta albo tytuł strony; znak NA ŻYWO (bez liczby ms), krąg stuknięcia, stany słowami (łączę, ekran wygaszony, poza siecią,
-  skończył N s temu; po 30 s okno się chowa). Przycisk jest też przy pasku „Podagenci”. Obraz telefonu (H.264,
-  WebCodecs) działa tylko po https: `jarvo panel siec https on` (rozdział 2g).
+  glob = przeglądarka Komputera, monitor = pulpit serwera, kropka przy urządzeniu agenta) i pinezka „Za agentem”,
+  pod nim nazwa i ruch agenta albo tytuł strony (pulpit: kto na nim pracuje, z zamka narzędzia); znak NA ŻYWO (bez
+  liczby ms), krąg stuknięcia, stany słowami (łączę, ekran wygaszony, poza siecią, skończył N s temu; po 30 s okno
+  się chowa). Obraz telefonu (H.264, WebCodecs) działa tylko po https: `jarvo panel siec https on` (rozdział 2g).
   Ustawienia › Powiadomienia: „Otwieraj podgląd sam” (localStorage, domyślnie włączone od 25.11). Okno należy do otwartej
   rozmowy: przejście do innej rozmowy je zamyka, a „sam” i „Za agentem” patrzą tylko na przebiegi tej rozmowy.
+- **Dziennik działań** pod obrazem (wzór dashboardu agent-browser): agent, zadanie (pierwsza linia wiadomości, od
+  której tura ruszyła), nazwa rozmowy i ostatnie 12 kroków: godzina z sekundami, ikona urządzenia, narzędzie i cel,
+  wynik (czas kroku, „trwa”, „błąd”). Kroki pracujących przebiegów idą na żywo ze sklepu, a gdy nikt nie pracuje,
+  zostaje ostatnia tura z osi rozmowy (`dziennikDzialan`).
+- **„Przejmij”** (tylko Komputer, szerokie okno albo pełny ekran): przycisk w nagłówku wysyła `przejmij` (pauza
+  właściciela: agent czeka), potem klik, prawy klik, kółko, klawisze (znak bez Ctrl, Alt i Cmd jako tekst, także AltGr)
+  i wklejenie idą do aktywnej karty (`wejscie` kanału `ster`, sterownik_cdp `wejscie_wlasciciela`, bez twardych zasad:
+  robi to człowiek); „Oddaj” wysyła `wznow`. Okien JavaScript i wyboru pliku podgląd jeszcze nie obsługuje.
 - **Serwer** (`hq/plugin/podglad_zywo.py`): WebSocket `/podglad/ws?token=` z uwierzytelnieniem WebSocketów Hermesa;
   telefon przez scrcpy-server 5.0.1 (`vendor/natywne.yaml` `scrcpy-server`, przy pierwszym użyciu) i adb Jarva,
-  tylko obraz H.264 bez przekodowania, pamięć konfiguracji i GOP dla nowego widza, strumień gaśnie 10 s po
-  ostatnim widzu; Komputer: klatki JPEG z `klatka` kanału `ster` (long-poll). Protokół w docstringu modułu.
+  tylko obraz H.264 bez przekodowania, pamięć konfiguracji i GOP dla nowego widza; telefon bez H.264 (iPhone, bez
+  adb) zrzutem PhoneUse `/shot` co 3 s, tylko zmieniony obraz (`Phone.send`, bez pliku `.busy`); Komputer: klatki
+  JPEG z `klatka` kanału `ster` (long-poll) z limitem 3 kl./s; pulpit `:0`: proces Pythonem systemu (Gdk i Pillow
+  jak silnik pulpitu) robi zrzut 3 razy na sekundę i wysyła JPEG 1280 px tylko po zmianie obrazu. Strumień gaśnie
+  10 s po ostatnim widzu, a schowana karta panelu wysyła `stop`, więc bez widza nic się nie liczy. Protokół
+  w docstringu modułu.
+- **Limit klatek Komputera** (`komputer/sterownik_cdp.py`, `PODGLAD_KLATKI`): klatkę `Page.startScreencast`
+  sterownik potwierdza najwcześniej 1/klatki s po poprzedniej, a strona, która rusza się bez przerwy przez 2 s,
+  przechodzi na zrzuty `Page.captureScreenshot` co 1/klatki s (screencast ruchomej strony kosztuje ok. 0,7 rdzenia
+  przy każdym limicie); 3 s jednakowych zrzutów przywraca screencast, a spokojna strona nie daje klatek wcale.
 - **Pomiar 24.11** (telefon first, Tailscale): pierwsza klatka 1,1 do 1,5 s przy zimnym starcie (JVM serwera na
   telefonie ok. 1 s), 30 ms dla drugiego widza; 55 klatek/s przy zmiennym obrazie; ekran telefonu → serwer
   mediana 135 ms (p10 92, p90 180, błąd zegara ±45 ms).
+- **Pomiar 27.11** (Chrome Komputera bez okna, strona z animacją 60 kl./s, 4 rdzenie, dwie serie): przed limitem
+  43 do 49 kl./s i +90 do +119 punktów procentowych rdzenia przeglądarki za podgląd, po zmianie 3 kl./s i +11 do +18;
+  spokojna strona 0 przed i po. Pulpit `:0` przy zmieniającym się obrazie ok. 12% rdzenia, telefon zrzutami 0,1%;
+  okno zamknięte: 0.
 
 ## 2g. Panel w sieci (Tailscale)
 

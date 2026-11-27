@@ -100,10 +100,11 @@ def opis_kroku(nazwa: str, args, intent: str = "") -> str:
 
 
 # Podgląd na żywo (hq/plugin/podglad_zywo.py): narzędzia telefonów PhoneUse (Hermes: mcp__phone__act, omp:
-# mcp__phone_act) i Komputera Jarva. Z argumentów idą do panelu tylko te pola: telefon, rodzaj działania, punkt
-# i numer wiersza; nigdy `text` ani inne treści (`type` niesie hasła i kody).
+# mcp__phone_act), Komputera Jarva i pulpitu serwera. Z argumentów idą do panelu tylko te pola: telefon, rodzaj
+# działania, punkt i numer wiersza; nigdy `text` ani inne treści (`type` niesie hasła i kody).
 NARZEDZIE_TELEFONU = re.compile(r"^mcp__phone__?(act|batch|screen|shot|ping|wait)$")
 NARZEDZIA_KOMPUTERA = ("computer_use", "komputer")
+NARZEDZIE_PULPITU = "pulpit"
 _NAZWA_TELEFONU = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 _DZIALANIE = re.compile(r"^[a-z_]{1,24}$")
 
@@ -113,9 +114,9 @@ def _liczba(v) -> float | int | None:
 
 
 def argumenty_urzadzenia(nazwa: str, args) -> dict | None:
-    """Bezpieczne argumenty kroku na telefonie albo Komputerze: {"phone", "cmd", "x", "y", "index"} (tylko obecne
-    i poprawne pola); None dla innych narzędzi. computer_use: `action` jako cmd, `coordinate` jako x i y, `element`
-    jako index."""
+    """Bezpieczne argumenty kroku na telefonie, Komputerze albo pulpicie: {"phone", "cmd", "x", "y", "index"} (tylko
+    obecne i poprawne pola); None dla innych narzędzi. computer_use: `action` jako cmd, `coordinate` jako x i y,
+    `element` jako index; pulpit: `akcja` jako cmd, `xy` jako x i y (piksele obrazu 1280 px), `numer` jako index."""
     a = args if isinstance(args, dict) else {}
     if isinstance(args, str):
         try:
@@ -140,6 +141,11 @@ def argumenty_urzadzenia(nazwa: str, args) -> dict | None:
         k = a.get("coordinate")
         x, y = (_liczba(k[0]), _liczba(k[1])) if isinstance(k, (list, tuple)) and len(k) == 2 else (None, None)
         i = _liczba(a.get("element"))
+    elif nazwa == NARZEDZIE_PULPITU:
+        out = {"cmd": a["akcja"]} if isinstance(a.get("akcja"), str) and _DZIALANIE.match(a["akcja"]) else {}
+        k = a.get("xy")
+        x, y = (_liczba(k[0]), _liczba(k[1])) if isinstance(k, (list, tuple)) and len(k) == 2 else (None, None)
+        i = _liczba(a.get("numer"))
     else:
         return None
     if x is not None and y is not None:

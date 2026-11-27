@@ -628,10 +628,11 @@ class WejscieNatywne:
         if s is None:
             return {"ok": False, "blad": "przeglądarka Jarva właśnie startuje"}
         po = p.get("po") if isinstance(p.get("po"), int) and not isinstance(p.get("po"), bool) else None
-        jakosc, maks = p.get("jakosc"), p.get("maks")
+        jakosc, maks, klatki = p.get("jakosc"), p.get("maks"), p.get("klatki")
         k = s.podglad(po=po, czekaj=self._liczba(p.get("czekaj"), 1.0),
                       jakosc=jakosc if isinstance(jakosc, int) and not isinstance(jakosc, bool) else None,
-                      maks=maks if isinstance(maks, int) and not isinstance(maks, bool) else None)
+                      maks=maks if isinstance(maks, int) and not isinstance(maks, bool) else None,
+                      klatki=klatki if isinstance(klatki, int) and not isinstance(klatki, bool) else None)
         if k is None:
             return {"ok": False, "blad": "przeglądarka nie ma otwartej karty albo nie dała obrazu"}
         return {"ok": True, "klatka": k, "wstrzymane": self.ekran.wstrzymane,

@@ -1,25 +1,31 @@
-"""Podgląd na żywo telefonów floty i przeglądarki Jarva w panelu (docs/HQ.md „Podgląd na żywo”).
+"""Podgląd na żywo telefonów floty, przeglądarki Jarva i pulpitu serwera w panelu (docs/HQ.md „Podgląd na żywo”).
 
-Jeden WebSocket `GET /api/plugins/jarvo-hq/podglad/ws?token=<token sesji panelu>` na kartę panelu; tylko podgląd,
-bez sterowania. Uwierzytelnienie jak WebSockety dashboardu Hermesa (hermes_cli.web_server_chat: `_ws_auth_ok`, czyli
-`?token=` z tokenem sesji wstrzykniętym w stronę, i `_ws_request_is_allowed`: Host, Origin, klient z pętli zwrotnej).
+Jeden WebSocket `GET /api/plugins/jarvo-hq/podglad/ws?token=<token sesji panelu>` na kartę panelu: podgląd
+i „Przejmij” Komputera (wejście właściciela). Uwierzytelnienie jak WebSockety dashboardu Hermesa
+(hermes_cli.web_server_chat: `_ws_auth_ok`, czyli `?token=` z tokenem sesji wstrzykniętym w stronę,
+i `_ws_request_is_allowed`: Host, Origin, klient z pętli zwrotnej).
 Panel w sieci Tailscale (siec.py) wpuszcza WebSocket tylko z ważną sesją i podaje go dalej jak lokalny, więc to
 samo sprawdzenie działa w obu trybach. Bez Hermesa (import się nie uda) albo bez poświadczeń = zamknięcie 4401
 przed przyjęciem (przeglądarka widzi odmowę uzgodnienia). Nowego sekretu nie ma.
 
-Protokół. Klient → serwer (tekst JSON): {"typ": "patrz", "u": "<telefon>"|"komputer"|null} (null = telefon, na
-którym agent pracuje teraz, inaczej pierwszy), {"typ": "ping", "t": <ms klienta>}. Serwer → klient:
-  tekst  {"typ": "witaj", "czas", "telefony": [{"id", "rodzaj"}], "komputer": bool, "agent", "przydzialy"}
+Protokół. Klient → serwer (tekst JSON): {"typ": "patrz", "u": "<telefon>"|"komputer"|"pulpit"|null} (null = telefon,
+na którym agent pracuje teraz, inaczej pierwszy), {"typ": "stop"} (karta panelu schowana: widz odchodzi od strumienia),
+{"typ": "ping", "t": <ms klienta>}, „Przejmij” Komputera: {"typ": "przejmij"}, {"typ": "oddaj"} i {"typ": "wejscie",
+"z": {"typ": DZIALANIA_WLASCICIELA, …}} (polecenia `przejmij`, `wznow` i `wejscie` kanału `ster`). Serwer → klient:
+  tekst  {"typ": "witaj", "czas", "telefony": [{"id", "rodzaj"}], "komputer": bool, "pulpit": bool, "agent",
+         "przydzialy"}
          {"typ": "pong", "t", "s"} (synchronizacja zegara: opóźnienie liczy klient z czasu nadania)
          {"typ": "stan", "u", "stan": "laczy"|"dziala"|"poza_siecia"|"niedostepny", "opis"}
          {"typ": "ekran", "u", "wlaczony", "zablokowany", "szer", "wys"} (PhoneUse ping co CO_ILE_EKRAN s, gdy ktoś
          patrzy; szer i wys = ekran w pikselach, do kręgu w miejscu stuknięcia)
          {"typ": "sesja", "u", "w", "h", "kodek"} (nowa sesja kodera: start albo obrót telefonu)
-         {"typ": "klatka", "u", "w_css", "h_css", "tytul", "url"} (opis klatki Komputera przed jej obrazem)
+         {"typ": "klatka", "u", "w_css", "h_css", "tytul", "url", "przejete"} (opis klatki JPEG przed jej obrazem;
+         `przejete` tylko Komputer: ekran ma właściciel)
+         {"typ": "ster", "co": "przejmij"|"oddaj"|"wejscie", "ok", "blad", "przejete"} (odpowiedź na „Przejmij”)
          {"typ": "agent", "agent"} (zmiana telefonu, na którym agent pracuje: pliki PhoneUse <stan>/<nazwa>.busy)
-  binarnie  RAMKA: typ u8 (1 konfiguracja H.264: SPS i PPS, 2 klatka kluczowa, 3 klatka, 4 JPEG Komputera),
-         czas odbioru na serwerze f64 (ms od epoki), pts u64 (µs, JPEG: numer klatki), dane. Serwer niczego nie
-         przekodowuje: H.264 w Annex B z kodera telefonu, JPEG z Page.startScreencast.
+  binarnie  RAMKA: typ u8 (1 konfiguracja H.264: SPS i PPS, 2 klatka kluczowa, 3 klatka, 4 JPEG Komputera, pulpitu
+         albo zrzutu telefonu), czas odbioru na serwerze f64 (ms od epoki), pts u64 (µs, JPEG: numer klatki), dane.
+         Serwer niczego nie przekodowuje: H.264 w Annex B z kodera telefonu, JPEG ze sterownika Komputera.
 
 Telefon: scrcpy-server 5.0.1 (vendor/natywne.yaml `scrcpy-server`, przy pierwszym użyciu przez jarvo/przy_uzyciu.py)
 przez adb z platform-tools Jarva: push do /data/local/tmp, `adb forward tcp:0 localabstract:scrcpy_<scid>` z losowym
@@ -32,8 +38,14 @@ ostatniej klatki kluczowej, więc nowy widz dostaje sesję, konfigurację i klat
 Nazwy telefonów (first, second, third) i seriale adb daje PhoneUse (`<stan>/telefon.json` z `jarvo telefon on`:
 katalog tools/ i Python serwera phone): krótki proces z tools/body.py (`Phone.load`, PHONEUSE_NO_RECONNECT=1),
 bez czytania plików telefonów przez panel. Ekran wygaszony = PhoneUse ping `screen_on: false`.
-Komputer: polecenie `klatka` kanału `ster` usługi Komputera (komputer/kanal.py, token właściciela) z `po` i
-`czekaj` (long-poll po stronie serwera); klatka idzie, gdy przyjdzie, bez odpytywania z przeglądarki.
+Telefon bez obrazu H.264 (iPhone, bez serialu adb w PhoneUse, bez adb Jarva): zrzut PhoneUse `/shot` co
+CO_ILE_ZRZUT_TELEFONU s, tylko zmieniony obraz (Phone.send, więc bez pliku .busy: podgląd nie udaje pracy agenta).
+Komputer: polecenie `klatka` kanału `ster` usługi Komputera (komputer/kanal.py, token właściciela) z `po`, `czekaj`
+(long-poll po stronie serwera) i `klatki` (KLATKI_KOMPUTERA na sekundę: sterownik potwierdza klatkę screencastu po
+odstępie, a ruchomą stronę pokazuje zrzutami; spokojna strona nie daje klatek i nic nie kosztuje).
+Pulpit (Linux, ekran X11 narzędzia `pulpit`, docs/PULPIT.md): proces Pythonem systemu (Gdk i Pillow jak silnik
+pulpitu) robi zrzut ekranu KLATKI_PULPITU razy na sekundę i wysyła JPEG tylko, gdy obraz się zmienił; kto pracuje na
+pulpicie, mówi zamek narzędzia `pulpit` (`<korzeń>/stan/pulpit/zamek.json`).
 
 Strumień urządzenia jest jeden na proces i dzielą go wszyscy widzowie; gaśnie WYGASZENIE s po odejściu ostatniego
 widza. Widz, który nie nadąża (kolejka ponad MAKS_KOLEJKI bajtów), traci zaległe klatki i czeka na najbliższą
@@ -72,7 +84,17 @@ CO_ILE_AGENT = 1.0               # s: pliki .busy PhoneUse (który telefon agent
 OKNO_AGENTA = 20.0               # s: tyle od ostatniego działania agenta telefon uchodzi za „w pracy”
 CZAS_MAPY = 60.0                 # s: pamięć nazw i seriali telefonów z PhoneUse
 KOMPUTER = "komputer"
+PULPIT = "pulpit"
 NAZWA_TELEFONU = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+KLATKI_KOMPUTERA = 3             # kl./s podglądu Komputera (limit w sterowniku: potwierdzenie klatki po odstępie)
+KLATKI_PULPITU = 3               # kl./s zrzutów pulpitu (wysyłany tylko zmieniony obraz)
+MAKS_PULPITU = 1280              # px szerokości klatki pulpitu
+JAKOSC_PULPITU = 70              # JPEG klatki pulpitu
+CO_ILE_ZRZUT_TELEFONU = 3.0      # s: zrzut PhoneUse telefonu bez obrazu H.264
+SZER_ZRZUTU_TELEFONU = 540       # px szerokości zrzutu telefonu
+# działania właściciela z podglądu Komputera (sterownik_cdp.wejscie_wlasciciela), bez ruchu myszy i wyboru pliku
+DZIALANIA_WLASCICIELA = frozenset({"klik", "kolko", "klawisz", "tekst", "adres", "wstecz", "dalej", "odswiez",
+                                   "dialog"})
 
 # typy ramek binarnych do przeglądarki
 KONFIG, KLUCZ, DELTA, JPEG = 1, 2, 3, 4
@@ -355,7 +377,8 @@ class Strumien:
         elif rodzaj == "jpeg":
             _, dane, opis = ev
             r = ramka(JPEG, self.zegar() * 1000.0, int(opis.get("nr") or 0), dane)
-            o = tekst(typ="klatka", u=self.uid, **{k: opis.get(k) for k in ("w_css", "h_css", "tytul", "url")})
+            o = tekst(typ="klatka", u=self.uid,
+                      **{k: opis.get(k) for k in ("w_css", "h_css", "tytul", "url", "przejete")})
             self.jpeg = [o, r]
             for w in list(self.widzowie):
                 if w.bajty > w.maks:
@@ -450,10 +473,15 @@ class Telefony:
         return cls(tools=Path(t["serwer"]).parent, python=str(t.get("python") or sys.executable), dom=dom,
                    stan_phoneuse=Path(stan_pu), przydzialy=przydzialy, log=log)
 
-    async def _zapytaj(self, ping: str) -> dict:
+    def env(self) -> dict:
+        """Środowisko procesu Pythonem PhoneUse: dom właściciela (PhoneUse czyta `~/.phoneuse/`), bez naprawy łącza."""
         env = {**os.environ, "PHONEUSE_NO_RECONNECT": "1"}
         if self.dom:
             env["USERPROFILE" if os.name == "nt" else "HOME"] = self.dom
+        return env
+
+    async def _zapytaj(self, ping: str) -> dict:
+        env = self.env()
         proc = await asyncio.create_subprocess_exec(self.python, "-c", KOD_TELEFONOW, str(self.tools), ping or "-",
                                                     stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.PIPE,
                                                     stderr=asyncio.subprocess.PIPE, env=env)
@@ -589,13 +617,15 @@ async def zrodlo_scrcpy(adb: str, serial: str, serwer: Path, *, opcje: tuple[str
             pass
 
 
-async def zrodlo_komputera(zapytaj: Callable[[dict], dict], *, maks: int = 1280) -> AsyncIterator[tuple]:
-    """Klatki Komputera (kanał `ster`, polecenie `klatka` z `po` i `czekaj`): ("jpeg", dane, opis) przy każdej
-    nowej klatce. `zapytaj` jest blokujące (wołane w wątku)."""
+async def zrodlo_komputera(zapytaj: Callable[[dict], dict], *, maks: int = 1280,
+                           klatki: int = KLATKI_KOMPUTERA) -> AsyncIterator[tuple]:
+    """Klatki Komputera (kanał `ster`, polecenie `klatka` z `po`, `czekaj` i `klatki`): ("jpeg", dane, opis) przy
+    każdej nowej klatce. `zapytaj` jest blokujące (wołane w wątku)."""
     yield ("stan", "laczy", "")
     nr = None
     while True:
-        odp = await asyncio.to_thread(zapytaj, {"polecenie": "klatka", "po": nr, "czekaj": 5, "maks": maks})
+        odp = await asyncio.to_thread(zapytaj, {"polecenie": "klatka", "po": nr, "czekaj": 5, "maks": maks,
+                                                "klatki": klatki})
         if not odp.get("ok"):
             raise BladZrodla(str(odp.get("blad") or "Komputer nie dał klatki"))
         k = odp.get("klatka") or {}
@@ -604,10 +634,207 @@ async def zrodlo_komputera(zapytaj: Callable[[dict], dict], *, maks: int = 1280)
         if k.get("dane"):
             yield ("jpeg", base64.b64decode(k["dane"]), {"nr": k.get("nr"), "w_css": k.get("szer_css"),
                                                         "h_css": k.get("wys_css"), "tytul": k.get("tytul"),
-                                                        "url": k.get("url")})
+                                                        "url": k.get("url"), "przejete": bool(odp.get("przejete"))})
         nr = k.get("nr") if isinstance(k.get("nr"), int) else nr
         if not k.get("dane"):
             await asyncio.sleep(0.5)                 # okno JavaScript na stronie: bez obrazu, pytamy spokojniej
+
+
+async def _klatki_procesu(proc, naglowek: struct.Struct, opis: Callable[[tuple], dict], ogon: list[str],
+                          czytnik: asyncio.Task, niedostepny: tuple[int, ...]) -> AsyncIterator[tuple]:
+    """Klatki JPEG z wyjścia procesu pomocnika: `naglowek` (pierwsze pole = rozmiar JPEG, reszta dla `opis`), dane.
+    Koniec procesu: kod z `niedostepny` = Niedostepny (stała przyczyna), inny = BladZrodla (ponowienie); opis błędu
+    z ogona stderr (`czytnik` go dopisuje)."""
+    nr = 0
+    while True:
+        try:
+            pola = naglowek.unpack(await proc.stdout.readexactly(naglowek.size))
+            if not 0 < pola[0] <= MAKS_PAKIET:
+                raise BladProtokolu(f"klatka {pola[0]} B")
+            dane = await proc.stdout.readexactly(pola[0])
+        except asyncio.IncompleteReadError:
+            kod = await proc.wait()
+            try:
+                await asyncio.wait_for(asyncio.shield(czytnik), 2.0)
+            except asyncio.TimeoutError:
+                pass
+            powod = " ".join(ogon)[-200:] or f"kod {kod}"
+            raise (Niedostepny if kod in niedostepny else BladZrodla)(powod) from None
+        nr += 1
+        yield ("jpeg", dane, {"nr": nr, **opis(pola)})
+
+
+async def _proces(*argv: str, env: dict) -> tuple[Any, list[str], asyncio.Task]:
+    """Proces pomocnika z ogonem stderr (ostatnie linie, do opisu błędu) czytanym w tle."""
+    proc = await asyncio.create_subprocess_exec(*argv, stdin=asyncio.subprocess.DEVNULL,
+                                                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                                                env=env)
+    ogon: list[str] = []
+
+    async def czytaj() -> None:
+        while True:
+            linia = await proc.stderr.readline()
+            if not linia:
+                return
+            ogon.append(linia.decode("utf-8", "replace").strip())
+            del ogon[:-5]
+    return proc, ogon, asyncio.get_running_loop().create_task(czytaj())
+
+
+# zrzuty telefonu Pythonem PhoneUse (Phone.send: bez pliku .busy, bez naprawy łącza); 3 błędy z rzędu = koniec (kod 5)
+KOD_ZRZUTOW_TELEFONU = r'''
+import base64, json, os, struct, sys, time
+sys.path.insert(0, sys.argv[1])
+os.environ["PHONEUSE_NO_RECONNECT"] = "1"
+import body
+try:
+    p = body.Phone.load(sys.argv[2])
+except Exception as e:
+    sys.stderr.write(f"PhoneUse nie zna telefonu {sys.argv[2]}: {type(e).__name__}\n")
+    sys.exit(3)
+co_ile, szer = float(sys.argv[3]), int(sys.argv[4])
+out, poprzedni, bledy = sys.stdout.buffer, None, 0
+while True:
+    t = time.monotonic()
+    try:
+        status, raw = p.send(f"/shot?w={szer}&q=60", timeout=15)
+        d = json.loads(raw)
+        if not d.get("jpeg_b64"):
+            raise RuntimeError(str(d.get("error") or f"HTTP {status}, bez obrazu")[:150])
+        jpg, bledy = base64.b64decode(d["jpeg_b64"]), 0
+        if jpg != poprzedni:
+            poprzedni = jpg
+            out.write(struct.pack(">IHH", len(jpg), int(d.get("src_w") or 0), int(d.get("src_h") or 0)) + jpg)
+            out.flush()
+    except Exception as e:
+        bledy += 1
+        sys.stderr.write(f"zrzut: {type(e).__name__}: {str(e)[:150]}\n")
+        sys.stderr.flush()
+        try:
+            p.drop()
+        except Exception:
+            pass
+        if bledy >= 3:
+            sys.exit(5)
+    time.sleep(max(0.0, co_ile - (time.monotonic() - t)))
+'''
+_NAGLOWEK_ZRZUTU = struct.Struct(">IHH")     # rozmiar JPEG, szerokość i wysokość ekranu (px)
+
+
+async def zrodlo_zrzutow_telefonu(telefony: "Telefony", nazwa: str, *, co_ile: float = CO_ILE_ZRZUT_TELEFONU,
+                                  szer: int = SZER_ZRZUTU_TELEFONU) -> AsyncIterator[tuple]:
+    """Telefon bez obrazu H.264: zrzut PhoneUse `/shot` co `co_ile` s, ("jpeg", dane, opis) tylko przy zmianie."""
+    yield ("stan", "laczy", "")
+    proc, ogon, czytnik = await _proces(telefony.python, "-c", KOD_ZRZUTOW_TELEFONU, str(telefony.tools), nazwa,
+                                        str(co_ile), str(szer), env=telefony.env())
+    try:
+        async for ev in _klatki_procesu(proc, _NAGLOWEK_ZRZUTU,
+                                        lambda p: {"w_css": p[1] or None, "h_css": p[2] or None},
+                                        ogon, czytnik, (3,)):
+            yield ev
+    finally:
+        czytnik.cancel()
+        if proc.returncode is None:
+            proc.kill()
+
+
+# zrzuty pulpitu Pythonem systemu (Gdk i Pillow, jak pulpit/plugin/silnik.py): JPEG tylko po zmianie obrazu;
+# kod 3 = brak Gdk albo Pillow, 4 = brak dostępu do ekranu
+KOD_PULPITU = r'''
+import io, os, struct, sys, time
+os.environ["DISPLAY"] = sys.argv[1]
+klatki, maks, jakosc = float(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
+try:
+    import gi
+    gi.require_version("Gdk", "3.0")
+    from gi.repository import Gdk
+    from PIL import Image
+except Exception as e:
+    sys.stderr.write(f"brak Gdk albo Pillow w Pythonie systemu: {type(e).__name__}\n")
+    sys.exit(3)
+if Gdk.Display.get_default() is None:
+    sys.stderr.write(f"nie ma dostępu do ekranu {sys.argv[1]}\n")
+    sys.exit(4)
+root, out, poprzedni = Gdk.get_default_root_window(), sys.stdout.buffer, None
+while True:
+    t = time.monotonic()
+    w, h = root.get_width(), root.get_height()
+    pb = Gdk.pixbuf_get_from_window(root, 0, 0, w, h)
+    if pb is not None:
+        surowe = pb.get_pixels()
+        if surowe != poprzedni:
+            poprzedni = surowe
+            tryb = "RGBA" if pb.get_has_alpha() else "RGB"
+            im = Image.frombuffer(tryb, (w, h), surowe, "raw", tryb, pb.get_rowstride(), 1).convert("RGB")
+            if w > maks:
+                im = im.resize((maks, max(1, round(h * maks / w))), Image.BILINEAR, reducing_gap=2.0)
+            buf = io.BytesIO()
+            im.save(buf, "JPEG", quality=jakosc)
+            out.write(struct.pack(">IHH", buf.tell(), w, h) + buf.getvalue())
+            out.flush()
+    time.sleep(max(0.0, 1.0 / klatki - (time.monotonic() - t)))
+'''
+
+
+class Pulpit:
+    """Ekran X11 narzędzia `pulpit` (docs/PULPIT.md): Python systemu z Gdk i Pillow, ekran, XAUTHORITY i zamek
+    narzędzia (kto ostatnio na nim działał)."""
+
+    def __init__(self, *, python: str, ekran: str, xauthority: str | None, zamek: Path | None):
+        self.python, self.ekran, self.xauthority, self.zamek = python, ekran, xauthority, zamek
+
+    @classmethod
+    def z_otoczenia(cls, env: dict, root: Path | None) -> "Pulpit | None":
+        """Linux z ekranem X11: JARVO_PULPIT_DISPLAY albo DISPLAY albo :0 (gniazdo /tmp/.X11-unix/X0), Python
+        JARVO_PULPIT_PYTHON albo /usr/bin/python3; inaczej None (macOS, Windows, serwer bez pulpitu)."""
+        if not sys.platform.startswith("linux"):
+            return None
+        ekran = env.get("JARVO_PULPIT_DISPLAY") or env.get("DISPLAY") or (
+            ":0" if Path("/tmp/.X11-unix/X0").exists() else "")
+        python = env.get("JARVO_PULPIT_PYTHON") or "/usr/bin/python3"
+        if not ekran or not Path(python).is_file():
+            return None
+        xa = env.get("XAUTHORITY") or str(Path(env.get("HOME") or Path.home()) / ".Xauthority")
+        return cls(python=python, ekran=ekran, xauthority=xa if Path(xa).is_file() else None,
+                   zamek=Path(root) / "stan" / "pulpit" / "zamek.json" if root else None)
+
+    def env(self) -> dict:
+        """Środowisko pomocnika: tylko to, czego trzeba do ekranu (bez kluczy i zmiennych procesu panelu)."""
+        env = {k: v for k, v in os.environ.items() if k in ("PATH", "HOME", "LANG", "LC_ALL", "USER")}
+        env["DISPLAY"] = self.ekran
+        if self.xauthority:
+            env["XAUTHORITY"] = self.xauthority
+        return env
+
+    def zajety(self, teraz: float | None = None) -> str | None:
+        """Kto pracuje na pulpicie (`kto` z zamka narzędzia, działanie w OKNO_AGENTA s), inaczej None."""
+        if self.zamek is None:
+            return None
+        try:
+            z = json.loads(self.zamek.read_text(encoding="utf-8"))
+            czas = float(z.get("czas") or 0)
+        except (OSError, ValueError, TypeError, AttributeError):
+            return None
+        teraz = time.time() if teraz is None else teraz
+        return str(z.get("kto") or "agent")[:80] if 0 <= teraz - czas <= OKNO_AGENTA else None
+
+
+async def zrodlo_pulpitu(pulpit: Pulpit, *, klatki: float = KLATKI_PULPITU, maks: int = MAKS_PULPITU,
+                         jakosc: int = JAKOSC_PULPITU) -> AsyncIterator[tuple]:
+    """Pulpit: zrzut `klatki` razy na sekundę, ("jpeg", dane, opis) tylko przy zmianie obrazu; `tytul` = kto na
+    nim pracuje."""
+    yield ("stan", "laczy", "")
+    proc, ogon, czytnik = await _proces(pulpit.python, "-I", "-c", KOD_PULPITU, pulpit.ekran, str(klatki), str(maks),
+                                        str(jakosc), env=pulpit.env())
+    try:
+        async for ev in _klatki_procesu(proc, _NAGLOWEK_ZRZUTU,
+                                        lambda p: {"w_css": p[1], "h_css": p[2], "tytul": pulpit.zajety()},
+                                        ogon, czytnik, (3, 4)):
+            yield ev
+    finally:
+        czytnik.cancel()
+        if proc.returncode is None:
+            proc.kill()
 
 
 # ---------------------------------------------------------------------------------------------- całość
@@ -624,15 +851,17 @@ def _modul_z_pliku(nazwa: str, plik: Path):
 
 class Podglad:
     """Strumienie urządzeń procesu panelu. `telefony`: Telefony albo None (PhoneUse wyłączony); `komputer`:
-    blokujące zapytanie kanału `ster` albo None; `narzedzia()` → (adb, ścieżka scrcpy-server.jar) albo Niedostepny;
-    `zrodlo_telefonu(serial)` i `zrodlo_komputera()` podmieniają testy."""
+    blokujące zapytanie kanału `ster` albo None; `pulpit`: Pulpit albo None; `narzedzia()` → (adb, ścieżka
+    scrcpy-server.jar) albo Niedostepny; `zrodlo_telefonu(serial)`, `zrodlo_komp` i `zrodlo_pulp` podmieniają testy."""
 
     def __init__(self, *, telefony: Telefony | None = None, komputer: Callable[[dict], dict] | None = None,
                  narzedzia: Callable[[], tuple[str, Path]] | None = None, wygaszenie: float = WYGASZENIE,
                  log: Callable[[str], None] = _log_nic, zrodlo_telefonu: Callable[[str], AsyncIterator] | None = None,
-                 zrodlo_komp: Zrodlo | None = None, czujnik_ekranu: bool = True):
+                 zrodlo_komp: Zrodlo | None = None, czujnik_ekranu: bool = True, pulpit: Pulpit | None = None,
+                 zrodlo_pulp: Zrodlo | None = None):
         self.telefony, self.komputer, self.narzedzia, self.wygaszenie, self.log = telefony, komputer, narzedzia, wygaszenie, log
         self._zrodlo_telefonu, self._zrodlo_komp, self.czujnik_ekranu = zrodlo_telefonu, zrodlo_komp, czujnik_ekranu
+        self.pulpit, self._zrodlo_pulp = pulpit, zrodlo_pulp
         self.strumienie: dict[str, Strumien] = {}
         self.polaczenia: set[Widz] = set()
         self.agent: str | None = None
@@ -681,7 +910,7 @@ class Podglad:
                                      kanal.pid_uslugi(root_p), maks=32 << 20)
 
         return cls(telefony=Telefony.z_konfiguracji(root_p / "stan", env, log), komputer=komputer, narzedzia=narzedzia,
-                   log=log)
+                   log=log, pulpit=Pulpit.z_otoczenia(env, root_p))
 
     # -- urządzenia
     async def urzadzenia(self) -> dict:
@@ -694,6 +923,7 @@ class Podglad:
                 mapa = {}
             telefony = [{"id": n, "rodzaj": w.get("rodzaj") or "android"} for n, w in mapa.items()]
         return {"telefony": telefony, "komputer": self.komputer is not None or self._zrodlo_komp is not None,
+                "pulpit": self.pulpit is not None or self._zrodlo_pulp is not None,
                 "agent": self.agent, "przydzialy": self.telefony.przydzialy if self.telefony else {}}
 
     def _zrodlo(self, uid: str) -> Zrodlo:
@@ -707,6 +937,16 @@ class Podglad:
                     raise Niedostepny("Komputer Jarva nie działa w tej instalacji.")
                 return zrodlo_komputera(komputer)
             return zk
+        if uid == PULPIT:
+            if self._zrodlo_pulp is not None:
+                return self._zrodlo_pulp
+            pulpit = self.pulpit
+
+            def zp() -> AsyncIterator[tuple]:
+                if pulpit is None:
+                    raise Niedostepny("Ten komputer nie ma pulpitu X11 dla agentów (docs/PULPIT.md).")
+                return zrodlo_pulpitu(pulpit)
+            return zp
 
         async def zt() -> AsyncIterator[tuple]:
             yield ("stan", "laczy", "")
@@ -716,13 +956,22 @@ class Podglad:
                 return
             if self.telefony is None:
                 raise Niedostepny("Telefony przez PhoneUse są wyłączone (jarvo telefon on).")
-            if self.narzedzia is None:
-                raise Niedostepny("Podgląd telefonu działa w instalacji natywnej Jarva.")
             w = (await self.telefony.mapa()).get(uid)
-            if not w or not w.get("serial"):
-                raise Niedostepny(f"Telefon {uid} nie ma połączenia adb w PhoneUse.")
-            if self._narzedzia is None:
-                self._narzedzia = await asyncio.to_thread(self.narzedzia)
+            if not w:
+                raise Niedostepny(f"PhoneUse nie zna telefonu {uid}.")
+            dlaczego = ("iPhone nie daje obrazu przez adb" if w.get("rodzaj") == "ios"
+                        else "telefon nie ma połączenia adb w PhoneUse" if not w.get("serial")
+                        else "podgląd H.264 działa w instalacji natywnej Jarva" if self.narzedzia is None else "")
+            if not dlaczego and self._narzedzia is None:
+                try:
+                    self._narzedzia = await asyncio.to_thread(self.narzedzia)
+                except Niedostepny as e:
+                    dlaczego = str(e)
+            if dlaczego:                             # obraz ze zrzutów PhoneUse co kilka sekund
+                self.log(f"podgląd: {uid} zrzutami co {CO_ILE_ZRZUT_TELEFONU:g} s ({dlaczego})")
+                async for ev in zrodlo_zrzutow_telefonu(self.telefony, uid):
+                    yield ev
+                return
             adb, srv = self._narzedzia
             async for ev in zrodlo_scrcpy(adb, w["serial"], srv, log=self.log):
                 yield ev
@@ -743,7 +992,8 @@ class Podglad:
     def strumien(self, uid: str) -> Strumien:
         s = self.strumienie.get(uid)
         if s is None:
-            czujnik = self._czujnik_ekranu if uid != KOMPUTER and self.czujnik_ekranu and self.telefony else None
+            czujnik = self._czujnik_ekranu if uid not in (KOMPUTER, PULPIT) and self.czujnik_ekranu and self.telefony \
+                else None
             s = self.strumienie[uid] = Strumien(uid, self._zrodlo(uid), wygaszenie=self.wygaszenie, czujnik=czujnik,
                                                 log=self.log)
         return s
@@ -758,6 +1008,28 @@ class Podglad:
                     w.daj(tekst(typ="agent", agent=agent))
             await asyncio.sleep(CO_ILE_AGENT)
         self._agent_zadanie = None
+
+    # -- „Przejmij” Komputera: polecenia kanału `ster` z tokenem właściciela (sesja panelu już sprawdzona)
+    async def ster(self, d: dict) -> dict:
+        co = d.get("typ")
+        out: dict[str, Any] = {"typ": "ster", "co": co, "ok": False}
+        if self.komputer is None:
+            return {**out, "blad": "Komputer Jarva nie działa w tej instalacji."}
+        if co == "wejscie":
+            z = d.get("z")
+            if not isinstance(z, dict) or z.get("typ") not in DZIALANIA_WLASCICIELA:
+                return {**out, "blad": "nieznane działanie"}
+            polecenie = {"polecenie": "wejscie", "zdarzenie": z}
+        else:
+            polecenie = {"polecenie": "przejmij" if co == "przejmij" else "wznow"}
+        try:
+            odp = await asyncio.to_thread(self.komputer, polecenie)
+        except Exception as e:  # noqa: BLE001 - Komputer wyłączony, kanał przerwany: słowami dla właściciela
+            return {**out, "blad": str(e)[:200] or type(e).__name__}
+        out.update(ok=bool(odp.get("ok", True)), blad=odp.get("blad"))
+        if co != "wejscie":
+            out["przejete"] = bool(odp.get("przejete")) if out["ok"] else co != "przejmij"
+        return out
 
     # -- połączenie
     async def obsluz(self, ws, autoryzuj: Callable[[Any], bool]) -> None:
@@ -809,7 +1081,7 @@ class Podglad:
                     u = d.get("u")
                     if u is None:
                         u = self.agent or next(iter((await self.urzadzenia())["telefony"]), {}).get("id")
-                    if not isinstance(u, str) or not (u == KOMPUTER or NAZWA_TELEFONU.match(u)):
+                    if not isinstance(u, str) or not (u in (KOMPUTER, PULPIT) or NAZWA_TELEFONU.match(u)):
                         continue
                     if biezacy is not None:
                         biezacy.odlacz(widz)
@@ -817,6 +1089,13 @@ class Podglad:
                     widz.czeka_na_klucz = False
                     biezacy = self.strumien(u)
                     biezacy.dolacz(widz)
+                elif d.get("typ") == "stop":             # karta panelu schowana: strumień zgaśnie bez widzów
+                    if biezacy is not None:
+                        biezacy.odlacz(widz)
+                        biezacy = None
+                    widz.porzuc_zaleglosci()
+                elif d.get("typ") in ("przejmij", "oddaj", "wejscie"):
+                    widz.daj(tekst(**await self.ster(d)))
         except Exception as e:  # noqa: BLE001 - rozłączenie w trakcie wysyłki albo odbioru
             if type(e).__name__ not in ("WebSocketDisconnect", "ClientDisconnected"):
                 self.log(f"podgląd: połączenie przerwane ({type(e).__name__})")

@@ -417,6 +417,24 @@ def test_flagi_chrome_bez_webdriver_i_z_user_agentem(tmp_path):
     assert "AGENT_BROWSER_ARGS" not in AB.srodowisko(["--cdp", "9222"], {"JARVO_KOMPUTER_CHROME": str(chrome)})
 
 
+def test_flagi_chrome_w_tle_ekran_i_karta_graficzna(tmp_path, monkeypatch):
+    """Bez okna: ekran z paskiem zadań zamiast 800×600 i na Linuksie z kartą graficzną WebGL z karty (nie
+    SwiftShader); z --headed (albo AGENT_BROWSER_HEADED) bez tych flag."""
+    chrome = tmp_path / "chrome-komputer" / "158.0.8127.36" / "chrome-linux64" / "chrome"
+    chrome.parent.mkdir(parents=True)
+    chrome.write_bytes(b"x")
+    monkeypatch.setattr(AB, "gpu_linux", lambda: True)
+    flagi = AB.srodowisko([], {"JARVO_KOMPUTER_CHROME": str(chrome)})["AGENT_BROWSER_ARGS"]
+    assert "--screen-info={0,0 1920x1080 workAreaBottom=48}" in flagi and "availablePointerTypes=4" in flagi
+    assert ",--use-gl=angle,--use-angle=gl-egl," in flagi and "Chrome/158.0.0.0" in flagi
+    for globalne, env in (["--headed"], {}), ([], {"AGENT_BROWSER_HEADED": "1"}):
+        flagi = AB.srodowisko(globalne, {"JARVO_KOMPUTER_CHROME": str(chrome), **env})["AGENT_BROWSER_ARGS"]
+        assert "--screen-info" not in flagi and "--use-angle" not in flagi and "--blink-settings" not in flagi
+    monkeypatch.setattr(AB, "gpu_linux", lambda: False)
+    flagi = AB.srodowisko([], {"JARVO_KOMPUTER_CHROME": str(chrome)})["AGENT_BROWSER_ARGS"]
+    assert "--screen-info" in flagi and "--use-angle" not in flagi
+
+
 def test_profil_agenta_trwaly_dla_pierwszej_sesji_i_staly_w_sesji(tmp_path):
     env = {"HERMES_HOME": str(tmp_path)}
     profil = ["--profile", str(tmp_path / "przegladarka" / "profil")]

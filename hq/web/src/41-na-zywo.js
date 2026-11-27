@@ -1,13 +1,13 @@
 // Podgląd na żywo (docs/HQ.md „Podgląd na żywo”), część rdzenia: urządzenie z kroku agenta (narzędzia telefonów
-// PhoneUse z argumentem `phone`, computer_use i komputer), przycisk „Telefon second · Podgląd na żywo” w pasku pracy
-// i w kroku rozmowy, stan okna i jego miejsce w korzeniu aplikacji. Samo okno (WebSocket, dekoder H.264, stany) jest
-// w pakiecie na żądanie „podglad” (42-podglad.js), wczytywanym przy pierwszym otwarciu.
+// PhoneUse z argumentem `phone`, computer_use i komputer, pulpit), przycisk „Telefon second · Podgląd na żywo” w pasku
+// pracy i w kroku rozmowy, stan okna i jego miejsce w korzeniu aplikacji. Samo okno (WebSocket, dekoder H.264, stany,
+// dziennik działań, „Przejmij”) jest w pakiecie na żądanie „podglad” (42-podglad.js), wczytywanym przy pierwszym otwarciu.
 const NaZywo = (() => {
   const TELEFON = /^mcp__phone__?(act|batch|screen|shot|ping|wait)$/;
   const KOMPUTER = new Set(["computer_use", "komputer"]);
   const liczba = (v) => typeof v === "number" && isFinite(v);
-  // krok → { rodzaj: "telefon"|"komputer", u: nazwa telefonu albo "komputer" (null: telefon bez argumentu phone),
-  // punkt: {x, y} (stuknięcie albo kliknięcie, gdy jest), cmd } albo null dla innych narzędzi i komentarzy
+  // krok → { rodzaj: "telefon"|"komputer"|"pulpit", u: nazwa telefonu, "komputer" albo "pulpit" (null: telefon bez
+  // argumentu phone), punkt: {x, y} (stuknięcie albo kliknięcie, gdy jest), cmd } albo null dla innych narzędzi
   function urzadzenie(k) {
     if (!k || k.komentarz != null) return null;
     const n = k.narzedzie || "", a = k.args || {};
@@ -15,6 +15,7 @@ const NaZywo = (() => {
     const cmd = typeof a.cmd === "string" ? a.cmd : null;
     if (TELEFON.test(n)) return { rodzaj: "telefon", u: typeof a.phone === "string" && a.phone ? a.phone : null, punkt, cmd };
     if (KOMPUTER.has(n)) return { rodzaj: "komputer", u: "komputer", punkt, cmd };
+    if (n === "pulpit") return { rodzaj: "pulpit", u: "pulpit", punkt, cmd };
     return null;
   }
   // bieżące urządzenie agentów otwartej rozmowy `wid`: ostatni krok narzędzia każdego jej pracującego przebiegu,
@@ -53,7 +54,9 @@ function useNaZywo() {
   return s;
 }
 
-const nazwaUrzadzenia = (u) => (u === "komputer" ? T("podglad.komputer") : u ? T("podglad.telefon_n", { n: u }) : T("podglad.telefon"));
+const nazwaUrzadzenia = (u) => (u === "komputer" ? T("podglad.komputer") : u === "pulpit" ? T("podglad.pulpit")
+  : u ? T("podglad.telefon_n", { n: u }) : T("podglad.telefon"));
+const ikonaUrzadzenia = (u) => (u === "komputer" ? "globe" : u === "pulpit" ? "monitor" : "phone");
 
 // jeden stały przycisk (pasek pracy, pasek podagentów): ikona urządzenia, „Na żywo” i nazwa; drugi klik zamyka okno
 function PrzyciskNaZywo({ urz }) {
@@ -62,8 +65,8 @@ function PrzyciskNaZywo({ urz }) {
   const opis = `${nazwaUrzadzenia(urz.u)} · ${T("podglad.na_zywo")}`;
   return html`<button type="button" class="j-na-zywo" aria-pressed=${String(s.otwarte)} title=${opis} aria-label=${opis}
     onClick=${(e) => { e.stopPropagation(); if (s.otwarte) NaZywo.zamknij(); else NaZywo.otworz(urz.u); }}>
-    <${Ikona} n=${urz.u === "komputer" ? "globe" : "phone"} r=${15}/><span class="j-na-zywo-t">${L("Na żywo", "Live")}</span>
-    ${urz.u && urz.u !== "komputer" && html`<span class="j-na-zywo-u">${urz.u}</span>`}<span class="j-na-zywo-k" aria-hidden="true"></span></button>`;
+    <${Ikona} n=${ikonaUrzadzenia(urz.u)} r=${15}/><span class="j-na-zywo-t">${L("Na żywo", "Live")}</span>
+    ${urz.rodzaj === "telefon" && urz.u && html`<span class="j-na-zywo-u">${urz.u}</span>`}<span class="j-na-zywo-k" aria-hidden="true"></span></button>`;
 }
 
 // okno w korzeniu aplikacji, zawsze dla otwartej rozmowy: zmiana rozmowy zamyka je (24.11 właściciel: podgląd
@@ -86,5 +89,5 @@ function NaZywoOkno() {
     NaZywo.otworz(biezacy.u);
   }, [sam, biezacy, s.otwarte]);
   if (!s.otwarte) return null;
-  return html`<${Leniwy} pakiet="podglad" nazwa="PodgladOkno" stan=${s} biezacy=${biezacy}/>`;
+  return html`<${Leniwy} pakiet="podglad" nazwa="PodgladOkno" stan=${s} biezacy=${biezacy} wid=${wid}/>`;
 }

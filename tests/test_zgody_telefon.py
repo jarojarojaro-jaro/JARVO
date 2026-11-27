@@ -49,6 +49,13 @@ def test_mcp_przeskok_w_zadaniu_blokowany(straz):
     assert zablokowane(w) and "telefonie first" in w["message"]
 
 
+def test_przepis_telefonu_wiaze_jak_akcja(straz):
+    """`run_recipe` stuka i pisze jak `batch`, więc też wiąże zadanie z telefonem; `find` i `read_list` tylko czytają."""
+    assert hak("mcp__phone__run_recipe", phone="second", name="lista") is None
+    assert zablokowane(hak("mcp__phone__run_recipe", phone="third", name="lista"))
+    assert hak("mcp__phone__read_list", phone="third") is None
+
+
 def test_inne_zadanie_zaczyna_od_zera(straz, monkeypatch):
     assert hak("mcp__phone__act", phone="first", cmd="tap") is None
     assert hak("mcp__phone__act", sesja="s2", phone="third", cmd="tap") is None

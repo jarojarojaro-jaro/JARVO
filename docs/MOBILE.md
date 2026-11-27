@@ -129,7 +129,7 @@ i stuka, pisze, przewija. Jego serwer MCP `tools/phone_mcp.py` (stdio, MCP SDK `
 sprawdza serwer i import SDK (domyślny Python: `~/.phoneuse/mcp-venv`, zakłada go
 `python3 <katalog PHONEUSE>/tools/mcp_setup.py`), zapisuje `<stan>/telefon.json` i dopisuje serwer `phone`
 w zainstalowanych profilach: `jarvo` dostaje wszystkie narzędzia (`mcp__phone__list_phones`, `ping`, `screen`,
-`act`, `shot`, `wait`, `batch`) i sam obsługuje telefon. Serwer dostaje `ADB` z platform-tools `jarvo android` (jeden serwer adb jednej wersji)
+`act`, `shot`, `wait`, `batch`, `find`, `read_list`, `save_recipe`, `run_recipe`) i sam obsługuje telefon. Serwer dostaje `ADB` z platform-tools `jarvo android` (jeden serwer adb jednej wersji)
 i `PHONEUSE_PHONE` z `--telefon`, a także `HOME` (Windows: `USERPROFILE`) właściciela zapisany przy `on`: PHONEUSE czyta
 `~/.phoneuse/` przez katalog domowy, a pracownik karty kanbana ma `HOME=<dane>/home`. Potem restart bramy przez nadzorcę, ale tylko gdy żadna karta kanbana nie jest
 w toku; inaczej zmiana działa po następnym restarcie bramy (`jarvo serwis --restart brama`) albo `jarvo update`.

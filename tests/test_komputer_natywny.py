@@ -167,8 +167,8 @@ class Sterownik:
         self.czasy_fokusu.append(time.monotonic())
         return self.fokus_pola
 
-    def podglad(self, po=None, czekaj=1.0, jakosc=None, maks=None):
-        self.podglady.append((po, czekaj, jakosc, maks))
+    def podglad(self, po=None, czekaj=1.0, jakosc=None, maks=None, klatki=None):
+        self.podglady.append((po, czekaj, jakosc, maks, klatki))
         if po == 7:
             return {"nr": 7, "okno": 3, "bez_zmian": True, "aktywne": 3}
         return {"nr": 7, "okno": 3, "typ": "image/jpeg", "dane": "/9j/AA==", "szer_css": 1440, "wys_css": 900,
@@ -401,10 +401,10 @@ def test_ekran_hq_klatka_przejmij_i_wejscie_tylko_wlasciciel(usluga):
         odp = kanal.zapytaj(adres, {"polecenie": co})
         assert odp["ok"] is False and "właściciel" in odp["blad"]
     assert not usluga.sterownik.podglady and not usluga.sterownik.wlasciciel
-    odp = kanal.zapytaj(adres, {"polecenie": "klatka", "token": usluga.token, "po": 3, "czekaj": 0.2},
+    odp = kanal.zapytaj(adres, {"polecenie": "klatka", "token": usluga.token, "po": 3, "czekaj": 0.2, "klatki": 3},
                         maks=16 << 20)
     assert odp["ok"] and odp["klatka"]["typ"] == "image/jpeg" and odp["przejete"] is False
-    assert usluga.sterownik.podglady[-1][:2] == (3, 0.2)
+    assert usluga.sterownik.podglady[-1][:2] == (3, 0.2) and usluga.sterownik.podglady[-1][4] == 3
     assert kanal.zapytaj(adres, {"polecenie": "klatka", "token": usluga.token, "po": 7})["klatka"]["bez_zmian"]
     klik = {"typ": "klik", "x": 0.5, "y": 0.5}
     odp = kanal.zapytaj(adres, {"polecenie": "wejscie", "token": usluga.token, "zdarzenie": klik})

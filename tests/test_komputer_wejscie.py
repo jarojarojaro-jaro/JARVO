@@ -549,7 +549,7 @@ def test_wtyczka_jarva_przez_ster(komputer, monkeypatch):
     assert klucz.startswith(f"p{os.getpid()}-") and wejscie.WZOR_GRUPY.match(klucz) and pl.grupa_ekranu() == klucz
     assert [n["name"] for n in narzedzia] == ["komputer"] and narzedzia[0]["toolset"] == "komputer"
     assert narzedzia[0]["schema"]["parameters"]["properties"]["akcja"]["enum"] == [
-        "stan", "dziennik", "oddaj", "idz", "patrz", "kroki", "czekaj"]
+        "stan", "dziennik", "oddaj", "idz", "patrz", "kroki", "czekaj", "sciezki", "zapisz_sciezke", "odtworz"]
     obsluz = narzedzia[0]["handler"]
     stan = json.loads(obsluz({"akcja": "stan"}))
     assert stan["ok"] and stan["dziala"] and not stan["wstrzymane"] and "pauza" not in stan

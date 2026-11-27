@@ -1,0 +1,22 @@
+<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Ogłoszenia testowe Jarvo</title>
+<style>body{font:16px sans-serif;margin:24px}label{display:block;margin:8px 0}
+#zgoda{position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.4);display:none}
+#zgoda div{position:absolute;left:0;right:0;bottom:0;background:#ffd;padding:16px}</style></head><body>
+<!-- ścieżki Komputera (komputer/plugin/sciezki.py): wyszukanie z filtrem ceny jak na OLX; zgoda zapamiętana w
+     localStorage (drugi raz baneru nie ma), localStorage.wersja = '2' zmienia przycisk wyszukania (samonaprawa) -->
+<h1>Ogłoszenia</h1>
+<form action="wyniki.html" method="get">
+<label>Czego szukasz? <input name="q"></label>
+<label>Cena od <input name="od" inputmode="numeric"></label>
+<label>Cena do <input name="do" inputmode="numeric"></label>
+<button type="submit" id="szukaj">Szukaj</button>
+</form>
+<div id="zgoda" role="dialog" aria-modal="true" aria-label="Zgoda na ciasteczka"><div>
+<p>Ta strona używa ciasteczek.</p>
+<button type="button" onclick="localStorage.zgoda = '1'; document.getElementById('zgoda').style.display = 'none'">Akceptuję</button>
+</div></div>
+<script>
+if (localStorage.zgoda !== '1') document.getElementById('zgoda').style.display = 'block';
+if (localStorage.wersja === '2') document.getElementById('szukaj').textContent = 'Pokaż ogłoszenia';
+</script>
+</body></html>

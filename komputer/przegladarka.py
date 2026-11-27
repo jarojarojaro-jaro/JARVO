@@ -33,6 +33,9 @@ EKRAN = (1440, 900)
 NARZEDZIE = "chrome-komputer"                       # wpis manifestu (vendor/natywne.yaml, kiedy: przy-uzyciu)
 ZMIENNA_PROGRAMU = "JARVO_KOMPUTER_CHROME"          # env wpisu manifestu: ścieżka programu w katalogu narzędzia
 ZMIENNA_PROBY = "JARVO_KOMPUTER_CHROME_PROBA"       # tylko próby i testy: inna przeglądarka (np. chrome-headless-shell)
+# przeglądarka w tle bez okna nie ma myszy: wskaźnik precyzyjny z najeżdżaniem jak na komputerze (typy Blinka: fine=4,
+# hover=2), bo (any-pointer: none) przy desktopowym user-agencie to cecha trybu bez okna
+MYSZ_W_TLE = "primaryPointerType=4,availablePointerTypes=4,primaryHoverType=2,availableHoverTypes=2"
 
 # Rozszerzenia plików, których Komputer nie zapisuje (programy, skrypty, instalatory, obrazy dysków, skróty).
 WYKONYWALNE = frozenset("""
@@ -78,10 +81,12 @@ def x64_w_emulacji(program: str | Path, maszyna: str = "") -> bool:
 
 
 def flagi(*, profil: Path, port_proxy: int | None, okno: bool, ekran: tuple[int, int] = EKRAN,
-          bez_piaskownicy: bool = False, jezyk: str = "pl", emulacja: bool = False) -> list[str]:
+          bez_piaskownicy: bool = False, jezyk: str = "pl", emulacja: bool = False,
+          program: str | Path | None = None) -> list[str]:
     """Argumenty startu przeglądarki Jarva (bez --remote-debugging-pipe, który dokłada cdp.Przegladarka).
     `emulacja`: przeglądarka x64 w emulacji (Windows arm64): bez GPU i bez SwiftShadera, którego JIT x64 w emulacji
-    potrafi zatrzymać renderer nowej karty na dziesiątki sekund (CI natywnie, WARM: Page.enable bez odpowiedzi)."""
+    potrafi zatrzymać renderer nowej karty na dziesiątki sekund (CI natywnie, WARM: Page.enable bez odpowiedzi).
+    `program`: ścieżka przeglądarki z wersją w katalogu manifestu, z niej user-agent w tle (user_agent)."""
     f = [f"--user-data-dir={profil}", "--site-per-process", "--no-first-run", "--no-default-browser-check",
          "--disable-sync",
          "--disable-extensions", "--disable-component-extensions-with-background-pages", "--disable-default-apps",
@@ -102,7 +107,18 @@ def flagi(*, profil: Path, port_proxy: int | None, okno: bool, ekran: tuple[int,
     if port_proxy:
         f += [f"--proxy-server=http://127.0.0.1:{int(port_proxy)}", "--proxy-bypass-list=<-loopback>"]
     if not okno:
-        f += ["--headless=new", "--mute-audio"]
+        # ekran przeglądarki w tle: bez tego 800×600 przy oknie 1440×900 i bez paska zadań (avail = cały ekran), a do
+        # tego bez myszy ((any-pointer: none), (hover: none)); po tych cechach CreepJS i antyboty rozpoznają tryb bez okna
+        szer, wys = max(1920, ekran[0]), max(1080, ekran[1] + 48)
+        f += ["--headless=new", "--mute-audio", f"--screen-info={{0,0 {szer}x{wys} workAreaBottom=48}}",
+              "--blink-settings=" + MYSZ_W_TLE]
+        if LINUX and not emulacja and gpu_linux():
+            # WebGL na karcie graficznej (ANGLE przez EGL bez ekranu) zamiast SwiftShadera, którego nazwę w WebGL
+            # antyboty czytają jako tryb bez okna; bez urządzenia renderD* zostaje SwiftShader (VPS, CI)
+            f += ["--use-gl=angle", "--use-angle=gl-egl"]
+        ua = user_agent(program)
+        if ua:
+            f.append(f"--user-agent={ua}")
     if emulacja:
         # bez GPU i SwiftShadera, a każda karta we własnym procesie renderera: przy małej pamięci Chrome upycha karty
         # tej samej strony w jednym procesie, a drugi widget w emulacji kończył się błędami mojo (Z42)
@@ -115,6 +131,27 @@ def flagi(*, profil: Path, port_proxy: int | None, okno: bool, ekran: tuple[int,
         f.append("--no-sandbox")                     # Linux bez przestrzeni nazw użytkownika (I41): ostrzeżenie w status
     f.append("about:blank")
     return f
+
+
+def user_agent(program: str | Path | None) -> str | None:
+    """User-agent jak Chrome z oknem tej samej wersji (z katalogu manifestu, np. …/158.0.8127.36/…) dla przeglądarki
+    w tle, która przedstawia się „HeadlessChrome”. Flagą, bo nadpisanie przez CDP (sterownik_cdp, karty z markami
+    i pełną wersją) nie sięga do service workerów: CreepJS czytał w nich „HeadlessChrome” (pomiar 27.11)."""
+    wersja = re.search(r"[/\\](\d+)\.\d+\.\d+\.\d+[/\\]", str(program or ""))
+    if not wersja:
+        return None
+    system = ("Windows NT 10.0; Win64; x64" if WINDOWS else "Macintosh; Intel Mac OS X 10_15_7" if MACOS
+              else "X11; Linux x86_64")
+    return (f"Mozilla/5.0 ({system}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{wersja.group(1)}.0.0.0 "
+            "Safari/537.36")
+
+
+def gpu_linux() -> bool:
+    """Linux: karta graficzna dostępna dla tego użytkownika (/dev/dri/renderD*, odczyt i zapis)."""
+    try:
+        return any(os.access(p, os.R_OK | os.W_OK) for p in Path("/dev/dri").glob("renderD*"))
+    except OSError:
+        return False
 
 
 def brak_piaskownicy(log: Path) -> bool:

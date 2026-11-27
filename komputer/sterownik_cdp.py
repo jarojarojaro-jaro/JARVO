@@ -64,9 +64,11 @@ from __future__ import annotations
 import base64
 import fnmatch
 import json
+import math
 import mimetypes
 import os
 import platform
+import random
 import re
 import secrets
 import struct
@@ -117,9 +119,16 @@ MAKS_RAMEK = 20
 MAKS_MIGAWEK = 32
 MAKS_NAPIS = 300
 CZAS_WEJSCIA = 10.0
+CZAS_RUCHU = 0.3                   # s: ruch kursora drogi bez potwierdzenia w tym czasie kończy drogę (_najedz)
 CZAS_FOKUSU = 10.0                 # s: tyle ważna jest ocena pola z fokusem przez zasady (sprawdzenie przy pisaniu)
 PODGLAD_JAKOSC = 60                # JPEG klatek podglądu
 PODGLAD_MAKS = 1280                # px dłuższego boku klatki podglądu
+PODGLAD_KLATKI = 3                 # kl./s podglądu (potwierdzenie klatki po odstępie); pytający może chcieć 1 do 15
+PODGLAD_KLATKI_MAKS = 15
+# Screencast ruchomej strony kosztuje ok. 0,7 rdzenia przy każdym limicie klatek (pomiar 27.11: 1 kl./s tyle co 4),
+# a zrzut co 1/klatki s ok. 0,05 do 0,08 rdzenia na klatkę/s; spokojna strona w screencaście nie kosztuje nic. Dlatego:
+PODGLAD_RUCH = 2.0                 # s klatek screencastu bez przerwy = strona się rusza: zrzuty zamiast screencastu
+PODGLAD_SPOKOJ = 3.0               # s jednakowych zrzutów = strona stoi: z powrotem screencast
 PODNIESIENIA = 3                   # ponownych wczytań padniętej karty na minutę (potem zostaje martwa z wpisem w dzienniku)
 PODGLAD_BEZCZYNNOSC = 20.0         # s bez pytania o klatkę: screencast staje (nie zużywa procesora bez widza)
 PUSTE_ADRESY = ("", "about:blank")  # karta bez strony: nie ma czego parkować
@@ -215,6 +224,7 @@ UPRAWNIENIA_ODMOWA = ("geolocation", "notifications", "camera", "microphone", "c
                       "accelerometer", "gyroscope", "magnetometer", "ambient-light-sensor", "background-sync",
                       "payment-handler", "nfc", "screen-wake-lock", "storage-access", "keyboard-lock",
                       "pointer-lock", "captured-surface-control", "speaker-selection")
+_LOS = random.Random()             # droga i odstępy kursora (droga_myszy)
 
 # JavaScript w odizolowanym świecie (strona go nie widzi ani nie podmieni). Opis elementu dla zasad.
 JS_OPIS = """function(){
@@ -330,6 +340,46 @@ def rola_zasad(rola_cdp: str, typ: str = "") -> str:
     return ROLE.get(r, r)
 
 
+def marki_chromium(pelna: str) -> tuple[list[dict], list[dict]]:
+    """(brands, fullVersionList) navigator.userAgentData tak, jak liczy je Chromium bez marki Google Chrome (Chrome
+    for Testing): marka-zmyłka (GREASE) i jej wersja z wersji głównej, kolejność z jej parzystości
+    (components/embedder_support/user_agent_utils.cc; sprawdzone na CfT 157 i 158 w tle bez nadpisania)."""
+    glowna = int(pelna.split(".")[0] or 0)
+    znaki = (" ", "(", ":", "-", ".", "/", ")", ";", "=", "?", "_")
+    zmylka, wersja = f"Not{znaki[glowna % 11]}A{znaki[(glowna + 1) % 11]}Brand", ("8", "99", "24")[glowna % 3]
+    kolej = [(zmylka, wersja, wersja + ".0.0.0"), ("Chromium", str(glowna), pelna)]
+    if glowna % 2:
+        kolej.reverse()
+    return [{"brand": m, "version": w} for m, w, _ in kolej], [{"brand": m, "version": p} for m, _, p in kolej]
+
+
+def droga_myszy(a: tuple[float, float], b: tuple[float, float],
+                los: random.Random = _LOS) -> list[tuple[float, float, float]]:
+    """Ruch kursora z punktu a do b jak ręką: łuk (krzywa Béziera z punktem kontrolnym z boku prostej), ruszanie
+    i hamowanie (smoothstep), drżenie poniżej piksela poza celem, razem 0,12 do 0,37 s; ostatni punkt to dokładnie b.
+    Lista (x, y, przerwa w s przed zdarzeniem). Bez tej drogi kursor skakał wprost na element i wciskał po 3 ms,
+    a z takiego wejścia antyboty (Turnstile, DataDome) poznają automat mimo zdarzeń z isTrusted."""
+    (x0, y0), (x1, y1) = a, b
+    d = math.hypot(x1 - x0, y1 - y0)
+    if d < 2:
+        return [(x1, y1, 0.0)]
+    n = max(6, min(18, int(d / 60) + 6))
+    bok = los.uniform(-0.25, 0.25) * min(d, 400)
+    kx, ky = (x0 + x1) / 2 - (y1 - y0) / d * bok, (y0 + y1) / 2 + (x1 - x0) / d * bok
+    czas = 0.12 + min(d, 1200) / 1200 * 0.25
+    droga = []
+    for i in range(1, n + 1):
+        t = i / n
+        s = t * t * (3 - 2 * t)
+        x = (1 - s) ** 2 * x0 + 2 * (1 - s) * s * kx + s * s * x1
+        y = (1 - s) ** 2 * y0 + 2 * (1 - s) * s * ky + s * s * y1
+        if i < n:
+            x, y = x + los.uniform(-0.8, 0.8), y + los.uniform(-0.8, 0.8)
+        droga.append((round(x, 1), round(y, 1), czas / n * los.uniform(0.8, 1.2)))
+    droga[-1] = (x1, y1, droga[-1][2])
+    return droga
+
+
 class Okno:
     """Karta przeglądarki (cel CDP typu page)."""
 
@@ -357,6 +407,7 @@ class Okno:
         self.byly = None                            # ostatni właściciel: po zwolnieniu wraca do tej samej karty
         self.zwolniona = 0.0                        # chwila zwolnienia (zamykamy najstarsze wolne)
         self.okno_przegl: int | None = None         # okno przeglądarki z tą kartą (Browser.getWindowForTarget)
+        self.mysz: tuple[float, float] | None = None  # ostatnie położenie kursora w karcie (droga_myszy)
 
 
 class Sterownik:
@@ -388,9 +439,14 @@ class Sterownik:
         self._nowe_okno = threading.Condition(self._lock)
         self._zawracane: set[str | None] = set()    # sesje, które _zawroc właśnie cofa na pustą stronę
         self.ua: str | None = None
-        # podgląd (Page.startScreencast): karta, ostatnia klatka i jej numer, czas ostatniego pytania
+        self.produkt = ""                           # Browser.getVersion: nazwa i pełna wersja przeglądarki
+        # podgląd (Page.startScreencast): karta, ostatnia klatka i jej numer, czas ostatniego pytania, limit klatek
+        # na sekundę, chwila ostatniego potwierdzenia klatki (monotonic), tryb (screencast albo zrzuty ruchomej
+        # strony), czasy ostatnich klatek screencastu, ostatni zrzut, jego chwila i chwila ostatniej zmiany obrazu
         self._podglad: dict[str, Any] = {"okno": None, "klatka": None, "nr": 0, "pytanie": 0.0,
-                                         "jakosc": PODGLAD_JAKOSC, "maks": PODGLAD_MAKS}
+                                         "jakosc": PODGLAD_JAKOSC, "maks": PODGLAD_MAKS, "klatki": PODGLAD_KLATKI,
+                                         "potwierdzenie": 0.0, "tryb": "screencast", "ruch": [], "zrzut": None,
+                                         "zrzut_czas": 0.0, "spokoj": 0.0}
         self._podglad_zmiana = threading.Condition()
 
     # ------------------------------------------------------------------ przygotowanie
@@ -423,19 +479,20 @@ class Sterownik:
 
     def _ua_bez_headless(self) -> dict:
         """User-agent przeglądarki w tle bez „HeadlessChrome” razem z podpowiedziami klienta (navigator.userAgentData,
-        nagłówki Sec-CH-UA): sama zmiana napisu zostawiała pustą listę marek, a to tak samo zdradza automat."""
+        nagłówki Sec-CH-UA): sama zmiana napisu zostawiała pustą listę marek, a to tak samo zdradza automat. Marki
+        jak w tej wersji przeglądarki z oknem (marki_chromium), a nie stała lista sprzed wersji."""
         ua = self.ua.replace("HeadlessChrome", "Chrome")
         wersja = re.search(r"Chrome/([\d.]+)", self.produkt or ua)
         pelna = wersja.group(1) if wersja else "0.0.0.0"
         system = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
-        marki = [{"brand": "Chromium", "version": pelna.split(".")[0]}, {"brand": "Not-A.Brand", "version": "99"}]
-        pelne = [{"brand": "Chromium", "version": pelna}, {"brand": "Not-A.Brand", "version": "99.0.0.0"}]
+        marki, pelne = marki_chromium(pelna)
         arm = platform.machine().lower() in ("arm64", "aarch64")
         return {"userAgent": ua, "acceptLanguage": "pl-PL,pl,en-US,en",
                 "platform": {"Windows": "Win32", "macOS": "MacIntel"}.get(system, "Linux x86_64"),
                 "userAgentMetadata": {"brands": marki, "fullVersionList": pelne, "fullVersion": pelna,
                                       "platform": system, "platformVersion": "", "architecture": "arm" if arm else "x86",
-                                      "model": "", "mobile": False, "bitness": "64", "wow64": False}}
+                                      "model": "", "mobile": False, "bitness": "64", "wow64": False,
+                                      "formFactors": ["Desktop"]}}
 
     def _przygotuj_cel(self, sesja: str, info: dict, rodzic: str | None) -> None:
         """Nowy cel (karta, ramka z innego procesu): Fetch, Page, Accessibility, automatyczne podpinanie ramek
@@ -450,7 +507,10 @@ class Sterownik:
                      ("Page.setInterceptFileChooserDialog", {"enabled": self.w_tle}),
                      ("Accessibility.enable", {}),
                      ("Target.setAutoAttach", {"autoAttach": True, "waitForDebuggerOnStart": True, "flatten": True})]
-        if typ == "page" and self.ua and "HeadlessChrome" in self.ua:
+        # w tle: user-agent z flagi startu (przegladarka.user_agent) nie ma już „HeadlessChrome”, ale bez nadpisania
+        # karta nie ma pełnej wersji w podpowiedziach klienta (fullVersionList pusta, rebrowser: „Cannot detect”);
+        # ramka z innego procesu (Turnstile) musi mówić to samo co karta, inaczej Cloudflare odrzuca weryfikację
+        if typ in ("page", "iframe") and (self.w_tle or "HeadlessChrome" in f"{self.produkt} {self.ua}"):
             polecenia.append(("Emulation.setUserAgentOverride", self._ua_bez_headless()))
         polecenia.append(("Runtime.runIfWaitingForDebugger", {}))
         oczekiwania = []
@@ -1927,19 +1987,22 @@ class Sterownik:
 
     # ------------------------------------------------------------------ wejście: mysz i klawiatura
 
-    def _wejscie(self, okno: Okno, metoda: str, params: dict) -> None:
-        """Zdarzenie wejścia; nie czeka bez końca, gdy kliknięcie otworzyło okno JavaScript albo wybór pliku."""
+    def _wejscie(self, okno: Okno, metoda: str, params: dict, limit: float | None = None) -> bool:
+        """Zdarzenie wejścia; nie czeka bez końca, gdy kliknięcie otworzyło okno JavaScript albo wybór pliku.
+        `limit`: czekanie na potwierdzenie najwyżej tyle s, potem False zamiast błędu (zdarzenie i tak idzie)."""
         o = self.b.nadaj(metoda, params, okno.sesja)
-        koniec = time.monotonic() + CZAS_WEJSCIA
+        koniec = time.monotonic() + (CZAS_WEJSCIA if limit is None else limit)
         while time.monotonic() < koniec:
-            if o.gotowe(0.05):
+            if o.gotowe(0.05 if limit is None else min(0.05, limit)):
                 try:
                     o.wynik(1)
                 except cdp.BladCDP as e:
                     raise BladSterownika("wejscie", f"przeglądarka odrzuciła zdarzenie: {e.tekst[:100]}") from None
-                return
+                return True
             if okno.dialog or okno.wybor_pliku:
-                return
+                return True
+        if limit is not None:
+            return False
         raise BladSterownika("wejscie", "przeglądarka nie potwierdziła zdarzenia wejścia")
 
     @staticmethod
@@ -1949,11 +2012,42 @@ class Sterownik:
             maska |= MODYFIKATORY.get(str(m).strip().lower(), (0,))[0]
         return maska
 
+    def _najedz(self, okno: Okno, x: float, y: float, mody: int = 0, wcisniety: bool = False) -> None:
+        """Kursor do (x, y) drogą ręki (droga_myszy) od ostatniego położenia w tej karcie (pierwszy raz: z losowego
+        miejsca środka strony); `wcisniety`: z wciśniętym lewym przyciskiem (przeciąganie). Ruch bez potwierdzenia
+        w CZAS_RUCHU s (okno przykryte innym oknem na pulpicie: pierwsze zdarzenie czeka ok. 5 s) kończy drogę:
+        kursor od razu na cel bez czekania, a resztę czekania bierze wciśnięcie, jak przed drogą kursora."""
+        sz, wy = okno.rozmiar
+        start = okno.mysz or (sz * _LOS.uniform(0.3, 0.7), wy * _LOS.uniform(0.3, 0.7))
+        droga = droga_myszy(start, (x, y))
+        for i, (px, py, przerwa) in enumerate(droga):
+            if i < len(droga) - 1:                     # łuk przy krawędzi nie wychodzi poza stronę; cel bez zmian
+                px, py = min(max(px, 0.0), sz - 1.0), min(max(py, 0.0), wy - 1.0)
+            time.sleep(przerwa)
+            params = {"type": "mouseMoved", "x": px, "y": py, "modifiers": mody}
+            if wcisniety:
+                params.update(button="left", buttons=1)
+            potwierdzony = self._wejscie(okno, "Input.dispatchMouseEvent", params, limit=CZAS_RUCHU)
+            okno.mysz = (px, py)
+            if okno.dialog:
+                return
+            if not potwierdzony:
+                if (px, py) != (x, y):
+                    self.b.nadaj("Input.dispatchMouseEvent", {**params, "x": x, "y": y}, okno.sesja)
+                    okno.mysz = (x, y)
+                return
+
     def _mysz(self, okno: Okno, x: float, y: float, przycisk: str = "left", klikniecia: int = 1, mody: int = 0) -> None:
+        """Kliknięcie jak ręką: dojazd kursora (_najedz), chwila nad celem, wciśnięcie przytrzymane 50 do 110 ms."""
         przyciski = {"left": 1, "right": 2, "middle": 4}
-        self._wejscie(okno, "Input.dispatchMouseEvent", {"type": "mouseMoved", "x": x, "y": y, "modifiers": mody})
+        self._najedz(okno, x, y, mody)
+        if okno.dialog:
+            return
         for n in range(1, klikniecia + 1):
+            time.sleep(_LOS.uniform(0.04, 0.09) if n == 1 else _LOS.uniform(0.05, 0.1))
             for typ in ("mousePressed", "mouseReleased"):
+                if typ == "mouseReleased":
+                    time.sleep(_LOS.uniform(0.05, 0.11))
                 self._wejscie(okno, "Input.dispatchMouseEvent", {
                     "type": typ, "x": x, "y": y, "button": przycisk, "clickCount": n, "modifiers": mody,
                     "buttons": przyciski.get(przycisk, 1) if typ == "mousePressed" else 0})
@@ -2239,13 +2333,12 @@ class Sterownik:
         self._przewiniecie_stanu(okno)
         mody = self._mody(args.get("modifier"))
         okno.pasek = None
-        self._wejscie(okno, "Input.dispatchMouseEvent", {"type": "mouseMoved", "x": a[0], "y": a[1], "modifiers": mody})
+        self._najedz(okno, a[0], a[1], mody)
+        time.sleep(_LOS.uniform(0.04, 0.09))
         self._wejscie(okno, "Input.dispatchMouseEvent", {"type": "mousePressed", "x": a[0], "y": a[1], "button": "left",
                                                          "buttons": 1, "clickCount": 1, "modifiers": mody})
-        for i in range(1, 6):
-            self._wejscie(okno, "Input.dispatchMouseEvent", {
-                "type": "mouseMoved", "x": a[0] + (b[0] - a[0]) * i / 5, "y": a[1] + (b[1] - a[1]) * i / 5,
-                "button": "left", "buttons": 1, "modifiers": mody})
+        self._najedz(okno, b[0], b[1], mody, wcisniety=True)
+        time.sleep(_LOS.uniform(0.04, 0.09))
         self._wejscie(okno, "Input.dispatchMouseEvent", {"type": "mouseReleased", "x": b[0], "y": b[1],
                                                          "button": "left", "buttons": 0, "clickCount": 1,
                                                          "modifiers": mody})
@@ -2265,6 +2358,7 @@ class Sterownik:
             ile = 3
         kierunek = str(args.get("direction") or "down").lower()
         dx, dy = {"down": (0, 1), "up": (0, -1), "right": (1, 0), "left": (-1, 0)}.get(kierunek, (0, 1))
+        self._najedz(okno, x, y)
         self._wejscie(okno, "Input.dispatchMouseEvent", {"type": "mouseWheel", "x": x, "y": y,
                                                          "deltaX": dx * ile * 100, "deltaY": dy * ile * 100,
                                                          "modifiers": self._mody(args.get("modifier"))})
@@ -2497,29 +2591,55 @@ class Sterownik:
     # ------------------------------------------------------------------ podgląd dla HQ (J10)
 
     def _klatka(self, p: dict, sesja: str | None) -> None:
-        """Klatka Page.startScreencast: potwierdzenie od razu (bez niego przeglądarka nie wyśle następnej)
-        i zapamiętanie ostatniej klatki karty, którą pokazuje podgląd."""
-        try:
-            self.b.nadaj("Page.screencastFrameAck", {"sessionId": p.get("sessionId")}, sesja)
-        except cdp.BladCDP:
-            pass
+        """Klatka Page.startScreencast: zapamiętanie ostatniej klatki karty, którą pokazuje podgląd, i potwierdzenie.
+        Przeglądarka nie wyśle następnej klatki bez potwierdzenia, więc potwierdzenie najwcześniej 1/klatki s po
+        poprzednim to limit klatek. Klatki bez przerwy przez PODGLAD_RUCH s (strona się rusza): screencast staje,
+        a podgląd bierze zrzuty (`_zrzuty_podgladu`). Wątek zdarzeń CDP: tu tylko `nadaj`, nigdy `wyslij`."""
         okno = self._okno_sesji(sesja)
-        if okno is None or okno.sesja != sesja or not p.get("data"):
-            return
         meta = p.get("metadata") or {}
+        ruch = False
         with self._podglad_zmiana:
-            if self._podglad["okno"] != okno.nr:
+            if self._podglad["tryb"] == "zrzuty":     # klatka spóźniona po Page.stopScreencast: bez potwierdzenia
                 return
-            self._podglad["nr"] += 1
-            self._podglad["klatka"] = {"nr": self._podglad["nr"], "okno": okno.nr, "typ": "image/jpeg",
-                                       "dane": p["data"], "szer_css": meta.get("deviceWidth"),
-                                       "wys_css": meta.get("deviceHeight"), "czas": round(time.time(), 3)}
-            self._podglad_zmiana.notify_all()
+            teraz = time.monotonic()
+            if okno is not None and okno.sesja == sesja and p.get("data") and self._podglad["okno"] == okno.nr:
+                self._podglad["nr"] += 1
+                self._podglad["klatka"] = {"nr": self._podglad["nr"], "okno": okno.nr, "typ": "image/jpeg",
+                                           "dane": p["data"], "szer_css": meta.get("deviceWidth"),
+                                           "wys_css": meta.get("deviceHeight"), "czas": round(time.time(), 3)}
+                czasy = self._podglad["ruch"] = [t for t in self._podglad["ruch"] if teraz - t < PODGLAD_RUCH] + [teraz]
+                if self._podglad["tryb"] == "screencast" and len(czasy) >= PODGLAD_RUCH * self._podglad["klatki"] - 1:
+                    self._podglad.update(tryb="zrzuty", ruch=[], zrzut=None, spokoj=teraz, zrzut_czas=teraz)
+                    ruch = True
+                self._podglad_zmiana.notify_all()
+            kiedy = max(teraz, self._podglad["potwierdzenie"] + 1.0 / self._podglad["klatki"])
+            if not ruch:
+                self._podglad["potwierdzenie"] = kiedy
+        if ruch:
+            try:
+                self.b.nadaj("Page.stopScreencast", {}, sesja)
+            except cdp.BladCDP:
+                pass
+            return
+
+        def potwierdz() -> None:
+            try:
+                self.b.nadaj("Page.screencastFrameAck", {"sessionId": p.get("sessionId")}, sesja)
+            except cdp.BladCDP:
+                pass
+        if kiedy - teraz <= 0.005:
+            potwierdz()
+        else:
+            t = threading.Timer(kiedy - teraz, potwierdz)
+            t.daemon = True
+            t.start()
 
     def _wlacz_podglad(self, okno: Okno) -> None:
         with self._podglad_zmiana:
             stare = self._podglad["okno"]
-            self._podglad.update(okno=okno.nr, klatka=None)
+            self._podglad.update(okno=okno.nr, tryb="screencast", ruch=[], zrzut=None)
+            if stare != okno.nr:
+                self._podglad["klatka"] = None
             jakosc, maks = self._podglad["jakosc"], self._podglad["maks"]
         poprzednie = self.okno(stare) if stare is not None else None
         if poprzednie is not None and poprzednie.nr != okno.nr:
@@ -2530,9 +2650,52 @@ class Sterownik:
         self.b.wyslij("Page.startScreencast", {"format": "jpeg", "quality": jakosc, "maxWidth": maks,
                                                "maxHeight": maks, "everyNthFrame": 1}, okno.sesja, czas=5)
 
+    def _zrzuty_podgladu(self, okno: Okno, koniec: float) -> bool:
+        """Ruchoma strona (tryb `zrzuty`): zrzut co 1/klatki s do `koniec`, nowa klatka tylko przy zmianie obrazu;
+        PODGLAD_SPOKOJ s jednakowych zrzutów przywraca screencast (spokojna strona nic nie kosztuje). True = nowa
+        klatka w `_podglad`."""
+        while True:
+            with self._podglad_zmiana:
+                if self._podglad["tryb"] != "zrzuty" or self._podglad["okno"] != okno.nr:
+                    return False
+                teraz = time.monotonic()
+                kiedy = max(teraz, self._podglad["zrzut_czas"] + 1.0 / self._podglad["klatki"])
+                if kiedy > koniec:
+                    return False
+                self._podglad["zrzut_czas"] = kiedy
+                jakosc, k = self._podglad["jakosc"], self._podglad["klatka"] or {}
+            time.sleep(kiedy - teraz)
+            try:
+                dane = self.b.wyslij("Page.captureScreenshot", {"format": "jpeg", "quality": jakosc,
+                                                                "optimizeForSpeed": True}, okno.sesja, czas=10)["data"]
+                sz, wy = (k["szer_css"], k["wys_css"]) if k.get("okno") == okno.nr and k.get("szer_css") \
+                    else self._zmierz(okno)
+            except (cdp.BladCDP, KeyError):
+                return False
+            teraz = time.monotonic()
+            with self._podglad_zmiana:
+                if self._podglad["tryb"] != "zrzuty" or self._podglad["okno"] != okno.nr:
+                    return False
+                if dane != self._podglad["zrzut"]:
+                    self._podglad.update(zrzut=dane, spokoj=teraz)
+                    self._podglad["nr"] += 1
+                    self._podglad["klatka"] = {"nr": self._podglad["nr"], "okno": okno.nr, "typ": "image/jpeg",
+                                               "dane": dane, "szer_css": sz, "wys_css": wy,
+                                               "czas": round(time.time(), 3)}
+                    self._podglad_zmiana.notify_all()
+                    return True
+                if teraz - self._podglad["spokoj"] < PODGLAD_SPOKOJ:
+                    continue
+            try:
+                self._wlacz_podglad(okno)
+            except cdp.BladCDP:
+                pass
+            return False
+
     def zatrzymaj_podglad(self) -> None:
         with self._podglad_zmiana:
             nr, self._podglad["okno"], self._podglad["klatka"] = self._podglad["okno"], None, None
+            self._podglad.update(tryb="screencast", ruch=[], zrzut=None)
         okno = self.okno(nr) if nr is not None else None
         if okno is not None:
             try:
@@ -2636,12 +2799,13 @@ class Sterownik:
         return wynik
 
     def podglad(self, po: int | None = None, czekaj: float = 1.0, jakosc: int | None = None,
-                maks: int | None = None) -> dict | None:
+                maks: int | None = None, klatki: int | None = None) -> dict | None:
         """Ostatnia klatka podglądu aktywnej karty: {"nr", "okno", "typ": "image/jpeg", "dane" (base64), "szer_css",
         "wys_css", "czas", "aktywne", "tytul", "url", "okna", opcjonalnie "dialog" i "wybor_pliku"}. Pierwsze pytanie
         włącza screencast tej karty (zmiana aktywnej karty przenosi go na nową). `po` = numer klatki, którą pytający
         już ma: czeka do `czekaj` s na nowszą, a bez zmian zwraca {"nr": po, "bez_zmian": True}. Bez klatki
-        (karta jeszcze nic nie narysowała) zrzut JPEG. None, gdy nie ma karty."""
+        (karta jeszcze nic nie narysowała) zrzut JPEG. `klatki`: limit klatek na sekundę (1 do PODGLAD_KLATKI_MAKS,
+        domyślnie PODGLAD_KLATKI). None, gdy nie ma karty."""
         okno = self.okno(self.aktywne_okno())
         if okno is None:
             return None
@@ -2652,6 +2816,8 @@ class Sterownik:
                 zmiana, self._podglad["jakosc"] = zmiana or jakosc != self._podglad["jakosc"], jakosc
             if isinstance(maks, int) and not isinstance(maks, bool) and 200 <= maks <= 4096:
                 zmiana, self._podglad["maks"] = zmiana or maks != self._podglad["maks"], maks
+            if isinstance(klatki, int) and not isinstance(klatki, bool) and 1 <= klatki <= PODGLAD_KLATKI_MAKS:
+                self._podglad["klatki"] = klatki
             biezace = self._podglad["okno"]
         if biezace != okno.nr or zmiana:
             try:
@@ -2668,9 +2834,13 @@ class Sterownik:
                 k = self._podglad["klatka"]
                 nowa = k is not None and k["okno"] == okno.nr and (po is None or k["nr"] > po)
                 zostalo = koniec - time.monotonic()
-                if nowa or zostalo <= 0:
+                if nowa or zostalo <= 0 or self._podglad["tryb"] == "zrzuty":
                     break
                 self._podglad_zmiana.wait(zostalo)
+        if not nowa and self._zrzuty_podgladu(okno, koniec):
+            with self._podglad_zmiana:
+                k = self._podglad["klatka"]
+                nowa = k is not None and k["okno"] == okno.nr and (po is None or k["nr"] > po)
         if nowa:
             return self._opis_klatki(k, okno)
         if k is not None and k["okno"] == okno.nr:

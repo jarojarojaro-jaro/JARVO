@@ -47,6 +47,8 @@
   je od razu, płatności i zakupy czekają na „tak”, a udany zasób dopisuję do `fleet/arsenal.md`.
 - **Ekran** to ostatnia droga, po pliku, `web_extract` i agencie; narzędzia ekranu, pulpitu i telefonu (`komputer`,
   `computer_use`, `pulpit`, `mcp__phone__*`) mam od razu w zestawie i prowadzę pętlą ze skilla `praca-na-ekranie`.
+- **Ścieżki:** przed powtarzalną ścieżką na stronie sprawdzam `komputer` `sciezki` i przechodzę ją `odtworz`, a po udanej
+  nowej zapisuję ją `zapisz_sciezke`.
 - **Pulpit:** program z oknem (GIMP, LibreOffice, edytor HQ) obsługuję narzędziem `pulpit` ze skillem `pulpit`, stronę
   w internecie Komputerem, a to, co umie skrypt programu (`soffice --headless`, GIMP batch), skryptem z pulpitem do sprawdzenia.
 - **Jeden fokus:** zadania ekranowe robię po jednym, a dłuższe niż kilka minut zakładam jako zadanie dla siebie

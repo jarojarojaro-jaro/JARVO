@@ -2772,6 +2772,23 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   animation: j-pz-krag .9s ease-out forwards; }
 @keyframes j-pz-krag { from { transform: scale(.4); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .j-pz-krag { animation-duration: .01s; } }
+/* „Przejmij” Komputera (klik, kółko i klawiatura idą do karty) i dziennik działań agenta pod obrazem */
+.j-pz-przejmij { flex: none; }
+.j-pz-ruch.is-ty { color: var(--j-tekst); box-shadow: inset 3px 0 0 var(--j-praca), inset 0 1px 0 var(--j-hi); }
+.j-pz-ekran.is-steruje { cursor: crosshair; outline: none; box-shadow: inset 0 0 0 2px var(--j-praca) !important; }
+.j-pz-dz { flex: 0 0 auto; display: flex; flex-direction: column; min-height: 0; max-height: 34%; }
+.j-pz-dz-g { margin: 0; padding: 8px 14px 4px; font: 400 12px/16px var(--j-font-ui); color: var(--j-tekst-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.j-pz-dz-g b { font-weight: 600; color: var(--j-tekst); }
+.j-pz-dz ol { list-style: none; margin: 0; padding: 0 6px 8px; min-height: 0; overflow-y: auto; font: 400 11.5px/16px var(--j-font-mono); }
+.j-pz-dz li { display: grid; grid-template-columns: auto 14px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 3px 8px; color: var(--j-tekst-2); }
+.j-pz-dz li:last-child { background: var(--j-tlo-3); color: var(--j-tekst); }
+.j-pz-dz time, .j-pz-dz-w { font-variant-numeric: tabular-nums; color: var(--j-tekst-3); white-space: nowrap; }
+.j-pz-dz-i { display: inline-flex; color: var(--j-tekst-3); }
+.j-pz-dz-o { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.j-pz-dz-o b { font-weight: 600; color: var(--j-tekst); }
+.j-pz-dz li.is-blad .j-pz-dz-w { color: var(--j-blad); }
+.j-pz-dz li.is-trwa .j-pz-dz-w { color: var(--j-praca); }
+.j-pz-dz-pusto { margin: 0; padding: 2px 14px 10px; font-size: 12px; color: var(--j-tekst-2); }
 /* podagenci w tle pod wiadomością agenta (42-podglad.js PodagenciLinia) */
 .j-pa { margin-top: 8px; font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .j-pa > .j-pa-l { flex-basis: 100%; }
