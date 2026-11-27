@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- `computer_use` po restarcie Komputera łączy się od nowa zamiast zwracać „Connection closed”.
 - Poza płatnością i zakupem nic nie czeka na zgodę: groźne polecenie dostaje od razu werdykt strażnika smart, a usunięcie pliku w danych Jarva poza katalogami roboczymi to blokada z radą.
 - Komputer nie ma `navigator.webdriver`, po restarcie otwiera karty sprzed restartu, odmowa `element_zmieniony` mówi, co się zmieniło, a edytor filmów HQ otwiera adres `http://127.0.0.1:9119/jarvo#/?n=edytor&p=<film>`.
 - Każda moja rozmowa i karta ma w Komputerze własne okno przeglądarki dla `komputer` i `computer_use`, okno innego zadania to odmowa `cudze_okno`, a w kontenerze dostaję `zajete` z miejscem w kolejce.

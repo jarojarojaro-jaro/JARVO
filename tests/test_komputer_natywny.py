@@ -1250,3 +1250,31 @@ def test_paczka_zla_forma_odrzucona_przed_pierwszym_krokiem(tmp_path):
     assert plan[2]["czekaj"] == ("Wyniki", False, "", sterownik_cdp.CZEKANIE_WARUNKU_MAKS)   # limit przycięty do 30 s
     assert st.wywolaj("run_steps", {"steps": [{"click": {"text": "OK"}}]}, {})["structuredContent"]["code"] == \
         "narzedzie"
+
+
+def test_computer_use_laczy_sie_od_nowa_po_zamknietym_polaczeniu(monkeypatch):
+    """27.11 W3: po `jarvo komputer off/on` każdy `capture` dawał „Connection closed” (MCPError z nowszego `mcp`,
+    którego Hermes nie uznawał za zamkniętą sesję); po owinięciu Hermes łączy się od nowa."""
+    import types
+
+    class MCPError(Exception):
+        def __init__(self, code, message):
+            super().__init__(code, message)
+            self.error = types.SimpleNamespace(code=code, message=message)
+
+    class _CuaDriverSession:
+        @staticmethod
+        def _is_closed_session_error(exc):
+            return isinstance(exc, EOFError)
+
+    wyj, typy, sesja = (types.ModuleType(n) for n in ("mcp.shared.exceptions", "mcp.types",
+                                                      "tools.computer_use.cua_backend_session"))
+    wyj.MCPError, typy.CONNECTION_CLOSED, sesja._CuaDriverSession = MCPError, -32000, _CuaDriverSession
+    monkeypatch.setitem(sys.modules, "mcp.shared.exceptions", wyj)
+    monkeypatch.setitem(sys.modules, "mcp.types", typy)
+    monkeypatch.setitem(sys.modules, "tools.computer_use.cua_backend_session", sesja)
+    m = _wtyczka()
+    assert m.ponawiaj_po_zamknieciu() and m.ponawiaj_po_zamknieciu()          # drugi raz bez podwójnego owinięcia
+    zamkniete = _CuaDriverSession._is_closed_session_error
+    assert zamkniete(MCPError(-32000, "Connection closed")) and zamkniete(EOFError())
+    assert not zamkniete(MCPError(-32603, "Internal error")) and not zamkniete(ValueError())

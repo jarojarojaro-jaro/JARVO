@@ -300,6 +300,30 @@ def zwiaz_computer_use() -> bool:
     return True
 
 
+def ponawiaj_po_zamknieciu() -> bool:
+    """Po restarcie Komputera (`jarvo komputer off/on`) bramka computer_use sesji jest martwa, a nowszy pakiet `mcp`
+    zgłasza to jako `MCPError(CONNECTION_CLOSED)`, którego Hermes nie uznaje za zamkniętą sesję, więc każdy `capture`
+    kończył się „Connection closed” (27.11, W3). Dokładamy ten błąd do zamkniętych: Hermes łączy się raz od nowa.
+    True, gdy owinięte (także wcześniej); False bez computer_use albo `mcp` w Hermesie."""
+    try:
+        from mcp.shared.exceptions import MCPError
+        from mcp.types import CONNECTION_CLOSED
+        from tools.computer_use.cua_backend_session import _CuaDriverSession
+    except Exception:  # noqa: BLE001 - inna wersja Hermesa albo mcp: zostaje zachowanie Hermesa
+        return False
+    stara = _CuaDriverSession._is_closed_session_error
+    if getattr(stara, ZNACZNIK, False):
+        return True
+
+    def _is_closed_session_error(exc: Exception) -> bool:
+        return (isinstance(exc, MCPError) and getattr(getattr(exc, "error", None), "code", None) == CONNECTION_CLOSED
+                or stara(exc))
+
+    setattr(_is_closed_session_error, ZNACZNIK, True)
+    _CuaDriverSession._is_closed_session_error = staticmethod(_is_closed_session_error)
+    return True
+
+
 class BrakBramki(RuntimeError):
     pass
 
@@ -620,6 +644,7 @@ def obsluz(args: Dict[str, Any], **kontekst: Any) -> str:
 def register(ctx) -> None:
     grupa_ekranu()                    # przed pierwszym computer_use: jego bramki dziedziczą klucz z otoczenia
     zwiaz_computer_use()              # i rozmowę swojej sesji Hermesa (okno Komputera na rozmowę)
+    ponawiaj_po_zamknieciu()          # po restarcie Komputera computer_use łączy się od nowa zamiast „Connection closed”
     ctx.register_tool(name="komputer", toolset="komputer", schema=SCHEMAT, handler=obsluz, emoji="🖥️",
                       description="Komputer Jarva: strony (idz, patrz, kroki, czekaj), stan, dziennik twardych zasad, "
                                   "oddanie ekranu właścicielowi")
