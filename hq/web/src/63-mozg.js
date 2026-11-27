@@ -631,7 +631,7 @@ function MozgWidok() {
   const szukam = q.trim() !== "";
 
   // mapa: dane raz na układ, potem tylko stan (lot kamery); otwarta notatka wstrzymuje rysowanie
-  useEffect(() => { if (uklad) { barwy.current = mozgBarwy(korzen.current); neuron.current.dane(uklad, barwy.current.barwy); } }, [uklad]);
+  useEffect(() => { if (uklad) barwy.current = mozgBarwy(korzen.current); neuron.current.dane(uklad, barwy.current.barwy); }, [uklad]);
   useEffect(() => {
     if (!uklad) return;
     const p = nrCzesci(s.k), cz = p >= 0 && uklad.czesci[p];

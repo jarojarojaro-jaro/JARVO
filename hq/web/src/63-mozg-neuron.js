@@ -291,9 +291,10 @@ function utworzNeuron(pudlo, o) {
     for (const c of [cgl, c2]) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); c.style.width = W + "px"; c.style.height = H + "px"; }
   }
   function rysujGL(czas) {
-    if (!gl || !bufory) return;
+    if (!gl) return;
     gl.viewport(0, 0, cgl.width, cgl.height);
     gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    if (!bufory || !u) return;
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
     const puls = bezRuchu.matches ? 0 : 1, nadP = stan.nad ? (u.byId.get(stan.nad) || {}).p ?? -1 : stan.nadP;
     const L = prog.linia;
@@ -516,7 +517,13 @@ function utworzNeuron(pudlo, o) {
 
   return {
     gl: !!gl,
-    dane(uklad, barwy) { u = uklad; kolory = barwy.map(neuronRgb); zbuduj(); Object.assign(kam, cel()); zamow(); },
+    // nowe dane (np. przełączenie Skarbiec Jarva ↔ Wiedza Kernela): przerwany lot kamery, kadr całości nowej mapy;
+    // null = mapa pusta do czasu nowych danych (27.11: stara mapa pod nazwą nowego źródła i kadr poza środkiem)
+    dane(uklad, barwy) {
+      u = uklad || null; lot = null; stan.nad = null; stan.nadP = -1;
+      if (u) { kolory = barwy.map(neuronRgb); zbuduj(); Object.assign(kam, cel()); }
+      zamow();
+    },
     // stan widoku z adresu: część (indeks), grupa (indeks w części), notatka; zmiana = lot kamery
     ustaw({ fok = -1, grupa = -1, wybrana = null, traf = null }, animuj = true) {
       const zmiana = fok !== stan.fok || grupa !== stan.grupa || wybrana !== stan.wybrana;
