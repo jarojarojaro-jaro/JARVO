@@ -3026,14 +3026,20 @@ def _nagrywanie_ekranu(narzedzie: str, tekst: str) -> Optional[Dict[str, str]]:
 
 
 # 26.11 Hacker zaczął weryfikację maila HF na telefonie first i przeskoczył (surowym adb) na third i second, a każdy
-# telefon ma inne konta Google: zadanie (karta kanbana albo rozmowa) pracuje na pierwszym użytym telefonie floty.
+# telefon ma inne konta Google: zadanie (karta kanbana albo rozmowa) działa na pierwszym telefonie, na którym coś
+# zrobiło. Odczyt (ekran, lista aplikacji, dumpsys, getprop) nie wiąże i nie jest blokowany (27.11: Jarvo nie mógł
+# sprawdzić, czy na którymś telefonie jest OLX). W rozmowie wiązanie wygasa po 30 min bez działania na telefonie.
 TELEFON_DOMYSLNY = "first"
-TELEFON_ODCZYT = frozenset({f"mcp__{TELEFON}__list_phones", f"mcp__{TELEFON}__ping"})
+TELEFON_AKCJE = frozenset({f"mcp__{TELEFON}__act", f"mcp__{TELEFON}__batch"})
 _ADB = re.compile(r"\badb\b|ANDROID_SERIAL", re.I)
+_ADB_AKCJA = re.compile(r"\binput\s|\bam\s+(?:start|broadcast|force-stop|kill|startservice)\b|\bmonkey\b|\bsendevent\b"
+                        r"|\bsettings\s+put\b|\bcontent\s+(?:insert|update|delete|call)\b|\bpm\s+(?:install|grant|enable)\b"
+                        r"|\s(?:push|install|install-multiple)\s|\bsvc\s|\bcmd\s+(?:connectivity|wifi|statusbar|notification)\b", re.I)
 _IP = re.compile(r"(?<![\d.])\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?![\d.])")
 _MAPA_TTL = 60.0
+_WIAZANIE_ROZMOWY = 1800.0
 _MAPA: Dict[str, Any] = {"t": 0.0, "ip": {}}                 # IP adb telefonu → nazwa
-_TELEFON_ZADANIA: "collections.OrderedDict[str, str]" = collections.OrderedDict()
+_TELEFON_ZADANIA: "collections.OrderedDict[str, Tuple[str, float]]" = collections.OrderedDict()
 
 
 def _mapa_ip() -> Dict[str, str]:
@@ -3057,15 +3063,15 @@ def _mapa_ip() -> Dict[str, str]:
 
 
 def _telefony_wywolania(tool_name: str, args: Dict[str, Any]) -> List[str]:
-    """Telefony floty, których dotyczy wywołanie (nazwa albo IP, gdy nazwa nieznana); [] = nie dotyczy telefonu."""
+    """Telefony floty, na których wywołanie coś robi (nazwa); [] = nie dotyczy telefonu albo tylko odczyt."""
     if tool_name.startswith(f"mcp__{TELEFON}__"):
-        if tool_name in TELEFON_ODCZYT:
+        if tool_name not in TELEFON_AKCJE:
             return []
         p = str(args.get("phone") or "").strip()
         return [p or os.environ.get("PHONEUSE_ONLY", "").strip() or TELEFON_DOMYSLNY]
     pole = {"terminal": "command", "execute_code": "code", "process_manage": "data"}.get(tool_name)
     tekst = str(args.get(pole) or "")[:_MAX_POLECENIA] if pole else ""
-    if not _ADB.search(tekst):
+    if not _ADB.search(tekst) or not _ADB_AKCJA.search(tekst):
         return []
     mapa = _mapa_ip()
     wynik: List[str] = []
@@ -3081,23 +3087,25 @@ def _klucz_zadania(task_id: str, session_id: str) -> str:
 
 
 def _jeden_telefon(tool_name: str, args: Dict[str, Any], task_id: str, session_id: str) -> Optional[Dict[str, str]]:
-    """Pierwszy telefon zadania wiąże je do końca (karta kanbana albo sesja rozmowy); inny telefon = block."""
+    """Pierwszy telefon, na którym zadanie coś zrobiło, wiąże je (karta kanbana: do końca, rozmowa: do 30 min bez
+    działania na telefonie); działanie na innym telefonie = block."""
     telefony = _telefony_wywolania(tool_name, args)
     if not telefony:
         return None
-    klucz = _klucz_zadania(task_id, session_id)
+    klucz, teraz = _klucz_zadania(task_id, session_id), time.monotonic()
     with _ZAMEK:
-        x = _TELEFON_ZADANIA.get(klucz)
-        if x is None:
+        x, kiedy = _TELEFON_ZADANIA.get(klucz) or (None, 0.0)
+        if x is None or (klucz.startswith("sesja:") and teraz - kiedy > _WIAZANIE_ROZMOWY):
             x = telefony[0]
-            _TELEFON_ZADANIA[klucz] = x
+        if all(t == x for t in telefony):
+            _TELEFON_ZADANIA[klucz] = (x, teraz)
+            _TELEFON_ZADANIA.move_to_end(klucz)
             while len(_TELEFON_ZADANIA) > 256:
                 _TELEFON_ZADANIA.popitem(last=False)
-    if all(t == x for t in telefony):
-        return None
+            return None
     logger.warning("jarvo-zgody: przeskok telefonu %s -> %s (%s)", x, telefony, tool_name)
-    return _blok(f"To zadanie pracuje na telefonie {x}; inny telefon tylko na wyraźne polecenie JARO, więc dokończ "
-                 f"na {x} albo zapytaj go jednym zdaniem.")
+    return _blok(f"To zadanie działa na telefonie {x}; na innym telefonie nie działasz bez wyraźnego polecenia JARO "
+                 f"(odczyt, np. lista aplikacji albo ekran, jest wolny), więc dokończ na {x} albo zapytaj go jednym zdaniem.")
 
 
 # 26.11 20:40 Jarvo wpisał w formularz weryfikacji SMS prywatny numer JARO: numery z listy sha256 ostatnich 9 cyfr

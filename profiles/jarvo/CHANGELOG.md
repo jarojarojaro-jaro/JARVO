@@ -1,8 +1,8 @@
 # Changelog: jarvo
 
 ## Niewydane
-- Po wgraniu zmienionego SOUL.md trwające rozmowy profilu biorą nowe zasady od następnej tury, zamiast działać na prompcie z pierwszej tury aż do kompresji.
-- Telefon floty: zadanie zaczęte na jednym telefonie zostaje na nim (strażnik blokuje drugi telefon, także przez adb), a numer i konta każdego telefonu są w skarbcu `fleet/telefony.md` z pomiaru `jarvo telefon spis`.
+- Po wgraniu zmienionego SOUL.md trwające rozmowy profilu biorą nowe zasady od następnej tury.
+- Telefon floty: zadanie działa na tym telefonie, na którym pierwszy raz coś zrobiło (w rozmowie do 30 min bez działania), a odczyt każdego telefonu (ekran, lista aplikacji) jest wolny; numer i konta każdego telefonu są w skarbcu `fleet/telefony.md` z pomiaru `jarvo telefon spis`.
 - Strażnik blokuje wpisanie albo wysłanie prywatnego numeru właściciela w każdym narzędziu.
 - Czyszczenie danych, odinstalowanie, wyłączenie aplikacji i kasowanie plików na telefonie floty przez adb strażnik blokuje do wyraźnego polecenia właściciela.
 - Hacker robi bez pytania wszystko, czego wymaga praca (konta, logowania, formularze, telefon, publikacja, zgłoszenia), a o zgodę pyta tylko przy płatności.

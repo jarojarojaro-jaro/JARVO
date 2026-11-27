@@ -43,35 +43,45 @@ def zablokowane(w):
 
 
 def test_mcp_przeskok_w_zadaniu_blokowany(straz):
-    assert hak("mcp__phone__screen", phone="first") is None
     assert hak("mcp__phone__act", cmd="tap") is None              # brak phone = first
-    w = hak("mcp__phone__screen", phone="third")
+    w = hak("mcp__phone__act", phone="third", cmd="tap")
     assert zablokowane(w) and "telefonie first" in w["message"]
 
 
 def test_inne_zadanie_zaczyna_od_zera(straz, monkeypatch):
-    assert hak("mcp__phone__screen", phone="first") is None
-    assert hak("mcp__phone__screen", sesja="s2", phone="third") is None
+    assert hak("mcp__phone__act", phone="first", cmd="tap") is None
+    assert hak("mcp__phone__act", sesja="s2", phone="third", cmd="tap") is None
     monkeypatch.setenv("HERMES_KANBAN_TASK", "t_nowa")
-    assert hak("mcp__phone__screen", phone="second") is None
+    assert hak("mcp__phone__act", phone="second", cmd="tap") is None
 
 
-def test_adb_na_innym_telefonie_blokowane(straz):
-    assert hak("mcp__phone__screen", phone="first") is None
-    assert hak("terminal", command=f"adb -s {IP['first']}:5555 shell getprop") is None
-    assert zablokowane(hak("terminal", command=f"adb -s {IP['third']}:5555 shell getprop"))
+def test_adb_akcja_na_innym_telefonie_blokowana(straz):
+    assert hak("terminal", command=f"adb -s {IP['first']}:5555 shell input tap 1 2") is None
+    assert zablokowane(hak("terminal", command=f"adb -s {IP['third']}:5555 shell am start -a android.intent.action.VIEW"))
 
 
-def test_petla_po_dwoch_telefonach_blokowana(straz):
-    polecenie = f"for N in first:{IP['first']} third:{IP['third']}; do adb -s ${{N#*:}}:5555 shell id; done"
+def test_petla_akcji_po_dwoch_telefonach_blokowana(straz):
+    polecenie = f"for N in first:{IP['first']} third:{IP['third']}; do adb -s ${{N#*:}}:5555 shell input keyevent 3; done"
     assert zablokowane(hak("terminal", command=polecenie))
 
 
-def test_lista_telefonow_nie_wiaze(straz):
+def test_odczyt_nie_wiaze_i_nie_blokuje(straz):
+    """27.11: Jarvo sprawdzał, czy na którymś telefonie jest OLX, a strażnik blokował odczyt wszystkich telefonów."""
+    assert hak("mcp__phone__act", phone="third", cmd="tap") is None
     assert hak("mcp__phone__list_phones") is None
     assert hak("mcp__phone__ping", phone="second") is None
-    assert hak("mcp__phone__screen", phone="third") is None
+    assert hak("mcp__phone__screen", phone="first") is None
+    polecenie = f"for S in {IP['first']} {IP['third']}; do adb -s $S:5555 shell pm list packages | grep olx; done"
+    assert hak("terminal", command=polecenie) is None
     assert hak("terminal", command="ls 100.99.0.1") is None        # bez adb nie dotyczy telefonu
+
+
+def test_wiazanie_rozmowy_wygasa(straz, monkeypatch):
+    zegar = [1000.0]
+    monkeypatch.setattr(z.time, "monotonic", lambda: zegar[0])
+    assert hak("mcp__phone__act", phone="first", cmd="tap") is None
+    zegar[0] += 1801
+    assert hak("mcp__phone__act", phone="third", cmd="tap") is None
 
 
 def test_prywatny_numer_blokowany(straz):
