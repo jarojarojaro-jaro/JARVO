@@ -117,8 +117,8 @@ PAKIETY = {
 # (shared/web/graf.js, 6,5 KB gzip, został tylko w zakładce Wiedza): 25 KB (ok. 24 KB: renderer WebGL z układem,
 # włóknami, impulsami i kamerą ok. 6 KB, strona notatki z „Edytuj”); pakiet idzie tylko po wejściu w Mózg. Rdzeń
 # 100 KB (20.11, było 95 KB): rozwijane kroki i komendy po „/” w kompozytorze
-# (oba muszą działać od pierwszej rozmowy)
-BUDZET_GZIP = {"app-rdzen.js": 100 * 1024, "app-rdzen.css": 18 * 1024, "mozg.js": 25 * 1024}
+# (oba muszą działać od pierwszej rozmowy). Mózg 26 KB od 27.11: nagłówek notatki bez podwójnych napisów.
+BUDZET_GZIP = {"app-rdzen.js": 100 * 1024, "app-rdzen.css": 18 * 1024, "mozg.js": 26 * 1024}
 ZNACZNIK_PAKIETOW = '"@@PAKIETY@@"'
 ZNACZNIK_CSS = re.compile(r"^/\* @@pakiet (\w+) \*/$", re.M)
 DEKLARACJA = re.compile(r"^(?:async\s+)?(?:function\*?\s+([A-Za-z_$][\w$]*)|class\s+([A-Za-z_$][\w$]*)"

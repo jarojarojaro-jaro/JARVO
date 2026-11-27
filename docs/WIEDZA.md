@@ -168,7 +168,7 @@ sekcje w indeksie, bloki GEN `sciezki` i `harmonogram` jego profilu), a lustro p
 z `state/wiedza-agenci.json` z katalogiem profilu; obca nazwa 400, brak profilu 404, CSRF jak dotąd). Instalacja zakłada puste
 `memories/MEMORY.md` i `USER.md` każdego profilu (`install_fleet.zasiej_pamiec`; dystrybucja Hermesa pomija `memories/`), a
 skarbiec zasiewa po profilach. Specjalista z `ZASADY.md` ma `MAPA.md` (validate.py `check_mapa`: sekcje z `mapa.SEKCJE`,
-znacznik w ZASADY.md, rdzeń ≤ `RDZEN_AGENTA` tok.; w prompcie tylko jego bloki RDZEN). Szablony: `shared/templates/{SOUL,ZASADY,MAPA}.template.md`.
+znacznik w ZASADY.md; w prompcie tylko jego bloki RDZEN). Szablony: `shared/templates/{SOUL,ZASADY,MAPA}.template.md`.
 
 **Lustro pamięci po treści pliku** (`wiedza.synchronizuj_pamiec`): `state/wiedza-pamiec.json` pamięta wersję (sha256) i wpisy
 MEMORY.md i USER.md każdego profilu. Nowa wersja pliku = wpisy, których wcześniej nie było (pierwszy raz: wszystkie), idą

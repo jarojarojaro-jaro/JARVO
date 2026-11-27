@@ -29,7 +29,6 @@ TYTUL = "Jarvo od A do Z"
 # blok GEN bez znacznika w pliku idzie na koniec swojej sekcji
 SEKCJA_GEN = {"agenci": "Zespół", "skille": "Zespół", "arsenal": "Co mogę", "sciezki": "Gdzie co jest", "harmonogram": "Kiedy"}
 GEN_W_RDZENIU = ("sciezki", "harmonogram")          # agenci = roster SOUL; skille i arsenał i tak są w prompcie
-MAX_TOKENOW_RDZENIA = 1200                         # liczone jak fleetlib.approx_tokens (znaki / 3,5)
 ZNAKOW_NA_TOKEN = 3.5
 RDZEN_RE = re.compile(r"<!-- Jarvo:RDZEN -->\n?(.*?)\n?<!-- /Jarvo:RDZEN -->", re.S)
 GEN_PUSTY_RE = re.compile(r"<!-- Jarvo:GEN (\w+) -->.*?<!-- /Jarvo:GEN \1 -->", re.S)

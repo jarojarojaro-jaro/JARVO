@@ -269,9 +269,10 @@ function MozgWiersz({ n, href, gdzie, otwarta, opis }) {
     ${opis && html`<span class="j-mozg-wo">${opis}</span>`}${!gdzie && n.zmieniono && html`<span class="j-mozg-wd">${mozgData(n.zmieniono)}</span>`}</a></li>`;
 }
 
-// ← z podpisem miejsca, do którego wraca (z historii: history.back, inaczej zwykły link poziom wyżej)
-const MozgWstecz = ({ w }) => w && html`<a class="j-mozg-wstecz" href=${w.href} onClick=${w.klik} aria-label=${L(`Wstecz do: ${w.napis}`, `Back to: ${w.napis}`)}>
-  <${Ikona} n="back" r=${16}/><span>${w.napis}</span></a>`;
+// ← z podpisem miejsca, do którego wraca (z historii: history.back, inaczej zwykły link poziom wyżej); `sama`: tylko
+// strzałka, gdy ten sam napis stoi obok (27.11: podwójne „Dokumentacja i źródła”)
+const MozgWstecz = ({ w, sama }) => w && html`<a class=${cx("j-mozg-wstecz", sama && "is-sama")} href=${w.href} onClick=${w.klik}
+  aria-label=${L(`Wstecz do: ${w.napis}`, `Back to: ${w.napis}`)}><${Ikona} n="back" r=${16}/>${!sama && html`<span>${w.napis}</span>`}</a>`;
 
 // edytor wpisów pamięci (`klucz`: memory|user, `profil`: agent floty, puste = Jarvo): lista pól, dodaj/usuń, licznik
 // z limitem, Zapisz/Anuluj, 409 = wczytaj ponownie. Esc bez zmian zamyka edytor (ze zmianami nic nie robi, żeby nie
@@ -453,8 +454,8 @@ function MozgStrona({ z, id, dane, mapa, href, cel, nazwaMiejsca, barwa, wstecz,
     : edycja === "repo" ? L("Plik Jarva: zmienia go Jarvo na Twoją prośbę", "Jarvo's file: he changes it when you ask") : "";
   return html`<article ref=${ref} tabIndex="-1" class="j-mozg-strona" aria-labelledby="j-mozg-tytul" style=${{ "--c": barwa }}>
     <div class="j-mozg-strona-gora">
-      <${MozgWstecz} w=${wstecz}/>
-      ${gd && html`<span class="j-mozg-miejsce"><i aria-hidden="true"></i>${nazwaMiejsca(gd)}</span>`}
+      <${MozgWstecz} w=${wstecz} sama=${!!gd}/>
+      ${gd && html`<span class="j-mozg-miejsce"><i aria-hidden="true"></i><span>${nazwaMiejsca(gd)}</span></span>`}
       ${edytuj && !edytor && html`<${Przycisk} maly ikona="pen" klasa="j-mozg-edytuj" onClick=${edytuj}>${L("Edytuj", "Edit")}</${Przycisk}>`}
       <button type="button" class="j-mozg-x" aria-label=${L("Zamknij notatkę", "Close the note")} onClick=${onClose}>×</button>
     </div>
@@ -657,7 +658,7 @@ function MozgWidok() {
   const okruszki = [[L("Mózg", "Brain"), href({ k: "", g: "", o: "" })]];
   if (kat) okruszki.push([nazwaKat(kat), href({ g: "", o: "" })]);
   if (kat && grupa && kat.grupy.length > 1) okruszki.push([grupa.nazwa, href({ o: "" })]);
-  const wGrupie = grupa && kat.grupy.length > 1;
+  const wGrupie = grupa && kat.grupy.length > 1, tytKat = kat && (wGrupie ? grupa.nazwa : nazwaKat(kat));
   const hub = wGrupie ? grupa.hub : kat ? kat.hub : mapa && mapa.korzen;
 
   return html`<div ref=${korzen} class=${cx("j-mozg", s.o && dane && "is-strona", szukam && "is-szuka")} onKeyDown=${esc} data-mozg>
@@ -690,8 +691,8 @@ function MozgWidok() {
         </div>`}
       </div>
       ${kat && html`<div class="j-mozg-poziom" style=${{ "--c": barwaCzesci(kat.k) }}>
-        <${MozgWstecz} w=${wstecz}/>
-        <h2 ref=${naglowek} tabIndex="-1">${wGrupie ? grupa.nazwa : nazwaKat(kat)} <span>${wGrupie ? grupa.ile : kat.ile}</span></h2>
+        <${MozgWstecz} w=${wstecz} sama=${wstecz && wstecz.napis === tytKat}/>
+        <h2 ref=${naglowek} tabIndex="-1">${tytKat} <span>${wGrupie ? grupa.ile : kat.ile}</span></h2>
         ${kat.opis && !wGrupie && html`<p class="j-mozg-opis">${L(kat.opis, kat.opis_en || kat.opis)}</p>`}
         ${hub && html`<a class="j-mozg-przeglad" href=${hrefNotatki(hub.id)}>${L("Przegląd tej części", "Overview of this part")} →</a>`}
       </div>`}

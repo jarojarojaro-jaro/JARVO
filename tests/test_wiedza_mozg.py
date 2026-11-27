@@ -165,7 +165,6 @@ def test_mapa_jarva_notatka_rdzen_i_sekcje(dane):
     assert rd == ("### Kim jestem\n- Profil `jarvo` Hermesa, orkiestrator.\n- Strony JARO na SEOHost.\n\n"
                   "### Gdzie co jest\n- dane Jarva `/d/jarvo`: skarbiec `knowledge/`, misje `missions/`\n\n"
                   "### Kiedy\n- codziennie 07:50: Poranny brief")
-    assert mapa.tokeny(rd) < mapa.MAX_TOKENOW_RDZENIA
     # sekcje w indeksie: przypomnienie trafia w sekcję, wiedza_czytaj czyta samą sekcję
     ix = w.Indeks(sk)
     ix.odswiez()

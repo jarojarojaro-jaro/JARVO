@@ -39,17 +39,17 @@ i 200 stron wiedzy, nie płacąc za to w każdej wiadomości.
 
 ## 1. Tożsamość: `SOUL.md` (postać), `ZASADY.md` (procedury), `MAPA.md` (mapa)
 
-Budżet: walidator pilnuje twardego limitu ~3400 tokenów (Jarvo 6000), liczonego na tekście takim, jaki dostaje model:
-postać, zasady, rdzeń mapy, protokół floty (~1 500 tokenów u agentów), najdłuższa możliwa kalibracja i podstawione ścieżki
-`@@…@@` (`validate.zbudowany_prompt`). Wszystko dłuższe należy do skilli albo do mapy w skarbcu.
+Rozmiar: bez limitu tokenów (decyzja właściciela 27.11). Prompt ma wszystkie kluczowe rzeczy, których agent potrzebuje
+w każdej turze, i nic zbędnego: bez powtórzeń, historii i przykładów; procedury na jedno zadanie idą do skilli, a wiedza
+do mapy w skarbcu. Tekst, który dostaje model, składa `validate.zbudowany_prompt`.
 
 **Układ Jarva u każdego agenta (decyzje właściciela 19.11 i 22.11, wzorzec `profiles/jarvo/`):**
 
 | Plik | Zawartość | W prompcie |
 |---|---|---|
-| `SOUL.md` | sama postać: kim jestem, szefem jest @@WLASCICIEL@@, szefem floty Jarvo, moja marka albo dziedzina, `## Charakter` (zachowania), `## Głos`; budżet 1600 tok., bez znaczników | tak, pierwszy |
+| `SOUL.md` | sama postać: kim jestem, szefem jest @@WLASCICIEL@@, szefem floty Jarvo, moja marka albo dziedzina, `## Charakter` (zachowania), `## Głos`; bez znaczników | tak, pierwszy |
 | `ZASADY.md` | procedury: `## Zakres` (z jednym zdaniem „Poza zakresem”), `## Zasady pracy` (ostatnia: **Pamięć**, kiedy `memory`), `## Mapa workflowów`, `## Standard jakości`, `## Autonomia`, `## Moja mapa (skrót)` ze znacznikiem `<!-- Jarvo:MAPA -->`, `<!-- Jarvo:PROTOCOL -->`, `## Formaty wyjścia` | tak, po postaci |
-| `MAPA.md` | „<Krótka nazwa> od A do Z”: sekcje tylko z `wiedza/mapa.py SEKCJE`, w tej kolejności; bloki `<!-- Jarvo:RDZEN -->` tylko z tym, co agent musi wiedzieć od razu | tylko bloki RDZEN (≤ `validate.RDZEN_AGENTA` = 250 tok.; Jarvo ≤ 1200 i zwarte ścieżki oraz rutyny) |
+| `MAPA.md` | „<Krótka nazwa> od A do Z”: sekcje tylko z `wiedza/mapa.py SEKCJE`, w tej kolejności; bloki `<!-- Jarvo:RDZEN -->` tylko z tym, co agent musi wiedzieć od razu | tylko bloki RDZEN (u Jarva też zwarte ścieżki oraz rutyny) |
 
 Build skleja `SOUL.md` + `ZASADY.md` w `SOUL.md` profilu Hermesa i wstawia rdzeń mapy w miejsce znacznika; pełne pliki
 (tokeny podstawione) idą do `build/wiedza/tozsamosc/` (Jarvo) i `build/wiedza/tozsamosc/agenci/<agent>/`, z których zasiew

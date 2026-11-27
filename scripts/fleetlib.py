@@ -168,10 +168,6 @@ HQ_ROOMS = {"bridge", "study", "devlab", "atelier", "filmstudio", "workshop", "o
 SKILL_PROMPT_DESC_LIMIT = 60
 # krój figur skilla `izometria` (JetBrains Mono, OFL, z krojów HQ): build skilla i plugin HQ kładą go obok iso.py
 ISO_KROJE = ("jetbrains-mono-latin-wght-normal.woff2", "jetbrains-mono-latin-ext-wght-normal.woff2", "OFL-JetBrainsMono.txt")
-# Budżet main promptu (SOUL.md) w przybliżonych tokenach (~3.5 znaku/token dla PL/EN), liczony od 19.11 na zbudowanym
-# tekście (ścieżki podstawione): Web, Wideo, Ads i Mobile mają tak ~3 310–3 390 od dawna, choć źródło mieściło się w 3 300.
-SOUL_TOKEN_BUDGET = 3400
-
 
 # --------------------------------------------------------------------------- YAML
 

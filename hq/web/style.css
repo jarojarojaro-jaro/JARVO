@@ -2362,7 +2362,8 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 @keyframes j-mozg-strona { from { opacity: 0; transform: translateX(18px); } }
 .j-mozg-strona-gora { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 4px 8px 4px 20px;
   background: var(--j-tlo-pasek); box-shadow: inset 0 -1px 0 var(--j-linia), inset 0 2px 0 var(--c); }
-.j-mozg-miejsce { display: inline-flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; color: var(--j-tekst-2); font: 500 12px var(--j-font-mono); white-space: nowrap; text-overflow: ellipsis; }
+.j-mozg-miejsce { display: inline-flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; color: var(--j-tekst-2); font: 500 12px var(--j-font-mono); white-space: nowrap; }
+.j-mozg-miejsce > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .j-mozg-miejsce i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px var(--c); }
 .j-mozg-edytuj { margin-left: auto; }
 .j-mozg-strona-gora .j-mozg-x { margin-left: 0; }
@@ -2400,6 +2401,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 /* „Wstecz” (← z podpisem miejsca), wycofane, akcje notatki, uwaga do Jarva i edytor pamięci (wpisy we wnęce) */
 .j-mozg-wstecz { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; min-height: 36px; padding: 0 10px 0 6px; margin-left: -6px; color: var(--j-tekst-2); font-size: 12.5px; }
 .j-mozg-wstecz span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.j-mozg-wstecz.is-sama { flex: none; justify-content: center; width: 36px; padding: 0; }
 .j-mozg-wstecz svg { flex: none; }
 .j-mozg-wstecz:hover { color: var(--j-tekst); background: var(--j-tlo-hover); }
 .j-mozg-wiersz.is-wycofana .j-mozg-wt { color: var(--j-tekst-3); }

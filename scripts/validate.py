@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Walidacja repo floty Jarvo. Uruchamiana lokalnie (`make validate`), w testach i przy każdym deployu.
 
-Sprawdza: fleet.yaml ↔ profile, kompletność profilu (anatomia z docs/PROFILE-SPEC.md), budżet SOUL,
+Sprawdza: fleet.yaml ↔ profile, kompletność profilu (anatomia z docs/PROFILE-SPEC.md), budowę SOUL (bez limitu
+tokenów: 27.11 właściciel, prompt ma mieć wszystkie kluczowe rzeczy, bez zbędnych),
 frontmatter i opisy skilli (≤ 60 znaków, bo tyle widzi model w indeksie), plik blokady skilli,
 definicje crona, evals, składnię skryptów, pakiet aplikacji HQ (jednoznaczne nazwy globalne w hq/web/src, te same
 klucze tekstów PL/EN), przypadkowe sekrety w repo i zgodność dokumentacji z kodem
@@ -32,21 +33,6 @@ REQUIRED_FILES = ["SOUL.md", "config.yaml", "distribution.yaml", "toolbox.yaml",
 SOUL_REQUIRED = ["## Misja", "## Osobowość"]
 # profil z ZASADY.md: SOUL.md to sama postać (decyzja właściciela 19.11) z sekcją charakteru, bez znaczników procedur
 SOUL_POSTAC_REQUIRED = ["## Charakter"]
-SOUL_POSTAC_BUDZET = 1600            # sama postać: tożsamość, charakter, głos (bez przykładów, PRZYKLAD_RE)
-# Jarvo: postać + zasady szefa floty, ekranu i telefonu (po usuniętym Operatorze, 14.11) + roster. 19.11 (SOUL v2):
-# budżet liczony na złożonym prompcie z prawdziwymi długościami ścieżek; wzrost o ~500 tok. wobec v1 kompensuje
-# wyłączenie sprzecznych bloków Hermesa (~1 000 tok.) i orzeczeń doklejanych do każdej wiadomości (~2 000 tok./turę).
-# 20.11 (mapa Jarva, właściciel: „wszystko ma być wiadome od razu, bez zastanowienia”): liczony jest prawdziwy roster
-# (linia z profilem, `@uchwytem` i `oddaj_gdy` na agenta) i rdzeń mapy (fl.rdzen_mapy, sam ≤ 1 200 tok.). Pomiar
-# z nakładką właściciela: reszta promptu ~4 180 tok. (jak przed mapą), roster 10 agentów ~516 (stała dawniej ~200),
-# rdzeń ~843 = ~5 539 tok. (bez nakładki ~5 079); zapas ~60 tok., kolejny agent wymaga świadomej decyzji o budżecie.
-# 22.11 (właściciel: „JARO jest szefem z wieloma biznesami, Jarvo ma mieć charakter, kozak”): postać z charakterem
-# (~+120 tok.) i sekcja „Biznesy” w rdzeniu (każdy biznes z opiekunem, ~+215 tok.) = ~5 874 tok. z nakładką;
-# stała część promptu, trafia w cache dostawcy. Zapas ~125 tok.
-SOUL_BUDZET_ORKIESTRATORA = 6000
-# 22.11 (właściciel: „każdy agent jak Jarvo, bez marnowania tokenów”): rdzeń mapy specjalisty (bloki RDZEN jego MAPA.md)
-# to kilka linii, które musi znać od razu (skąd zlecenia, gdzie wyniki, pamięć); reszta mapy jest w skarbcu
-RDZEN_AGENTA = 250
 DLUGOSC_SCIEZKI = 60                 # średnia długość podstawionej ścieżki @@…@@ w zbudowanym SOUL
 SCIEZKI_MAPY = ("DATA_DIR", "JARVO_DIR", "KNOWLEDGE_DIR", "MISSIONS_DIR", "WORKSPACES_DIR", "INBOX_DIR")   # fl.sciezki_mapy
 # zasada bloku kontekstu (protokół floty, zasada 8; docs/HQ.md „Aplikacja”): każdy złożony SOUL nazywa znaczniki,
@@ -234,8 +220,7 @@ def zbudowany_prompt(fleet: fl.Fleet, a: fl.Agent, protocol: str) -> str:
 def check_mapa(fleet: fl.Fleet, a: fl.Agent, soul: str, r: Report) -> None:
     """Mapa agenta (docs/WIEDZA.md §2b): orkiestrator ma ją zawsze, a każdy agent w układzie Jarva (z ZASADY.md) też.
     MAPA.md ⇔ znacznik `<!-- Jarvo:MAPA -->` w ZASADY.md (w SOUL.md postaci nie), sekcje tylko z wiedza/mapa.py SEKCJE
-    (jeden układ notatki „od A do Z” u każdego agenta), rdzeń w budżecie: orkiestrator mapa.MAX_TOKENOW_RDZENIA,
-    specjalista RDZEN_AGENTA (jego prompt ma być krótki: w rdzeniu tylko to, co musi wiedzieć od razu)."""
+    (jeden układ notatki „od A do Z” u każdego agenta)."""
     mapa = fl._modul_mapy()
     repo, nakl = fl.mapa_zrodla(fleet, a.name)
     orch, zasady = a.name == fleet.orchestrator, (a.dir / fl.ZASADY_FILE).exists()
@@ -253,10 +238,6 @@ def check_mapa(fleet: fl.Fleet, a: fl.Agent, soul: str, r: Report) -> None:
     for nazwa in [*mapa.sekcje(repo), *mapa.sekcje(nakl)]:
         if nazwa not in mapa.SEKCJE:
             r.err(f"{a.name}: {fl.MAPA_FILE} ma sekcję {nazwa!r} spoza wiedza/mapa.py SEKCJE")
-    limit = mapa.MAX_TOKENOW_RDZENIA if orch else RDZEN_AGENTA
-    sciezki = fl.sciezki_mapy({k: "x" * DLUGOSC_SCIEZKI for k in SCIEZKI_MAPY}, a.name)
-    if (t := fl.approx_tokens(fl.rdzen_mapy(fleet, sciezki, a.name))) > limit:
-        r.err(f"{a.name}: rdzeń mapy ~{t} tokenów > {limit}; resztę zostaw poza blokami RDZEN (notatka w skarbcu)")
 
 
 def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set[str]:
@@ -293,8 +274,6 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
         for znacznik in (fl.PROTOCOL_MARKER, fl.ROSTER_MARKER):
             if znacznik in soul_postac:
                 r.err(f"{a.name}: SOUL.md to sama postać; {znacznik} należy do {fl.ZASADY_FILE}")
-        if (t := fl.approx_tokens(soul_postac)) > SOUL_POSTAC_BUDZET:
-            r.err(f"{a.name}: SOUL.md (postać) ~{t} tokenów > {SOUL_POSTAC_BUDZET}; procedury do {fl.ZASADY_FILE}")
     else:
         for h in SOUL_REQUIRED:
             if h not in soul:
@@ -310,11 +289,6 @@ def check_profile(fleet: fl.Fleet, a: fl.Agent, protocol: str, r: Report) -> set
     if PRZYKLAD_RE.search(soul):
         r.err(f"{a.name}: SOUL.md albo {fl.ZASADY_FILE} z przykładem (<example>, „Przykład:”); w prompcie stoją ogólne zasady")
     check_mapa(fleet, a, soul, r)
-    zbudowany = zbudowany_prompt(fleet, a, protocol)
-    tokens = fl.approx_tokens(zbudowany)
-    budzet = SOUL_BUDZET_ORKIESTRATORA if a.name == fleet.orchestrator else fl.SOUL_TOKEN_BUDGET
-    if tokens > budzet:
-        r.err(f"{a.name}: SOUL ~{tokens} tokenów (zbudowany: protokół, kalibracja, ścieżki) > budżet {budzet}")
 
     cfg_text = (d / "config.yaml").read_text(encoding="utf-8") if (d / "config.yaml").exists() else ""
     try:

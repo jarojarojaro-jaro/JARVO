@@ -1,6 +1,6 @@
 <!-- Mapa agenta „od A do Z” (docs/WIEDZA.md §2b, wzorzec: profiles/jarvo/MAPA.md). Sekcje tylko z wiedza/mapa.py SEKCJE,
      w tej kolejności; całość idzie do skarbca (`agenci/jarvo-hacker/jak działa hacker`), do promptu tylko bloki RDZEN
-     (validate.py: najwyżej RDZEN_AGENTA tokenów). Bloki „harmonogram” i „ścieżki” dokłada zasiew. Tekst nad pierwszą
+     (to, co agent musi wiedzieć od razu). Bloki „harmonogram” i „ścieżki” dokłada zasiew. Tekst nad pierwszą
      sekcją nie trafia nigdzie. -->
 
 ## Kim jestem

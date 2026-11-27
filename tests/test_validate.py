@@ -46,8 +46,8 @@ def test_soul_without_protocol_marker(repo_copy):
 
 
 def test_mapa_specjalisty(repo_copy):
-    """22.11 właściciel: każdy agent jak Jarvo. Profil z ZASADY.md ma MAPA.md, znacznik mapy w ZASADY.md, sekcje z
-    wiedza/mapa.py SEKCJE i krótki rdzeń (validate.RDZEN_AGENTA); rdzeń trafia do zbudowanego promptu."""
+    """22.11 właściciel: każdy agent jak Jarvo. Profil z ZASADY.md ma MAPA.md, znacznik mapy w ZASADY.md i sekcje z
+    wiedza/mapa.py SEKCJE; rdzeń trafia do zbudowanego promptu."""
     fleet = fl.load_fleet(nakladka=None)
     web = fleet.agent("jarvo-web")
     protokol = (fl.REPO_ROOT / fleet.raw["shared"]["protocol"]).read_text(encoding="utf-8")
@@ -56,12 +56,9 @@ def test_mapa_specjalisty(repo_copy):
     assert "Jarvo:RDZEN" not in fl.rdzen_mapy(fleet, {}, "jarvo-web") and "### Gdzie co jest" not in fl.rdzen_mapy(fleet, {}, "jarvo-web")
     mapa = repo_copy / "profiles/jarvo-web/MAPA.md"
     tekst = mapa.read_text(encoding="utf-8")
-    mapa.write_text(tekst + "\n## Ciekawostki\nNic.\n"
-                    + "\n## Słownik\n<!-- Jarvo:RDZEN -->\n" + "- długa linia rdzenia, która nie jest potrzebna od razu\n" * 30
-                    + "<!-- /Jarvo:RDZEN -->\n", encoding="utf-8")
+    mapa.write_text(tekst + "\n## Ciekawostki\nNic.\n", encoding="utf-8")
     report = validate.run()
     assert errors_matching(report, r"jarvo-web: MAPA.md ma sekcję 'Ciekawostki' spoza wiedza/mapa.py SEKCJE")
-    assert errors_matching(report, rf"jarvo-web: rdzeń mapy ~\d+ tokenów > {validate.RDZEN_AGENTA}")
     mapa.unlink()
     zasady = repo_copy / "profiles/jarvo-sherlock/ZASADY.md"
     zasady.write_text(zasady.read_text(encoding="utf-8").replace(fl.MAPA_MARKER, ""), encoding="utf-8")
@@ -89,13 +86,6 @@ def test_prompt_bez_przykladow(repo_copy):
     report = validate.run()
     assert errors_matching(report, r"^jarvo: SOUL.md albo ZASADY.md z przykładem")
     assert errors_matching(report, r"^jarvo-web: SOUL.md albo ZASADY.md z przykładem")
-
-
-def test_budzet_soul_na_zbudowanym_tekscie(repo_copy):
-    """19.11: walidator liczył źródło z krótkimi @@ŚCIEŻKAMI@@ (3 400 tok.), a model dostawał 3 673 tok."""
-    zasady = repo_copy / "profiles/jarvo/ZASADY.md"
-    zasady.write_text(zasady.read_text(encoding="utf-8") + "\n" + "@@JARVO_DIR@@ " * 400, encoding="utf-8")
-    assert errors_matching(validate.run(), r"jarvo: SOUL ~\d+ tokenów \(zbudowany")
 
 
 def test_profile_yaml_must_parse(repo_copy):
