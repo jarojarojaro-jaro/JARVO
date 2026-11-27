@@ -292,7 +292,8 @@ def przebieg(root: str) -> int:
     stary = el["Dodaj do koszyka"]["element_token"]
     sprawdz(kod(klik("Pokaż baner")) == "ok", "klik „Pokaż baner” (token świeżej migawki od wejścia): przechodzi")
     w = k.narzedzie("click", {"pid": pid, "window_id": wid, "element_token": stary})
-    sprawdz(zasada(w) == "element_zmieniony" and "„Dodaj do koszyka”; zrób" in tekst(w),
+    sprawdz(zasada(w) == "element_zmieniony" and "„Dodaj do koszyka” jest teraz pod numerem" in tekst(w)
+            and "Odśwież widok" in tekst(w),
             "klik „Dodaj do koszyka” numerem sprzed zmiany strony: zablokowany", tekst(w))
     w, el = stan_okna()
     sprawdz(kod(klik("Dodaj do koszyka")) == "ok", "ten sam klik z nowej migawki: przechodzi")

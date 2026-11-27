@@ -96,6 +96,15 @@ class _ProcesPosix:
     def kill(self) -> None:
         self._sygnal(signal.SIGKILL)
 
+    def dobij_grupe(self) -> None:
+        """Po końcu przeglądarki: reszta jej grupy procesów. Proces sklonowany przez wątek przeglądarki bez exec
+        (Linux z oknem: ładowarka obrazów GTK, wątek „gly-hdl-loader”) potrafi zawisnąć na blokadzie odziedziczonej
+        przy fork i przeżyć przeglądarkę na dni z otwartymi plikami profilu (27.11: od 22.11)."""
+        try:
+            os.killpg(self.pid, signal.SIGKILL)
+        except OSError:
+            pass                                     # grupa pusta: nic nie zostało
+
 
 def _wyzej(fd: int) -> int:
     """Kopia deskryptora o numerze ≥ 10 (z CLOEXEC), żeby dup2 na 3 i 4 zawsze tworzył nowy deskryptor."""
@@ -361,6 +370,8 @@ class Przegladarka:
                 self.proces.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 pass
+        if isinstance(self.proces, _ProcesPosix) and self.proces.poll() is not None:
+            self.proces.dobij_grupe()
         for fd in (self._czyt, self._pisz):
             if fd >= 0:
                 try:

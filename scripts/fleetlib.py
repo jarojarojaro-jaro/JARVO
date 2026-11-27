@@ -273,6 +273,7 @@ class Agent:
     en: dict = field(default_factory=dict)   # angielskie title / hq_label / description (HQ po angielsku)
     oddaj_gdy: str = ""                       # kiedy Jarvo oddaje zadanie temu agentowi (roster w prompcie); tabela generowana
     komputer: bool = False                    # agent z narzędziem computer_use (Komputer Jarva, docs/KOMPUTER.md)
+    pulpit: bool = False                      # agent z narzędziem `pulpit` (programy na ekranie serwera, docs/PULPIT.md)
     # agent biznesowy: slug marki = katalog brands/<marka>/ w skarbcu; widzi w wiedzy tylko swoją markę
     # (docs/FLEET.md „Agenci biznesowi”); "" = bez marki, widzi wszystko
     marka: str = ""
@@ -445,6 +446,7 @@ def _agent(entry: dict, root: Path | None = None) -> Agent:
         en={k: " ".join(str(v).split()) for k, v in (entry.get("en") or {}).items() if v},
         oddaj_gdy=" ".join(str(entry.get("oddaj_gdy", "") or "").split()),
         komputer=entry.get("komputer") is True,
+        pulpit=entry.get("pulpit") is True,
         marka=str(entry.get("marka") or ""),
         root=root,
     )

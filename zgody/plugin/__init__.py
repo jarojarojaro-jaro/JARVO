@@ -13,7 +13,7 @@ Tryby (wybór: `/tryb` w sesji > JARVO_TRYB_ZGOD z `jarvo chat --tryb` > plik st
            karty (HERMES_KANBAN_WORKSPACE); poza nimi approve;
   pelny    tylko na sesję: proces czatu z --yolo albo /yolo, wtedy Hermes sam zatwierdza prośby wtyczki. Wtyczka
            nigdy nie włącza YOLO; pod YOLO blokuje w każdym profilu narzędzia ekranu i telefonu (computer_use,
-           komputer, mcp__phone__*), bo Komputer Jarva i telefon działałyby wtedy bez człowieka.
+           komputer, pulpit, mcp__phone__*), bo Komputer Jarva, pulpit i telefon działałyby wtedy bez człowieka.
 Zawsze, w każdym trybie: zapis config.yaml Hermesa = block; zapis w kodzie floty (skills, plugins, hooks, scripts,
 SOUL.md i mcp.json profili i hosta, <JARVO_ROOT>/program i build, kod Hermesa, Jarva i tej wtyczki) = block z radą
 „zlecenie dla Claude Code w misjach/DLA-CLAUDE.md”, bez pytania (także bez człowieka i pod YOLO); zgoda na AGENTS.md,
@@ -23,7 +23,9 @@ tylko ten sam plik albo to samo polecenie. Pod YOLO o chronione miejsca nie da s
 Telefon (serwer MCP `phone` z PHONEUSE, `jarvo telefon on`): mcp__phone__act i mcp__phone__batch z confirm=true
 (na wierzchu, w args albo w kroku batch) przechodzą bramkę needs_confirm telefonu, więc z człowiekiem to prośba
 z treścią akcji (zgoda = „tak” dla tej jednej akcji, bez zapamiętania), bez człowieka i pod YOLO block. Reszta
-narzędzi telefonu bez zdania wtyczki.
+narzędzi telefonu bez zdania wtyczki. Surowe adb do telefonu floty, które steruje ekranem albo go czyta (input,
+uiautomator dump, screencap, am start, monkey), w każdym trybie = block z radą „narzędzie telefonu”, gdy profil ma ten
+telefon w serwerze `phone`, a jego ciało PhoneUse odpowiada na /ping (pamięć 60 s, brak 15 s); bez ciała adb przechodzi.
 Bez człowieka (karta kanbana, cron, -q, podagent delegate_task, webhook, sesja bez nikogo, kto odpowie na prośbę):
 nigdy approve. Zapisy w katalogu karty, skarbcu (JARVO_KNOWLEDGE_DIR) i misjach (JARVO_MISSIONS_DIR) oraz to, co
 tryb przepuszcza bez pytania w folderze projektu (projekt i pełny), idą dalej; reszta zapisów to block z poradą
@@ -149,7 +151,7 @@ RUTYNY_ODCZYT = frozenset({"list"})                              # cronjob_manag
 # pod YOLO w każdym profilu: narzędzia ekranu i telefonu block (I08, docs/NATYWNIE.md F09), reszta jak w trybie pełnym;
 # ekran i telefon ma Jarvo i agent biznesowy z przydziałem (fleet.yaml `komputer: true`, `jarvo telefon przydziel`),
 # więc blokada nie zależy od profilu: nowy agent z ekranem albo telefonem nie wypada spod niej
-NARZEDZIA_EKRANU = frozenset({"computer_use", "komputer"})
+NARZEDZIA_EKRANU = frozenset({"computer_use", "komputer", "pulpit"})
 # telefon przez PHONEUSE (jarvo telefon on, serwer MCP `phone`): act i batch z confirm=true przechodzą bramkę
 # needs_confirm telefonu, więc confirm daje tylko „tak” człowieka dla tej jednej akcji
 TELEFON = "phone"
@@ -3038,28 +3040,37 @@ _ADB_AKCJA = re.compile(r"\binput\s|\bam\s+(?:start|broadcast|force-stop|kill|st
 _IP = re.compile(r"(?<![\d.])\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?![\d.])")
 _MAPA_TTL = 60.0
 _WIAZANIE_ROZMOWY = 1800.0
-_MAPA: Dict[str, Any] = {"t": 0.0, "ip": {}}                 # IP adb telefonu → nazwa
+_MAPA: Dict[str, Any] = {"t": 0.0, "ip": {}}       # IP adb telefonu → nazwa, plus `wlaczony` i `przydzialy`
 _TELEFON_ZADANIA: "collections.OrderedDict[str, Tuple[str, float]]" = collections.OrderedDict()
 
 
-def _mapa_ip() -> Dict[str, str]:
-    """IP adb telefonu floty → nazwa, z klucza `adresy` w <stan>/telefon.json ({"first": "100.x.y.z:5555"}, ten sam
-    plik co `stan_telefonu` w jarvo/telefon.py; <stan> = <korzeń>/stan obok <korzeń>/dane). Cache _MAPA_TTL s."""
+def _stan_telefonow() -> Dict[str, Any]:
+    """<stan>/telefon.json (ten sam plik co `stan_telefonu` w jarvo/telefon.py; <stan> = <korzeń>/stan obok
+    <korzeń>/dane): `ip` = IP adb telefonu floty → nazwa (z `adresy`, {"first": "100.x.y.z:5555"}), `wlaczony`,
+    `przydzialy` (`profile`: agent biznesowy → telefon). Cache _MAPA_TTL s."""
     teraz = time.monotonic()
     if _MAPA["ip"] and teraz - _MAPA["t"] < _MAPA_TTL:
-        return _MAPA["ip"]
+        return _MAPA
     mapa: Dict[str, str] = {}
+    wlaczony, przydzialy = False, {}
     try:
         plik = _korzen_danych(_hermes_home()).parent / "stan" / "telefon.json"
-        adresy = json.loads(plik.read_text(encoding="utf-8")).get("adresy") or {}
-        for nazwa, adres in adresy.items():
+        dane = json.loads(plik.read_text(encoding="utf-8"))
+        for nazwa, adres in (dane.get("adresy") or {}).items():
             ip = str(adres).rsplit(":", 1)[0].strip()
             if ip:
                 mapa[ip] = str(nazwa)
+        wlaczony = dane.get("wlaczony") is True
+        przydzialy = {str(p): str(t) for p, t in (dane.get("profile") or {}).items()}
     except (OSError, ValueError, AttributeError):
         pass
-    _MAPA.update(t=teraz, ip=mapa)
-    return mapa
+    _MAPA.update(t=teraz, ip=mapa, wlaczony=wlaczony, przydzialy=przydzialy)
+    return _MAPA
+
+
+def _mapa_ip() -> Dict[str, str]:
+    """IP adb telefonu floty → nazwa (_stan_telefonow)."""
+    return _stan_telefonow()["ip"]
 
 
 def _telefony_wywolania(tool_name: str, args: Dict[str, Any]) -> List[str]:
@@ -3114,7 +3125,7 @@ PRYWATNE_NUMERY = ("jarvo", "konfig", "prywatne-numery.json")
 # 27.11 JARO zdecydował, że prywatny numer jest obowiązkowy w zgłoszeniach Hackera i Bigshorta na hackathony i granty.
 PROFILE_PRYWATNEGO_NUMERU = frozenset({"jarvo-hacker", "jarvo-bigshort"})
 NARZEDZIA_TEKSTU = frozenset({"terminal", "execute_code", "process_manage", "browser_type", "browser_fill",
-                              "send_message", "computer_use", "komputer", "write_file", "patch"})
+                              "send_message", "computer_use", "komputer", "pulpit", "write_file", "patch"})
 _CIAG_CYFR = re.compile(r"\d[\d\s().\-]{7,}\d")
 _NUMERY_CACHE: Dict[str, Tuple[Tuple[int, int], frozenset]] = {}
 
@@ -3176,6 +3187,92 @@ def _adb_niszczace(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[str, s
     logger.warning("jarvo-zgody: zablokowane niszczące polecenie adb (%s)", tool_name)
     return _blok("Czyszczenie danych, odinstalowanie, wyłączenie aplikacji i kasowanie plików na telefonie floty albo "
                  "to, co odcina telefon od sieci, tylko na wyraźne polecenie JARO: zapytaj go jednym zdaniem.")
+
+
+# 27.11 Jarvo czytał Sklep Play surowym `uiautomator dump` z grepem, wziął planszę „Complete account setup” za płatność
+# i nie przewinął do „Skip”; w 7 dni 377 kroków adb obok PhoneUse. Adb, które steruje ekranem telefonu floty albo go
+# czyta, idzie do narzędzia telefonu (bramka, paragon, cały ekran z flagami), gdy ciało PhoneUse tego telefonu odpowiada
+# i profil ma ten telefon w serwerze `phone`; bez ciała adb działa jak dawniej. Instalacja, pm list, dumpsys, getprop
+# i logcat zostają wolne. Odpowiedź ciała (GET /ping bez tokenu, ~0,15 s) pamiętamy, żeby nie spowalniać poleceń.
+_ODST = r"['\"]?(?:\s*,\s*|\s+)['\"]?"                  # odstęp w powłoce albo w liście argumentów (subprocess)
+ADB_EKRAN = re.compile(
+    rf"\binput{_ODST}(?:-d{_ODST}\S+?{_ODST})?(?:tap|swipe|text|keyevent|press|roll|draganddrop|motionevent|"
+    r"keycombination|touchscreen|touchpad|touchnavigation|mouse|keyboard|stylus|gamepad|dpad|trackball|joystick)\b|"
+    rf"\buiautomator{_ODST}dump\b|\bscreencap\b|\bam{_ODST}start(?:-activity)?\b|\bmonkey\b", re.I)
+_SERIAL_ADB = re.compile(r"\badb\b[^;&|\n]*?\s-s\s*['\"]?([^\s'\";&|)]+)|\bANDROID_SERIAL\s*=\s*['\"]?([^\s'\";&|)]+)",
+                         re.I)
+PORT_CIALA = 18888                 # ciało PhoneUse na adresie Tailscale telefonu (PHONEUSE docs/body-api.md, sekcja 3)
+_CIALO_TIMEOUT = 0.8
+_CIALO_ZYWE_TTL = 60.0
+_CIALO_MARTWE_TTL = 15.0
+_CIALA: Dict[str, Tuple[bool, float]] = {}
+
+
+def _telefony_adb(tekst: str) -> List[str]:
+    """Telefony floty, w które celuje polecenie adb: po IP z telefon.json; bez IP i bez jawnego serialu (adb bez -s,
+    serial w zmiennej) każdy telefon floty; jawny inny serial (emulator, obcy telefon) = []."""
+    mapa = _mapa_ip()
+    trafione = list(dict.fromkeys(mapa[ip] for ip in _IP.findall(tekst) if ip in mapa))
+    if trafione:
+        return trafione
+    if any("$" not in s for m in _SERIAL_ADB.finditer(tekst) for s in m.groups() if s):
+        return []
+    return list(dict.fromkeys(mapa.values()))
+
+
+def _telefony_profilu() -> frozenset:
+    """Telefony, które ten profil ma w serwerze MCP `phone` (jarvo/telefon.py): jarvo wszystkie, agent biznesowy
+    swój przydział, przy wyłączonym telefonie żaden."""
+    st = _stan_telefonow()
+    if not st.get("wlaczony"):
+        return frozenset()
+    profil = _profil(_hermes_home())
+    if profil == "jarvo":
+        return frozenset(st["ip"].values())
+    t = (st.get("przydzialy") or {}).get(profil)
+    return frozenset({t}) if t else frozenset()
+
+
+def _cialo_odpowiada(nazwa: str) -> bool:
+    """Ciało PhoneUse telefonu odpowiada na GET /ping (bez tokenu) i ma token; wynik pamiętany 60 s, brak 15 s."""
+    ip = next((i for i, n in _mapa_ip().items() if n == nazwa), None)
+    if not ip:
+        return False
+    teraz = time.monotonic()
+    with _ZAMEK:
+        hit = _CIALA.get(nazwa)
+    if hit and teraz - hit[1] < (_CIALO_ZYWE_TTL if hit[0] else _CIALO_MARTWE_TTL):
+        return hit[0]
+    import urllib.request
+    zywe = False
+    try:
+        otwieracz = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with otwieracz.open(f"http://{ip}:{PORT_CIALA}/ping", timeout=_CIALO_TIMEOUT) as r:
+            ping = json.loads(r.read(8192).decode("utf-8", "replace"))
+        zywe = ping.get("service") == "PhoneUseBody" and ping.get("token_set") is not False
+    except (OSError, ValueError, AttributeError):
+        pass
+    with _ZAMEK:
+        _CIALA[nazwa] = (zywe, teraz)
+    return zywe
+
+
+def _adb_ekranu(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[str, str]]:
+    pole = {"terminal": "command", "execute_code": "code", "process_manage": "data"}.get(tool_name)
+    tekst = str(args.get(pole) or "")[:_MAX_POLECENIA] if pole else ""
+    if not (_ADB.search(tekst) and ADB_EKRAN.search(tekst)):
+        return None
+    wolno = _telefony_profilu()
+    zywe = [t for t in _telefony_adb(tekst) if t in wolno and _cialo_odpowiada(t)]
+    if not zywe:
+        return None
+    logger.warning("jarvo-zgody: surowe adb ekranu przy działającym ciele PhoneUse %s (%s)", zywe, tool_name)
+    t = zywe[0]
+    return _blok(f"Ciało PhoneUse telefonu {t} działa, więc ekran czytasz i sterujesz nim narzędziem telefonu z "
+                 f"phone=\"{t}\" (`mcp__phone__screen`, `act`, `batch`, `wait`, `shot`; `am start` to `act` `open` "
+                 "z `url` albo `package`, pętla w skillu `telefon`), a nie surowym adb (input, uiautomator dump, "
+                 "screencap, am start, monkey), bo ono omija bramkę, paragon i cały ekran z flagami; instalacja APK, "
+                 "`pm list`, `dumpsys`, `getprop` i `logcat` przez adb są wolne.")
 
 
 def _blok_werdyktow(werdykty: List[_Werdykt], m: _Miejsca, co: str) -> Dict[str, str]:
@@ -3667,7 +3764,7 @@ def straznik_zgod(tool_name: str = "", args: Optional[Dict[str, Any]] = None, ta
     Wyjątek = block (fail-closed, bez treści argumentów w komunikacie)."""
     try:
         tool_name, args = str(tool_name or ""), args if isinstance(args, dict) else {}
-        wynik = (_prywatny_numer(tool_name, args) or _adb_niszczace(tool_name, args)
+        wynik = (_prywatny_numer(tool_name, args) or _adb_niszczace(tool_name, args) or _adb_ekranu(tool_name, args)
                  or _decyzja(tool_name, args, str(task_id or "")))
         if not wynik or wynik.get("action") != "block":     # zablokowane wywołanie nie wiąże telefonu
             wynik = _jeden_telefon(tool_name, args, str(task_id or ""), str(session_id or "")) or wynik
@@ -3795,7 +3892,8 @@ def polecenie_tryb(raw_args: str = "") -> str:
 # ------------------------------------------------------------------------------------------------ rejestracja
 
 def register(ctx) -> None:
-    """Hak pre_tool_call (bez niego wtyczka nie chroni, więc błąd rejestracji przerywa ładowanie) i polecenie /tryb."""
+    """Hak pre_tool_call (bez niego wtyczka nie chroni, więc błąd rejestracji przerywa ładowanie), polecenie /tryb
+    i obraz z narzędzi MCP jako obraz dla modelu głównego (obraz.py)."""
     _zamroz()
     ctx.register_hook("pre_tool_call", straznik_zgod)
     try:
@@ -3804,3 +3902,8 @@ def register(ctx) -> None:
                              args_hint="[auto|projekt|pytaj|pelny]")
     except Exception as e:
         logger.warning("jarvo-zgody: polecenie /tryb niezarejestrowane: %s", e)
+    try:
+        from . import obraz
+        obraz.zarejestruj(ctx)
+    except Exception as e:
+        logger.warning("jarvo-zgody: obraz z narzędzi MCP niezarejestrowany: %s", e)

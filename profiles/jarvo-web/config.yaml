@@ -38,7 +38,7 @@ terminal:
 # natywny wpisuje engine: chrome (docs/NATYWNIE.md C06).
 browser:
   backend: "off"                  # bez trybu Browser Use (uvx browser-use pobierany w locie)
-  engine: lightpanda
+  engine: chrome                 # Chrome z trwałym profilem agenta (nakładka infra/bin/agent_browser.py)
   inactivity_timeout: 120
 
 # Wiadomości głosowe: Parakeet (jarvo-stt) uruchamiany na czas transkrypcji (HERMES_LOCAL_STT_COMMAND).

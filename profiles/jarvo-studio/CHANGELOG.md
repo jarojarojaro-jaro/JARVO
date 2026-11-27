@@ -1,6 +1,9 @@
 # Changelog: jarvo-studio
 
 ## Niewydane
+- `browser_*` działa na Chrome z trwałym profilem przeglądarki (logowania zostają między zadaniami), nawigacja zwraca zwartą listę elementów z refami i tekstem, klik, klawisz i Wstecz zwracają widok strony po ustaleniu, a blokada antybotowa mówi wprost: telefon floty, potem `kanban_block`.
+- Narzędzie `pulpit` (wtyczka `jarvo-pulpit`, docs/PULPIT.md) otwiera na pulpicie serwera GIMP i Inkscape (pobierany przy pierwszym uruchomieniu), a skille `pulpit` i `gimp` (Python-Fu bez okna, potem okno do poprawek) mówią, kiedy skrypt, a kiedy okno.
+- Obraz z narzędzi (zrzut, `shot` telefonu, `vision_analyze`) widzisz od razu jako obraz w wyniku narzędzia, bez osobnego opisu modelu pomocniczego, a wszystkie narzędzia są w zestawie od razu, bez `tool_search`.
 - SOUL w układzie Jarva: postać (SOUL), procedury (ZASADY), mapa (MAPA); zasada pamięci w `memory`; zbudowany prompt przed/po: 10 717 → 11 099 znaków (ok. 3063 → 3172 tokenów; przybył rdzeń mapy i zasada pamięci).
 - Wtyczka `jarvo-zgody` w każdym trybie blokuje `kill`, `pkill` i `killall` pracownika karty kanbana albo Hermesa (16.11 zabity pracownik karty wracał trzy razy jako „protocol violation”): swoją kartę kończysz `kanban_block` albo `kanban_complete`, a własne procesy (render, serwer) zatrzymujesz jak dotąd. Odrzuca też tekst narzędzi kanbana i zapis w misjach albo skarbcu, który przypisuje decyzję właścicielowi („decyzja właściciela”, „właściciel zdecydował”) bez jego słów w cudzysłowie i godziny; bez cytatu to decyzja agenta.
 - `publikacja` 1.1.0: zgoda na publikację to słowa właściciela w cudzysłowie z datą, godziną, zakresem i wersją; „decyzja Jarva” albo decyzja bez jego słów to nie zgoda.

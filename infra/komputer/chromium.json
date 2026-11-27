@@ -1,5 +1,5 @@
 {
-  "PasswordManagerEnabled": false,
+  "PasswordManagerEnabled": true,
   "PasswordLeakDetectionEnabled": false,
   "AutofillCreditCardEnabled": false,
   "AutofillAddressEnabled": false,

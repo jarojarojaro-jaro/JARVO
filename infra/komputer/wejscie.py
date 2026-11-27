@@ -531,6 +531,42 @@ class KontekstSesji:
             a, b = stare.get(a["parent_index"]), nowe.get(a["parent_index"])
         return False
 
+    @staticmethod
+    def opis_zmiany(stare: dict, nowe: dict, indeks: int) -> str:
+        """Zdanie dla agenta, czym element pod numerem `indeks` świeżej migawki różni się od tego z jego migawki
+        (rola i napis, a gdy te są takie same, miejsce na stronie: rodzic albo głębokość) i gdzie jest teraz element
+        o tej samej roli i napisie, jeśli jest jeden taki."""
+        def nazwa(e: dict | None) -> str:
+            if not e:
+                return "nic"
+            tekst, _ = zasady.ukryj_sekrety(f"{e.get('role') or '?'} „{(e.get('label') or '')[:60]}”")
+            return tekst
+
+        def znak(e: dict | None) -> tuple:
+            return (e or {}).get("role"), (e or {}).get("label") or ""
+
+        a, b = stare.get(indeks), nowe.get(indeks)
+        if b is None:
+            zdanie = f"elementu numer {indeks} już nie ma (był {nazwa(a)})"
+        elif znak(a) != znak(b):
+            zdanie = f"pod numerem {indeks} jest teraz {nazwa(b)}, a był {nazwa(a)}"
+        else:
+            ra, rb = stare.get(a.get("parent_index")), nowe.get(b.get("parent_index"))
+            if znak(ra) != znak(rb):
+                gdzie = f"w {nazwa(rb)}, a był w {nazwa(ra)}"
+            elif a.get("depth") != b.get("depth"):
+                gdzie = f"na innym poziomie drzewa ({b.get('depth')} zamiast {a.get('depth')})"
+            else:
+                gdzie = "pod innym elementem nadrzędnym (strona przesunęła elementy wyżej w drzewie)"
+            zdanie = f"pod numerem {indeks} jest {nazwa(b)} o tym samym napisie, ale w innym miejscu strony: {gdzie}"
+        if a is not None:
+            tacy = [i for i, e in nowe.items() if i != indeks and znak(e) == znak(a)]
+            if len(tacy) == 1:
+                zdanie += f"; {nazwa(a)} jest teraz pod numerem {tacy[0]}"
+            elif tacy:
+                zdanie += f"; takich elementów jest teraz {len(tacy)} (numery {', '.join(map(str, sorted(tacy)[:5]))})"
+        return zdanie
+
     def _z_migawki(self, sid: str | None, indeks) -> dict | None:
         m = self.migawki.get(sid or "")
         if not m:
@@ -877,15 +913,11 @@ class Sesja:
                                   cel=w.cel), args
         nowe = {e.get("element_index"): e for e in sc["elements"] if isinstance(e, dict)}
         if not KontekstSesji.ten_sam(m["elementy"], nowe, indeks):
-            def opis(e: dict) -> str:
-                tekst, _ = zasady.ukryj_sekrety(f"{e.get('role') or '?'} „{(e.get('label') or '')[:60]}”")
-                return tekst
-            teraz = nowe.get(indeks)
             return zasady.Werdykt(zasady.ODMOWA, "element_zmieniony",
-                                  f"strona zmieniła się od migawki: pod numerem {indeks} jest teraz "
-                                  f"{opis(teraz) if teraz else 'inny element'} zamiast "
-                                  f"{opis(m['elementy'][indeks])}; zrób get_window_state jeszcze raz i wybierz "
-                                  f"element z nowej migawki", cel=w.cel), args
+                                  f"strona zmieniła się od Twojego widoku, więc nic nie kliknąłem: "
+                                  f"{KontekstSesji.opis_zmiany(m['elementy'], nowe, indeks)}. Odśwież widok "
+                                  "(get_window_state, w narzędziu `komputer`: patrz) i działaj numerem z nowego "
+                                  "widoku", cel=w.cel), args
         token = (nowe[indeks].get("element_token") if isinstance(nowe[indeks].get("element_token"), str)
                  else f"{sid}:{indeks}")
         swieze = dict(args)

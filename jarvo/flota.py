@@ -54,9 +54,22 @@ ZNACZNIK_PANELU = ".odcisk-panelu"                    # <dane>/plugins: odcisk w
 USTAWIENIA_PROFILI = "flota-ustawienia.json"          # <stan>: klucze configu profili zależne od instalacji
 # compression (27.11 decyzja właściciela): modele DeepSeek (okno 1M) kompresują rozmowę przy 700 tys. tokenów, bez
 # kompresji po przerwie; klucze są jawne, bo instalacja dopisuje wartości i nie usuwa starych.
+# Oczy (27.11): Hermes nie zna katalogu models.dev dla commandcode, więc bez wpisu modelu traktuje każdy model jako
+# tekstowy, a zrzut (computer_use, pulpit, shot telefonu, vision_analyze) idzie przez osobne wywołanie opisu obrazu.
+# Próba na żywo 27.11 (obraz w wyniku narzędzia): V4.1 Flash, V4 Flash i Kimi K2.6 czytają napis, V4 Pro gubi obraz
+# bez błędu.
+# vision_analyze przez model pomocniczy zostaje tylko zapasem dla modelu bez obrazu: krótki limit, małe rozumowanie.
+# tool_search wyłączony: narzędzia telefonu (MCP), ekranu i pulpitu są w tablicy narzędzi od razu, bez mostka
+# tool_search → tool_describe → tool_call (34 błędy formatu w 7 dni; odłożonych było 3 do 13 narzędzi).
+MODELE_Z_OBRAZEM = {"commandcode": {"deepseek/deepseek-v4.1-flash": True, "deepseek/deepseek-v4-flash": True,
+                                    "moonshotai/Kimi-K2.6": True, "deepseek/deepseek-v4-pro": False}}
 KLUCZE_WSZYSTKICH = {"updates.check": False,          # jak hermes.BEZPIECZNE dla hosta (build ich nie ustawia)
                      "compression.model_thresholds.deepseek": 0.7, "compression.threshold_tokens": 700000,
-                     "compression.idle_compact_after_seconds": 0}
+                     "compression.idle_compact_after_seconds": 0,
+                     **{f"providers.{dostawca}.models": {m: {"supports_vision": v} for m, v in modele.items()}
+                        for dostawca, modele in MODELE_Z_OBRAZEM.items()},
+                     "auxiliary.vision.timeout": 45, "auxiliary.vision.reasoning_effort": "low",
+                     "tools.tool_search.enabled": "off"}
 CZAS_BUILDU = 3600.0             # pierwszy build klonuje 34 repo skilli (ok. 0,9 GB), kolejne biorą je z <cache>/build
 CZAS_INSTALACJI = 3600.0         # profile update kopiuje skille 10 profili, zasiew skarbca, lint
 # Tokeny ścieżek E4 (wspólny kontrakt build.py, install_fleet.py i skilli; docs/NATYWNIE.md S06, F12, F14, F17)

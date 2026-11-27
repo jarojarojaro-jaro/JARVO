@@ -180,6 +180,21 @@ if [[ -d "$BUILD/plugins/jarvo-komputer" ]]; then
   done
 fi
 
+# 3c'''. wyniki browser_* (docs/KOMPUTER.md „Przeglądarka agentów floty”): wtyczka jarvo-przegladarka w każdym profilu,
+# który ją włącza (config z buildu); w pozostałych dowiązanie znika
+if [[ -d "$BUILD/plugins/jarvo-przegladarka" ]]; then
+  log "Wtyczka jarvo-przegladarka (wyniki browser_*)"
+  put_plugin jarvo-przegladarka
+  for a in $AGENTS; do
+    if grep -q "jarvo-przegladarka" "$BUILD/profiles/$a/config.yaml" 2>/dev/null; then
+      mkdir -p "$DATA/profiles/$a/plugins"
+      ln -sfn "$DATA/plugins/jarvo-przegladarka" "$DATA/profiles/$a/plugins/jarvo-przegladarka"
+    else
+      rm -f "$DATA/profiles/$a/plugins/jarvo-przegladarka"
+    fi
+  done
+fi
+
 # 3d. branding terminala: skórka "jarvo" dla hosta i każdego profilu (display.skin w config.yaml)
 if [[ -f "$REPO/branding/skin-jarvo.yaml" ]]; then
   for home in "$DATA" "$DATA"/profiles/*/; do

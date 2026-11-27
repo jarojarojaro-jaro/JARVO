@@ -94,6 +94,7 @@ agents:
       description: >-
         The fleet lead. Takes requests, opens missions, splits them into kanban cards for the specialists, reviews results against the Definition of Done and reports. Does screen work (Jarvo's Computer), the owner's phone, accounts and the terminal himself; does no domain work of the specialists.
     komputer: true      # computer_use i narzędzie `komputer` na Komputerze Jarva, wtyczka jarvo-komputer (docs/KOMPUTER.md)
+    pulpit: true        # narzędzie `pulpit`: programy z oknami na ekranie serwera :0 (GIMP, LibreOffice, edytor HQ), wtyczka jarvo-pulpit (docs/PULPIT.md)
     status: active
 
   - name: jarvo-sherlock
@@ -172,6 +173,7 @@ agents:
       description: >-
         Promo graphics, social media posts, living photos (loops and PSD layers), copy, campaigns and publishing calendars, all on brand. Orders videos from the Videographer. Prepares packages; never publishes without approval.
     oddaj_gdy: "treść albo grafika ma reprezentować markę publicznie: copy, grafiki social, kampania, kalendarz postów"
+    pulpit: true        # GIMP i Inkscape na pulpicie serwera (miniatury, grafiki); wtyczka jarvo-pulpit (docs/PULPIT.md)
     status: active
 
   - name: jarvo-wideo
@@ -201,6 +203,7 @@ agents:
       description: >-
         Video end to end: short films for TikTok, Reels and Shorts from a topic (script, stock, AI or own footage, Polish voice-over, karaoke captions, music, editing), A/B variants, editing the user's recordings, reels from long recordings (clipmaker: editable in HQ, karaoke captions), videos from code (HyperFrames, Manim), AI video, Polish captions, platform formats, quality control. Prepares files; never publishes without approval.
     oddaj_gdy: "film: montaż, lektor, napisy, klipy z długiego nagrania, wideo na platformy, demo strony"
+    pulpit: true        # Kdenlive i edytor HQ na pulpicie serwera (podgląd i poprawki montażu); wtyczka jarvo-pulpit (docs/PULPIT.md)
     status: active
 
   - name: jarvo-ads

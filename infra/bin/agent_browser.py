@@ -43,9 +43,11 @@ import glob
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 from pathlib import Path
 
@@ -80,6 +82,20 @@ Jarvo: snapshot jest do klikania, nie do czytania treści.
   Treść z cenami: agent-browser read <url> albo, po open, samo agent-browser read (strona po JavaScripcie).
   Refy do klikania: agent-browser snapshot -i -c.
 """
+
+# przeglądarka agenta (silnik chrome): flagi startu, profil, widok strony
+FLAGI_CHROME = ("--disable-blink-features=AutomationControlled", "--lang=pl", "--accept-lang=pl-PL,pl,en-US,en",
+                "--disk-cache-size=104857600")
+KATALOG_PRZEGLADARKI = "przegladarka"      # w HERMES_HOME profilu agenta: profil/, sesje/, wlasciciel, zamek
+ZAJECIE_S = 60.0                           # s: profil zajęty przez sesję, której przeglądarka jeszcze startuje
+WIERSZ_DRZEWA = re.compile(r'^([A-Za-z]+)(?: "((?:[^"\\]|\\.)*)")?(?: \[([^\]]*)\])?(.*)$')
+BEZ_TRESCI = frozenset({"ListMarker"})
+W_AKAPICIE = frozenset({"link", "emphasis", "strong", "code", "mark", "superscript", "subscript", "Abbr", "time"})
+USTALENIE_MS = 200
+USTALENIE_JS = ("new Promise(r=>{let t=Date.now();const o=new MutationObserver(()=>{t=Date.now()});"
+                "o.observe(document,{subtree:true,childList:true,attributes:true,characterData:true});"
+                "const k=Date.now()+2500;(function c(){if((document.readyState==='complete'&&Date.now()-t>="
+                f"{USTALENIE_MS})||Date.now()>k){{o.disconnect();r(true)}}else setTimeout(c,50)}})()}})")
 
 # program w bin-floty
 ARGUMENTY_PYTHONA = ("-I", "-S", "-X", "utf8")   # bez PYTHONPATH, site-packages i katalogu bieżącego; UTF-8 zawsze
@@ -191,19 +207,294 @@ def silnik(globalne: list[str], env: dict) -> str:
     return (wartosc(globalne, "--engine") or env.get("AGENT_BROWSER_ENGINE") or "chrome").strip().lower()
 
 
+def zewnetrzna(globalne: list[str], env: dict) -> bool:
+    """Sesja na cudzej przeglądarce (CDP, dostawca w chmurze, przeglądarka właściciela): bez naszych flag i profilu."""
+    return (wartosc(globalne, "--cdp") is not None or wartosc(globalne, "--provider") is not None
+            or wartosc(globalne, "-p") is not None or bool(env.get("AGENT_BROWSER_PROVIDER"))
+            or wlaczona(globalne, "--auto-connect"))
+
+
+def program_chrome(env: dict) -> str:
+    """Chromium dla silnika chrome: pełny Chrome for Testing Komputera (JARVO_KOMPUTER_CHROME, gdy jest), bo
+    chrome-headless-shell (CHROME_PATH) to stary tryb bez okna, który antyboty rozpoznają po samym odcisku."""
+    for zmienna in ("JARVO_KOMPUTER_CHROME", "CHROME_PATH"):
+        sciezka = env.get(zmienna) or ""
+        if sciezka and os.path.isfile(sciezka):
+            return sciezka
+    return ""
+
+
+def user_agent(program: str) -> str | None:
+    """User-agent jak Chrome z oknem tej samej wersji (wersja z katalogu manifestu, np. …/157.0.8103.78/…): przeglądarka
+    w tle przedstawia się „HeadlessChrome”, a to blokuje wiele stron od pierwszego żądania."""
+    wersja = re.search(r"[/\\](\d+)\.\d+\.\d+\.\d+[/\\]", program)
+    if not wersja:
+        return None
+    system = {"win32": "Windows NT 10.0; Win64; x64", "darwin": "Macintosh; Intel Mac OS X 10_15_7"}.get(
+        sys.platform, "X11; Linux x86_64")
+    return (f"Mozilla/5.0 ({system}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{wersja.group(1)}.0.0.0 "
+            "Safari/537.36")
+
+
 def srodowisko(globalne: list[str], env: dict) -> dict:
-    """Środowisko binarki: silnik inny niż Lightpanda dostaje Chromium z instalacji (CHROME_PATH), gdy nikt nie podał
-    własnego (AGENT_BROWSER_EXECUTABLE_PATH, --executable-path). Bez tego agent-browser szukałby Chrome w systemie
-    (np. przeglądarki właściciela) albo prosił o `agent-browser install`. Od 0.41.2 agent-browser przy starcie
-    przeglądarki pyta chromereleases.googleblog.com o poprawki CVE nowszego Chrome: w Jarvie wersję Chromium daje
-    manifest instalacji, a nowe wydania śledzi Jarvo, więc tego zapytania nie ma (AGENT_BROWSER_NO_VERSION_CHECK)."""
+    """Środowisko binarki. Silnik inny niż Lightpanda dostaje Chromium z instalacji (program_chrome), gdy nikt nie
+    podał własnego (AGENT_BROWSER_EXECUTABLE_PATH, --executable-path): bez tego agent-browser szukałby Chrome w systemie
+    (np. przeglądarki właściciela) albo prosił o `agent-browser install`. Przeglądarka, którą agent-browser uruchamia
+    sam, dostaje FLAGI_CHROME (bez navigator.webdriver, polski język, pamięć podręczna do 100 MB) i user-agenta bez
+    „HeadlessChrome”, jak Komputer Jarva. Od 0.41.2 agent-browser przy starcie przeglądarki pyta
+    chromereleases.googleblog.com o poprawki CVE nowszego Chrome: w Jarvie wersję Chromium daje manifest instalacji,
+    a nowe wydania śledzi Jarvo, więc tego zapytania nie ma (AGENT_BROWSER_NO_VERSION_CHECK)."""
     env = dict(env)
     env.setdefault("AGENT_BROWSER_NO_VERSION_CHECK", "1")
-    chrome = env.get("CHROME_PATH") or ""
-    if (silnik(globalne, env) != "lightpanda" and not env.get("AGENT_BROWSER_EXECUTABLE_PATH")
-            and wartosc(globalne, "--executable-path") is None and chrome and os.path.isfile(chrome)):
+    if silnik(globalne, env) == "lightpanda":
+        return env
+    chrome = program_chrome(env)
+    if not env.get("AGENT_BROWSER_EXECUTABLE_PATH") and wartosc(globalne, "--executable-path") is None and chrome:
         env["AGENT_BROWSER_EXECUTABLE_PATH"] = chrome
+    if zewnetrzna(globalne, env):
+        return env
+    obecne = env.get("AGENT_BROWSER_ARGS") or env.get("AGENT_BROWSER_CHROME_FLAGS") or ""
+    nowe = [f for f in FLAGI_CHROME if f.split("=", 1)[0] not in obecne]
+    # user-agent flagą Chrome, nie AGENT_BROWSER_USER_AGENT: nadpisanie przez CDP zostawia pustą listę marek
+    # (navigator.userAgentData.brands), a to zdradza automat tak samo jak „HeadlessChrome”
+    ua = user_agent(env.get("AGENT_BROWSER_EXECUTABLE_PATH") or chrome)
+    if (ua and "--user-agent" not in obecne and not env.get("AGENT_BROWSER_USER_AGENT")
+            and wartosc(globalne, "--user-agent") is None):
+        nowe.append(f"--user-agent={ua}")
+    if nowe and wartosc(globalne, "--args") is None:
+        env["AGENT_BROWSER_ARGS"] = ("\n" if "\n" in obecne else ",").join([obecne, *nowe] if obecne else nowe)
     return env
+
+
+# ------------------------------------------------------------------ profil przeglądarki agenta
+
+def _sesja(globalne: list[str], env: dict) -> str:
+    nazwa = wartosc(globalne, "--session") or env.get("AGENT_BROWSER_SESSION") or "default"
+    return re.sub(r"[^\w-]", "_", nazwa)[:100] or "default"
+
+
+def _zyje(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if WINDOWS:
+        import ctypes
+        uchwyt = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)      # PROCESS_QUERY_LIMITED_INFORMATION
+        if uchwyt:
+            ctypes.windll.kernel32.CloseHandle(uchwyt)
+        return bool(uchwyt)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def profil_zajety(profil: Path) -> bool:
+    """Czy Chrome działa na tym profilu: POSIX dowiązanie SingletonLock („host-pid”) z żywym procesem, Windows plik
+    lockfile otwarty przez przeglądarkę."""
+    if WINDOWS:
+        try:
+            fd = os.open(str(profil / "lockfile"), os.O_RDWR)
+        except FileNotFoundError:
+            return False
+        except OSError:
+            return True
+        os.close(fd)
+        return False
+    try:
+        cel = os.readlink(profil / "SingletonLock")
+    except OSError:
+        return False
+    pid = cel.rpartition("-")[2]
+    return pid.isdigit() and _zyje(int(pid))
+
+
+class _Zamek:
+    """Blokada pliku na czas decyzji o profilu (dwie sesje startujące naraz nie dostaną tego samego profilu)."""
+
+    def __init__(self, plik: Path):
+        self.plik = plik
+
+    def __enter__(self):
+        self.fd = os.open(str(self.plik), os.O_RDWR | os.O_CREAT, 0o600)
+        if WINDOWS:
+            import msvcrt
+            koniec = time.monotonic() + 10
+            while True:
+                try:
+                    msvcrt.locking(self.fd, msvcrt.LK_NBLCK, 1)
+                    break
+                except OSError:
+                    if time.monotonic() > koniec:
+                        raise
+                    time.sleep(0.05)
+        else:
+            import fcntl
+            fcntl.flock(self.fd, fcntl.LOCK_EX)
+        return self
+
+    def __exit__(self, *_):
+        if WINDOWS:
+            import msvcrt
+            try:
+                msvcrt.locking(self.fd, msvcrt.LK_UNLCK, 1)
+            except OSError:
+                pass
+        os.close(self.fd)
+
+
+def profil_agenta(globalne: list[str], polecenie: list[str], env: dict) -> list[str]:
+    """Trwały profil przeglądarki agenta (`<HERMES_HOME>/przegladarka/profil`: logowania i ciasteczka przeżywają
+    zadania i restarty) jako flagi `--profile <katalog>` do dopisania, albo [] (Lightpanda, cudza przeglądarka, własny
+    profil lub stan podany wprost, brak HERMES_HOME). Profil ma naraz jedna przeglądarka, więc pierwsza sesja agenta
+    go zajmuje, a druga, gdy profil jest zajęty, działa na profilu chwilowym jak dotąd. Decyzja jest stała dla sesji
+    (plik `sesje/<sesja>`): każde polecenie tej sesji dostaje te same flagi, bo inne flagi agent-browser uznałby za
+    nową przeglądarkę. `close` zwalnia profil."""
+    dom = env.get("HERMES_HOME") or ""
+    if (not dom or silnik(globalne, env) == "lightpanda" or zewnetrzna(globalne, env)
+            or wartosc(globalne, "--profile") is not None or wartosc(globalne, "--state") is not None
+            or any(a == "--restore" or a.startswith("--restore=") for a in globalne)
+            or env.get("AGENT_BROWSER_PROFILE") or env.get("AGENT_BROWSER_STATE") or env.get("AGENT_BROWSER_RESTORE")):
+        return []
+    katalog = Path(dom) / KATALOG_PRZEGLADARKI
+    profil, sesje = katalog / "profil", katalog / "sesje"
+    sesja = _sesja(globalne, env)
+    plik = sesje / sesja
+    try:
+        sesje.mkdir(parents=True, exist_ok=True)
+        with _Zamek(katalog / "zamek"):
+            decyzja = plik.read_text(encoding="utf-8").strip() if plik.is_file() else ""
+            if not decyzja:
+                decyzja = _decyzja(katalog, sesja)
+                plik.write_text(decyzja, encoding="utf-8")
+            if (polecenie[:1] == ["close"]):
+                plik.unlink(missing_ok=True)
+                wlasciciel = katalog / "wlasciciel"
+                if decyzja == "profil" and wlasciciel.is_file() and wlasciciel.read_text(
+                        encoding="utf-8").split("\n", 1)[0] == sesja:
+                    wlasciciel.unlink(missing_ok=True)
+    except OSError:
+        return []
+    return ["--profile", str(profil)] if decyzja == "profil" else []
+
+
+def _decyzja(katalog: Path, sesja: str) -> str:
+    """„profil”, gdy profil agenta jest wolny (żadna przeglądarka go nie trzyma i żadna inna sesja nie zajęła go przed
+    chwilą, ZAJECIE_S), inaczej „chwilowy”. Przy okazji usuwa decyzje sesji starszych niż doba."""
+    teraz = time.time()
+    for stary in (katalog / "sesje").iterdir():
+        try:
+            if teraz - stary.stat().st_mtime > 86400:
+                stary.unlink()
+        except OSError:
+            pass
+    wlasciciel = katalog / "wlasciciel"
+    try:
+        kto, _, kiedy = wlasciciel.read_text(encoding="utf-8").partition("\n")
+        swiezy = (kto != sesja and (katalog / "sesje" / kto).is_file()
+                  and teraz - float(kiedy or 0) < ZAJECIE_S)
+    except (OSError, ValueError):
+        swiezy = False
+    if swiezy or profil_zajety(katalog / "profil"):
+        return "chwilowy"
+    wlasciciel.write_text(f"{sesja}\n{teraz}", encoding="utf-8")
+    return "profil"
+
+
+# ------------------------------------------------------------------ widok strony dla Hermesa (snapshot -c)
+
+def zwiezly_widok(drzewo: str) -> str:
+    """Drzewo dostępności agent-browsera (`snapshot -c`) jako zwarta lista: jeden element na wiersz bez wcięć,
+    kontrolki z refem na początku (`[e12] button "Szukaj"`), tekst strony w tej samej kolejności, a tekst i linki
+    jednego akapitu w jednym wierszu. Węzły bez nazwy, refu i atrybutów (generic, list, listitem, row…) i znaczniki
+    list znikają. Na stronach z dużą ilością tekstu wychodzi ok. połowa znaków przy tych samych refach i treści."""
+    wiersze: list[str] = []
+    akapit: list[str] = []
+    poprzedni = ""
+
+    def zamknij() -> None:
+        if akapit:
+            wiersze.append(" ".join(akapit))
+            akapit.clear()
+
+    for linia in drzewo.split("\n"):
+        s = linia.strip()
+        if not s.startswith("- "):
+            if s:
+                zamknij()
+                wiersze.append(s)
+            continue
+        m = WIERSZ_DRZEWA.match(s[2:])
+        if not m:
+            zamknij()
+            wiersze.append(s[2:])
+            continue
+        rola, nazwa, atrybuty, reszta = m.group(1), m.group(2), m.group(3) or "", (m.group(4) or "").strip()
+        if rola in BEZ_TRESCI:
+            continue
+        if rola == "StaticText":
+            tekst = (nazwa if nazwa is not None else reszta.lstrip(":").strip())
+            if tekst.strip() and tekst.strip() != poprzedni:
+                akapit.append(tekst.strip())
+            poprzedni = ""
+            continue
+        czesci = [a.strip() for a in atrybuty.split(",") if a.strip()]
+        ref = next((a[4:] for a in czesci if a.startswith("ref=")), None)
+        poziom = next((a[6:] for a in czesci if a.startswith("level=")), None)
+        inne = [a for a in czesci if not a.startswith(("ref=", "level="))]
+        if not ref and not nazwa and not inne and not reszta:
+            if rola not in W_AKAPICIE:
+                zamknij()                        # akapit, punkt listy, wiersz tabeli: nowy wiersz widoku
+            continue
+        if rola == "heading" and poziom:
+            rola = f"h{poziom}"
+        opis = " ".join(x for x in ((f"[{ref}]" if ref else ""), rola, (f'"{nazwa}"' if nazwa else ""), *inne,
+                                    reszta) if x)
+        if rola in W_AKAPICIE and akapit and len(" ".join(akapit)) < 400:
+            akapit.append(opis)
+        else:
+            zamknij()
+            if rola in W_AKAPICIE:
+                akapit.append(opis)
+            else:
+                wiersze.append(opis)
+        poprzedni = nazwa or ""
+    zamknij()
+    return "\n".join(wiersze)
+
+
+def _wynik_binarki(ab: str, argv: list[str], env: dict) -> tuple[int, str]:
+    """Kod i wyjście polecenia binarki (plik tymczasowy, nie potok: demon dziedziczy uchwyty, jak w wylacz_podglad)."""
+    with tempfile.TemporaryFile() as plik:
+        try:
+            kod = _czekaj(_popen([ab, *argv], env, stdin=subprocess.DEVNULL, stdout=plik, stderr=subprocess.DEVNULL))
+        except OSError as e:
+            return 127, json.dumps({"success": False, "data": None, "error": f"agent-browser: {e}"})
+        plik.seek(0)
+        return kod, plik.read().decode("utf-8", errors="replace")
+
+
+def widok_strony(ab: str, globalne: list[str], env: dict) -> int:
+    """`snapshot -c` z Hermesa (wynik browser_navigate i browser_snapshot): najpierw ustalenie strony (USTALENIE_JS:
+    dokument wczytany i USTALENIE_MS bez zmian DOM, najwyżej 2,5 s), potem drzewo w zwartym widoku (zwiezly_widok)
+    z tymi samymi refami i adresem strony w pierwszym wierszu. Błąd binarki idzie dalej bez zmian."""
+    _wynik_binarki(ab, [*globalne, "eval", USTALENIE_JS], env)
+    kod, wyjscie = _wynik_binarki(ab, [*globalne, "snapshot", "-c"], env)
+    try:
+        wynik = json.loads(wyjscie)
+        drzewo = wynik["data"]["snapshot"]
+        if not wynik.get("success") or not isinstance(drzewo, str):
+            raise ValueError
+    except (ValueError, KeyError, TypeError):
+        _pisz(sys.stdout, wyjscie)
+        return kod
+    adres = wynik["data"].get("origin")
+    widok = zwiezly_widok(drzewo)
+    wynik["data"]["snapshot"] = f"adres: {adres}\n{widok}" if isinstance(adres, str) and adres else widok
+    _pisz(sys.stdout, json.dumps(wynik, ensure_ascii=False, separators=(",", ":")) + "\n")
+    return kod
 
 
 def odmowa(tekst: str, json_: bool) -> int:
@@ -384,8 +675,12 @@ def main(argv: list[str] | None = None) -> int:
     env_binarki = srodowisko(globalne, env)
     if (polecenie[0] if polecenie else "") in BEZ_DEMONA:
         return uruchom(ab, args, env_binarki)
+    profil = profil_agenta(globalne, polecenie, env)
+    globalne, args = profil + globalne, profil + args
     if not wylacz_podglad(ab, globalne, env_binarki):
         return odmowa("nie udało się wyłączyć serwera podglądu agent-browsera, więc polecenie nie poszło dalej", json_)
+    if json_ and polecenie == ["snapshot", "-c"] and silnik(globalne, env) != "lightpanda":
+        return widok_strony(ab, globalne, env_binarki)
     return uruchom(ab, args, env_binarki)
 
 

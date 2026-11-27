@@ -725,6 +725,36 @@
     }
    }
   },
+  "inkscape": {
+   "wersja": "1.4.4",
+   "kiedy": "przy-uzyciu",
+   "licencja": "GPL-2.0-or-later (Inkscape), w AppImage biblioteki GTK i Python na ich licencjach (LGPL, PSF)",
+   "zrodlo": "inkscape",
+   "pliki": {
+    "windows-x64": {
+     "brak": "pulpit agentów działa tylko na ekranie X11 serwera z Linuksem (docs/PULPIT.md)"
+    },
+    "windows-arm64": {
+     "brak": "pulpit agentów działa tylko na ekranie X11 serwera z Linuksem (docs/PULPIT.md)"
+    },
+    "macos-arm64": {
+     "brak": "pulpit agentów działa tylko na ekranie X11 serwera z Linuksem (docs/PULPIT.md)"
+    },
+    "linux-x64": {
+     "bin": [
+      "."
+     ],
+     "format": "plik",
+     "nazwa_pliku": "inkscape",
+     "rozmiar": 120236536,
+     "sha256": "d217fe05c92faaed5c3af46856b6299c98933dc722819cb5bc2ca052c5522166",
+     "url": "https://media.inkscape.org/dl/resources/file/Inkscape-1.4.4.AppImage"
+    },
+    "linux-arm64": {
+     "brak": "KDE i Inkscape nie wydają AppImage dla Linux arm64"
+    }
+   }
+  },
   "jq": {
    "wersja": "1.8.2",
    "kiedy": "instalacja",
@@ -780,6 +810,36 @@
      "rozmiar": 1797688,
      "sha256": "8b85c817833814ddca00a144c33705546355afccf0cf39b188f3cdb48b852309",
      "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-linux-arm64"
+    }
+   }
+  },
+  "kdenlive": {
+   "wersja": "26.08.3",
+   "kiedy": "przy-uzyciu",
+   "licencja": "GPL-3.0-or-later (Kdenlive), w AppImage MLT LGPL-2.1, FFmpeg LGPL/GPL, Qt LGPL-3.0, KDE Frameworks LGPL",
+   "zrodlo": "kdenlive",
+   "pliki": {
+    "windows-x64": {
+     "brak": "pulpit agentów działa tylko na ekranie X11 serwera z Linuksem (docs/PULPIT.md)"
+    },
+    "windows-arm64": {
+     "brak": "pulpit agentów działa tylko na ekranie X11 serwera z Linuksem (docs/PULPIT.md)"
+    },
+    "macos-arm64": {
+     "brak": "pulpit agentów działa tylko na ekranie X11 serwera z Linuksem (docs/PULPIT.md)"
+    },
+    "linux-x64": {
+     "bin": [
+      "."
+     ],
+     "format": "plik",
+     "nazwa_pliku": "kdenlive",
+     "rozmiar": 214346232,
+     "sha256": "2c8322edfc86605e4c98a78a019310d9b4fc46bb8e94e6fe313dc7dd987e7671",
+     "url": "https://download.kde.org/stable/kdenlive/26.08/linux/kdenlive-26.08.3-x86_64.AppImage"
+    },
+    "linux-arm64": {
+     "brak": "KDE i Inkscape nie wydają AppImage dla Linux arm64"
     }
    }
   },

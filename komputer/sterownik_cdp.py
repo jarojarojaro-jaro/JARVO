@@ -56,9 +56,11 @@ import fnmatch
 import json
 import mimetypes
 import os
+import platform
 import re
 import secrets
 import struct
+import sys
 import threading
 import time
 from collections import Counter, OrderedDict
@@ -113,6 +115,7 @@ PODGLAD_BEZCZYNNOSC = 20.0         # s bez pytania o klatkę: screencast staje (
 PUSTE_ADRESY = ("", "about:blank")  # karta bez strony: nie ma czego parkować
 CZAS_POSTOJU = 5.0                 # s na przejście jednej karty na pustą stronę przy postoju
 CZAS_PRZYGOTOWANIA = 15.0         # s na odpowiedzi przygotowania nowego celu (_przygotuj_cel), razem, nie na każde
+MAKS_KART_PRZYWRACANYCH = 8        # kart ze stroną zapisywanych przed restartem usługi i otwieranych po nim
 MAKS_TEKST_WLASCICIELA = 4000
 MAKS_PLIKOW = 10
 # strona testowa (usługa z --strona-testowa): dwie witryny, żeby ramka płatności była z innego procesu (OOPIF)
@@ -394,6 +397,22 @@ class Sterownik:
             wzorce += [{"urlPattern": w} for w in WZORCE_TESTOWE]
         return wzorce
 
+    def _ua_bez_headless(self) -> dict:
+        """User-agent przeglądarki w tle bez „HeadlessChrome” razem z podpowiedziami klienta (navigator.userAgentData,
+        nagłówki Sec-CH-UA): sama zmiana napisu zostawiała pustą listę marek, a to tak samo zdradza automat."""
+        ua = self.ua.replace("HeadlessChrome", "Chrome")
+        wersja = re.search(r"Chrome/([\d.]+)", self.produkt or ua)
+        pelna = wersja.group(1) if wersja else "0.0.0.0"
+        system = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
+        marki = [{"brand": "Chromium", "version": pelna.split(".")[0]}, {"brand": "Not-A.Brand", "version": "99"}]
+        pelne = [{"brand": "Chromium", "version": pelna}, {"brand": "Not-A.Brand", "version": "99.0.0.0"}]
+        arm = platform.machine().lower() in ("arm64", "aarch64")
+        return {"userAgent": ua, "acceptLanguage": "pl-PL,pl,en-US,en",
+                "platform": {"Windows": "Win32", "macOS": "MacIntel"}.get(system, "Linux x86_64"),
+                "userAgentMetadata": {"brands": marki, "fullVersionList": pelne, "fullVersion": pelna,
+                                      "platform": system, "platformVersion": "", "architecture": "arm" if arm else "x86",
+                                      "model": "", "mobile": False, "bitness": "64", "wow64": False}}
+
     def _przygotuj_cel(self, sesja: str, info: dict, rodzic: str | None) -> None:
         """Nowy cel (karta, ramka z innego procesu): Fetch, Page, Accessibility, automatyczne podpinanie ramek
         i user-agent bez HeadlessChrome, potem wznowienie (Runtime.runIfWaitingForDebugger). Polecenia idą naraz,
@@ -408,8 +427,7 @@ class Sterownik:
                      ("Accessibility.enable", {}),
                      ("Target.setAutoAttach", {"autoAttach": True, "waitForDebuggerOnStart": True, "flatten": True})]
         if typ == "page" and self.ua and "HeadlessChrome" in self.ua:
-            polecenia.append(("Emulation.setUserAgentOverride", {"userAgent": self.ua.replace("HeadlessChrome",
-                                                                                              "Chrome")}))
+            polecenia.append(("Emulation.setUserAgentOverride", self._ua_bez_headless()))
         polecenia.append(("Runtime.runIfWaitingForDebugger", {}))
         oczekiwania = []
         for metoda, params in polecenia:
@@ -2388,6 +2406,32 @@ class Sterownik:
                 continue
             okno.url, okno.tytul = "about:blank", ""
             ile += 1
+        return ile
+
+    def karty(self) -> list[dict]:
+        """Karty ze stroną http(s) (adres i tytuł z ostatnich zdarzeń; działa też po padnięciu przeglądarki): usługa
+        zapisuje je przed zatrzymaniem, żeby praca w toku wróciła po restarcie."""
+        return [{"url": o.url, "tytul": o.tytul} for o in self._strony()
+                if urlsplit(o.url).scheme.lower() in ("http", "https")][:MAKS_KART_PRZYWRACANYCH]
+
+    def przywroc(self, karty: list[dict]) -> int:
+        """Karty zapisane przed restartem: pierwszy adres w pustej karcie startowej, kolejne w nowych kartach
+        (launch_app: najpierw przygotowanie karty, potem adres). Zwraca liczbę otwartych kart."""
+        adresy = [str(k.get("url") or "") for k in karty if isinstance(k, dict)]
+        adresy = [a for a in adresy if urlsplit(a).scheme.lower() in ("http", "https")][:MAKS_KART_PRZYWRACANYCH]
+        if not adresy:
+            return 0
+        puste = [o for o in self.okna() if o.url in PUSTE_ADRESY and o.gotowe.is_set()]
+        ile = 0
+        if puste:
+            try:
+                self.b.wyslij("Page.navigate", {"url": adresy[0]}, puste[0].sesja, czas=CZAS_NAWIGACJI)
+                self._aktywne, ile, adresy = puste[0].nr, 1, adresy[1:]
+            except cdp.BladCDP as e:
+                self.log(f"sterownik: karta {puste[0].nr} nie wróciła pod zapisany adres ({e.tekst[:100]})")
+        if adresy:
+            nowe = (self.launch_app({"urls": adresy}).get("structuredContent") or {}).get("windows") or []
+            ile += sum(1 for o in nowe if o.get("url") in adresy)
         return ile
 
     def _opis_klatki(self, k: dict, okno: Okno) -> dict:

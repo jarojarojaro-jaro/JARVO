@@ -246,7 +246,8 @@ def test_element_sprawdzany_w_swiezej_migawce(komputer, monkeypatch):
     w = k.narzedzie("click", {"pid": 7, "window_id": 3, "element_token": "s1:2"})
     assert zasada(w) == "element_zmieniony"
     tekst = w["content"][0]["text"]
-    assert "pod numerem 2 jest teraz entry „E-mail” zamiast push button „Dodaj do koszyka”" in tekst
+    assert "pod numerem 2 jest teraz entry „E-mail”, a był push button „Dodaj do koszyka”" in tekst
+    assert "nic nie kliknąłem" in tekst and "Odśwież widok" in tekst
     assert komputer.do_sterownika()[-1]["params"]["name"] == "get_window_state"   # klik nie doszedł
     # sterownik nie odpowiada na świeżą migawkę: odmowa po czasie, nie przepuszczenie
     monkeypatch.setattr(wejscie, "CZAS_MIGAWKI", 0.5)
@@ -266,6 +267,23 @@ def test_element_sprawdzany_w_swiezej_migawce(komputer, monkeypatch):
     k.wyslij({"jsonrpc": "2.0", "id": wejscie.WEWNETRZNE + "1", "method": "ping"})
     assert k.czytaj()["error"]["code"] == -32600
     k.zamknij()
+
+
+def test_opis_zmiany_elementu_mowi_roznice():
+    """Odmowa `element_zmieniony` mówi, czym różni się element: ten sam napis w innym miejscu strony to inny rodzic,
+    a element, który się przesunął, ma podany nowy numer (26.11: „link Google zamiast link Google”)."""
+    stare = {0: {"role": "document web", "label": "Strona", "depth": 0, "parent_index": None},
+             1: {"role": "navigation", "label": "Menu", "depth": 1, "parent_index": 0},
+             2: {"role": "link", "label": "Google", "depth": 2, "parent_index": 1}}
+    nowe = {0: stare[0], 1: {"role": "dialog", "label": "Zgoda na ciasteczka", "depth": 1, "parent_index": 0},
+            2: {"role": "link", "label": "Google", "depth": 2, "parent_index": 1},
+            3: {"role": "navigation", "label": "Menu", "depth": 1, "parent_index": 0},
+            4: {"role": "link", "label": "Google", "depth": 2, "parent_index": 3}}
+    opis = wejscie.KontekstSesji.opis_zmiany(stare, nowe, 2)
+    assert "o tym samym napisie, ale w innym miejscu strony" in opis
+    assert "w dialog „Zgoda na ciasteczka”, a był w navigation „Menu”" in opis
+    assert "link „Google” jest teraz pod numerem 4" in opis
+    assert wejscie.KontekstSesji.opis_zmiany(stare, {0: stare[0]}, 2) == "elementu numer 2 już nie ma (był link „Google”)"
 
 
 def test_ten_sam_element():

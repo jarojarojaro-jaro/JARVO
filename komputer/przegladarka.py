@@ -4,11 +4,12 @@ Polityk maszynowych (HKLM, /etc/opt/chrome/policies) nie używamy, bo wymagają 
 właściciela. Zamiast nich:
   - flagi startu: bez synchronizacji, rozszerzeń, aplikacji domyślnych, Cast (MediaRouter szuka urządzeń w sieci
     lokalnej po UDP, poza proxy), QUIC, pingów; proxy filtrujące dla całego ruchu (także pętli zwrotnej),
-    WebRTC bez UDP poza proxy, odmowa każdej prośby o uprawnienie (`--deny-permission-prompts`);
-  - preferencje profilu (`Default/Preferences`, zapisywane przed każdym startem): bez menedżera haseł,
-    autouzupełniania adresów i kart, logowania do przeglądarki, tłumacza; pobrane pliki do osobnego katalogu,
-    bez pytania; Bezpieczne przeglądanie włączone (ochrony przed phishingiem nie wyłączamy); WebRTC drugi raz
-    w preferencjach (ta sama zasada co flaga: UDP tylko przez proxy, czyli wcale);
+    WebRTC bez UDP poza proxy, odmowa każdej prośby o uprawnienie (`--deny-permission-prompts`), bez
+    navigator.webdriver (`--disable-blink-features=AutomationControlled`);
+  - preferencje profilu (`Default/Preferences`, zapisywane przed każdym startem): menedżer haseł włączony (logowania
+    trwałe), bez autouzupełniania adresów i kart, logowania do przeglądarki, tłumacza; pobrane pliki do osobnego
+    katalogu, bez pytania; Bezpieczne przeglądanie włączone (ochrony przed phishingiem nie wyłączamy); WebRTC drugi
+    raz w preferencjach (ta sama zasada co flaga: UDP tylko przez proxy, czyli wcale);
   - przez CDP (sterownik_cdp.py): odmowa uprawnień (kamera, mikrofon, schowek, przechwytywanie ekranu, położenie,
     powiadomienia…), pobrania pod nazwą GUID z odrzuceniem typów wykonywalnych, blokada file://, przechwycenie
     wyboru pliku (w trybie w tle), strona testowa przez Fetch.fulfillRequest.
@@ -19,7 +20,10 @@ from __future__ import annotations
 import json
 import os
 import re
+import signal
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 WINDOWS = os.name == "nt"
@@ -90,6 +94,9 @@ def flagi(*, profil: Path, port_proxy: int | None, okno: bool, ekran: tuple[int,
          "--disable-features=MediaRouter,GlobalMediaControls,DialMediaRouteProvider,CastMediaRouteProvider,"
          "Translate,AutofillServerCommunication,OptimizationHints,WebUIReloadButton,WebUIOmniboxPopup,"
          "WebUIOmniboxAimPopup,SpareRendererForSitePerProcess",
+         # CDP przez potok włącza w Blinku AutomationControlled, czyli navigator.webdriver = true, po którym Turnstile
+         # i DataDome odrzucają stronę od razu; Komputer działa na kontach właściciela jak człowiek, więc bez tej flagi
+         "--disable-blink-features=AutomationControlled",
          f"--lang={jezyk}", f"--accept-lang={jezyk}-PL,{jezyk},en-US,en" if jezyk == "pl" else f"--accept-lang={jezyk}",
          f"--window-size={ekran[0]},{ekran[1]}"]
     if port_proxy:
@@ -118,6 +125,69 @@ def brak_piaskownicy(log: Path) -> bool:
     except OSError:
         return False
     return "sandbox" in ogon and ("namespace" in ogon or "no usable sandbox" in ogon)
+
+
+def procesy_profilu(profil: Path) -> list[int]:
+    """PID-y procesów z `--user-data-dir=<profil>` w argumentach (Linux: /proc, macOS: ps; Windows: brak, tam
+    przeglądarka siedzi w zadaniu, które ginie z usługą). Usługa trzyma blokadę profilu, więc przy jej starcie
+    każdy taki proces to resztka poprzedniej usługi."""
+    znak = f"--user-data-dir={profil}"
+    wlasny = os.getpid()
+    pidy: list[int] = []
+    if LINUX:
+        for wpis in os.listdir("/proc"):
+            if not wpis.isdigit() or int(wpis) == wlasny:
+                continue
+            try:
+                argv = Path(f"/proc/{wpis}/cmdline").read_bytes().split(b"\0")
+            except OSError:
+                continue
+            if znak.encode() in argv:
+                pidy.append(int(wpis))
+    elif MACOS:
+        try:
+            wynik = subprocess.run(["ps", "-axww", "-o", "pid=,command="], capture_output=True, text=True, timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            return []
+        for linia in wynik.stdout.splitlines():
+            pid, _, polecenie = linia.strip().partition(" ")
+            if pid.isdigit() and int(pid) != wlasny and f" {znak} " in f" {polecenie} ":
+                pidy.append(int(pid))
+    return pidy
+
+
+def sprzatnij_osierocone(profil: Path, log=None) -> list[int]:
+    """Resztki przeglądarki Jarva na tym profilu (usługa zabita bez sprzątania, proces po fork bez exec, który
+    przeżył przeglądarkę): SIGTERM, po 3 s SIGKILL. Zwraca PID-y, które znalazła."""
+    pidy = procesy_profilu(profil)
+    if not pidy:                                     # także Windows (bez SIGKILL)
+        return []
+    for sygnal in (signal.SIGTERM, signal.SIGKILL):
+        for pid in pidy:
+            try:
+                os.kill(pid, sygnal)
+            except OSError:
+                pass
+        koniec = time.monotonic() + 3
+        while time.monotonic() < koniec and any(_zyje(p) for p in pidy):
+            time.sleep(0.1)
+        if not any(_zyje(p) for p in pidy):
+            break
+    if pidy and log is not None:
+        log(f"sprzątanie: {len(pidy)} procesów przeglądarki Jarva z poprzedniego startu zakończonych "
+            f"(pid {', '.join(map(str, pidy[:8]))})")
+    return pidy
+
+
+def _zyje(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    try:                                             # zombie własnego dziecka: już nie żyje, tylko czeka na wait
+        return Path(f"/proc/{pid}/stat").read_text().split(")")[-1].split()[0] != "Z" if LINUX else True
+    except OSError:
+        return False
 
 
 def preferencje(pobrane: Path) -> dict:

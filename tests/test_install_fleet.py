@@ -142,7 +142,7 @@ def zbuduj(build: Path) -> None:
     w = build / "plugins"
     _pisz(w / "jarvo-hq" / "dashboard" / "manifest.json", '{"name": "jarvo-hq"}\n')
     _pisz(w / "jarvo-hq" / "dashboard" / "plugin_api.py", "# panel\n")
-    for nazwa in ("jarvo-wiedza", "jarvo-komputer", "jarvo-zgody", "jarvo-sesje"):
+    for nazwa in ("jarvo-wiedza", "jarvo-komputer", "jarvo-przegladarka", "jarvo-zgody", "jarvo-sesje", "jarvo-pulpit"):
         _pisz(w / nazwa / "plugin.yaml", f"name: {nazwa}\nversion: 0.1.0\n")
         _pisz(w / nazwa / "__init__.py", "def register(ctx):\n    pass\n")
     _pisz(build / "wiedza" / "fleet.json", json.dumps(

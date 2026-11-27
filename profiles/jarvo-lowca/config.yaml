@@ -38,7 +38,7 @@ terminal:
 # Przeglądarka: browser_* przez agent-browser (nakładka Jarva) z Lightpandą; Windows: engine chrome z buildu (C06).
 browser:
   backend: "off"
-  engine: lightpanda
+  engine: chrome                 # Chrome z trwałym profilem agenta (nakładka infra/bin/agent_browser.py)
   inactivity_timeout: 120
 
 stt:

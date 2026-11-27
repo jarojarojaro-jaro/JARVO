@@ -143,8 +143,8 @@ root: katalogi, konfiguracje sterownika, baza certyfikatów i czyszczenie blokad
 Dowiązanie symboliczne podłożone w wolumenie (np. `.cua-driver/config.json` → `/etc/...`) nie da więc zapisu
 z uprawnieniami roota; root zakłada tylko sam katalog domowy.
 
-**Chromium** ma politykę `/etc/chromium/policies/managed/jarvo.json` (`infra/komputer/chromium.json`): bez
-menedżera haseł, autouzupełniania kart i adresów, logowania do przeglądarki i synchronizacji, rozszerzeń
+**Chromium** ma politykę `/etc/chromium/policies/managed/jarvo.json` (`infra/komputer/chromium.json`): menedżer haseł
+włączony jak natywnie (logowania trwałe, hasło zostaje w profilu przeglądarki), bez autouzupełniania kart i adresów, logowania do przeglądarki i synchronizacji, rozszerzeń
 i narzędzi deweloperskich; bez `file://`, `javascript:`, `chrome://flags`, `chrome://inspect` i `devtools://`; pobrane pliki tylko do `~/Pobrane`, bez pytania
 i bez automatycznego otwierania; WebRTC tylko przez publiczny interfejs. Okno wraca po zamknięciu.
 

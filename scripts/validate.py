@@ -390,6 +390,9 @@ def check_komputer(a: fl.Agent, cfg: dict, r: Report) -> None:
     plats = sorted(p for p, ts in toolsets.items() if "computer_use" in (ts or []))
     if plats and not a.komputer:
         r.err(f"{a.name}: toolset computer_use na {', '.join(plats)} bez `komputer: true` we fleet.yaml")
+    if any("pulpit" in (ts or []) for ts in toolsets.values()):
+        r.err(f"{a.name}: toolset pulpit w config.yaml: dokłada go build agentom z `pulpit: true` we fleet.yaml "
+              "(docs/PULPIT.md), nie wpisuj go ręcznie")
     appr = cfg.get("approvals") or {}
     if appr.get("mode") is False or str(appr.get("mode", "")).lower() == "off":     # YAML 1.1: `off` = False
         r.err(f"{a.name}: approvals.mode: off wyłącza wszystkie zgody (także computer_use); zostaw smart albo manual")

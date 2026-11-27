@@ -5,9 +5,12 @@ zgody są główną ochroną. To kontrola, nie izolacja: polecenie terminala mo�
 Plan i uzasadnienie: [docs/NATYWNIE.md, sekcja (d)](../docs/NATYWNIE.md#d-pozwolenia-jak-w-claude-code) i decyzja I08
 (domyślny tryb „projekt”, tryb pełny tylko na jedną sesję).
 
-Wtyczka Hermesa (`plugin/`: `__init__.py`, `plugin.yaml`) ma hak `pre_tool_call` i polecenie `/tryb`. Hak zwraca
-`approve` (prośba trafia do bramki zgód Hermesa: raz, sesja, zawsze, odmowa; w CLI, TUI, Telegramie i w HQ przez
-`/v1/runs`), `block` albo nic.
+Wtyczka Hermesa (`plugin/`: `__init__.py`, `obraz.py`, `plugin.yaml`) ma hak `pre_tool_call`, polecenie `/tryb`
+i middleware `tool_execution` z `obraz.py`. Hak zwraca `approve` (prośba trafia do bramki zgód Hermesa: raz, sesja,
+zawsze, odmowa; w CLI, TUI, Telegramie i w HQ przez `/v1/runs`), `block` albo nic. Middleware oddaje wynik narzędzia
+MCP z obrazem (np. `shot` telefonu, który Hermes zamienia na tekst `MEDIA:<plik>`) jako obraz dla modelu głównego
+(koperta `_multimodal`, JPEG o dłuższym boku do 1280 px, tekst wyniku bez zmian), gdy model przyjmuje obraz według
+tej samej bramki co zrzut `computer_use` (wpisy modeli w `jarvo/flota.py`, `MODELE_Z_OBRAZEM`).
 
 | Tryb | Co robi hak |
 |---|---|

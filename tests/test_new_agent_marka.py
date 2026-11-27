@@ -48,6 +48,8 @@ def kopia(tmp_path):
     shutil.copy2(REPO / "infra" / "docker-compose.yml", tmp_path / "infra" / "docker-compose.yml")
     (tmp_path / "wiedza").mkdir()                       # wiedza/mapa.py: mapa agenta (fleetlib.rdzen_mapy, validate.check_mapa)
     shutil.copy2(REPO / "wiedza" / "mapa.py", tmp_path / "wiedza" / "mapa.py")
+    (tmp_path / "vendor").mkdir()                       # lock skilli: agent biznesowy z --publiczny dostaje skill telefon
+    shutil.copy2(REPO / "vendor" / "skills.lock.yaml", tmp_path / "vendor" / "skills.lock.yaml")
     return tmp_path
 
 
@@ -65,7 +67,7 @@ def test_szkielet_agenta_biznesowego_w_nakladce(kopia, tmp_path):
     assert p.returncode == 0, p.stderr
     assert (kopia / "fleet.yaml").read_text(encoding="utf-8") == przed          # publiczne repo bez zmian
     assert not (kopia / "profiles" / "jarvo-kwiaty").exists() and not (kopia / "evals" / "jarvo-kwiaty").exists()
-    for rel in ("fleet.yaml", "wzorce.md", "security/redteam/testy.yaml", "README.md", ".gitignore"):
+    for rel in ("fleet.yaml", "wzorce.md", "security/redteam/testy.yaml", "README.md", ".gitignore", "skills.lock.yaml"):
         assert (n / rel).is_file(), rel                                           # szkielet nakładki
     d = n / "profiles" / "jarvo-kwiaty"
     for rel in ("SOUL.md", "ZASADY.md", "MAPA.md", "config.yaml", "cron/jobs.yaml", "distribution.yaml", "toolbox.yaml",
@@ -118,6 +120,13 @@ def test_szkielet_agenta_biznesowego_w_nakladce(kopia, tmp_path):
                     if s["id"] == "sklep-wiedza-inna-marka")
     assert izolacja["type"] == "out_of_scope" and "kwiaty" in izolacja["input"]
 
+    # każdy agent biznesowy ma telefon floty: skill `telefon` w locku nakładki, build go weźmie (fleetlib.load_lock)
+    telefon = {"source": "jarvo", "path": "shared/skills/telefon", "dest": "ekran/telefon"}
+    assert fl.load_yaml(n / "skills.lock.yaml")["agents"] == {"jarvo-kwiaty": [telefon], "jarvo-sklep": [telefon]}
+    assert (kopia / "shared" / "skills" / "telefon" / "SKILL.md").is_file()
+    lock = fl.load_lock(kopia / "vendor" / "skills.lock.yaml", nakladka=n)
+    assert lock["agents"]["jarvo-sklep"] == [telefon] and "jarvo" in lock["agents"]
+
 
 @pytest.mark.parametrize("marka, powod", [("kwiaty", "należy już do jarvo-kwiaty"), ("Zła_marka", "[a-z0-9-]+")])
 def test_odmowa_marki(kopia, tmp_path, marka, powod):
@@ -145,6 +154,9 @@ def test_publiczny_tylko_na_zyczenie(kopia):
     assert (kopia / "profiles" / "jarvo-kwiaty" / "SOUL.md").is_file()
     assert next(a for a in fl.load_fleet(kopia / "fleet.yaml", nakladka=None).agents if a.name == "jarvo-kwiaty").marka == "kwiaty"
     assert "security/redteam/promptfooconfig.yaml" in p.stdout
+    agenci = fl.load_yaml(kopia / "vendor" / "skills.lock.yaml")["agents"]
+    assert agenci["jarvo-kwiaty"] == [{"source": "jarvo", "path": "shared/skills/telefon", "dest": "ekran/telefon"}]
+    assert agenci["jarvo"] == fl.load_yaml(REPO / "vendor" / "skills.lock.yaml")["agents"]["jarvo"]   # reszta bez zmian
 
 
 def test_specjalista_bez_watku_telegrama(kopia):

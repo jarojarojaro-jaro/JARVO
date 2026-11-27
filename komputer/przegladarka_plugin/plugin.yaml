@@ -1,0 +1,6 @@
+name: jarvo-przegladarka
+version: 0.1.0
+description: "Wyniki browser_* Hermesa po polsku i bez ostrzeżeń o planie Browserbase: nawigacja rozpoznaje blokadę antybotową po treści strony i podaje drogę floty (telefon, potem kanban_block), a klik, klawisz i Wstecz zwracają widok strony po ustaleniu. Hak transform_tool_result."
+author: "Jarvo fleet"
+kind: standalone
+provides_hooks: [transform_tool_result]

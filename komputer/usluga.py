@@ -24,6 +24,13 @@ Przeglądarka, która padnie, wstaje od nowa z tym samym profilem (przerwa rośn
 (nadzorca Jarva) zatrzymują usługę łagodnie. Na Linuksie bez przestrzeni nazw użytkownika (Ubuntu 24.04 z AppArmor)
 przeglądarka startuje drugi raz z `--no-sandbox` i status mówi to wprost (decyzja I41).
 
+Restart: usługa wstaje z każdym restartem Jarva (aktualizacja, `jarvo restart`), bo działa pod jego nadzorcą. Karty ze
+stroną http(s) (najwyżej 8) zapisuje przy zatrzymaniu w `<stan>/komputer/karty.json`, a start w ciągu PRZYWROC_DO s
+otwiera je z powrotem (profil daje zalogowania), z postojem dopiero po POSTOJ_PO_PRZYWROCENIU s; tak samo po
+restarcie przeglądarki z HQ, zmianie okna i pojedynczym padnięciu. Przed każdym startem przeglądarki usługa kończy
+procesy z argumentem `--user-data-dir=<profil>` (resztka usługi zabitej bez sprzątania), a po zamknięciu
+przeglądarki resztę jej grupy procesów (cdp.Przegladarka.zamknij).
+
 Postój: gdy z ekranu nikt nie korzysta, karty przechodzą na `about:blank` (sterownik_cdp.zaparkuj), bo strona
 zostawiona po zadaniu (animacja, skrypty) zajmowała ponad rdzeń procesora godzinami, także w tle. „Nikt” to razem:
 żadnej czynnej sesji Jarva (sesja otwarta, ale bez wiadomości od CISZA_SESJI s, liczy się jak zakończona:
@@ -59,6 +66,8 @@ KOD_FILTR = 3                      # samotest filtra albo przeglądarki nie prze
 PORT_PANELU = 9119
 CZAS_ZASTAPIENIA = 40.0            # s: tyle usługa z --zastap czeka, aż poprzednia odda blokadę (jak CZAS_STOPU off)
 POSTOJ_PO = 60.0                   # s bez sesji Jarva, pauzy, podglądu i fokusu okna: karty na about:blank
+PRZYWROC_DO = 1800.0               # s od zatrzymania: karty z karty.json wracają, starsze zapisy przepadają
+POSTOJ_PO_PRZYWROCENIU = 300.0     # s ciszy przed postojem kart otwartych z powrotem po restarcie
 CISZA_SESJI = 900.0                # s bez wiadomości od agenta: otwarta sesja Jarva nie liczy się jako czynna
 CO_ILE_FOKUS = 5.0                 # s: przy oknie widocznym co tyle sprawdzamy, czy właściciel pracuje w oknie
 ZMIENNE_EKRANU = ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY")   # Linux: ustawienie `ekran` (jarvo komputer on|okno)
@@ -75,7 +84,7 @@ def katalogi(u: sciezki.Uklad) -> dict[str, Path]:
     dane = u.jarvo_dane / "komputer"
     stan = kanal.katalog_stanu(u.root)
     return {"dane": dane, "profil": dane / "profil", "pobrane": dane / "pobrane", "wysylane": dane / "wysylane",
-            "stan": stan,
+            "stan": stan, "karty": stan / "karty.json",
             "ustawienia": stan / "ustawienia.json", "usluga": stan / "usluga.json", "token": stan / "wlasciciel.klucz",
             "blokada": stan / "usluga.lock", "log_przegladarki": u.logi / "komputer-przegladarka.log"}
 
@@ -163,6 +172,7 @@ class Usluga:
             log(f"dziennik zmian hosta: nie zapisałem katalogu raportów przeglądarki ({e})")
 
     def uruchom_przegladarke(self) -> None:
+        przegladarka.sprzatnij_osierocone(self.k["profil"], log)
         przegladarka.przygotuj_profil(self.k["profil"], self.k["pobrane"])
         self._slad_raportow_awarii()
         self.k["log_przegladarki"].parent.mkdir(parents=True, exist_ok=True)
@@ -192,12 +202,56 @@ class Usluga:
         log(f"przeglądarka: {st.produkt} (pid {b.pid}), {'okno widoczne' if self.okno else 'w tle'}"
             + (", BEZ piaskownicy" if self.bez_piaskownicy else ""))
 
-    def zatrzymaj_przegladarke(self) -> None:
+    def zatrzymaj_przegladarke(self) -> list[dict]:
+        """Koniec przeglądarki; zwraca jej karty ze stroną (adresy z ostatnich zdarzeń, także po padnięciu), żeby
+        restart mógł je otworzyć z powrotem."""
         if self.wejscie is not None:
             self.wejscie.sterownik = None
-        b, self.przegl, self.sterownik = self.przegl, None, None
+        b, st, self.przegl, self.sterownik = self.przegl, self.sterownik, None, None
+        karty = st.karty() if st is not None else []
         if b is not None:
             b.zamknij(10)
+        return karty
+
+    def przywroc_karty(self, karty: list[dict], skad: str) -> None:
+        """Karty sprzed restartu z powrotem (w tle: usługa jest już gotowa, strony wczytują się same)."""
+        st = self.sterownik
+        if not karty or st is None:
+            return
+
+        def przywroc() -> None:
+            try:
+                ile = st.przywroc(karty)
+            except (cdp.BladCDP, sterownik_cdp.BladSterownika) as e:
+                log(f"karty sprzed {skad} nie wróciły: {e}")
+                return
+            log(f"karty sprzed {skad}: {ile} z {len(karty)} otwarte z powrotem (zalogowania z profilu)")
+
+        threading.Thread(target=przywroc, name="przywroc-karty", daemon=True).start()
+
+    def _zapisz_karty(self, karty: list[dict]) -> None:
+        """Karty ze stroną przy zatrzymaniu usługi (restart Jarva, aktualizacja): następny start otwiera je, jeśli
+        wstanie w ciągu PRZYWROC_DO s."""
+        if not karty:
+            return
+        try:
+            przenosne.zapisz_atomowo(self.k["karty"], json.dumps({"zapisano": time.time(), "karty": karty},
+                                                                 ensure_ascii=False) + "\n", tryb=0o600)
+        except OSError as e:
+            log(f"karty: nie zapisałem kart przed zatrzymaniem ({e})")
+
+    def _karty_sprzed_restartu(self) -> list[dict]:
+        plik = self.k["karty"]
+        dane = srodowisko.wczytaj_json(plik)
+        try:
+            plik.unlink()
+        except OSError:
+            pass
+        if not isinstance(dane, dict) or not isinstance(dane.get("karty"), list):
+            return []
+        if not isinstance(dane.get("zapisano"), (int, float)) or time.time() - dane["zapisano"] > PRZYWROC_DO:
+            return []
+        return dane["karty"]
 
     def samotest_przegladarki(self) -> dict:
         """Karta z adresem panelu Jarva (https, więc CONNECT) ma pójść przez proxy i dostać odmowę filtra."""
@@ -232,12 +286,14 @@ class Usluga:
         if co == "okno":
             self.okno = bool(p.get("okno"))
             zapisz_ustawienia(self.u, okno=self.okno)
-            self.zatrzymaj_przegladarke()
+            karty = self.zatrzymaj_przegladarke()
             self.uruchom_przegladarke()
+            self.przywroc_karty(karty, "zmiany okna")
             return {"ok": True, "okno": self.okno}
         if co == "restart":
-            self.zatrzymaj_przegladarke()
+            karty = self.zatrzymaj_przegladarke()
             self.uruchom_przegladarke()
+            self.przywroc_karty(karty, "restartu przeglądarki")
             return {"ok": True}
         if co == "wyczysc":
             self.zatrzymaj_przegladarke()
@@ -311,7 +367,7 @@ class Usluga:
         token = secrets.token_urlsafe(32)
         przenosne.zapisz_atomowo(self.k["token"], token, tryb=0o600)
         przenosne.chron(self.k["token"], katalog=False)
-        self.proxy = filtr.Proxy(log=log, port=self.port_proxy)
+        self.proxy = filtr.Proxy(log=log, port=self.port_proxy, panel=self.port_panelu)
         port = self.proxy.start()
         test = filtr.samotest(port, self.port_panelu)
         self.samotest = {"filtr": test}
@@ -338,6 +394,11 @@ class Usluga:
         self._zapisz_stan()
         log(f"gotowe: kanały {kanal.adres(self.u.root, 'cua')} i {kanal.adres(self.u.root, 'ster')}, pauza "
             f"{'tak' if self.wejscie.ekran.wstrzymane else 'nie'}")
+        karty = self._karty_sprzed_restartu()
+        if karty:
+            # strony wracają do pracy w toku: postój czeka dłużej, aż sesja agenta wróci po restarcie bramy
+            self._wolny_od = time.monotonic() + POSTOJ_PO_PRZYWROCENIU - POSTOJ_PO
+            self.przywroc_karty(karty, "zatrzymania usługi")
         return self._petla()
 
     def _petla(self) -> int:
@@ -361,12 +422,15 @@ class Usluga:
                     pass
             if self.przegl is not None and not self.przegl.dziala() and not self.stop.is_set():
                 log(f"przeglądarka Jarva skończyła pracę; start od nowa za {przerwa:g} s")
+                powtorna = przerwa > 2.0                      # padła znowu w ciągu ok. 30 s: bez kart, które ją kładą
                 self.stop.wait(przerwa)
                 przerwa = min(przerwa * 2, 60.0)
-                self.zatrzymaj_przegladarke()
+                karty = self.zatrzymaj_przegladarke()
                 try:
                     self.uruchom_przegladarke()
                     self.restarty += 1
+                    if not powtorna:
+                        self.przywroc_karty(karty, "padnięcia przeglądarki")
                 except (RuntimeError, OSError) as e:
                     log(f"przeglądarka nie wstała: {e}")
                 self._zapisz_stan()
@@ -415,7 +479,7 @@ class Usluga:
                     sesja.zamknij()
                 except OSError:
                     pass
-        self.zatrzymaj_przegladarke()
+        self._zapisz_karty(self.zatrzymaj_przegladarke())
         if self.proxy is not None:
             self.proxy.zatrzymaj()
         for nazwa in ("usluga", "token"):

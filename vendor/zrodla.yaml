@@ -239,6 +239,16 @@ zrodla:
     status: uzywane
     przejrzane: 85e2b1318bd77ccf3cfa88ccdf875a4bb7eaed19
     notatka: "Ręce na ekranie właściciela natywnie (K6, wpis cua-driver w vendor/natywne.yaml, przegląd 2026-10-25): cua-driver-rs 0.38.0, tag cua-driver-rs-v0.38.0 = commit 85e2b131 (wydanie 2026-10-21 z workflow cd-rust-cua-driver.yml); sumy 5 archiwów z SHA256SUMS wydania = digesty GitHuba = własne liczenie strumieniowe, programy po rozpakowaniu przypięte sumą w komputer/rece/__init__.py. Windows x64 i arm64: Authenticode „Cua AI, Inc.” (WinVerifyTrust w bramce), macOS: CuaDriver.app universal z Developer ID (zespół YCK386LBJ7), Linux: X11 albo XWayland; Sigstore dla SHA256SUMS z tożsamością tego workflow (kryptograficznie niesprawdzone bez sigstore). `usun`: pracownik UIAccess (omija UIPI), SDK, moduł Node, nagłówek C, motywy kursora, pomocnik GNOME; telemetria, sprawdzanie aktualizacji i tryb unrestricted wyłączone w otoczeniu z bramki; pobiera go dopiero `jarvo komputer rece on`. Próba na Windows 11 tylko --version i --help (sterownik nie steruje ekranem w czasie prac). Kontener Komputera (VPS) zostaje na 0.21.0: cua-driver-rs 0.21.0 (tag cua-driver-rs-v0.21.0 = commit 70db98d): sterownik ekranu Komputera Jarva (computer use, docs/KOMPUTER.md), tylko program cua-driver z archiwum -binary, w obrazie jarvo-komputer (/opt/cua/0.21.0). Sumy archiwów sprawdzane sha256sum -c w infra/komputer/Dockerfile: linux-x86_64 cf29bfaad16737e31e72f38dad2a6424f24b21a4ac2edea885e83cb9d5034135, linux-arm64 6b3a308c6741dd8291aad22a308bd2ec8eb52eab64687be007ac86ceaf7e3307 (te same w locku przypiętego Hermesa). MIT (Cua AI, Inc.), LICENSE w infra/komputer/LICENSE-cua-driver.md (archiwum -binary go nie ma). Przegląd 2026-10-19: telemetria PostHog i sprawdzanie aktualizacji domyślnie włączone, w Komputerze wyłączone zmiennymi i configiem (0 połączeń w 29 uruchomieniach), bramka komputer/jarvo_cua.py odmawia check-update, update, install i serve; instalator curl|bash nieużywany. Nowsze wersje (0.31+, 0.35+) zmieniają argumenty kliknięcia i format drzewa: podbicie dopiero z adapterem (K6), hosty tylko z podpisaną wersją 0.36+"
+  kdenlive:
+    repo: https://github.com/KDE/kdenlive
+    status: uzywane
+    przejrzane: 73f290d57a9ec01d5b6513f644f631d9eac4923a
+    notatka: "GPL-3.0-or-later (KDE, lustro GitHub repo invent.kde.org/multimedia/kdenlive): Kdenlive 26.08.3, tag v26.08.3 = ten commit. AppImage x86_64 z download.kde.org, suma z pliku .sha256 wydania = własne liczenie (przegląd 2026-11-27): w środku Kdenlive, melt 7, ffmpeg i kdenlive_render z MLT, Qt i KDE Frameworks; bez telemetrii. Pulpit agentów (vendor/natywne.yaml kdenlive, przy pierwszym uruchomieniu narzędziem pulpit)."
+  inkscape:
+    repo: https://github.com/inkscape/inkscape
+    status: uzywane
+    przejrzane: dcaf3e7d9e6724cd18d6bd2b4f3d4f12ab691871
+    notatka: "GPL-2.0-or-later (lustro GitHub repo gitlab.com/inkscape/inkscape, które tagi ma tylko na GitLabie): Inkscape 1.4.4, tag INKSCAPE_1_4_4 = ten commit (AppImage Inkscape-dcaf3e7-x86_64). Plik z inkscape.org (media.inkscape.org), suma ze strony wydania = własne liczenie (przegląd 2026-11-27). Pulpit agentów (vendor/natywne.yaml inkscape, przy pierwszym uruchomieniu narzędziem pulpit)."
   espeak-ng:
     repo: https://github.com/espeak-ng/espeak-ng
     status: uzywane

@@ -23,4 +23,5 @@ wystapienia: 1
 - hub: [[bledy/_hub-bledy|Księga błędów]]
 - [[bledy/nagrywanie tylko udanych kroków krótkimi odcinkami|Nagrywanie tylko udanych kroków]]
 - [[bledy/cloudflare nie przepuszcza komputera, krok na telefonie floty|Cloudflare nie przepuszcza Komputera]]
+- [[bledy/complete account setup w sklepie play to nie płatność, przewiń do skip|Complete account setup to nie płatność]]
 - [[fleet/lekcje|Księga lekcji floty]]

@@ -13,7 +13,8 @@ i evals/<name>/scenarios.yaml. Agent wchodzi do floty dopiero po spełnieniu Def
 (`--nakladka KATALOG`, domyślnie JARVO_NAKLADKA, inaczej <root>/nakladka; brakujący szkielet nakładki zakłada sam;
 do publicznego repo tylko z `--publiczny`): wpis z `marka`, SOUL (postać) i ZASADY z zasadami agenta biznesowego (zgoda właściciela,
 art. 398 PKE, RODO, wiedza tylko z marki), config bez ekranu w rozmowie, wstrzymana rutyna dnia w cron/jobs.yaml
-i evals ze scenariuszami izolacji marki i odmowy bez zgody.
+i evals ze scenariuszami izolacji marki i odmowy bez zgody; każdy agent biznesowy ma telefon floty, więc dostaje też
+wspólny skill `telefon` w `agents:` locka skilli (skills.lock.yaml nakładki albo, z `--publiczny`, vendor/skills.lock.yaml).
 """
 
 from __future__ import annotations
@@ -141,6 +142,22 @@ TELEFON_BIZNESOWY = """  - name: phoneuse-mcp
     notes: "Jeden przydzielony telefon floty (PHONEUSE_ONLY): konta marki, sprawdzanie na żywo. confirm=true tylko za „tak” właściciela (wtyczka jarvo-zgody)."
 """
 
+
+# Telefon floty prowadzi wspólny skill `telefon` (shared/skills/telefon): wpis agenta biznesowego w `agents:` locka
+# skilli (nakładki albo, przy --publiczny, vendor/skills.lock.yaml), żeby build dał mu skill razem z telefonem.
+SKILL_TELEFONU = "    - {source: jarvo, path: shared/skills/telefon, dest: ekran/telefon}\n"
+
+
+def dopisz_skill_telefonu(lock: Path, name: str) -> None:
+    """Agent `name` z wpisem skilla `telefon` na końcu `agents:` locka (sekcja `agents:` jest ostatnia w pliku)."""
+    tekst = lock.read_text(encoding="utf-8")
+    if re.search(rf"^  {re.escape(name)}:\s*$", tekst, re.M):
+        raise SystemExit(f"{lock}: agent {name} ma już wpis w locku skilli.")
+    if not re.search(r"^agents:", tekst, re.M):
+        tekst = tekst.rstrip("\n") + "\nagents:\n"
+    tekst = re.sub(r"^agents:\s*(?:\{\}|\[\])?\s*$", "agents:", tekst, flags=re.M)
+    zapisz(lock, tekst.rstrip("\n") + f"\n  {name}:\n    # telefon floty z przydziału (jarvo telefon przydziel "
+                                       f"{name} <telefon>)\n{SKILL_TELEFONU}")
 
 
 def config_biznesowy(name: str, marka: str) -> str:
@@ -373,6 +390,8 @@ SZKIELET_NAKLADKI = {
     "security/redteam/testy.yaml": "# Ataki red teamu na agentów nakładki: lista testów promptfoo jak `tests:` w\n"
                                    "# security/redteam/promptfooconfig.yaml publicznego repo (scripts/redteam.sh je dopisuje).\n[]\n",
     ".gitignore": "secrets/\n*.env\n.env\n__pycache__/\n",
+    "skills.lock.yaml": "# Skille z locka dla agentów nakładki (tylko `agents:`; źródła są w vendor/skills.lock.yaml "
+                        "publicznego repo).\nagents:\n",
     "README.md": "# Nakładka prywatna Jarva\n\nPrywatni agenci tej instalacji (docs/FLEET.md „Agenci biznesowi” w publicznym "
                  "repo JARVO). Klon w `<root>/nakladka` albo katalog z `JARVO_NAKLADKA`; `jarvo update` robi\n"
                  "`git pull --ff-only` i buduje agentów razem z flotą. Sprawdzenie: "
@@ -529,6 +548,9 @@ def main(argv: list[str] | None = None) -> int:
     gdzie = f"nakładka {n}: " if n is not None else ""
     print(f"✓ Szkielet: {dest}\n✓ {gdzie}evals/{args.name}/scenarios.yaml\n✓ wpis w {gdzie}fleet.yaml (status: planned)")
     if args.marka:
+        lock = n / "skills.lock.yaml" if n is not None else fl.VENDOR_LOCK
+        dopisz_skill_telefonu(lock, args.name)
+        print(f"✓ skill telefon w {gdzie}{lock.name if n is not None else 'vendor/skills.lock.yaml'}")
         print(dalej_biznesowy(args.name, slug, args.marka, n))
         return 0
     print("Dalej: uzupełnij SOUL, ZASADY i MAPA, skille, rubrykę, evals, `oddaj_gdy` i `rola` (+ `en.rola`) w fleet.yaml i wzorzec misji Jarva "

@@ -134,7 +134,8 @@ def test_filtr_ruchu_przed_pulpitem_i_bez_powrotu():
 
 def test_polityka_chromium():
     p = json.loads(_tekst("chromium.json"))
-    assert p["PasswordManagerEnabled"] is False and p["AutofillCreditCardEnabled"] is False
+    # logowania trwałe jak natywnie (komputer/przegladarka.py preferencje): menedżer haseł włączony, karty nie
+    assert p["PasswordManagerEnabled"] is True and p["AutofillCreditCardEnabled"] is False
     assert p["SyncDisabled"] is True and p["BrowserSignin"] == 0
     assert p["ExtensionInstallBlocklist"] == ["*"]
     for adres in ("file://*", "chrome://flags", "chrome://inspect", "devtools://*"):

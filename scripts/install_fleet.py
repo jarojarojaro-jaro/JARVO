@@ -33,10 +33,10 @@ Kroki (numeracja jak w install-fleet.sh):
       właściciela (jarvo.przenosne.chron: POSIX 0600, Windows ACL),
   3b2. impeccable: IMPECCABLE_HOME (<narzędzia>/impeccable) w .env profilu; program pobiera launcher `sh` skilla
       (Windows: przy pierwszym użyciu, w Git Bash agenta, bo instalacja floty nie woła powłoki),
-  3c. wtyczki jarvo-hq, jarvo-wiedza, jarvo-komputer, jarvo-zgody, jarvo-sesje (te, które są w buildzie): kopia do <dane>/plugins
+  3c. wtyczki jarvo-hq, jarvo-wiedza, jarvo-komputer, jarvo-przegladarka, jarvo-zgody, jarvo-sesje, jarvo-pulpit (te, które są w buildzie): kopia do <dane>/plugins
       z atomową podmianą (katalog .new, dwie zmiany nazwy), ta sama treść = stara kopia zostaje. W profilach: POSIX
       symlink jak `ln -sfn`, Windows junction (bez admina i trybu dewelopera), a gdy system plików ich nie zna, kopia
-      (H27, W02). jarvo-wiedza w każdym profilu (dostawca pamięci), komputer i zgody tam, gdzie config profilu
+      (H27, W02). jarvo-wiedza w każdym profilu (dostawca pamięci), komputer, przeglądarka, pulpit i zgody tam, gdzie config profilu
       z buildu je włącza (plugins.enabled); w pozostałych dowiązanie znika. jarvo-hq i jarvo-wiedza (zakładki
       panelu) oraz wtyczki z plugins.enabled configu hosta z buildu włączone w config hosta: `hermes plugins
       enable`, a gdy Hermes jej nie zna (wtyczka samego panelu), enable_plugin.py,
@@ -93,7 +93,8 @@ from jarvo import przenosne  # noqa: E402
 
 WINDOWS = os.name == "nt"
 ORKIESTRATOR = "jarvo"
-WTYCZKI = ("jarvo-hq", "jarvo-wiedza", "jarvo-komputer", "jarvo-zgody", "jarvo-sesje")
+WTYCZKI = ("jarvo-hq", "jarvo-wiedza", "jarvo-komputer", "jarvo-przegladarka", "jarvo-zgody", "jarvo-sesje",
+           "jarvo-pulpit")
 W_HOSCIE = ("jarvo-hq", "jarvo-wiedza")             # zakładki panelu: włączone w config hosta (plugins.enabled)
 WE_WSZYSTKICH = ("jarvo-wiedza",)                   # dostawca pamięci każdego profilu
 TYLKO_PANEL = ("jarvo-hq",)                         # wtyczka samego panelu: bez dowiązań w profilach i restartu bramy

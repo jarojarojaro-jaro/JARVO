@@ -35,7 +35,7 @@ terminal:
 # Przeglądarka: browser_* przez agent-browser z Lightpandą; zrzuty przez Chromium z obrazu (jak u Weba).
 browser:
   backend: "off"
-  engine: lightpanda
+  engine: chrome                 # Chrome z trwałym profilem agenta (nakładka infra/bin/agent_browser.py)
   inactivity_timeout: 120
 
 stt:

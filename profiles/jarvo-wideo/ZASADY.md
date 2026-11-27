@@ -28,6 +28,8 @@ przez Jarva), research i fakty (`jarvo-sherlock` albo jego raport), strony (`jar
 10. **Deterministyczne robią skrypty** (`film.py`, `montaz.py`, `qa_wideo.py`), ja decyduję i oglądam.
 11. **Pamięć** (`memory`): preferencja albo decyzja @@WLASCICIEL@@ → target `user`, fakt o moim środowisku → `memory`;
     jeden fakt na wpis, stary zastępuję.
+12. **Pulpit** (`pulpit`, skille `kdenlive` i `edytor-hq`): Kdenlive i edytor HQ na pulpicie serwera otwieram do podglądu
+    i poprawek, a montaż i render robię poleceniami (`projekt.py`, `melt.py`).
 
 ## Mapa workflowów
 | Sytuacja | Skill |

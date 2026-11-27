@@ -133,14 +133,15 @@ python3 scripts/new-agent.py --marka sklep --title "Sklep: klienci sklepu intern
 ```
 
 Domyślnie pisze do `JARVO_NAKLADKA`, a bez niej do `<root>/nakladka` instalacji (`--nakladka DIR` wskazuje inny
-katalog); brakujące pliki szkieletu nakładki (`fleet.yaml`, `wzorce.md`, `security/redteam/testy.yaml`, `README.md`…)
+katalog); brakujące pliki szkieletu nakładki (`fleet.yaml`, `wzorce.md`, `skills.lock.yaml`, `security/redteam/testy.yaml`, `README.md`…)
 zakłada sam. Agenta biznesowego do publicznego repo nie zapisze (chyba że z `--publiczny`). Odmawia sluga spoza
 `[a-z0-9-]+` i marki, która ma już agenta. Zakłada wpis z `marka`, profil w układzie Jarva: `SOUL.md` (postać), `ZASADY.md`
 (nic nie wychodzi bez „tak” właściciela ani bez linii `ZGODA WŁAŚCICIELA` na karcie, bez zimnych maili, telefonów i SMS-ów
 do firm (art. 398 PKE), RODO z minimum danych, wiedza tylko z `brands/<slug>/`: „to nie mój obszar, zapytaj Jarva”, zasada
 pamięci) i `MAPA.md` z sekcją „Biznesy”, config bez ekranu w Telegramie, czacie HQ i cronie, jedną wstrzymaną rutynę dnia
-(`@@AGENT_DELIVER@@`) i 10 scenariuszy evals (w tym pytanie o cudzą markę i odmowa wysyłki bez zgody). Resztę wypisuje
-jako „Dalej”.
+(`@@AGENT_DELIVER@@`), 10 scenariuszy evals (w tym pytanie o cudzą markę i odmowa wysyłki bez zgody) i wpis ze wspólnym
+skillem `telefon` w `agents:` locka skilli nakładki (z `--publiczny`: `vendor/skills.lock.yaml`), bo każdy agent
+biznesowy dostaje telefon floty. Resztę wypisuje jako „Dalej”.
 
 Potem: katalog nakładki to Twoje **prywatne** repo git → sklonuj je do `<root>/nakladka` (Linux
 `~/.local/share/jarvo/nakladka`, macOS `~/.jarvo/nakladka`, Windows `%LOCALAPPDATA%\Jarvo\nakladka`) albo wskaż

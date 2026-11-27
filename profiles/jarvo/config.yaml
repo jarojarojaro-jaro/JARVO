@@ -109,7 +109,7 @@ command_allowlist:
 # Hermes sam przełącza na Chromium z obrazu.
 browser:
   backend: "off"                  # bez trybu Browser Use (uvx browser-use pobierany w locie)
-  engine: lightpanda
+  engine: chrome                 # Chrome z trwałym profilem agenta (nakładka infra/bin/agent_browser.py)
   inactivity_timeout: 120
 
 # Wiadomości głosowe: Parakeet (jarvo-stt) uruchamiany na czas transkrypcji (HERMES_LOCAL_STT_COMMAND).

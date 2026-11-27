@@ -1,6 +1,11 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Komputer nie ma `navigator.webdriver`, po restarcie otwiera karty sprzed restartu, odmowa `element_zmieniony` mówi, co się zmieniło, a edytor filmów HQ otwiera adres `http://127.0.0.1:9119/jarvo#/?n=edytor&p=<film>`.
+- `browser_*` działa na Chrome z trwałym profilem i zwartym widokiem strony z refami.
+- Narzędzie `pulpit` (wtyczka `jarvo-pulpit`, docs/PULPIT.md) daje mi programy z oknami na pulpicie serwera (zobacz z numerami elementów, klik, pisz, klawisz, przewiń, przeciągnij, okna, uruchom, kroki z paragonem, czekaj) ze skillami `pulpit`, `gimp`, `libreoffice` i `edytor-hq`.
+- Telefon prowadzę skillem `telefon` (plansze Sklepu Play, sprawdzenie celu), surowe adb do ekranu telefonu strażnik odrzuca, gdy ciało PhoneUse odpowiada, a paragon ostrzega o pętli i o niewpisanym tekście, a `shot` ma numery wierszy.
+- Zrzut z `computer_use`, `pulpit`, `shot` telefonu i `vision_analyze` widzę od razu jako obraz w wyniku narzędzia, bez wolnego opisu modelu pomocniczego, a narzędzia telefonu, ekranu i pulpitu mam od razu, bez `tool_search`.
 - Cała flota pyta właściciela tylko o płatności i zakupy, a logowanie, konta, formularze, wiadomości, kroki na telefonie i w przeglądarce (także `confirm=true`), publikację i wdrożenia robi sama.
 - Po wgraniu zmienionego SOUL.md trwające rozmowy profilu biorą nowe zasady od następnej tury.
 - Telefon floty: zadanie działa na tym telefonie, na którym pierwszy raz coś zrobiło (w rozmowie do 30 min bez działania), a odczyt każdego telefonu (ekran, lista aplikacji) jest wolny; numer i konta każdego telefonu są w skarbcu `fleet/telefony.md` z pomiaru `jarvo telefon spis`.

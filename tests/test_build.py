@@ -323,6 +323,7 @@ def test_wiedza_plugin_wiring(built, tmp_path):
         cfg = fl.load_yaml(out / agent.name / "config.yaml")
         assert cfg["memory"]["provider"] == "jarvo-wiedza", agent.name
         assert "jarvo-wiedza" in cfg["plugins"]["enabled"], agent.name
+        assert "jarvo-przegladarka" in cfg["plugins"]["enabled"], agent.name       # wyniki browser_* w każdym profilu
         assert cfg["auxiliary"]["jarvo_wiedza"]["model"] == fleet.model_for("frontier"), agent.name
         assert cfg["auxiliary"]["jarvo_wiedza"]["timeout"] > 30, agent.name     # 30 s Hermesa nie starcza na kompilację
         # głos floty: Matcha przez jarvo-tts z profiles/_host/config.yaml (nie Edge)
@@ -521,7 +522,7 @@ def test_kontener_main_to_dawny_build_bez_wartosci_natywnych(built, kontener_mai
     assert not (kontener_main / "plugins" / build.ZGODY_PLUGIN).exists()
     assert not (kontener_main / "host" / "srodowisko.json").exists()
     manifest = json.loads((kontener_main / "BUILD.json").read_text(encoding="utf-8"))
-    assert manifest["plugins"] == ["jarvo-hq", "jarvo-wiedza", "jarvo-komputer"] and "uklad" not in manifest
+    assert manifest["plugins"] == ["jarvo-hq", "jarvo-wiedza", "jarvo-komputer", "jarvo-przegladarka"] and "uklad" not in manifest
     host, szablon = (fl.load_yaml(kontener_main / "host" / "config.yaml"),
                      fl.load_yaml(fl.REPO_ROOT / "profiles" / "_host" / "config.yaml"))
     for klucz in ("plugins", "security", "auth", "terminal", "tts"):
@@ -665,10 +666,10 @@ def test_natywny_macos_i_linux_bez_exe_z_lightpanda(tmp_path):
         finally:
             build.build_cron = original
         cfg = fl.load_yaml(out / "jarvo-web" / "config.yaml")
-        assert cfg["browser"]["engine"] == "lightpanda" and "search_backend" not in (cfg.get("web") or {})
+        assert cfg["browser"]["engine"] == "chrome" and "search_backend" not in (cfg.get("web") or {})
         assert cfg["mcp_servers"]["inspo"]["args"] == [f"{program}/node-floty/node_modules/inspo-mcp/inspo-mcp.mjs",
                                                        "--stdio"]
-        # Lightpanda zostaje, więc brama nie dostaje AGENT_BROWSER_EXECUTABLE_PATH (agent-browser użyłby go też dla niej)
+        # brama nie dostaje AGENT_BROWSER_EXECUTABLE_PATH: Chromium silnika chrome wybiera nakładka agent-browsera
         build.build_host(fleet, out / "host", ENV, u)
         assert set(json.loads((out / "host" / "srodowisko.json").read_text(encoding="utf-8"))) == \
             {"HERMES_LOCAL_STT_COMMAND"}

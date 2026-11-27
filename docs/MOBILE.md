@@ -139,7 +139,12 @@ status` pokazuje pliki, SDK, adb i wpisy w profilach, `jarvo doctor` sprawdza pl
 właściciel w swoim terminalu. Zgoda: `act` i `batch` z `confirm: true` omijają bramkę `needs_confirm` telefonu, więc
 wtyczka `jarvo-zgody` pyta o nie z treścią akcji (zgoda = „tak” właściciela dla tej jednej akcji); na karcie
 przepuszcza je tylko z linią `ZGODA WŁAŚCICIELA` w treści karty, a bez niej, w rutynie i pod YOLO blokuje; pod YOLO
-żaden profil nie ma telefonu wcale, tak jak `computer_use`.
+żaden profil nie ma telefonu wcale, tak jak `computer_use`. Surowe adb, które steruje ekranem telefonu floty albo go
+czyta (`input`, `uiautomator dump`, `screencap`, `am start`, `monkey`), wtyczka odrzuca z radą „narzędzie telefonu”,
+gdy profil ma ten telefon w serwerze `phone`, a jego ciało PhoneUse odpowiada na `/ping` (sonda bez tokenu, wynik
+pamiętany 60 s, brak 15 s); bez ciała adb działa jak wcześniej, a instalacja APK, `pm list`, `dumpsys`, `getprop`
+i `logcat` są zawsze wolne. Pętlę pracy na telefonie (paragon, `wait`, przewijanie, plansze Sklepu Play, sprawdzenie
+celu na ekranie) opisuje wspólny skill `telefon` (`shared/skills/telefon`, profile z telefonem).
 
 **Telefon agenta biznesowego.** Agent biznesowy (np. `jarvo-sklep`, [FLEET.md](FLEET.md#agenci-biznesowi)) dostaje
 serwer `phone` tylko z przydziałem właściciela i tylko na **jeden** telefon:

@@ -189,8 +189,59 @@ def test_samotest_wykrywa_dziurawy_filtr(monkeypatch):
     """Cel, który nie dostał 403 (proxy go przepuściło albo milczy), oblewa samotest: usługa Komputera nie wstaje.
     Bez prawdziwych połączeń z siecią lokalną: odpowiedzi proxy podstawione."""
     monkeypatch.setattr(filtr, "zapytaj_przez_proxy",
-                        lambda port, host, p, czas=10.0: 200 if host == "169.254.169.254" else 403)
+                        lambda port, host, p, czas=10.0, sciezka=None: 200 if host == "169.254.169.254" else 403)
     wynik = filtr.samotest(1, 19200)
     assert not wynik["ok"] and [c["cel"] for c in wynik["cele"] if c["kod"] != 403] == ["169.254.169.254:80"]
-    monkeypatch.setattr(filtr, "zapytaj_przez_proxy", lambda port, host, p, czas=10.0: None)
+    monkeypatch.setattr(filtr, "zapytaj_przez_proxy", lambda port, host, p, czas=10.0, sciezka=None: None)
     assert not filtr.samotest(1, 19200)["ok"]
+    # panel poza edytorem przepuszczony zwykłym żądaniem http też oblewa samotest
+    monkeypatch.setattr(filtr, "zapytaj_przez_proxy",
+                        lambda port, host, p, czas=10.0, sciezka=None: 200 if sciezka == "/api/env" else 403)
+    wynik = filtr.samotest(1, 19200)
+    assert [c["cel"] for c in wynik["cele"] if c["kod"] != 403] == ["127.0.0.1:19200/api/env"]
+
+
+@pytest.mark.parametrize("metoda, sciezka, wolno", [
+    ("GET", "/jarvo", True), ("GET", "/jarvo?profile=default", True), ("GET", "/assets/index-x.js", True),
+    ("GET", "/api/plugins/jarvo-hq/file?path=/a/film.mp4", True), ("POST", "/api/plugins/jarvo-hq/edit/save", True),
+    ("GET", "/api/plugins/jarvo-hq/edit/info?path=x", True), ("POST", "/api/plugins/jarvo-hq/upload", True),
+    ("POST", "/api/plugins/jarvo-hq/file", False), ("POST", "/api/plugins/jarvo-hq/app/klucz", False),
+    ("GET", "/api/env", False), ("GET", "/api/config", False), ("GET", "/api/plugins/jarvo-hq/strumien", False),
+    ("GET", "/api/plugins/jarvo-hq/rozmowy", False), ("POST", "/api/plugins/jarvo-hq/chat/x", False),
+    ("GET", "/assets/../api/env", False), ("GET", "/assets/%2e%2e/api/env", False),
+    ("GET", "/api/plugins/jarvo-hq/edit/..%2f..%2fapi%2fenv", False), ("GET", "//api/env", False),
+    ("GET", "/jarvox", False), ("GET", "/api/plugins/jarvo-hq/editor", False),
+])
+def test_edytor_panelu_tylko_sciezki_edytora(metoda, sciezka, wolno):
+    assert filtr.edytor_panelu(metoda, sciezka) is wolno
+
+
+def test_proxy_przepuszcza_do_panelu_tylko_edytor():
+    """Edytor filmów HQ w przeglądarce Jarva: zwykłe żądania http do 127.0.0.1/localhost na porcie panelu ze
+    ścieżkami edytora idą do panelu, reszta panelu, CONNECT i Upgrade dostają 403, inne porty pętli zwrotnej też."""
+    panel = _Serwer(http=True)
+    p = filtr.Proxy(port=wolny_port(), panel=panel.port)
+    p.start()
+    try:
+        for host in ("127.0.0.1", "localhost"):
+            odp = _zapytanie(p.port, f"GET http://{host}:{panel.port}/jarvo HTTP/1.1\r\nHost: x\r\n\r\n".encode())
+            assert odp.startswith(b"HTTP/1.1 200"), odp[:80]
+        odp = _zapytanie(p.port, (f"POST http://127.0.0.1:{panel.port}/api/plugins/jarvo-hq/edit/save HTTP/1.1\r\n"
+                                  "Host: x\r\nContent-Length: 2\r\n\r\n{}").encode())
+        assert odp.startswith(b"HTTP/1.1 200")
+        assert [d.split(b"\r\n", 1)[0] for d in panel.dane] == [
+            b"GET /jarvo HTTP/1.1", b"GET /jarvo HTTP/1.1", b"POST /api/plugins/jarvo-hq/edit/save HTTP/1.1"]
+        for zadanie in (f"GET http://127.0.0.1:{panel.port}/api/env HTTP/1.1\r\n\r\n",
+                        f"POST http://127.0.0.1:{panel.port}/api/plugins/jarvo-hq/chat/w HTTP/1.1\r\n\r\n",
+                        f"GET http://127.0.0.1:{panel.port}/assets/../api/env HTTP/1.1\r\n\r\n",
+                        f"GET http://127.0.0.1:{panel.port}/jarvo HTTP/1.1\r\nUpgrade: websocket\r\n\r\n",
+                        f"CONNECT 127.0.0.1:{panel.port} HTTP/1.1\r\n\r\n",
+                        f"GET http://[::1]:{panel.port}/jarvo HTTP/1.1\r\n\r\n",
+                        f"GET http://127.0.0.1:{panel.port + 1}/jarvo HTTP/1.1\r\n\r\n"):
+            odp = _zapytanie(p.port, zadanie.encode())
+            assert odp.startswith(b"HTTP/1.1 403"), (zadanie, odp[:80])
+        assert len(panel.dane) == 3
+        assert filtr.samotest(p.port, panel.port)["ok"]
+    finally:
+        p.zatrzymaj()
+        panel.zamknij()

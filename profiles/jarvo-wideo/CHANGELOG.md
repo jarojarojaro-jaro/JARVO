@@ -1,6 +1,9 @@
 # Changelog: jarvo-wideo
 
 ## Niewydane
+- `browser_*` działa na Chrome z trwałym profilem przeglądarki (logowania zostają między zadaniami), nawigacja zwraca zwartą listę elementów z refami i tekstem, klik, klawisz i Wstecz zwracają widok strony po ustaleniu, a blokada antybotowa mówi wprost: telefon floty, potem `kanban_block`.
+- Narzędzie `pulpit` (docs/PULPIT.md) otwiera na pulpicie serwera Kdenlive, edytor HQ i GIMP, a skille `kdenlive` (z `melt.py`: pionowa wersja z napisem), `edytor-hq`, `gimp` i `pulpit` mówią, kiedy skrypt, a kiedy okno.
+- Obraz z narzędzi (zrzut, `shot` telefonu, `vision_analyze`, klatki i arkusze) widzisz od razu jako obraz w wyniku narzędzia, bez osobnego opisu modelu pomocniczego, a wszystkie narzędzia są w zestawie od razu, bez `tool_search`.
 - Film z kodu z `projekt.py z-kodu --strona` właściciel poprawia w HQ (**Edytuj ujęcie**: teksty i kolory planszy z `parametry.json`, render tylko tego ujęcia); pliki robocze kontroli w `out/wideo/qa/`.
 - Nowe skille z silnikjava: `film-rysowany` (ręka rysuje i pisze pod lektora, 21 stylów, `rysowany.py`), `pracownia-malarza` (obraz malowany i film z pracowni, `pracownia.py`) i `voxel-ascii` (diorama z klocków w ASCII, `voxel.py`); instalacja `narzedzia.py instaluj silnikjava`.
 - Film rysowany sprawdza `rysowany.py sprawdz` (lint i audyt silnika), a każdy z trzech filmów oddajesz jako projekt edytora.

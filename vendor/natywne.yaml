@@ -1046,6 +1046,53 @@ narzedzia:
         usun_poziom: 1
         usun: *cua-usun-linux
 
+  # ── Pulpit agentów: programy z oknami na ekranie serwera (docs/PULPIT.md, narzędzie `pulpit`) ──────────────────────
+  # Kdenlive 26.08.3 (KDE; tag v26.08.3 = commit 73f290d5) i Inkscape 1.4.4 (tag INKSCAPE_1_4_4 = commit dcaf3e7d):
+  # AppImage x86_64 bez sudo, przegląd 2026-11-27. Suma Kdenlive = plik .sha256 z download.kde.org = własne liczenie,
+  # Inkscape = sha256sum ze strony wydania = własne liczenie. W środku Kdenlive są też melt, ffmpeg i kdenlive_render
+  # (skill kdenlive woła melt przez scripts/melt.py). Uruchamia je narzędzie `pulpit` (akcja uruchom), które przy
+  # pierwszym użyciu pobiera plik tą drogą co reszta (jarvo/przy_uzyciu.py); potem są w PATH procesów floty.
+  # AppImage montuje się przez FUSE 2 (libfuse2); bez niego silnik pulpitu ustawia APPIMAGE_EXTRACT_AND_RUN=1.
+  # Tylko Linux x86_64: pulpit agentów to ekran X11 serwera, a wydania arm64 tych programów nie ma.
+  kdenlive:
+    zrodlo: kdenlive
+    wersja: "26.08.3"
+    licencja: GPL-3.0-or-later (Kdenlive), w AppImage MLT LGPL-2.1, FFmpeg LGPL/GPL, Qt LGPL-3.0, KDE Frameworks LGPL
+    rola: "montaż wideo z oknem na pulpicie agentów (Wideograf: podgląd i poprawki projektu MLT) i melt do renderu projektu"
+    kiedy: przy-uzyciu
+    pliki:
+      windows-x64: &pulpit-brak
+        brak: "pulpit agentów działa tylko na ekranie X11 serwera z Linuksem (docs/PULPIT.md)"
+      windows-arm64: *pulpit-brak
+      macos-arm64: *pulpit-brak
+      linux-x64:
+        url: https://download.kde.org/stable/kdenlive/26.08/linux/kdenlive-26.08.3-x86_64.AppImage
+        sha256: 2c8322edfc86605e4c98a78a019310d9b4fc46bb8e94e6fe313dc7dd987e7671
+        rozmiar: 214346232
+        format: plik
+        nazwa_pliku: kdenlive
+        bin: ["."]
+      linux-arm64: &pulpit-brak-arm
+        brak: "KDE i Inkscape nie wydają AppImage dla Linux arm64"
+  inkscape:
+    zrodlo: inkscape
+    wersja: "1.4.4"
+    licencja: GPL-2.0-or-later (Inkscape), w AppImage biblioteki GTK i Python na ich licencjach (LGPL, PSF)
+    rola: "grafika wektorowa z oknem na pulpicie agentów i `inkscape --export-type=png` z wiersza poleceń"
+    kiedy: przy-uzyciu
+    pliki:
+      windows-x64: *pulpit-brak
+      windows-arm64: *pulpit-brak
+      macos-arm64: *pulpit-brak
+      linux-x64:
+        url: https://media.inkscape.org/dl/resources/file/Inkscape-1.4.4.AppImage
+        sha256: d217fe05c92faaed5c3af46856b6299c98933dc722819cb5bc2ca052c5522166
+        rozmiar: 120236536
+        format: plik
+        nazwa_pliku: inkscape
+        bin: ["."]
+      linux-arm64: *pulpit-brak-arm
+
 # Modele i dane niezależne od platformy (przegląd 2026-10-24): pliki z przypiętej rewizji repo modelu, każdy z sumą.
 # Wagi lektorów i OCR to te same pliki i sumy co w infra/Dockerfile. JARVO-ZRODLO.txt (jak w obrazie) pisze instalator.
 modele:

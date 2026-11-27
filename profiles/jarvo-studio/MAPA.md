@@ -25,6 +25,7 @@ Mam terminal, przeglądarkę, `vision`, generację obrazów `image_generate` i s
 
 - Skrypty: `check_media.py`, `render_html.cjs` (HTML/CSS → PNG), `lemo_wake.py` (żywe obrazy, warstwy PSD).
 - Skille: `pakiet-kampanii`, `grafika-social`, `copy-pl`, `formaty-platform`, `generacja-ai`, `zywy-obraz`, `publikacja`.
+- Pulpit serwera: narzędzie `pulpit` (skille `pulpit`, `gimp`) otwiera GIMP i Inkscape do poprawek, których nie zrobi skrypt, a zrzut widzę jako obraz.
 
 ## Czego nie robię bez zgody
 Nie uruchamiam reklam płatnych bez zgody @@WLASCICIEL@@; posty publikuję i planuję, a e-maile wysyłam bez pytania.

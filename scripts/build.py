@@ -11,8 +11,10 @@ Wynik: build/
   host/config.yaml    config profilu hosta (default): gateway, trasy Telegrama, kanban
   host/srodowisko.json  (tylko natywnie) zmienne bramy z buildu: HERMES_LOCAL_STT_COMMAND, na Windows także
                       AGENT_BROWSER_EXECUTABLE_PATH (Chromium silnika chrome)
-  plugins/            jarvo-hq, jarvo-wiedza, jarvo-komputer; natywnie także jarvo-zgody (tryby zgód, zgody/)
-                      i jarvo-sesje (skrzynki sesji zewnętrznych „… gpu”, sesje/; host i każdy profil)
+  plugins/            jarvo-hq, jarvo-wiedza, jarvo-komputer, jarvo-przegladarka (wyniki browser_* w każdym profilu,
+                      komputer/przegladarka_plugin); natywnie także jarvo-zgody (tryby zgód, zgody/),
+                      jarvo-sesje (skrzynki sesji zewnętrznych „… gpu”, sesje/; host i każdy profil) i jarvo-pulpit
+                      (narzędzie `pulpit` na ekranie serwera, pulpit/; profile z `pulpit: true`)
   BUILD.json          manifest (commit repo, źródła skilli, agenci; natywnie także układ i ścieżki)
 
 Układ (`--uklad`, docs/NATYWNIE.md S06): `kontener` (domyślny) daje dzisiejsze ścieżki obrazu (/opt/data, /opt/jarvo/…),
@@ -788,6 +790,9 @@ WIEDZA_PLUGIN = "jarvo-wiedza"
 KOMPUTER_PLUGIN = "jarvo-komputer"     # narzędzie `komputer` (komputer/plugin) dla agentów z `komputer: true`
 ZGODY_PLUGIN = "jarvo-zgody"           # tryby zgód pytaj/projekt/pełny (zgody/plugin), tylko w układzie natywnym
 SESJE_PLUGIN = "jarvo-sesje"           # skrzynki sesji zewnętrznych (sesje/plugin): host i każdy profil, tylko natywnie
+PULPIT_PLUGIN = "jarvo-pulpit"         # narzędzie `pulpit` (pulpit/plugin) dla agentów z `pulpit: true`, tylko natywnie
+PRZEGLADARKA_PLUGIN = "jarvo-przegladarka"   # wyniki browser_* (komputer/przegladarka_plugin): każdy profil
+TOOLSET_PULPIT = "pulpit"
 # czas zadania jarvo_wiedza (s): kompilacja jednego szkicu na deepseek-v4.1-flash trwa ok. 20–25 s, wyciąg z długiej
 # rozmowy dłużej; domyślne 30 s Hermesa po przekroczeniu wyłącza dostawcę na 10 min (pomiar 2026-11-07)
 CZAS_ZADANIA_WIEDZY = 180
@@ -1298,8 +1303,16 @@ def build_agent(fleet, agent, out_root, lock, resolver, protocol, runtime_build_
             cfg["tts"] = glos
         wtyczki = cfg.setdefault("plugins", {})
         wlaczone = list(wtyczki.get("enabled") or [])
-        wtyczki["enabled"] = wlaczone + [w for w in [WIEDZA_PLUGIN] + ([KOMPUTER_PLUGIN] if agent.komputer else [])
-                                         + ([ZGODY_PLUGIN, SESJE_PLUGIN] if u.natywny else []) if w not in wlaczone]
+        pulpit = agent.pulpit and u.natywny and u.system == "linux"       # pulpit X11: tylko Linux (docs/PULPIT.md)
+        wtyczki["enabled"] = wlaczone + [w for w in [WIEDZA_PLUGIN, PRZEGLADARKA_PLUGIN]
+                                         + ([KOMPUTER_PLUGIN] if agent.komputer else [])
+                                         + ([ZGODY_PLUGIN, SESJE_PLUGIN] if u.natywny else [])
+                                         + ([PULPIT_PLUGIN] if pulpit else []) if w not in wlaczone]
+        if pulpit:
+            # pulpit (docs/PULPIT.md): toolset na każdej platformie rozmowy i zadań agenta, bez rutyn cron
+            for plat, ts in (cfg.get("platform_toolsets") or {}).items():
+                if plat != "cron" and isinstance(ts, list) and TOOLSET_PULPIT not in ts:
+                    ts.append(TOOLSET_PULPIT)
         cfg.setdefault("auxiliary", {})["jarvo_wiedza"] = {"model": fleet.model_for("frontier"), "timeout": CZAS_ZADANIA_WIEDZY}
         if agent.kind == "generalist":
             # skille specjalistów nakładki prywatnej: publiczny config wymienia tylko agentów repo (validate.py)
@@ -1476,6 +1489,11 @@ def main(argv: list[str] | None = None) -> int:
     if kp.exists():
         remove_tree(kp)
     shutil.copytree(fl.REPO_ROOT / "komputer" / "plugin", kp, ignore=COPY_IGNORE)
+    # wyniki browser_* (docs/KOMPUTER.md „Przeglądarka agentów floty”): hak w każdym profilu, w obu układach
+    pr = out / "plugins" / PRZEGLADARKA_PLUGIN
+    if pr.exists():
+        remove_tree(pr)
+    shutil.copytree(fl.REPO_ROOT / "komputer" / "przegladarka_plugin", pr, ignore=COPY_IGNORE)
     print(f"✓ plugins/{KOMPUTER_PLUGIN}: agenci z Komputerem: {', '.join(a.name for a in fleet.active() if a.komputer) or 'brak'}")
     # tryby zgód (zgody/README.md, docs/NATYWNIE.md (d)): tylko natywnie; w kontenerze zgody jak dziś (approvals.mode)
     zp = out / "plugins" / ZGODY_PLUGIN
@@ -1483,7 +1501,17 @@ def main(argv: list[str] | None = None) -> int:
     for stary in (zp, sp):
         if stary.exists():
             remove_tree(stary)
-    wtyczki = ["jarvo-hq", WIEDZA_PLUGIN, KOMPUTER_PLUGIN]
+    wtyczki = ["jarvo-hq", WIEDZA_PLUGIN, KOMPUTER_PLUGIN, PRZEGLADARKA_PLUGIN]
+    pp = out / "plugins" / PULPIT_PLUGIN
+    if pp.exists():
+        remove_tree(pp)
+    if uklad.natywny and uklad.system == "linux":
+        # pulpit serwera (docs/PULPIT.md): silnik w Pythonie systemu z tymi samymi twardymi zasadami co Komputer
+        shutil.copytree(fl.REPO_ROOT / "pulpit" / "plugin", pp, ignore=COPY_IGNORE)
+        shutil.copy2(fl.REPO_ROOT / "infra" / "komputer" / "zasady.py", pp / "zasady.py")
+        shutil.copy2(fl.REPO_ROOT / "komputer" / "zgoda_karty.py", pp / "zgoda_karty.py")
+        wtyczki.append(PULPIT_PLUGIN)
+        print(f"✓ plugins/{PULPIT_PLUGIN}: agenci z pulpitem: {', '.join(a.name for a in fleet.active() if a.pulpit) or 'brak'}")
     if uklad.natywny:
         shutil.copytree(fl.REPO_ROOT / "zgody" / "plugin", zp, ignore=COPY_IGNORE)
         # zgoda właściciela z karty (linia ZGODA WŁAŚCICIELA): ten sam parser co wejście Komputera, dla bramki telefonu

@@ -286,10 +286,17 @@ agents:
   jarvo:
     - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     - {source: jarvo, path: shared/skills/odczyt-ekranu, dest: pliki/odczyt-ekranu}
+    # telefony floty przez PhoneUse (jarvo telefon on): pętla ekranu, plansze Sklepu Play, sprawdzenie celu
+    - {source: jarvo, path: shared/skills/telefon, dest: ekran/telefon}
     # proste obrazy i krótkie filmy robi sam (silnikjava); dłuższe filmy zleca Wideografowi
     - {source: jarvo, path: shared/skills/film-rysowany, dest: wideo/film-rysowany}
     - {source: jarvo, path: shared/skills/pracownia-malarza, dest: wideo/pracownia-malarza}
     - {source: jarvo, path: shared/skills/voxel-ascii, dest: wideo/voxel-ascii}
+    # pulpit serwera (narzędzie `pulpit`, docs/PULPIT.md): pętla i programy z oknami
+    - {source: jarvo, path: shared/skills/pulpit, dest: pulpit/pulpit}
+    - {source: jarvo, path: shared/skills/gimp, dest: pulpit/gimp}
+    - {source: jarvo, path: shared/skills/libreoffice, dest: pulpit/libreoffice}
+    - {source: jarvo, path: shared/skills/edytor-hq, dest: pulpit/edytor-hq}
     - {source: mattpocock-skills, path: skills/productivity/writing-for-agents, dest: meta/writing-for-agents}
   jarvo-sherlock:
     - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
@@ -383,6 +390,8 @@ agents:
     - {source: jarvo, path: shared/skills/odczyt-ekranu, dest: pliki/odczyt-ekranu}
     - {source: jarvo, path: shared/skills/hooki, dest: marketing/hooki}
     - {source: jarvo, path: shared/skills/izometria, dest: design/izometria}
+    - {source: jarvo, path: shared/skills/pulpit, dest: pulpit/pulpit}
+    - {source: jarvo, path: shared/skills/gimp, dest: pulpit/gimp}
     - {source: anthropic-skills, path: skills/algorithmic-art, dest: design/algorithmic-art}
     - {source: impeccable, path: .hermes/skills/impeccable, dest: design/impeccable}
     - {source: marketingskills, path: skills/copywriting, dest: marketing/copywriting}
@@ -420,6 +429,10 @@ agents:
     - {source: jarvo, path: shared/skills/pracownia-malarza, dest: wideo/pracownia-malarza}
     - {source: jarvo, path: shared/skills/voxel-ascii, dest: wideo/voxel-ascii}
     - {source: jarvo, path: shared/skills/izometria, dest: design/izometria}
+    - {source: jarvo, path: shared/skills/pulpit, dest: pulpit/pulpit}
+    - {source: jarvo, path: shared/skills/kdenlive, dest: pulpit/kdenlive}
+    - {source: jarvo, path: shared/skills/edytor-hq, dest: pulpit/edytor-hq}
+    - {source: jarvo, path: shared/skills/gimp, dest: pulpit/gimp}
     - {source: gsap-skills, path: skills/gsap-core, dest: gsap/gsap-core}
     - {source: gsap-skills, path: skills/gsap-timeline, dest: gsap/gsap-timeline}
     - {source: gsap-skills, path: skills/gsap-scrolltrigger, dest: gsap/gsap-scrolltrigger}
@@ -527,6 +540,8 @@ agents:
   jarvo-hacker:
     - {source: jarvo, path: shared/skills/konwersja-plikow, dest: pliki/konwersja-plikow}
     - {source: jarvo, path: shared/skills/odczyt-ekranu, dest: pliki/odczyt-ekranu}
+    # telefon first z przydziału (jarvo telefon przydziel jarvo-hacker first)
+    - {source: jarvo, path: shared/skills/telefon, dest: ekran/telefon}
     - {source: jarvo, path: shared/skills/graf-kodu, dest: kod/graf-kodu}
     - {source: hermes, path: skills/software-development/systematic-debugging, dest: kod/systematic-debugging}
     - {source: hermes, path: skills/web/blocked-page-recovery, dest: research/blocked-page-recovery}

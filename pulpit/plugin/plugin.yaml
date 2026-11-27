@@ -1,0 +1,6 @@
+name: jarvo-pulpit
+version: 0.1.0
+description: "Pulpit serwera (:0) dla agentów: zrzut z numerami elementów, klik, pisanie, klawisze, okna i programy (docs/PULPIT.md)."
+author: "Jarvo fleet"
+provides_tools:
+  - pulpit

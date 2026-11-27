@@ -29,6 +29,7 @@ NAKLADKA = REPO / "infra" / "bin" / "agent-browser"
 MODUL = REPO / "infra" / "bin" / "agent_browser.py"
 AB = load_script("infra/bin/agent_browser.py", "agent_browser_nakladka")
 WINDOWS = os.name == "nt"
+POZA_TESTEM = ("CHROME_PATH", "JARVO_KOMPUTER_CHROME", "HERMES_HOME")   # z otoczenia sesji: Chromium i profil agenta
 # Python bez venvu (jak python-build-standalone w instalacji): launcher venvu na Windows to osobny proces
 PYTHON = Path(sys.base_prefix) / "python.exe" if WINDOWS else Path(sys.executable)
 
@@ -79,7 +80,7 @@ def ab(tmp_path: Path):
 
     def uruchom(impl: str, *args: str, stan: str = "wylaczony", wejscie: str = "", env: dict | None = None,
                 bez_binarki: bool = False) -> tuple[subprocess.CompletedProcess, list[dict]]:
-        e = {k: v for k, v in os.environ.items() if not k.startswith("AGENT_BROWSER_") and k != "CHROME_PATH"}
+        e = {k: v for k, v in os.environ.items() if not k.startswith("AGENT_BROWSER_") and k not in POZA_TESTEM}
         e.update(LOG=str(log), STAN=stan, PIDY=str(tmp_path / "pidy"))
         if not bez_binarki:
             e["JARVO_AGENT_BROWSER_BIN"] = str(binarka)
@@ -314,7 +315,7 @@ def test_program_w_bin_floty_przekazuje_argumenty_bez_zmian(ab, tmp_path):
     assert zmiany == [program] and AB.zainstaluj(bin_floty, PYTHON) == []
     sciezka = os.pathsep.join([str(bin_floty), os.environ.get("PATH", "")])
     assert Path(shutil.which("agent-browser", path=sciezka)).resolve() == program.resolve()
-    e = {k: v for k, v in os.environ.items() if not k.startswith("AGENT_BROWSER_") and k != "CHROME_PATH"}
+    e = {k: v for k, v in os.environ.items() if not k.startswith("AGENT_BROWSER_") and k not in POZA_TESTEM}
     log = tmp_path / "log.jsonl"
     e.update(JARVO_AGENT_BROWSER_BIN=str(ab.binarka), LOG=str(log), STAN="wlaczony", PIDY=str(tmp_path / "p"))
     trudne = ["open", "https://x.pl/?a=1&b=%20%PATH%", 'z "cudzysłowem"', "Zażółć gęślą jaźń", "a\nb", "", "^|<>"]
@@ -389,3 +390,42 @@ def wykonywalny(plik: Path) -> bool:
     if r.returncode or not r.stdout:
         pytest.skip("bez repozytorium gita nie ma trybu pliku na Windows")
     return r.stdout.startswith("100755 ")
+
+
+def test_zwiezly_widok_jeden_element_na_wiersz_z_refami_i_tekstem():
+    drzewo = "\n".join([
+        '- generic', '  - banner', '    - link "Start" [ref=e1]', '    - search',
+        '      - searchbox "Szukaj" [ref=e2]', '  - heading "Oferty" [level=2, ref=e3]', '  - list',
+        '    - listitem [level=1]', '      - ListMarker "• "', '      - StaticText "Telefon za"',
+        '      - link "79 zł" [ref=e4]', '      - StaticText "64 GB"', '    - listitem [level=1]',
+        '      - checkbox "Nowe" [checked=false, ref=e5]'])
+    assert AB.zwiezly_widok(drzewo).split("\n") == [
+        '[e1] link "Start"', '[e2] searchbox "Szukaj"', '[e3] h2 "Oferty"', 'Telefon za [e4] link "79 zł" 64 GB',
+        '[e5] checkbox "Nowe" checked=false']
+
+
+def test_flagi_chrome_bez_webdriver_i_z_user_agentem(tmp_path):
+    chrome = tmp_path / "chrome-komputer" / "157.0.8103.78" / "chrome-linux64" / "chrome"
+    chrome.parent.mkdir(parents=True)
+    chrome.write_bytes(b"x")
+    env = AB.srodowisko(["--engine", "chrome"], {"JARVO_KOMPUTER_CHROME": str(chrome), "AGENT_BROWSER_ARGS": "--no-sandbox"})
+    assert env["AGENT_BROWSER_EXECUTABLE_PATH"] == str(chrome)
+    flagi = env["AGENT_BROWSER_ARGS"]
+    assert flagi.startswith("--no-sandbox,--disable-blink-features=AutomationControlled,")
+    assert "Chrome/157.0.0.0 Safari/537.36" in flagi and "Headless" not in flagi
+    assert "AGENT_BROWSER_ARGS" not in AB.srodowisko(["--engine", "lightpanda"], {"JARVO_KOMPUTER_CHROME": str(chrome)})
+    assert "AGENT_BROWSER_ARGS" not in AB.srodowisko(["--cdp", "9222"], {"JARVO_KOMPUTER_CHROME": str(chrome)})
+
+
+def test_profil_agenta_trwaly_dla_pierwszej_sesji_i_staly_w_sesji(tmp_path):
+    env = {"HERMES_HOME": str(tmp_path)}
+    profil = ["--profile", str(tmp_path / "przegladarka" / "profil")]
+    assert AB.profil_agenta(["--session", "a"], ["open", "x.pl"], env) == profil
+    assert AB.profil_agenta(["--session", "b"], ["open", "x.pl"], env) == []          # zajęty przez a: chwilowy
+    assert AB.profil_agenta(["--session", "a"], ["snapshot", "-c"], env) == profil    # decyzja stała w sesji
+    assert AB.profil_agenta(["--session", "a"], ["close"], env) == profil
+    assert AB.profil_agenta(["--session", "b"], ["snapshot"], env) == []              # b dalej chwilowy
+    assert AB.profil_agenta(["--session", "c"], ["open", "x.pl"], env) == profil      # a zwolnił profil
+    for globalne, e in ((["--session", "d", "--engine", "lightpanda"], env), (["--session", "d", "--cdp", "9222"], env),
+                        (["--session", "d", "--profile", "/inny"], env), (["--session", "d"], {})):
+        assert AB.profil_agenta(globalne, ["open", "x.pl"], e) == []

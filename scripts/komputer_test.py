@@ -272,7 +272,8 @@ def main() -> int:
     sprawdz(kod(klik("Pokaż baner")) == "ok", "klik „Pokaż baner” (token świeżej migawki od wejścia): przechodzi")
     time.sleep(0.5)
     w = k.narzedzie("click", {"pid": pid, "window_id": wid, "element_token": stary})
-    sprawdz(zasada(w) == "element_zmieniony" and "„Dodaj do koszyka”; zrób" in tekst(w),
+    sprawdz(zasada(w) == "element_zmieniony" and "„Dodaj do koszyka” jest teraz pod numerem" in tekst(w)
+            and "Odśwież widok" in tekst(w),
             "klik „Dodaj do koszyka” numerem sprzed zmiany strony (pod nim jest już inny element): zablokowany",
             tekst(w))
     w, el = stan()

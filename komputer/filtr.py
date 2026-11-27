@@ -10,6 +10,10 @@ odpowiedzi DNS po sprawdzeniu nic nie da). Odrzuca:
   - pętlę zwrotną (panel Jarva 127.0.0.1:9119, API bramy :8642, podgląd :9120 i każdy inny serwer na tym komputerze),
   - zakresy specjalne i multicast, adresy samego komputera,
   - port 25 (poczta).
+Jedyny wyjątek to edytor filmów panelu (`Proxy(panel=<port>)`): zwykłe żądanie http do 127.0.0.1 albo localhost na
+porcie panelu ze ścieżką z `PANEL_GET` (strona /jarvo, jej pliki i odczyty, których potrzebuje) albo z `PANEL_EDYTOR`
+(API edytora, każda metoda). Reszta panelu (zgody, ustawienia, czat, zadania agentów), CONNECT do panelu i inne
+porty pętli zwrotnej dostają 403 jak dotąd.
 IPv4 w IPv6 (::ffff:a.b.c.d, NAT64 64:ff9b::/96, 6to4 2002::/16) sprawdzamy jak IPv4. Samotest (`samotest`) przed
 startem przeglądarki łączy się przez proxy z adresami zakazanymi: każdy ma dostać 403 bez próby połączenia.
 To filtr w aplikacji, nie w jądrze: obejmuje cały ruch tej przeglądarki, ale nie inne programy właściciela.
@@ -24,13 +28,21 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Callable
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 PORTY_ZAKAZANE = frozenset({25})
 MAKS_NAGLOWEK = 64 << 10
 CZAS_NAGLOWKA = 30.0
 CZAS_POLACZENIA = 15.0
 CZAS_BEZCZYNNOSCI = 300.0
+# edytor filmów HQ w panelu Jarva (docs/KOMPUTER.md): ścieżki, które przeglądarka Jarva dostaje z pętli zwrotnej
+PANEL_HOSTY = frozenset({"127.0.0.1", "localhost"})
+PANEL_GET = ("/jarvo", "/jarvo/", "/favicon.ico", "/assets/", "/dashboard-plugins/", "/api/status",
+             "/api/dashboard/plugins", "/api/dashboard/themes", "/api/dashboard/font", "/api/profiles/active",
+             "/api/plugins/jarvo-hq/app", "/api/plugins/jarvo-hq/state", "/api/plugins/jarvo-hq/host",
+             "/api/plugins/jarvo-hq/fleet", "/api/plugins/jarvo-hq/file", "/api/plugins/jarvo-hq/site")
+PANEL_EDYTOR = ("/api/plugins/jarvo-hq/edit/", "/api/plugins/jarvo-hq/upload")
+PANEL_SAMOTEST = ("/api/config", "/api/env", "/api/plugins/jarvo-hq/chat/", "/jarvo/../api/env")
 # zakresy zawsze zakazane (z powodem po polsku); kolejność: pierwszy pasujący daje powód
 ZAKRESY = [
     ("127.0.0.0/8", "pętla zwrotna: ten komputer (panel i API Jarva)"),
@@ -146,12 +158,32 @@ def _host_port(tekst: str, domyslny: int) -> tuple[str, int]:
     return host.rstrip("."), int(port)
 
 
+def edytor_panelu(metoda: str, sciezka: str) -> bool:
+    """Czy żądanie do panelu Jarva należy do edytora filmów: GET/HEAD ścieżek z PANEL_GET, każda metoda ścieżek
+    z PANEL_EDYTOR. Wpis zakończony „/” to przedrostek, inne pasują dokładnie (zapytanie po „?” nie liczy się).
+    Ścieżka z „..”, „//”, „\\” albo zakodowanym ukośnikiem nie pasuje do niczego."""
+    sciezka = sciezka.split("?", 1)[0].split("#", 1)[0]
+    jawna = unquote(sciezka)
+    if (not jawna.startswith("/") or "\\" in jawna or "//" in jawna or "%2f" in sciezka.lower()
+            or ".." in jawna.split("/") or any(ord(z) < 32 for z in jawna)):
+        return False
+
+    def pasuje(wzorce: tuple) -> bool:
+        return any(jawna.startswith(w) if w.endswith("/") else jawna == w for w in wzorce)
+
+    if pasuje(PANEL_EDYTOR):
+        return True
+    return metoda.upper() in ("GET", "HEAD") and pasuje(PANEL_GET)
+
+
 class Proxy:
     """Proxy HTTP (CONNECT i zwykłe żądania z pełnym adresem) w osobnym wątku z pętlą asyncio."""
 
     def __init__(self, filtr: Filtr | None = None, *, host: str = "127.0.0.1", port: int = 0,
                  log: Callable[[str], None] | None = None,
-                 rozwiaz: Callable[[str, int], list[str]] | None = None):
+                 rozwiaz: Callable[[str, int], list[str]] | None = None, panel: int | None = None):
+        self.panel = panel                    # port panelu Jarva: edytor filmów przechodzi (edytor_panelu)
+        self._panel_odrzucone: set[str] = set()
         self.filtr = filtr or Filtr(wlasne=adresy_tego_komputera())
         self.host, self.port = host, port
         self.log = log or (lambda _t: None)
@@ -303,7 +335,25 @@ class Proxy:
             await self._odpowiedz(w, 400, "Bad Request", "proxy przyjmuje tylko http:// i CONNECT")
             return
         host, port = czesci.hostname, czesci.port or 80
-        wynik = await self._polacz(host, port)
+        upgrade = any(l.lower().startswith("upgrade:") for l in linie[1:])
+        if self.panel is not None and port == self.panel and host.lower() in PANEL_HOSTY:
+            if upgrade or not edytor_panelu(metoda, czesci.path or "/"):
+                # edytor otwarty w karcie ponawia odczyty reszty panelu (strumień co 15 s): wpis w logu raz na ścieżkę
+                sciezka = f"{metoda.upper()} {(czesci.path or '/')[:80]}"
+                powod = ("panel Jarva poza edytorem filmów (przeglądarka Jarva dostaje tylko "
+                         "/jarvo#/?n=edytor&p=<film>)")
+                if sciezka not in self._panel_odrzucone:
+                    self._panel_odrzucone.add(sciezka)
+                    self.log(f"filtr: odrzucone {host}:{port} {sciezka} ({powod})")
+                self.statystyki.blokada(f"{host}:{port}", powod)
+                await self._odpowiedz(w, 403, "Forbidden", f"połączenie z {host}:{port} zablokowane ({powod})")
+                return
+            try:
+                wynik = await asyncio.wait_for(asyncio.open_connection("127.0.0.1", port), CZAS_POLACZENIA)
+            except (OSError, asyncio.TimeoutError):
+                wynik = "panel Jarva nie odpowiada"
+        else:
+            wynik = await self._polacz(host, port)
         if isinstance(wynik, str):
             await self._odmowa(w, host, port, wynik)
             return
@@ -311,7 +361,6 @@ class Proxy:
         sciezka = czesci.path or "/"
         if czesci.query:
             sciezka += "?" + czesci.query
-        upgrade = any(l.lower().startswith("upgrade:") for l in linie[1:])
         naglowki = [f"{metoda} {sciezka} {wersja}"]
         for linia in linie[1:]:
             if not linia:
@@ -389,11 +438,14 @@ def cele_samotestu(port_panelu: int = 9119) -> list[tuple[str, int, str]]:
     return wynik
 
 
-def zapytaj_przez_proxy(port_proxy: int, host: str, port: int, czas: float = 10.0) -> int | None:
-    """CONNECT host:port przez proxy na 127.0.0.1; kod odpowiedzi albo None (brak odpowiedzi)."""
+def zapytaj_przez_proxy(port_proxy: int, host: str, port: int, czas: float = 10.0, sciezka: str | None = None) -> int | None:
+    """CONNECT host:port przez proxy na 127.0.0.1 albo, ze `sciezka`, zwykłe GET http://host:port<sciezka>; kod
+    odpowiedzi proxy albo None (brak odpowiedzi)."""
     s = socket.create_connection(("127.0.0.1", port_proxy), timeout=czas)
+    zadanie = (f"CONNECT {host}:{port} HTTP/1.1\r\n" if sciezka is None else
+               f"GET http://{host}:{port}{sciezka} HTTP/1.1\r\n")
     try:
-        s.sendall(f"CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n".encode("latin-1"))
+        s.sendall(f"{zadanie}Host: {host}:{port}\r\n\r\n".encode("latin-1"))
         dane = b""
         while b"\r\n" not in dane and len(dane) < 4096:
             k = s.recv(4096)
@@ -411,10 +463,13 @@ def zapytaj_przez_proxy(port_proxy: int, host: str, port: int, czas: float = 10.
 
 
 def samotest(port_proxy: int, port_panelu: int = 9119) -> dict:
-    """Każdy cel z `cele_samotestu` ma dostać od proxy 403. {"ok": bool, "cele": [{cel, opis, kod}]}."""
+    """Każdy cel z `cele_samotestu` ma dostać od proxy 403, a zwykłe żądania do panelu poza edytorem filmów
+    (zgody, ustawienia, czat) też. {"ok": bool, "cele": [{cel, opis, kod}]}."""
     wyniki, ok = [], True
-    for host, port, opis in cele_samotestu(port_panelu):
-        kod = zapytaj_przez_proxy(port_proxy, host, port)
-        wyniki.append({"cel": f"{host}:{port}", "opis": opis, "kod": kod})
+    proby = [(host, port, opis, None) for host, port, opis in cele_samotestu(port_panelu)]
+    proby += [("127.0.0.1", port_panelu, "panel Jarva poza edytorem", s) for s in PANEL_SAMOTEST]
+    for host, port, opis, sciezka in proby:
+        kod = zapytaj_przez_proxy(port_proxy, host, port, sciezka=sciezka)
+        wyniki.append({"cel": f"{host}:{port}{sciezka or ''}", "opis": opis, "kod": kod})
         ok = ok and kod == 403
     return {"ok": ok, "cele": wyniki}
