@@ -363,11 +363,19 @@ class Usluga:
                 self.stop.wait(0.5)
         return False
 
+    def _port_podgladu(self) -> int | None:
+        """Port podglądu stron HQ z `state/preview.json` (edytor filmów wyświetla w nim ujęcie); brak pliku = None."""
+        try:
+            port = json.loads((self.u.dane / "jarvo" / "state" / "preview.json").read_text(encoding="utf-8")).get("port")
+        except (OSError, ValueError, AttributeError):
+            return None
+        return port if isinstance(port, int) and port != self.port_panelu else None
+
     def _uruchom_pod_blokada(self) -> int:
         token = secrets.token_urlsafe(32)
         przenosne.zapisz_atomowo(self.k["token"], token, tryb=0o600)
         przenosne.chron(self.k["token"], katalog=False)
-        self.proxy = filtr.Proxy(log=log, port=self.port_proxy, panel=self.port_panelu)
+        self.proxy = filtr.Proxy(log=log, port=self.port_proxy, panel=self.port_panelu, podglad=self._port_podgladu)
         port = self.proxy.start()
         test = filtr.samotest(port, self.port_panelu)
         self.samotest = {"filtr": test}

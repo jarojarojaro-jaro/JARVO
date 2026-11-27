@@ -1,7 +1,7 @@
 ---
 name: telefon
 description: "Telefon floty: odczyt ekranu, kroki, plansze Sklepu Play."
-version: 1.0.1
+version: 1.0.2
 author: Jarvo
 license: MIT
 metadata:
@@ -43,7 +43,7 @@ numerowane wiersze w 0,1 do 0,2 s, każdy krok wraca z paragonem, a ryzykowne kr
 - Jedno zadanie pracuje na jednym telefonie, z tym samym `phone` w każdym wywołaniu.
 - Ekranem sterujesz tylko narzędziami telefonu, bo surowe adb (`input`, `uiautomator dump`, `screencap`, `am start`, `monkey`) jest odrzucane, gdy ciało PhoneUse odpowiada.
 - Link albo aplikację otwierasz `act` `open` z `url`, `package` albo `app`.
-- Link do oferty albo wpisu, którego aplikacja nie pokazuje, bierzesz z „Udostępnij”: adres stoi w podglądzie arkusza udostępniania (wiersz albo `shot`), i nigdy go nie zgadujesz.
+- Link do oferty albo wpisu, którego aplikacja nie pokazuje, bierzesz z „Udostępnij” → „Kopiuj link”, wklejasz go w dowolne pole tekstowe (np. wyszukiwarka aplikacji) i czytasz z wiersza ekranu, a potem pole czyścisz; linku nigdy nie zgadujesz ani nie przepisujesz z uciętego podglądu.
 - Adb zostaje do instalacji APK, `pm list`, `dumpsys`, `getprop` i `logcat`.
 - Telefon, który nie odpowiada, wraca sam, więc czekasz i ponawiasz `ping`, zanim napiszesz do @@WLASCICIEL@@.
 

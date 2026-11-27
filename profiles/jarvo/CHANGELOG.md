@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Okno „Edytuj ujęcie” w edytorze filmów HQ działa w Komputerze: teksty i kolory zmieniam w nim klikaniem, z podglądem ujęcia.
 - `computer_use` po restarcie Komputera łączy się od nowa zamiast zwracać „Connection closed”.
 - Poza płatnością i zakupem nic nie czeka na zgodę: groźne polecenie dostaje od razu werdykt strażnika smart, a usunięcie pliku w danych Jarva poza katalogami roboczymi to blokada z radą.
 - Komputer nie ma `navigator.webdriver`, po restarcie otwiera karty sprzed restartu, odmowa `element_zmieniony` mówi, co się zmieniło, a edytor filmów HQ otwiera adres `http://127.0.0.1:9119/jarvo#/?n=edytor&p=<film>`.

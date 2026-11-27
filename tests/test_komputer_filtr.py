@@ -211,6 +211,7 @@ def test_samotest_wykrywa_dziurawy_filtr(monkeypatch):
     ("GET", "/assets/../api/env", False), ("GET", "/assets/%2e%2e/api/env", False),
     ("GET", "/api/plugins/jarvo-hq/edit/..%2f..%2fapi%2fenv", False), ("GET", "//api/env", False),
     ("GET", "/jarvox", False), ("GET", "/api/plugins/jarvo-hq/editor", False),
+    ("POST", "/api/plugins/jarvo-hq/anim/info", True), ("POST", "/api/plugins/jarvo-hq/anim/params", True),
 ])
 def test_edytor_panelu_tylko_sciezki_edytora(metoda, sciezka, wolno):
     assert filtr.edytor_panelu(metoda, sciezka) is wolno
@@ -245,3 +246,26 @@ def test_proxy_przepuszcza_do_panelu_tylko_edytor():
     finally:
         p.zatrzymaj()
         panel.zamknij()
+
+
+def test_proxy_przepuszcza_podglad_ujecia_edytora():
+    """27.11 C1: okno „Edytuj ujęcie” pokazuje ujęcie z serwera podglądu stron HQ (inny port niż panel): GET do niego
+    przechodzi, POST, Upgrade i CONNECT nie, a bez znanego portu podglądu pętla zwrotna zostaje zamknięta."""
+    podglad = _Serwer(http=True)
+    port = {"v": podglad.port}
+    p = filtr.Proxy(port=wolny_port(), panel=podglad.port + 1, podglad=lambda: port["v"])
+    p.start()
+    try:
+        odp = _zapytanie(p.port, f"GET http://127.0.0.1:{podglad.port}/tok/ujecie.html HTTP/1.1\r\nHost: x\r\n\r\n".encode())
+        assert odp.startswith(b"HTTP/1.1 200"), odp[:80]
+        for zadanie in (f"POST http://127.0.0.1:{podglad.port}/tok/x HTTP/1.1\r\nContent-Length: 0\r\n\r\n",
+                        f"GET http://127.0.0.1:{podglad.port}/tok/x HTTP/1.1\r\nUpgrade: websocket\r\n\r\n",
+                        f"CONNECT 127.0.0.1:{podglad.port} HTTP/1.1\r\n\r\n"):
+            assert _zapytanie(p.port, zadanie.encode()).startswith(b"HTTP/1.1 403"), zadanie
+        port["v"] = None
+        odp = _zapytanie(p.port, f"GET http://127.0.0.1:{podglad.port}/tok/x HTTP/1.1\r\n\r\n".encode())
+        assert odp.startswith(b"HTTP/1.1 403")
+        assert len(podglad.dane) == 1
+    finally:
+        p.zatrzymaj()
+        podglad.zamknij()

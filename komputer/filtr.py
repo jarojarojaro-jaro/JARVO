@@ -10,10 +10,11 @@ odpowiedzi DNS po sprawdzeniu nic nie da). Odrzuca:
   - pętlę zwrotną (panel Jarva 127.0.0.1:9119, API bramy :8642, podgląd :9120 i każdy inny serwer na tym komputerze),
   - zakresy specjalne i multicast, adresy samego komputera,
   - port 25 (poczta).
-Jedyny wyjątek to edytor filmów panelu (`Proxy(panel=<port>)`): zwykłe żądanie http do 127.0.0.1 albo localhost na
-porcie panelu ze ścieżką z `PANEL_GET` (strona /jarvo, jej pliki i odczyty, których potrzebuje) albo z `PANEL_EDYTOR`
-(API edytora, każda metoda). Reszta panelu (zgody, ustawienia, czat, zadania agentów), CONNECT do panelu i inne
-porty pętli zwrotnej dostają 403 jak dotąd.
+Jedyny wyjątek to edytor filmów panelu (`Proxy(panel=<port>, podglad=<port z state/preview.json>)`): zwykłe żądanie
+http do 127.0.0.1 albo localhost na porcie panelu ze ścieżką z `PANEL_GET` (strona /jarvo, jej pliki i odczyty,
+których potrzebuje) albo z `PANEL_EDYTOR` (API edytora i animacji, każda metoda) oraz GET do serwera podglądu stron
+(ujęcie w oknie „Edytuj ujęcie”, katalogi tylko z tokenem). Reszta panelu (zgody, ustawienia, czat, zadania
+agentów), CONNECT i inne porty pętli zwrotnej dostają 403 jak dotąd.
 IPv4 w IPv6 (::ffff:a.b.c.d, NAT64 64:ff9b::/96, 6to4 2002::/16) sprawdzamy jak IPv4. Samotest (`samotest`) przed
 startem przeglądarki łączy się przez proxy z adresami zakazanymi: każdy ma dostać 403 bez próby połączenia.
 To filtr w aplikacji, nie w jądrze: obejmuje cały ruch tej przeglądarki, ale nie inne programy właściciela.
@@ -41,7 +42,7 @@ PANEL_GET = ("/jarvo", "/jarvo/", "/favicon.ico", "/assets/", "/dashboard-plugin
              "/api/dashboard/plugins", "/api/dashboard/themes", "/api/dashboard/font", "/api/profiles/active",
              "/api/plugins/jarvo-hq/app", "/api/plugins/jarvo-hq/state", "/api/plugins/jarvo-hq/host",
              "/api/plugins/jarvo-hq/fleet", "/api/plugins/jarvo-hq/file", "/api/plugins/jarvo-hq/site")
-PANEL_EDYTOR = ("/api/plugins/jarvo-hq/edit/", "/api/plugins/jarvo-hq/upload")
+PANEL_EDYTOR = ("/api/plugins/jarvo-hq/edit/", "/api/plugins/jarvo-hq/upload", "/api/plugins/jarvo-hq/anim/")
 PANEL_SAMOTEST = ("/api/config", "/api/env", "/api/plugins/jarvo-hq/chat/", "/jarvo/../api/env")
 # zakresy zawsze zakazane (z powodem po polsku); kolejność: pierwszy pasujący daje powód
 ZAKRESY = [
@@ -181,8 +182,10 @@ class Proxy:
 
     def __init__(self, filtr: Filtr | None = None, *, host: str = "127.0.0.1", port: int = 0,
                  log: Callable[[str], None] | None = None,
-                 rozwiaz: Callable[[str, int], list[str]] | None = None, panel: int | None = None):
+                 rozwiaz: Callable[[str, int], list[str]] | None = None, panel: int | None = None,
+                 podglad: Callable[[], int | None] | None = None):
         self.panel = panel                    # port panelu Jarva: edytor filmów przechodzi (edytor_panelu)
+        self.podglad = podglad or (lambda: None)   # port podglądu stron HQ: odczyty GET (podgląd ujęcia w edytorze)
         self._panel_odrzucone: set[str] = set()
         self.filtr = filtr or Filtr(wlasne=adresy_tego_komputera())
         self.host, self.port = host, port
@@ -336,7 +339,13 @@ class Proxy:
             return
         host, port = czesci.hostname, czesci.port or 80
         upgrade = any(l.lower().startswith("upgrade:") for l in linie[1:])
-        if self.panel is not None and port == self.panel and host.lower() in PANEL_HOSTY:
+        podglad = self.podglad() if host.lower() in PANEL_HOSTY else None
+        if podglad is not None and port == podglad and not upgrade and metoda.upper() in ("GET", "HEAD"):
+            try:            # podgląd ujęcia edytora: serwer podglądu daje tylko katalogi z tokenem (state/preview-links)
+                wynik = await asyncio.wait_for(asyncio.open_connection("127.0.0.1", port), CZAS_POLACZENIA)
+            except (OSError, asyncio.TimeoutError):
+                wynik = "podgląd stron Jarva nie odpowiada"
+        elif self.panel is not None and port == self.panel and host.lower() in PANEL_HOSTY:
             if upgrade or not edytor_panelu(metoda, czesci.path or "/"):
                 # edytor otwarty w karcie ponawia odczyty reszty panelu (strumień co 15 s): wpis w logu raz na ścieżkę
                 sciezka = f"{metoda.upper()} {(czesci.path or '/')[:80]}"
