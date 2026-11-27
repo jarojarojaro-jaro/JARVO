@@ -11,6 +11,7 @@ bez zmiennych obcych, podsumowanie i potwierdzenie restartu panelu.
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import os
 import re
@@ -418,6 +419,78 @@ def test_zrodlo_dystrybucji_idzie_za_buildem(tmp_path):
     przed = manifest.stat().st_mtime_ns
     f.ustaw_zrodlo(manifest, zrodlo)
     assert manifest.stat().st_mtime_ns == przed
+
+
+BAZA_SESJI = r'''
+import json, sys
+from pathlib import Path
+from hermes_state import SessionDB
+db = SessionDB(Path(sys.argv[1]))
+if sys.argv[2:] == ["zasiej"]:
+    for sid in ("s-1", "s-2", "s-koniec"):
+        db.create_session(sid, "api_server")
+        db.update_system_prompt(sid, "stary SOUL")
+    db.end_session("s-koniec", "user_exit")
+print(json.dumps({sid: (db.get_session(sid) or {}).get("system_prompt") for sid in ("s-1", "s-2", "s-koniec")}))
+db.close()
+'''
+
+
+def _python_hermesa() -> str | None:
+    """Python z venvu Hermesa (HERMES_SRC albo instalacja natywna): prawdziwy SessionDB w teście promptu."""
+    for src in [os.environ.get("HERMES_SRC") or "", "/opt/hermes",
+                *sorted(glob.glob(os.path.expanduser("~/.local/share/jarvo/program/hermes/*")))]:
+        py = Path(src) / ".venv" / "bin" / "python"
+        if src and (Path(src) / "hermes_state.py").is_file() and py.is_file():
+            return str(py)
+    return None
+
+
+def _prompty(py: str, baza: Path, *tryb: str) -> dict:
+    r = subprocess.run([py, "-P", "-c", BAZA_SESJI, str(baza), *tryb], capture_output=True, text=True,
+                       encoding="utf-8", env={**os.environ, "HERMES_HOME": str(baza.parent)}, timeout=120)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout.strip().splitlines()[-1])
+
+
+def test_nowy_soul_czysci_prompt_trwajacych_rozmow(tmp_path):
+    """27.11: po wgraniu zmienionego SOUL.md trwające rozmowy profilu tracą zapisany prompt (Hermes zbuduje nowy),
+    zakończone zostają; bez zmiany SOUL nic; błąd bazy to tylko ostrzeżenie, a następne wdrożenie ponawia."""
+    py = _python_hermesa()
+    if not py:
+        pytest.skip("brak instalacji Hermesa (HERMES_SRC, /opt/hermes albo ~/.local/share/jarvo/program/hermes)")
+    dane = tmp_path / "dane"
+    home = dane / "profiles" / "jarvo"
+    _pisz(home / "SOUL.md", "# stary\n")
+    stary = install_fleet._soul(home)
+    assert _prompty(py, home / "state.db", "zasiej") == {"s-1": "stary SOUL", "s-2": "stary SOUL",
+                                                          "s-koniec": "stary SOUL"}
+    linie: list[str] = []
+    f = flota_na(dane, tmp_path / "build", "--hermes-python", py)
+    f.log = install_fleet.Log(linie.append)
+    stan = dane / "jarvo" / "state" / install_fleet.ODCISKI_SOUL
+
+    f.odswiez_prompty("jarvo", home, stary)                     # SOUL bez zmian: rozmowy nietknięte
+    assert _prompty(py, home / "state.db")["s-1"] == "stary SOUL" and not f.ostrzezenia
+    assert json.loads(stan.read_text(encoding="utf-8")) == {"jarvo": stary}
+
+    _pisz(home / "SOUL.md", "# nowy\n")
+    f.odswiez_prompty("jarvo", home, stary)
+    assert _prompty(py, home / "state.db") == {"s-1": None, "s-2": None, "s-koniec": "stary SOUL"}
+    assert "  prompt odświeżony: jarvo (2 rozmów)" in linie and not f.ostrzezenia
+    assert json.loads(stan.read_text(encoding="utf-8")) == {"jarvo": install_fleet._soul(home)}
+
+    # błąd bazy: krok ostrzega, instalacja idzie dalej, odcisk zostaje stary (ponowi następne wdrożenie)
+    _pisz(home / "SOUL.md", "# jeszcze nowszy\n")
+    baza_zajeta = atrapy.program(tmp_path / "zly", "python", "import sys\nprint('database is locked')\nsys.exit(1)\n")
+    zly = flota_na(dane, tmp_path / "build", "--hermes-python", str(baza_zajeta))
+    zly.odswiez_prompty("jarvo", home, install_fleet._soul(home))
+    assert len(zly.ostrzezenia) == 1 and "prompt nieodświeżony: jarvo" in zly.ostrzezenia[0]
+    assert "database is locked" in zly.ostrzezenia[0]
+    assert json.loads(stan.read_text(encoding="utf-8")) != {"jarvo": install_fleet._soul(home)}
+    f.odswiez_prompty("jarvo", home, install_fleet._soul(home))     # przed = po, ale stan pamięta stary odcisk
+    assert "  prompt odświeżony: jarvo (0 rozmów)" in linie
+    assert json.loads(stan.read_text(encoding="utf-8")) == {"jarvo": install_fleet._soul(home)}
 
 
 def test_zapis_yaml_pomocnikow_z_lf_i_tylko_przy_zmianie(tmp_path):

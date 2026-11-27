@@ -113,6 +113,7 @@ CZAS_INSTALACJI = re.compile(r"^installed_at:.*$", re.M)   # Hermes stawia go pr
 BLOKADA_STARA_S = 2 * 3600                          # jak wiedza/kompilacja.py: starsza blokada to resztka po awarii
 CZAS_HERMESA = 900                                  # s na jedno polecenie Hermesa (profile update kopiuje skille)
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+ODCISKI_SOUL = "odciski-soul.json"                  # <dane>/jarvo/state: {profil: sha256 SOUL.md, który znają rozmowy}
 
 
 class BladFloty(RuntimeError):
@@ -204,6 +205,14 @@ def _skrot(plik: Path) -> str:
         for kawalek in iter(lambda: f.read(1 << 20), b""):
             h.update(kawalek)
     return h.hexdigest()
+
+
+def _soul(home: Path) -> str | None:
+    """sha256 SOUL.md profilu; brak pliku = None."""
+    try:
+        return _skrot(home / "SOUL.md")
+    except OSError:
+        return None
 
 
 def _junction(p: Path) -> bool:
@@ -736,6 +745,7 @@ class Flota:
     def profil_hosta(self) -> None:
         self.krok("Profil hosta")
         pliki = [self.dane / n for n in ("config.yaml", "SOUL.md", ".env")]
+        soul = _soul(self.dane)
         przed = {str(p): spis(p) for p in pliki}
         self.pomocnik("merge_host_config", [self.build / "host" / "config.yaml", self.dane / "config.yaml",
                                             *(["--force-model"] if self.pierwsza else [])])
@@ -745,6 +755,7 @@ class Flota:
             self.pomocnik("merge_env", [self.sekrety / "host.env", self.dane / ".env"])
         if {str(p): spis(p) for p in pliki} != przed:
             self.zmiana("profil hosta")
+        self.odswiez_prompty("host", self.dane, soul)
 
     def ustaw_zrodlo(self, manifest: Path, zrodlo: Path) -> None:
         """`source:` w distribution.yaml = bieżący build (po migracji TARS → Jarvo zostawała stara ścieżka); YAML
@@ -765,6 +776,7 @@ class Flota:
         src = self.build / "profiles" / agent
         home = self.profil(agent)
         przed = self.odcisk_profilu(home)
+        soul = _soul(home)
         if (home / "distribution.yaml").is_file():
             self.krok(f"Aktualizacja profilu {agent}")
             self.pomocnik("profile_model", ["snapshot", home])
@@ -796,8 +808,43 @@ class Flota:
             (home / "home").mkdir(parents=True, exist_ok=True)   # terminal.home_mode: profile (H24)
         zasiej_pamiec(home)
         self.ustaw_klucze_profilu(agent, home / "config.yaml")
+        self.odswiez_prompty(agent, home, soul)
         if self.odcisk_profilu(home) != przed:
             self.zmiana(f"profil {agent}")
+
+    def odswiez_prompty(self, nazwa: str, home: Path, przed: str | None) -> None:
+        """Nowy SOUL.md profilu = pusty zapisany prompt jego trwających rozmów (scripts/odswiez_prompt.py Pythonem
+        Hermesa), żeby następna tura zbudowała prompt z nowego SOUL. Odcisk, który rozmowy już znają, leży w
+        <dane>/jarvo/state/odciski-soul.json; nieudane czyszczenie zostawia stary, więc ponowi je następne wdrożenie.
+        Błąd tego kroku to tylko ostrzeżenie. Restart bramy (zmiana profilu) zrzuca agentów trzymanych w pamięci."""
+        # 27.11: rozmowa trwająca tygodniami (kompresja dopiero przy 700 tys. tokenów) działała na starym SOUL.md
+        try:
+            plik = self.jd / "state" / ODCISKI_SOUL
+            try:
+                stan = json.loads(plik.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                stan = {}
+            if not isinstance(stan, dict):
+                stan = {}
+            po = _soul(home)
+            znany = stan.get(nazwa) or przed
+            nowy = po
+            if po and znany and po != znany and (home / "state.db").is_file():
+                kod, linie = self.uruchom([self.hermes_python, "-P", SKRYPTY / "odswiez_prompt.py", home / "state.db"],
+                                          env=self.env_hermesa(HERMES_HOME=str(home)), pokaz=False, czas=300)
+                wynik = next((x for x in reversed(linie) if x.startswith('{"rozmowy"')), "") if kod == 0 else ""
+                if wynik:
+                    self.log(f"  prompt odświeżony: {nazwa} ({int(json.loads(wynik)['rozmowy'])} rozmów)")
+                else:
+                    self.uwaga(f"prompt nieodświeżony: {nazwa} (kod {kod}: {' / '.join(linie[-2:])}); ponowi go "
+                               "następne wdrożenie")
+                    nowy = znany
+            if nowy and stan.get(nazwa) != nowy:
+                stan[nazwa] = nowy
+                plik.parent.mkdir(parents=True, exist_ok=True)
+                przenosne.zapisz_atomowo(plik, json.dumps(stan, indent=1, sort_keys=True) + "\n")
+        except Exception as e:                                 # noqa: BLE001 - krok pomocniczy nie wywraca instalacji
+            self.uwaga(f"prompt nieodświeżony: {nazwa} ({type(e).__name__}: {e})")
 
     def ustawienia_profili(self) -> dict:
         """--ustawienia-profili: {"wszystkie": {klucz: wartość}, "profile": {agent: {klucz: wartość}}}."""

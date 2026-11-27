@@ -18,6 +18,19 @@ for a in "$@"; do
 done
 
 log() { printf '▶ %s\n' "$*"; }
+soul() { sha256sum "$1/SOUL.md" 2>/dev/null | cut -d' ' -f1 || true; }
+# 27.11: trwająca rozmowa trzyma prompt z pierwszej tury; nowy SOUL.md = pusty zapisany prompt (install_fleet.py
+# odswiez_prompty, scripts/odswiez_prompt.py); błąd to tylko ostrzeżenie
+odswiez_prompt() {  # <profil> <home> <odcisk SOUL.md przed>
+  local po wynik; po=$(soul "$2")
+  [[ -n "$3" && -n "$po" && "$3" != "$po" && -f "$2/state.db" ]] || return 0
+  if wynik=$(HERMES_HOME="$2" $PY -P "$REPO/scripts/odswiez_prompt.py" "$2/state.db" 2>&1 | tail -1) \
+     && [[ "$wynik" == '{"rozmowy"'* ]]; then
+    echo "  prompt odświeżony: $1 (${wynik//[^0-9]/} rozmów)"
+  else
+    echo "  ! prompt nieodświeżony: $1 ($wynik)"
+  fi
+}
 [[ -f "$BUILD/BUILD.json" ]] || { echo "Brak $BUILD/BUILD.json: najpierw scripts/build.py"; exit 1; }
 if [[ -d "$SECRETS" ]] && ! ls "$SECRETS" >/dev/null 2>&1; then
   echo "✗ $SECRETS jest nieczytelny dla użytkownika $(id -un) (uid $(id -u)). Na hoście:"
@@ -45,7 +58,9 @@ log "Profil hosta"
 MERGE_FLAGS=()
 [[ $FIRST -eq 1 ]] && MERGE_FLAGS+=(--force-model)
 $PY "$REPO/scripts/merge_host_config.py" "$BUILD/host/config.yaml" "$DATA/config.yaml" "${MERGE_FLAGS[@]+"${MERGE_FLAGS[@]}"}"
+SOUL_PRZED=$(soul "$DATA")
 cp "$BUILD/host/SOUL.md" "$DATA/SOUL.md"
+odswiez_prompt host "$DATA" "$SOUL_PRZED"
 if [[ -f "$SECRETS/host.env" ]]; then
   $PY "$REPO/scripts/merge_env.py" "$SECRETS/host.env" "$DATA/.env"
 fi
@@ -53,6 +68,7 @@ fi
 # 3. profile agentów
 for a in $AGENTS; do
   src="$BUILD/profiles/$a"
+  SOUL_PRZED=$(soul "$DATA/profiles/$a")
   if [[ -d "$DATA/profiles/$a" && -f "$DATA/profiles/$a/distribution.yaml" ]]; then
     log "Aktualizacja profilu $a"
     $PY "$REPO/scripts/profile_model.py" snapshot "$DATA/profiles/$a"
@@ -76,6 +92,7 @@ for a in $AGENTS; do
   else
     echo "  ! brak $SECRETS/$a.env (agent nie ma klucza OpenRouter)"
   fi
+  odswiez_prompt "$a" "$DATA/profiles/$a" "$SOUL_PRZED"
 done
 
 # 3a. skarbiec wiedzy (docs/WIEDZA.md): huby agentów z buildu, SCHEMA, INDEX, docs repo jako źródła, nowe notatki księgi
