@@ -49,9 +49,15 @@ def test_rozmowa_bez_narzedzi_i_zwykla_odpowiedz_bez_zmian():
 
 @pytest.mark.skipif(not os.environ.get("JARVO_HERMES_PYTHON"), reason="bez Pythona Hermesa (JARVO_HERMES_PYTHON)")
 def test_owija_petle_prawdziwego_hermesa():
-    kod = ("import importlib.util,sys; s=importlib.util.spec_from_file_location('c', sys.argv[1]); m=importlib.util."
-           "module_from_spec(s); s.loader.exec_module(m); assert m.zarejestruj(); from agent import conversation_loop "
-           "as cl; assert getattr(cl.finish_text_response, m.ZNACZNIK); print('ok')")
+    """27.11 21:17: owinięcie z samym **kw dało w pętli Hermesa „'_LoopState' object has no attribute 'kw'” przy każdej
+    odpowiedzi tekstowej (`_run_phase` podaje argumenty po sygnaturze), więc sprawdzamy sygnaturę tak jak pętla."""
+    kod = ("import importlib.util,sys,inspect,dataclasses; s=importlib.util.spec_from_file_location('c', sys.argv[1]); "
+           "m=importlib.util.module_from_spec(s); s.loader.exec_module(m); from agent import conversation_loop as cl; "
+           "stara=cl.finish_text_response; assert m.zarejestruj(); f=cl.finish_text_response; "
+           "assert getattr(f, m.ZNACZNIK) and f is not stara; "
+           "p=lambda fn: tuple(n for n in inspect.signature(fn).parameters if n != 'agent'); "
+           "assert p(f) == p(stara), p(f); pola={x.name for x in dataclasses.fields(cl._LoopState)}; "
+           "assert set(p(f)) <= pola, set(p(f)) - pola; assert f.__name__ == 'finish_text_response'; print('ok')")
     wynik = subprocess.run([os.environ["JARVO_HERMES_PYTHON"], "-c", kod, str(REPO / "zgody" / "plugin" / "ciaglosc.py")],
                            capture_output=True, text=True, cwd=os.environ.get("JARVO_TEST_HERMES_SRC") or None, timeout=120)
     assert wynik.stdout.strip() == "ok", wynik.stderr[-2000:]

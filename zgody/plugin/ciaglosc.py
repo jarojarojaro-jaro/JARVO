@@ -11,6 +11,7 @@ dopełnienia rozumowania), a dopiero gdy to nie pomoże, Hermes kończy jak dot�
 """
 from __future__ import annotations
 
+import functools
 import logging
 from typing import Any
 
@@ -39,6 +40,7 @@ def owin(oryginal):
     if getattr(oryginal, ZNACZNIK, False):
         return oryginal
 
+    @functools.wraps(oryginal)          # pętla Hermesa (_run_phase) podaje argumenty po sygnaturze funkcji
     def finish_text_response(agent: Any, **kw: Any):
         if not (samo_rozumowanie(kw.get("assistant_message"), kw.get("finish_reason"))
                 and w_trakcie_pracy(kw.get("messages"))):
