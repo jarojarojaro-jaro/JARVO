@@ -23,6 +23,8 @@ wyjatki:
   # --- środowisko procesu przekazywane do podprocesu (nie wysyła go nigdzie)
   - {zrodlo: jarvo, rev: "*", skill: shared/skills/graf-kodu, regula: "hermes:python_os_environ", plik: scripts/graf_kodu.py,
      powod: "kopiuje środowisko do procesu silnika grafu z własnym HOME i cache"}
+  - {zrodlo: jarvo, rev: "*", skill: shared/skills/kdenlive, regula: "hermes:python_os_environ", plik: scripts/melt.py,
+     powod: "kopiuje środowisko do procesu melt z QT_QPA_PLATFORM=offscreen, nic nie wychodzi"}
   - {zrodlo: hyperframes, rev: ad3a238, skill: skills/media-use, regula: "hermes:python_os_environ", plik: "audio/scripts/lib/gemini-auth*.py",
      powod: "odczyt klucza Gemini ze zmiennej GCS_CREDS i testy tej funkcji; floty nie dotyczy (nie mamy klucza Gemini)"}
   - {zrodlo: live-panel, rev: 8a70aa2, skill: ., regula: "hermes:python_os_environ", plik: scripts/livepanel.py,
