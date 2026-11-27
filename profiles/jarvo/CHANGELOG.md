@@ -1,7 +1,9 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Poza płatnością i zakupem nic nie czeka na zgodę: groźne polecenie dostaje od razu werdykt strażnika smart, a usunięcie pliku w danych Jarva poza katalogami roboczymi to blokada z radą.
 - Komputer nie ma `navigator.webdriver`, po restarcie otwiera karty sprzed restartu, odmowa `element_zmieniony` mówi, co się zmieniło, a edytor filmów HQ otwiera adres `http://127.0.0.1:9119/jarvo#/?n=edytor&p=<film>`.
+- Każda moja rozmowa i karta ma w Komputerze własne okno przeglądarki dla `komputer` i `computer_use`, okno innego zadania to odmowa `cudze_okno`, a w kontenerze dostaję `zajete` z miejscem w kolejce.
 - `browser_*` działa na Chrome z trwałym profilem i zwartym widokiem strony z refami.
 - Narzędzie `pulpit` (wtyczka `jarvo-pulpit`, docs/PULPIT.md) daje mi programy z oknami na pulpicie serwera (zobacz z numerami elementów, klik, pisz, klawisz, przewiń, przeciągnij, okna, uruchom, kroki z paragonem, czekaj) ze skillami `pulpit`, `gimp`, `libreoffice` i `edytor-hq`.
 - Telefon prowadzę skillem `telefon` (plansze Sklepu Play, sprawdzenie celu), surowe adb do ekranu telefonu strażnik odrzuca, gdy ciało PhoneUse odpowiada, a paragon ostrzega o pętli i o niewpisanym tekście, a `shot` ma numery wierszy.

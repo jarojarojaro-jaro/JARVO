@@ -327,7 +327,7 @@ def test_klik_w_punkt_w_zaplac_po_przewinieciu_wymaga_czlowieka(przegl):
 
 def test_natywny_test_komputera_na_zywo(tmp_path):
     """Cała droga jak u Hermesa: `jarvo komputer on` (usługa: proxy z samotestem, przeglądarka, wejście z zasadami),
-    bramka floty, 134 sprawdzenia scripts/komputer_natywny_test.py, `jarvo komputer off`."""
+    bramka floty, 135 sprawdzeń scripts/komputer_natywny_test.py, `jarvo komputer off`."""
     import subprocess
     root = Path(tempfile.mkdtemp(prefix="jkz"))
     env = {**os.environ, "JARVO_ROOT": str(root), "JARVO_PANEL_PORT": "19200",
@@ -643,11 +643,15 @@ def wejscie(przegl, tmp_path):
 class Mcp:
     """Agent na kanale `cua` (para gniazd): wiadomości MCP przez SesjaNatywna (zasady, dziennik) do sterownika."""
 
-    def __init__(self, wej):
+    def __init__(self, wej, grupa: dict | None = None):
         self.a, b = socket.socketpair()
         self.a.settimeout(150)
         sesja = wejscie_natywne.SesjaNatywna(b, wej)
         wej.sesje.add(sesja)
+        if grupa:                                    # powiadomienie bramki: grupa ekranu, karta, rozmowa
+            sesja._od_agenta(json.dumps({"jsonrpc": "2.0", "method": wejscie_natywne.wejscie.GRUPA,
+                                         "params": grupa}).encode())
+        self.sesja = sesja
         threading.Thread(target=sesja.obsluz, daemon=True).start()
         self.n, self.bufor = 0, b""
 
@@ -707,7 +711,8 @@ def test_okienko_jestem_czlowiekiem_raz_na_strone_potem_telefon_i_wlasciciel(prz
     nr = otworz(st, "https://sklep.jarvo.test/weryfikacja.html")
     krok = {"click": {"text": "Potwierdź, że jesteś człowiekiem", "role": "checkbox"}}
     zaznaczone = "document.getElementById('czlowiek').checked"
-    k = Mcp(wejscie)
+    zadanie = {"grupa": "p1-" + "e" * 32}                                  # obie sesje to jedno zadanie (jedno okno)
+    k = Mcp(wejscie, zadanie)
     try:
         w = k.narzedzie("run_steps", {"window_id": nr, "steps": [krok]})
         assert not w["isError"] and js(st, nr, zaznaczone) is True, w
@@ -721,7 +726,7 @@ def test_okienko_jestem_czlowiekiem_raz_na_strone_potem_telefon_i_wlasciciel(prz
     assert "już było" in tekst and "jarvo.test" in tekst
     assert tekst.index("telefonie floty") < tekst.index("kanban_block") and "needs_input" in tekst
     assert js(st, nr, zaznaczone) is True                                  # drugie kliknięcie nie poszło
-    k = Mcp(wejscie)                                                       # nowa sesja: strona po nieudanej weryfikacji
+    k = Mcp(wejscie, zadanie)                                              # nowa sesja: strona po nieudanej weryfikacji
     try:
         w = k.narzedzie("run_steps", {"window_id": nr, "steps": [{"click": {"text": "Pokaż błąd"}}, krok]})
     finally:
@@ -887,3 +892,76 @@ def test_wtyczka_jarva_idz_patrz_kroki_przez_bramke(przegl, monkeypatch):
         wt._zamknij_wszystkie()
         serwer.zamknij()
         shutil.rmtree(root, ignore_errors=True)
+
+
+def test_dwie_rozmowy_kazda_we_wlasnym_oknie_przegladarki(przegl, wejscie):
+    """27.11: rozmowy panelu C1 (edytor) i W1 (oferta) w jednym procesie bramy Hermesa (ten sam klucz grupy, bez
+    karty) działały na jednej karcie przeglądarki, a `hotkey ctrl+z` w C1 dał paragon ze strony W1. Teraz każda
+    rozmowa ma własne okno przeglądarki: przejście, zrzut, klik w punkt, pisanie i ctrl+z bez window_id idą do jej
+    okna, ctrl+l to odmowa zasad, pasek adresu i adres zmieniają tylko jej kartę, list_windows pokazuje tylko jej
+    okno, a window_id okna drugiej rozmowy to odmowa `cudze_okno`. Podgląd HQ pokazuje kartę ostatniego działania;
+    koniec rozmowy zwalnia jej kartę."""
+    st, _, _ = przegl
+    grupa = "p1-" + "c" * 32
+    c1 = Mcp(wejscie, {"grupa": grupa, "rozmowa": "c1" + "a" * 14})
+    w1 = Mcp(wejscie, {"grupa": grupa, "rozmowa": "w1" + "b" * 14})
+    try:
+        okna = {}
+        for k, r in ((c1, "c1"), (w1, "w1")):
+            w = k.narzedzie("navigate", {"url": f"https://sklep.jarvo.test/formularz.html?r={r}"})
+            assert not w.get("isError"), w
+            okna[r] = w["structuredContent"]["window_id"]
+        assert okna["c1"] != okna["w1"]
+        assert c1.sesja.klucz_ekranu != w1.sesja.klucz_ekranu
+        for k, r in ((c1, "c1"), (w1, "w1")):
+            lw = k.narzedzie("list_windows", {})["structuredContent"]["windows"]
+            assert [o["window_id"] for o in lw] == [okna[r]], lw
+            sc = k.narzedzie("get_window_state", {"pid": st.pid, "include_screenshot": True})["structuredContent"]
+            assert sc["window_id"] == okna[r] and f"r={r}" in sc["url"] and sc.get("screenshot_width"), sc
+            pole = next(e for e in sc["elements"] if e["label"] == "Imię i nazwisko" and e["role"] == "entry")
+            assert not k.narzedzie("click", {"pid": st.pid, "element_token": pole["element_token"]}).get("isError")
+            w = k.narzedzie("type_text", {"pid": st.pid, "text": "Jan Kowalski" if r == "c1" else "Anna Nowak"})
+            assert not w.get("isError"), w
+        wartosc = "document.querySelector('[name=imie]').value"
+        assert (js(st, okna["c1"], wartosc), js(st, okna["w1"], wartosc)) == ("Jan Kowalski", "Anna Nowak")
+
+        w = c1.narzedzie("hotkey", {"pid": st.pid, "keys": ["ctrl", "z"]})          # bez window_id
+        assert not w.get("isError") and "r=w1" not in json.dumps(w, ensure_ascii=False), w
+        assert js(st, okna["c1"], wartosc) != "Jan Kowalski"                       # cofnięte w C1
+        assert js(st, okna["w1"], wartosc) == "Anna Nowak"                         # W1 nietknięte
+        assert st.podglad(czekaj=2)["aktywne"] == okna["c1"]                      # HQ: karta ostatniego działania
+
+        w = c1.narzedzie("hotkey", {"pid": st.pid, "keys": ["ctrl", "l"]})
+        assert w["structuredContent"]["rule"] == "skrot_przegladarki", w
+        sc = c1.narzedzie("get_window_state", {"pid": st.pid, "include_screenshot": False})["structuredContent"]
+        pasek = next(e for e in sc["elements"] if e["element_index"] == 0)
+        assert not c1.narzedzie("click", {"pid": st.pid, "element_token": pasek["element_token"]}).get("isError")
+        w = c1.narzedzie("type_text", {"pid": st.pid, "text": "https://sklep.jarvo.test/dluga.html?r=c1\n"})
+        assert not w.get("isError"), w
+        for _ in range(40):
+            if "dluga.html" in st.okno(okna["c1"]).url:
+                break
+            time.sleep(0.25)
+        assert "dluga.html?r=c1" in st.okno(okna["c1"]).url
+        assert "formularz.html?r=w1" in st.okno(okna["w1"]).url and js(st, okna["w1"], wartosc) == "Anna Nowak"
+
+        przed = js(st, okna["w1"], "document.title")
+        w = w1.narzedzie("click", {"pid": st.pid, "x": 40, "y": 40})               # klik w punkt: okno W1
+        assert w["structuredContent"].get("rule") != "cudze_okno", w
+        assert "dluga.html?r=c1" in st.okno(okna["c1"]).url and js(st, okna["w1"], "document.title") == przed
+        for nazwa, args in (("get_window_state", {}), ("hotkey", {"keys": ["ctrl", "z"]}),
+                            ("navigate", {"url": "https://www.olx.pl/"}), ("click", {"x": 40, "y": 40})):
+            w = c1.narzedzie(nazwa, {"pid": st.pid, "window_id": okna["w1"], **args})
+            sc = w["structuredContent"]
+            assert w["isError"] and sc["rule"] == "cudze_okno" and sc["next_step"] == "fresh_state", (nazwa, sc)
+        assert "formularz.html?r=w1" in st.okno(okna["w1"]).url and js(st, okna["w1"], wartosc) == "Anna Nowak"
+    finally:
+        c1.zamknij()
+        w1.zamknij()
+    def wolne() -> bool:                                          # wolna albo zamknięta (najstarsze wolne karty)
+        return all(st.okno(okna[r]) is None or st.okno(okna[r]).wlasciciel is None for r in ("c1", "w1"))
+    for _ in range(100):
+        if wolne():
+            break
+        time.sleep(0.05)
+    assert wolne() and not wejscie.sesje

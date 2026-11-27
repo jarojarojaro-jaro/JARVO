@@ -48,6 +48,16 @@ twardych zasad; wejście natywne przepuszcza je tylko z tokenem właściciela i 
 Postój: `zaparkuj()` przenosi każdą kartę ze stroną na about:blank (strona przestaje rysować, liczyć i pobierać;
 profil i zalogowania zostają, strona jest w historii karty), a `wlasciciel_przy_oknie()` mówi, czy przy oknie
 widocznym któraś strona ma fokus. Kiedy parkować, decyduje usługa (usluga.py, „Postój”).
+
+Okno zadania agenta (27.11: dwie rozmowy panelu w jednym procesie bramy działały na tej samej karcie, a `hotkey
+ctrl+z` w edytorze HQ dał paragon ze strony OLX drugiej rozmowy): wejście podaje każde wywołanie z kluczem zadania
+(`wl`: klucz ekranu sesji, czyli rozmowa, karta kanbana albo sama sesja). Zadanie dostaje własną kartę w osobnym oknie
+przeglądarki (`okno_dla`: jego aktywna karta, jego dawna karta, wolna pusta karta albo nowe okno), a narzędzia działają
+tylko na jego kartach: bez `window_id` na jego aktywnej, `window_id` cudzej karty to odmowa `cudze_okno`,
+`list_windows` pokazuje tylko jego karty, `launch_app` i okno otwarte przez jego stronę są jego, `kill_app` zamyka
+tylko jego karty. Koniec zadania (ostatnia sesja z tym kluczem) zwalnia karty (`zwolnij_okna`); wolnych kart po
+zadaniach zostaje najwyżej MAKS_WOLNYCH. Bez `wl` (testy, HQ) sterownik działa jak dotąd na aktywnej karcie
+przeglądarki. Aktywna karta przeglądarki (podgląd i „Przejmij” w HQ) to karta ostatniego działania agenta.
 """
 from __future__ import annotations
 
@@ -115,6 +125,8 @@ PODGLAD_BEZCZYNNOSC = 20.0         # s bez pytania o klatkę: screencast staje (
 PUSTE_ADRESY = ("", "about:blank")  # karta bez strony: nie ma czego parkować
 CZAS_POSTOJU = 5.0                 # s na przejście jednej karty na pustą stronę przy postoju
 CZAS_PRZYGOTOWANIA = 15.0         # s na odpowiedzi przygotowania nowego celu (_przygotuj_cel), razem, nie na każde
+CZAS_NOWEJ_KARTY = 30.0            # s na nową kartę gotową do pracy (Windows arm64 z x64 w emulacji: ponad 10 s)
+MAKS_WOLNYCH = 2                   # kart po zakończonych zadaniach agenta, które zostają otwarte (starsze zamykamy)
 MAKS_KART_PRZYWRACANYCH = 8        # kart ze stroną zapisywanych przed restartem usługi i otwieranych po nim
 MAKS_TEKST_WLASCICIELA = 4000
 MAKS_PLIKOW = 10
@@ -187,6 +199,12 @@ KLAWISZE = {
 AKTYWUJACE = frozenset({"return", "enter", "kp_enter", "iso_enter", "space", "kp_space", " "})   # jak zasady.py
 DZIALANIA_AGENTA = frozenset({"click", "double_click", "right_click", "drag", "scroll", "type_text", "press_key",
                               "hotkey", "set_value", "navigate"})
+# narzędzia na jednej karcie (window_id): z kluczem zadania tylko na jego kartach, bez window_id na jego aktywnej
+OKNOWE = DZIALANIA_AGENTA | frozenset({"get_window_state", "wait_for", "run_steps", "get_desktop_state",
+                                       "bring_to_front", "get_screen_size"})
+CUDZE_OKNO = ("to okno przeglądarki należy do innego zadania agenta (inna rozmowa albo karta kanbana) i z niego nie "
+              "korzystasz; Twoje okna pokazuje list_windows, a capture (get_window_state) bez window_id patrzy na "
+              "Twoje okno")
 MODYFIKATORY = {"alt": (1, "Alt", "AltLeft", 18), "option": (1, "Alt", "AltLeft", 18),
                 "ctrl": (2, "Control", "ControlLeft", 17), "control": (2, "Control", "ControlLeft", 17),
                 "cmd": (4, "Meta", "MetaLeft", 91), "command": (4, "Meta", "MetaLeft", 91),
@@ -335,6 +353,10 @@ class Okno:
         self.stan: dict | None = None               # drzewo z ostatniej migawki albo paragonu: stan przed działaniem
         self.przed: dict = {}                       # liczniki sprzed działania (okna, pobrania)
         self.gotowe = threading.Event()             # przygotowanie karty skończone (_przygotuj_cel): Fetch, Page, UA
+        self.wlasciciel = None                      # klucz zadania agenta, które ma tę kartę (None: wolna)
+        self.byly = None                            # ostatni właściciel: po zwolnieniu wraca do tej samej karty
+        self.zwolniona = 0.0                        # chwila zwolnienia (zamykamy najstarsze wolne)
+        self.okno_przegl: int | None = None         # okno przeglądarki z tą kartą (Browser.getWindowForTarget)
 
 
 class Sterownik:
@@ -357,6 +379,8 @@ class Sterownik:
         self._sesje_ramek: dict[str, tuple[int, str]] = {}   # sesja ramki OOPIF -> (nr okna, frameId)
         self._nr = 0
         self._aktywne: int | None = None
+        self._aktywne_wl: dict[Any, int] = {}       # zadanie agenta (klucz od wejścia) -> jego aktywna karta
+        self._tworzenie = threading.Lock()          # okno_dla: jedna nowa karta naraz (bez dwóch dla jednego zadania)
         self._migawki: OrderedDict[str, dict] = OrderedDict()
         self._pobrania: dict[str, dict] = {}
         self._pobrania_start = 0                    # pobrań rozpoczętych (paragon: działanie zaczęło pobieranie)
@@ -548,6 +572,11 @@ class Sterownik:
                 self._okna[okno.nr] = okno
                 self._po_celu[okno.target_id] = okno.nr
                 self._aktywne = okno.nr
+                # okno otwarte przez stronę (window.open, link z target=_blank) należy do zadania tamtej strony
+                # i staje się jego aktywną kartą, jak dotąd aktywną kartą przeglądarki
+                otwierajaca = self._okna.get(self._po_celu.get(str(info.get("openerId") or ""), -1))
+                if otwierajaca is not None and otwierajaca.wlasciciel is not None:
+                    self._przypisz(okno, otwierajaca.wlasciciel)
                 self._nowe_okno.notify_all()
         elif typ == "iframe":
             with self._lock:
@@ -600,6 +629,13 @@ class Sterownik:
                     self._po_celu.pop(okno.target_id, None)
                     if self._aktywne == nr:
                         self._aktywne = max(self._okna, default=None)
+                    wl = okno.wlasciciel
+                    if wl is not None and self._aktywne_wl.get(wl) == nr:
+                        zostaja = [o.nr for o in self._okna.values() if o.wlasciciel == wl]
+                        if zostaja:
+                            self._aktywne_wl[wl] = max(zostaja)
+                        else:
+                            self._aktywne_wl.pop(wl, None)
 
     def _okno_sesji(self, sesja: str | None) -> Okno | None:
         with self._lock:
@@ -727,9 +763,150 @@ class Sterownik:
         with self._lock:
             return self._okna.get(nr)
 
-    def aktywne_okno(self) -> int | None:
+    def aktywne_okno(self, wl=None) -> int | None:
+        """Aktywna karta przeglądarki (podgląd w HQ), a z kluczem zadania `wl` aktywna karta tego zadania."""
         with self._lock:
-            return self._aktywne if self._aktywne in self._okna else None
+            if wl is None:
+                return self._aktywne if self._aktywne in self._okna else None
+            nr = self._aktywne_wl.get(wl)
+            okno = self._okna.get(nr) if nr is not None else None
+            return nr if okno is not None and okno.wlasciciel == wl else None
+
+    def nalezy(self, nr, wl) -> bool:
+        """Czy karta `nr` jest kartą zadania `wl` (bez klucza: każda karta). Wolną kartę tego samego zadania (po
+        ponownym połączeniu), kartę, której żadne zadanie nie miało (karta startowa, karty przywrócone po restarcie,
+        otwarte przez właściciela), albo pustą zadanie bierze, wskazując ją numerem, o ile w jej oknie przeglądarki
+        nie pracuje inne zadanie; wolnej karty ze stroną innego, zakończonego zadania nie dostaje."""
+        okno = self.okno(nr)
+        if okno is None or wl is None:
+            return okno is not None
+        if okno.wlasciciel != wl:
+            inne = self._okna_innych(wl)
+            with self._lock:
+                if not (okno.wlasciciel is None and okno.gotowe.is_set() and not okno.dialog
+                        and (okno.byly in (None, wl) or okno.url in PUSTE_ADRESY)
+                        and okno.okno_przegl is not None and okno.okno_przegl not in inne):
+                    return False
+                self._przypisz(okno, wl)
+        self._na_wierzch(okno)
+        return True
+
+    def _okno_przegladarki(self, okno: Okno) -> int | None:
+        """Okno przeglądarki z kartą (Browser.getWindowForTarget, zapamiętane w karcie)."""
+        if okno.okno_przegl is None:
+            try:
+                okno.okno_przegl = int(self.b.wyslij("Browser.getWindowForTarget", {"targetId": okno.target_id},
+                                                     czas=5)["windowId"])
+            except (cdp.BladCDP, KeyError, TypeError, ValueError):
+                return None
+        return okno.okno_przegl
+
+    def _okna_innych(self, wl) -> set:
+        """Okna przeglądarki, w których są karty innych zadań niż `wl` (tam zadanie `wl` karty nie bierze: w jednym
+        oknie na wierzchu jest jedna karta, a pełny Chrome nie liczy kart w tle)."""
+        okna = self.okna()
+        for o in okna:
+            self._okno_przegladarki(o)
+        return {o.okno_przegl for o in okna if o.wlasciciel not in (None, wl) and o.okno_przegl is not None}
+
+    def _na_wierzch(self, okno: Okno) -> None:
+        """Karta zadania na wierzchu swojego okna przeglądarki, zanim cokolwiek o niej czytamy albo w niej robimy:
+        pełny Chrome nie rysuje kart w tle i nie odpowiada dla nich na drzewo dostępności (Accessibility.queryAXTree
+        czekał do limitu). Widoczność karty sprawdzamy w odizolowanym świecie (strona jej nie podmieni); kartę w tle
+        (np. właściciel kliknął inną kartę tego okna, przyszła nowa karta) aktywujemy. Każde zadanie ma własne okno,
+        więc to nie zabiera wierzchu innemu zadaniu; podglądu HQ (aktywna karta przeglądarki) nie zmienia."""
+        if not okno.dialog:                            # strona pod oknem JavaScript nie odpowiada na Runtime.evaluate
+            try:
+                ctx = self._swiat(okno, okno.sesja)
+                w = self.b.wyslij("Runtime.evaluate", {"expression": "document.visibilityState", "contextId": ctx,
+                                                       "returnByValue": True}, okno.sesja, czas=3)
+                if (w.get("result") or {}).get("value") == "visible":
+                    return
+            except (cdp.BladCDP, BladSterownika, KeyError, TypeError):
+                okno.swiaty.clear()
+        try:
+            self.b.wyslij("Target.activateTarget", {"targetId": okno.target_id}, czas=5)
+        except cdp.BladCDP:
+            pass
+
+    def _przypisz(self, okno: Okno, wl) -> None:
+        """Karta dla zadania `wl` i jego aktywna karta (pod self._lock)."""
+        okno.wlasciciel = okno.byly = wl
+        self._aktywne_wl[wl] = okno.nr
+
+    def _nowa_karta(self, nowe_okno: bool = False) -> Okno | None:
+        """Nowa pusta karta (w nowym oknie przeglądarki przy `nowe_okno`), na którą czekamy, aż będzie gotowa do pracy
+        (_przygotuj_cel), najwyżej CZAS_NOWEJ_KARTY s; None, gdy przeglądarka jej nie dała albo karta zniknęła
+        w trakcie. Adres dostaje dopiero gotowa karta (launch_app)."""
+        params: dict[str, Any] = {"url": "about:blank"}
+        if nowe_okno:
+            params["newWindow"] = True
+        przed = {o.nr for o in self.okna()}
+        cel = self.b.wyslij("Target.createTarget", params).get("targetId")
+        # przygotowanie nowej karty na Windows arm64 z przeglądarką x64 w emulacji trwa dłużej niż 10 s (CI
+        # natywnie, WARM); karta zamknięta w trakcie znika z okien
+        koniec, okno, byla = time.monotonic() + CZAS_NOWEJ_KARTY, None, False
+        with self._lock:
+            while time.monotonic() < koniec:
+                okno = self._okna.get(self._po_celu.get(cel, -1))
+                if (okno is not None and okno.gotowe.is_set()) or (okno is None and byla):
+                    break
+                byla = byla or okno is not None
+                self._nowe_okno.wait(0.2)
+        return None if okno is None or okno.nr in przed else okno
+
+    def okno_dla(self, wl) -> int:
+        """Karta zadania agenta `wl` na wierzchu swojego okna przeglądarki: jego aktywna, inna jego, jego dawna wolna,
+        wolna pusta (np. karta startowa albo zaparkowana) w oknie bez kart innych zadań albo nowa karta w nowym oknie
+        przeglądarki. Karty z cudzą stroną (zadanie skończone, ale strona została) nie bierze: zadanie widzi tylko to,
+        co samo otworzyło."""
+        nr = self.aktywne_okno(wl)
+        if nr is None:
+            with self._tworzenie:
+                nr = self._wybierz_karte(wl)
+        okno = self.okno(nr)
+        if okno is not None:
+            self._na_wierzch(okno)
+        return nr
+
+    def _wybierz_karte(self, wl) -> int:
+        inne = self._okna_innych(wl)
+        with self._lock:
+            okna = list(self._okna.values())
+            wybor = max((o for o in okna if o.wlasciciel == wl), key=lambda o: o.nr, default=None)
+            if wybor is None:
+                wolne = [o for o in okna if o.wlasciciel is None and o.gotowe.is_set() and o.okno_przegl is not None
+                         and o.okno_przegl not in inne]
+                wybor = max((o for o in wolne if o.byly == wl), key=lambda o: o.zwolniona, default=None) or min(
+                    (o for o in wolne if o.url in PUSTE_ADRESY and not o.dialog), key=lambda o: o.nr, default=None)
+            if wybor is not None:
+                self._przypisz(wybor, wl)
+                return wybor.nr
+        okno = self._nowa_karta(nowe_okno=True)
+        if okno is None:
+            raise BladSterownika("okno", "przeglądarka nie otworzyła okna dla tego zadania; spróbuj znowu")
+        with self._lock:
+            self._przypisz(okno, wl)
+        return okno.nr
+
+    def zwolnij_okna(self, wl) -> None:
+        """Koniec zadania `wl`: jego karty są wolne (zostają z jego stroną do postoju; to samo zadanie wraca do nich
+        po ponownym połączeniu). Wolnych kart po zadaniach zostaje najwyżej MAKS_WOLNYCH, starsze zamykamy; kart,
+        których żadne zadanie nie miało (otwartych przez właściciela), nie ruszamy, a ostatniej karty nigdy."""
+        teraz = time.monotonic()
+        with self._lock:
+            for o in self._okna.values():
+                if o.wlasciciel == wl:
+                    o.wlasciciel, o.zwolniona = None, teraz
+            self._aktywne_wl.pop(wl, None)
+            po_zadaniach = sorted((o for o in self._okna.values() if o.wlasciciel is None and o.byly is not None),
+                                  key=lambda o: o.zwolniona)
+            zamknij = po_zadaniach[:max(0, len(po_zadaniach) - MAKS_WOLNYCH)][:max(0, len(self._okna) - 1)]
+        for o in zamknij:
+            try:
+                self.b.wyslij("Target.closeTarget", {"targetId": o.target_id}, czas=5)
+            except cdp.BladCDP:
+                pass
 
     def _okno_z(self, args: dict, wymagaj: bool = True) -> Okno:
         pid = args.get("pid")
@@ -1249,21 +1426,24 @@ class Sterownik:
             return _blad("klawisz", "w pasku adresu: tekst, Backspace, Ctrl+A, Enter (przejście) albo Escape")
         return _wynik(f"pasek adresu: klawisz {klawisz}", effect="confirmed", path="cdp", delivery=delivery)
 
-    def _aktywuj(self, okno: Okno) -> None:
-        """Karta na wierzch: pełny Chrome nie rysuje kart w tle, więc zrzut karty w tle czekałby bez końca."""
+    def _aktywuj(self, okno: Okno, hq: bool = True) -> None:
+        """Karta na wierzch: pełny Chrome nie rysuje kart w tle, więc zrzut karty w tle czekałby bez końca. `hq`:
+        karta staje się też aktywną kartą przeglądarki (podgląd i „Przejmij” w HQ)."""
         try:
             self.b.wyslij("Target.activateTarget", {"targetId": okno.target_id}, czas=5)
             self.b.wyslij("Page.bringToFront", {}, okno.sesja, czas=5)
         except cdp.BladCDP:
             pass
-        with self._lock:
-            self._aktywne = okno.nr
+        if hq:
+            with self._lock:
+                self._aktywne = okno.nr
 
     def _zrzut(self, okno: Okno, maks_wymiar: int | None) -> tuple[str, int, int]:
         """Zrzut obszaru strony (PNG w base64) i jego wymiary; skala karty = piksele zrzutu na piksel CSS. Zrzut
-        karty w tle przełącza na nią (jak spojrzenie na kartę w przeglądarce)."""
+        karty w tle przełącza na nią (jak spojrzenie na kartę w przeglądarce). Zrzut karty zadania agenta nie zmienia
+        karty podglądu w HQ: przy „Przejmij” właściciel zostaje na swojej karcie, choć inne zadanie patrzy na swoją."""
         if okno.nr != self.aktywne_okno():
-            self._aktywuj(okno)
+            self._aktywuj(okno, hq=okno.wlasciciel is None)
         met = self.b.wyslij("Page.getLayoutMetrics", {}, okno.sesja)
         v = met.get("cssVisualViewport") or met.get("cssLayoutViewport") or {}
         sz, wy = float(v.get("clientWidth") or okno.rozmiar[0]), float(v.get("clientHeight") or okno.rozmiar[1])
@@ -2210,28 +2390,20 @@ class Sterownik:
             return _blad("set_value", f"set_value: {wynik.get('powod') or 'nie udało się'}")
         return _wynik(f"wartość ustawiona: {wynik.get('wartosc')}", effect="confirmed", path="cdp")
 
-    def launch_app(self, args: dict) -> dict:
+    def launch_app(self, args: dict, wl=None) -> dict:
         """Adresy w nowych kartach. Karta powstaje pusta, a adres dostaje (Page.navigate) dopiero po przygotowaniu
         (_przygotuj_cel): pełny Chrome (Chrome for Testing 156) nie wstrzymuje pierwszej nawigacji karty
         z Target.createTarget do Runtime.runIfWaitingForDebugger, więc adres podany od razu wczytywał się przed
         Fetch.enable, Page.enable i zmianą user-agenta (file:/// zostawał w karcie, pierwsze żądanie miało
-        user-agenta HeadlessChrome)."""
+        user-agenta HeadlessChrome). Z kluczem zadania `wl` każda karta w nowym oknie i należy do tego zadania."""
         okna = []
         for url in [str(u) for u in args.get("urls") or []][:8]:
-            przed = {o.nr for o in self.okna()}
-            cel = self.b.wyslij("Target.createTarget", {"url": "about:blank"}).get("targetId")
-            # przygotowanie nowej karty na Windows arm64 z przeglądarką x64 w emulacji trwa dłużej niż 10 s (CI
-            # natywnie, WARM); karta zamknięta w trakcie znika z okien
-            koniec, okno, byla = time.monotonic() + 30, None, False
-            with self._lock:
-                while time.monotonic() < koniec:
-                    okno = self._okna.get(self._po_celu.get(cel, -1))
-                    if (okno is not None and okno.gotowe.is_set()) or (okno is None and byla):
-                        break
-                    byla = byla or okno is not None
-                    self._nowe_okno.wait(0.2)
-            if okno is None or okno.nr in przed:
+            okno = self._nowa_karta(nowe_okno=wl is not None)
+            if okno is None:
                 continue
+            if wl is not None:
+                with self._lock:
+                    self._przypisz(okno, wl)
             try:
                 self.b.wyslij("Page.navigate", {"url": url}, okno.sesja, czas=CZAS_NAWIGACJI)
             except cdp.BladCDP as e:
@@ -2239,21 +2411,33 @@ class Sterownik:
             self._aktywne = okno.nr
             okna.append({"window_id": okno.nr, "title": "", "url": url})
         if not okna:
-            okna = [{"window_id": o.nr, "title": o.tytul, "url": o.url} for o in self.okna()]
+            okna = [{"window_id": o.nr, "title": o.tytul, "url": o.url} for o in self.okna()
+                    if wl is None or o.wlasciciel == wl]
         return _wynik(f"{APLIKACJA}: {len(okna)} okien", pid=self.pid, name=APLIKACJA, bundle_id="chromium",
                       windows=okna)
 
-    def kill_app(self, args: dict) -> dict:
+    def kill_app(self, args: dict, wl=None) -> dict:
+        """Przeglądarka od nowa: zamknięte karty i nowa pusta. Z kluczem zadania `wl` tylko karty tego zadania (inne
+        zadania pracują dalej w swoich oknach), a nowa pusta karta w nowym oknie jest jego."""
         if args.get("pid") != self.pid:
             return _blad("aplikacja", "kill_app tylko dla przeglądarki Jarva")
-        stare = self.okna()
-        self.b.wyslij("Target.createTarget", {"url": "about:blank"})
+        if wl is None:
+            stare = self.okna()
+            self.b.wyslij("Target.createTarget", {"url": "about:blank"})
+        else:
+            with self._lock:
+                stare = [o for o in self._okna.values() if o.wlasciciel == wl]
+            nowa = self._nowa_karta(nowe_okno=True)
+            if nowa is not None:
+                with self._lock:
+                    self._przypisz(nowa, wl)
         for o in stare:
             try:
                 self.b.wyslij("Target.closeTarget", {"targetId": o.target_id}, czas=5)
             except cdp.BladCDP:
                 pass
-        return _wynik("przeglądarka wyczyszczona: zamknięte karty, nowa pusta karta", effect="confirmed", path="cdp")
+        return _wynik("przeglądarka wyczyszczona: zamknięte karty" + (" tego zadania" if wl is not None else "")
+                      + ", nowa pusta karta", effect="confirmed", path="cdp")
 
     def bring_to_front(self, args: dict) -> dict:
         okno = self._okno_z(args)
@@ -2279,10 +2463,16 @@ class Sterownik:
         except (cdp.BladCDP, BladSterownika, ValueError, TypeError):
             okno.swiaty.clear()
 
-    def list_windows(self, args: dict) -> dict:
-        aktywne = self.aktywne_okno()
+    def list_windows(self, args: dict, wl=None) -> dict:
+        """Karty przeglądarki jako okna (aktywna na wierzchu); z kluczem zadania `wl` tylko jego karty, a gdy nie ma
+        żadnej, dostaje ją teraz (computer_use Hermesa zaczyna `capture` od list_windows i bierze okno z wierzchu)."""
+        if wl is not None:
+            self.okno_dla(wl)
+        aktywne = self.aktywne_okno(wl)
         okna = []
         for o in self.okna():
+            if wl is not None and o.wlasciciel != wl:
+                continue
             self._odswiez_tytul(o)
             okna.append({"window_id": o.nr, "pid": self.pid, "app_name": APLIKACJA, "title": o.tytul, "url": o.url,
                          "bounds": {"x": 0, "y": 0, "w": round(o.rozmiar[0]), "h": round(o.rozmiar[1])},
@@ -2291,9 +2481,10 @@ class Sterownik:
         okna.sort(key=lambda w: -w["z_index"])
         return _wynik(f"{len(okna)} okien", windows=okna)
 
-    def list_apps(self, args: dict) -> dict:
+    def list_apps(self, args: dict, wl=None) -> dict:
+        ile = sum(1 for o in self.okna() if wl is None or o.wlasciciel == wl)
         return _wynik(APLIKACJA, apps=[{"name": APLIKACJA, "pid": self.pid, "bundle_id": "chromium", "running": True,
-                                        "windows": len(self.okna())}])
+                                        "windows": ile}])
 
     def get_desktop_state(self, args: dict, konfig: dict) -> dict:
         okno = self._okno_z(args)
@@ -2914,7 +3105,7 @@ class Sterownik:
             time.sleep(0.3)
 
     def _krok_paczki(self, i: int, krok: dict, start: float,
-                     wykonaj: Callable[[str, dict], dict]) -> tuple[dict, str]:
+                     wykonaj: Callable[[str, dict], dict], wl=None) -> tuple[dict, str]:
         """Jeden krok paczki: limit czasu paczki, okno, wait_for przed działaniem, cel napisem i działanie przez
         `wykonaj`. (raport kroku, wiersz wyniku)."""
         nazwa, a = krok["tool"], dict(krok["args"])
@@ -2929,7 +3120,7 @@ class Sterownik:
             return blad("time_budget", "czas_paczki", f"paczka zużyła {CZAS_PACZKI:.0f} s przed tym krokiem")
         a.setdefault("pid", self.pid)
         if a.get("window_id") is None:
-            a["window_id"] = self.aktywne_okno()
+            a["window_id"] = self.aktywne_okno(wl)      # z kluczem zadania: jego aktywna karta (także okno otwarte krokiem)
         okno = self.okno(a["window_id"])
         if okno is None:
             return blad("find", "okno", "nie ma takiego okna przeglądarki; zrób list_windows")
@@ -2968,7 +3159,7 @@ class Sterownik:
             raport["phase"] = "action"
         return raport, f"{i + 1}. {nazwa}{cel}: {'' if ok else 'BŁĄD ' + str(sc.get('code') or 'blad') + ': '}{tekst}"
 
-    def run_steps(self, args: dict, konfig: dict, wykonaj: Callable[[str, dict], dict]) -> dict:
+    def run_steps(self, args: dict, konfig: dict, wykonaj: Callable[[str, dict], dict], wl=None) -> dict:
         """Paczka kroków w jednym wywołaniu (kontrakt run_steps cua-driver 0.38, najwyżej MAKS_KROKOW kroków
         i CZAS_PACZKI s). Każdy krok, także migawka do celu napisem i obserwacja na końcu, idzie przez `wykonaj`:
         w usłudze to wejście, czyli ta sama droga co pojedyncze wywołanie (twarde zasady na stronie po poprzednim
@@ -2993,7 +3184,7 @@ class Sterownik:
         zatrzymany = None
         ostatnie_okno = nr_paczki
         for i, krok in enumerate(plan):
-            raport, linia = self._krok_paczki(i, krok, start, wykonaj)
+            raport, linia = self._krok_paczki(i, krok, start, wykonaj, wl)
             raporty.append(raport)
             linie.append(linia)
             ostatnie_okno = raport.get("window_id", ostatnie_okno)
@@ -3074,24 +3265,35 @@ class Sterownik:
     # ------------------------------------------------------------------ MCP
 
     def wywolaj(self, nazwa: str, args: dict, konfig: dict,
-                wykonaj: Callable[[str, dict], dict] | None = None) -> dict:
+                wykonaj: Callable[[str, dict], dict] | None = None, wl=None) -> dict:
         """Jedno narzędzie MCP; wynik w formacie tools/call (content, structuredContent, isError). `wykonaj`: droga
         jednego kroku run_steps (wejście: twarde zasady przed każdym krokiem); bez niej run_steps nie działa, bo
-        kroki nie przeszłyby przez zasady."""
+        kroki nie przeszłyby przez zasady. `wl`: klucz zadania agenta od wejścia: narzędzie działa tylko na jego
+        kartach (bez window_id na jego aktywnej karcie, okno_dla), cudza karta to odmowa `cudze_okno`."""
         args = args if isinstance(args, dict) else {}
-        if nazwa in DZIALANIA_AGENTA:
-            # wybór pliku z wcześniejszego działania (albo kliknięcia właściciela) nie należy do tego wywołania;
-            # stronę, która czeka na plik, pokazuje dalej get_window_state (file_chooser)
-            for o in self.okna():
-                o.wybor_pliku = None
         try:
+            if wl is not None and nazwa in OKNOWE:
+                if args.get("window_id") is None:
+                    args = {**args, "window_id": self.okno_dla(wl)}
+                elif self.okno(args["window_id"]) is not None and not self.nalezy(args["window_id"], wl):
+                    return _blad("cudze_okno", CUDZE_OKNO, next_step="fresh_state")
+                okno = self.okno(args["window_id"])
+                if okno is not None and (nazwa in DZIALANIA_AGENTA or nazwa == "bring_to_front"):
+                    with self._lock:
+                        self._aktywne = okno.nr                   # podgląd w HQ: karta ostatniego działania agenta
+            if nazwa in DZIALANIA_AGENTA:
+                # wybór pliku z wcześniejszego działania (albo kliknięcia właściciela) nie należy do tego wywołania;
+                # stronę, która czeka na plik, pokazuje dalej get_window_state (file_chooser)
+                for o in self.okna():
+                    if wl is None or o.wlasciciel == wl:
+                        o.wybor_pliku = None
             if nazwa == "get_window_state":
                 return self.get_window_state(args, konfig)
             if nazwa == "run_steps":
                 if wykonaj is None:
                     return _blad("narzedzie", "run_steps działa tylko przez wejście Komputera (zasady oceniają każdy "
                                               "krok)")
-                return self.run_steps(args, konfig, wykonaj)
+                return self.run_steps(args, konfig, wykonaj, wl)
             if nazwa == "wait_for":
                 return self.wait_for(args)
             if nazwa == "navigate":
@@ -3111,15 +3313,15 @@ class Sterownik:
             if nazwa == "set_value":
                 return self.set_value(args)
             if nazwa == "launch_app":
-                return self.launch_app(args)
+                return self.launch_app(args, wl)
             if nazwa == "kill_app":
-                return self.kill_app(args)
+                return self.kill_app(args, wl)
             if nazwa == "bring_to_front":
                 return self.bring_to_front(args)
             if nazwa == "list_windows":
-                return self.list_windows(args)
+                return self.list_windows(args, wl)
             if nazwa == "list_apps":
-                return self.list_apps(args)
+                return self.list_apps(args, wl)
             if nazwa == "get_desktop_state":
                 return self.get_desktop_state(args, konfig)
             if nazwa == "get_screen_size":
@@ -3146,8 +3348,9 @@ class Sterownik:
         except cdp.BladCDP as e:
             return _blad("cdp", f"przeglądarka: {e.tekst[:200]}")
 
-    def obsluz_mcp(self, msg: dict, konfig: dict, wykonaj: Callable[[str, dict], dict] | None = None) -> dict | None:
-        """Wiadomość JSON-RPC MCP od wejścia; odpowiedź (None dla powiadomień). `wykonaj`: jak w `wywolaj`."""
+    def obsluz_mcp(self, msg: dict, konfig: dict, wykonaj: Callable[[str, dict], dict] | None = None,
+                   wl=None) -> dict | None:
+        """Wiadomość JSON-RPC MCP od wejścia; odpowiedź (None dla powiadomień). `wykonaj`, `wl`: jak w `wywolaj`."""
         ident, metoda = msg.get("id"), msg.get("method")
         if ident is None or metoda is None:
             return None
@@ -3161,7 +3364,7 @@ class Sterownik:
         elif metoda == "tools/list":
             wynik = {"tools": NARZEDZIA}
         elif metoda == "tools/call":
-            wynik = self.wywolaj(str(params.get("name") or ""), params.get("arguments") or {}, konfig, wykonaj)
+            wynik = self.wywolaj(str(params.get("name") or ""), params.get("arguments") or {}, konfig, wykonaj, wl)
         else:
             return {"jsonrpc": "2.0", "id": ident, "error": {"code": -32601, "message": f"metoda {metoda}"}}
         return {"jsonrpc": "2.0", "id": ident, "result": wynik}

@@ -1,6 +1,7 @@
 # Changelog: jarvo-lowca
 
 ## Niewydane
+- Poza płatnością i zakupem nic nie czeka na zgodę: groźne polecenie dostaje od razu werdykt strażnika smart, a usunięcie pliku w danych Jarva poza katalogami roboczymi to blokada z radą.
 - `browser_*` działa na Chrome z trwałym profilem przeglądarki (logowania zostają między zadaniami), nawigacja zwraca zwartą listę elementów z refami i tekstem, klik, klawisz i Wstecz zwracają widok strony po ustaleniu, a blokada antybotowa mówi wprost: telefon floty, potem `kanban_block`.
 - Obraz z narzędzi (zrzut, `shot` telefonu, `vision_analyze`) widzisz od razu jako obraz w wyniku narzędzia, bez osobnego opisu modelu pomocniczego, a wszystkie narzędzia są w zestawie od razu, bez `tool_search`.
 - SOUL w układzie Jarva: postać (`SOUL.md`: kim jestem, charakter, głos), procedury (`ZASADY.md`: zakres z jednym zdaniem „Poza zakresem”, zasady pracy, mapa workflowów, standard, autonomia, skrót mapy, formaty), mapa „od A do Z” (`MAPA.md`, sekcje z `wiedza/mapa.py`, rdzeń `@lowca`). Nowa zasada pamięci: preferencja albo decyzja właściciela → target `user`, fakt o środowisku → `memory`, jeden fakt na wpis. Zbudowany prompt: przed 11 094 zn (~3170 tok.), po 11 393 zn (~3256 tok.).

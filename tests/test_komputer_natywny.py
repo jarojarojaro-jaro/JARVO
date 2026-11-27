@@ -50,12 +50,15 @@ def _elementy(zmiana: bool = False) -> list[dict]:
 
 
 class Sterownik:
-    """Atrapa sterownika CDP: te same metody, z których korzysta wejście (MCP i opis celu dla zasad)."""
+    """Atrapa sterownika CDP: te same metody, z których korzysta wejście (MCP i opis celu dla zasad), z oknami zadań
+    jak sterownik_cdp: pierwsze zadanie dostaje wolną kartę 3, każde następne własną (10, 11…), a `wl` każdego
+    wywołania trafia do `wywolania_wl`."""
 
     pid = PID
 
     def __init__(self) -> None:
         self.wywolania: list[tuple[str, dict]] = []
+        self.wywolania_wl: list = []
         self.fokus_pola: dict | None = None
         self.zmiana = False
         self.migawki: dict[str, list[dict]] = {}
@@ -65,6 +68,9 @@ class Sterownik:
         self.wolny_klik = 0.0                    # s: klik w sterowniku trwa (kolejka sesji)
         self.koniec_kliku = 0.0
         self.czasy_fokusu: list[float] = []
+        self.okna: dict[int, object] = {3: None}   # karta -> zadanie (None: wolna)
+        self.zwolnione: list = []
+        self._lock = threading.Lock()
 
         class B:
             @staticmethod
@@ -72,13 +78,43 @@ class Sterownik:
                 return True
         self.b = B()
 
-    def aktywne_okno(self):
-        return 3
+    def okno_dla(self, wl):
+        with self._lock:
+            for nr, w in self.okna.items():
+                if w == wl:
+                    return nr
+            nr = 3 if self.okna[3] is None else max(10, *self.okna) + 1
+            self.okna[nr] = wl
+            return nr
+
+    def nalezy(self, nr, wl):
+        with self._lock:
+            if nr not in self.okna:
+                return False
+            if wl is None or self.okna[nr] == wl:
+                return True
+            if self.okna[nr] is None and wl not in self.okna.values():
+                self.okna[nr] = wl
+                return True
+            return False
+
+    def zwolnij_okna(self, wl):
+        self.zwolnione.append(wl)
+        with self._lock:
+            for nr, w in self.okna.items():
+                if w == wl:
+                    self.okna[nr] = None
+
+    def aktywne_okno(self, wl=None):
+        if wl is None:
+            return 3
+        with self._lock:
+            return next((nr for nr, w in self.okna.items() if w == wl), None)
 
     def okno(self, nr):
-        return object() if nr == 3 else None
+        return object() if nr in self.okna else None
 
-    def obsluz_mcp(self, msg: dict, konfig: dict, wykonaj=None) -> dict | None:
+    def obsluz_mcp(self, msg: dict, konfig: dict, wykonaj=None, wl=None) -> dict | None:
         ident, metoda = msg.get("id"), msg.get("method")
         if ident is None:
             return None
@@ -89,7 +125,15 @@ class Sterownik:
                 "click", "type_text", "press_key", "hotkey", "get_window_state", "page", "clipboard_read",
                 "mouse_button_down")]}}
         nazwa, args = msg["params"]["name"], msg["params"].get("arguments") or {}
+        if wl is not None and nazwa not in ("start_session", "set_config", "set_agent_cursor_enabled"):
+            okno = args.get("window_id")
+            if okno is None:
+                args = {**args, "window_id": self.okno_dla(wl)}
+            elif not self.nalezy(okno, wl):                   # jak sterownik_cdp.wywolaj
+                return {"jsonrpc": "2.0", "id": ident, "result": {"isError": True, "structuredContent": {
+                    "ok": False, "code": "cudze_okno"}, "content": [{"type": "text", "text": "cudze okno"}]}}
         self.wywolania.append((nazwa, args))
+        self.wywolania_wl.append(wl)
         if nazwa == "click" and self.wolny_klik:
             time.sleep(self.wolny_klik)
             self.koniec_kliku = time.monotonic()
@@ -100,9 +144,11 @@ class Sterownik:
             for e in elementy:
                 e["element_token"] = f"{sid}:{e['element_index']}"
             self.migawki[sid] = elementy
-            sc = {"snapshot_id": sid, "pid": PID, "window_id": 3, "elements": elementy}
+            sc = {"snapshot_id": sid, "pid": PID, "window_id": args.get("window_id", 3), "elements": elementy}
+        elif nazwa == "list_windows":
+            sc = {"windows": [{"window_id": nr, "pid": PID} for nr, w in self.okna.items() if wl is None or w == wl]}
         else:
-            sc = {"ok": True, "effect": "unverifiable", "path": "cdp"}
+            sc = {"ok": True, "effect": "unverifiable", "path": "cdp", "window_id": args.get("window_id", 3)}
         return {"jsonrpc": "2.0", "id": ident, "result": {
             "content": [{"type": "text", "text": f"{nazwa} gotowe, {KLUCZ}"}], "structuredContent": sc}}
 
@@ -602,16 +648,20 @@ def test_kanal_i_dziennik_bez_sekretow_w_powodzie_pauzy(usluga):
     assert KLUCZ not in json.dumps(pauza) and "\n" not in pauza["powod"]
 
 
-OKNO = {"pid": PID, "window_id": 3}
+MOJE = {"pid": PID}                    # bez window_id: okno zadania tej sesji (sterownik_cdp.okno_dla)
 
 
-def _patrz(k: Klient) -> dict:
-    return k.narzedzie("get_window_state", OKNO)
+def _patrz(k: Klient, **args) -> dict:
+    return k.narzedzie("get_window_state", {**MOJE, **args})
+
+
+def _okno(k: Klient) -> int:
+    return _patrz(k)["structuredContent"]["window_id"]
 
 
 def _klik(k: Klient, napis: str = "Dodaj do koszyka") -> dict:
     el = {e["label"]: e for e in _patrz(k)["structuredContent"]["elements"]}
-    return k.narzedzie("click", {**OKNO, "element_token": el[napis]["element_token"]})
+    return k.narzedzie("click", {**MOJE, "element_token": el[napis]["element_token"]})
 
 
 def _czekaj_na_sesje(usluga, ile: int) -> None:
@@ -621,19 +671,34 @@ def _czekaj_na_sesje(usluga, ile: int) -> None:
         time.sleep(0.05)
 
 
-def test_sesje_rownolegle_jedna_przy_ekranie(usluga):
-    """Druga sesja ani nie patrzy, ani nie działa, dopóki ekran ma pierwsza (odmowa nie dochodzi do przeglądarki);
-    koniec pierwszej zwalnia ekran od razu."""
+def _cudze(w: dict) -> None:
+    sc = w["structuredContent"]
+    assert w["isError"] and sc["rule"] == "cudze_okno" and sc["next_step"] == "fresh_state", sc
+    assert "innego zadania agenta" in sc["message"], sc
+
+
+def test_sesje_rownolegle_kazda_we_wlasnym_oknie(usluga):
+    """Dwie sesje naraz nie czekają na siebie: każda ma własne okno przeglądarki, patrzy i działa tylko na nim,
+    klawisz bez window_id (ctrl+z) idzie do jej okna, a window_id okna drugiej sesji to odmowa `cudze_okno`, która
+    nie dochodzi do przeglądarki. Koniec sesji zwalnia jej okno."""
     k1, k2 = Klient(usluga.root), Klient(usluga.root)
     try:
         assert not _klik(k1).get("isError")
+        o1, o2 = _okno(k1), _okno(k2)
+        assert o1 != o2
+        assert not _klik(k2).get("isError")
         przed = len(usluga.sterownik.wywolania)
-        sc = _patrz(k2)["structuredContent"]
-        assert sc["rule"] == "zajete" and sc["held_by"].startswith("rozmowa Jarva bez karty kanbana")
-        assert len(usluga.sterownik.wywolania) == przed
+        for nazwa, args in (("get_window_state", {"window_id": o1}), ("hotkey", {"window_id": o1, "keys": ["ctrl", "z"]}),
+                            ("navigate", {"window_id": o1, "url": "https://www.olx.pl/"}),
+                            ("click", {"window_id": o1, "x": 10, "y": 10})):
+            _cudze(k2.narzedzie(nazwa, {**MOJE, **args}))
+        assert len(usluga.sterownik.wywolania) == przed               # nic z tego nie doszło do przeglądarki
+        assert not k2.narzedzie("hotkey", {**MOJE, "keys": ["ctrl", "z"]}).get("isError")
+        assert usluga.sterownik.wywolania[-1] == ("hotkey", {**MOJE, "keys": ["ctrl", "z"], "window_id": o2})
         k1.zamknij()
         _czekaj_na_sesje(usluga, 1)
-        assert not _klik(k2).get("isError")
+        assert len(usluga.sterownik.zwolnione) == 1 and usluga.sterownik.okna[o1] is None
+        assert _okno(k2) == o2
     finally:
         k1.zamknij()
         k2.zamknij()
@@ -641,77 +706,95 @@ def test_sesje_rownolegle_jedna_przy_ekranie(usluga):
     assert not usluga.wejscie.sesje
 
 
-def test_grupa_ekranu_jednego_procesu_dzieli_ekran(usluga):
-    """computer_use i narzędzie `komputer` jednego procesu Hermesa (ta sama JARVO_KOMPUTER_GRUPA w otoczeniu bramek)
-    nie odmawiają sobie `zajete`; sesja innego procesu nawet nie patrzy. Zły klucz grupy wejście pomija."""
+def test_grupa_ekranu_jednego_procesu_jedno_okno(usluga):
+    """computer_use i narzędzie `komputer` jednego zadania (ta sama JARVO_KOMPUTER_GRUPA w otoczeniu bramek) pracują
+    w jednym oknie; sesja innego procesu ma własne. Zły klucz grupy wejście pomija (sesja sama dla siebie)."""
     k1, k2, k3, k4 = (Klient(usluga.root, grupa="a" * 32), Klient(usluga.root, grupa="a" * 32),
                       Klient(usluga.root, grupa="b" * 32), Klient(usluga.root, grupa="za krótki"))
     try:
         assert not _klik(k1).get("isError") and not _klik(k2).get("isError")
-        assert [_patrz(k)["structuredContent"]["rule"] for k in (k3, k4)] == ["zajete", "zajete"]
+        okna = [_okno(k) for k in (k1, k2, k3, k4)]
+        assert okna[0] == okna[1] and len(set(okna)) == 3, okna
+        _cudze(_patrz(k3, window_id=okna[0]))
     finally:
         for k in (k1, k2, k3, k4):
             k.zamknij()
 
 
-def test_dwie_karty_z_kluczem_bramy_nie_dziela_ekranu(usluga):
+def test_dwie_karty_z_kluczem_bramy_w_osobnych_oknach(usluga):
     """16.11 22:23–22:35: karty t_87d11e3a i t_8a2f5f5e w osobnych pracownikach miały ten sam klucz grupy ekranu
-    (odziedziczony po bramie Hermesa), więc wejście liczyło je jak jedną sesję: przechodziły pod adresy naraz,
-    a paczka kroków jednej poszła w rejestrację otwartą przez drugą. Klucz ekranu ma teraz kartę: druga karta nie
-    przechodzi pod adres, nie puszcza paczki, nie patrzy i nie czeka na tekst, dopóki ekran ma pierwsza, a odmowa
-    mówi, która karta go ma i za ile się zwolni. computer_use i `komputer` tej samej karty dalej dzielą ekran;
-    ekran zwalnia koniec ostatniej sesji karty."""
+    (odziedziczony po bramie Hermesa) i działały na jednej karcie przeglądarki: paczka kroków jednej poszła
+    w rejestrację otwartą przez drugą. Klucz ma kartę, a każde zadanie własne okno: B przechodzi pod adres w swoim
+    oknie, gdy A pracuje w swoim, a okna A nie widzi; computer_use i `komputer` karty A dzielą okno; okno A zwalnia
+    koniec ostatniej sesji karty A."""
     brama = "p1-" + "b" * 32
     a, a2, b = (Klient(usluga.root, grupa=brama, karta="t_87d11e3a"),
                 Klient(usluga.root, grupa=brama, karta="t_87d11e3a"),
                 Klient(usluga.root, grupa=brama, karta="t_8a2f5f5e"))
-    zajete = wejscie_natywne.wejscie.ZAJETE_S
     try:
         assert not a.narzedzie("navigate", {"url": "https://accounts.google.com/signup"}).get("isError")
-        assert not _patrz(a2).get("isError")                          # computer_use tej samej karty
+        okno_a = usluga.sterownik.wywolania[-1][1]["window_id"]
+        assert _okno(a2) == okno_a                                    # computer_use tej samej karty
+        assert not b.narzedzie("navigate", {"url": "https://gotranscript.com/register"}).get("isError")
+        okno_b = usluga.sterownik.wywolania[-1][1]["window_id"]
+        assert okno_b != okno_a
+        assert not b.narzedzie("run_steps", {"steps": [{"click": {"text": "Dalej"}}]}).get("isError")
+        assert usluga.sterownik.wywolania[-1][1]["window_id"] == okno_b
         przed = len(usluga.sterownik.wywolania)
-        for nazwa, args in (("navigate", {"url": "https://gotranscript.com/register"}),
-                            ("run_steps", {"steps": [{"click": {"text": "Dalej"}}]}),
-                            ("get_window_state", OKNO), ("wait_for", {"text": "Utwórz konto"})):
-            w = b.narzedzie(nazwa, args)
-            sc = w["structuredContent"]
-            assert w["isError"] and sc["rule"] == "zajete" and sc["next_step"] == "wait_and_retry", (nazwa, sc)
-            assert sc["held_by"] == "karta t_87d11e3a" and 0 < sc["free_in_s"] <= zajete, sc
-            assert "karta t_87d11e3a" in sc["message"] and "zwolni się najpóźniej za" in sc["message"], sc
-        assert len(usluga.sterownik.wywolania) == przed               # nic od karty B nie doszło do przeglądarki
-        assert not a.narzedzie("run_steps", {"steps": [{"click": {"text": "Dalej"}}]}).get("isError")
+        for nazwa, args in (("get_window_state", {}), ("run_steps", {"steps": [{"click": {"text": "Dalej"}}]}),
+                            ("wait_for", {"text": "Utwórz konto"})):
+            _cudze(b.narzedzie(nazwa, {**args, "window_id": okno_a}))
+        assert len(usluga.sterownik.wywolania) == przed
         a.zamknij()                                                   # computer_use karty A dalej otwarte
         _czekaj_na_sesje(usluga, 2)
-        assert _patrz(b)["structuredContent"]["rule"] == "zajete"
-        a2.zamknij()                                                  # ostatnia sesja karty A: ekran wolny
+        assert not usluga.sterownik.zwolnione
+        a2.zamknij()                                                  # ostatnia sesja karty A: okno wolne
         _czekaj_na_sesje(usluga, 1)
-        assert not b.narzedzie("navigate", {"url": "https://gotranscript.com/register"}).get("isError")
+        assert usluga.sterownik.zwolnione == [("grupa", brama, "t_87d11e3a", None)]
     finally:
         for k in (a, a2, b):
             k.zamknij()
-    wpisy = [w for w in usluga.wejscie.dziennik.ostatnie if w.get("zasada") == "zajete"]
-    assert len(wpisy) == 5 and {w["przez"] for w in wpisy} == {"karta t_87d11e3a"}
+    assert not [w for w in usluga.wejscie.dziennik.ostatnie if w.get("zasada") == "zajete"]
+    assert len([w for w in usluga.wejscie.dziennik.ostatnie if w.get("zasada") == "cudze_okno"]) == 3
 
 
+# Pracownik Hermesa z wtyczką i computer_use: `tools.computer_use` udaje Hermesa tak, jak go owija wtyczka
+# (zwiaz_computer_use): `tool._get_backend(session_id)` uruchamia bramkę raz na sesję w wątku pętli (jak
+# _AsyncBridge) z otoczeniem z `cua_backend.cua_driver_child_env()` bez HERMES_KANBAN_* (scrub_kanban_env).
 _PRACOWNIK = """
-import importlib.util, itertools, json, os, subprocess, sys
+import importlib.util, itertools, json, os, subprocess, sys, threading, types
 s = importlib.util.spec_from_file_location("jarvo_komputer_pracownik", sys.argv[1])
 m = importlib.util.module_from_spec(s)
 s.loader.exec_module(m)
+tools, pakiet = types.ModuleType("tools"), types.ModuleType("tools.computer_use")
+cb, tool = types.ModuleType("tools.computer_use.cua_backend"), types.ModuleType("tools.computer_use.tool")
+def cua_driver_child_env(base_env=None):
+    return {**(os.environ if base_env is None else base_env), "CUA_DRIVER_RS_TELEMETRY_ENABLED": "0"}
+bramki = {}
+def _get_backend(session_id=""):
+    if session_id not in bramki:
+        wynik = {}
+        def petla():
+            env = {k: v for k, v in cb.cua_driver_child_env().items() if not k.startswith("HERMES_KANBAN_")}
+            wynik["p"] = subprocess.Popen(m._wywolanie_bramki(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                          env=env)
+        t = threading.Thread(target=petla)
+        t.start()
+        t.join()
+        bramki[session_id] = (wynik["p"], itertools.count(1))
+    return bramki[session_id]
+cb.cua_driver_child_env, tool._get_backend = cua_driver_child_env, _get_backend
+pakiet.cua_backend, pakiet.tool, tools.computer_use = cb, tool, pakiet
+sys.modules.update({"tools": tools, "tools.computer_use": pakiet, "tools.computer_use.cua_backend": cb,
+                    "tools.computer_use.tool": tool})
 m.register(type("Ctx", (), {"register_tool": lambda self, **kw: None})())   # Hermes ładuje wtyczki na starcie
-cu, n = None, itertools.count(1)
 for linia in sys.stdin:
     polecenie = json.loads(linia)
+    sesja = polecenie.pop("sesja", "rozmowa")
     if "cu" not in polecenie:                                   # narzędzie `komputer`
-        odp = m.obsluz(polecenie, session_id="rozmowa")
+        odp = m.obsluz(polecenie, session_id=sesja)
     else:                                                       # computer_use Hermesa
-        if cu is None:   # bramka przy pierwszym computer_use; otoczenie jak cua_driver_child_env + scrub_kanban_env
-            env = {k: v for k, v in os.environ.items() if k not in (
-                "HERMES_KANBAN_TASK", "HERMES_KANBAN_RUN_ID", "HERMES_KANBAN_CLAIM_LOCK",
-                "HERMES_KANBAN_GOAL_MODE", "HERMES_KANBAN_GOAL_MAX_TURNS")}
-            env.update(HERMES_DELEGATED_CHILD_CONTEXT=os.environ.get("HERMES_HOME", "/tmp"),
-                       CUA_DRIVER_RS_TELEMETRY_ENABLED="0")
-            cu = subprocess.Popen(m._wywolanie_bramki(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=env)
+        cu, n = tool._get_backend(session_id=sesja)
         ident = next(n)
         cu.stdin.write((json.dumps({"jsonrpc": "2.0", "id": ident, "method": "tools/call", "params": {
             "name": polecenie["cu"], "arguments": polecenie.get("args") or {}}}) + "\\n").encode())
@@ -720,7 +803,7 @@ for linia in sys.stdin:
             pass
         odp = msg.get("result") or {}
     print(json.dumps({"grupa": os.environ["JARVO_KOMPUTER_GRUPA"], "odp": odp}), flush=True)
-if cu is not None:
+for cu, _ in bramki.values():
     cu.stdin.close()
     cu.wait(20)
 """
@@ -729,7 +812,8 @@ if cu is not None:
 @pytest.fixture
 def pracownicy(usluga, tmp_path, monkeypatch):
     """Brama Hermesa z wtyczką (klucz grupy ekranu w jej otoczeniu) i fabryka pracowników kart: proces z kopią tego
-    otoczenia i kartą (jak _default_spawn), wtyczka ładowana na starcie, computer_use przez bramkę na żądanie."""
+    otoczenia i kartą (jak _default_spawn; pusta karta: proces bramy z rozmowami panelu), wtyczka ładowana na
+    starcie, computer_use przez bramkę na żądanie."""
     monkeypatch.delenv("JARVO_KOMPUTER_GNIAZDO", raising=False)
     monkeypatch.setenv("JARVO_ROOT", str(usluga.root))
     monkeypatch.setenv("JARVO_KOMPUTER_GRUPA", "do-zastapienia-przez-brame")
@@ -741,7 +825,9 @@ def pracownicy(usluga, tmp_path, monkeypatch):
     procesy: list[subprocess.Popen] = []
 
     def pracownik(karta: str) -> subprocess.Popen:
-        env = {**os.environ, "HERMES_KANBAN_TASK": karta, "HERMES_KANBAN_BOARD": "default"}   # jak _default_spawn
+        env = {k: v for k, v in os.environ.items() if not k.startswith("HERMES_KANBAN_")}
+        if karta:
+            env.update(HERMES_KANBAN_TASK=karta, HERMES_KANBAN_BOARD="default")   # jak _default_spawn
         p = subprocess.Popen([sys.executable, "-I", "-c", _PRACOWNIK, str(REPO / "komputer" / "plugin" /
                                                                           "__init__.py")],
                              stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
@@ -768,105 +854,106 @@ def _do_pracownika(p: subprocess.Popen, polecenie: dict) -> dict:
     return json.loads(linia)
 
 
-def test_karty_w_osobnych_pracownikach_nie_steruja_ekranem_naraz(usluga, pracownicy):
+def _okno_odp(tekst: str) -> int:
+    assert tekst.startswith("ok: okno "), tekst
+    return int(tekst.split()[2])
+
+
+def test_karty_w_osobnych_pracownikach_kazda_we_wlasnym_oknie(usluga, pracownicy):
     """Incydent 16.11 od początku do końca: brama Hermesa ładuje wtyczkę (klucz grupy ekranu w jej otoczeniu),
-    dispatcher kanbana daje pracownikom kart kopię tego otoczenia, każdy pracownik ma wtyczkę i bramkę. Pracownik
-    karty B dostaje przy `idz`, `kroki`, `patrz` i `czekaj` odmowę z kartą A i czasem do zwolnienia, a przeglądarka
-    nic od niego nie dostaje; po końcu pracownika A ekran jest wolny."""
+    dispatcher kanbana daje pracownikom kart kopię tego otoczenia, każdy pracownik ma wtyczkę i bramkę. Karta B
+    przechodzi pod adres, puszcza kroki, patrzy i czeka we własnym oknie, a okno karty A zostaje nietknięte."""
     a, b = pracownicy("t_87d11e3a"), pracownicy("t_8a2f5f5e")
     odp_a = _do_pracownika(a, {"akcja": "idz", "adres": "https://accounts.google.com/signup"})
-    assert odp_a["odp"].startswith("ok: okno"), odp_a
-    przed = len(usluga.sterownik.wywolania)
-    for args in ({"akcja": "idz", "adres": "https://gotranscript.com/register"},
-                 {"akcja": "kroki", "kroki": [{"type_text": {"name": "E-mail", "text": "jarvo@example.com"}}]},
+    okno_a = _okno_odp(odp_a["odp"])
+    odp_b = _do_pracownika(b, {"akcja": "idz", "adres": "https://gotranscript.com/register"})
+    okno_b = _okno_odp(odp_b["odp"])
+    assert okno_a != okno_b
+    for args in ({"akcja": "kroki", "kroki": [{"type_text": {"name": "E-mail", "text": "jarvo@example.com"}}]},
                  {"akcja": "patrz"}, {"akcja": "czekaj", "tekst": "Utwórz konto"}):
-        odp_b = _do_pracownika(b, args)
-        tekst = odp_b["odp"]
-        assert tekst.startswith("BŁĄD zablokowane: Komputer Jarva: ekran ma teraz inna sesja Jarva "
-                                "(karta t_87d11e3a"), (args, tekst)
-        assert "zwolni się najpóźniej za" in tekst and "Dalej: odczekaj" in tekst, tekst
-    assert len(usluga.sterownik.wywolania) == przed
+        przed = len(usluga.sterownik.wywolania)
+        _do_pracownika(b, args)
+        assert {w[1].get("window_id") for w in usluga.sterownik.wywolania[przed:]} == {okno_b}, args
     assert len({pracownicy.brama, odp_a["grupa"], odp_b["grupa"]}) == 3      # każdy proces ma własny klucz grupy
     assert "„Dodaj do koszyka”" in _do_pracownika(a, {"akcja": "patrz"})["odp"]
-    a.stdin.close()
-    a.wait(timeout=30)                                            # koniec pracownika A kończy jego rozmowę
-    _czekaj_na_sesje(usluga, 1)
-    assert _do_pracownika(b, {"akcja": "idz", "adres": "https://gotranscript.com/register"})["odp"].startswith(
-        "ok: okno")
+    assert usluga.sterownik.wywolania[-1][1]["window_id"] == okno_a
+    assert _do_pracownika(b, {"akcja": "patrz", "okno": okno_a})["odp"].startswith("BŁĄD zablokowane: Komputer Jarva: "
+                                                                                    "to okno przeglądarki należy do "
+                                                                                    "innego zadania agenta")
 
 
-def test_computer_use_i_komputer_jednej_karty_dziela_ekran(usluga, pracownicy):
+def test_computer_use_i_komputer_jednej_karty_jedno_okno(usluga, pracownicy):
     """17.11 00:25 karta t_8a8a79ab (jeden pracownik): `komputer` idz przeszło, a computer_use tej samej karty
-    9 s później dostał `zajete` „ekran ma inna sesja (karta t_8a8a79ab)” już na list_windows. Hermes buduje otoczenie
-    bramki computer_use bez HERMES_KANBAN_* (scrub_kanban_env), więc ta sesja nie miała karty i jej klucz ekranu był
-    inny niż sesji wtyczki. Kolejność jak na żywo: wtyczka przy starcie pracownika, idz, potem pierwsze computer_use
-    (start_session, set_config, kursor, list_windows, zrzut). Inna karta dalej nie dostaje ekranu, także gdy ma go
-    computer_use, a odmowa nazywa kartę."""
+    dostał `zajete` od własnego narzędzia, bo Hermes buduje otoczenie bramki computer_use bez HERMES_KANBAN_*.
+    Kolejność jak na żywo: wtyczka przy starcie pracownika, idz, potem pierwsze computer_use (start_session,
+    set_config, kursor, list_windows, zrzut): computer_use widzi to samo jedno okno co `komputer`. computer_use
+    innej karty widzi w list_windows tylko swoje okno."""
     a, b = pracownicy("t_8a8a79ab"), pracownicy("t_8a2f5f5e")
-    assert _do_pracownika(a, {"akcja": "idz", "adres": "https://www.oneforma.com/"})["odp"].startswith("ok: okno")
+    okno_a = _okno_odp(_do_pracownika(a, {"akcja": "idz", "adres": "https://www.oneforma.com/"})["odp"])
     for nazwa, args in (("start_session", {}), ("set_config", {"capture_mode": "som"}),
                         ("set_agent_cursor_enabled", {"enabled": True}), ("list_windows", {}),
-                        ("get_window_state", OKNO)):
+                        ("get_window_state", {"pid": PID})):
         w = _do_pracownika(a, {"cu": nazwa, "args": args})["odp"]
         assert not w.get("isError"), (nazwa, w)
+    assert [o["window_id"] for o in _do_pracownika(a, {"cu": "list_windows"})["odp"]["structuredContent"][
+        "windows"]] == [okno_a]
     assert "„Dodaj do koszyka”" in _do_pracownika(a, {"akcja": "patrz"})["odp"]   # i z powrotem do wtyczki
-    w = _do_pracownika(b, {"cu": "list_windows"})["odp"]
-    sc = w["structuredContent"]
-    assert sc["rule"] == "zajete" and sc["held_by"] == "karta t_8a8a79ab", sc
-    assert not _do_pracownika(a, {"cu": "get_window_state", "args": OKNO})["odp"].get("isError")
-    tekst = _do_pracownika(b, {"akcja": "patrz"})["odp"]              # ekran ma computer_use karty A
-    assert tekst.startswith("BŁĄD zablokowane: Komputer Jarva: ekran ma teraz inna sesja Jarva (karta t_8a8a79ab"), \
-        tekst
-    zajete = [w for w in usluga.wejscie.dziennik.ostatnie if w.get("zasada") == "zajete"]
-    assert len(zajete) == 2 and {w["przez"] for w in zajete} == {"karta t_8a8a79ab"}
-    karty = {s.nr: s.karta for s in list(usluga.wejscie.sesje)}
-    assert sorted(karty.values()) == ["t_8a2f5f5e"] * 2 + ["t_8a8a79ab"] * 2, karty   # wtyczka i computer_use
+    okna_b = _do_pracownika(b, {"cu": "list_windows"})["odp"]["structuredContent"]["windows"]
+    assert len(okna_b) == 1 and okna_b[0]["window_id"] != okno_a, okna_b
+    _cudze(_do_pracownika(b, {"cu": "get_window_state", "args": {"pid": PID, "window_id": okno_a}})["odp"])
+    karty = {s.nr: (s.karta, s.rozmowa) for s in list(usluga.wejscie.sesje)}
+    assert sorted(k for k, _ in karty.values()) == ["t_8a2f5f5e"] + ["t_8a8a79ab"] * 2, karty   # B: sam computer_use
+    assert len({r for _, r in karty.values()}) == 1                   # ta sama rozmowa w obu pracownikach
 
 
-def test_ekran_po_ciszy_przechodzi_a_karta_wraca_od_patrzenia(usluga, monkeypatch):
-    """Ekran zwalnia też cisza karty (ZAJETE_S bez wywołań). Karta, której inna zabrała ekran, nie puszcza kroków na
-    stronę, której nie widziała (16.11: paczka trafiła w cudzą rejestrację): najpierw patrz albo idz."""
-    a, b = (Klient(usluga.root, grupa="a" * 32, karta="t_87d11e3a"),
-            Klient(usluga.root, grupa="b" * 32, karta="t_8a2f5f5e"))
-    paczka = {"steps": [{"click": {"text": "Dalej"}}]}
-    try:
-        assert not _patrz(a).get("isError") and not a.narzedzie("run_steps", paczka).get("isError")
-        assert _patrz(b)["structuredContent"]["rule"] == "zajete"
-        monkeypatch.setattr(wejscie_natywne.wejscie, "ZAJETE_S", 0)   # karta A milczy dłużej niż ZAJETE_S
-        assert not b.narzedzie("navigate", {"url": "https://gotranscript.com/register"}).get("isError")
-        przed = len(usluga.sterownik.wywolania)
-        w = a.narzedzie("run_steps", paczka)
-        sc = w["structuredContent"]
-        assert sc["rule"] == "ekran_zmieniony" and sc["next_step"] == "fresh_state" and "karta t_8a2f5f5e" in sc[
-            "message"], sc
-        assert len(usluga.sterownik.wywolania) == przed               # paczka nie doszła do przeglądarki
-        assert a.narzedzie("run_steps", paczka)["structuredContent"]["rule"] == "ekran_zmieniony"
-        assert not _patrz(a).get("isError") and not a.narzedzie("run_steps", paczka).get("isError")
-        assert not _klik(b).get("isError")                            # karta B patrzy od nowa i działa
-    finally:
-        a.zamknij()
-        b.zamknij()
+def test_dwie_rozmowy_panelu_jednej_bramy_w_osobnych_oknach(usluga, pracownicy):
+    """27.11 ok. 05:30: rozmowy panelu C1 (edytor HQ) i W1 (oferty OLX) w jednym procesie bramy Hermesa miały ten
+    sam klucz grupy ekranu i żadnej karty, więc wejście liczyło je jak jedno zadanie: `computer_use hotkey ctrl+z`
+    w C1 dał paragon ze strony OLX z W1, a `capture` C1 widział kartę W1. Wtyczka dokłada teraz rozmowę Hermesa
+    do klucza bramek (komputer i computer_use, zwiaz_computer_use): każda rozmowa ma własne okno, klawisze,
+    zrzut, klik w punkt i nawigacja jednej nie ruszają okna drugiej, a computer_use i `komputer` jednej rozmowy
+    dzielą okno."""
+    brama = pracownicy("")                                         # proces bramy: rozmowy panelu bez karty
+    c1, w1 = "w_001a21b31b2d12bff7794", "w_001a21b41b7cdae1c91a6"
+    okno_c1 = _okno_odp(_do_pracownika(brama, {"akcja": "idz", "adres": "https://hq.jarvo.test/edytor",
+                                                "sesja": c1})["odp"])
+    okno_w1 = _okno_odp(_do_pracownika(brama, {"akcja": "idz", "adres": "https://www.olx.pl/d/oferta/rower",
+                                                "sesja": w1})["odp"])
+    assert okno_c1 != okno_w1
+    st = usluga.sterownik
+    for sesja, okno in ((c1, okno_c1), (w1, okno_w1)):
+        assert [o["window_id"] for o in _do_pracownika(brama, {"cu": "list_windows", "sesja": sesja})["odp"][
+            "structuredContent"]["windows"]] == [okno]
+        przed = len(st.wywolania)
+        for nazwa, args in (("get_window_state", {"pid": PID}), ("hotkey", {"pid": PID, "keys": ["ctrl", "z"]}),
+                            ("hotkey", {"pid": PID, "keys": ["ctrl", "l"]}), ("get_desktop_state", {"pid": PID})):
+            _do_pracownika(brama, {"cu": nazwa, "args": args, "sesja": sesja})
+        assert {w[1].get("window_id") for w in st.wywolania[przed:]} == {okno}, st.wywolania[przed:]
+        assert ("hotkey", {"pid": PID, "keys": ["ctrl", "z"], "window_id": okno}) in st.wywolania[przed:]
+    _cudze(_do_pracownika(brama, {"cu": "hotkey", "args": {"pid": PID, "window_id": okno_w1, "keys": ["ctrl", "z"]},
+                                  "sesja": c1})["odp"])
+    _cudze(_do_pracownika(brama, {"cu": "get_window_state", "args": {"pid": PID, "window_id": okno_c1},
+                                  "sesja": w1})["odp"])
+    zadania = {}
+    for s in list(usluga.wejscie.sesje):
+        zadania.setdefault(s.klucz_ekranu, []).append(s.nr)
+    assert len(zadania) == 2 and all(len(n) == 2 for n in zadania.values()), zadania   # komputer + computer_use
+    assert not [w for w in usluga.wejscie.dziennik.ostatnie if w.get("zasada") == "zajete"]
 
 
-def test_oddanie_ekranu_wlascicielowi_trzyma_ekran_karty(usluga, monkeypatch):
-    """Skill oddaj-ekran: karta prosi właściciela o krok (pauza od floty) i czeka. Pauza nie liczy się do ciszy
-    karty: inna karta nie weźmie ekranu ani w trakcie, ani zaraz po wznowieniu (karta ma jeszcze ZAJETE_S s, żeby
-    wrócić do strony po kroku właściciela)."""
-    monkeypatch.setattr(wejscie_natywne.wejscie, "ZAJETE_S", 1.0)
+def test_pauza_wstrzymuje_kazde_zadanie_a_patrzec_wolno(usluga):
+    """Skill oddaj-ekran: karta prosi właściciela o krok (pauza od floty) i czeka. Przy pauzie żadne zadanie nie
+    działa, ale każde patrzy na swoje okno; po wznowieniu obie karty działają dalej, każda w swoim oknie."""
     adres = kanal.adres(usluga.root, "ster")
     a, b = Klient(usluga.root, grupa="a" * 32, karta="t_a"), Klient(usluga.root, grupa="b" * 32, karta="t_b")
     try:
         assert not a.narzedzie("navigate", {"url": "https://sklep.example/logowanie"}).get("isError")
         assert kanal.zapytaj(adres, {"polecenie": "pauza", "powod": "Zaloguj się do sklepu i daj znać"})["wstrzymane"]
-        time.sleep(1.1)                                              # pauza dłuższa niż ZAJETE_S
-        sc = _patrz(b)["structuredContent"]
-        assert sc["rule"] == "zajete" and "wstrzymany" in sc["message"] and "free_in_s" not in sc, sc
-        assert not _patrz(a).get("isError")                          # karta A patrzy przy pauzie
-        time.sleep(1.1)
+        assert not _patrz(b).get("isError") and not _patrz(a).get("isError")
+        assert b.narzedzie("navigate", {"url": "https://www.olx.pl/"})["structuredContent"]["code"] == "wstrzymane"
         assert kanal.zapytaj(adres, {"polecenie": "wznow", "token": usluga.token})["wstrzymane"] is False
-        assert _patrz(b)["structuredContent"]["rule"] == "zajete"    # po wznowieniu ekran jeszcze karty A
-        time.sleep(1.1)
-        assert not _patrz(b).get("isError")                          # cisza karty A po wznowieniu: ekran wolny
+        assert not b.narzedzie("navigate", {"url": "https://www.olx.pl/"}).get("isError")
+        assert not _klik(a).get("isError") and _okno(a) != _okno(b)
     finally:
         a.zamknij()
         b.zamknij()

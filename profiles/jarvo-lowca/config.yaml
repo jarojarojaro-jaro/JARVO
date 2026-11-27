@@ -64,8 +64,9 @@ approvals:
     - "* | sh"
     - "* | bash"
 
+# pliki instrukcji (AGENTS.md, CLAUDE.md…) ocenia wtyczka jarvo-zgody: bramka Hermesa pyta zawsze i czekała 300 s (27.11)
 security:
-  protected_instruction_files: true
+  protected_instruction_files: false
 
 display:
   skin: jarvo

@@ -19,12 +19,16 @@ zasady:
              `obserwuj` dokłada migawkę po ostatnim kroku (z `*` przy nowych elementach),
   czekaj     wait_for: tekst, jego zniknięcie albo adres, do 30 s, liczone w sterowniku.
 Rozmowa trwa na sesję Hermesa (snapshot_id ostatniego `patrz` dokłada się do `kroki`) i kończy się po BEZCZYNNOSC s
-bez wywołań. Ekran: wejście daje go jednej sesji naraz (patrzenie i działanie; inna dostaje `zajete` z kartą, która ma
-ekran, i czasem do zwolnienia, najdłużej 120 s od jej ostatniego wywołania), ale wtyczka ustawia w procesie Hermesa
-klucz grupy ekranu (JARVO_KOMPUTER_GRUPA), który dziedziczą bramki computer_use, i bramka podaje go wejściu razem
-z kartą kanbana: computer_use i `komputer` jednego procesu agenta liczą się jak jedna sesja. Klucz zaczyna się od PID
-procesu, który go ustawił: pracownik karty kanbana dostaje otoczenie bramy Hermesa (z jej kluczem), więc tu bierze
-własny (16.11 dwie karty z kluczem bramy sterowały ekranem naraz).
+bez wywołań. Ekran: każde zadanie agenta (rozmowa Hermesa, karta kanbana) ma natywnie własne okno przeglądarki,
+a w kontenerze dostaje ekran jedno naraz (inne: `zajete` z tym, kto ma ekran, czasem do zwolnienia i miejscem
+w kolejce). Zadanie rozpoznaje wejście po kluczu: grupa ekranu procesu (JARVO_KOMPUTER_GRUPA, klucz z PID procesu:
+pracownik karty kanbana dostaje otoczenie bramy Hermesa z jej kluczem, więc tu bierze własny; 16.11 dwie karty
+z kluczem bramy sterowały ekranem naraz), karta kanbana (JARVO_KOMPUTER_KARTA) i rozmowa (JARVO_KOMPUTER_ROZMOWA:
+skrót id sesji Hermesa). Bramki tej wtyczki dostają rozmowę wprost, a bramki computer_use przez `zwiaz_computer_use`:
+Hermes uruchamia bramkę computer_use raz na sesję w `_get_backend(session_id)`, z otoczeniem z
+`cua_driver_child_env()` w wątku swojej pętli, więc wtyczka owija oba i dokłada rozmowę tej sesji (27.11 dwie
+rozmowy panelu w jednym procesie bramy działały na jednej karcie: `ctrl+z` w edytorze HQ dał paragon ze strony OLX).
+Bez rozmowy (Hermes bez tych funkcji) klucz jest jak dotąd: grupa i karta.
 
 build.py kopiuje wtyczkę do plugins/jarvo-komputer, install-fleet.sh dowiązuje ją w profilach z `komputer: true`.
 
@@ -52,6 +56,8 @@ STER = os.path.join(os.path.dirname(os.environ.get("JARVO_KOMPUTER_GNIAZDO", "/o
                     "ster.sock")
 GRUPA_ENV = "JARVO_KOMPUTER_GRUPA"        # grupa ekranu procesu (komputer/jarvo_cua.py, infra/komputer/wejscie.py)
 KARTA_EKRANU_ENV = "JARVO_KOMPUTER_KARTA" # karta kanbana procesu dla klucza ekranu (przeżywa scrub Hermesa)
+ROZMOWA_ENV = "JARVO_KOMPUTER_ROZMOWA"    # rozmowa Hermesa (skrót id sesji) dla klucza ekranu bramki
+ZNACZNIK = "_jarvo_rozmowa"               # owinięta funkcja Hermesa (zwiaz_computer_use raz na proces)
 BEZCZYNNOSC = 300.0                       # s bez wywołania: rozmowa z wejściem się kończy (sesja i ekran wolne)
 CZASY = {"patrz": 60.0, "idz": 60.0, "czekaj": 45.0, "kroki": 150.0}   # s na odpowiedź wejścia
 DOMYSLNIE_ELEMENTOW = 150
@@ -144,7 +150,8 @@ SCHEMAT: Dict[str, Any] = {
             "adres": {"type": "string", "description": (
                 "Dla akcja=idz: pełny adres http(s). Dla akcja=czekaj: fragment adresu karty albo wzór z *, na "
                 "który czekasz.")},
-            "okno": {"type": "integer", "description": "Numer karty (window_id); bez niego aktywna karta."},
+            "okno": {"type": "integer", "description": "Numer karty (window_id) z Twoich okien; bez niego Twoja "
+                                                       "aktywna karta (każda rozmowa i karta kanbana ma własne okno)."},
             "maks": {"type": "integer", "description": (
                 f"Dla patrz i obserwuj: ile elementów (domyślnie {DOMYSLNIE_ELEMENTOW}, najwyżej {MAKS_ELEMENTOW}).")},
             "kroki": {"type": "array", "maxItems": 20, "items": {"type": "object"}, "description": (
@@ -237,6 +244,62 @@ def grupa_ekranu() -> str:
     return klucz
 
 
+def rozmowa_sesji(session_id: Any) -> str:
+    """Rozmowa Hermesa w kluczu ekranu: skrót id sesji (16 znaków szesnastkowych, id nie wychodzi z procesu);
+    pusty bez sesji (wtedy klucz jak dotąd: grupa procesu i karta)."""
+    sid = str(session_id or "")
+    return hashlib.sha256(sid.encode("utf-8")).hexdigest()[:16] if sid else ""
+
+
+_START: Dict[str, Any] = {}               # rozmowa i wątek wywołania `_get_backend` w toku (start bramki computer_use)
+_START_LOCK = threading.Lock()
+_ROZMOWA_WATKU: Dict[int, str] = {}       # wątek pętli bramki computer_use -> jej rozmowa (restart transportu)
+
+
+def zwiaz_computer_use() -> bool:
+    """Rozmowa Hermesa w otoczeniu bramek computer_use (JARVO_KOMPUTER_ROZMOWA). Hermes uruchamia bramkę raz na
+    sesję w `tool._get_backend(session_id)` (pod swoją blokadą, czekając, aż bramka odpowie), a otoczenie bierze
+    z `cua_backend.cua_driver_child_env()` w wątku pętli tej bramki (także przy restarcie transportu). Owijamy
+    oba: `_get_backend` podaje rozmowę sesji na czas startu, a otoczenie zapamiętuje ją dla wątku pętli bramki.
+    True, gdy owinięte (także wcześniej); False bez computer_use w Hermesie."""
+    try:
+        from tools.computer_use import cua_backend, tool
+    except Exception:  # noqa: BLE001 - Hermes bez computer_use albo w innej wersji: klucz bez rozmowy
+        return False
+    if getattr(tool._get_backend, ZNACZNIK, False):
+        return True
+    get_backend, child_env = tool._get_backend, cua_backend.cua_driver_child_env
+
+    def _get_backend(session_id: str = ""):
+        with _START_LOCK:
+            _START.update(rozmowa=rozmowa_sesji(session_id), watek=threading.get_ident())
+            try:
+                return get_backend(session_id=session_id)
+            finally:
+                _START.clear()
+
+    def cua_driver_child_env(base_env=None):
+        env = child_env(base_env)
+        watek = threading.get_ident()
+        rozmowa = _START.get("rozmowa")
+        if rozmowa is not None and _START.get("watek") != watek:     # pętla bramki startowanej teraz
+            if len(_ROZMOWA_WATKU) > 256:
+                _ROZMOWA_WATKU.clear()
+            _ROZMOWA_WATKU[watek] = rozmowa
+        else:
+            rozmowa = _ROZMOWA_WATKU.get(watek, "")
+        if rozmowa:
+            env[ROZMOWA_ENV] = rozmowa
+        else:
+            env.pop(ROZMOWA_ENV, None)
+        return env
+
+    setattr(_get_backend, ZNACZNIK, True)
+    setattr(cua_driver_child_env, ZNACZNIK, True)
+    tool._get_backend, cua_backend.cua_driver_child_env = _get_backend, cua_driver_child_env
+    return True
+
+
 class BrakBramki(RuntimeError):
     pass
 
@@ -261,9 +324,13 @@ def _wywolanie_bramki() -> List[str]:
 class _Klient:
     """Jedna rozmowa MCP z wejściem Komputera przez bramkę (proces `bramka mcp` na sesję Hermesa)."""
 
-    def __init__(self, polecenie: List[str]) -> None:
+    def __init__(self, polecenie: List[str], rozmowa: str = "") -> None:
+        env = dict(os.environ)
+        env.pop(ROZMOWA_ENV, None)
+        if rozmowa:
+            env[ROZMOWA_ENV] = rozmowa                # ta sama rozmowa co bramki computer_use tej sesji Hermesa
         self.p = subprocess.Popen(polecenie, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                  env=dict(os.environ))
+                                  env=env)
         self.lock = threading.Lock()                  # jedno wywołanie naraz (kroki oceniają stronę po poprzednich)
         self.ostatnio = time.monotonic()
         self.migawka: Optional[str] = None            # snapshot_id ostatniego `patrz` albo obserwacji `kroki`
@@ -370,7 +437,7 @@ def _zamknij_wszystkie() -> None:
 atexit.register(_zamknij_wszystkie)
 
 
-def _klient(klucz: str) -> _Klient:
+def _klient(klucz: str, rozmowa: str = "") -> _Klient:
     grupa_ekranu()
     if not _SPRZATACZ:
         _SPRZATACZ.append(threading.Thread(target=_petla_sprzatania, daemon=True, name="jarvo-komputer-sprzatanie"))
@@ -379,7 +446,7 @@ def _klient(klucz: str) -> _Klient:
     with _KLIENCI_LOCK:
         c = _KLIENCI.get(klucz)
         if c is None or not c.zyje():
-            c = _KLIENCI[klucz] = _Klient(_wywolanie_bramki())
+            c = _KLIENCI[klucz] = _Klient(_wywolanie_bramki(), rozmowa)
         return c
 
 
@@ -515,7 +582,7 @@ def obsluz(args: Dict[str, Any], **kontekst: Any) -> str:
     if akcja in CZASY:
         klucz = str(kontekst.get("session_id") or kontekst.get("task_id") or "")
         try:
-            c = _klient(klucz)
+            c = _klient(klucz, rozmowa_sesji(kontekst.get("session_id")))
         except (BrakBramki, OSError) as e:
             return f"BŁĄD komputer: {e}"
         with c.lock:
@@ -552,6 +619,7 @@ def obsluz(args: Dict[str, Any], **kontekst: Any) -> str:
 
 def register(ctx) -> None:
     grupa_ekranu()                    # przed pierwszym computer_use: jego bramki dziedziczą klucz z otoczenia
+    zwiaz_computer_use()              # i rozmowę swojej sesji Hermesa (okno Komputera na rozmowę)
     ctx.register_tool(name="komputer", toolset="komputer", schema=SCHEMAT, handler=obsluz, emoji="🖥️",
                       description="Komputer Jarva: strony (idz, patrz, kroki, czekaj), stan, dziennik twardych zasad, "
                                   "oddanie ekranu właścicielowi")

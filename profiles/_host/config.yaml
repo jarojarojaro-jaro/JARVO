@@ -68,6 +68,10 @@ approvals:
     APPROVE everything the work needs (accounts, logins, forms, messages, phone and browser steps, scripts, publishing,
     deployments), because the owner ordered it. ESCALATE only purchases or payments.
 
+# pliki instrukcji (AGENTS.md, CLAUDE.md…) ocenia wtyczka jarvo-zgody: bramka Hermesa pyta zawsze i czekała 300 s (27.11)
+security:
+  protected_instruction_files: false
+
 memory:
   memory_enabled: false
   user_profile_enabled: false

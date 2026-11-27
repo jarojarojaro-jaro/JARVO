@@ -9,7 +9,10 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import subprocess
 import sys
+import time
+import types
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -77,6 +80,9 @@ def sr(tmp_path, monkeypatch):
     monkeypatch.setattr(z, "_yolo", lambda: False)
     monkeypatch.setattr(z, "_hermes_niebezpieczne", lambda polecenie: False)
     monkeypatch.setattr(z, "_hermes_dozwolone_na_stale", lambda polecenie: False)
+    monkeypatch.setattr(z, "_hermes_pyta_o_zapis", lambda sciezka: False)
+    monkeypatch.setattr(z, "_hermes_zapyta", lambda narzedzie, tresc: None)    # Hermes nie da tego strażnikowi smart
+    monkeypatch.setattr(z, "_PRZEPUSZCZONE", type(z._PRZEPUSZCZONE)())
     monkeypatch.setattr(z, "_hermes_pyta_o_instrukcje", lambda sciezka, task_id: False)
     monkeypatch.setattr(z, "_hermes_odmowi_zapisu", lambda sciezka: False)
     monkeypatch.setattr(z, "_hermes_pyta_o_kod", lambda: False)
@@ -236,10 +242,11 @@ def test_straznik_rutyn_bez_prob_i_kopii(sr, monkeypatch):
 
 
 def test_tryb_auto_zostawia_strazniki(sr, monkeypatch):
+    """Decyzja właściciela 27.11: w auto pytamy tylko o płatność; chronione miejsca przechodzą, niszczenie blokujemy."""
     ustaw_tryb(monkeypatch, "auto")
     assert akcja(hak("write_file", path=str(sr.home / "config.yaml"), content="x")) == "block"   # config Hermesa
-    assert akcja(hak("write_file", path=str(sr.proj / "SOUL.md"), content="x")) == "approve"     # plik instrukcji
-    assert akcja(hak("terminal", command=f"echo x >> '{sr.proj / '.git' / 'config'}'")) == "approve"
+    assert hak("write_file", path=str(sr.proj / "SOUL.md"), content="x") is None                 # plik instrukcji
+    assert hak("terminal", command=f"echo x >> '{sr.proj / '.git' / 'config'}'") is None
     assert akcja(hak("terminal", command=f"rm -rf '{sr.dom}'")) == "block"                        # strażnik kasowania
     # telefon w rozmowie: zwykłe potwierdzenie przechodzi, płatność i usunięcie konta dalej pyta
     assert hak("mcp__phone__act", phone="first", cmd="tap", args={"text": "Continue"}, confirm=True) is None
@@ -249,8 +256,8 @@ def test_tryb_auto_zostawia_strazniki(sr, monkeypatch):
 
 def test_tryb_auto_brudnopis_i_home_profilu_bez_prosb(sr, monkeypatch):
     """14.11 12:52 i 12:56: właściciel klikał zgody na zapis cache/scratch/gpu_audyt.py w profilu Jarva („no limits,
-    tylko security, nie normalna praca”). Katalogi robocze Hermesa przechodzą; sekrety dalej pytają, wtyczki i skille
-    blokuje strażnik kodu floty (test niżej)."""
+    tylko security, nie normalna praca”). Katalogi robocze Hermesa przechodzą, a od 27.11 w auto także reszta danych
+    Jarva (klucze odrzuca sam Hermes, agent/file_safety.py); wtyczki i skille blokuje strażnik kodu floty (test niżej)."""
     ustaw_tryb(monkeypatch, "auto")
     for rel in ("cache/scratch/gpu_audyt.py", "home/notatki.txt", "workspace/a.md", "plans/plan.md"):
         (sr.home / rel).parent.mkdir(parents=True, exist_ok=True)
@@ -258,7 +265,7 @@ def test_tryb_auto_brudnopis_i_home_profilu_bez_prosb(sr, monkeypatch):
     (sr.dane / "profiles" / "jarvo-web" / "cache").mkdir(parents=True)
     assert hak("write_file", path=str(sr.dane / "profiles" / "jarvo-web" / "cache" / "x.py"), content="x") is None
     assert hak("terminal", command=f"python3 a.py > '{sr.home / 'cache' / 'scratch' / 'wynik.json'}'") is None
-    assert akcja(hak("write_file", path=str(sr.home / ".env"), content="x")) == "approve"
+    assert hak("write_file", path=str(sr.home / ".env"), content="x") is None
     for rel in ("plugins/jarvo-zgody/__init__.py", "skills/x/SKILL.md"):
         (sr.home / rel).parent.mkdir(parents=True, exist_ok=True)
         assert akcja(hak("write_file", path=str(sr.home / rel), content="x")) == "block", rel
@@ -527,7 +534,8 @@ def test_kod_floty_nie_rusza_legalnych_drog(sr, monkeypatch):
         assert hak("write_file", path=str(sr.misje / "DLA-CLAUDE.md"), content="- [ ] x\n") is None
         assert hak("patch", path=str(sr.misje / "Z-1" / "MISSION.md"), old_string="a", new_string="b") is None
         assert hak("write_file", path=str(sr.wiedza / "fleet" / "arsenal.md"), content="x") is None
-        assert akcja(hak("write_file", path=str(sr.home / "memories" / "MEMORY.md"), content="x")) == "approve"
+        pamiec = hak("write_file", path=str(sr.home / "memories" / "MEMORY.md"), content="x")
+        assert akcja(pamiec) == ("approve" if tryb == "projekt" else None), (tryb, pamiec)   # auto: decyzja 27.11
         assert hak("skill_manage", action="create", name="x", content="---\nname: x\n---\n") is None
     # poczekalnia skilli: zatwierdzenie robi skrypt (zapis Pythona, nie ścieżka w poleceniu), w auto bez pytania
     assert hak("terminal", command="python3 poczekalnia.py zatwierdz jarvo-web p1 abc") is None
@@ -537,7 +545,7 @@ def test_kod_floty_nie_rusza_legalnych_drog(sr, monkeypatch):
 def test_prosba_zawsze_pytaj_nie_obiecuje_stalej_zgody(sr, monkeypatch):
     """Hermes nie da wtyczce ukryć „Always”, więc prośba o chronione miejsce mówi, że obejmie ono jedno wywołanie."""
     dluga = sr.proj / ".git" / ("a" * 150) / ("b" * 150) / "config"
-    for tryb in ("pytaj", "projekt", "auto"):
+    for tryb in ("pytaj", "projekt"):                    # auto o chronione miejsca nie pyta (decyzja 27.11)
         ustaw_tryb(monkeypatch, tryb)
         for w in (hak("write_file", path=str(sr.home / ".env"), content="x"),
                   hak("terminal", command=f"echo x >> '{sr.proj / '.git' / 'config'}'"),
@@ -1371,3 +1379,252 @@ def test_decyzja_wlasciciela_w_tabeli_decyzji_misji(sr, monkeypatch):
         w = hak("write_file", path=str(misja), content=naglowek + "| 1 | nazwa: „Nova” | właściciel | 16.11 22:01 | "
                                                                    "„niech będzie Nova” |\n" + wiersz)
         assert w is None or "decyzję właścicielowi" not in w["message"], wiersz
+
+
+# ------------------------------------------------------------------------------------------------ nic nie czeka na zgodę
+# Decyzja właściciela 27.11 (ostateczna): cała flota pyta o zgodę tylko przy płatnościach i zakupach, masowe kasowanie
+# blokujemy twardo w każdym trybie. 27.11 05:15:45 i 05:21:36 Hacker w panelu czekał dwa razy po 300 s: wtyczka zwróciła
+# approve dla `rm -f` pliku w danych Jarva (tryb auto, „chronione: dane Jarva”), a Hermes czekał na przycisk w HQ.
+
+INCYDENT_27_11 = 'echo "JARVO_DATA_DIR=[$JARVO_DATA_DIR]"; F={baza}/hackatony.db; ls -la "$F"; rm -f "$F"; rmdir {baza}'
+
+
+@pytest.mark.parametrize("tryb", ["auto"] + TRYBY_PRACY)
+def test_incydent_27_11_plik_w_danych_jarva_blokada_bez_czekania(sr, monkeypatch, tryb):
+    baza = sr.home / "baza"
+    baza.mkdir()
+    (baza / "hackatony.db").write_bytes(b"")
+    if tryb == "auto":
+        ustaw_tryb(monkeypatch, "auto")
+    else:
+        tryb_pracy(sr, monkeypatch, tryb)
+    w = hak("terminal", command=INCYDENT_27_11.format(baza=baza))
+    assert akcja(w) == "block", w
+    assert "dane Jarva" in w["message"] and "jednym zdaniem ze ścieżką" in w["message"], w
+    for polecenie in (f"unlink '{baza / 'hackatony.db'}'", f"python3 -c \"import os; os.remove('{baza / 'hackatony.db'}')\""):
+        assert akcja(hak("terminal", command=polecenie)) == "block", polecenie
+
+
+def test_auto_pliki_w_katalogach_roboczych_wolno_usuwac(sr, monkeypatch):
+    ustaw_tryb(monkeypatch, "auto")
+    for p in (sr.ws_root / "jarvo" / "out" / "a.txt", sr.home / "cache" / "scratch" / "x.py", sr.home / "home" / "a.txt",
+              sr.home / "workspace" / "a.md", sr.misje / "Z-1" / "stary.md", sr.wiedza / "skrzynka" / "x.md",
+              sr.proj / "a.txt"):
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("x\n", encoding="utf-8")
+        assert hak("terminal", command=f"rm -f '{p}'") is None, p
+
+
+NIC_NIE_CZEKA = [
+    ("rm -r katalogu w katalogu karty", "terminal", lambda s: {"command": f"rm -r '{s.ws_root / 'jarvo' / 't_1' / 'out'}'"}),
+    ("find -name -delete", "terminal", lambda s: {"command": f"find '{s.ws_root / 'jarvo'}' -name '*.tmp' -delete"}),
+    ("nadpisanie pliku", "terminal", lambda s: {"command": f"echo x > '{s.ws_root / 'jarvo' / 't_1' / 'a.txt'}'"}),
+    ("dopisanie do .git/config", "terminal", lambda s: {"command": f"echo x >> '{s.proj / '.git' / 'config'}'"}),
+    ("sed -i .bashrc", "terminal", lambda s: {"command": f"sed -i 's/X=1/X=2/' '{s.dom / '.bashrc'}'"}),
+    ("pkill -f chromium", "terminal", lambda s: {"command": "pkill -f chromium"}),
+    ("git reset --hard w klonie w temp", "terminal", lambda s: {"command": f"git -C '{s.tmp / 'temp' / 'klon'}' reset --hard"}),
+    ("zapis w danych Jarva", "write_file", lambda s: {"path": str(s.home / "memories" / "MEMORY.md"), "content": "x"}),
+    ("patch AGENTS.md", "patch", lambda s: {"path": str(s.proj / "AGENTS.md"), "old_string": "#", "new_string": "##"}),
+    ("zapis .hermes w projekcie", "write_file", lambda s: {"path": str(s.proj / ".hermes" / "x.yaml"), "content": "x"}),
+    ("execute_code", "execute_code", lambda s: {"code": "print(1)"}),
+    ("proces w tle", "process_manage", lambda s: {"action": "kill", "session_id": "proc_1"}),
+    ("nowa rutyna", "cronjob_manage", lambda s: {"action": "create", "name": "Raport rano", "schedule": "0 8 * * *",
+                                                 "prompt": "x"}),
+]
+
+
+@pytest.mark.parametrize("opis,narzedzie,argumenty", NIC_NIE_CZEKA, ids=[p[0] for p in NIC_NIE_CZEKA])
+def test_auto_poza_platnoscia_nic_nie_czeka(sr, monkeypatch, opis, narzedzie, argumenty):
+    drzewo(sr)
+    ustaw_tryb(monkeypatch, "auto")
+    assert hak(narzedzie, **argumenty(sr)) is None
+
+
+@pytest.fixture
+def smart(sr, monkeypatch):
+    """Tryb auto; Hermes dałby wywołanie strażnikowi smart, a ten odpowiada werdyktem z `stan["werdykt"]`."""
+    ustaw_tryb(monkeypatch, "auto")
+    stan = {"werdykt": "approve", "ocenione": [], "przepuszczone": []}
+    monkeypatch.setattr(z, "_hermes_zapyta", lambda narzedzie, tresc: (
+        "panel", "recursive delete" if narzedzie == "terminal" else "execute_code", "opis Hermesa"))
+
+    def werdykt(tresc, opis, klucz, sesja):
+        stan["ocenione"].append(tresc)
+        return stan["werdykt"]
+
+    monkeypatch.setattr(z, "_smart_werdykt", werdykt)
+    monkeypatch.setattr(z, "_hermes_przepusc", lambda sesja, klucz: stan["przepuszczone"].append((sesja, klucz)))
+    return stan
+
+
+def test_auto_smart_approve_przepuszcza_w_hermesie(sr, smart):
+    assert hak("terminal", command="rm -r build/stare") is None
+    assert smart["przepuszczone"] == [("panel", "recursive delete")] and smart["ocenione"] == ["rm -r build/stare"]
+    assert hak("execute_code", code="print(1)\nprint(2)") is None
+    assert smart["ocenione"][-1] == "execute_code <<'PY'\nprint(1)\nprint(2)\nPY"       # jak approval.py:1283
+    assert smart["przepuszczone"][-1] == ("panel", "execute_code")
+
+
+@pytest.mark.parametrize("werdykt", ["deny", "escalate", "brak"])
+@pytest.mark.parametrize("narzedzie,args", [("terminal", {"command": "rm -r build/stare"}),
+                                            ("execute_code", {"code": "import shutil\nshutil.rmtree('build/stare')"})])
+def test_auto_smart_bez_zgody_to_blokada_od_razu(sr, smart, werdykt, narzedzie, args):
+    smart["werdykt"] = werdykt
+    w = hak(narzedzie, **args)
+    assert akcja(w) == "block", w
+    assert ("uznał" if werdykt == "deny" else "nie ocenił") in w["message"] and "jednym zdaniem" in w["message"]
+    assert "—" not in w["message"] and "–" not in w["message"]
+    assert smart["przepuszczone"] == []
+
+
+def test_auto_platnosc_jedyna_prosba(sr, smart):
+    platnosc = "python3 - <<'PY'\nimport stripe\nstripe.checkout.Session.create()\nPY"
+    smart["werdykt"] = "escalate"
+    w1, w2 = hak("terminal", command=platnosc), hak("terminal", command=platnosc)
+    assert akcja(w1) == "approve" and "płatność albo zakup" in w1["message"], w1
+    assert w1["rule_key"] != w2["rule_key"]                       # „zawsze” nie zapamięta zgody na płatność
+    assert smart["przepuszczone"] == [("panel", "recursive delete")] * 2    # Hermes nie pyta drugi raz
+    smart["werdykt"] = "deny"
+    assert akcja(hak("terminal", command=platnosc)) == "block"
+    smart["werdykt"] = "approve"
+    assert hak("terminal", command=platnosc) is None
+
+
+def test_auto_strazniki_przed_smart_i_tryby_z_pytaniem_bez_zmian(sr, smart, monkeypatch):
+    assert akcja(hak("terminal", command=f"rm -rf '{sr.dom}'")) == "block" and smart["ocenione"] == []
+    monkeypatch.setattr(z, "_yolo", lambda: True)                  # YOLO: Hermes przepuszcza sam, nie pytamy modelu
+    assert hak("terminal", command="rm -r build/stare") is None and smart["ocenione"] == []
+    monkeypatch.setattr(z, "_yolo", lambda: False)
+    monkeypatch.setattr(z, "_hermes_niebezpieczne", lambda polecenie: True)
+    for tryb in ("pytaj", "projekt"):                             # tam pyta Hermes, jak dotąd
+        ustaw_tryb(monkeypatch, tryb)
+        assert hak("terminal", command="rm -r build/stare") is None
+    assert smart["ocenione"] == []
+
+
+def test_auto_zapis_o_ktory_hermes_pyta_czlowieka_blokada_z_rada(sr, monkeypatch):
+    ssh = sr.dom / ".ssh" / "config"
+    monkeypatch.setattr(z, "_hermes_pyta_o_zapis", lambda s: Path(s) == ssh)
+    ustaw_tryb(monkeypatch, "auto")
+    w = hak("write_file", path=str(ssh), content="Host x\n")
+    assert akcja(w) == "block" and "co i gdzie ma wkleić" in w["message"], w
+    ustaw_tryb(monkeypatch, "projekt")
+    assert hak("write_file", path=str(ssh), content="Host x\n") is None          # pyta sam Hermes
+    monkeypatch.setattr(z, "_hermes_pyta_o_instrukcje", lambda sciezka, task_id: True)   # bramka Hermesa włączona
+    ustaw_tryb(monkeypatch, "auto")
+    assert akcja(hak("patch", path=str(sr.proj / "AGENTS.md"), old_string="a", new_string="b")) == "block"
+    ustaw_tryb(monkeypatch, "projekt")
+    assert hak("patch", path=str(sr.proj / "AGENTS.md"), old_string="a", new_string="b") is None
+
+
+def atrapa_hermesa(monkeypatch, *, tryb="smart", obecny=(False, False, True), bez_czl=False, twarde=False,
+                   zgody=None):
+    """tools.approval* Hermesa tak, jak czyta je _hermes_zapyta: tryb zgód, obecność (cli, brama, ask), platforma bez
+    człowieka, twarda blokada, zgody z sesji. Groźne jest tylko `rm -r`."""
+    zgody = set() if zgody is None else zgody
+    ap = types.ModuleType("tools.approval")
+    ap._yolo_active = lambda: False
+    ap._presence = lambda: (None, *obecny)
+    ap._unattended_contexts = lambda: ["api_server"] if bez_czl else []
+    ap._EXECUTE_CODE_DESCRIPTION = "execute_code script execution"
+    ap.get_current_session_key = lambda: "panel"
+    ap.is_approved = lambda sesja, klucz: (sesja, klucz) in zgody
+    ap.approve_session = lambda sesja, klucz: zgody.add((sesja, klucz))
+    kontekst = types.ModuleType("tools.approval_context")
+    kontekst._get_approval_mode = lambda: tryb
+    wykrycie = types.ModuleType("tools.approval_detection")
+    wykrycie.detect_hardline_command = lambda c: (twarde, "x")
+    wykrycie.detect_dangerous_command = lambda c: (True, "recursive delete", "recursive delete") if "rm -r" in c \
+        else (False, None, None)
+    progi = types.ModuleType("tools.approval_floors")
+    progi._command_matches_permanent_allowlist = lambda c: False
+    progi._match_user_deny_rule = lambda c: None
+    tools = types.ModuleType("tools")
+    tools.approval = ap
+    for nazwa, modul in (("tools", tools), ("tools.approval", ap), ("tools.approval_context", kontekst),
+                         ("tools.approval_detection", wykrycie), ("tools.approval_floors", progi)):
+        monkeypatch.setitem(sys.modules, nazwa, modul)
+    monkeypatch.setattr(z, "_PRZEPUSZCZONE", type(z._PRZEPUSZCZONE)())
+    return zgody
+
+
+def test_hermes_zapyta_tylko_gdy_hermes_czekalby_na_czlowieka(monkeypatch):
+    zgody = atrapa_hermesa(monkeypatch)
+    assert z._hermes_zapyta("terminal", "rm -r out/stare") == ("panel", "recursive delete", "recursive delete")
+    assert z._hermes_zapyta("terminal", "ls -la") is None                         # Hermes nie flaguje
+    z._hermes_przepusc("panel", "recursive delete")
+    assert ("panel", "recursive delete") in zgody
+    assert z._hermes_zapyta("terminal", "rm -r out/inne") is not None             # nasza zgoda: oceniamy od nowa
+    atrapa_hermesa(monkeypatch, zgody={("panel", "recursive delete")})          # zgoda człowieka w sesji
+    assert z._hermes_zapyta("terminal", "rm -r out/stare") is None
+    for kwargs in ({"tryb": "manual"}, {"tryb": "off"}, {"twarde": True}, {"obecny": (False, False, False)}):
+        atrapa_hermesa(monkeypatch, **kwargs)
+        assert z._hermes_zapyta("terminal", "rm -r out/stare") is None, kwargs
+    atrapa_hermesa(monkeypatch)
+    assert z._hermes_zapyta("execute_code", "print(1)") == ("panel", "execute_code", "execute_code script execution")
+    for kwargs in ({"bez_czl": True}, {"obecny": (True, False, False)}):          # api_server odmawia sam; CLI pyta per wywołanie
+        atrapa_hermesa(monkeypatch, **kwargs)
+        assert z._hermes_zapyta("execute_code", "print(1)") is None, kwargs
+
+
+def test_smart_werdykt_w_limicie_czasu_haka(monkeypatch):
+    assert z.SMART_LIMIT_S < 30                                    # plugins.hook_callback_timeout Hermesa
+    smart = types.ModuleType("tools.approval_smart")
+    monkeypatch.setitem(sys.modules, "tools", types.ModuleType("tools"))
+    monkeypatch.setitem(sys.modules, "tools.approval_smart", smart)
+    smart._smart_verdict = lambda tresc, opis, klucz, klucze, sesja: "deny"
+    assert z._smart_werdykt("rm -r x", "recursive delete", "recursive delete", "panel") == "deny"
+    monkeypatch.setattr(z, "SMART_LIMIT_S", 0.05)
+    smart._smart_verdict = lambda *a: time.sleep(0.5) or "approve"
+    assert z._smart_werdykt("rm -r x", "recursive delete", "recursive delete", "panel") == "brak"
+    smart._smart_verdict = lambda *a: 1 / 0
+    assert z._smart_werdykt("rm -r x", "recursive delete", "recursive delete", "panel") == "brak"
+
+
+def test_flota_bez_bramki_plikow_instrukcji_hermesa():
+    """Bramka plików instrukcji Hermesa pyta zawsze (także pod YOLO) i w panelu czekała 300 s; pliki instrukcji ocenia
+    wtyczka (w auto przechodzą, w pytaj i projekt pyta ona)."""
+    for plik in sorted((REPO / "profiles").glob("*/config.yaml")):
+        cfg = yaml.safe_load(plik.read_text(encoding="utf-8"))
+        assert cfg["approvals"]["mode"] == "smart", plik
+        assert cfg["security"]["protected_instruction_files"] is False, plik
+    assert "protected_instruction_files: false" in (REPO / "scripts" / "new-agent.py").read_text(encoding="utf-8")
+
+
+HERMES_SRC = os.environ.get("JARVO_TEST_HERMES_SRC")
+HERMES_PY = os.environ.get("JARVO_HERMES_PYTHON")
+ZGODY_SMART = ["rm -r katalogu w workspace", "find -name -delete w workspace", "pkill -9 -f chromium", "python3 -c",
+               "SQL DROP na bazie profilu"]
+
+
+@pytest.mark.skipif(not (HERMES_SRC and HERMES_PY),
+                    reason="ustaw JARVO_TEST_HERMES_SRC i JARVO_HERMES_PYTHON, aby sprawdzić panel kodem Hermesa")
+@pytest.mark.parametrize("werdykt", ["approve", "deny", "escalate"])
+def test_panel_hermesa_nic_nie_czeka(tmp_path, werdykt):
+    """Prawdziwy Hermes w układzie panelu (tests/zgody_panel_hermesa.py): poza płatnością nic nie czeka na człowieka."""
+    dom = tmp_path / "dom"
+    profil = dom / ".local" / "share" / "jarvo" / "dane" / "profiles" / "jarvo-hacker"
+    ws = profil.parent.parent / "jarvo" / "workspaces" / "jarvo-hacker"
+    for d in (profil, ws, tmp_path / "t"):
+        d.mkdir(parents=True)
+    cfg = yaml.safe_load((REPO / "profiles" / "jarvo-hacker" / "config.yaml").read_text(encoding="utf-8"))
+    (profil / "config.yaml").write_text(yaml.safe_dump(
+        {"approvals": {k: v for k, v in cfg["approvals"].items() if k != "deny"},
+         "security": {**cfg["security"], "tirith_enabled": False}}, allow_unicode=True), encoding="utf-8")
+    env = {"PATH": os.environ.get("PATH", ""), "HOME": str(dom), "HERMES_HOME": str(profil), "TMPDIR": str(tmp_path / "t"),
+           "TERMINAL_CWD": str(ws), "HERMES_EXEC_ASK": "1", "HERMES_SESSION_PLATFORM": "api_server", "PYTHONUTF8": "1"}
+    wyjscie = subprocess.run([HERMES_PY, "-P", str(REPO / "tests" / "zgody_panel_hermesa.py"), str(REPO / "zgody" / "plugin"),
+                              werdykt], cwd=HERMES_SRC, env=env, capture_output=True, text=True, timeout=300,
+                             check=True).stdout
+    w = json.loads(next(l for l in wyjscie.splitlines() if l.startswith("WYNIK "))[len("WYNIK "):])
+    czeka = {k for k, v in w.items() if v.startswith("CZEKA")}
+    assert czeka == ({"płatność w heredocu"} if werdykt == "escalate" else set()), w
+    for przypadek in ("incydent 27.11: rm -f pliku bazy w profilu + rmdir", "rm -rf katalogu w danych Jarva (05:15:38)",
+                      "nadpisanie pamięci > w danych Jarva", "git reset --hard w projekcie", "write_file ~/.ssh/config"):
+        assert w[przypadek] == "blok", (przypadek, w)
+    for przypadek in ("rm pliku w workspace", "nadpisanie pliku > w workspace", "dopisanie >> do .git/config projektu",
+                      "pkill -f chromium", "git reset --hard w klonie w temp", "write_file AGENTS.md w projekcie",
+                      "write_file pamięci w danych Jarva"):
+        assert w[przypadek] == "przechodzi", (przypadek, w)
+    for przypadek in ZGODY_SMART:
+        assert w[przypadek] == ("przechodzi" if werdykt == "approve" else "blok"), (przypadek, w)

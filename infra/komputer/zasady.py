@@ -68,8 +68,9 @@ EKRAN_SESJI = ZMIANY_EKRANU | ODCZYT_EKRANU
 WIDOK = (ODCZYT_EKRANU - {"list_windows", "wait_for"}) | {"navigate", "launch_app"}
 # odmowy, po których agent czeka i próbuje znowu (nie szuka innej drogi)
 CZEKAJ = frozenset({"zajete", "limit"})
-# odmowy, po których agent najpierw patrzy na stronę od nowa (next_step fresh_state, jak w computer_use Hermesa)
-OD_NOWA = frozenset({"ekran_zmieniony"})
+# odmowy, po których agent najpierw patrzy na stronę od nowa (next_step fresh_state, jak w computer_use Hermesa);
+# `cudze_okno` (natywnie): window_id karty innego zadania agenta, a własne okno pokazuje capture bez window_id
+OD_NOWA = frozenset({"ekran_zmieniony", "cudze_okno"})
 
 KLUCZE_KONFIGURACJI = frozenset({"capture_scope", "capture_mode", "max_image_dimension"})
 PRZEGLADARKA = re.compile(r"^(chromium|chromium[- ]browser|chromium web browser|chromium\.desktop)$", re.I)
@@ -764,6 +765,8 @@ def wynik_odmowy(w: Werdykt) -> dict:
         sc["held_by"] = w.dane["przez"]
         if isinstance(w.dane.get("za_s"), int):
             sc["free_in_s"] = w.dane["za_s"]
+        if isinstance(w.dane.get("kolejka"), int):    # miejsce w kolejce do ekranu (1: następna)
+            sc["queue_position"] = w.dane["kolejka"]
     return {"content": [{"type": "text", "text": tekst}], "isError": True, "structuredContent": sc}
 
 

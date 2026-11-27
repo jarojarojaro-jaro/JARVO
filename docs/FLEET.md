@@ -112,8 +112,9 @@ Mechanizm:
   ([WIEDZA.md](WIEDZA.md)). To podział dla skupienia, nie szyfr: wszyscy agenci działają jako ten sam użytkownik
   systemu. Jarvo i Claude (operator) wiedzą wszystko; agenci bez `marka` widzą całość;
 - jeden przydzielony telefon (`jarvo telefon przydziel <profil> <telefon>`, serwer `phone` z `PHONEUSE_ONLY`: widzi
-  tylko ten telefon, [MOBILE.md](MOBILE.md)) i opcjonalnie Komputer Jarva (`komputer: true`, ekran wspólny z Jarvem,
-  jedna sesja steruje naraz, [KOMPUTER.md](KOMPUTER.md) §7); pod YOLO ekran i telefon są zablokowane w każdym profilu;
+  tylko ten telefon, [MOBILE.md](MOBILE.md)) i opcjonalnie Komputer Jarva (`komputer: true`, przeglądarka wspólna
+  z Jarvem, natywnie własne okno na zadanie, w kontenerze jedna sesja steruje naraz, [KOMPUTER.md](KOMPUTER.md) §7);
+  pod YOLO ekran i telefon są zablokowane w każdym profilu;
 - wątek agenta w grupie Jarvo HQ (`telegram_topic`, `TELEGRAM_TOPIC_<TEMAT>` w `.env`), DM z dopiskiem (np. „sklep”)
   albo `@uchwyt` w aplikacji; rutyny z `deliver: "@@AGENT_DELIVER@@"` piszą w wątku agenta;
 - sekcja „Agenci biznesowi” w porannym briefie i przeglądzie tygodnia Jarva (lejek, szkice do zgody, rutyny, telefon,
@@ -250,8 +251,9 @@ tylko z linią `ZGODA WŁAŚCICIELA: platnosc` w karcie; inaczej przygotowuje ek
 pauza z jednym zdaniem prośby, karta w `kanban_block`), a wznawia Komputer tylko właściciel. Haseł ani numerów kart
 z czatu nie przyjmuje. Stałe zgody Hermesa (`command_allowlist`) ma na działania w tle i na działania wejścia na
 wierzchu, nigdy na okno na wierzch (walidator odrzuca `bring_to_front`). Limit: 60 działań na kartę, po 3 nieudanych
-próbach zmienia drogę albo oddaje ekran. Ekran jest jeden: gdy na Komputerze pracuje już inna sesja, wejście zwraca
-`zajete` (jedna sesja naraz). Dłuższą pracę na ekranie (więcej niż kilka minut) Jarvo daje na kartę przypisaną do
+próbach zmienia drogę albo oddaje ekran. Natywnie każde zadanie (rozmowa albo karta) ma własne okno przeglądarki,
+a okno innego zadania to odmowa `cudze_okno`; w kontenerze ekran jest jeden: gdy pracuje już inna sesja, wejście
+zwraca `zajete` z czasem zwolnienia i miejscem w kolejce. Dłuższą pracę na ekranie (więcej niż kilka minut) Jarvo daje na kartę przypisaną do
 siebie, żeby czat był wolny. Sesja z narzędziem ekranu albo telefonu nie daje wyciągu do skarbca: to, co było na
 ekranie, nie trafia do wiedzy floty sam. Pod YOLO (tryb pełny) narzędzia ekranu i telefonu są zablokowane.
 

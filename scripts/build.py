@@ -640,6 +640,10 @@ def vendor_skills(agent: str, out_skills: Path, lock: dict, resolver: SourceReso
         src_root = resolver.resolve(source)
         src = src_root / entry["path"]
         if not (src / "SKILL.md").exists():
+            if entry.get("z_nakladki") and spec["type"] == "repo-tree":
+                # nakładka bywa nowsza od budowanej wersji (powrót do poprzedniej po nieudanej aktualizacji)
+                print(f"! [{agent}] nakładka wskazuje {source}:{entry['path']}, którego ta wersja Jarva nie ma")
+                continue
             raise SystemExit(f"[{agent}] brak SKILL.md w {source}:{entry['path']}")
         dest = out_skills / entry["dest"]
         if dest.exists():

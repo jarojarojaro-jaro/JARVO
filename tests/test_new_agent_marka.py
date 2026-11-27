@@ -125,7 +125,7 @@ def test_szkielet_agenta_biznesowego_w_nakladce(kopia, tmp_path):
     assert fl.load_yaml(n / "skills.lock.yaml")["agents"] == {"jarvo-kwiaty": [telefon], "jarvo-sklep": [telefon]}
     assert (kopia / "shared" / "skills" / "telefon" / "SKILL.md").is_file()
     lock = fl.load_lock(kopia / "vendor" / "skills.lock.yaml", nakladka=n)
-    assert lock["agents"]["jarvo-sklep"] == [telefon] and "jarvo" in lock["agents"]
+    assert lock["agents"]["jarvo-sklep"] == [{**telefon, "z_nakladki": True}] and "jarvo" in lock["agents"]
 
 
 @pytest.mark.parametrize("marka, powod", [("kwiaty", "należy już do jarvo-kwiaty"), ("Zła_marka", "[a-z0-9-]+")])

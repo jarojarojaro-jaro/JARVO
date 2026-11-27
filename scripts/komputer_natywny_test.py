@@ -345,16 +345,21 @@ def przebieg(root: str) -> int:
             f"zablokowane przed {przed}, po {po}")
     k.narzedzie("bring_to_front", {"pid": pid, "window_id": wid})
 
-    # druga sesja (druga karta Jarva): ekran ma ta, która działała ostatnio, także do patrzenia (75e4c361)
+    # druga sesja (druga rozmowa albo karta Jarva): własne okno przeglądarki, okna pierwszej nie widzi i nie rusza
+    # (27.11: dwie rozmowy panelu na jednej karcie, ctrl+z w jednej dał paragon ze strony drugiej)
     k2 = Klient()
     inicjuj(k2, "komputer-natywny-test-2")
     patrz2 = k2.narzedzie("get_window_state", {"pid": pid, "window_id": wid})
-    w = k2.narzedzie("click", {"pid": pid, "window_id": wid, "element_token": (el.get("Dodaj do koszyka") or {}).get(
-        "element_token")})
-    sprawdz(all(zasada(x) == "zajete" and (x.get("structuredContent") or {}).get("next_step") == "wait_and_retry"
-                and (x.get("structuredContent") or {}).get("held_by") for x in (patrz2, w)),
-            "druga sesja: patrzenie i klik dostają „zajęte” z `held_by` (jedna sesja naraz)",
-            f"{tekst(patrz2)} | {tekst(w)}")
+    w = k2.narzedzie("hotkey", {"pid": pid, "window_id": wid, "keys": ["ctrl", "z"]})
+    sprawdz(all(zasada(x) == "cudze_okno" and (x.get("structuredContent") or {}).get("next_step") == "fresh_state"
+                for x in (patrz2, w)),
+            "druga sesja: patrzenie i ctrl+z w oknie pierwszej dostają „cudze_okno”", f"{tekst(patrz2)} | {tekst(w)}")
+    wlasne = (k2.narzedzie("get_window_state", {"pid": pid, "include_screenshot": False}).get("structuredContent")
+              or {})
+    okna2 = (k2.narzedzie("list_windows", {}).get("structuredContent") or {}).get("windows", [])
+    sprawdz(wlasne.get("window_id") not in (None, wid) and [o.get("window_id") for o in okna2] == [wlasne.get(
+        "window_id")], "druga sesja: własne okno przeglądarki, list_windows tylko z nim",
+            f"{wlasne.get('window_id')} {okna2}")
     k2.zamknij()
 
     formularz(k, pid)

@@ -1,6 +1,7 @@
 # Changelog: jarvo-wideo
 
 ## Niewydane
+- Poza płatnością i zakupem nic nie czeka na zgodę: groźne polecenie dostaje od razu werdykt strażnika smart, a usunięcie pliku w danych Jarva poza katalogami roboczymi to blokada z radą.
 - `browser_*` działa na Chrome z trwałym profilem przeglądarki (logowania zostają między zadaniami), nawigacja zwraca zwartą listę elementów z refami i tekstem, klik, klawisz i Wstecz zwracają widok strony po ustaleniu, a blokada antybotowa mówi wprost: telefon floty, potem `kanban_block`.
 - Narzędzie `pulpit` (docs/PULPIT.md) otwiera na pulpicie serwera Kdenlive, edytor HQ i GIMP, a skille `kdenlive` (z `melt.py`: pionowa wersja z napisem), `edytor-hq`, `gimp` i `pulpit` mówią, kiedy skrypt, a kiedy okno.
 - Obraz z narzędzi (zrzut, `shot` telefonu, `vision_analyze`, klatki i arkusze) widzisz od razu jako obraz w wyniku narzędzia, bez osobnego opisu modelu pomocniczego, a wszystkie narzędzia są w zestawie od razu, bez `tool_search`.

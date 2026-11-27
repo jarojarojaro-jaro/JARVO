@@ -121,7 +121,7 @@ Pod YOLO (tryb pełny) narzędzia ekranu i telefonu są zablokowane w każdym pr
 walidator: `[a-z0-9-]+`, tylko specjalista, jedna marka = jeden agent). W skarbcu widzi tylko swoją markę, swoje notatki,
 `fleet/`, `inspiracje/` i księgę błędów `bledy/` ([FLEET.md](FLEET.md#agenci-biznesowi), [WIEDZA.md](WIEDZA.md)); Jarvo i operator wiedzą wszystko.
 Telefon: jeden przydzielony (`jarvo telefon przydziel jarvo-sklep <telefon>`: serwer `phone` z `PHONEUSE_ONLY`, inne
-telefony niewidoczne i odrzucane); ekran opcjonalnie (`komputer: true`, jedna sesja naraz). Publiczne repo nie ma
+telefony niewidoczne i odrzucane); ekran opcjonalnie (`komputer: true`, natywnie własne okno na zadanie). Publiczne repo nie ma
 żadnego agenta biznesowego: każdy zakłada swoich (`scripts/new-agent.py --marka sklep`) w prywatnej nakładce
 (`<root>/nakladka` albo `JARVO_NAKLADKA`), którą build i `jarvo update` dołączają do floty.
 
@@ -360,7 +360,8 @@ z formularzem, skrzynka szkiców z kompilacją, lint, dziennik ([WIEDZA.md](WIED
   haseł, kart, BLIK i kodów zostawia właścicielowi, sekretów nie wpisuje i ukrywa je w odpowiedziach, wyłącza
   JavaScript, schowek i DevTools, uruchamia tylko Chromium; cel działania zna z migawek sterownika i z AT-SPI.
   Pauzę włączy każdy, zdejmie tylko właściciel (`SO_PEERCRED`); pauza od floty to prośba Jarva do właściciela
-  z powodem (widać ją w `jarvo komputer status`); ekranem steruje jedna sesja naraz (`zajete`); dziennik bez treści.
+  z powodem (widać ją w `jarvo komputer status`); ekranem steruje jedna sesja naraz (`zajete` z kolejką; natywnie
+  każde zadanie ma własne okno przeglądarki, `cudze_okno`); dziennik bez treści.
   Test na żywo: `scripts/komputer-test.sh`.
   Agent z `komputer: true` (dziś tylko `jarvo`) dostaje wtyczkę `jarvo-komputer` (narzędzie `komputer`: stan,
   dziennik, prośba do właściciela jako pauza z powodem; wznowić nie umie); sesja z narzędziem ekranu albo telefonu

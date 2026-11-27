@@ -532,7 +532,7 @@ def load_lock(path: Path | None = None, nakladka: Path | None = _Z_ENV) -> dict:
     for agent, entries in wpisy.items():
         if agent in agenci:
             raise SystemExit(f"nakładka {n}: skills.lock.yaml: agent {agent} ma już wpisy w vendor/skills.lock.yaml")
-        agenci[agent] = entries
+        agenci[agent] = [{**e, "z_nakladki": True} if isinstance(e, dict) else e for e in entries or []]
     return lock
 
 

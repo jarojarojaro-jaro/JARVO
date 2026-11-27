@@ -4,6 +4,7 @@ import contextlib
 import importlib.util
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -77,6 +78,10 @@ def test_zasiew_wymienia_nietknieta_notatke_na_nowsza_wersje(sk, tmp_path):
     shutil.copytree(ZASIEW, repo)
     stan = sk.stan / w.ZASIANE_BLEDY
     stan.write_text(json.dumps(sorted(json.loads(stan.read_text(encoding="utf-8")))), encoding="utf-8")   # format 17.11
+    stara = sk.plik(EKRAN)                              # zasiew 17.11: notatka bez zmian po utworzeniu
+    fm = stara.read_text(encoding="utf-8")
+    utw = fm.split("utworzono: ", 1)[1][:10]
+    stara.write_text(re.sub(r"zmieniono: \S+", f"zmieniono: {utw}", fm, count=1), encoding="utf-8")
     ekran, google = (repo / f"{r.split('/', 1)[1]}.md" for r in (EKRAN, GOOGLE))
     ekran.write_text(ekran.read_text(encoding="utf-8").replace("ekran_zmieniony,", "ekran_zmieniony, nowa sygnatura,"),
                      encoding="utf-8")

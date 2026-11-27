@@ -484,6 +484,49 @@ def test_karty_z_kluczem_bramy_nie_dziela_ekranu_przez_bramke(komputer):
             p.stderr.close()
 
 
+def test_rozmowy_jednej_bramy_osobno_i_kolejka_do_ekranu():
+    """27.11: dwie rozmowy panelu w jednym procesie bramy (ten sam klucz grupy, bez karty) to dwa zadania. Ekran
+    kontenera widać w całości (zrzut ekranu, klik w punkt), więc druga rozmowa nie działa na stronie pierwszej, tylko
+    dostaje `zajete` z czasem zwolnienia i miejscem w kolejce; po zwolnieniu ekran dostaje najpierw sesja, która
+    czekała najdłużej, a późniejsza czeka dalej."""
+    class Wej:
+        pass
+    wej = Wej()
+    wej.ekran = wejscie.Ekran.__new__(wejscie.Ekran)
+    wej.ekran.pauza = None
+    wej.ekran._stan_sesji()
+    gniazda = []
+
+    def sesja(rozmowa: str) -> wejscie.Sesja:
+        a, b = socket.socketpair()
+        gniazda.extend((a, b))
+        s = wejscie.Sesja(b, wej)
+        s._od_agenta(json.dumps({"jsonrpc": "2.0", "method": wejscie.GRUPA, "params": {
+            "grupa": "p1-" + "b" * 32, "rozmowa": rozmowa}}).encode())
+        return s
+
+    try:
+        c1, w1, x = sesja("c1aaaaaaaaaaaaaa"), sesja("w1bbbbbbbbbbbbbb"), sesja("x3cccccccccccccc")
+        assert len({c1.klucz_ekranu, w1.klucz_ekranu, x.klucz_ekranu}) == 3
+        assert c1._ekran_sesji("get_window_state") is None
+        odm = w1._ekran_sesji("hotkey")
+        sc = wejscie.zasady.wynik_odmowy(odm)["structuredContent"]
+        assert (sc["rule"], sc["next_step"], sc["queue_position"]) == ("zajete", "wait_and_retry", 1), sc
+        assert sc["held_by"] == "rozmowa Jarva c1aaaaaa bez karty kanbana" and 0 < sc["free_in_s"] <= wejscie.ZAJETE_S
+        assert "Jesteś 1. w kolejce" in sc["message"], sc
+        assert wejscie.zasady.wynik_odmowy(x._ekran_sesji("get_window_state"))["structuredContent"][
+            "queue_position"] == 2
+        wej.ekran.zwolnij(c1.klucz_ekranu)                               # koniec rozmowy C1
+        sc = wejscie.zasady.wynik_odmowy(x._ekran_sesji("click"))["structuredContent"]
+        assert sc["queue_position"] == 2 and "odesłana przed Tobą" in sc["message"], sc   # W1 czeka dłużej
+        assert w1._ekran_sesji("get_window_state") is None
+        sc = wejscie.zasady.wynik_odmowy(x._ekran_sesji("click"))["structuredContent"]
+        assert sc["queue_position"] == 1 and sc["held_by"] == "rozmowa Jarva w1bbbbbb bez karty kanbana", sc
+    finally:
+        for g in gniazda:
+            g.close()
+
+
 @pytest.mark.linux_only
 def test_wtyczka_jarva_przez_ster(komputer, monkeypatch):
     """Wtyczka jarvo-komputer (komputer/plugin, docs/KOMPUTER.md §7): stan, dziennik i prośba do właściciela

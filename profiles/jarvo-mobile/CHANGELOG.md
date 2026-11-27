@@ -1,6 +1,7 @@
 # Changelog: jarvo-mobile
 
 ## Niewydane
+- Poza płatnością i zakupem nic nie czeka na zgodę: groźne polecenie dostaje od razu werdykt strażnika smart, a usunięcie pliku w danych Jarva poza katalogami roboczymi to blokada z radą.
 - `browser_*` działa na Chrome z trwałym profilem przeglądarki (logowania zostają między zadaniami), nawigacja zwraca zwartą listę elementów z refami i tekstem, klik, klawisz i Wstecz zwracają widok strony po ustaleniu, a blokada antybotowa mówi wprost: telefon floty, potem `kanban_block`.
 - Obraz z narzędzi (zrzut, `shot` telefonu, `vision_analyze`) widzisz od razu jako obraz w wyniku narzędzia, bez osobnego opisu modelu pomocniczego, a wszystkie narzędzia są w zestawie od razu, bez `tool_search`.
 - SOUL w układzie Jarva: postać (SOUL: kim jestem, charakter, głos), procedury (nowy ZASADY.md: zakres z „Poza zakresem”, zasady pracy, workflowy, standard, autonomia, skrót mapy `<!-- Jarvo:MAPA -->`, protokół, formaty) i mapa „od A do Z” (nowy MAPA.md, rdzeń z `@mobile`). Nowa zasada pamięci: preferencja albo decyzja właściciela do `user`, fakt o środowisku do `memory`, jeden fakt na wpis. Zakres i tabela workflowów zwięźlej, bez powtórzeń między sekcjami. Zbudowany prompt: przed 11 757 zn (~3 360 tok.), po 11 754 zn (~3 359 tok.).

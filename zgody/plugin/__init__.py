@@ -4,22 +4,30 @@ Bez kontenera terminal agenta działa z prawami właściciela, więc zgody są g
 „kontrola, nie izolacja”). Hak `pre_tool_call` ocenia zapisy plików, terminal, execute_code, procesy w tle i rutyny;
 polecenie `/tryb` zmienia tryb w sesji.
 
-Tryby (wybór: `/tryb` w sesji > JARVO_TRYB_ZGOD z `jarvo chat --tryb` > plik stanu profilu > „projekt”):
+Tryby (wybór: `/tryb` w sesji > JARVO_TRYB_ZGOD z `jarvo chat --tryb` > plik stanu profilu > „auto”):
   pytaj    approve dla write_file i patch (także V4A z nagłówkami *** Update/Add/Delete/Move File), execute_code,
            process_manage i cronjob_manage (działania zmieniające) oraz terminala spoza listy poleceń tylko do odczytu;
-  projekt  (domyślny, I08) jak pytaj, ale bez pytania zapisy i proste polecenia plikowe (mkdir, touch, cp, mv, rm,
+  projekt  (I08) jak pytaj, ale bez pytania zapisy i proste polecenia plikowe (mkdir, touch, cp, mv, rm,
            rmdir, sed -i, tee, przekierowania > i >>), gdy rzeczywista ścieżka (po realpath) leży w folderze
            projektu (JARVO_FOLDER_PROJEKTU albo TERMINAL_CWD, czyli katalog startu czatu) albo w katalogu roboczym
            karty (HERMES_KANBAN_WORKSPACE); poza nimi approve;
+  auto     (domyślny; decyzje właściciela 14.11 i 27.11: cała flota pyta tylko o płatności i zakupy) bez pytania
+           zapisy, polecenia, execute_code, procesy i rutyny, także w chronionych miejscach; z człowiekiem jedyna
+           prośba to płatność albo zakup (confirm na telefonie, terminal i execute_code, których strażnik smart Hermesa
+           nie zatwierdził). To, o co Hermes zapytałby człowieka i czekał approvals.timeout (300 s), wtyczka
+           rozstrzyga od razu: polecenie terminala i execute_code tym samym strażnikiem smart (APPROVE = zgoda w Hermesie
+           dla wzorca, DENY albo brak oceny = block z radą), zapis ~/.ssh/config i pliku instrukcji przy włączonym
+           security.protected_instruction_files = block z radą;
   pelny    tylko na sesję: proces czatu z --yolo albo /yolo, wtedy Hermes sam zatwierdza prośby wtyczki. Wtyczka
            nigdy nie włącza YOLO; pod YOLO blokuje w każdym profilu narzędzia ekranu i telefonu (computer_use,
            komputer, pulpit, mcp__phone__*), bo Komputer Jarva, pulpit i telefon działałyby wtedy bez człowieka.
 Zawsze, w każdym trybie: zapis config.yaml Hermesa = block; zapis w kodzie floty (skills, plugins, hooks, scripts,
 SOUL.md i mcp.json profili i hosta, <JARVO_ROOT>/program i build, kod Hermesa, Jarva i tej wtyczki) = block z radą
-„zlecenie dla Claude Code w misjach/DLA-CLAUDE.md”, bez pytania (także bez człowieka i pod YOLO); zgoda na AGENTS.md,
-CLAUDE.md, SOUL.md i chronione miejsca (.git, .vscode, .idea, .claude, .hermes, .gitconfig, .bashrc, .zshrc, .npmrc,
-.mcp.json i podobne pliki startowe powłoki, reszta danych Jarva), a w treści takiej prośby uwaga, że „Always” obejmie
-tylko ten sam plik albo to samo polecenie. Pod YOLO o chronione miejsca nie da się zapytać, więc wtyczka je blokuje.
+„zlecenie dla Claude Code w misjach/DLA-CLAUDE.md”, bez pytania (także bez człowieka i pod YOLO). W trybach pytaj
+i projekt zgoda na AGENTS.md, CLAUDE.md, SOUL.md i chronione miejsca (.git, .vscode, .idea, .claude, .hermes,
+.gitconfig, .bashrc, .zshrc, .npmrc, .mcp.json i podobne pliki startowe powłoki, reszta danych Jarva), a w treści
+takiej prośby uwaga, że „Always” obejmie tylko ten sam plik albo to samo polecenie; w auto przechodzą. Pod YOLO
+o chronione miejsca nie da się zapytać, więc wtyczka je blokuje.
 Telefon (serwer MCP `phone` z PHONEUSE, `jarvo telefon on`): mcp__phone__act i mcp__phone__batch z confirm=true
 (na wierzchu, w args albo w kroku batch) przechodzą bramkę needs_confirm telefonu, więc z człowiekiem to prośba
 z treścią akcji (zgoda = „tak” dla tej jednej akcji, bez zapamiętania), bez człowieka i pod YOLO block. Reszta
@@ -37,7 +45,9 @@ Strażnik kasowania (przed wszystkim innym, w każdym trybie, z człowiekiem, be
 omijania przez command_allowlist): block dla masowego kasowania i niszczenia danych. Chronione w całości (samo miejsce
 i wszystko nad nim): katalog domowy, ~/dev, ~/strony, ~/jarvo-testy, każde repozytorium git (poza katalogami
 tymczasowymi i kart), skarbiec, misje i katalogi robocze kart; w całości i w środku: ~/.ssh, ~/.config, ~/.phoneuse;
-dane i kod Jarva (poza skarbcem, misjami, katalogami kart i HOME terminala) bez kasowania drzew i nadpisywania plików.
+dane i kod Jarva (poza skarbcem, misjami, katalogami kart i HOME terminala) bez kasowania drzew i nadpisywania plików,
+a pojedynczego pliku (rm, unlink, os.remove) poza tymi miejscami i katalogami roboczymi profili (cache, home,
+workspace, plans, sandboxes, audio_cache, image_cache) też nie (27.11: `rm -f` pliku bazy w profilu Hackera).
 Formy: rm -r/-f (każda kolejność flag, długie flagi, flagi po celach, owijki sudo/env/nice/timeout/xargs), find -delete
 i -exec rm (bez zawężenia nazwą albo czasem), shutil.rmtree/os.removedirs/os.system/subprocess w python -c, heredocu,
 here-stringu i execute_code, fs.rmSync/rimraf/rmtree w node/perl/ruby -e, bash -c, eval, $(…), rsync --delete,
@@ -90,13 +100,16 @@ Jak to działa w Hermesie f97608f (sprawdzone w kodzie, plik:linia):
     tools/delegate_tool_child_run.py:855-859; w CLI jego prośby o zgodę odrzuca tools/delegate_tool_config.py:42-59.
   - Polecenie /tryb: hermes_cli/plugins.py:659-683 (register_command, handler(raw_args) -> str | None, nazwa zajęta
     przez polecenie wbudowane jest pomijana); wywołanie w CLI cli.py:1274-1285, w bramie gateway/run_inbound.py:1056-1080.
-  - Czego nie dublujemy (nie pytać dwa razy): niebezpieczne polecenia terminala pyta sam Hermes
+  - Czego nie dublujemy w trybach pytaj i projekt (nie pytać dwa razy): niebezpieczne polecenia terminala pyta sam Hermes
     (tools/approval_detection.py:180 detect_hardline_command, :1516 detect_dangerous_command; tools/approval_floors.py
     :23 approvals.deny, :188 command_allowlist z dokładnym tekstem albo wzorcem); AGENTS.md, CLAUDE.md, SOUL.md,
     .cursorrules i <projekt>/.hermes/* przez write_file/patch pyta zawsze, także pod YOLO, poza HERMES_HOME
     (tools/file_tools_write_guards.py:171-247, 329-339); config.yaml i ścieżki systemowe blokuje
     (tools/file_tools_write_guards.py:145-168); klucze i HERMES_WRITE_SAFE_ROOT odrzuca (agent/file_safety.py:176-297);
-    execute_code pyta sam tylko w bramie i przez HERMES_EXEC_ASK (tools/approval.py:1233-1300).
+    execute_code pyta sam tylko w bramie i przez HERMES_EXEC_ASK (tools/approval.py:1233-1300). W trybie auto to samo
+    rozstrzyga od razu _bez_czekania: strażnik smart (tools/approval_smart.py:134), zgoda approve_session
+    (tools/approval.py:249) albo block; bez tego DENY i ESCALATE strażnika smart czekały na człowieka (approval.py:761-790,
+    852-892), a prośba wtyczki (request_tool_approval, :1095-1120, _ACTION_GATE :745-758) do approvals.timeout.
   - Ścieżki jak w narzędziach plików: tools/file_tools_paths.py:121-134 (katalog bazowy: cwd sesji, nadpisanie,
     TERMINAL_CWD), :137-163 (na Windows ntpath.normpath bez realpath, więc dowiązania i junction sprawdzamy sami);
     Git Bash /c/... → C:\\... jak tools/environments/local.py:117-125; nagłówki V4A jak tools/file_tools.py:149-150
@@ -112,6 +125,7 @@ Instalacja (build.py, install_fleet.py, `jarvo chat --tryb`) to etap E4: zgody/R
 # może wczytać ktoś inny niż loader Hermesa (który go tam wpisuje, hermes_cli/plugins_loader.py:651)
 import ast
 import collections
+import contextvars
 import glob as _glob
 import hashlib
 import itertools
@@ -157,13 +171,15 @@ NARZEDZIA_EKRANU = frozenset({"computer_use", "komputer", "pulpit"})
 TELEFON = "phone"
 TELEFON_POTWIERDZENIA = frozenset({f"mcp__{TELEFON}__act", f"mcp__{TELEFON}__batch"})
 _NIE = frozenset({"", "false", "0", "no", "off", "none", "null", "nie"})
-# tryb auto: confirm na telefonie przechodzi bez pytania, chyba że cel wygląda na płatność albo usunięcie konta
-PLATNOSC_TELEFON = re.compile(
+# tryb auto: confirm na telefonie przechodzi bez pytania, chyba że cel wygląda na płatność albo usunięcie konta; ten sam
+# wzór rozstrzyga terminal i execute_code, których strażnik smart Hermesa nie zatwierdził (_bez_czekania)
+PLATNOSC = re.compile(
     r"(?i)(?<!\w)(?:kup(?:uj[eę])?|zap[lł]a[cć]|p[lł]ac[eę]|p[lł]atno[sś][cć]|zam[oó]w(?:ienie)?|zamawiam|blik|"
     r"przelew|do[lł]aduj|subskrybuj|wykup|buy|purchase|pay|check ?out|place (?:your )?order|subscribe|top ?up|"
     r"usu[nń] konto|delete (?:my )?account|zamknij konto|close (?:my )?account)(?!\w)")
 
-# zawsze pytamy (pod YOLO blokujemy): katalogi z ustawieniami, które wykonują kod albo sterują agentem
+# pytamy w trybach pytaj i projekt, w auto przechodzą (niszczenie blokuje strażnik kasowania), pod YOLO blokujemy:
+# katalogi z ustawieniami, które wykonują kod albo sterują agentem
 CHRONIONE_KATALOGI = frozenset({".git", ".vscode", ".idea", ".claude", ".hermes"})
 CHRONIONE_PLIKI = frozenset({".gitconfig", ".bashrc", ".zshrc", ".npmrc", ".mcp.json", ".bash_profile", ".bash_login",
                              ".profile", ".zprofile", ".zshenv", ".zlogin", ".envrc"})
@@ -180,6 +196,12 @@ KOD_FLOTY_PROFILU = (("skills", "zainstalowane skille"), ("plugins", "wtyczki"),
                      ("scripts", "skrypty floty"), ("SOUL.md", "instrukcja agenta"), ("mcp.json", "serwery MCP"))
 ZLECENIE_FLOTY = "DLA-CLAUDE.md"           # zlecenia dla Claude Code w katalogu misji (SOUL Jarva, zasada 8)
 KOD_FLOTY = "kod floty"
+# Decyzja właściciela 27.11 (ostateczna): cała flota pyta o zgodę tylko przy płatnościach i zakupach. 27.11 05:15:45
+# i 05:21:36 Hacker w panelu czekał dwa razy po 300 s na zgodę (prośba tej wtyczki o `rm -f` pliku w danych Jarva).
+# W trybie auto z człowiekiem nic nie czeka na przycisk zgody poza płatnością: niszczenie blokuje strażnik kasowania,
+# a to, o co Hermes zapytałby sam, wtyczka rozstrzyga od razu (_bez_czekania niżej).
+HERMES_CZEKA = "zapis, o który Hermes pyta człowieka"
+SMART_LIMIT_S = 20.0               # ocena strażnika smart w haku; hak dłuższy niż 30 s Hermes blokuje i wycisza na 60 s
 
 # Nagrywanie ekranu tylko przez nagraj.py ze skilla praca-na-ekranie (krótkie odcinki udanych kroków, koniec przy
 # pierwszej odmowie Komputera albo bez ruchu, film tylko z udanych kroków). 16.11 Jarvo nagrywał surowym
@@ -196,9 +218,9 @@ KONTEKSTY = {"kanban": "karta kanbana", "cron": "rutyna (cron)", "q": "jednorazo
 OPISY_TRYBOW = {
     "pytaj": "pytam o każdy zapis, polecenie spoza listy tylko do odczytu, execute_code, procesy w tle i rutyny",
     "projekt": "zapisy i proste polecenia plikowe w folderze projektu bez pytania, poza nim pytam",
-    "auto": "bez pytania: polecenia, zapisy, kod, procesy i rutyny; pytam tylko o chronione miejsca (config, .git, "
-            "pliki instrukcji, dane Jarva poza katalogami roboczymi) i o płatność na telefonie; masowe kasowanie i "
-            "klucze zawsze blokuję",
+    "auto": "bez pytania: polecenia, zapisy, kod, procesy i rutyny, także w chronionych miejscach; pytam tylko o "
+            "płatność albo zakup; masowe kasowanie, usuwanie danych Jarva, config.yaml i kod floty blokuję od razu, "
+            "a to, o co Hermes zapytałby człowieka, rozstrzygam od razu jego strażnikiem smart",
     "pelny": "Hermes sam zatwierdza prośby (YOLO, tylko ta sesja)",
 }
 
@@ -347,6 +369,16 @@ def _hermes_odmowi_zapisu(sciezka: str) -> bool:
         return False
 
 
+def _hermes_pyta_o_zapis(sciezka: str) -> bool:
+    """Czy write_file/patch tej ścieżki zatrzyma bramka zgód plików Hermesa (~/.ssh/config, agent/file_safety.py
+    build_write_approval_paths, tools/file_tools_write_guards.py _check_approval_required_write)."""
+    try:
+        from agent.file_safety import is_write_approval_required
+        return bool(is_write_approval_required(sciezka))
+    except Exception:
+        return False
+
+
 def _hermes_pyta_o_kod() -> bool:
     """execute_code: Hermes pyta o cały skrypt sam w bramie i przy HERMES_EXEC_ASK (tools/approval.py:1273-1279)."""
     try:
@@ -354,6 +386,83 @@ def _hermes_pyta_o_kod() -> bool:
         return bool(_is_gateway_approval_context() or _prawda(os.environ.get("HERMES_EXEC_ASK")))
     except Exception:
         return _prawda(os.environ.get("HERMES_EXEC_ASK"))
+
+
+# zgody strażnika smart wydane przez wtyczkę w Hermesie: (klucz sesji, klucz wzorca). Hermes pamięta zgodę dla całej
+# sesji i wzorca, więc każde następne wywołanie z tym wzorcem wtyczka ocenia od nowa (_hermes_zapyta niżej).
+_PRZEPUSZCZONE: "collections.OrderedDict[Tuple[str, str], None]" = collections.OrderedDict()
+
+
+def _hermes_zapyta(narzedzie: str, tresc: str) -> Optional[Tuple[str, str, str]]:
+    """(klucz sesji, klucz wzorca, opis), gdy Hermes w trybie smart da to wywołanie strażnikowi smart, a przy jego DENY
+    albo ESCALATE człowiekowi na approvals.timeout (tools/approval.py:1159-1224 terminal, :1233-1300 execute_code,
+    :761-790 _smart_gate, :852-892 czekanie w bramie i w HQ przez /v1/runs); None, gdy Hermes rozstrzygnie sam od razu
+    (twarda blokada, approvals.deny, YOLO, tryb off albo manual, command_allowlist, zgoda człowieka w sesji, praca bez
+    człowieka, execute_code na platformie bez człowieka, np. api_server)."""
+    try:
+        from tools import approval as ap
+        from tools.approval_context import _get_approval_mode
+        from tools.approval_detection import detect_dangerous_command, detect_hardline_command
+        from tools.approval_floors import _command_matches_permanent_allowlist, _match_user_deny_rule
+        if _get_approval_mode() != "smart" or ap._yolo_active():
+            return None
+        _, cli, brama, pyta = ap._presence()
+        if narzedzie == "execute_code":
+            if ap._unattended_contexts() or not (brama or pyta):
+                return None
+            klucz, opis = "execute_code", ap._EXECUTE_CODE_DESCRIPTION
+        else:
+            if not (cli or brama or pyta) or detect_hardline_command(tresc)[0] or _match_user_deny_rule(tresc) \
+                    or _command_matches_permanent_allowlist(tresc):
+                return None
+            groznie, klucz, opis = detect_dangerous_command(tresc)
+            if not groznie:
+                return None
+        sesja = ap.get_current_session_key()
+        with _ZAMEK:
+            nasza = (sesja, klucz) in _PRZEPUSZCZONE
+        if ap.is_approved(sesja, klucz) and not nasza:
+            return None
+        return sesja, klucz, opis
+    except Exception:
+        logger.debug("jarvo-zgody: nie ustaliłem, czy Hermes zapyta o %s", narzedzie, exc_info=True)
+        return None
+
+
+def _smart_werdykt(tresc: str, opis: str, klucz: str, sesja: str) -> str:
+    """Werdykt strażnika smart Hermesa: approve, deny albo escalate (ten sam model i approvals.smart_policy profilu,
+    tools/approval_smart.py:134 _smart_verdict); „brak”, gdy nie odpowie w SMART_LIMIT_S albo go nie ma."""
+    try:
+        from tools.approval_smart import _smart_verdict
+    except Exception:
+        return "brak"
+    wynik: Dict[str, str] = {}
+    gotowe = threading.Event()
+    kontekst = contextvars.copy_context()
+
+    def ocen() -> None:
+        try:
+            wynik["werdykt"] = kontekst.run(_smart_verdict, tresc, opis, klucz, [klucz], sesja)
+        except Exception:
+            logger.debug("jarvo-zgody: strażnik smart zawiódł", exc_info=True)
+        finally:
+            gotowe.set()
+
+    threading.Thread(target=ocen, name="jarvo-zgody-smart", daemon=True).start()
+    if not gotowe.wait(SMART_LIMIT_S):
+        return "brak"
+    return str(wynik.get("werdykt") or "brak")
+
+
+def _hermes_przepusc(sesja: str, klucz: str) -> None:
+    """Zgoda w Hermesie dla wzorca w tej sesji (tools/approval.py:249 approve_session), żeby bramka nie pytała."""
+    from tools.approval import approve_session
+    approve_session(sesja, klucz)
+    with _ZAMEK:
+        _PRZEPUSZCZONE[(sesja, klucz)] = None
+        _PRZEPUSZCZONE.move_to_end((sesja, klucz))
+        while len(_PRZEPUSZCZONE) > 512:
+            _PRZEPUSZCZONE.popitem(last=False)
 
 
 def _terminal_cwd() -> str:
@@ -678,11 +787,17 @@ def _ocen_sciezke(realna: Optional[str], surowa: str, m: _Miejsca, *, plikowe: b
         return _Werdykt("blokuj", pokaz, f"chronione: {chronione}" if chronione else "poza dozwolonymi katalogami",
                         zawsze=bool(chronione))
     if plikowe:
-        if skl and skl[-1] in PLIKI_INSTRUKCJI and _hermes_pyta_o_instrukcje(surowa or realna, task_id):
-            return _Werdykt("hermes", pokaz, "plik instrukcji (pyta Hermes)")
+        czeka = ((skl and skl[-1] in PLIKI_INSTRUKCJI and _hermes_pyta_o_instrukcje(surowa or realna, task_id))
+                 or _hermes_pyta_o_zapis(realna))
+        if czeka:          # Hermes zapyta sam (pliki instrukcji przy security.protected_instruction_files, ~/.ssh/config)
+            if m.tryb == "auto":                      # auto nie czeka na człowieka: od razu blokada z radą
+                return _Werdykt("blokuj", pokaz, HERMES_CZEKA)
+            return _Werdykt("hermes", pokaz, "zapis z prośbą Hermesa")
         if _hermes_odmowi_zapisu(realna):
             return _Werdykt("hermes", pokaz, "zapis odrzuca Hermes")
     if chronione:
+        if m.tryb == "auto" and not m.yolo:   # decyzja 27.11: pytamy tylko o płatności; niszczenie łapie strażnik kasowania
+            return _Werdykt("ok", pokaz)
         return _Werdykt("blokuj" if m.yolo else "pytaj", pokaz, f"chronione: {chronione}", zawsze=True)
     if m.tryb == "pytaj":
         return _Werdykt("pytaj", pokaz, "zapis")
@@ -1790,6 +1905,8 @@ class _Krytyczne:
     robocze: List[str]                # wyjątki w danych Jarva: skarbiec, misje, katalogi kart, HOME terminala
     jednorazowe: List[str]            # katalogi tymczasowe i kart: repozytoria git w nich nie są chronione
     konfig_k: Optional[str] = None
+    # pojedynczy plik w danych Jarva wolno usunąć tylko tu: robocze wyżej i katalogi robocze profili (ROBOCZE_PROFILU)
+    robocze_plikow: List[str] = field(default_factory=list)
 
 
 def _domy() -> List[str]:
@@ -1848,7 +1965,7 @@ def _krytyczne(m: _Miejsca) -> _Krytyczne:
     robocze = [k for k, _ in cale if any(_wewnatrz(k, j) for j, _ in jarvo)]
     jednorazowe = [k for k in (_k_realny(t) for t in _tymczasowe()) if k] + \
         [k for k, opis in cale if opis == "katalogi robocze kart"]
-    return _Krytyczne(cale, wnetrze, jarvo, robocze, jednorazowe, m.konfig_k)
+    return _Krytyczne(cale, wnetrze, jarvo, robocze, jednorazowe, m.konfig_k, robocze + list(m.robocze))
 
 
 def _korzen_repo(p: str) -> Optional[str]:
@@ -2870,6 +2987,10 @@ def _powod_sciezki(ks: _Kasowanie, p: str, kr: _Krytyczne) -> Optional[str]:
             return None
         nazwa = _skladnik(os.path.basename(k))
         opis = w(kr.wnetrze) or ("dane Jarva" if ks.rodzaj == "oproznij" and not roboczy and w(kr.jarvo) else None)
+        # 27.11 Hacker chciał usunąć `rm -f` plik bazy w profilu i czekał 300 s na zgodę: plik w danych Jarva poza
+        # katalogami roboczymi (stan, sesje, bazy, pamięć) jest nie do odtworzenia, więc to blokada, a nie prośba
+        if not opis and ks.rodzaj == "plik" and w(kr.jarvo) and not any(_wewnatrz(k, r) for r in kr.robocze_plikow):
+            opis = "dane Jarva"
         if not opis and nazwa in CHRONIONE_PLIKI:
             opis = os.path.basename(p)
         if ks.rodzaj == "oproznij" and not opis:
@@ -2921,6 +3042,9 @@ def _rada_kasowania(kasowania: List[_Kasowanie], m: _Miejsca) -> str:
                     "zwykłego push albo nowej gałęzi")
     if any(k.rodzaj == "oproznij" for k in kasowania):
         rady.append("chroniony plik zmieniaj konkretnymi liniami (patch) albo dopisuj (`>>`), nie opróżniaj go")
+    if any(k.rodzaj == "plik" for k in kasowania):
+        rady.append("chroniony plik (dane Jarva, ~/.ssh, pliki startowe powłoki) zostaw, a zbędny opisz właścicielowi "
+                    "jednym zdaniem ze ścieżką, to usunie go sam")
     if any(k.sciezki is None for k in kasowania):
         rady.append("podaj jawne ścieżki (bez zmiennych, $(…), xargs i globów spoza projektu)")
     rady.append("skasuj konkretne pliki albo wyniki budowania w projekcie (node_modules, dist, .svelte-kit, "
@@ -3290,6 +3414,12 @@ def _blok_werdyktow(werdykty: List[_Werdykt], m: _Miejsca, co: str) -> Dict[str,
     if konfig:
         return _blok(f"{_lista(konfig)} to konfiguracja Hermesa (zgody, modele, klucze). Agent nie zmienia jej w żadnym "
                      "trybie; zmianę robi właściciel (`jarvo`, `hermes config`).")
+    czeka = [w for w in werdykty if w.powod == HERMES_CZEKA]
+    if czeka:
+        logger.warning("jarvo-zgody: zablokowany zapis, o który Hermes pytałby człowieka: %s", _maskuj(_lista(czeka)))
+        return _blok(f"o zapis {_lista(czeka)} Hermes pyta człowieka i czekałby na zgodę do 5 min, a w trybie auto nic "
+                     "nie czeka na zgodę poza płatnością, więc zapisz proponowaną treść obok jako plik roboczy i powiedz "
+                     "właścicielowi jednym zdaniem, co i gdzie ma wkleić.")
     if m.bez_czl:
         powody = "; ".join(dict.fromkeys(w.powod for w in werdykty))
         return _blok(f"{KONTEKSTY.get(m.bez_czl, m.bez_czl)} działa bez człowieka, więc nie ma kogo zapytać o zgodę na "
@@ -3390,14 +3520,14 @@ def _terminal(args: Dict[str, Any], m: _Miejsca, task_id: str) -> Optional[Dict[
         return _blok_werdyktow(blok, m, "zapis")
     if m.bez_czl:
         return None       # bez człowieka: reszta (nieznane cele, inne programy) zostaje polityce Hermesa
+    if m.tryb == "auto":  # auto: chronione miejsca przechodzą (_ocen_sciezke), Hermes nie czeka na człowieka
+        return None if m.yolo else _bez_czekania("terminal", polecenie, m)
     if _hermes_niebezpieczne(polecenie):
         return None       # niebezpieczne pyta albo blokuje Hermes (nie pytamy dwa razy)
     zawsze = [w for w in werdykty if w.rodzaj == "pytaj" and w.zawsze]
     zwykle = [w for w in werdykty if w.rodzaj in ("pytaj", "nieznana") and not w.zawsze]
     if m.tryb == "pytaj":                     # pytaj: wszystko poza poleceniami tylko do odczytu
         potrzebne = not a.tylko_odczyt or bool(zawsze or zwykle)
-    elif m.tryb == "auto":                    # auto: tylko chronione miejsca (zapis config.yaml blokuje _ocen_sciezke)
-        potrzebne = bool(zawsze)
     else:                                     # projekt: zapisy poza folderem, chronione, inne programy, nieznane
         potrzebne = bool(zawsze or zwykle or a.inne or a.nieznane)
     if not potrzebne:
@@ -3416,6 +3546,36 @@ def _terminal(args: Dict[str, Any], m: _Miejsca, task_id: str) -> Optional[Dict[
         powody.append("zapis")
     return _prosba("terminal", m, f"polecenie `{pokaz}` ({'; '.join(powody)})", polecenie.strip(),
                    zawsze=bool(zawsze))
+
+
+def _bez_czekania(narzedzie: str, tresc: str, m: _Miejsca) -> Optional[Dict[str, str]]:
+    """Tryb auto z człowiekiem (decyzja 27.11): polecenie terminala albo execute_code, o które Hermes zapytałby człowieka
+    po ocenie strażnika smart, wtyczka rozstrzyga od razu tym samym strażnikiem. APPROVE = zgoda w Hermesie dla wzorca
+    (następne takie wywołanie wtyczka ocenia od nowa), DENY = blokada z radą, ESCALATE albo brak oceny = prośba tylko
+    przy płatności albo zakupie, inaczej blokada z radą. Nic nie czeka approvals.timeout (300 s) na przycisk zgody."""
+    ocena = _hermes_zapyta(narzedzie, tresc)
+    if not ocena:
+        return None
+    sesja, klucz, opis = ocena
+    polecenie = tresc if narzedzie == "terminal" else f"execute_code <<'PY'\n{tresc}\nPY"   # jak approval.py:1283
+    werdykt = _smart_werdykt(polecenie, opis, klucz, sesja)
+    if werdykt == "approve":
+        _hermes_przepusc(sesja, klucz)
+        return None
+    pokaz = _poczatek(tresc, 120) if narzedzie == "terminal" else f"execute_code ({tresc.count(chr(10)) + 1} linii)"
+    if werdykt != "deny" and PLATNOSC.search(tresc[:_MAX_POLECENIA]):
+        _hermes_przepusc(sesja, klucz)        # o płatność pyta wtyczka, Hermes nie pyta drugi raz
+        return _prosba(narzedzie, m, f"płatność albo zakup ({opis}): `{pokaz}`. Zgoda = Twoje „tak” dla tego jednego "
+                       "wywołania.", f"{tresc}\n{os.urandom(8).hex()}")
+    logger.warning("jarvo-zgody: strażnik smart: %s dla %s (%s), blokuję zamiast czekać na zgodę", werdykt, narzedzie,
+                   _maskuj(pokaz))
+    if werdykt == "deny":
+        return _blok(f"strażnik smart uznał `{pokaz}` za niszczące ({opis}), więc nie uruchamiam tego, tylko zrób to "
+                     "bezpieczniej (jawne ścieżki w katalogu roboczym, `git stash` zamiast reset --hard, kopia przed "
+                     "zmianą) albo poproś właściciela jednym zdaniem, żeby zrobił to sam.")
+    return _blok(f"strażnik smart nie ocenił `{pokaz}` ({opis}), a w trybie auto nic nie czeka na zgodę poza płatnością, "
+                 "więc rozbij to na prostsze kroki (skrypt zapisz do pliku i uruchom go po ścieżce), a płatność albo "
+                 "zakup opisz właścicielowi jednym zdaniem.")
 
 
 def _potwierdza(v: Any) -> bool:
@@ -3489,7 +3649,7 @@ def _telefon(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[str, str]]:
         return _blok(f"confirm=true na telefonie ({tool_name}) wymaga „tak” człowieka, a w trybie pełnym (YOLO) Hermes "
                      "zatwierdza wszystko sam. Wyłącz /yolo i ponów.")
     tryb, _ = tryb_zgod()
-    if tryb == "auto" and not PLATNOSC_TELEFON.search(json.dumps(args, ensure_ascii=False, default=str)):
+    if tryb == "auto" and not PLATNOSC.search(json.dumps(args, ensure_ascii=False, default=str)):
         return None                 # auto: polecenie właściciela w rozmowie jest zgodą; płatność dalej pytamy
     m = _miejsca(tryb, None, False)
     return _prosba(tool_name, m, f"telefon: ryzykowna akcja z confirm=true (bramka needs_confirm telefonu): {akcja}. "
@@ -3716,9 +3876,11 @@ def _decyzja(tool_name: str, args: Dict[str, Any], task_id: str) -> Optional[Dic
         if bez_czl:
             return _blok(f"execute_code to dowolny kod, a {KONTEKSTY.get(bez_czl, bez_czl)} działa bez człowieka. "
                          f"Użyj terminala albo narzędzi plików w dozwolonych katalogach. {_porada_bez_czlowieka(m)}")
-        if (_hermes_pyta_o_kod() and not yolo) or m.tryb == "auto":
-            return None
         kod = str(args.get("code") or "")
+        if m.tryb == "auto":
+            return None if yolo else _bez_czekania(tool_name, kod, m)
+        if _hermes_pyta_o_kod() and not yolo:
+            return None
         return _prosba(tool_name, m, f"uruchomienie kodu Pythona (execute_code, {kod.count(chr(10)) + 1} linii)", kod)
     akcja = str(args.get("action") or "").strip().lower()
     if tool_name == "process_manage":

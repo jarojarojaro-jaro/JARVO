@@ -16,7 +16,7 @@ tej samej bramki co zrzut `computer_use` (wpisy modeli w `jarvo/flota.py`, `MODE
 |---|---|
 | **pytaj** | pyta o `write_file`, `patch` (także łatki V4A), `execute_code`, `process_manage` i `cronjob_manage` (działania zmieniające) oraz o terminal spoza listy poleceń tylko do odczytu |
 | **projekt** | jak pytaj, ale bez pytania zapisy i proste polecenia plikowe (`mkdir`, `touch`, `cp`, `mv`, `rm`, `rmdir`, `sed -i`, `tee`, `>` i `>>`), gdy rzeczywista ścieżka leży w folderze projektu, w katalogu roboczym karty, w skarbcu (`JARVO_KNOWLEDGE_DIR`) albo w misjach (`JARVO_MISSIONS_DIR`, dziennik Jarva) |
-| **auto** (domyślny, decyzja właściciela 14.11) | bez pytania polecenia terminala, zapisy, `execute_code`, procesy i rutyny; pyta tylko o chronione miejsca (niżej) i o `confirm` na telefonie, gdy cel wygląda na płatność albo usunięcie konta; masowe kasowanie i zapis `config.yaml` blokuje jak w każdym trybie. Z człowiekiem; na karcie i w rutynie zasady bez zmian (niżej) |
+| **auto** (domyślny, decyzje właściciela 14.11 i 27.11) | bez pytania polecenia terminala, zapisy, `execute_code`, procesy i rutyny, także w chronionych miejscach (niżej); z człowiekiem jedyna prośba to płatność albo zakup: `confirm` na telefonie, gdy cel wygląda na płatność albo usunięcie konta, oraz terminal i `execute_code` z płatnością, których strażnik smart Hermesa nie zatwierdził. Nic nie czeka na przycisk zgody (`approvals.timeout`, 300 s): polecenie, o które Hermes zapytałby człowieka po ocenie strażnika smart (`rm -r`, `find -delete`, `python -c`, `pkill -9`, SQL DROP…), wtyczka rozstrzyga od razu tym samym strażnikiem (APPROVE = zgoda w Hermesie dla wzorca w tej sesji, DENY albo brak oceny w 20 s = blokada z radą), a zapis `~/.ssh/config`, o który Hermes pyta zawsze, blokuje z radą. Masowe kasowanie, usunięcie pliku w danych Jarva i zapis `config.yaml` blokuje jak w każdym trybie. Na karcie i w rutynie zasady bez zmian (niżej) |
 | **pełny** | tylko na sesję: `jarvo chat --tryb pelny` (czyli `--yolo`) albo `/yolo`; Hermes zatwierdza prośby sam; wtyczka nigdy nie włącza go sama, a w każdym profilu blokuje pod nim narzędzia ekranu i telefonu (`computer_use`, `komputer`, `mcp__phone__*`; ekran i telefon mają Jarvo i agent biznesowy z przydziałem) |
 
 Zawsze, w każdym trybie:
@@ -27,16 +27,19 @@ Zawsze, w każdym trybie:
   wtyczka, config agenta) to zlecenie dla Claude Code w `<misje>/DLA-CLAUDE.md` (repo JARVO, skan skilli, wdrożenie);
   zapis w zainstalowanym profilu znika przy aktualizacji i omija skan. 14.11 Jarvo wgrał tak ręcznie skill do
   `jarvo-web`, a właściciel osiem razy klikał „Always”;
-- zgoda na `AGENTS.md`, `CLAUDE.md`, `SOUL.md` i chronione miejsca: `.git`, `.vscode`, `.idea`, `.claude`, `.hermes`,
-  `.gitconfig`, `.bashrc`, `.zshrc`, `.npmrc`, `.mcp.json` (i inne pliki startowe powłoki), reszta danych Jarva
-  (`HERMES_HOME`, `JARVO_ROOT`: sekrety, stan zgód, pamięć, bazy; poza `jarvo/workspaces`, skarbcem, misjami
+- w trybach pytaj i projekt zgoda na `AGENTS.md`, `CLAUDE.md`, `SOUL.md` i chronione miejsca: `.git`, `.vscode`, `.idea`,
+  `.claude`, `.hermes`, `.gitconfig`, `.bashrc`, `.zshrc`, `.npmrc`, `.mcp.json` (i inne pliki startowe powłoki), reszta
+  danych Jarva (`HERMES_HOME`, `JARVO_ROOT`: sekrety, stan zgód, pamięć, bazy; poza `jarvo/workspaces`, skarbcem, misjami
   i katalogami roboczymi Hermesa w każdym profilu: `cache` (brudnopis `cache/scratch`), `home`, `workspace`, `plans`,
-  `sandboxes`, `audio_cache`, `image_cache`). Hermes nie pozwala wtyczce ukryć przycisku „Always”, a klucz reguły
-  obejmuje ten sam plik albo to samo polecenie, więc treść takiej prośby kończy się zdaniem „Stała zgoda tu nie
-  działa: …”. W trybie pełnym o te miejsca nie da się zapytać, więc są blokowane;
-- o polecenia, które Hermes sam uzna za niebezpieczne, pyta tylko Hermes (bez drugiego pytania). Pliki instrukcji
-  przez `write_file` i `patch` też pyta sam Hermes (zawsze, także pod YOLO). Wyjątek: masowe kasowanie blokuje
-  strażnik kasowania (niżej), zanim Hermes o nie zapyta;
+  `sandboxes`, `audio_cache`, `image_cache`); w trybie auto przechodzą (decyzja 27.11), a niszczenie tych miejsc łapie
+  strażnik kasowania. Hermes nie pozwala wtyczce ukryć przycisku „Always”, a klucz reguły obejmuje ten sam plik albo to
+  samo polecenie, więc treść takiej prośby kończy się zdaniem „Stała zgoda tu nie działa: …”. W trybie pełnym o te
+  miejsca nie da się zapytać, więc są blokowane;
+- w trybach pytaj i projekt o polecenia, które Hermes sam uzna za niebezpieczne, pyta tylko Hermes (bez drugiego
+  pytania); w auto rozstrzyga je od razu wtyczka (wyżej). Bramkę plików instrukcji Hermesa, która pyta zawsze (także
+  pod YOLO) i czekała w panelu 300 s, flota wyłącza (`security.protected_instruction_files: false` w configu każdego
+  profilu); pliki instrukcji ocenia wtyczka. Wyjątek: masowe kasowanie blokuje strażnik kasowania (niżej), zanim
+  Hermes o nie zapyta;
 - `kill`, `pkill` i `killall` pracownika karty kanbana albo Hermesa = blokada z radą `kanban_block` / `kanban_complete`
   ([strażnik pracowników kart](#strażnik-pracowników-kart));
 - decyzja przypisana właścicielowi bez jego cytatu i czasu (tekst narzędzi kanbana, zapis w misjach i skarbcu) =
@@ -83,7 +86,7 @@ konkretne pliki po jawnej ścieżce, a całość zostawić właścicielowi (na k
 |---|---|
 | katalog domowy, `~/dev`, `~/strony`, `~/jarvo-testy`, każde repozytorium git (katalog z `.git`; poza katalogami tymczasowymi i katalogami kart), skarbiec, misje, katalogi robocze kart | skasować miejsca w całości, jego zawartości (`rm -rf ~/dev/*`, `rsync --delete` do niego) ani katalogu nad nim; skasować `.git` repozytorium |
 | `~/.ssh`, `~/.config`, `~/.phoneuse` | skasować cokolwiek w środku, także pojedynczy plik, ani opróżnić pliku |
-| dane i kod Jarva (`~/.local/share/jarvo`, `HERMES_HOME`, `JARVO_ROOT`, kod Hermesa; poza skarbcem, misjami, katalogami kart i HOME terminala) | skasować drzewo w środku ani nadpisać pliku |
+| dane i kod Jarva (`~/.local/share/jarvo`, `HERMES_HOME`, `JARVO_ROOT`, kod Hermesa; poza skarbcem, misjami, katalogami kart i HOME terminala) | skasować drzewo w środku ani nadpisać pliku; usunąć pojedynczy plik (`rm`, `unlink`, `os.remove`) poza tymi miejscami i katalogami roboczymi profili (`cache`, `home`, `workspace`, `plans`, `sandboxes`, `audio_cache`, `image_cache`): 27.11 Hacker chciał tak usunąć bazę w profilu i czekał 300 s na zgodę |
 | pliki startowe powłoki (`.bashrc`, `.gitconfig`…), pliki w `.git`, `config.yaml` Hermesa; pliki instrukcji (`AGENTS.md`, `SOUL.md`…) | usunąć (startowe) albo opróżnić (`> plik`, `truncate`, `dd of=`, `cp /dev/null`, `tee`, `write_file` z pustą treścią, `patch` usuwający całą treść, V4A `*** Delete File`) |
 
 Rozpoznawane formy: `rm -r`/`-R`/`--recursive` i `-f` w każdej kolejności (także po celach), pod `sudo`, `env`,

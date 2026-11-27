@@ -1,9 +1,12 @@
 """Wejście Komputera natywnie (docs/NATYWNIE.md J04, J09): jedyna droga floty do przeglądarki Jarva.
 
 Rdzeń jest ten sam co w kontenerze (`infra/komputer/wejscie.py`: sesja MCP, kontrola protokołu, migawki tej sesji,
-świeża migawka przed działaniem na element, ukrywanie sekretów, dziennik bez treści, limit działań, jedna sesja przy
-ekranie naraz) i te same twarde zasady (`infra/komputer/zasady.py`) z zasadami natywnymi przed nimi
-(`zasady_natywne.py`). Inne są cztery rzeczy:
+świeża migawka przed działaniem na element, ukrywanie sekretów, dziennik bez treści, limit działań) i te same twarde
+zasady (`infra/komputer/zasady.py`) z zasadami natywnymi przed nimi (`zasady_natywne.py`). Inne jest pięć rzeczy:
+  - zamiast jednego ekranu na sesję naraz każde zadanie agenta (klucz ekranu sesji: rozmowa Hermesa, karta kanbana
+    albo sama sesja) ma własne okno przeglądarki (sterownik_cdp.okno_dla): sterownik dostaje każde wywołanie
+    z kluczem zadania, zasady oceniają kartę tego zadania, `window_id` cudzej karty to odmowa `cudze_okno`, a koniec
+    ostatniej sesji zadania zwalnia jego karty; dwa zadania pracują naraz i żadne nie widzi strony drugiego;
   - kontekst zasad to KontekstCDP: element, punkt i fokus opisuje na żywo sterownik CDP (zamiast AT-SPI i X11);
   - sterownik działa w tym samym procesie (sterownik_cdp.Sterownik), więc wiadomość MCP po ocenie idzie do niego
     przez kolejkę sesji, a odpowiedź wraca tą samą drogą co w kontenerze (ukrywanie sekretów, migawki);
@@ -51,10 +54,10 @@ if str(_INFRA) not in sys.path:
 import wejscie  # noqa: E402  (infra/komputer/wejscie.py: rdzeń sesji bez zmian)
 import zasady  # noqa: E402
 
-from . import kanal, zasady_natywne, zgoda_karty  # noqa: E402
+from . import kanal, sterownik_cdp, zasady_natywne, zgoda_karty  # noqa: E402
 
 MAKS_DZIENNIK = 2 << 20
-MAKS_SESJE = wejscie.MAKS_SESJE
+MAKS_SESJE = 8                    # sesji naraz: dwa połączenia na zadanie (computer_use i `komputer`), kilka zadań
 CZAS_KOLEJKI = 60.0               # s czekania na koniec poprzedniego wywołania sesji, zanim zasady ocenią następne
 TYLKO_WLASCICIEL = ("wznow", "stop", "okno", "wyczysc", "restart", "klatka", "przejmij", "wejscie")
 # Bramka (jarvo_cua.py) podaje przed rozmową kartę kanbana, nad którą pracuje agent (HERMES_KANBAN_TASK i tablica
@@ -169,6 +172,7 @@ class KontekstCDP(wejscie.KontekstSesji):
         self.karta: tuple[str, str] | None = None     # (numer karty, tablica) od bramki (KARTA), pierwsza wygrywa
         self.sesja = 0                                # numer sesji (klucz prób weryfikacji bez karty)
         self.proba_weryfikacji: str | None = None     # strona dozwolonej próby okienka „jestem człowiekiem”
+        self.zadanie: Callable[[], object] = lambda: None   # klucz zadania agenta (SesjaNatywna.klucz_ekranu)
 
     @property
     def klucz_weryfikacji(self) -> tuple:
@@ -207,8 +211,17 @@ class KontekstCDP(wejscie.KontekstSesji):
         """Skalę zrzutu zna sterownik (ta sama dla zasad i kliknięcia), więc kontekst jej nie liczy."""
 
     def _nr_okna(self, args: dict):
+        """Karta, na której działa wywołanie: `window_id` albo aktywna karta zadania tej sesji (sterownik daje ją
+        zadaniu przy pierwszym wywołaniu, więc zasady oceniają tę samą kartę, na której sterownik zadziała)."""
         nr = args.get("window_id")
-        return nr if nr is not None else (self.sterownik.aktywne_okno() if self.sterownik else None)
+        s, zadanie = self.sterownik, self.zadanie()
+        if nr is not None or s is None or zadanie is None:
+            return nr if nr is not None or s is None else s.aktywne_okno()
+        try:
+            return s.okno_dla(zadanie)
+        except Exception as e:  # noqa: BLE001 - bez karty cel nieznany: zasady odmówią, nigdy nie przepuszczą
+            log(f"sesja {self.sesja}: karta zadania: {e!r}")
+            return None
 
     def cel(self, nazwa: str, args: dict) -> dict | None:
         s = self.sterownik
@@ -244,21 +257,22 @@ class KontekstCDP(wejscie.KontekstSesji):
         return zasady.PROGRAM_PRZEGLADARKI if self.sterownik is not None and pid == self.sterownik.pid else ""
 
     def aktywne_okno(self) -> int | None:
-        return self.sterownik.aktywne_okno() if self.sterownik is not None else None
+        return self.sterownik.aktywne_okno(self.zadanie()) if self.sterownik is not None else None
 
     def pid_okna(self, okno: int) -> int | None:
         s = self.sterownik
-        return s.pid if s is not None and s.okno(okno) is not None else None
+        return s.pid if s is not None and s.nalezy(okno, self.zadanie()) else None
 
 
 class SesjaNatywna(wejscie.Sesja):
     """Jedno połączenie z kanałem `cua`: agent ↔ zasady (rdzeń z kontenera) ↔ sterownik CDP w tym procesie.
 
     Paczka `run_steps` (sterownik_cdp.run_steps) przechodzi tu jako jedno wywołanie, ale sterownik wykonuje każdy
-    jej krok przez `_krok`: tę samą drogę co pojedyncze wywołanie od agenta (twarde zasady z pauzą, ekranem jednej
-    sesji i limitem działań na minutę, świeży element, wpis w dzienniku, migawki sesji, ukrywanie sekretów), na
+    jej krok przez `_krok`: tę samą drogę co pojedyncze wywołanie od agenta (twarde zasady z pauzą, oknem zadania
+    i limitem działań na minutę, świeży element, wpis w dzienniku, migawki sesji, ukrywanie sekretów), na
     stronie po poprzednim kroku. Odmowa kroku wraca jako jego wynik, sterownik go nie wykonuje i kończy paczkę.
-    Paczki JSON-RPC (lista wiadomości) rdzeń dalej odrzuca."""
+    Paczki JSON-RPC (lista wiadomości) rdzeń dalej odrzuca. Każde wywołanie idzie do sterownika z kluczem zadania
+    (`klucz_ekranu`), więc działa tylko na kartach tego zadania (sterownik_cdp: okno zadania agenta)."""
 
     DOSTEPNE = zasady.DOSTEPNE | {"run_steps"}
 
@@ -266,6 +280,7 @@ class SesjaNatywna(wejscie.Sesja):
         super().__init__(strumien, wej)
         self.ctx = KontekstCDP(wej.ekran, wej)
         self.ctx.sesja = self.nr
+        self.ctx.zadanie = lambda: self.klucz_ekranu
         self._kolejka: queue.Queue = queue.Queue()
         self._pracownik: threading.Thread | None = None
         self._konfig: dict = {"capture_scope": "window", "capture_mode": "som", "max_image_dimension": None}
@@ -320,7 +335,7 @@ class SesjaNatywna(wejscie.Sesja):
             try:
                 if sterownik is None:
                     raise RuntimeError("przeglądarka Jarva właśnie startuje")
-                odp = sterownik.obsluz_mcp(msg, self._konfig, self._krok)
+                odp = sterownik.obsluz_mcp(msg, self._konfig, self._krok, self.klucz_ekranu)
             except Exception as e:  # noqa: BLE001 - błąd sterownika to błąd wywołania, nie koniec sesji
                 odp = None if msg.get("id") is None else {
                     "jsonrpc": "2.0", "id": msg.get("id"),
@@ -358,6 +373,9 @@ class SesjaNatywna(wejscie.Sesja):
 
     def _ocen(self, nazwa: str, args) -> zasady.Werdykt:
         self.ctx.proba_weryfikacji = None
+        odmowa = self._cudze_okno(nazwa, args)
+        if odmowa is not None:
+            return odmowa
         if nazwa == "run_steps":
             return self._ocen_paczke(args)
         # zasady patrzą na stronę po poprzednim działaniu, a nie przed nim (np. klik w pole hasła jeszcze w kolejce);
@@ -382,22 +400,32 @@ class SesjaNatywna(wejscie.Sesja):
             self.wejscie.zapisz_weryfikacje(self.ctx.klucz_weryfikacji, adres)
         super()._zapisz(nazwa, args, w)
 
+    def _ekran_sesji(self, nazwa: str) -> zasady.Werdykt | None:
+        """Natywnie każde zadanie agenta ma własne okno przeglądarki (sterownik_cdp.okno_dla), więc sesje różnych
+        zadań nie czekają na siebie (`zajete` z rdzenia jest dla ekranu kontenera, który widać w całości)."""
+        return None
+
+    def _cudze_okno(self, nazwa: str, args) -> zasady.Werdykt | None:
+        """`window_id` karty innego zadania agenta: odmowa przed zasadami (zasady nie opisują cudzej strony)."""
+        s = self.wejscie.sterownik
+        nr = args.get("window_id") if isinstance(args, dict) else None
+        if s is None or nr is None or nazwa not in sterownik_cdp.OKNOWE or s.okno(nr) is None \
+                or s.nalezy(nr, self.klucz_ekranu):
+            return None
+        return zasady.Werdykt(zasady.ODMOWA, "cudze_okno", sterownik_cdp.CUDZE_OKNO, cel=f"okno {nr}")
+
     def _ocen_paczke(self, args: dict) -> zasady.Werdykt:
-        """Sama paczka: przy pauzie nie idzie wcale, przy ekranie innej sesji też nie (`zajete`, a po utracie ekranu
-        `ekran_zmieniony`: najpierw patrz); inaczej przechodzi do sterownika, a każdy jej krok ocenia `_krok` przed
-        wykonaniem (paczka bez wejścia nie działa: sterownik bez `wykonaj` odmawia)."""
+        """Sama paczka: przy pauzie nie idzie wcale; inaczej przechodzi do sterownika, a każdy jej krok ocenia `_krok`
+        przed wykonaniem (paczka bez wejścia nie działa: sterownik bez `wykonaj` odmawia)."""
         if self.ctx.wstrzymane:
             powod = self.ctx.powod_pauzy or "właściciel zatrzymał Komputer"
             return zasady.Werdykt(zasady.WSTRZYMANE, "wstrzymane", f"{powod}; patrzeć wolno, działać nie")
-        odmowa = self._ekran_sesji("run_steps")
-        if odmowa is not None:
-            return odmowa
         kroki = args.get("steps")
         return zasady.Werdykt(zasady.TAK, cel=f"{len(kroki) if isinstance(kroki, list) else 0} kroków")
 
     def _krok(self, nazwa: str, args: dict) -> dict:
         """Jeden krok paczki (także migawka do celu napisem i obserwacja), wołany przez sterownik w jego wątku przed
-        każdym krokiem: ocena zasad (pauza, ekran jednej sesji, limit działań), świeży element, dziennik, sterownik,
+        każdym krokiem: ocena zasad (okno zadania, pauza, limit działań), świeży element, dziennik, sterownik,
         migawka w kontekście sesji i sekrety ukryte. Odmowa: wynik odmowy, sterownik kroku nie dostaje."""
         if nazwa not in zasady.DOSTEPNE:                    # paczka w paczce i narzędzia spoza listy
             w = zasady.Werdykt(zasady.ODMOWA, "narzedzie", f"{nazwa} nie może być krokiem paczki")
@@ -412,14 +440,15 @@ class SesjaNatywna(wejscie.Sesja):
         if sterownik is None:
             return zasady.wynik_odmowy(zasady.Werdykt(zasady.ODMOWA, "przegladarka", "przeglądarka Jarva właśnie "
                                                                                      "startuje"))
-        return self._po_wyniku(nazwa, args, sterownik.wywolaj(nazwa, args, self._konfig))
+        return self._po_wyniku(nazwa, args, sterownik.wywolaj(nazwa, args, self._konfig, wl=self.klucz_ekranu))
 
     def _zapytaj_sterownik(self, nazwa: str, args: dict) -> dict | None:
         # krok paczki: sterownik wykonuje paczkę w tym samym wątku, więc świeża migawka idzie do niego wprost
         # (przez kolejkę czekałaby na koniec paczki)
         if self._w_pracowniku():
             sterownik = self.wejscie.sterownik
-            return None if sterownik is None else {"result": sterownik.wywolaj(nazwa, args, self._konfig)}
+            return None if sterownik is None else {"result": sterownik.wywolaj(nazwa, args, self._konfig,
+                                                                               wl=self.klucz_ekranu)}
         return super()._zapytaj_sterownik(nazwa, args)
 
     def zamknij(self) -> None:
@@ -480,11 +509,18 @@ class WejscieNatywne:
 
     def koniec_sesji(self, sesja) -> None:
         with self._lock:
-            if not any(s is not sesja and s.klucz_ekranu == sesja.klucz_ekranu for s in self.sesje):
+            ostatnia = not any(s is not sesja and s.klucz_ekranu == sesja.klucz_ekranu for s in self.sesje)
+            if ostatnia:
                 self.ekran.zwolnij(sesja.klucz_ekranu)   # ostatnia sesja grupy ekranu: ekran wolny od razu
             if sesja in self.sesje:
                 self.sesje.discard(sesja)
                 log(f"sesja {sesja.nr}: koniec")
+        s = self.sterownik
+        if ostatnia and s is not None:
+            try:
+                s.zwolnij_okna(sesja.klucz_ekranu)     # koniec zadania: jego karty wolne (najstarsze zamknięte)
+            except Exception as e:  # noqa: BLE001 - przeglądarka mogła właśnie paść; karty wróci restart
+                log(f"sesja {sesja.nr}: zwolnienie kart zadania: {e!r}")
 
     def w_uzyciu(self, cisza: float, teraz: float | None = None) -> bool:
         """Czy ktoś korzysta z ekranu albo ekran na kogoś czeka (usługa nie parkuje wtedy kart): pauza (prośba

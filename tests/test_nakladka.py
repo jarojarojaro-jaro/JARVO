@@ -99,11 +99,26 @@ def test_kolizja_nazwy_i_obcy_klucz_to_blad(tmp_path):
 
 def test_lock_dokłada_wpisy_nakladki(nakladka, tmp_path):
     lock = fl.load_lock(nakladka=nakladka)
-    assert lock["agents"][AGENT] == [{"source": "jarvo", "path": "shared/skills/odczyt-ekranu", "dest": "pliki/odczyt-ekranu"}]
+    assert lock["agents"][AGENT] == [{"source": "jarvo", "path": "shared/skills/odczyt-ekranu", "dest": "pliki/odczyt-ekranu",
+                                      "z_nakladki": True}]
     assert AGENT not in fl.load_lock(nakladka=None)["agents"]
     (tmp_path / "skills.lock.yaml").write_text("agents:\n  jarvo-web: []\n", encoding="utf-8")
     with pytest.raises(SystemExit, match="jarvo-web ma już wpisy"):
         fl.load_lock(nakladka=tmp_path)
+
+
+def test_skill_nakladki_ktorego_wersja_nie_ma_jest_pomijany(tmp_path, capsys):
+    """Powrót do poprzedniej wersji po nieudanej aktualizacji: nakładka bywa nowsza i wskazuje nowy skill repo."""
+    class Zrodla:
+        def resolve(self, name):
+            return tmp_path
+    lock = {"sources": {"jarvo": {"type": "repo-tree"}},
+            "agents": {"a": [{"source": "jarvo", "path": "shared/skills/nowy", "dest": "x/nowy", "z_nakladki": True}]}}
+    build.vendor_skills("a", tmp_path / "out", lock, Zrodla(), [])
+    assert "ta wersja Jarva nie ma" in capsys.readouterr().out
+    lock["agents"]["a"][0].pop("z_nakladki")
+    with pytest.raises(SystemExit, match="brak SKILL.md"):
+        build.vendor_skills("a", tmp_path / "out", lock, Zrodla(), [])
 
 
 @pytest.fixture(scope="module")

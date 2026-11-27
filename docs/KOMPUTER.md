@@ -13,7 +13,7 @@ odtwarzamy własnym kodem na Hermesie i otwartym sterowniku `cua-driver` (MIT).
 |---|---|---|
 | **Komputer Jarva**: pulpit z Chromium i terminalem w osobnym kontenerze `jarvo-komputer`, włączany `jarvo komputer on` | Linux, macOS (Colima), Windows (WSL), VPS bez monitora | pulpit, wejście sterownika i twarde zasady działają (K1, K2); sprawdzone na Linuksie amd64, macOS i arm64 czekają na pierwszą próbę na prawdziwym sprzęcie |
 | **Jarvo przy ekranie** (`jarvo`, `komputer: true`): sam steruje ekranem (najpierw drzewo dostępności, zrzut tylko gdy trzeba) | wszędzie tam, gdzie Komputer | działa (K3) |
-| **Agent biznesowy przy ekranie** (dowolny agent z `marka` i `komputer: true`): ta sama przeglądarka, ta sama bramka i twarde zasady, jedna sesja steruje naraz (§7) | wszędzie tam, gdzie Komputer | w kodzie, pierwsza próba przed nami |
+| **Agent biznesowy przy ekranie** (dowolny agent z `marka` i `komputer: true`): ta sama przeglądarka, ta sama bramka i twarde zasady, natywnie własne okno na zadanie, w kontenerze jedna sesja steruje naraz (§7) | wszędzie tam, gdzie Komputer | w kodzie, pierwsza próba przed nami |
 | **Ekran w HQ**: podgląd na żywo, Przejmij, Oddaj, Zatrzymaj | zalogowany dashboard | etap K4 |
 | **Terminal i serwery**: powłoka w Komputerze, ekrany programów tekstowych, Twoje serwery przez SSH | wszędzie | etap K5 |
 | **Ręce**: Twój komputer na czas, który sam ustawisz, tylko w aplikacjach, które wskażesz | Windows, macOS, Linux (X11 albo XWayland), instalacja natywna | działa w kodzie (K6, §9): `jarvo komputer rece on/off/status`, zgoda, bramka, profil rąk `jarvo-ekran`; próba na żywo z prawdziwym sterownikiem przed nami |
@@ -226,35 +226,57 @@ wejścia (użytkownik `pulpit`, wznawiany przez `start.sh` po awarii, uruchamian
 - **pilnuje protokołu**: tylko pojedyncze wiadomości (bez batch JSON-RPC), tylko `initialize`, `ping`, `tools/list`,
   `tools/call` (argumenty jako obiekt) i powiadomienia; sterownik dostaje wiadomość zapisaną od nowa z tego,
   co ocenił, a nie surowe bajty agenta; id żądania w toku nie da się użyć drugi raz (odpowiedź zawsze trafia do swojego
-  wywołania); do 1 MB na wiadomość, do 4 sesji naraz, do 120 działań na minutę;
+  wywołania); do 1 MB na wiadomość, do 4 sesji naraz (natywnie 8: dwie na zadanie), do 120 działań na minutę;
 - **ocenia każdy krok paczki** `run_steps` (natywnie, sterownik CDP): sama paczka przechodzi do sterownika tylko bez
   pauzy, a sterownik przed każdym krokiem woła wejście (`SesjaNatywna._krok`). Krok idzie tą samą drogą co
-  pojedyncze wywołanie: zasady na stronie po poprzednim kroku (z ekranem jednej sesji i limitem 120 działań na
+  pojedyncze wywołanie: zasady na stronie po poprzednim kroku (z oknem zadania i limitem 120 działań na
   minutę liczonym na krok), świeża migawka elementu, wpis w dzienniku, ukrywanie sekretów. Odmowa kroku wraca jako
   jego wynik, sterownik go nie wykonuje i kończy paczkę; kolejne kroki nie idą. W kontenerze (cua-driver) paczki nie
   ma: wejście nie pokazuje `run_steps` i go nie przepuszcza;
-- **daje ekran jednej sesji naraz** (K3): patrzeć na stronę (drzewo, zrzut, karty z adresami, `wait_for`) i ją
-  zmieniać (klik, pisanie, przejście, paczka `run_steps`, okna) może tylko sesja, która ma ekran, czyli ta, która
-  wywołała coś z tego ostatnio. Druga sesja Jarva (np. druga karta kanbana albo rozmowa w HQ w trakcie karty) dostaje
-  odmowę `zajete` z `next_step: wait_and_retry`, `held_by` (kto ma ekran: `karta t_…` albo rozmowa bez karty)
-  i `free_in_s` (za ile najpóźniej się zwolni), a przeglądarka nic od niej nie dostaje. Ekran zwalnia koniec ostatniej
-  sesji tamtej karty albo 120 s bez jej wywołań; przy pauzie (krok właściciela, `oddaj`) czas nie płynie, a po
+- **natywnie daje każdemu zadaniu agenta własne okno przeglądarki** (sterownik CDP, `okno_dla`): zadanie to rozmowa
+  Hermesa, karta kanbana albo sama sesja (klucz ekranu, niżej). Pierwsze wywołanie zadania bierze wolną pustą kartę
+  (np. startową) albo otwiera nową kartę w nowym oknie przeglądarki; potem każde narzędzie (`computer_use` i `komputer`:
+  przejście, zrzut, drzewo, klik elementem i w punkt, pisanie, klawisze z `ctrl+z`, przewijanie, `wait_for`, paczka
+  `run_steps`) bez `window_id` działa na aktywnej karcie tego zadania, `list_windows` pokazuje tylko jego karty,
+  `launch_app` i okno otwarte przez jego stronę są jego, a `kill_app` zamyka tylko jego karty. `window_id` karty
+  innego zadania to odmowa `cudze_okno` (`next_step: fresh_state`), zanim zasady i przeglądarka cokolwiek dostaną.
+  Wolną kartę, której żadne zadanie nie miało (startowa, przywrócona po restarcie, otwarta przez właściciela), albo
+  pustą zadanie bierze, wskazując ją numerem; wolnej karty ze stroną zakończonego zadania nie dostaje. Koniec ostatniej
+  sesji zadania zwalnia jego karty (to samo zadanie wraca do nich po ponownym połączeniu), a z wolnych kart po zadaniach
+  zostają najwyżej dwie, starsze się zamykają. Dwa zadania pracują więc naraz i żadne nie widzi ani nie rusza strony
+  drugiego (27.11 ok. 05:30: rozmowy panelu C1, edytor HQ, i W1, oferty OLX, miały jeden klucz i jedną kartę, więc
+  `computer_use hotkey ctrl+z` w C1 dał paragon ze strony OLX, a `capture` C1 widział kartę W1). Zrzut karty zadania
+  nie przestawia podglądu w HQ: podgląd i „Przejmij” pokazują kartę ostatniego działania agenta;
+- **w kontenerze daje ekran jednej sesji naraz** (K3): zrzut obejmuje cały pulpit, a klik w punkt i klawisze idą
+  przez globalne wejście X11, więc okien zadań nie da się tam bezpiecznie rozdzielić. Patrzeć na stronę (drzewo,
+  zrzut, karty z adresami, `wait_for`) i ją zmieniać (klik, pisanie, przejście, okna) może tylko sesja, która ma ekran,
+  czyli ta, która wywołała coś z tego ostatnio. Druga sesja (inna karta kanbana albo inna rozmowa, także w tym samym
+  procesie bramy) dostaje odmowę `zajete` z `next_step: wait_and_retry`, `held_by` (kto ma ekran: `karta t_…` albo
+  `rozmowa Jarva <skrót> bez karty kanbana`), `free_in_s` (za ile najpóźniej się zwolni) i `queue_position` (miejsce
+  w kolejce), a przeglądarka nic od niej nie dostaje. Kolejka: po zwolnieniu ekran dostaje najpierw sesja, która
+  dostała `zajete` najwcześniej, jeśli spróbuje znowu do 30 s po podanym czasie (przy wcześniejszym zwolnieniu: do
+  30 s od zwolnienia); późniejsze dostają `zajete` z miejscem w kolejce. Ekran zwalnia koniec ostatniej sesji
+  tamtego zadania albo 120 s bez jej wywołań; przy pauzie (krok właściciela, `oddaj`) czas nie płynie, a po
   wznowieniu sesja, która miała ekran, ma go jeszcze 120 s, żeby wrócić do strony po kroku właściciela. Sesja, której
   inna zabrała ekran, nie działa na stronie, której nie widziała: pierwsze działanie po utracie ekranu dostaje
   `ekran_zmieniony` (`next_step: fresh_state`), dopóki nie zrobi `get_window_state` (albo `navigate`). 16.11 karty
   t_87d11e3a i t_8a2f5f5e sterowały ekranem naraz, a paczka kroków jednej poszła w rejestrację otwartą przez drugą:
   obie miały ten sam klucz grupy ekranu (niżej), a patrzenie nie zajmowało ekranu.
-  Wyjątek to **grupa ekranu**: wtyczka `jarvo-komputer` ustawia w procesie Hermesa losowy klucz
+  **Klucz ekranu** (czyje jest okno, kto ma ekran): wtyczka `jarvo-komputer` ustawia w procesie Hermesa losowy klucz
   `JARVO_KOMPUTER_GRUPA` z PID tego procesu (`p<pid>-…`), który dziedziczą bramki `computer_use` tego procesu, a bramka
   podaje go wejściu powiadomieniem `notifications/jarvo/grupa` przed rozmową, razem z kartą procesu
   (`JARVO_KOMPUTER_KARTA`, którą wtyczka ustawia obok klucza z `HERMES_KANBAN_TASK`; Hermes zdejmuje
-  `HERMES_KANBAN_*` z otoczenia bramki `computer_use`, a tę zmienną zostawia). Sesje z tym samym kluczem i tą samą
-  kartą (narzędzie `komputer` i `computer_use` jednej sesji Jarva) liczą się jak jedna, więc zrzut przez
-  `computer_use` po krokach wtyczki nie czeka 120 s (17.11 karta t_8a8a79ab: `computer_use` bez karty dostawał
-  `zajete` od własnego `komputer`). Pracownik
+  `HERMES_KANBAN_*` z otoczenia bramki `computer_use`, a tę zmienną zostawia) i z rozmową Hermesa
+  (`JARVO_KOMPUTER_ROZMOWA`: 16 znaków skrótu SHA-256 id sesji Hermesa). Rozmowę bramce swojego narzędzia wtyczka
+  daje wprost, a bramce `computer_use` przez owinięcie Hermesa (`zwiaz_computer_use`): Hermes uruchamia ją raz na
+  sesję w `tools.computer_use.tool._get_backend(session_id)` z otoczeniem z `cua_backend.cua_driver_child_env()`
+  w wątku pętli tej bramki, więc wtyczka podaje rozmowę sesji na czas startu i zapamiętuje ją dla tego wątku (także
+  przy restarcie transportu). Sesje z tym samym kluczem, kartą i rozmową (narzędzie `komputer` i `computer_use`
+  jednej rozmowy albo karty) liczą się jak jedno zadanie: natywnie jedno okno, w kontenerze bez czekania na siebie
+  (17.11 karta t_8a8a79ab: `computer_use` bez karty dostawał `zajete` od własnego `komputer`). Pracownik
   karty kanbana dostaje od dispatchera kopię otoczenia bramy Hermesa, a w nim klucz bramy: wtyczka zastępuje klucz
-  z cudzym PID własnym, a wejście i tak nie łączy sesji różnych kart. To nie jest granica bezpieczeństwa: każde
-  działanie i tak oceniają twarde zasady. Dwie rozmowy w jednym procesie bramy Hermesa dzielą ekran.
+  z cudzym PID własnym, a wejście i tak nie łączy sesji różnych kart ani różnych rozmów. To nie jest granica
+  bezpieczeństwa: każde działanie i tak oceniają twarde zasady.
 
 **Twarde zasady** (`infra/komputer/zasady.py`, czyste funkcje, testy w `tests/test_komputer_zasady.py`):
 
@@ -278,8 +300,9 @@ wejścia (użytkownik `pulpit`, wznawiany przez `start.sh` po awarii, uruchamian
 | Alt (także Alt+Shift) z literą, cyfrą albo innym klawiszem spoza nawigacji: skrót `accesskey` strony klika przycisk bez sprawdzenia (Alt ze strzałkami, Home, End, PgUp, PgDn, Tab, Esc, Backspace, Delete, Insert i F1–F11 przechodzi) | zablokowane (`accesskey`) |
 | działanie z `delivery_mode: foreground` (globalne wejście X11) w oknie, które nie jest aktywne, bez `window_id` (przewijanie całego okna bez `window_id`: gdy aktywne okno należy do innego programu, `_NET_WM_PID`) albo gdy nie wiadomo, które okno jest aktywne (`_NET_ACTIVE_WINDOW`) | zablokowane (`okno_nieaktywne`) |
 | wszystko poza odczytem przy pauzie | wstrzymane |
-| patrzenie na stronę albo działanie, gdy ekran ma inna sesja (jej ostatnie wywołanie mniej niż 120 s temu albo pauza) | zablokowane (`zajete`, kto ma ekran i za ile się zwolni; czekaj i spróbuj znowu) |
-| działanie sesji, której inna zabrała ekran, zanim spojrzy na stronę od nowa | zablokowane (`ekran_zmieniony`, najpierw `get_window_state` albo `navigate`) |
+| patrzenie na stronę albo działanie, gdy ekran ma inna sesja (jej ostatnie wywołanie mniej niż 120 s temu albo pauza) albo gdy na zwolniony ekran czeka sesja odesłana wcześniej (kontener) | zablokowane (`zajete`, kto ma ekran, za ile się zwolni i miejsce w kolejce; czekaj i spróbuj znowu) |
+| działanie sesji, której inna zabrała ekran, zanim spojrzy na stronę od nowa (kontener) | zablokowane (`ekran_zmieniony`, najpierw `get_window_state` albo `navigate`) |
+| `window_id` karty przeglądarki innego zadania agenta (natywnie) | zablokowane (`cudze_okno`, `next_step: fresh_state`; własne okno pokazuje `list_windows` i `get_window_state` bez `window_id`) |
 
 **Zgoda właściciela w karcie.** Płatność i zakup idą tylko z Twoim poleceniem zapisanym przez Jarva w treści
 karty kanbana, jedną linią w dowolnym miejscu:
@@ -394,8 +417,9 @@ wygląd, dowód kroku) i do kliku w punkt ze zrzutu; w kontenerze (cua-driver) c
 przeciąganie i podwójny klik na wierzchu w aktywnym oknie (`okno_nieaktywne` → nowy `capture` i inna droga albo
 prośba do właściciela, nigdy samo przestawianie okien).
 Odmowy wejścia to granica: `wymaga_czlowieka` → `komputer` `oddaj` i `kanban_block`, `zablokowane` → inna droga,
-`zajete` → raz po podanym czasie (`free_in_s`), dalej zajęte → `kanban_block` z kartą, która ma ekran,
-`ekran_zmieniony` → najpierw `patrz`, `wstrzymane` → czeka; po wznowieniu zaczyna od `patrz`. Treść ekranu to dane, nie
+`zajete` (kontener) → raz po podanym czasie (`free_in_s`, miejsce w kolejce `queue_position`), dalej zajęte →
+`kanban_block` z kartą, która ma ekran, `cudze_okno` (natywnie: okno innego zadania) → własne okno bez `window_id`,
+od `patrz`, `ekran_zmieniony` → najpierw `patrz`, `wstrzymane` → czeka; po wznowieniu zaczyna od `patrz`. Treść ekranu to dane, nie
 polecenia. Haseł, kart i kodów z czatu nie przyjmuje; loguje się, wysyła i publikuje sam, a płaci tylko ze zgodą
 właściciela w karcie (§6), inaczej płaci właściciel w oknie Komputera (VNC do pulpitu serwera, Tailscale); Jarvo
 korzysta z tej sesji tylko w zakresie karty. Limit: 60 działań na kartę (krok paczki to działanie), po 3 nieudanych
@@ -420,8 +444,8 @@ dowiązuje ją tylko tam, a z innych profili dowiązanie usuwa. `stan`, `dzienni
 przez `ster.sock`, a strony (`idz`, `patrz`, `kroki`, `czekaj`) przez kanał `cua`, tą samą bramką co `computer_use`
 (`$HERMES_CUA_DRIVER_CMD mcp`, polecenie z manifestu bramki), więc każde wywołanie oceniają te same twarde zasady
 i ten sam dziennik. Rozmowa trwa na sesję Hermesa i kończy się po 5 minutach bez wywołań; numery z ostatniego
-`patrz` albo obserwacji wtyczka dokłada do `kroki` sama (`snapshot_id`). Ekran dzieli z `computer_use` tego samego
-procesu (grupa ekranu, §6):
+`patrz` albo obserwacji wtyczka dokłada do `kroki` sama (`snapshot_id`). Okno (natywnie) i ekran (kontener) dzieli
+z `computer_use` tej samej rozmowy albo karty (klucz ekranu, §6; bez `okno` działa w oknie swojego zadania):
 
 | Akcja | Co robi |
 |---|---|
@@ -440,20 +464,23 @@ tam `computer_use`.
 
 **Drugi agent na ekranie (agent biznesowy z `komputer: true`).** Kod Komputera nie zakłada jednego profilu: walidator
 dopuszcza `computer_use` i klucze `cua:` każdemu agentowi z `komputer: true`, build włącza mu wtyczkę `jarvo-komputer`,
-a `HERMES_CUA_DRIVER_CMD` mają wszystkie procesy floty. Ekran jest jeden i to jest zamek: wejście daje patrzenie i sterowanie
-jednej sesji naraz (§6), więc gdy Jarvo działa, sesja agenta biznesowego dostaje `zajete` (`wait_and_retry`) i odwrotnie; ekran
-zwalnia koniec sesji albo 120 s bez wywołań. Grupa ekranu (`JARVO_KOMPUTER_GRUPA`) jest losowa na proces Hermesa, a brama
-Telegrama i czatu HQ to jeden proces wszystkich profili: rozmowa agenta biznesowego i rozmowa Jarva w bramie liczyłyby się jak
-jedna sesja i zamek by między nimi nie działał. Dlatego agent biznesowy ma ekran (`computer_use`, `komputer`) tylko w `cli`:
-na karcie kanbana (osobny proces pracownika z własnym kluczem i kartą) i w `hermes -p <profil> chat`; w rozmowie pracę na
-ekranie zleca sobie kartą (toolset `kanban`). Karta agenta biznesowego i karta albo rozmowa Jarva to zawsze różne sesje przy
-ekranie. Agent ma te same twarde zasady, dziennik, pauzę i zgody z karty, ten sam zestaw stałych zgód co Jarvo (bez okna na
+a `HERMES_CUA_DRIVER_CMD` mają wszystkie procesy floty. Natywnie każde zadanie (karta albo rozmowa) ma własne okno
+przeglądarki (§6), więc Jarvo i agent biznesowy pracują naraz, każdy w swoim oknie, a okna drugiego nie widzi
+(`list_windows`) i go nie rusza (`cudze_okno`). W kontenerze ekran jest jeden i to jest zamek: wejście daje patrzenie
+i sterowanie jednej sesji naraz, więc gdy Jarvo działa, sesja agenta biznesowego dostaje `zajete` (`wait_and_retry`,
+z miejscem w kolejce) i odwrotnie; ekran zwalnia koniec sesji albo 120 s bez wywołań. Klucz ekranu ma grupę procesu
+(`JARVO_KOMPUTER_GRUPA`), kartę i rozmowę Hermesa, więc rozmowy w jednym procesie bramy (Telegram, czat HQ) to różne
+zadania. Agent biznesowy ma ekran (`computer_use`, `komputer`) tylko w `cli`: na karcie kanbana (osobny proces
+pracownika z własnym kluczem i kartą) i w `hermes -p <profil> chat`; w rozmowie pracę na ekranie zleca sobie kartą
+(toolset `kanban`). Karta agenta biznesowego i karta albo rozmowa Jarva to zawsze różne zadania przy ekranie. Agent ma
+te same twarde zasady, dziennik, pauzę i zgody z karty, ten sam zestaw stałych zgód co Jarvo (bez okna na
 wierzch), bez `code_execution`, w rutynie (cron) bez ekranu; pod YOLO ekran i telefon są zablokowane w każdym profilu
 (wtyczka `jarvo-zgody`).
-Czego zamek nie daje: przeglądarka jest wspólna (te same zalogowane konta, karty i historia), więc agent biznesowy **może
-zobaczyć** karty Jarva i odwrotnie. Podział wiedzy agenta biznesowego dotyczy skarbca, nie ekranu (to skupienie, nie
-szyfr; [FLEET.md](FLEET.md#agenci-biznesowi)); jego skille ekranu powinny kazać nie zamykać cudzych kart i nie przestawiać okien.
-Osobny profil przeglądarki na agenta to możliwy kolejny krok.
+Czego okna zadań nie dają: profil przeglądarki jest wspólny (te same zalogowane konta, ciasteczka i historia), a w
+kontenerze agent biznesowy **może zobaczyć** karty Jarva na wspólnym pulpicie i odwrotnie. Podział wiedzy agenta
+biznesowego dotyczy skarbca, nie ekranu (to skupienie, nie szyfr; [FLEET.md](FLEET.md#agenci-biznesowi)); jego skille
+ekranu powinny kazać nie zamykać cudzych kart i nie przestawiać okien. Osobny profil przeglądarki na agenta to możliwy
+kolejny krok.
 
 **Skarbiec bez wyciągów z sesji ekranu i telefonu.** Wyniki narzędzi ekranu i telefonu to treść ekranu: cudze dane,
 maile, formularze. Wtyczka `jarvo-wiedza` nie robi wyciągu z sesji, w której Jarvo użył `computer_use`, `komputer`
@@ -496,8 +523,10 @@ dotąd; czytanie skarbca i orzeczeń działa bez zmian.
   patrzy najpierw drzewem (`ax`), a zrzut robi tylko, gdy drzewo nie wystarcza. Zamazywanie obrazu (rozpoznanie
   tekstu i maska na sekretach) to możliwy kolejny krok.
 - **Ryzyko resztkowe: wspólna przeglądarka dwóch agentów.** Jarvo i agent biznesowy z `komputer: true` sterują tym
-  samym Chromium (zamek: jedna sesja naraz, §6), więc każdy widzi karty, historię i zalogowane konta drugiego.
-  Twarde zasady obowiązują obu; odczytu cudzej karty zamek nie zatrzymuje (§7, „Drugi agent na ekranie”).
+  samym Chromium z jednym profilem (natywnie każde zadanie we własnym oknie, w kontenerze zamek: jedna sesja naraz,
+  §6), więc dzielą zalogowane konta, ciasteczka i historię. Twarde zasady obowiązują obu; natywnie cudzej karty
+  zadanie nie widzi ani nie rusza (`cudze_okno`), w kontenerze odczytu cudzej karty zamek nie zatrzymuje (§7, „Drugi
+  agent na ekranie”).
 - **Działania na wierzchu.** Klawiatura, przewijanie, przeciąganie i klik w punkt idą przez globalne wejście X11
   (§6). Wejście przepuszcza je tylko w oknie, które już jest aktywne, i sprawdza pole z fokusem albo element w punkcie
   w tym oknie; zostaje krótka chwila między sprawdzeniem a wykonaniem, w której strona może przestawić elementy
