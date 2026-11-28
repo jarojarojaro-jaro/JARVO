@@ -393,6 +393,8 @@ class Zbieracz:
                 wynik = self._wynik_przebiegu(r, agent, omp, wpisy_omp, teraz)
             kroki = _json(r["kroki"], None)
             zlecil = {"wlasciciel": "JARO", "decyzja": "JARO", "nadzor": "JARO"}.get(r["zrodlo"], agent)
+            if zlecil == "JARO" and str(prompt).lstrip().startswith("(Operator"):
+                zlecil = "Operator"          # Operator pisze z panelu jak właściciel, ale podpisuje się na początku
             if r["zrodlo"] == "przekaz" and r["przekaz_z"]:
                 z = str(agenci_przekazu.get(r["przekaz_z"]) or agent)
                 zlecil = z[2:] if z.startswith("s:") else z

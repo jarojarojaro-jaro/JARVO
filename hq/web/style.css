@@ -2600,7 +2600,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-osf-ul { list-style: none; margin: 0; padding: 0; }
 .j-osf-w { box-shadow: inset 0 1px 0 var(--j-linia); }
 .j-osf-w.is-dziecko { margin-left: calc(var(--j-osf-poziom, 1) * 20px); box-shadow: inset 0 1px 0 var(--j-linia), inset 1px 0 0 var(--j-linia-mocna); }
-.j-osf-l { display: grid; grid-template-columns: 40px minmax(0, 150px) minmax(0, 1fr) 84px minmax(0, 110px) 124px minmax(0, .8fr); gap: 0 12px; align-items: baseline;
+.j-osf-l { display: grid; grid-template-columns: 40px minmax(0, 130px) minmax(0, 2fr) 84px minmax(0, 100px) 140px minmax(0, 1fr); gap: 0 12px; align-items: baseline;
   width: 100%; min-height: 32px; padding: 7px 12px; border: 0; background: none; color: var(--j-tresc); font: inherit; font-size: 13px; line-height: 18px; text-align: left;
   cursor: pointer; transition: background .24s var(--j-ease); }
 .j-osf-l:hover { background: var(--j-tlo-hover); }

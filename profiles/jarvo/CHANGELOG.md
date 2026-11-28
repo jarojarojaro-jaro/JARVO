@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Oś floty: każde zlecenie każdego agenta (panel, Telegram, karta, rutyna, Kernel, Operator) to wpis od zlecenia do końca z urządzeniami i wynikiem; przed turą widzę blok „Teraz we flocie” z zadaniami innych i zajętymi urządzeniami, całość czytam `jarvo flota os`.
 - Prośba o zgodę czeka na odpowiedź JARO do doby, a w panelu agent z pytaniem albo prośbą ma stan PYTANIE pulsujący na pomarańczowo.
 - Pulpit prowadzi jedno zadanie naraz jak telefon: klik albo pisanie, gdy inne zadanie działało na nim w ostatnich 10 minutach, strażnik zatrzymuje z informacją, kto go zajmuje.
 - Telefon prowadzi jedno zadanie naraz: gdy inne zadanie działało na nim w ostatnich 10 minutach, strażnik zatrzymuje mój krok z informacją, kto go zajmuje.
