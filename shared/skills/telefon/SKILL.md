@@ -1,7 +1,7 @@
 ---
 name: telefon
 description: "Telefon floty: narzędzia, odczyt ekranu, listy, przepisy, plansze Sklepu Play."
-version: 1.2.0
+version: 1.3.0
 author: Jarvo
 license: MIT
 metadata:
@@ -58,6 +58,7 @@ numerowane wiersze w 0,1 do 0,2 s, każdy krok wraca z paragonem, a ryzykowne kr
 - Link albo aplikację otwierasz `act` `open` z `url`, `package` albo `app`.
 - SMS piszesz `act` `open` z `url` `sms:<numer bez spacji>?body=<tekst zakodowany jak w adresie>`, co otwiera wątek tego numeru z tekstem w polu, potem na `shot` sprawdzasz, że pole ma dokładnie ten tekst (stary szkic wątku zostaje), i stukasz „Send message”, a gdy zamiast wątku z polem widzisz inny tryb (np. „Forward message”), zamykasz Wiadomości `adb shell am force-stop com.google.android.apps.messaging` i otwierasz adres jeszcze raz.
 - Pole bez wiersza (np. pole wiadomości w Wiadomościach Google) czyścisz `tap` w pole i `clear` bez indeksu.
+- SMS do ludzi piszesz jak @@WLASCICIEL@@: małe litery, bez przecinków i polskich znaków, najwyżej 2 krótkie zdania, link na końcu po „ - ”, np. `mikolaj jestem robie strony tutaj poprawilem lekko twoja daj znac czy sie podoba - https://…`, a draft pokazujesz @@WLASCICIEL@@ przed wysłaniem.
 - Link do oferty albo wpisu, którego aplikacja nie pokazuje, bierzesz z „Udostępnij” → „Kopiuj link”, wklejasz go w dowolne pole tekstowe (np. wyszukiwarka aplikacji) i czytasz z wiersza ekranu, a potem pole czyścisz; linku nigdy nie zgadujesz ani nie przepisujesz z uciętego podglądu.
 - Adb zostaje do instalacji APK, `pm list`, `dumpsys`, `getprop` i `logcat`.
 - Telefon, który nie odpowiada, wraca sam, więc czekasz i ponawiasz `ping`, zanim napiszesz do @@WLASCICIEL@@.
