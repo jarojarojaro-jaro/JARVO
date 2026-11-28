@@ -56,7 +56,7 @@ numerowane wiersze w 0,1 do 0,2 s, każdy krok wraca z paragonem, a ryzykowne kr
 - Jedno zadanie pracuje na jednym telefonie, z tym samym `phone` w każdym wywołaniu.
 - Ekranem sterujesz tylko narzędziami telefonu, bo surowe adb (`input`, `uiautomator dump`, `screencap`, `am start`, `monkey`) jest odrzucane, gdy ciało PhoneUse odpowiada.
 - Link albo aplikację otwierasz `act` `open` z `url`, `package` albo `app`.
-- SMS piszesz `act` `open` z `url` `sms:<numer bez spacji>?body=<tekst zakodowany jak w adresie>`, co otwiera wątek tego numeru z tekstem w polu, potem na `shot` sprawdzasz, że pole ma dokładnie ten tekst (stary szkic wątku zostaje), i stukasz „Send message”.
+- SMS piszesz `act` `open` z `url` `sms:<numer bez spacji>?body=<tekst zakodowany jak w adresie>`, co otwiera wątek tego numeru z tekstem w polu, potem na `shot` sprawdzasz, że pole ma dokładnie ten tekst (stary szkic wątku zostaje), i stukasz „Send message”, a gdy zamiast wątku z polem widzisz inny tryb (np. „Forward message”), zamykasz Wiadomości `adb shell am force-stop com.google.android.apps.messaging` i otwierasz adres jeszcze raz.
 - Pole bez wiersza (np. pole wiadomości w Wiadomościach Google) czyścisz `tap` w pole i `clear` bez indeksu.
 - Link do oferty albo wpisu, którego aplikacja nie pokazuje, bierzesz z „Udostępnij” → „Kopiuj link”, wklejasz go w dowolne pole tekstowe (np. wyszukiwarka aplikacji) i czytasz z wiersza ekranu, a potem pole czyścisz; linku nigdy nie zgadujesz ani nie przepisujesz z uciętego podglądu.
 - Adb zostaje do instalacji APK, `pm list`, `dumpsys`, `getprop` i `logcat`.
