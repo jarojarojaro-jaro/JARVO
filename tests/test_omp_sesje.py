@@ -95,6 +95,7 @@ def test_stan(w, tmp_path, monkeypatch):
                                     "odpowiedz": None, "blad": None}
     monkeypatch.delenv("JARVO_OMP")
     monkeypatch.setenv("PATH", str(tmp_path / "pusto"))
+    monkeypatch.setenv("HOME", str(tmp_path))    # bez zapasu ~/.local/bin/omp
     s = om.stan(w)
     assert s["stan"] == "offline" and s["powod"] == "brak programu omp"
 

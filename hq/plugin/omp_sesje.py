@@ -273,7 +273,9 @@ def rozmowcy(dane: Path, dom: Path | None = None) -> list[dict]:
 # ---------------------------------------------------------------- blokada, dzierżawa, stan
 
 def program_omp() -> str | None:
-    return os.environ.get("JARVO_OMP") or shutil.which("omp")
+    """omp z JARVO_OMP, z PATH albo z ~/.local/bin (usługa po starcie systemu ma krótszy PATH niż terminal)."""
+    zapas = Path.home() / ".local" / "bin" / "omp"
+    return os.environ.get("JARVO_OMP") or shutil.which("omp") or (str(zapas) if zapas.is_file() else None)
 
 
 def blokada_zajeta(w: Wpis) -> bool:

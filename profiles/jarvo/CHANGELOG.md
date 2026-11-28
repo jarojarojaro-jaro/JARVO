@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Sesje omp (Operator, Kernel) w panelu działają od razu po restarcie serwera: program `omp` jest szukany także w `~/.local/bin`.
 - Gdy w trakcie pracy model odda samo rozumowanie bez odpowiedzi, tura idzie dalej zamiast kończyć się w połowie zadania bez wyniku.
 - W Komputerze klikam jak ręką (kursor dojeżdża łukiem, przycisk trzymany chwilę), Komputer w tle i `browser_*` mają ekran z paskiem zadań, mysz i WebGL z karty graficznej zamiast cech trybu bez okna, a Komputer w tle przechodzi wyzwanie Cloudflare.
 - JARO widzi moją pracę w HQ w jednym oknie „Na żywo” (Komputer do 3 klatek na sekundę, pulpit serwera, telefon i obok moje ostatnie kroki z nazwą zadania i rozmowy), a gdy naciśnie tam „Przejmij”, moje działania w Komputerze czekają na pauzie do „Oddaj”.
