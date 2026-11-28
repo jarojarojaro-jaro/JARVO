@@ -309,6 +309,7 @@ def test_compact_i_licznik(w, at):
     assert c["customInstructions"] == "skup się na GPU"
     wk = om.wynik_komendy(w, "c1")
     assert wk["stan"] == "gotowe" and wk["wynik"] == "Kontekst skompresowany: było 5 000 tokenów, jest 1 200 (0,6% okna)."
+    assert wk["kompresja"] == {"przed": 5000, "po": 1200, "procent": 0.6}
     assert om.licznik(w)["kontekst"] == 1200
     (at / "compact_blad").write_text("")
     om.komenda(w, "compact", "", "c2")

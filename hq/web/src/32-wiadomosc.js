@@ -445,12 +445,14 @@ function ZywyDymek({ p, ctx, odcinek = null }) {
 }
 
 // ------------------------------------------------------------------------------------------------- systemowe
+const krotkoTokeny = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : `${Math.round(n / 1e3)}k`);
+
 function PozycjaSystemowa({ x }) {
   let tekst = x.tekst || T("os.zdarzenie"), ikona = null;
   if (x.rodzaj === "luka") { tekst = T("os.luka"); ikona = "alert"; }
   else if (x.rodzaj === "kompresja") {
-    const t = x.tokeny || {}, k = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : `${Math.round(n / 1e3)}k`);
-    tekst = t.przed && t.po ? T("os.kompresjaTokeny", { przed: k(t.przed), po: k(t.po) }) : T("os.kompresja");
+    const t = x.tokeny || {};
+    tekst = t.przed && t.po ? T("os.kompresjaTokeny", { przed: krotkoTokeny(t.przed), po: krotkoTokeny(t.po) }) : T("os.kompresja");
     ikona = "repeat";
   }
   else if (x.rodzaj === "dopisano") { tekst = T("os.dopisano", { tekst: x.tekst || "" }); ikona = "plus"; }

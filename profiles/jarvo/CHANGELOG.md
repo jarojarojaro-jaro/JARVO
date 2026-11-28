@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- `/compact` sesji omp w panelu to jedna linia: kółko z licznikiem czasu, póki trwa, potem tokeny przed i po z procentem okna.
 - Licznik kontekstu sesji omp w panelu liczy z bieżącej gałęzi rozmowy, tak jak omp w terminalu.
 - Panel pokazuje sesję omp z terminala w tle (tmux bez ekranu, bez ruchu od 60 s) jako wolną, a wiadomość z panelu albo Telegrama zamyka taki terminal i od razu robi turę.
 - `jarvo telegram wyslij` ponawia wysyłkę, gdy połączenie z Telegramem się zerwie, a skrzynka sesji omp zapisuje w `sesja.log` każdą wiadomość, której nie wysłała.

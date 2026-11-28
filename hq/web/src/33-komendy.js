@@ -69,8 +69,39 @@ function MenuKomend({ id, lista, aktywna, onWybierz, onNajedz }) {
   </ul>`;
 }
 
+// `/compact` sesji omp w rozmowie: jedna linia jak inne zdarzenia osi, z kółkiem i licznikiem czasu, póki trwa (jak
+// „Compacting context…” w terminalu omp), potem liczby tokenów; ten sam wpis przechodzi z `trwa` w wynik
+function KomendaWToku({ x, d }) {
+  const trwa = !!d.trwa;
+  const [teraz, setTeraz] = useState(() => Date.now() / 1000);
+  useEffect(() => {
+    if (!trwa) return undefined;
+    const t = setInterval(() => setTeraz(Date.now() / 1000), 1000);
+    return () => clearInterval(t);
+  }, [trwa]);
+  const k = d.kompresja || {};
+  let tekst;
+  if (trwa) tekst = d.komenda === "compact" ? T("komendy.kompresja_trwa") : T("komendy.trwa", { komenda: d.polecenie || "" });
+  else if (k.przed && k.po) {
+    tekst = T("os.kompresjaTokeny", { przed: krotkoTokeny(k.przed), po: krotkoTokeny(k.po) });
+    if (typeof k.procent === "number") tekst += ` · ${T("komendy.procent_okna", { procent: k.procent.toFixed(1).replace(".", isPL() ? "," : ".") })}`;
+  } else tekst = ((isPL() ? d.wynik : d.wynik_en || d.wynik) || "").replace(/`/g, "");
+  const s = Math.max(0, Math.round(teraz - (x.ts || teraz)));
+  return html`<p class=${cx("j-msg-sys is-komenda", trwa && "is-trwa")} data-pozycja=${x.id} role="status" aria-live="polite">
+    ${trwa ? html`<span class="j-spin" aria-hidden="true"></span>` : html`<${Ikona} n="repeat" r=${14}/>`}<span>${tekst}</span>
+    ${d.agent && html`<span class="j-kom-sys-ag">· ${nazwaAgenta(d.agent)}</span>`}
+    <time class="j-kom-sys-czas">${trwa ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}` : Czas.godzina(x.ts)}</time></p>`;
+}
+
 // wynik komendy: w rozmowie z wpisu osi (`x`), na ekranie startu z odpowiedzi trasy (`dane`, `onZamknij`)
-function WynikKomendy({ x = null, dane = null, watek = null, onZamknij = null }) {
+function WynikKomendy(props) {
+  const { x = null, dane = null } = props;
+  const d = dane || (x && x.wpis && x.wpis.dane) || {};
+  return x && d.ok !== false && (d.trwa || d.komenda === "compact") ? html`<${KomendaWToku} x=${x} d=${d}/>`
+    : html`<${KartaKomendy} ...${props}/>`;
+}
+
+function KartaKomendy({ x = null, dane = null, watek = null, onZamknij = null }) {
   const d = dane || (x && x.wpis && x.wpis.dane) || {};
   const [trwa, setTrwa] = useState(null);
   const wybor = Array.isArray(d.wybor) ? d.wybor : [];

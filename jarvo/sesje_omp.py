@@ -815,17 +815,20 @@ class Sesja:
             proc = (dane.get("contextUsage") or {}).get("percent")
             if isinstance(proc, (int, float)):
                 tekst += f" ({proc:.1f}% okna)".replace(".", ",")
-            self.komenda_koniec(k, wynik=tekst + ".")
+            liczby = {"przed": k.get("przed"), "po": po, "procent": proc}
+            self.komenda_koniec(k, wynik=tekst + ".", kompresja={x: v for x, v in liczby.items()
+                                                                 if isinstance(v, (int, float))})
         elif not e.get("success"):
             self.komenda_koniec(k, blad=f"omp nie skompresował kontekstu: {e.get('error') or 'nieznany błąd'}")
         else:
             k["etap"], k["przed"] = "licznik", dane.get("tokensBefore")
             self.komendy[self.rpc.wyslij("get_session_stats")] = k
 
-    def komenda_koniec(self, k: dict, wynik: str = "", blad: str | None = None) -> None:
+    def komenda_koniec(self, k: dict, wynik: str = "", blad: str | None = None, kompresja: dict | None = None) -> None:
         d = k["d"] if isinstance(k.get("d"), dict) else {}
         rdzen.zapisz_atomowo(self.w.komendy / "zrobione" / f"{k['klucz']}.json",
                              {**d, "stan": "blad" if blad else "gotowe", "wynik": wynik, "blad": blad,
+                              **({"kompresja": kompresja} if kompresja else {}),
                               "koniec": time.strftime("%Y-%m-%d %H:%M:%S")})
         k["plik"].unlink(missing_ok=True)
         log(self.w, f"komenda {k['klucz']}: {blad or wynik}")

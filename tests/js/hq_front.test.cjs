@@ -348,6 +348,14 @@ test("Os.widok: budzenia kart z wątku w karcie pracy, ostatnie „completed” 
   eq("koniec_nizej" in v[1], false);                                                 // bez niej karta pokazuje wynik
 });
 
+test("Os.widok: /compact z panelu to jedna pozycja, kompresja z pliku sesji w jej czasie znika", () => {
+  const kom = (dane) => ({ id: "e1", rodzaj: "system", ts: 100, wpis: { id: "e1", dane: { typ: "komenda", komenda: "compact", ok: true, ...dane } } });
+  const sep = (ts) => ({ id: `s${ts}`, rodzaj: "kompresja", ts, tokeny: { przed: 600000, po: 48000 } });
+  eq(Os.widok([kom({ trwa: true }), sep(150)], []).map((x) => x.id), ["e1"]);                  // trwa
+  eq(Os.widok([kom({ koniec_at: 190 }), sep(185), sep(5000)], []).map((x) => x.id), ["e1", "s5000"]);  // późniejsza auto zostaje
+  eq(Os.widok([kom({ ok: false }), sep(150)], []).map((x) => x.id), ["e1", "s150"]);          // nieudana nic nie zastępuje
+});
+
 test("Os.widok: karty pod wiadomością, która je zapowiada; w trwającej turze od razu pod dymkiem", () => {
   const karta = (n, w) => ({ id: `p${n}`, rodzaj: "przekazanie", ts: n, agent: "jarvo", przebieg_id: "r1", w_toku: !!w,
     karta: { task_id: `t_${n}`, tytul: "x", agent: "jarvo-web" } });

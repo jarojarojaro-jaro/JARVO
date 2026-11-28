@@ -943,7 +943,7 @@ def komendy_czekajace(w: Wpis) -> list[Path]:
 
 
 def wynik_komendy(w: Wpis, klucz: str) -> dict:
-    """{stan: kolejka|pracuje|gotowe|blad|brak, wynik, blad}."""
+    """{stan: kolejka|pracuje|gotowe|blad|brak, wynik, blad}; skończony `/compact` także `kompresja` {przed, po, procent}."""
     if not KLUCZ_RE.fullmatch(klucz or ""):
         raise ValueError("zły klucz komendy")
     wynik = {"stan": "brak", "wynik": "", "blad": None}
@@ -958,8 +958,11 @@ def wynik_komendy(w: Wpis, klucz: str) -> dict:
         except ValueError:
             d = {}
         if gotowa:
+            k = d.get("kompresja")
             return {"stan": "blad" if d.get("blad") else "gotowe", "wynik": str(d.get("wynik") or ""),
-                    "blad": str(d["blad"]) if d.get("blad") else None}
+                    "blad": str(d["blad"]) if d.get("blad") else None,
+                    **({"kompresja": {x: v for x, v in k.items() if x in ("przed", "po", "procent")
+                                      and isinstance(v, (int, float))}} if isinstance(k, dict) else {})}
         return {**wynik, "stan": "pracuje" if d.get("stan") == "pracuje" else "kolejka"}
     return wynik
 

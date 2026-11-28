@@ -265,8 +265,8 @@ def test_omp_model_usage_i_niedostepne(tmp_path):
 
 def test_omp_compact_komendy_skrzynki_i_licznik(tmp_path, monkeypatch):
     """`/compact` (alias `/compress`) i komendy zgłoszone przez skrzynkę idą do skrzynki sesji omp (`komenda` +
-    `wynik_komendy`); dłuższa niż `czekaj_s` kończy się drugim wpisem (`po_czasie`); licznik i `/context` z
-    `omp_sesje.licznik`."""
+    `wynik_komendy`); dłuższa niż `czekaj_s` zwraca `trwa`, a wynik przychodzi przez `po_czasie` (podmienia wpis);
+    licznik i `/context` z `omp_sesje.licznik`."""
     w = _wpis_omp(tmp_path)
     om = M.omp_sesje
     wyniki, komendy = {}, []
@@ -286,10 +286,11 @@ def test_omp_compact_komendy_skrzynki_i_licznik(tmp_path, monkeypatch):
                    po_czasie=po.append)
 
     async def scenariusz():
-        wyniki["kC1"] = {"stan": "gotowe", "wynik": "120k na 20k tokenów", "blad": None}
+        wyniki["kC1"] = {"stan": "gotowe", "wynik": "Kontekst skompresowany: było 120 000 tokenów, jest 20 000.", "blad": None,
+                         "kompresja": {"przed": 120_000, "po": 20_000, "procent": 10.0}}
         d1 = (await wyk.wykonaj(k, *K.parsuj("/compress skup się na GPU"))).dane()
         k.klucz = "kC2"
-        d2 = (await wyk.wykonaj(k, *K.parsuj("/compact"))).dane()          # dłużej niż czekaj_s: wynik drugim wpisem
+        d2 = (await wyk.wykonaj(k, *K.parsuj("/compact"))).dane()          # dłużej niż czekaj_s: trwa, wynik przez po_czasie
         k.klucz = "kC2b"
         d2b = (await wyk.wykonaj(k, *K.parsuj("/compact"))).dane()         # drugie kliknięcie w trakcie: bez drugiej kompresji
         wyniki["kC2"] = {"stan": "blad", "wynik": "", "blad": "lock held"}
@@ -301,8 +302,9 @@ def test_omp_compact_komendy_skrzynki_i_licznik(tmp_path, monkeypatch):
 
     d1, d2, d2b, d3, pomoc, lic, ctx = asyncio.run(scenariusz())
     assert komendy[0] == ("compact", "skup się na GPU", "kC1")
-    assert d1["ok"] and "skompresowany" in d1["wynik"] and "120k" in d1["wynik"]
-    assert d2["ok"] and "trwa" in d2["wynik"] and len(po) == 1
+    assert d1["ok"] and d1["wynik"].count("skompresowany") == 1 and d1["kompresja"] == {"przed": 120_000, "po": 20_000, "procent": 10.0}
+    assert d1["wynik_en"] == "Context compacted: 120 000 → 20 000 tokens." and "trwa" not in d1
+    assert d2["ok"] and d2["trwa"] is True and "trwa" in d2["wynik"] and len(po) == 1
     assert "już trwa" in d2b["wynik"] and [c[2] for c in komendy].count("kC2b") == 0
     assert not po[0].ok and "lock held" in po[0].dane()["wynik"]
     assert komendy[2][0] == "export" and "plik.md" in d3["wynik"] and "/export" in pomoc["wynik"]

@@ -294,8 +294,18 @@ const Os = (() => {
       const b = x.rodzaj === "budzenie" && x.budzenie;
       if (b && karty.has(b.task_id) && b.status === "completed") ostatniKoniec.set(b.task_id, x.id);
     }
+    // `/compact` z panelu ma własną linię (KomendaWToku); zdarzenie kompresji z pliku sesji omp w czasie tej komendy
+    // to ta sama kompresja, więc nie stoi drugi raz (28.11: trzy pozycje na jeden /compact)
+    const kompresjeKomend = [];
+    for (const x of pozycje) {
+      const d = x.rodzaj === "system" && x.wpis && x.wpis.dane;
+      if (d && d.typ === "komenda" && d.komenda === "compact" && d.ok !== false) {
+        kompresjeKomend.push([(x.ts || 0) - 5, d.trwa ? Infinity : (d.koniec_at || x.ts || 0) + 120]);
+      }
+    }
     const out = [];
     for (const x of pozycje) {
+      if (x.rodzaj === "kompresja" && kompresjeKomend.some(([od, doo]) => (x.ts || 0) >= od && (x.ts || 0) <= doo)) continue;
       // karta pracy z trwającej tury stoi od razu pod żywym dymkiem; reszta tury jest w dymku
       if (wDymku(x) && !(x.rodzaj === "przekazanie" && x.karta && x.karta.task_id)) continue;
       if (x.rodzaj === "budzenie" && x.budzenie && karty.has(x.budzenie.task_id)) {

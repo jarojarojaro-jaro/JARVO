@@ -193,8 +193,9 @@ def katalog(zaplecze: str, rejestr: Iterable[Mapping] | None = None, omp: Iterab
 class Wynik:
     """Odpowiedź komendy w dwóch językach (Markdown linia po linii) i przyciski wyboru modelu."""
 
-    def __init__(self, ok: bool = True):
+    def __init__(self, ok: bool = True, **dodatki):
         self.ok, self.pl, self.en, self.wybor = ok, [], [], []
+        self.dodatki = dodatki       # `trwa` (komenda skrzynki omp jeszcze pracuje), `kompresja` {przed, po, procent}
 
     def linia(self, pl: str, en: str | None = None) -> "Wynik":
         self.pl.append(pl)
@@ -203,7 +204,7 @@ class Wynik:
 
     def dane(self) -> dict:
         return {"ok": self.ok, "wynik": "\n".join(self.pl).strip(), "wynik_en": "\n".join(self.en).strip(),
-                "wybor": self.wybor}
+                "wybor": self.wybor, **self.dodatki}
 
 
 def blad(pl: str, en: str) -> Wynik:
@@ -448,7 +449,7 @@ class Wykonawca:
 
     async def _omp_komenda(self, k: Kontekst, nazwa: str, args: str) -> Wynik:
         """Komenda RPC skrzynki sesji omp (także w trakcie tury): zapis do skrzynki, potem wynik. Czeka najwyżej
-        `czekaj_s`; dłuższa (kompresja potrafi trwać minuty) kończy się drugim wpisem w rozmowie (`po_czasie`)."""
+        `czekaj_s`; dłuższa (kompresja potrafi trwać minuty) zwraca `trwa`, a wynik podmienia ten wpis (`po_czasie`)."""
         omp, w = self.m.omp_sesje, k.wpis_omp
         if w is None or getattr(w, "blad", ""):
             return blad("Sesja omp tej rozmowy jest niedostępna.", "This conversation's omp session is unavailable.")
@@ -468,13 +469,15 @@ class Wykonawca:
         if st is not None:
             self._omp_trwa.discard(trwa)
             return self._wynik_omp(nazwa, st)
-        if k.po_czasie is None:
+        if k.po_czasie is None:               # bez rozmowy (ekran startu) nikt nie dopisze wyniku
             self._omp_trwa.discard(trwa)
-        else:
-            k.sil.rejestr.zadanie(self._dokoncz_omp(k, nazwa, klucz, trwa))
-        return Wynik().linia(f"{_kod('/' + nazwa)} trwa w sesji omp {k.nazwa}; wynik pojawi się tutaj, gdy się skończy.",
-                             f"{_kod('/' + nazwa)} is running in {k.nazwa}'s omp session; the result will appear here "
-                             "when it finishes.")
+            return Wynik().linia(f"{_kod('/' + nazwa)} trwa w sesji omp {k.nazwa}; wynik zobaczysz w jej rozmowie.",
+                                 f"{_kod('/' + nazwa)} is running in {k.nazwa}'s omp session; the result will show in "
+                                 "its conversation.")
+        k.sil.rejestr.zadanie(self._dokoncz_omp(k, nazwa, klucz, trwa))
+        # ten sam wpis w rozmowie przejdzie z „trwa” w wynik (`po_czasie` podmienia jego dane): jedna pozycja na komendę
+        return Wynik(trwa=True).linia(f"{_kod('/' + nazwa)} trwa w sesji omp {k.nazwa}.",
+                                      f"{_kod('/' + nazwa)} is running in {k.nazwa}'s omp session.")
 
     async def _czekaj_na_komende(self, w, klucz: str, ile_s: float) -> dict | None:
         koniec = time.monotonic() + ile_s
@@ -506,8 +509,10 @@ class Wykonawca:
             return blad(f"{_kod('/' + nazwa)} się nie udała: {b}", f"{_kod('/' + nazwa)} failed: {b}")
         tekst = utajnij(str(st.get("wynik") or "")).strip()[:2000]
         if nazwa == "compact":
-            return Wynik().linia(f"Kontekst sesji skompresowany.{' ' + tekst if tekst else ''}",
-                                 f"Session context compacted.{' ' + tekst if tekst else ''}")
+            liczby = st.get("kompresja") if isinstance(st.get("kompresja"), dict) else {}
+            en = (f"Context compacted: {_liczba(liczby['przed'])} → {_liczba(liczby['po'])} tokens."
+                  if {"przed", "po"} <= liczby.keys() else "Context compacted.")
+            return Wynik(**({"kompresja": dict(liczby)} if liczby else {})).linia(tekst or "Kontekst skompresowany.", en)
         return Wynik().linia(f"{_kod('/' + nazwa)}: {tekst or 'gotowe'}", f"{_kod('/' + nazwa)}: {tekst or 'done'}")
 
     # ------------------------------------------------------------------- licznik, /context
@@ -1128,14 +1133,17 @@ def dolacz(router, *, m, trasy, silnik: Callable[[], Any], agenci, hub, log: Cal
                        "This conversation is in the trash: restore it to keep writing.")
         polecenie = " ".join(body.tekst.split())[:200]
         k.klucz = body.klucz
+        wspolne = {"typ": "komenda", "komenda": getattr(_PANEL.get(nazwa), "nazwa", nazwa), "polecenie": polecenie}
 
         def po_czasie(wynik: Wynik) -> None:
-            """Wynik komendy, która skończyła się po odpowiedzi trasy (kompresja omp): drugi wpis w rozmowie."""
+            """Wynik komendy, która skończyła się po odpowiedzi trasy (kompresja omp): ten sam wpis rozmowy przechodzi
+            z „trwa” w wynik, więc komenda to jedna pozycja (28.11: „trwa” i wynik stały jako dwie karty)."""
             wid = k.watek["id"]
-            dane = {"typ": "komenda", "polecenie": polecenie, "agent": k.agent, **wynik.dane()}
-            w = sil.db.dodaj_wpis(wid, rodzaj="system", tekst=polecenie, dane=dane, klucz=f"{body.klucz[:60]}_w")
-            if not w.get("powtorzony"):
-                hub.nadaj("watek.wpis", {"watek_id": wid, "wpis": w}, watek_id=wid)
+            dane = {**wspolne, "agent": k.agent, **wynik.dane(), "koniec_at": time.time()}
+            jest = sil.db.wpis_po_kluczu(wid, body.klucz)
+            w = sil.db.zmien_dane_wpisu(jest["id"], dane) if jest else \
+                sil.db.dodaj_wpis(wid, rodzaj="system", tekst=polecenie, dane=dane, klucz=body.klucz)
+            hub.nadaj("watek.wpis", {"watek_id": wid, "wpis": w}, watek_id=wid)
             log(f"jarvo-hq: komenda /{nazwa} {k.agent} ({k.zaplecze}) skończona → {'ok' if wynik.ok else 'odmowa'}")
 
         k.po_czasie = po_czasie if k.watek else None
@@ -1145,7 +1153,7 @@ def dolacz(router, *, m, trasy, silnik: Callable[[], Any], agenci, hub, log: Cal
                 wynik = await wyk.wykonaj(k, nazwa, args)
             except m.brama.BladBramy as e:
                 wynik = blad(f"Brama Hermesa nie odpowiedziała ({e.kod}).", f"The Hermes gateway did not answer ({e.kod}).")
-            dane = {"typ": "komenda", "polecenie": polecenie, "agent": k.agent, **wynik.dane()}
+            dane = {**wspolne, "agent": k.agent, **wynik.dane()}
             log(f"jarvo-hq: komenda /{nazwa} {k.agent} ({k.zaplecze}) → {'ok' if wynik.ok else 'odmowa'}")
             cicha = body.cicho and getattr(_PANEL.get(nazwa), "nazwa", "") in ("model", "effort", "fast")
             if not k.watek or cicha:

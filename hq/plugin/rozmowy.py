@@ -823,6 +823,12 @@ class Rozmowy:
         with self._odczyt() as c:
             return _wiersz("wpisy", c.execute("SELECT * FROM wpisy WHERE id = ?", (eid,)).fetchone())
 
+    def zmien_dane_wpisu(self, eid: str, dane: Mapping) -> dict | None:
+        """Nowe `dane` wpisu (wynik komendy omp, która skończyła się po odpowiedzi trasy, zastępuje jej „trwa”)."""
+        with self._tx() as c:
+            c.execute("UPDATE wpisy SET dane = ? WHERE id = ?", (_json(dict(dane)), eid))
+        return self.wpis(eid)
+
     def wpis_po_kluczu(self, wid: str, klucz: str) -> dict | None:
         with self._odczyt() as c:
             return _wiersz("wpisy", c.execute("SELECT * FROM wpisy WHERE watek_id = ? AND klucz = ?", (wid, klucz)).fetchone())

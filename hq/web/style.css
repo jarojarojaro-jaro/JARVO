@@ -1640,6 +1640,12 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-msg-sys { display: flex; align-items: center; gap: 8px; margin: 18px 0; font: 400 11.5px/16px var(--j-font-mono); color: var(--j-tekst-2); }
 .j-msg-sys .j-i { color: var(--j-tekst-3); }
 .j-msg-sys.is-luka, .j-msg-sys.is-luka .j-i { color: var(--j-uwaga); }
+/* `/compact` sesji omp (33-komendy.js KomendaWToku): jedna linia, kółko i licznik czasu, póki trwa */
+.j-msg-sys.is-komenda { max-width: 680px; }
+.j-msg-sys.is-trwa { color: var(--j-tekst); }
+.j-msg-sys.is-trwa .j-spin { color: var(--j-link); }
+.j-kom-sys-ag { color: var(--j-tekst-3); white-space: nowrap; }
+.j-kom-sys-czas { margin-left: auto; color: var(--j-tekst-3); font-variant-numeric: tabular-nums; }
 /* karty pracy w wątku (35-karty.js): przekazanie Jarva jako moduł agenta (krawędź w kolorze etapu) i „<agent> skończył” */
 .j-os .j-karta { --k-akcent: var(--j-tekst-3); position: relative; margin: 18px 0; padding: 14px 16px 12px 18px;
   background: var(--j-stal), var(--j-tlo-karta); box-shadow: inset 0 1px 0 var(--j-hi), inset 2px 0 0 var(--k-akcent); animation: j-karta-wejscie .32s var(--j-serwo) both; }
@@ -1972,7 +1978,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-kom.is-zle { box-shadow: inset 2px 0 0 var(--j-uwaga), inset 0 0 0 1px var(--j-linia); background: var(--j-uwaga-tlo); }
 .j-komp-w > .j-kom { margin: 0 0 8px; max-width: none; }
 .j-kom-pol { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-size: 12px; color: var(--j-tekst-2); }
-.j-kom-pol code { font: 500 12px/1.3 var(--j-font-mono); color: var(--j-link); overflow-wrap: anywhere; }
+.j-kom-pol code { font: 500 12px/1.3 var(--j-font-mono); color: var(--j-link); background: none; padding: 0; border: 0; overflow-wrap: anywhere; }
 .j-kom-ag { white-space: nowrap; }
 .j-kom-czas { margin-left: auto; font-family: var(--j-font-mono); }
 .j-kom-pol .j-btn { margin-left: auto; }
