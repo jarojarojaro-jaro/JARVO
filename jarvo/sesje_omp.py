@@ -1,10 +1,16 @@
-"""`jarvo sesja <klucz> [stan|terminal|skrzynka]`: wykonawca sesji omp z wpisu `sesje.json` (docs/centrum §3.2, 1d).
+"""`jarvo sesja <klucz> [stan|terminal|skrzynka|straz|napraw]`: wykonawca sesji omp z wpisu `sesje.json` (docs/centrum
+§3.2, 1d); `jarvo przed-restartem`: sesje omp gotowe na restart serwera.
 
 Sesję omp (wpis z `panel.zaplecze = "omp"`, opis wpisu: hq/plugin/omp_sesje.py) prowadzi tylko ten proces: skrzynka
 albo terminal. Oba biorą tę samą blokadę (`<skrzynka>/sesja.lock`) i przed startem pytają omp o dzierżawę
 (`omp session lease --json`), więc nigdy dwa procesy nie piszą do jednej sesji (omp odgałęziłby ją do nowego pliku).
+Przed startem oba robią też straż (jarvo/straz_omp.py): zamykają omp sprzed aktualizacji, który dalej wisi na tej
+sesji (terminal także każdy proces na niej, gdy nikt nie trzyma dzierżawy), i naprawiają koniec pliku sesji, gdy
+taki proces przy wyjściu przestawił go na starszy punkt rozmowy.
 
   stan       jedna linia JSON: stan rozmówcy jak w panelu (pracuje, terminal, kolejka, wolny, offline)
+  straz      JSON: procesy omp na sesji i stan końca pliku sesji (klucz `wszystkie` = każdy wpis; stan-jarva)
+  napraw     straż jak przed startem skrzynki (klucz `wszystkie`: jednostka po starcie systemu)
   terminal   interaktywny omp w tej sesji (`omp --session-dir <sesje> --resume <sesja> <omp_arg…> [argumenty…]`)
              z blokadą; skrzynka bez tury oddaje mu sesję (prośba `zwolnij`), po wyjściu skrzynka rusza sama.
              Wpis z `panel.wiedza`: `-e jarvo/omp/mozg_sesji.ts` (wtyczka omp z tego kodu) i JARVO_SESJA_WIEDZA,
@@ -50,6 +56,7 @@ import threading
 import time
 from pathlib import Path
 
+from . import straz_omp
 from .sciezki import Uklad
 
 _REPO = Path(__file__).resolve().parents[1]
@@ -984,6 +991,78 @@ def _sprzatnij_po_poprzedniej(w) -> None:
         rdzen.zapisz_stan(w, rpc=None, tura=None)
 
 
+def straz(w, *, sieroty: bool = False, wypisz: bool = False) -> dict:
+    """Przed otwarciem sesji: omp sprzed aktualizacji na tej sesji zamknięty (`sieroty` = każdy proces na niej, gdy
+    nikt nie trzyma dzierżawy omp), potem koniec pliku sesji naprawiony, o ile nikt jej już nie trzyma (żywy proces
+    i tak dopisałby od swojego punktu). 28.11: stary omp przy reboocie przestawił sesję operatora na 18.11."""
+    na_sesji = straz_omp.procesy_sesji(w.sesja)
+    do_zamkniecia = [p for p in na_sesji if p["stary"] or sieroty]
+    zamkniete = straz_omp.zamknij([p["pid"] for p in do_zamkniecia]) if do_zamkniecia else []
+    for p in do_zamkniecia:
+        rodzaj = "wersja sprzed aktualizacji omp" if p["stary"] else "bez dzierżawy"
+        tekst = (f"proces omp {p['pid']} na tej sesji ({rodzaj}, od "
+                 f"{time.strftime('%d.%m %H:%M', time.localtime(p['start']))}): "
+                 f"{'zamknięty' if p['pid'] in zamkniete else 'nie dał się zamknąć'}")
+        log(w, tekst)
+        if wypisz:
+            print(f"{w.nazwa}: {tekst}", file=sys.stderr)
+    zostaly = [p for p in na_sesji if p["pid"] not in zamkniete]
+    plik = rdzen.plik_sesji(w)
+    wynik = {"procesy": zostaly, "zamkniete": zamkniete, "koniec": None}
+    if plik is not None and not zostaly:
+        k = straz_omp.napraw(plik)
+        wynik["koniec"] = k
+        if k.get("naprawiono"):
+            tekst = f"koniec sesji wskazywał starszy punkt ({k['powod']}): wraca do punktu z {k['czas']}"
+            log(w, tekst)
+            if wypisz:
+                print(f"{w.nazwa}: {tekst}", file=sys.stderr)
+    return wynik
+
+
+def stan_strazy(w) -> dict:
+    """`jarvo sesja <klucz> straz`: procesy omp na sesji i koniec pliku sesji, bez zmian (stan-jarva)."""
+    plik = rdzen.plik_sesji(w)
+    return {"klucz": w.klucz, "nazwa": w.nazwa, "procesy": straz_omp.procesy_sesji(w.sesja),
+            "koniec": straz_omp.koniec(plik) if plik else {"ok": True, "powod": "brak pliku sesji"}}
+
+
+def przed_restartem(u: Uklad, czekaj_s: float = 5.0) -> int:
+    """`jarvo przed-restartem`: czeka na apt/dpkg i zadania agentów, zamyka każdy proces omp (zapisuje rozmowy),
+    naprawia końce sesji z sesje.json i podaje polecenie restartu. 28.11: `systemctl reboot -i` w trakcie apt i przy
+    zapomnianym omp przestawił sesję operatora na 18.11."""
+    ostatnio = 0.0
+    while True:
+        apt = straz_omp.apt_pracuje()
+        r = subprocess.run(["systemctl", "--user", "list-units", "hermes-worker-*", "--no-legend", "--plain",
+                            "--state=active"], capture_output=True, text=True)
+        karty = [x.split()[0] for x in r.stdout.splitlines() if x.strip()]
+        if not apt and not karty:
+            break
+        if time.monotonic() - ostatnio > 30:
+            print(f"Czekam: {'apt: ' + '; '.join(apt) if apt else ''}{' · ' if apt and karty else ''}"
+                  f"{'zadania agentów: ' + str(len(karty)) if karty else ''} (Ctrl+C przerywa)", flush=True)
+            ostatnio = time.monotonic()
+        time.sleep(czekaj_s)
+    moje, p = set(), os.getpid()
+    while p > 1 and p not in moje:                 # nie zamykam omp, z którego to uruchomiono
+        moje.add(p)
+        p = int((straz_omp._stat(p) or ["", "1"])[1])
+    omp = [x for x in straz_omp.procesy() if x["pid"] not in moje]
+    zamkniete = straz_omp.zamknij([x["pid"] for x in omp]) if omp else []
+    print(f"Sesje omp: zamknięte {len(zamkniete)} z {len(omp)} (rozmowy zapisane, wznowisz je po restarcie).")
+    for w in rdzen.wpisy(u.dane).values():
+        if w.blad:
+            continue
+        k = straz(w)["koniec"] or {}
+        print(f"{w.nazwa}: {'koniec sesji naprawiony' if k.get('naprawiono') else 'koniec sesji w porządku'}")
+    if len(zamkniete) < len(omp):
+        print("Nie wszystkie procesy omp się zamknęły: sprawdź `jarvo sesja wszystkie straz` przed restartem.")
+        return 1
+    print("Gotowe. Teraz: sudo reboot   (bez -i: -i pomija blokadę apt i przerywa instalację pakietów)")
+    return 0
+
+
 # ---------------------------------------------------------------- skrzynka i terminal
 
 def zamknij_bezczynna(w) -> bool:
@@ -1056,6 +1135,7 @@ def skrzynka(w, wyslij=telegram) -> int:
         rdzen.zapisz_stan(w, skrzynka={"pid": os.getpid(), "od": time.time()})
         try:
             _sprzatnij_po_poprzedniej(w)
+            straz(w)
             if rdzen.dzierzawa(w):   # sesję trzyma omp spoza blokady (np. zwykłe `omp --resume`): nigdy odgałęzienia
                 fcntl.flock(blok, fcntl.LOCK_UN)
                 return _zajeta(w, wyslij)
@@ -1096,8 +1176,11 @@ def terminal(w, reszta: list[str], po_wyjsciu=uruchom_skrzynke_w_tle, korzen: Pa
                 fcntl.flock(blok, fcntl.LOCK_EX)
             finally:
                 zwolnij.unlink(missing_ok=True)
+        straz(w, sieroty=not rdzen.dzierzawa(w), wypisz=True)
         if rdzen.dzierzawa(w):
-            print(f"Sesję {w.sesja} trzyma inny proces omp: nie otwieram jej drugi raz.", file=sys.stderr)
+            pidy = ", ".join(str(p["pid"]) for p in straz_omp.procesy_sesji(w.sesja))
+            print(f"Sesję {w.sesja} trzyma inny proces omp{f' (pid {pidy})' if pidy else ''}: nie otwieram jej drugi "
+                  "raz.", file=sys.stderr)
             return 1
         n = len(rdzen.czekajace(w))
         if n:
@@ -1198,10 +1281,27 @@ def polecenie_wiedzy(w, reszta: list[str]) -> int:
 
 
 def polecenie_sesja(u: Uklad, a, reszta, _ot) -> int:
-    w = wpis(u, a.klucz)
-    if w is None:
-        return 2
     akcja = a.akcja or "stan"
+    if akcja in ("straz", "napraw") and a.klucz.strip().lower() == "wszystkie":
+        wpisy = [w for w in rdzen.wpisy(u.dane).values() if not w.blad]
+    else:
+        w = wpis(u, a.klucz)
+        if w is None:
+            return 2
+        wpisy = [w]
+    if akcja == "straz":
+        print(json.dumps([stan_strazy(w) for w in wpisy], ensure_ascii=False))
+        return 0
+    if akcja == "napraw":
+        for w in wpisy:
+            r = straz(w, wypisz=True)
+            k = r["koniec"] or {}
+            stan = ("naprawiony" if k.get("naprawiono") else "w porządku" if k else
+                    f"nie ruszam, sesję trzyma omp (pid {', '.join(str(p['pid']) for p in r['procesy'])})"
+                    if r["procesy"] else "bez pliku sesji")
+            print(f"{w.nazwa}: koniec sesji {stan}")
+        return 0
+    w = wpisy[0]
     if akcja == "stan":
         print(json.dumps(rdzen.stan(w), ensure_ascii=False))
         return 0
@@ -1219,14 +1319,28 @@ def polecenie_sesja(u: Uklad, a, reszta, _ot) -> int:
     return skrzynka(w)
 
 
+def polecenie_przed_restartem(u: Uklad, _a, _reszta, _ot) -> int:
+    return przed_restartem(u)
+
+
 def dodaj_polecenia(sub) -> None:
-    s = sub.add_parser("sesja", help="sesja omp z sesje.json: stan, terminal, skrzynka (rozmówca panelu), wiedza",
+    r = sub.add_parser("przed-restartem", help="przed restartem serwera: czeka na apt i zadania agentów, zamyka "
+                       "sesje omp, naprawia ich koniec i podaje sudo reboot",
+                       description="Czeka, aż skończą się apt/dpkg i zadania agentów, zamyka każdy proces omp "
+                                   "(rozmowy zapisane), naprawia koniec plików sesji z sesje.json i wypisuje "
+                                   "`sudo reboot` (nigdy `reboot -i`, które przerywa instalację pakietów).")
+    r.set_defaults(funkcja=polecenie_przed_restartem)
+    s = sub.add_parser("sesja", help="sesja omp z sesje.json: stan, terminal, skrzynka (rozmówca panelu), wiedza, "
+                       "straz, napraw",
                        description="Wykonawca sesji omp wpisu z panel.zaplecze = omp: terminal i skrzynka biorą "
                                    "tę samą blokadę, skrzynka prowadzi sesję w jednym procesie `omp --mode rpc` "
                                    "(tury z panelu i Telegrama, dopiski w trakcie tury, /compact, licznik). "
                                    "Argumenty po `terminal` idą do omp. `wiedza` (mózg sesji z panel.wiedza): "
                                    "stan, przypomnij <tekst>, ocena <zestaw.json>, indeksuj, tozsamosc; "
-                                   "przed-tura i po-turze (stdin) woła wtyczka omp terminalu.")
+                                   "przed-tura i po-turze (stdin) woła wtyczka omp terminalu. `straz` (JSON) i "
+                                   "`napraw`: procesy omp na sesji i koniec pliku sesji, klucz `wszystkie` = "
+                                   "każdy wpis.")
     s.add_argument("klucz", help="klucz wpisu w sesje.json (np. gpu)")
-    s.add_argument("akcja", nargs="?", choices=("stan", "terminal", "skrzynka", "wiedza"), help="domyślnie stan")
+    s.add_argument("akcja", nargs="?", choices=("stan", "terminal", "skrzynka", "wiedza", "straz", "napraw"),
+                   help="domyślnie stan")
     s.set_defaults(funkcja=polecenie_sesja)

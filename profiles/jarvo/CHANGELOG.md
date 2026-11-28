@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Sesje omp Operatora i Kernela same wracają do najnowszej wiadomości, gdy zapomniany proces omp przestawi je przy zamknięciu, a `jarvo przed-restartem` przygotowuje serwer do restartu.
 - Sesje omp (Operator, Kernel) w panelu działają od razu po restarcie serwera: program `omp` jest szukany także w `~/.local/bin`.
 - Gdy w trakcie pracy model odda samo rozumowanie bez odpowiedzi, tura idzie dalej zamiast kończyć się w połowie zadania bez wyniku.
 - W Komputerze klikam jak ręką (kursor dojeżdża łukiem, przycisk trzymany chwilę), Komputer w tle i `browser_*` mają ekran z paskiem zadań, mysz i WebGL z karty graficznej zamiast cech trybu bez okna, a Komputer w tle przechodzi wyzwanie Cloudflare.
