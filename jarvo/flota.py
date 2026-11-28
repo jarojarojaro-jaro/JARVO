@@ -61,17 +61,15 @@ USTAWIENIA_PROFILI = "flota-ustawienia.json"          # <stan>: klucze configu p
 # vision_analyze przez model pomocniczy zostaje tylko zapasem dla modelu bez obrazu: krótki limit, małe rozumowanie.
 # tool_search wyłączony: narzędzia telefonu (MCP), ekranu i pulpitu są w tablicy narzędzi od razu, bez mostka
 # tool_search → tool_describe → tool_call (34 błędy formatu w 7 dni; odłożonych było 3 do 13 narzędzi).
-# Przycinanie starych wyników narzędzi (decyzja JARO 27.11, „zrób te wszystkie poprawki”): powyżej 80 tys. tokenów
-# kontekstu Hermes bez modelu zamienia stare wyniki narzędzi dłuższe niż 1500 znaków na jedną linię, ostatnie 20
-# wiadomości zostają w całości; próg kompresji 700k bez zmian. T1 27.11: kontekst rósł o 1,3 tys. tokenów na krok
-# telefonu do 290 tys. na wywołanie, 26 do 32 mln tokenów wejścia na zadanie.
+# Przycinanie starych wyników narzędzi wyłączone (0): włączone 27.11 przy 80 tys. tokenów, a T1 (OLX na telefonie)
+# dwa razy doszedł potem do limitu 200 wywołań (3 i 4 oferty z 5), wobec 181 wywołań i 6 ofert przed włączeniem;
+# próba A/B 28.11 za zgodą JARO. Próg kompresji 700k bez zmian.
 MODELE_Z_OBRAZEM = {"commandcode": {"deepseek/deepseek-v4.1-flash": True, "deepseek/deepseek-v4-flash": True,
                                     "moonshotai/Kimi-K2.6": True, "deepseek/deepseek-v4-pro": False}}
 KLUCZE_WSZYSTKICH = {"updates.check": False,          # jak hermes.BEZPIECZNE dla hosta (build ich nie ustawia)
                      "compression.model_thresholds.deepseek": 0.7, "compression.threshold_tokens": 700000,
                      "compression.idle_compact_after_seconds": 0,
-                     "compression.proactive_prune_tokens": 80000,
-                     "compression.proactive_prune_min_result_chars": 1500,
+                     "compression.proactive_prune_tokens": 0,
                      **{f"providers.{dostawca}.models": {m: {"supports_vision": v} for m, v in modele.items()}
                         for dostawca, modele in MODELE_Z_OBRAZEM.items()},
                      "auxiliary.vision.timeout": 45, "auxiliary.vision.reasoning_effort": "low",

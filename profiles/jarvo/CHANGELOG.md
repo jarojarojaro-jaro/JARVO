@@ -11,7 +11,6 @@
 - JARO widzi moją pracę w HQ w jednym oknie „Na żywo” (Komputer do 3 klatek na sekundę, pulpit serwera, telefon i obok moje ostatnie kroki z nazwą zadania i rozmowy), a gdy naciśnie tam „Przejmij”, moje działania w Komputerze czekają na pauzie do „Oddaj”.
 - Powtarzalną ścieżkę na stronie zapisuję `komputer` `zapisz_sciezke` i przechodzę potem jednym `odtworz` z parametrami, ze sprawdzeniem kroków i samonaprawą, bez haseł w pliku i z tymi samymi twardymi zasadami.
 - Na telefonie mam `find` (przewija do tekstu), `read_list` (cała lista jednym wywołaniem) i przepisy `save_recipe` / `run_recipe` (droga w aplikacji jednym wywołaniem ze sprawdzeniem ekranu), opisane w skillu `telefon` 1.1.0.
-- Powyżej 80 tys. tokenów kontekstu stare wyniki narzędzi dłuższe niż 1500 znaków skracają się do jednej linii, a ostatnie kroki zostają w całości.
 - Okno „Edytuj ujęcie” w edytorze filmów HQ działa w Komputerze: teksty i kolory zmieniam w nim klikaniem, z podglądem ujęcia.
 - `computer_use` po restarcie Komputera łączy się od nowa zamiast zwracać „Connection closed”.
 - Poza płatnością i zakupem nic nie czeka na zgodę: groźne polecenie dostaje od razu werdykt strażnika smart, a usunięcie pliku w danych Jarva poza katalogami roboczymi to blokada z radą.
