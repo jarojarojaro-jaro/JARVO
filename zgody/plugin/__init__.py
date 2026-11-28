@@ -3164,6 +3164,7 @@ _ADB_AKCJA = re.compile(r"\binput\s|\bam\s+(?:start|broadcast|force-stop|kill|st
 _IP = re.compile(r"(?<![\d.])\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?![\d.])")
 _MAPA_TTL = 60.0
 _WIAZANIE_ROZMOWY = 1800.0
+_ZAJETY_S = 600.0                 # inne zadanie z krokiem na telefonie w tym czasie = telefon zajęty
 _MAPA: Dict[str, Any] = {"t": 0.0, "ip": {}}       # IP adb telefonu → nazwa, plus `wlaczony` i `przydzialy`
 _TELEFON_ZADANIA: "collections.OrderedDict[str, Tuple[str, float]]" = collections.OrderedDict()
 
@@ -3221,9 +3222,36 @@ def _klucz_zadania(task_id: str, session_id: str) -> str:
     return f"karta:{karta}" if karta else f"sesja:{session_id or task_id or 'default'}"
 
 
+def _zajmij_telefon(telefon: str, klucz: str) -> Optional[Tuple[str, int]]:
+    """Telefon prowadzi jedno zadanie naraz: <stan>/telefon-zadania.json trzyma ostatnie działające zadanie każdego
+    telefonu (plik, bo karty kanbana to osobne procesy). Inne zadanie z krokiem w ostatnich _ZAJETY_S s = (jego
+    klucz, ile s temu); inaczej telefon przechodzi na to zadanie i None. Błąd pliku nie blokuje telefonu."""
+    try:
+        plik = _korzen_danych(_hermes_home()).parent / "stan" / "telefon-zadania.json"
+        try:
+            dane = json.loads(plik.read_text(encoding="utf-8"))
+            dane = dane if isinstance(dane, dict) else {}
+        except (OSError, ValueError):
+            dane = {}
+        teraz, jest = time.time(), dane.get(telefon)
+        if isinstance(jest, dict) and jest.get("klucz") != klucz:
+            temu = teraz - float(jest.get("t") or 0)
+            if 0 <= temu < _ZAJETY_S:
+                return str(jest.get("klucz")), int(temu)
+        dane[telefon] = {"klucz": klucz, "t": teraz}
+        plik.parent.mkdir(parents=True, exist_ok=True)
+        tmp = plik.with_name(f"{plik.name}.{os.getpid()}.tmp")
+        tmp.write_text(json.dumps(dane), encoding="utf-8")
+        os.replace(tmp, plik)
+    except (OSError, ValueError, TypeError):
+        pass
+    return None
+
+
 def _jeden_telefon(tool_name: str, args: Dict[str, Any], task_id: str, session_id: str) -> Optional[Dict[str, str]]:
     """Pierwszy telefon, na którym zadanie coś zrobiło, wiąże je (karta kanbana: do końca, rozmowa: do 30 min bez
-    działania na telefonie); działanie na innym telefonie = block."""
+    działania na telefonie); działanie na innym telefonie = block. Telefon, na którym inne zadanie działało
+    w ostatnich _ZAJETY_S s, też = block (28.11: SMS Jarva i test OLX stukały naraz w first i zgubiły się oba)."""
     telefony = _telefony_wywolania(tool_name, args)
     if not telefony:
         return None
@@ -3233,6 +3261,13 @@ def _jeden_telefon(tool_name: str, args: Dict[str, Any], task_id: str, session_i
         if x is None or (klucz.startswith("sesja:") and teraz - kiedy > _WIAZANIE_ROZMOWY):
             x = telefony[0]
         if all(t == x for t in telefony):
+            zajety = _zajmij_telefon(x, klucz)
+            if zajety is not None:
+                logger.warning("jarvo-zgody: telefon %s zajęty przez %s (%s s temu)", x, zajety[0], zajety[1])
+                return _blok(f"Telefon {x} prowadzi teraz inne zadanie ({zajety[0]}, ostatni krok {zajety[1]} s temu), "
+                             "a dwa zadania na jednym telefonie przestawiają sobie ekran, więc nic na nim nie rób: "
+                             f"ponów za kilka minut, a gdy sprawa jest pilna, napisz JARO jednym zdaniem, że {x} "
+                             "jest zajęty.")
             _TELEFON_ZADANIA[klucz] = (x, teraz)
             _TELEFON_ZADANIA.move_to_end(klucz)
             while len(_TELEFON_ZADANIA) > 256:

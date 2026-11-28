@@ -1,6 +1,8 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Telefon prowadzi jedno zadanie naraz: gdy inne zadanie działało na nim w ostatnich 10 minutach, strażnik zatrzymuje mój krok z informacją, kto go zajmuje.
+- SMS piszę `open` z adresem `sms:<numer>?body=<tekst>` i stukam „Send message” (skill `telefon` 1.2.0).
 - `/compact` sesji omp w panelu to jedna linia: kółko z licznikiem czasu, póki trwa, potem tokeny przed i po z procentem okna.
 - Licznik kontekstu sesji omp w panelu liczy z bieżącej gałęzi rozmowy, tak jak omp w terminalu.
 - Panel pokazuje sesję omp z terminala w tle (tmux bez ekranu, bez ruchu od 60 s) jako wolną, a wiadomość z panelu albo Telegrama zamyka taki terminal i od razu robi turę.

@@ -92,6 +92,20 @@ def test_wiazanie_rozmowy_wygasa(straz, monkeypatch):
     assert hak("mcp__phone__act", phone="third", cmd="tap") is None
 
 
+def test_telefon_zajety_przez_inne_zadanie(straz, monkeypatch):
+    """28.11: SMS Jarva w rozmowie i test OLX stukały naraz w first i zgubiły się oba."""
+    zegar = [5000.0]
+    monkeypatch.setattr(z.time, "time", lambda: zegar[0])
+    assert hak("mcp__phone__act", phone="first", cmd="tap") is None
+    w = hak("mcp__phone__act", sesja="s2", phone="first", cmd="tap")
+    assert zablokowane(w) and "Telefon first prowadzi teraz inne zadanie" in w["message"]
+    assert hak("mcp__phone__screen", sesja="s2", phone="first") is None           # odczyt wolny
+    assert hak("mcp__phone__act", phone="first", cmd="tap") is None               # właściciel działa dalej
+    zegar[0] += 601
+    assert hak("mcp__phone__act", sesja="s2", phone="first", cmd="tap") is None   # po 10 min bez kroku przejmuje
+    assert zablokowane(hak("mcp__phone__act", phone="first", cmd="tap"))
+
+
 def test_prywatny_numer_blokowany(straz):
     plik = straz.parent.parent / "jarvo" / "konfig" / "prywatne-numery.json"
     assert hak("mcp__phone__act", cmd="type", text="+48 600 100 200") is None        # brak pliku = nic
@@ -100,7 +114,7 @@ def test_prywatny_numer_blokowany(straz):
     w = hak("mcp__phone__act", cmd="type", text="+48 600 100 200")
     assert zablokowane(w) and "prywatny numer JARO" in w["message"]
     assert zablokowane(hak("browser_type", text="0048-600.100(200)"))
-    assert hak("mcp__phone__act", sesja="s9", cmd="type", text="+48 600 100 201") is None
+    assert hak("mcp__phone__act", sesja="s9", phone="second", cmd="type", text="+48 600 100 201") is None
 
 
 @pytest.mark.parametrize("profil,wolno", [("jarvo-hacker", True), ("jarvo-bigshort", True), ("jarvo", False),
