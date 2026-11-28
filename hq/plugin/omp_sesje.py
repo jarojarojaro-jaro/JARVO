@@ -32,7 +32,8 @@ Kontrakt dla panelu (CentrumUI; wszystko synchroniczne i szybkie, wołać w wąt
     wpisy(dane) -> dict[klucz, Wpis]          wpisy omp z sesje.json; zły wpis ma `blad` (np. „niebezpieczna ścieżka”)
     rozmowcy(dane) -> list[dict]              lista do lewej kolumny: klucz, nazwa, opis, kolejnosc, potwierdzenia
     stan(wpis) -> dict                        {stan: pracuje|terminal|kolejka|wolny|offline, czeka, najstarsza_s,
-                                               tura, terminal_od, proces_od, powod}; dzierżawa omp w pamięci 2 s
+                                               tura, terminal_od, proces_od, powod}; dzierżawa omp w pamięci 2 s;
+                                              terminal w tmux bez ekranu i bez ruchu W_TLE_S = wolny („terminal w tle”)
     wyslij(wpis, tekst, klucz, media=(), lustro=True) -> dict
                                               {plik, nowy}; ten sam `klucz` = ten sam plik (idempotencja)
     dopisz(wpis, tekst, klucz, media=(), lustro=True) -> dict
@@ -93,6 +94,7 @@ KLUCZ_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
 SESJA_RE = re.compile(r"[0-9A-Za-z][0-9A-Za-z-]{5,63}")
 TURA_RE = re.compile(r"\d{8}-\d{6}-[0-9a-f]{6}")
 DZIERZAWA_S = 2.0
+W_TLE_S = 60.0              # terminal w tmux bez ekranu i bez zapisu w sesji tyle sekund = wolny dla panelu i skrzynki
 _dzierzawy: dict[str, tuple[float, bool | None]] = {}
 PLIK_LICZNIKA, PLIK_ZATRZYMAJ, PLIK_ZWOLNIJ, BUDZIK = "licznik.json", "zatrzymaj", "zwolnij", ".budzik"
 # komendy panelu, które skrzynka wykonuje przez RPC omp (jarvo/sesje_omp.py): nazwa → (opis, aliasy)
@@ -349,6 +351,48 @@ def plik_sesji(w: Wpis) -> Path | None:
         return None
     pliki = sorted(w.sesje.glob(f"*_{w.sesja}*.jsonl")) or sorted(w.sesje.glob(f"*{w.sesja}*.jsonl"))
     return pliki[-1] if pliki else None
+
+
+def ostatni_ruch_s(w: Wpis) -> float:
+    """Sekundy od ostatniego zapisu w pliku sesji (każdy krok omp go dopisuje); bez pliku: nieskończoność."""
+    plik = plik_sesji(w)
+    try:
+        return time.time() - plik.stat().st_mtime if plik else float("inf")
+    except OSError:
+        return float("inf")
+
+
+def _rodzic(pid: int) -> int:
+    try:
+        s = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8", errors="replace")
+        return int(s[s.rfind(")") + 2:].split()[1])
+    except (OSError, ValueError, IndexError):
+        return 0
+
+
+def terminal_w_tle(pid) -> bool:
+    """Terminal sesji (`jarvo sesja <klucz> terminal`, z `praca`) siedzi w tmux bez podłączonego ekranu: Ctrl+B D albo
+    zamknięty Termius. Proces terminala albo jego przodek jest procesem panelu tmux; poza tmux (Herdr, zwykły
+    terminal) False. 28.11: właściciel wyszedł z terminala, a panel dalej pokazywał „terminal”."""
+    zapas = Path.home() / ".local" / "bin" / "tmux"
+    tmux = shutil.which("tmux") or (str(zapas) if zapas.is_file() else None)
+    if not tmux or not pid:
+        return False
+    try:
+        r = subprocess.run([tmux, "list-panes", "-a", "-F", "#{pane_pid} #{session_attached}"], capture_output=True,
+                           text=True, timeout=2)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    panele = {int(a[0]): int(a[1]) for a in (x.split() for x in r.stdout.splitlines())
+              if len(a) == 2 and a[0].isdigit() and a[1].isdigit()}
+    p = int(pid)
+    for _ in range(8):
+        if p in panele:
+            return panele[p] == 0
+        p = _rodzic(p)
+        if p <= 1:
+            break
+    return False
 
 
 # ---------------------------------------------------------------- model i zużycie (komendy panelu, komendy.py)
@@ -633,6 +677,11 @@ def stan(w: Wpis) -> dict:
         if not term_zyje and sk and zyje(sk.get("pid")):
             wynik["stan"] = "pracuje"
             return wynik
+        if term_zyje and terminal_w_tle(term.get("pid")):
+            if ostatni_ruch_s(w) >= W_TLE_S:   # wiadomość z panelu zamknie terminal w tle i weźmie sesję
+                wynik.update(stan="kolejka" if nowe else "wolny", powod="terminal w tle")
+                return wynik
+            wynik["powod"] = "terminal w tle, pracuje"
         wynik["stan"] = "terminal"
         if term_zyje:
             wynik["terminal_od"] = term.get("od")

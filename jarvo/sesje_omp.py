@@ -1088,7 +1088,8 @@ def zamknij_bezczynna(w) -> bool:
 
 
 def _zajeta(w, wyslij=telegram) -> int:
-    """Sesja zajęta: zamknięcie bezczynnego terminalu (gdy wpis tak chce) albo jedno powiadomienie po 2 min.
+    """Sesja zajęta: terminal w tle (tmux bez ekranu, bez ruchu W_TLE_S) zamknięty od razu, bezczynny terminal po
+    `zamykaj_bezczynna_min` (gdy wpis tak chce), inaczej jedno powiadomienie po 2 min.
     Blokadę trzyma działająca skrzynka (proces RPC): nic, ona weźmie wiadomości sama."""
     if rdzen.proces_skrzynki(w) is not None:
         return 0
@@ -1096,6 +1097,11 @@ def _zajeta(w, wyslij=telegram) -> int:
     n = len(pliki)
     if not n:                                   # same komendy: czekają, aż sesja będzie wolna
         return 0
+    term = rdzen.czytaj_stan(w).get("terminal")
+    if isinstance(term, dict) and rdzen.blokada_zajeta(w) and rdzen.terminal_w_tle(term.get("pid")) \
+            and rdzen.ostatni_ruch_s(w) >= rdzen.W_TLE_S and zamknij_bezczynna(w):
+        log(w, f"terminal w tle (tmux bez ekranu) bez ruchu: zamknięty, w skrzynce {n}")   # 28.11: panel ma być na żywo
+        return skrzynka(w, wyslij)
     ostatni_ruch = max((p.stat().st_mtime for p in w.sesje.glob("*.jsonl")), default=time.time())
     bezczynna = time.time() - ostatni_ruch
     if w.zamykaj_bezczynna_min and bezczynna > w.zamykaj_bezczynna_min * 60 and rdzen.blokada_zajeta(w) \

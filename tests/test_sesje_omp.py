@@ -195,6 +195,25 @@ def test_terminal_trzyma_blokade(w, at):
     assert om.wynik_komendy(w, "c1")["stan"] == "kolejka"
 
 
+def test_terminal_w_tle_oddaje_sesje_wiadomosci_od_razu(w, at, monkeypatch):
+    """28.11: terminal z `praca` został w tmux bez ekranu: wiadomość z panelu nie czeka, skrzynka zamyka go i robi turę."""
+    om.wyslij(w, "x", "k1")
+    blok = w.blokada.open("a")
+    fcntl.flock(blok, fcntl.LOCK_EX)
+    om.zapisz_stan(w, terminal={"pid": os.getpid(), "omp": 0, "od": time.time()})
+    monkeypatch.setattr(om, "terminal_w_tle", lambda pid: pid == os.getpid())
+    monkeypatch.setattr(om, "ostatni_ruch_s", lambda _w: om.W_TLE_S + 1)
+
+    def zamknij(w_):                                  # jak SIGTERM dla omp terminalu: blokada wolna, stan bez terminalu
+        blok.close()
+        om.zapisz_stan(w_, terminal=None)
+        return True
+
+    monkeypatch.setattr(so, "zamknij_bezczynna", zamknij)
+    so.skrzynka(w, Telegram())
+    assert blok.closed and len(tury(at)) == 1 and om.przebieg(w, "k1")["stan"] == "gotowe"
+
+
 def test_proba_panelu_nie_zatrzymuje_skrzynki(w, at):
     """InstaBox 20.11: stan() panelu (próbny flock) trafił w chwilę startu skrzynki, ta uznała sesję za zajętą
     i skończyła się bez tury. Krótko trzymana blokada (tu 0,2 s, jak powolna próba) nie może tego zrobić."""

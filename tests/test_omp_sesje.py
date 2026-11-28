@@ -100,6 +100,36 @@ def test_stan(w, tmp_path, monkeypatch):
     assert s["stan"] == "offline" and s["powod"] == "brak programu omp"
 
 
+def _tmux(tmp_path, monkeypatch, podlaczone: int):
+    """Atrapa `tmux list-panes`: jeden panel z tym procesem testu i `podlaczone` ekranami."""
+    kat = tmp_path / "bin"
+    kat.mkdir(exist_ok=True)
+    (kat / "tmux").write_text(f"#!/bin/sh\necho '{os.getppid()} 9'\necho '{os.getpid()} {podlaczone}'\n")
+    (kat / "tmux").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{kat}{os.pathsep}{os.environ.get('PATH', '')}")
+
+
+def test_terminal_w_tle_jest_wolny_dla_panelu(w, tmp_path, monkeypatch):
+    """28.11: właściciel wyszedł z terminala (tmux w tle), a panel dalej pokazywał „terminal”."""
+    om.zapisz_stan(w, terminal={"pid": os.getpid(), "omp": 0, "od": time.time()})
+    sesja = w.sesje / f"2026-11-28T15-00-00-000Z_{w.sesja}-0000.jsonl"
+    sesja.write_text("{}\n")
+    stary = time.time() - om.W_TLE_S - 5
+    os.utime(sesja, (stary, stary))
+    with w.blokada.open("a") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        _tmux(tmp_path, monkeypatch, podlaczone=1)
+        assert om.terminal_w_tle(os.getpid()) is False and om.stan(w)["stan"] == "terminal"
+        _tmux(tmp_path, monkeypatch, podlaczone=0)
+        assert om.terminal_w_tle(os.getpid()) is True
+        assert om.stan(w)["stan"] == "wolny" and om.stan(w)["powod"] == "terminal w tle"
+        om.wyslij(w, "a", "k1")
+        assert om.stan(w)["stan"] == "kolejka"
+        sesja.write_text("{}\n{}\n")                       # omp w tle jeszcze pracuje: nie przerywać
+        s = om.stan(w)
+        assert s["stan"] == "terminal" and s["powod"] == "terminal w tle, pracuje"
+
+
 def test_ogon_tylko_pelne_linie(w):
     plik = w.tura / "20261117-120000-abcdef.jsonl"
     plik.write_text('{"typ": "delta", "tekst": "Ala"}\n{"typ": "narzedzie", "nazwa": "bash", "intencja": "x"}\n{"typ": "del')

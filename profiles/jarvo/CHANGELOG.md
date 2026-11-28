@@ -1,6 +1,7 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Panel pokazuje sesję omp z terminala w tle (tmux bez ekranu, bez ruchu od 60 s) jako wolną, a wiadomość z panelu albo Telegrama zamyka taki terminal i od razu robi turę.
 - `jarvo telegram wyslij` ponawia wysyłkę, gdy połączenie z Telegramem się zerwie, a skrzynka sesji omp zapisuje w `sesja.log` każdą wiadomość, której nie wysłała.
 - Sesje omp Operatora i Kernela same wracają do najnowszej wiadomości, gdy zapomniany proces omp przestawi je przy zamknięciu, a `jarvo przed-restartem` przygotowuje serwer do restartu.
 - Sesje omp (Operator, Kernel) w panelu działają od razu po restarcie serwera: program `omp` jest szukany także w `~/.local/bin`.
