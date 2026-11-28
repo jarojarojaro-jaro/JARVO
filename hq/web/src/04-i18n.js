@@ -258,7 +258,7 @@ const SLOWNIK = {
     "akt.offline": "Pomocnik aktualizacji nie działa, więc Jarvo nie sprawdzi nowych wersji. Uruchom go poleceniem poniżej.",
     "akt.na_komputerze": "Na tym komputerze", "akt.na_serwerze": "Na serwerze",
     "akt.zrobiona": "Zaktualizowano do {wersja}. Odśwież stronę, gdy skończysz pisać.",
-    "rozm.sekcja": "Rozmówcy", "rozm.sekcja_t": "ROZMÓWCY", "rozm.pracuje": "pracuje", "rozm.czeka": "czeka na ciebie",
+    "rozm.sekcja": "Rozmówcy", "rozm.sekcja_t": "ROZMÓWCY", "rozm.pracuje": "pracuje", "rozm.czeka": "pytanie",
     "rozm.wolny": "wolny", "rozm.odpowiedz": "odpowiedź", "rozm.terminal": "w terminalu", "rozm.offline": "niedostępny",
     "rozm.kolejka": { one: "{n} w kolejce", few: "{n} w kolejce", many: "{n} w kolejce", other: "{n} w kolejce" },
     "rozm.czeka_n": { one: "{n} wiadomość czeka", few: "{n} wiadomości czekają", many: "{n} wiadomości czeka", other: "{n} wiadomości czeka" },
@@ -279,6 +279,8 @@ const SLOWNIK = {
     "podglad.pulpit": "Pulpit",
     "skroty.rozmowca_1": "Rozmówca 1", "skroty.rozmowca_2": "Rozmówca 2", "skroty.rozmowca_3": "Rozmówca 3",
     "skroty.rozmowca_4": "Rozmówca 4", "skroty.mozg": "Mózg",
+    // Oś floty: nazwa pozycji w pasku; teksty widoku w pakiecie „osfloty” (65-os-floty.js)
+    "osf.tytul": "Oś floty",
   },
   en: {
     "ui.zamknij": "Close", "ui.otworz": "Open", "ui.ponow": "Try again", "ui.odswiez": "Reload",
@@ -523,7 +525,7 @@ const SLOWNIK = {
     "akt.offline": "The update helper is not running, so Jarvo cannot check for new versions. Start it with the command below.",
     "akt.na_komputerze": "On this computer", "akt.na_serwerze": "On a server",
     "akt.zrobiona": "Updated to {wersja}. Reload the page when you finish typing.",
-    "rozm.sekcja": "Partners", "rozm.sekcja_t": "PARTNERS", "rozm.pracuje": "working", "rozm.czeka": "waiting for you",
+    "rozm.sekcja": "Partners", "rozm.sekcja_t": "PARTNERS", "rozm.pracuje": "working", "rozm.czeka": "question",
     "rozm.wolny": "idle", "rozm.odpowiedz": "new reply", "rozm.terminal": "in the terminal", "rozm.offline": "unavailable",
     "rozm.kolejka": { one: "{n} queued", other: "{n} queued" },
     "rozm.czeka_n": { one: "{n} message waiting", other: "{n} messages waiting" },
@@ -544,6 +546,8 @@ const SLOWNIK = {
     "podglad.pulpit": "Desktop",
     "skroty.rozmowca_1": "Partner 1", "skroty.rozmowca_2": "Partner 2", "skroty.rozmowca_3": "Partner 3",
     "skroty.rozmowca_4": "Partner 4", "skroty.mozg": "Brain",
+    // Oś floty: nazwa pozycji w pasku; teksty widoku w pakiecie „osfloty” (65-os-floty.js)
+    "osf.tytul": "Fleet timeline",
   },
 };
 

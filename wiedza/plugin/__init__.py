@@ -16,6 +16,8 @@ profilu ma `memory.provider: jarvo-wiedza`). Co robi:
     było: <tytuł> → jak poprawnie: …”, błąd bez notatki jedną linię o zapisie do księgi (0 tokenów),
   - hak `on_kanban_dispatch_tick` (brama, co 30 s): kompilacja skrzynki osobnym procesem, gdy pora (tik_kompilacji;
     natywnie od startu robi to nadzorca, tu droga bramy bez nadzorcy),
+  - hak `pre_llm_call` „Teraz we flocie” (flota_teraz.py): przed turą inne zadania w toku z osi floty (os-floty.db
+    panelu; innych agentów i własne z innej rozmowy albo karty) i zajęte urządzenia, bez promptów; nic = nic nie dodaje,
   - narzędzia tylko dla agentów z SCHEMAT_DLA (Jarvo, rozmowa z właścicielem, bez terminala): `schemat` (schemat.py,
     SVG → PNG w rozmowie) i `pobierz_link` (linki.py: link od właściciela → treść do analizy, skill `skrzynka-linkow`).
     Hermes ładuje tę wtyczkę jako dostawcę pamięci (wyłączną), więc narzędzia idą przez get_tool_schemas, nie register_tool.
@@ -133,6 +135,25 @@ def blokada_przed_tura(**kwargs) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.warning("jarvo-wiedza: przypomnienie o blokadzie niedostępne: %s", e)
         return None
+
+
+def teraz_we_flocie(session_id: str = "", **_kw: Any) -> Optional[Dict[str, Any]]:
+    """Hak `pre_llm_call`: blok „Teraz we flocie” z osi floty (flota_teraz.py): inne zadania w toku (innych agentów
+    i własne z innej sesji albo karty) i zajęte urządzenia (28.11 dwie sesje Jarva naraz na telefonie `first`).
+    Pusty blok albo błąd = nic nie dodaje."""
+    try:
+        home = _hermes_home()
+        karta = os.environ.get("HERMES_KANBAN_TASK", "").strip()
+        wlasne = {f"sesja:{session_id}"} if session_id else set()
+        if karta:
+            wlasne.add(f"karta:{karta}")
+        tekst = _modul("jarvo_flota_teraz", "flota_teraz.py").blok(
+            _sciezki(home)[1] / "os-floty.db", _korzen(home).parent / "stan" / "telefon-zadania.json",
+            _profil(home), wlasne)
+    except Exception as e:
+        logger.debug("jarvo-wiedza: teraz we flocie: %s", e)
+        return None
+    return {"context": tekst} if tekst else None
 
 
 def blokada_bez_ciszy(**kwargs) -> Optional[str]:
@@ -1716,7 +1737,7 @@ def register(ctx) -> None:
     except Exception as e:
         logger.debug("jarvo-wiedza: cisza tablicy nie zarejestrowana: %s", e)
     for hak, funkcja in (("pre_llm_call", blokada_przed_tura), ("pre_llm_call", odpowiedz_na_brief),
-                         ("transform_llm_output", blokada_bez_ciszy)):
+                         ("pre_llm_call", teraz_we_flocie), ("transform_llm_output", blokada_bez_ciszy)):
         try:
             ctx.register_hook(hak, funkcja)
         except Exception as e:

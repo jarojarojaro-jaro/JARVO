@@ -1,6 +1,6 @@
 // Pasek boczny (docs/HQ.md „Aplikacja”, makieta V2 · Spokojny): marka, Nowa rozmowa, Szukaj, lista wątków
 // w grupach (Przypięte, Dziś, Wczoraj, Ten tydzień, Wcześniej), Archiwum i Kosz pod „⋯” obok Szukaj, nawigacja
-// (Aktualizacje, Mózg, Ustawienia), stopka (odznaka aktualizacji, stan połączenia słowem). Wiersz: ikona źródła, tytuł w jednej linii, znak stanu (● czeka na Ciebie, ◌ pracuje, ⚠ błąd) z tekstem
+// (Oś floty, Aktualizacje, Mózg, Ustawienia), stopka (odznaka aktualizacji, stan połączenia słowem). Wiersz: ikona źródła, tytuł w jednej linii, znak stanu (● czeka na Ciebie, ◌ pracuje, ⚠ błąd) z tekstem
 // dla czytnika i menu ⋯ (Zmień nazwę, Przypnij, Archiwizuj, Usuń; w koszu Przywróć i Usuń na zawsze), widoczne po
 // najechaniu, na dotyku zawsze, też długim przytrzymaniem (500 ms) i prawym przyciskiem. Długa lista (> 120 wierszy)
 // rysuje tylko widoczne wiersze. Wiersz idzie przez WierszListy (typ elementu), gotowy na jednolitą listę z sesjami.
@@ -195,9 +195,17 @@ function PozycjaAktualizacji({ trasa, klasa }) {
     ${n > 0 && html`<span class="j-rozm-licz" aria-hidden="true">${n > 99 ? "99+" : n}</span>`}</a></li>`;
 }
 
+// Oś floty (28.11 JARO: co robi flota, które urządzenia zajęte) nad Aktualizacjami, w tych samych dwóch miejscach
+function PozycjaOsiFloty({ trasa, klasa }) {
+  const tu = trasa.widok === "os";
+  return html`<li class=${klasa}><a href=${Trasa.zbuduj({ widok: "os" })} aria-current=${tu ? "page" : undefined}
+      class=${cx(tu && "is-aktywny")} data-nawig="os">
+    <${Ikona} n=${IKONY_WIDOKOW.os} r=${16} klasa="j-nawig-i"/><span class="j-nawig-t">${T("osf.tytul")}</span></a></li>`;
+}
+
 function NawigacjaCentrum({ trasa }) {
   const poz = [["mozg", T("rozm.mozg"), "Mod+M"], ["ustawienia", T("pasek.ustawienia"), "Mod+,"]];
-  return html`<ul class="j-nawig is-dol"><${PozycjaAktualizacji} trasa=${trasa} klasa="j-tylko-telefon"/>
+  return html`<ul class="j-nawig is-dol"><${PozycjaOsiFloty} trasa=${trasa} klasa="j-tylko-telefon"/><${PozycjaAktualizacji} trasa=${trasa} klasa="j-tylko-telefon"/>
     ${poz.map(([w, tekst, komb]) => html`<li key=${w}>
     <a href=${Trasa.zbuduj({ widok: w })} aria-current=${trasa.widok === w ? "page" : undefined} class=${cx(trasa.widok === w && "is-aktywny")}>
       <${Ikona} n=${IKONY_WIDOKOW[w]} r=${16} klasa="j-nawig-i"/><span class="j-nawig-t">${tekst}</span>
@@ -328,7 +336,7 @@ function Pasek({ trasa, warstwa = false }) {
         onClick=${() => sklep.zmien("pasek", { otwarty: false })}/>
     </div>
     <${NowaRozmowa} fokus=${!saRozmowcy}/>
-    <ul class="j-nawig is-gora"><${PozycjaAktualizacji} trasa=${trasa}/></ul>
+    <ul class="j-nawig is-gora"><${PozycjaOsiFloty} trasa=${trasa}/><${PozycjaAktualizacji} trasa=${trasa}/></ul>
     <div class="j-pasek-s" ref=${przewijana}>
     ${saRozmowcy && html`<div class="j-pasek-rozm">
       <h2 class="j-sekcja" id="j-sekcja-rozm">${T("rozm.sekcja_t")}</h2>

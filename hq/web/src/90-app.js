@@ -150,7 +150,7 @@ function OknoEdytora({ sciezka }) {
 
 // widoki z własną belką `NaglowekWidoku` (ta sama wysokość i krój co belka rozmowy): pusta belka nad nimi spychała
 // ich tytuł 56 px niżej niż u rozmówcy
-const WLASNY_NAGLOWEK = new Set(["aktualizacje", "mozg", "ustawienia"]);
+const WLASNY_NAGLOWEK = new Set(["aktualizacje", "os", "mozg", "ustawienia"]);
 
 function Gora({ trasa }) {
   const watek = useSklep((s) => (trasa.watek ? s.watki[trasa.watek] || (s.lista.wg_klucza[`w:${trasa.watek}`] || {}).watek : null));
@@ -438,7 +438,7 @@ function AplikacjaJarvo() {
   }, []);
 
   // pierwsze spotkanie na całym ekranie: same pytania, bez paska rozmów i górnej belki
-  if (!["watek", "sesja", "ustawienia", "rozmowca", "aktualizacje"].includes(trasa.widok) && (poznanie === "trwa" || poznanie === "mozg" || poznanieOtwarte(got))) {
+  if (!["watek", "sesja", "ustawienia", "rozmowca", "aktualizacje", "os"].includes(trasa.widok) && (poznanie === "trwa" || poznanie === "mozg" || poznanieOtwarte(got))) {
     return html`<div class="jarvo-app" data-jarvo-korzen="" data-motyw=${motyw} data-paleta=${paleta} lang=${isPL() ? "pl" : "en"} ref=${korzen}>
       <main class="j-poz-ekran" data-region="glowna" tabIndex="-1" aria-label=${T("poz.etykieta")}>
         <${Leniwy} pakiet="poznajmy" nazwa="Poznajmy" key=${poznanie === "mozg" ? "mozg" : "poz"} poczatek=${poznanie === "mozg" ? "mozg" : "witaj"}
@@ -455,6 +455,7 @@ function AplikacjaJarvo() {
   else if (trasa.widok === "sesja") widok = html`<${Pusto} ikona="msg" tytul=${T("sesja.wkrotce")}/>`;
   else if (trasa.widok === "mozg") widok = html`<${WidokMozgu}/>`;
   else if (trasa.widok === "aktualizacje") widok = html`<${Leniwy} pakiet="raporty" nazwa="Aktualizacje" trasa=${trasa} zastepczy=${zastepczy}/>`;
+  else if (trasa.widok === "os") widok = html`<${Leniwy} pakiet="osfloty" nazwa="OsFloty" trasa=${trasa} zastepczy=${zastepczy}/>`;
   else if (trasa.widok === "ustawienia") widok = html`<${Leniwy} pakiet="ustawienia" nazwa="Ustawienia" trasa=${trasa} zastepczy=${zastepczy}/>`;
   else widok = html`<${EkranStartu} key=${trasa.agent || "start"} agent=${trasa.widok === "nowa" ? trasa.agent : null}/>`;
   return html`<div class="jarvo-app" data-jarvo-korzen="" data-motyw=${motyw} data-paleta=${paleta} lang=${isPL() ? "pl" : "en"} ref=${korzen}>

@@ -142,7 +142,7 @@ class Silnik:
                  agenci, hub, log: Callable[[str], None] | None = None, limit: int | None = None,
                  sciezka_db: Path | str | None = None, stan_aktualizacji: Callable[[], dict] | None = None,
                  obserwator: bool = True, http=None, odstep_odpytania: float | None = None,
-                 plik: Callable[[str], dict | None] | None = None, raporty=None):
+                 plik: Callable[[str], dict | None] | None = None, raporty=None, os_floty=None):
         self.m = moduly
         self.home = Path(home)
         self.jarvo_dir = Path(jarvo_dir)
@@ -170,6 +170,9 @@ class Silnik:
         self._gotowy = threading.Event()
         self._koniec: asyncio.Event | None = None
         self.czytnik = moduly.czytnik.Czytnik(self.home / "profiles", agenci.nazwy, log=self.log)
+        self.os_floty = os_floty          # zbieracz osi zadań floty (os_floty.Zbieracz): czyta state.db tym czytnikiem
+        if os_floty is not None and os_floty.czytnik is None:
+            os_floty.czytnik = self.czytnik
 
     # ------------------------------------------------------------------------------------------- start
     def start(self, czekaj: float = 10.0) -> "Silnik":
@@ -278,9 +281,10 @@ class Silnik:
     async def _petla_rozmowcow(self) -> None:
         """Co 2 s: stan rozmówców (`rozmowca.stan`), sesje tematów, zaległe lustro do Telegrama, nowe raporty rutyn
         (archiwum Aktualizacji zbiera co 30 s, nowe idą zdarzeniem `raporty.nowe` i do wątków rozmówców:
-        `rozmowcy.raporty`), wszystko w wątku tła."""
+        `rozmowcy.raporty`) i oś zadań floty (zbiera co 5 s, zmienione wpisy idą zdarzeniem `flota.os`), wszystko
+        w wątku tła."""
         while True:
-            for zadanie in (self.rozmowcy.stany, self.lustro.runda, self._raporty):
+            for zadanie in (self.rozmowcy.stany, self.lustro.runda, self._raporty, self._os_floty):
                 try:
                     await asyncio.to_thread(zadanie)
                 except asyncio.CancelledError:
@@ -299,6 +303,13 @@ class Silnik:
         nowe = self.raporty.runda(po_nowych=self._raporty_do_rozmow)
         if nowe:
             self.hub.nadaj("raporty.nowe", nowe)
+
+    def _os_floty(self) -> None:
+        if self.os_floty is None:
+            return
+        zmiany = self.os_floty.runda()
+        if zmiany:
+            self.hub.nadaj("flota.os", {"zadania": zmiany})
 
     def _raporty_do_rozmow(self, raporty: list[dict]) -> None:
         """Raport rozmówcy bez lustra Hermesa do jego wątku; błąd nie wstrzymuje kanału Aktualizacje."""

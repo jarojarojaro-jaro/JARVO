@@ -55,6 +55,8 @@ PLUGIN_FILES = ("manifest.json", "plugin_api.py", "hq_core.py", "ochrona.py", "e
                 "mozg_zrodla.py",
                 # kanał Aktualizacje (docs/HQ.md „Aktualizacje”): archiwum raportów rutyn z cron/output profili
                 "raporty.py",
+                # oś zadań floty (docs/HQ.md „Oś floty”): os-floty.db, zbieracz w pętli silnika, GET /flota/os
+                "os_floty.py",
                 # limity planów modeli w pasku (docs/HQ.md „Limity planów”): `omp usage --json`
                 "limity.py",
                 # podgląd na żywo telefonów floty i Komputera Jarva (docs/HQ.md „Podgląd na żywo”): WebSocket z obrazem
@@ -102,6 +104,8 @@ PAKIETY = {
     "mozg": {"pliki": ("63-mozg-neuron.js", "63-mozg.js"), "zalezy": ()},
     # Aktualizacje (#/aktualizacje): archiwum raportów rutyn, poza pierwszym wyświetleniem rozmowy
     "raporty": {"pliki": ("64-raporty.js",), "zalezy": ()},
+    # Oś floty (#/os): zadania floty dzień po dniu; kalendarz, daty i style dnia z pakietu Aktualizacji
+    "osfloty": {"pliki": ("65-os-floty.js",), "zalezy": ("raporty",)},
     # stopka kompozytora (model, myślenie, tryb szybki, pierścień kontekstu z dymkiem): przy pierwszej otwartej
     # rozmowie, do tej pory rząd bloczka ma tylko „Do:”, spinacz i wysyłanie (ta sama wysokość)
     "stopka": {"pliki": ("33-stopka.js",), "zalezy": ()},

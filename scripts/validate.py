@@ -747,6 +747,17 @@ def slownik_i18n(tekst: str) -> dict[str, dict[str, set[str] | None]]:
             for j, blok in (("pl", pl), ("en", en))}
 
 
+def teksty_aplikacji(src) -> str:
+    """04-i18n.js i dopiski słownika z pakietów na żądanie (Object.assign(SLOWNIK.…) w 65-os-floty.js: teksty widoku
+    poza rdzeniem, 28.11 budżet gzip): jeden tekst dla slownik_i18n."""
+    czesci = [(src / "04-i18n.js").read_text(encoding="utf-8")]
+    for f in sorted(src.glob("*.js")):
+        t = f.read_text(encoding="utf-8")
+        if f.name != "04-i18n.js" and re.search(r"^Object\.assign\(SLOWNIK\.", t, re.M):
+            czesci.append(t)
+    return "\n".join(czesci)
+
+
 FORMY_MNOGIE = {"pl": {"one", "few", "many", "other"}, "en": {"one", "other"}}
 
 
@@ -772,7 +783,7 @@ def check_hq_pakiet(r: Report) -> None:
     if not i18n.exists():
         return
     try:
-        sl = slownik_i18n(i18n.read_text(encoding="utf-8"))
+        sl = slownik_i18n(teksty_aplikacji(src))
     except IndexError:
         r.err("hq/web/src/04-i18n.js: brak bloków pl / en w SLOWNIK")
         return

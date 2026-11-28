@@ -11,15 +11,16 @@ const assert = require("assert");
 
 const SRC = path.join(__dirname, "..", "..", "hq", "web", "src");
 const PLIKI = ["02-sklep.js", "03-trasa.js", "04-i18n.js", "05-skroty.js", "06-tokeny.js", "07-sciezki.js", "12-wzmianki.js",
-  "13-markdown.js", "14-czas.js", "15-os.js", "33-komendy.js", "37-poznajmy.js", "64-raporty.js"];
+  "13-markdown.js", "14-czas.js", "15-os.js", "33-komendy.js", "37-poznajmy.js", "64-raporty.js", "65-os-floty.js"];
 const PRZED = `const React = {}; const useMemo = (f) => f(); const useRef = (v) => ({ current: v }); const useEffect = () => {};
 let HQ_LANG = null; const isPL = () => T.wymus !== "en"; const Zasoby = { daj() {} };\n`;
-const PO = "\n;({ T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, sklep, USTAWIENIA_DOMYSLNE, Poznanie, kwestiePoznania, Sciezki, kluczDnia, granicyDnia, siatkaMiesiaca, dniKalendarza, koloryRodzajow, cytatRaportu, ukladRaportu, Komendy });";
+const PO = "\n;({ T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, sklep, USTAWIENIA_DOMYSLNE, Poznanie, kwestiePoznania, Sciezki, kluczDnia, granicyDnia, siatkaMiesiaca, dniKalendarza, koloryRodzajow, cytatRaportu, ukladRaportu, Komendy, osfPorzadek, osfDrzewo, osfScal, osfSasiedzi, osfZasoby, osfNazwaZasobu, osfTrwanie });";
 const kod = PRZED + PLIKI.map((f) => `// ---- ${f}\n` + fs.readFileSync(path.join(SRC, f), "utf8")).join("\n") + PO;
 const kontekst = vm.createContext({ Intl, Date, Math, JSON, URLSearchParams, setTimeout, clearTimeout, console, Set, Map,
   encodeURIComponent, decodeURIComponent, Number, String, Object, Array, RegExp });
 const M = vm.runInContext(kod, kontekst, { filename: "hq-front.js" });
-const { T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, Poznanie, kwestiePoznania, Sciezki, kluczDnia, granicyDnia, siatkaMiesiaca, dniKalendarza, koloryRodzajow, cytatRaportu, ukladRaportu, Komendy } = M;
+const { T, SLOWNIK, Czas, Trasa, Skroty, Motyw, Os, Md, Pisanie, Wzmianki, utworzSklep, stanPoczatkowy, plytko, Poznanie, kwestiePoznania, Sciezki, kluczDnia, granicyDnia, siatkaMiesiaca, dniKalendarza, koloryRodzajow, cytatRaportu, ukladRaportu, Komendy,
+  osfPorzadek, osfDrzewo, osfScal, osfSasiedzi, osfZasoby, osfNazwaZasobu, osfTrwanie } = M;
 
 let ile = 0;
 function test(nazwa, f) {
@@ -862,6 +863,70 @@ test("ukladRaportu: sekcje z etykiet linii, decyzje z pogrubionym pytaniem i rek
   const czysty = (t) => t.replace(/\*+|^#### /gm, "").replace(/\s+/g, " ").trim();
   assert.strictEqual(czysty(u), czysty(brief));
   assert.strictEqual(ukladRaportu(""), "");
+});
+
+// ------------------------------------------------------------------------------------------------ oś floty
+test("Oś floty: trasa #/os[/<dzień>]", () => {
+  eq(Trasa.parsuj("#/os"), { widok: "os" });
+  eq(Trasa.parsuj("#/os/2026-11-27"), { widok: "os", dzien: "2026-11-27" });
+  eq(Trasa.parsuj("#/os/zle"), { widok: "start" });
+  eq(Trasa.parsuj("#/os/2026-11-27/x"), { widok: "start" });
+  for (const t of [{ widok: "os" }, { widok: "os", dzien: "2026-11-27" }]) eq(Trasa.parsuj(Trasa.zbuduj(t)), t);
+  assert.strictEqual(Trasa.zbuduj({ widok: "os", dzien: "2026-11-27" }), "#/os/2026-11-27");
+});
+test("Oś floty: kolejność (w toku i pytanie od najstarszego, reszta od najnowszej, rutyna po końcu)", () => {
+  const z = [{ id: "a", stan: "gotowe", start_at: ts("2026-11-28T09:00:00") }, { id: "b", stan: "w_toku", start_at: ts("2026-11-28T11:00:00") },
+    { id: "c", stan: "pytanie", start_at: ts("2026-11-28T10:00:00") }, { id: "d", stan: "blad", start_at: ts("2026-11-28T12:00:00") },
+    { id: "r", stan: "gotowe", start_at: null, koniec_at: ts("2026-11-28T09:30:00") }];
+  eq(osfPorzadek(z).map((w) => w.id), ["c", "b", "d", "r", "a"]);
+  eq(z.map((w) => w.id), ["a", "b", "c", "d", "r"]);                             // bez zmiany wejścia
+});
+test("Oś floty: dzieci pod rodzicem, grupa z czymś w toku na górze, sierota i pętla jako zwykłe linie", () => {
+  const g = (h) => ts(`2026-11-28T${h}:00`);
+  const z = [{ id: "p", stan: "gotowe", start_at: g("09:00") }, { id: "k1", rodzic: "p", stan: "w_toku", start_at: g("09:10") },
+    { id: "k2", rodzic: "p", stan: "gotowe", start_at: g("09:05") }, { id: "q", stan: "gotowe", start_at: g("11:00") },
+    { id: "sierota", rodzic: "x", stan: "gotowe", start_at: g("10:00") }, { id: "l1", rodzic: "l2", stan: "gotowe", start_at: g("08:00") },
+    { id: "l2", rodzic: "l1", stan: "gotowe", start_at: g("07:00") }, { id: "wnuk", rodzic: "k2", stan: "gotowe", start_at: g("09:06") },
+    { id: "sam", rodzic: "sam", stan: "gotowe", start_at: g("06:00") }];
+  eq(osfDrzewo(z).map((r) => [r.w.id, r.poziom, r.aktywna]), [["p", 0, true], ["k2", 1, true], ["wnuk", 2, true], ["k1", 1, true],
+    ["q", 0, false], ["sierota", 0, false], ["l1", 0, false], ["l2", 0, false], ["sam", 0, false]]);
+  eq(osfDrzewo([]), []);
+  // filtr agenta bez rodzica: dziecko staje się zwykłą linią
+  eq(osfDrzewo(z.filter((w) => w.id === "k1")).map((r) => [r.w.id, r.poziom]), [["k1", 0]]);
+});
+test("Oś floty: zdarzenie flota.os scala po id, starsza zmiana nie cofa, nowe tylko z oglądanego dnia", () => {
+  const dzis = "2026-11-28";
+  const baza = [{ id: "a", stan: "w_toku", tytul: "A", start_at: ts("2026-11-28T10:00:00"), zmieniono_at: 100 },
+    { id: "b", stan: "gotowe", start_at: ts("2026-11-28T09:00:00"), zmieniono_at: 100 }];
+  const nowe = [{ id: "a", stan: "gotowe", start_at: ts("2026-11-28T10:00:00"), koniec_at: ts("2026-11-28T10:20:00"), wynik: "ok", zmieniono_at: 200 },
+    { id: "b", stan: "blad", start_at: ts("2026-11-28T09:00:00"), zmieniono_at: 50 },
+    { id: "c", stan: "gotowe", start_at: ts("2026-11-28T11:00:00"), zmieniono_at: 200 },
+    { id: "d", stan: "gotowe", start_at: ts("2026-11-27T12:00:00"), zmieniono_at: 200 },
+    { id: "e", stan: "w_toku", start_at: ts("2026-11-27T23:00:00"), zmieniono_at: 200 }, null, {}];
+  const s = osfScal(baza, nowe, { dzien: dzis, dzis });
+  eq(s.map((w) => w.id), ["e", "c", "a", "b"]);
+  eq([s[2].stan, s[2].tytul, s[2].wynik], ["gotowe", "A", "ok"]);
+  assert.strictEqual(s[3].stan, "gotowe");
+  eq(osfScal(baza, nowe, { dzien: "2026-11-27", dzis }).map((w) => w.id), ["e", "a", "b", "d"]);
+  assert.strictEqual(osfScal(baza, [{ id: "b", zmieniono_at: 50 }], { dzien: dzis, dzis }), baza);
+  assert.strictEqual(osfScal(baza, undefined, { dzien: dzis, dzis }), baza);
+});
+test("Oś floty: sąsiednie dni, zasoby, czas trwania", () => {
+  const dni = ["2026-11-27", "2026-11-20"];
+  eq(osfSasiedzi(dni, "2026-11-28", "2026-11-28"), { poprzedni: "2026-11-27", nastepny: null });
+  eq(osfSasiedzi(dni, "2026-11-24", "2026-11-28"), { poprzedni: "2026-11-20", nastepny: "2026-11-27" });
+  eq(osfSasiedzi(dni, "2026-11-27", "2026-11-28"), { poprzedni: "2026-11-20", nastepny: "2026-11-28" });
+  eq(osfSasiedzi([], "2026-11-28", "2026-11-28"), { poprzedni: null, nastepny: null });
+  eq(osfZasoby({ zasoby: '["telefon:first", "pulpit"]' }), ["telefon:first", "pulpit"]);
+  eq(osfZasoby({ zasoby: ["komputer", 3, ""] }), ["komputer"]);
+  eq(osfZasoby({ zasoby: "{zle" }), []);
+  eq(osfZasoby({}), []);
+  T.wymus = "pl";
+  eq(["telefon:first", "pulpit", "telefon", "dron:x"].map(osfNazwaZasobu), ["telefon first", "pulpit", "telefon", "dron x"]);
+  eq([40, 1500, 3900].map(osfTrwanie), ["<1 min", "25 min", "1 h 05 min"]);
+  T.wymus = "en";
+  assert.strictEqual(osfNazwaZasobu("telefon:first"), "phone first");
+  T.wymus = "pl";
 });
 
 // ------------------------------------------------------------------------------------------------ komendy po „/”

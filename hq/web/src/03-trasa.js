@@ -6,6 +6,7 @@
 //   #/mozg                 Mózg Jarva (pakiet „mozg” na żądanie)
 //   #/aktualizacje[/<dzień RRRR-MM-DD>][/<rodzaj>]   Aktualizacje: raporty z dnia (domyślnie najnowszy dzień z raportami),
 //                          filtr rodzaju = id zadania crona (pakiet „raporty”)
+//   #/os[/<dzień RRRR-MM-DD>]  Oś floty: zadania floty z dnia (domyślnie dziś), pakiet „osfloty”
 //   #/ustawienia[/<sekcja>[/<pod>]]   strona Ustawień      …?n=<narzędzie>&p=<ścieżka>   narzędzie na pełny ekran
 // parsuj/zbuduj są czyste (testy node); reszta dotyka location i sessionStorage.
 
@@ -32,6 +33,7 @@ const Trasa = (() => {
       if (c === "m" && POZYCJA.test(d || "")) t.pozycja = d;
     } else if (a === "s" && PROFIL.test(b || "") && SESJA.test(c || "")) t = { widok: "sesja", profil: b, sesja: c };
     else if (a === "mozg" && !b) t = { widok: "mozg" };
+    else if (a === "os" && (!b || (DZIEN.test(b) && !c))) t = b ? { widok: "os", dzien: b } : { widok: "os" };
     else if (a === "aktualizacje") {
       t = { widok: "aktualizacje" };
       const [dz, rodz] = DZIEN.test(b || "") ? [b, c] : [null, b];
@@ -55,6 +57,7 @@ const Trasa = (() => {
     else if (t.widok === "watek" && t.watek) s += `r/${e(t.watek)}` + (t.pozycja ? `/m/${e(t.pozycja)}` : "");
     else if (t.widok === "sesja" && t.profil && t.sesja) s += `s/${e(t.profil)}/${e(t.sesja)}`;
     else if (t.widok === "mozg") s += "mozg";
+    else if (t.widok === "os") s += "os" + (t.dzien ? `/${e(t.dzien)}` : "");
     else if (t.widok === "aktualizacje") s += "aktualizacje" + (t.dzien ? `/${e(t.dzien)}` : "") + (t.rodzaj ? `/${e(t.rodzaj)}` : "");
     else if (t.widok === "ustawienia") s += "ustawienia" + (t.sekcja ? `/${e(t.sekcja)}${t.pod ? "/" + e(t.pod) : ""}` : "");
     const q = [];

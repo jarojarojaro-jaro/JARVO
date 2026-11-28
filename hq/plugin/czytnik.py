@@ -389,6 +389,9 @@ class Czytnik:
     def wiadomosci_po(self, profil: str, sesje: Iterable[str], po_id: int) -> list[tuple[str, str]]:
         return self._sonda(profil, wiadomosci_po, list(sesje), po_id, domyslna=[])
 
+    def odpowiedz_tury(self, profil: str, sesje: Iterable[str], po_id: int) -> str:
+        return self._sonda(profil, odpowiedz_tury, list(sesje), po_id, domyslna="") or ""
+
     def stan_sesji(self, profil: str, sesje: Iterable[str]) -> dict:
         return self._sonda(profil, stan_sesji, list(sesje), domyslna={"max_id": 0, "skompaktowane": 0})
 
@@ -449,15 +452,16 @@ def dzierzawy(state_db: Path | str, sesje: list[str], teraz: float) -> list[dict
 
 
 def dzierzawy_profilu(state_db: Path | str, teraz: float) -> list[dict]:
-    """Wszystkie ważne dzierżawy tur profilu (praca floty do `praca.json`)."""
+    """Wszystkie ważne dzierżawy tur profilu (praca floty do `praca.json`, tury Telegrama na osi floty: `od` = start
+    tury, część klucza wpisu osi)."""
     conn = _polacz(state_db)
     try:
-        rows = conn.execute("SELECT conversation_id, holder, expires_at FROM session_turn_leases WHERE expires_at > ?",
-                            (teraz,)).fetchall()
+        rows = conn.execute("SELECT conversation_id, holder, acquired_at, expires_at FROM session_turn_leases "
+                            "WHERE expires_at > ?", (teraz,)).fetchall()
     finally:
         conn.close()
-    return [{"sesja_id": r["conversation_id"], "platforma": platforma(r["holder"]), "do": float(r["expires_at"])}
-            for r in rows]
+    return [{"sesja_id": r["conversation_id"], "platforma": platforma(r["holder"]), "od": float(r["acquired_at"] or 0),
+             "do": float(r["expires_at"])} for r in rows]
 
 
 def _tresc_wiersza(raw: Any) -> str:
@@ -527,6 +531,29 @@ def wiadomosci_po(state_db: Path | str, sesje: list[str], po_id: int) -> list[tu
         return out
     finally:
         conn.close()
+
+
+def odpowiedz_tury(state_db: Path | str, sesje: list[str], po_id: int, maks: int = 400) -> str:
+    """Ostatni tekst asystenta bez `tool_calls` w turze, która zaczęła się wierszem użytkownika `po_id`: do
+    następnego wiersza użytkownika innego niż dopisek (`steer`) i najwyżej `maks` wierszy (wynik wpisu osi floty)."""
+    if not sesje or po_id <= 0:
+        return ""
+    conn = _polacz(state_db)
+    try:
+        rows = conn.execute(f"SELECT role, content, tool_calls, display_kind FROM messages WHERE session_id IN "
+                            f"({_w(sesje)}) AND id > ? AND role IN ('assistant', 'user'){_WIDOCZNE} ORDER BY id LIMIT ?",
+                            (*sesje, po_id, maks)).fetchall()
+    finally:
+        conn.close()
+    wynik = ""
+    for r in rows:
+        if r["role"] == "user":
+            if str(r["display_kind"] or "") != "steer":
+                break
+            continue
+        if not _json(r["tool_calls"], None) and str(r["display_kind"] or "") in ("", "failed_turn"):
+            wynik = _tresc_wiersza(r["content"]).strip() or wynik
+    return wynik
 
 
 def stan_sesji(state_db: Path | str, sesje: list[str]) -> dict:

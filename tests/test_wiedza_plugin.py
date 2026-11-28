@@ -1026,3 +1026,43 @@ def test_odpowiedz_na_brief_hakiem_i_brief_bez_ustalonych(tmp_path, monkeypatch)
     monkeypatch.setenv("HERMES_HOME", str(root / "profiles" / "jarvo-web"))               # inny agent: bez briefów
     assert pl.odpowiedz_na_brief(user_message="> Odpowiadam na raport „Poranny brief” (07:51): Brief B-2026-11-20\n\n1 nie",
                                  conversation_history=[]) is None
+
+
+def test_teraz_we_flocie_hakiem(tmp_path, monkeypatch):
+    """28.11 test OLX i SMS Jarva stukały naraz w telefon `first`: hak `pre_llm_call` daje agentowi blok „Teraz we
+    flocie” z osi floty (zadania w toku innych agentów, zajęte urządzenia); własne zadania i pusta oś = nic."""
+    root = tmp_path / "dane"
+    state = root / "jarvo" / "state"
+    state.mkdir(parents=True)
+    for zmienna in ("JARVO_KNOWLEDGE_DIR", "JARVO_STATE_DIR", "HERMES_KANBAN_TASK"):
+        monkeypatch.delenv(zmienna, raising=False)
+    monkeypatch.setenv("HERMES_HOME", str(root / "profiles" / "jarvo"))
+    haki = []
+
+    class Ctx:
+        def register_memory_provider(self, provider): pass
+        def register_hook(self, nazwa, f): haki.append((nazwa, f))
+        def register_auxiliary_task(self, *a, **k): pass
+
+    pl.register(Ctx())
+    assert ("pre_llm_call", pl.teraz_we_flocie) in haki
+    assert pl.teraz_we_flocie(session_id="s1") is None                   # brak osi: nic
+    teraz = time.time()
+    c = sqlite3.connect(state / "os-floty.db")
+    c.execute("CREATE TABLE zadania (id TEXT PRIMARY KEY, agent TEXT, tytul TEXT, stan TEXT, start_at REAL, zasoby TEXT, "
+              "klucz TEXT, zmieniono_at REAL)")
+    c.executemany("INSERT INTO zadania VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [
+        ("k:t1", "jarvo-web", "Strona OLX", "w_toku", teraz - 60, "[]", "karta:t1", teraz),
+        ("p:p1", "jarvo", "Własna rozmowa", "w_toku", teraz - 30, "[]", "sesja:s1", teraz),
+        ("p:p2", "jarvo", "Test OLX", "w_toku", teraz - 20, "[]", "sesja:s2", teraz)])
+    c.commit()
+    c.close()
+    telefony = tmp_path / "stan" / "telefon-zadania.json"
+    telefony.parent.mkdir()
+    telefony.write_text(json.dumps({"first": {"klucz": "sesja:obca", "t": teraz - 5},
+                                    "second": {"klucz": "sesja:s1", "t": teraz - 5}}), encoding="utf-8")
+    tekst = pl.teraz_we_flocie(session_id="s1")["context"]
+    assert tekst.startswith("Teraz we flocie (inne zadania;") and "jarvo-web · Strona OLX · od " in tekst
+    assert "jarvo (twoja inna rozmowa) · Test OLX · od " in tekst      # ten sam profil, inna sesja
+    assert "telefon:first · zajęty przez inne zadanie (sesja:obca)" in tekst
+    assert "Własna rozmowa" not in tekst and "telefon:second" not in tekst

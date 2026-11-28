@@ -1,6 +1,8 @@
 # Changelog: jarvo
 
 ## Niewydane
+- Prośba o zgodę czeka na odpowiedź JARO do doby, a w panelu agent z pytaniem albo prośbą ma stan PYTANIE pulsujący na pomarańczowo.
+- Pulpit prowadzi jedno zadanie naraz jak telefon: klik albo pisanie, gdy inne zadanie działało na nim w ostatnich 10 minutach, strażnik zatrzymuje z informacją, kto go zajmuje.
 - Telefon prowadzi jedno zadanie naraz: gdy inne zadanie działało na nim w ostatnich 10 minutach, strażnik zatrzymuje mój krok z informacją, kto go zajmuje.
 - SMS piszę `open` z adresem `sms:<numer>?body=<tekst>` i stukam „Send message” (skill `telefon` 1.2.0).
 - `/compact` sesji omp w panelu to jedna linia: kółko z licznikiem czasu, póki trwa, potem tokeny przed i po z procentem okna.

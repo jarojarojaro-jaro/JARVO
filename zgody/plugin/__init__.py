@@ -3222,10 +3222,12 @@ def _klucz_zadania(task_id: str, session_id: str) -> str:
     return f"karta:{karta}" if karta else f"sesja:{session_id or task_id or 'default'}"
 
 
-def _zajmij_telefon(telefon: str, klucz: str) -> Optional[Tuple[str, int]]:
-    """Telefon prowadzi jedno zadanie naraz: <stan>/telefon-zadania.json trzyma ostatnie działające zadanie każdego
-    telefonu (plik, bo karty kanbana to osobne procesy). Inne zadanie z krokiem w ostatnich _ZAJETY_S s = (jego
-    klucz, ile s temu); inaczej telefon przechodzi na to zadanie i None. Błąd pliku nie blokuje telefonu."""
+def _zajmij_zasob(zasob: str, klucz: str) -> Optional[Tuple[str, int]]:
+    """Telefon i pulpit prowadzą jedno zadanie naraz: <stan>/telefon-zadania.json trzyma ostatnie działające zadanie
+    każdego zasobu (nazwa telefonu albo "pulpit"; plik, bo karty kanbana to osobne procesy, a oś floty pokazuje z niego
+    zajęte urządzenia). Inne zadanie z krokiem w ostatnich _ZAJETY_S s = (jego klucz, ile s temu); inaczej zasób
+    przechodzi na to zadanie i None. Błąd pliku nie blokuje."""
+    telefon = zasob
     try:
         plik = _korzen_danych(_hermes_home()).parent / "stan" / "telefon-zadania.json"
         try:
@@ -3261,7 +3263,7 @@ def _jeden_telefon(tool_name: str, args: Dict[str, Any], task_id: str, session_i
         if x is None or (klucz.startswith("sesja:") and teraz - kiedy > _WIAZANIE_ROZMOWY):
             x = telefony[0]
         if all(t == x for t in telefony):
-            zajety = _zajmij_telefon(x, klucz)
+            zajety = _zajmij_zasob(x, klucz)
             if zajety is not None:
                 logger.warning("jarvo-zgody: telefon %s zajęty przez %s (%s s temu)", x, zajety[0], zajety[1])
                 return _blok(f"Telefon {x} prowadzi teraz inne zadanie ({zajety[0]}, ostatni krok {zajety[1]} s temu), "
@@ -3276,6 +3278,26 @@ def _jeden_telefon(tool_name: str, args: Dict[str, Any], task_id: str, session_i
     logger.warning("jarvo-zgody: przeskok telefonu %s -> %s (%s)", x, telefony, tool_name)
     return _blok(f"To zadanie działa na telefonie {x}; na innym telefonie nie działasz bez wyraźnego polecenia JARO "
                  f"(odczyt, np. lista aplikacji albo ekran, jest wolny), więc dokończ na {x} albo zapytaj go jednym zdaniem.")
+
+
+PULPIT_ODCZYT = frozenset({"zobacz", "okna", "czekaj"})
+
+
+def _jeden_pulpit(tool_name: str, args: Dict[str, Any], task_id: str, session_id: str) -> Optional[Dict[str, str]]:
+    """Pulpit (ekran :0 serwera) jak telefon: krok, który klika albo pisze, gdy inne zadanie działało na nim w ostatnich
+    _ZAJETY_S s = block; odczyt (`zobacz`, `okna`, `czekaj`) jest wolny."""
+    if tool_name != "pulpit":
+        return None
+    akcje = {str(k.get("akcja")) for k in args.get("kroki") or [] if isinstance(k, dict)} or {str(args.get("akcja") or "zobacz")}
+    if akcje <= PULPIT_ODCZYT:
+        return None
+    zajety = _zajmij_zasob("pulpit", _klucz_zadania(task_id, session_id))
+    if zajety is None:
+        return None
+    logger.warning("jarvo-zgody: pulpit zajęty przez %s (%s s temu)", zajety[0], zajety[1])
+    return _blok(f"Pulpit prowadzi teraz inne zadanie ({zajety[0]}, ostatni krok {zajety[1]} s temu), a dwa zadania na "
+                 "jednym ekranie przestawiają sobie okna i kursor, więc nic na nim nie klikaj: ponów za kilka minut, "
+                 "a gdy sprawa jest pilna, napisz JARO jednym zdaniem, że pulpit jest zajęty.")
 
 
 # 26.11 20:40 Jarvo wpisał w formularz weryfikacji SMS prywatny numer JARO: numery z listy sha256 ostatnich 9 cyfr
@@ -3963,8 +3985,9 @@ def straznik_zgod(tool_name: str = "", args: Optional[Dict[str, Any]] = None, ta
         tool_name, args = str(tool_name or ""), args if isinstance(args, dict) else {}
         wynik = (_prywatny_numer(tool_name, args) or _adb_niszczace(tool_name, args) or _adb_ekranu(tool_name, args)
                  or _decyzja(tool_name, args, str(task_id or "")))
-        if not wynik or wynik.get("action") != "block":     # zablokowane wywołanie nie wiąże telefonu
-            wynik = _jeden_telefon(tool_name, args, str(task_id or ""), str(session_id or "")) or wynik
+        if not wynik or wynik.get("action") != "block":     # zablokowane wywołanie nie wiąże telefonu ani pulpitu
+            wynik = (_jeden_telefon(tool_name, args, str(task_id or ""), str(session_id or ""))
+                     or _jeden_pulpit(tool_name, args, str(task_id or ""), str(session_id or "")) or wynik)
         if wynik and wynik.get("action") == "approve" and bez_czlowieka():
             # bez człowieka Hermes odpowiedziałby BLOCKED od razu; nigdy nie zwracamy approve (sekcja d)
             return _blok("praca bez człowieka, a to wywołanie wymaga zgody. Zapisz wynik w katalogu karty, w skarbcu "

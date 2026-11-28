@@ -22,7 +22,7 @@ Aplikacja (szczegóły: sekcja [2f](#2f-aplikacja-rozmowa-pasek-szuflada)):
 | Element | Skąd dane | Co pokazuje |
 |---|---|---|
 | Ekran startu (`#/`) | `GET /app` (właściciel z `USER.md`, gotowość), `GET /podpowiedzi` | robot Jarva (CRT) i powitanie po imieniu („Dzień dobry, Ania”, pod spodem firma); bez imienia w `USER.md` zamiast startu **pierwsze spotkanie** na całym ekranie (rozmowa bez modelu, głos Jarva, zapis do `USER.md`, mózg na miejscu, potem wątek „Pierwsza sesja”; `POST /app/poznanie`, `POST /app/glos`, `POST /app/klucz`, `POST /app/mozg/chatgpt`, `POST /app/pierwsza-sesja`). Jedno zdanie gotowości z najwyżej jednym przyciskiem, tylko gdy czegoś brakuje: **Podłącz** („Podłącz mózg, a zacznę pierwszą sesję.”; otwiera kartę mózgu pierwszego spotkania), **Poznajmy się** (otwiera pierwsze spotkanie po „Pomiń”), **Zacznij pierwszą sesję** (profil i mózg są, sesji jeszcze nie było; × = „Nie teraz”, `localStorage` `jarvo.pierwsza.odrzucona.v1`); brama, która wstaje, = „Jarvo się uruchamia…” bez czerwonego paska. Pole wiadomości zakłada nową rozmowę; pod nim najwyżej 4 rzeczy: **Czeka na Ciebie** (zgody, pytania zespołu, nieudana praca) i **Na początek** (startery tylko z połączonym modelem; × ukrywa, potem „Nie pokazuj tego więcej”) |
-| Pasek rozmów | `rozmowy.db` (`GET /rozmowy`) + strumień | **Nowa rozmowa**, pod nią **Aktualizacje** (raporty rutyn z licznikiem), szukaj, wątki w grupach (Przypięte, Dziś, Wczoraj, …), menu wiersza, Archiwum i Kosz; nawigacja Mózg, **Ustawienia** (jedyne wejście do szuflady w pasku); stopka: stan połączenia słowem („● połączono”, bez połączenia „⚠ Łączę ponownie…”), odznaka **⬆ N** (dostępna aktualizacja) |
+| Pasek rozmów | `rozmowy.db` (`GET /rozmowy`) + strumień | **Nowa rozmowa**, pod nią **Oś floty** (zadania floty dzień po dniu) i **Aktualizacje** (raporty rutyn z licznikiem), szukaj, wątki w grupach (Przypięte, Dziś, Wczoraj, …), menu wiersza, Archiwum i Kosz; nawigacja Mózg, **Ustawienia** (jedyne wejście do szuflady w pasku); stopka: stan połączenia słowem („● połączono”, bez połączenia „⚠ Łączę ponownie…”), odznaka **⬆ N** (dostępna aktualizacja) |
 | Rozmowa (`#/r/<wątek>`) | oś czasu wątku (`rozmowy.db` + `state.db` agentów) | wiadomości z Markdownem, żywy dymek pracy agenta (tekst na bieżąco, kroki, czas, **Zatrzymaj**), zgody z odliczaniem, karty plików (Podgląd, Pobierz, Kopiuj ścieżkę, Odpal), błąd z **Ponów**, znacznik „bezpośrednio” |
 | Pole wiadomości | wybór adresata, załączniki, szkic | „Do: Jarvo”; `@uchwyt` na początku albo lista **Do:** = tylko ta wiadomość wprost do agenta, potem znów Jarvo; zdjęcia (wklejenie, przeciągnięcie) i pliki; szkic na wątek |
 | Szuflada ustawień (pozycja Ustawienia, Ctrl/⌘+,) | strony Hermesa w ramce, `GET/POST /update` | **Połączenia** (Klucze, Modele), **Wygląd** (motyw), **Konto** (język PL/EN także dla stron Hermesa, Wyloguj, klasyczny panel, skróty), **System › Aktualizacja** (bezpieczna aktualizacja: przy pracy agentów pytanie „Zaktualizuj, gdy skończą”), **Stara Baza** |
@@ -1458,6 +1458,93 @@ czerwień; klik = wysuwka z planem i czasem odnowienia. Konta: Command Code z kl
 z subskrypcji) i konta z `omp usage --json` (np. Claude); dostawca floty z omp odpada. Serwer (`hq/plugin/limity.py`,
 `GET /limity`) pyta źródła najwyżej raz na 5 minut, karta trzyma jedną odpowiedź dla wszystkich rozmów.
 
+### Oś floty (`#/os`)
+
+Widok osi zadań floty w panelu (28.11 JARO: agent widzi, co robią inni i które urządzenia są zajęte, JARO widzi, co
+flota zrobiła dziś). Pozycja „Oś floty” w pasku nad Aktualizacjami (na telefonie na dole paska razem z nimi). Adres
+`#/os[/<RRRR-MM-DD>]`; bez dnia dziś (serwer liczy dzień w swojej strefie). Dane: `GET /flota/os?dzien=` (skróty
+wpisów i `dni` z wpisami), `GET /flota/os/{id}` (pełny wpis), zdarzenie strumienia `flota.os`; baza i źródła po
+stronie serwera opisuje rozdział zbieracza osi.
+
+- **Linia** (jedna na zadanie, gęsto, mono metadane): godzina startu (rutyna: godzina raportu), „kto → komu” (JARO,
+  Operator, „rutyna” albo nazwa agenta → agent wykonujący), skrót tytułu, stan jako etykieta `.j-st` jak u rozmówców
+  (W TOKU czerwień pracy, PYTANIE pomarańczowe pulsujące, GOTOWE, PRZERWANE szare, BŁĄD), urządzenia („telefon
+  first”, „pulpit”), czas trwania albo „od HH:MM · 23 min” (upływ tyka co minutę), wynik skrótem. Na górze sekcja
+  TERAZ (w toku i pytania od najstarszego startu), niżej reszta dnia od najnowszej. Wpis z `rodzic` stoi wcięty pod
+  rodzicem (dzieci od najstarszego); grupa z czymś w toku idzie na górę cała. Rodzica spoza listy nie ma, dziecko jest
+  wtedy zwykłą linią.
+- **Rozwinięcie** (klik w linię, wiele naraz): rodzaj, kanał, start i koniec z sekundami, wywołania, urządzenia, id,
+  „Otwórz rozmowę →” przy `watek_id`, prompt (mono, przewijany) i pełny wynik w Markdown (`TrescMd`). Pełny wpis idzie
+  z `GET /flota/os/{id}` przy rozwinięciu i po każdej zmianie wpisu ze strumienia.
+- **Filtr agentów:** chipy agentów dnia (od najczęstszego, „Wszyscy” czyści), wybór kilku naraz, po stronie
+  przeglądarki (lista dnia przychodzi cała, chipy nie znikają po wyborze).
+- **Na żywo:** `flota.os` scala wpisy po id (starsza `zmieniono_at` nie cofa nowszej), nowy wpis dochodzi, gdy jego
+  start wypada w oglądanym dniu (w toku: zawsze na dzisiejszym widoku); po ponownym połączeniu strumienia dzień
+  wczytuje się od nowa. Czysta logika (`osfPorzadek`, `osfDrzewo`, `osfScal`, `osfSasiedzi`) ma testy w
+  `tests/js/hq_front.test.cjs`.
+- **Dni:** ‹ › i ←/→ po dniach z wpisami i dziś, „Dziś” poza dzisiejszym dniem, obok kalendarz miesiąca (dni z
+  zadaniami jasne z kropką); układ, nagłówek i kalendarz jak w Aktualizacjach. Średnia szerokość (≤ 1023 px kontenera)
+  chowa wynik w linii (jest w rozwinięciu); telefon (≤ 760 px): kalendarz pod datą; poniżej 640 px linia na dwa rzędy
+  (godzina, kto → komu, czas, stan / tytuł, urządzenia).
+- **Pakiet** `osfloty` (`hq/web/src/65-os-floty.js`, style w bloku „@@pakiet osfloty”) ładuje się po wejściu w widok
+  razem z pakietem `raporty` (kalendarz, daty, style dnia). Pakiet niesie też teksty widoku PL i EN (`Object.assign
+  (SLOWNIK.…)`; `validate.teksty_aplikacji` dokłada je do sprawdzenia kluczy) i swoje trasy API; w rdzeniu zostaje
+  nazwa pozycji paska, ikona, trasa `#/os` i zdarzenie strumienia (28.11: budżet gzip rdzenia).
+
+### Oś floty: zbieracz, baza, `jarvo flota os`, „Teraz we flocie”
+
+Zaplecze widoku `#/os` (`hq/plugin/os_floty.py`, testy `tests/test_os_floty.py`). Każde zlecenie dowolnego agenta to
+jeden wpis od chwili zlecenia do końca; agenci niczego nie dopisują, wpisy składa panel ze źródeł.
+
+- **Baza** `<dane>/jarvo/state/os-floty.db` (WAL, 0600): tabela `zadania` (id, rodzaj, agent, zlecil, kanal, tytul,
+  prompt, stan, start_at, koniec_at, wynik, wynik_pelny, wywolania, zasoby JSON, rodzic, watek_id, klucz,
+  zmieniono_at) i `stan` (znaczniki ostatnio przeczytanego per źródło). Pisze tylko zbieracz; trasy, CLI i hak czytają
+  `mode=ro`. `klucz` to klucz zadania jak u strażnika telefonu (zgody/plugin `_klucz_zadania`): `sesja:<session_id>`
+  przebiegu (jego sesja, a przed jej nadaniem sesja członka wątku) i tury Telegrama, `karta:<task_id>` karty; omp
+  i rutyny bez klucza. Baza bez tej kolumny (pierwszy kształt) dostaje ją przy otwarciu (ALTER TABLE, indeks).
+  Wpis raz zapisany zostaje (usunięta rozmowa nie zabiera historii); pusty tytuł, prompt czy wynik źródła nie zeruje
+  zapisanego. Tytuł (≤ 120), prompt i wynik (≤ 20 000, skrót ≤ 300) przechodzą przez `ochrona.utajnij`.
+- **Zbieracz** (`Zbieracz.runda`): pętla rozmówców silnika (co 2 s) woła go razem z raportami, a on zbiera co 5 s
+  w wątku tła; zmienione wpisy idą zdarzeniem `flota.os` `{"zadania": [skrót…]}` (najwyżej 100 najnowszych po starcie,
+  pierwszy obieg po wdrożeniu importuje całą historię). Błąd albo brak jednego źródła pomija tylko je.
+- **Źródła i mapowanie:**
+  - przebiegi panelu (`rozmowy.db`, `p:<id>`, rodzaj `panel`): nowe od znacznika `utworzony_at` (z zakładką 2 min)
+    i wszystkie otwarte; pracuje/wysylanie/przyjety/czeka_na_ture/kolejka → `w_toku`, czeka_na_zgode → `pytanie`,
+    gotowe → `gotowe`, zatrzymane/przerwane/anulowane → `przerwane`, blad/zgubione → `blad`; `wlaczony` (dopisek
+    w trakcie tury) ma stan tury, do której doszedł, i ją jako `rodzic`. Prompt z wpisu właściciela (albo
+    `payload.prosba`), wywołania = kroki z narzędziem, wynik: odpowiedź skrzynki omp (`panel-<id>.json`) albo ostatni
+    tekst asystenta tury Hermesa (`czytnik.odpowiedz_tury`, tylko przebiegi skończone w ostatnich 2 dniach), przy
+    błędzie komunikat błędu. Agent sesji omp bez przedrostka `s:`;
+  - karty (`kanban.db`, `k:<task_id>`, rodzaj `karta`, kanał `lista`): pierwszy obieg wszystkie, potem karty
+    z nowymi `task_events`; running/todo/ready/triage/review → `w_toku`, blocked → `pytanie`, done → `gotowe`,
+    failed → `blad`, archived: zakończona → `gotowe`, ostatni bieg crashed/timed_out → `blad`, inaczej `przerwane`.
+    `rodzic` z `task_links`, a bez niego przebieg, w którego sesji karta powstała; wynik z `task_runs.summary`
+    albo `tasks.result`; `created_by` operator → Operator, puste → JARO;
+  - rutyny (`raporty.db`, `r:<id>`): raport = wpis `gotowe` albo `blad`, start = koniec = czas raportu, kanał `cron`;
+  - sesje omp (`o:<klucz>:<plik>`): `zrobione/` i `bledy/` skrzynki bez wiadomości panelu (te są przebiegami),
+    czas → start, start tury z id tury + `sekundy` → koniec, `odpowiedz` → wynik; Telegram → JARO, `operator` i
+    `reczne` → Operator (terminal), skrypty (czuwanie, zwiad, turbo, vast) → rutyna; tura w toku z `stan.json`
+    (żywy pid) daje `w_toku` wiadomościom z `nowe/` sprzed jej startu, a wpis, którego pliku nigdzie już nie ma,
+    kończy się jako `przerwane`;
+  - Telegram Hermesa (`t:<profil>:<sesja>:<start tury>`): dzierżawa tury z platformą `telegram` przy pierwszym
+    zobaczeniu = wpis `w_toku` z ostatnią wiadomością właściciela jako promptem, po zniknięciu dzierżawy `gotowe`
+    z odpowiedzią tury; tylko od wdrożenia (dzierżaw z przeszłości nie ma);
+  - zasoby: `<stan>/telefon-zadania.json` strażnika telefonu (zgody/plugin) z krokiem w ostatnich 10 min dokłada
+    `telefon:<nazwa>` albo `pulpit` wpisom w toku z tym samym `klucz`; zasób zostaje we wpisie po jego końcu.
+- **Trasy** (tylko panel, jak raporty): `GET /flota/os?dzien=RRRR-MM-DD&agent=<a>` → `{dzien, dni (≤ 60, malejąco),
+  zadania: [skrót]}` (skrót bez `prompt` i `wynik_pelny`, `zasoby` jako lista; w toku i pytania na górze od
+  najstarszego startu, dziś wszystkie otwarte, potem reszta dnia malejąco po starcie; dzień w strefie serwera),
+  `GET /flota/os/{id}` → `{zadanie}` albo 404.
+- **`jarvo flota os [--dzien RRRR-MM-DD] [--agent a] [--pelne <id>] [--json]`** (`jarvo/os_floty_cli.py`): ten sam
+  odczyt w terminalu; linia kończy się `#<id>` do `--pelne` (prompt i pełny wynik).
+- **Hak „Teraz we flocie”** (`pre_llm_call` wtyczki jarvo-wiedza, którą ma każdy profil Hermesa jako dostawcę
+  pamięci; `wiedza/plugin/flota_teraz.py`): przed turą ≤ 12 linii `<agent> · <tytuł> · od HH:MM · <zasoby>` z wpisów
+  w toku i z pytaniem z ostatniej doby poza bieżącym zadaniem (`klucz` = `sesja:<session_id>` haka albo
+  `karta:<HERMES_KANBAN_TASK>`). Ten sam profil z innej sesji też widać, z dopiskiem „(twoja inna rozmowa)” albo
+  „(twoja karta)”: 28.11 test OLX i SMS Jarva to były dwie sesje profilu `jarvo`. Dalej linie urządzeń zajętych przez
+  inne zadanie spoza tych wpisów; bez promptów i wyników. Nic innego i wolne urządzenia = nic nie dodaje; sesje omp
+  (Kernel, Operator) Hermesa nie mają, więc bloku nie dostają.
+
 ### Aktualizacje (`#/aktualizacje`)
 
 Kanał na górze paska, pod „+ Nowa rozmowa” (pozycja „↻ Aktualizacje” z licznikiem nieprzeczytanych; na telefonie na
@@ -1881,7 +1968,8 @@ brutalistyczny minimalizm). Jedno miejsce prawdy to blok tokenów na początku s
 - **Kolor z sensem:** `--j-tekst` tytuły i nazwy, `--j-tresc` treść ciągła, `--j-tekst-2` opisy, `--j-tekst-3`
   metadane; biel `--j-akcent` = tu jesteś i główna akcja (Wyślij, Odpowiedz, wybrany dzień, aktywny segment z białą
   krawędzią); czerwień `--j-praca` = agent pracuje (kwadrat stanu, etykieta PRACUJE, żywy moduł, oś); bursztyn
-  `--j-uwaga` = czeka na Ciebie (liczniki nieprzeczytanych, „Czeka na Ciebie”, decyzje, Najważniejsze); błękit
+  `--j-uwaga` = czeka na Ciebie (liczniki nieprzeczytanych, „Czeka na Ciebie”, decyzje, Najważniejsze); pomarańcz
+  `--j-pytanie` pulsujący = rozmówca ma pytanie albo prośbę o zgodę (etykieta PYTANIE i kwadrat stanu); błękit
   `--j-link` = link, kod, ścieżka, terminal; `--j-barwa-N` = przygaszony odcień agenta tylko na dwóch segmentach jego
   znaku i rodzaje raportów. Pary kontrastu (w tym treść, link i czerwień na każdym poziomie tła, metadane na module
   aktywnym i we wnęce) sprawdza `tests/test_hq_front.py`.
@@ -1894,8 +1982,8 @@ brutalistyczny minimalizm). Jedno miejsce prawdy to blok tokenów na początku s
   falą) z nazwy, roli albo pokoju; odcień `--j-barwa-N` na dwóch segmentach. Pikselowe figurki zostały w wieży Starej
   Bazy (silnik pikseli w pakiecie `app-baza`), robot CRT Jarva na starcie i w pierwszym spotkaniu (marka, antena
   idzie za głosem).
-- **Komponenty.** Pasek: rozmówca jako wiersz 48 px z etykietą stanu mono (WOLNY, PRACUJE, W TERMINALU, CZEKA NA
-  CIEBIE), licznik w bursztynie, aktywny segment wysunięty do sceny; na dole za rowkiem stan połączenia (mierniki
+- **Komponenty.** Pasek: rozmówca jako wiersz 48 px z etykietą stanu mono (WOLNY, PRACUJE, W TERMINALU, PYTANIE
+  pulsujące na pomarańczowo), licznik w bursztynie, aktywny segment wysunięty do sceny; na dole za rowkiem stan połączenia (mierniki
   „szczerość, humor” usunięte 22.11: właściciel chce profesjonalnie). Rozmowa: oś czasu z godzinami w lewej kolumnie
   i znacznikiem każdej pozycji, właściciel na jasnej płycie z białą krawędzią i etykietą źródła („Z TELEGRAMA”),
   agent z nagłówkiem w kroju nagłówków, kroki we wnęce, żywy moduł pracy (znak z czerwoną krawędzią, kto, co robi,

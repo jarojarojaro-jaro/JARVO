@@ -190,6 +190,8 @@ def _parser() -> argparse.ArgumentParser:
     sesje_omp.dodaj_polecenia(sub)
     from . import stan                      # stan instalacji jednym poleceniem: jarvo stan [temat…]
     stan.dodaj_polecenia(sub)
+    from . import os_floty_cli              # oś zadań floty (docs/HQ.md „Oś floty”): jarvo flota os
+    os_floty_cli.dodaj_polecenia(sub)
 
     s = sub.add_parser("komputer", add_help=False, help="Komputer Jarva: przeglądarka Jarva (on, off, status, …) "
                        "i ręce na Twoim ekranie (komputer rece on|off|status)",

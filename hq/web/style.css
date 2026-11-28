@@ -1118,6 +1118,7 @@ button.thq-out-name:hover { text-decoration: underline; }
   --j-akcent: #F5F4F0; --j-akcent-hover: #FFFFFF; --j-akcent-na: #000000; --j-fokus: #F5F4F0; --j-praca: #FF5F52;
   --j-mocny: #F5F4F0; --j-mocny-na: #000000;
   --j-uwaga: #E8B56D; --j-uwaga-tlo: rgba(232, 181, 109, .08); --j-uwaga-linia: rgba(232, 181, 109, .34);
+  --j-pytanie: #FF8A3D;
   --j-link: #8DBBE8; --j-link-tlo: rgba(141, 187, 232, .1);
   --j-wolny: #4ADE80; --j-odpowiedz: #7DD3FC; --j-terminal: #F472D0;
   --j-ok: #F5F4F0; --j-blad: #FF7A6E; --j-blad-tlo: rgba(255, 74, 61, .1);
@@ -1139,6 +1140,7 @@ button.thq-out-name:hover { text-decoration: underline; }
   --j-akcent: #111114; --j-akcent-hover: #000000; --j-akcent-na: #FFFFFF; --j-fokus: #111114; --j-praca: #A82418;
   --j-mocny: #111114; --j-mocny-na: #FFFFFF;
   --j-uwaga: #7A4600; --j-uwaga-tlo: #F5EAD6; --j-uwaga-linia: #D9B77A;
+  --j-pytanie: #C2410C;
   --j-link: #1D5896; --j-link-tlo: rgba(29, 88, 150, .08);
   --j-wolny: #15803D; --j-odpowiedz: #0369A1; --j-terminal: #A21CAF;
   --j-ok: #111114; --j-blad: #A8241A; --j-blad-tlo: #F8E4E1;
@@ -2170,7 +2172,9 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 /* etykieta stanu TARS: mono, wersaliki, kolor = stan */
 .j-st { flex: none; font: 500 10px/16px var(--j-font-mono); font-style: normal; letter-spacing: .09em; text-transform: uppercase; color: var(--j-tekst-2); }
 .j-st.is-pracuje { color: var(--j-praca); }
-.j-st.is-czeka { color: var(--j-uwaga); }
+/* PYTANIE (JARO 28.11): agent czeka na odpowiedź albo zgodę, pomarańczowy pulsujący jak WOLNY i ODPOWIEDŹ obok */
+.j-st.is-czeka { color: var(--j-pytanie); animation: j-pytanie 1.4s ease-in-out infinite; }
+@keyframes j-pytanie { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 .j-st.is-wolny { color: var(--j-wolny); }
 .j-st.is-odpowiedz { color: var(--j-odpowiedz); }
 .j-st.is-terminal, .j-st.is-kolejka { color: var(--j-terminal); }
@@ -2181,7 +2185,7 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
 .j-rk { position: absolute; right: -2px; bottom: -2px; width: 6px; height: 6px; background: var(--j-tlo-pasek); box-shadow: inset 0 0 0 1px var(--j-tekst-3), 0 0 0 2px var(--j-tlo-pasek); }
 .j-rozm.is-aktywny .j-rk { box-shadow: inset 0 0 0 1px var(--j-tekst-2), 0 0 0 2px var(--j-tlo-3); }
 .j-rk.is-pracuje { background: var(--j-praca); box-shadow: 0 0 0 2px var(--j-tlo-pasek); animation: j-sygnal 2.8s ease-in-out infinite; }
-.j-rk.is-czeka { background: var(--j-uwaga); box-shadow: 0 0 0 2px var(--j-tlo-pasek); }
+.j-rk.is-czeka { background: var(--j-pytanie); box-shadow: 0 0 0 2px var(--j-tlo-pasek); animation: j-pytanie 1.4s ease-in-out infinite; }
 .j-rk.is-wolny { background: var(--j-wolny); box-shadow: 0 0 0 2px var(--j-tlo-pasek); }
 .j-rk.is-odpowiedz { background: var(--j-odpowiedz); box-shadow: 0 0 0 2px var(--j-tlo-pasek); }
 .j-rk.is-terminal, .j-rk.is-kolejka { background: var(--j-terminal); box-shadow: 0 0 0 2px var(--j-tlo-pasek); }
@@ -2583,6 +2587,61 @@ html[data-jarvo-app] body::after { content: none !important; display: none !impo
   .j-rap-r-t .j-md > ol > li::before { width: 32px; }
   .j-rap-r-t .j-md > .j-md-h4:has(+ ul) { padding-right: 0; }
   .j-rap-r-t .j-md > .j-md-h4 + ul { margin: 0 0 10px 14px; }
+}
+/* @@pakiet osfloty */
+/* Oś floty (#/os, hq/web/src/65-os-floty.js), TARS: nagłówek z datą, układ i kalendarz z Aktualizacji (pakiet raporty
+   idzie razem), lista to jeden moduł z gęstymi liniami w kolumnach: godzina, kto → komu (mono), tytuł, stan (.j-st jak
+   u rozmówców), urządzenia, czas, wynik; dziecko wcięte z kreską po lewej; rozwinięcie to wnęka z danymi (etykiety
+   mono), promptem i wynikiem. Poniżej 640 px linia na dwa rzędy (godzina, kto, czas, stan / tytuł, urządzenia). */
+.j-osf-lista { min-width: 0; display: grid; align-content: start; padding-bottom: 6px; background: var(--j-stal), var(--j-tlo-pasek); box-shadow: var(--j-cien-1); }
+.j-osf-filtr { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; box-shadow: inset 0 -1px 0 var(--j-linia); }
+.j-osf-filtr .j-chip { height: 26px; padding: 0 10px; font: 500 11px/1 var(--j-font-mono); letter-spacing: .04em; }
+.j-osf-sekcja { margin: 0; padding: 12px 12px 6px; font: 500 10.5px/16px var(--j-font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--j-tekst-3); }
+.j-osf-ul { list-style: none; margin: 0; padding: 0; }
+.j-osf-w { box-shadow: inset 0 1px 0 var(--j-linia); }
+.j-osf-w.is-dziecko { margin-left: calc(var(--j-osf-poziom, 1) * 20px); box-shadow: inset 0 1px 0 var(--j-linia), inset 1px 0 0 var(--j-linia-mocna); }
+.j-osf-l { display: grid; grid-template-columns: 40px minmax(0, 150px) minmax(0, 1fr) 84px minmax(0, 110px) 124px minmax(0, .8fr); gap: 0 12px; align-items: baseline;
+  width: 100%; min-height: 32px; padding: 7px 12px; border: 0; background: none; color: var(--j-tresc); font: inherit; font-size: 13px; line-height: 18px; text-align: left;
+  cursor: pointer; transition: background .24s var(--j-ease); }
+.j-osf-l:hover { background: var(--j-tlo-hover); }
+.j-osf-l:focus-visible { outline: 2px solid var(--j-fokus); outline-offset: -2px; }
+.j-osf-l > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.j-osf-godz, .j-osf-czas, .j-osf-zas { font: 400 12px/18px var(--j-font-mono); font-variant-numeric: tabular-nums; color: var(--j-tekst-2); }
+.j-osf-kto { font: 500 12px/18px var(--j-font-mono); color: var(--j-tekst-2); }
+.j-osf-tytul { color: var(--j-tekst); }
+.j-osf-wynik { font-size: 12.5px; color: var(--j-tekst-3); }
+.j-osf-w.is-pracuje .j-osf-czas { color: var(--j-praca); }
+.j-osf-w.is-otwarty > .j-osf-l { background: var(--j-tlo-3); box-shadow: inset 2px 0 0 var(--j-akcent); }
+.j-osf .j-st.is-blad { color: var(--j-blad); }
+.j-osf .j-st.is-przerwane { color: var(--j-tekst-3); }
+.j-osf-kropka { background: var(--j-tekst-2); }
+.j-osf-pelny { padding: 10px 16px 14px 64px; background: var(--j-wneka); box-shadow: inset 0 1px 0 var(--j-linia); }
+.j-osf-dane { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 16px; margin: 0; font-size: 12.5px; line-height: 18px; }
+.j-osf-dane dt { font: 500 10.5px/18px var(--j-font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--j-tekst-3); }
+.j-osf-dane dd { margin: 0; color: var(--j-tresc); overflow-wrap: anywhere; }
+.j-osf-dane code { font: 400 11.5px var(--j-font-mono); color: var(--j-tekst-2); }
+.j-osf-akcje { margin: 8px 0 0; font-size: 13px; }
+.j-osf-h { margin: 12px 0 4px; font: 500 10.5px/16px var(--j-font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--j-tekst-2); }
+.j-osf-prompt { margin: 0; max-height: 18em; overflow: auto; padding: 8px 10px; background: var(--j-tlo-karta); box-shadow: inset 0 0 0 1px var(--j-linia);
+  font: 400 12px/18px var(--j-font-mono); color: var(--j-tresc); white-space: pre-wrap; overflow-wrap: anywhere; }
+.j-osf-pelny .j-msg-t { max-width: none; font-size: 13px; }
+.j-osf-brak { margin: 0; font-size: 12.5px; color: var(--j-tekst-3); }
+/* średnia szerokość (kalendarz obok listy): wynik tylko w rozwinięciu, tytuł zostaje czytelny */
+@container app (max-width: 1023px) {
+  .j-osf-l { grid-template-columns: 40px minmax(0, 130px) minmax(0, 1fr) 84px minmax(0, 100px) 116px; }
+  .j-osf-wynik { display: none; }
+}
+@container app (max-width: 640px) {
+  .j-osf-l { grid-template-columns: 40px minmax(0, 1fr) auto auto; grid-template-areas: "godz kto czas stan" ". tytul tytul zas"; gap: 2px 10px; padding: 7px 10px; }
+  .j-osf-godz { grid-area: godz; }
+  .j-osf-kto { grid-area: kto; }
+  .j-osf-czas { grid-area: czas; }
+  .j-osf-l > .j-st { grid-area: stan; }
+  .j-osf-tytul { grid-area: tytul; }
+  .j-osf-zas { grid-area: zas; max-width: 120px; }
+  .j-osf-wynik { display: none; }
+  .j-osf-w.is-dziecko { margin-left: calc(var(--j-osf-poziom, 1) * 12px); }
+  .j-osf-pelny { padding: 10px 12px 14px; }
 }
 /* @@pakiet rdzen */
 /* @@pakiet stopka */

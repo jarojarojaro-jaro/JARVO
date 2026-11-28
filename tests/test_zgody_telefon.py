@@ -106,6 +106,14 @@ def test_telefon_zajety_przez_inne_zadanie(straz, monkeypatch):
     assert zablokowane(hak("mcp__phone__act", phone="first", cmd="tap"))
 
 
+def test_pulpit_zajety_przez_inne_zadanie(straz):
+    assert hak("pulpit", akcja="klik", x=1, y=2) is None
+    assert hak("pulpit", sesja="s2", akcja="zobacz") is None                       # odczyt wolny
+    w = hak("pulpit", sesja="s2", kroki=[{"akcja": "okna"}, {"akcja": "pisz", "tekst": "x"}])
+    assert zablokowane(w) and "Pulpit prowadzi teraz inne zadanie" in w["message"]
+    assert hak("pulpit", akcja="pisz", tekst="y") is None                          # właściciel działa dalej
+
+
 def test_prywatny_numer_blokowany(straz):
     plik = straz.parent.parent / "jarvo" / "konfig" / "prywatne-numery.json"
     assert hak("mcp__phone__act", cmd="type", text="+48 600 100 200") is None        # brak pliku = nic

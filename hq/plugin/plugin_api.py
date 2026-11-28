@@ -2224,7 +2224,7 @@ from types import SimpleNamespace  # noqa: E402
 roz = SimpleNamespace(hq_core=core, ochrona=ochrona)
 for _nazwa in ("agenci", "rozmowy", "czytnik", "kontekst", "wzmianki", "budzenia", "scalanie", "brama", "strumien",
                "przebiegi", "prace", "karty", "obserwator", "aplikacja", "podpowiedzi", "glos", "mozg", "tematy",
-               "lustro", "omp_sesje", "czytnik_omp", "rozmowcy", "raporty", "silnik", "komendy"):
+               "lustro", "omp_sesje", "czytnik_omp", "rozmowcy", "raporty", "os_floty", "silnik", "komendy"):
     setattr(roz, _nazwa, _load(f"jarvo_hq_{_nazwa}", f"{_nazwa}.py"))
 trasy_rozmow = _load("jarvo_hq_trasy_rozmow", "trasy_rozmow.py")
 trasy_aplikacji = _load("jarvo_hq_trasy_aplikacji", "trasy_aplikacji.py")
@@ -2233,6 +2233,13 @@ RAPORTY = roz.raporty.Archiwum(HOME, core.JARVO_DIR / "state" / "raporty.db", ut
 _dziennik_hq = roz.silnik.ustaw_dziennik(HOME / "logs" / "jarvo-hq.log"
                                          if os.environ.get("JARVO_HQ_SILNIK", "1") != "0" else None)
 AGENCI = roz.agenci.Agenci(FLEET_FILE, core.JARVO_DIR / "state" / "agenci.json")
+# oś zadań floty (os_floty.py, docs/HQ.md „Oś floty”): zbieracz w pętli silnika (czytnik state.db daje mu silnik),
+# telefon-zadania.json pisze strażnik telefonu zgód w <stan> obok korzenia danych (jak zgody/plugin _zajmij_telefon)
+OS_FLOTY = roz.os_floty.Zbieracz(
+    core.JARVO_DIR / "state" / "os-floty.db", dane=HOME, rozmowy_db=core.JARVO_DIR / "state" / "rozmowy.db",
+    kanban_db=HOME / "kanban.db", raporty_db=core.JARVO_DIR / "state" / "raporty.db",
+    telefony=HOME.parent / "stan" / "telefon-zadania.json", omp=roz.omp_sesje, agenci=AGENCI.nazwy,
+    utajnij=ochrona.utajnij, log=_dziennik_hq.info)
 
 
 def _log_hq(linia: str) -> None:
@@ -2277,7 +2284,7 @@ def _start_silnika():
         return hub
     try:
         s = roz.silnik.Silnik(moduly=roz, home=HOME, jarvo_dir=core.JARVO_DIR, api_base=API_BASE, agenci=AGENCI,
-                              hub=hub, log=_log_hq, stan_aktualizacji=_update_state, raporty=RAPORTY)
+                              hub=hub, log=_log_hq, stan_aktualizacji=_update_state, raporty=RAPORTY, os_floty=OS_FLOTY)
         roz.silnik.zarejestruj(s).start(czekaj=2.0)
         roz.silnik.zahacz_uvicorn(hub.zamknij_wszystkie)
     except Exception as exc:  # wtyczka działa dalej (stare trasy), /health i hello mówią „awaria”
@@ -2328,6 +2335,8 @@ trasy_aplikacji.dolacz(router, m=roz, trasy=trasy_rozmow, silnik=_silnik, agenci
 _load("jarvo_hq_mozg_zrodla", "mozg_zrodla.py").dolacz(router, konfig=core.JARVO_DIR / "konfig" / "mozg.json", log=_log_hq)
 # Aktualizacje (#/aktualizacje): GET /raporty, POST /raporty/przeczytane
 roz.raporty.dolacz(router, archiwum=RAPORTY, hub=HUB, log=_log_hq)
+# Oś floty: GET /flota/os, GET /flota/os/{id} (tylko odczyt os-floty.db)
+roz.os_floty.dolacz(router, plik=OS_FLOTY.plik, log=_log_hq)
 # limity planów modeli w pasku (limity.py, docs/HQ.md „Limity planów”): GET /limity z `omp usage --json`
 _limity = _load("jarvo_hq_limity", "limity.py")
 _limity.dolacz(router, limity=_limity.Limity(

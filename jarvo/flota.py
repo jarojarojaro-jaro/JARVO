@@ -61,9 +61,11 @@ USTAWIENIA_PROFILI = "flota-ustawienia.json"          # <stan>: klucze configu p
 # vision_analyze przez model pomocniczy zostaje tylko zapasem dla modelu bez obrazu: krótki limit, małe rozumowanie.
 # tool_search wyłączony: narzędzia telefonu (MCP), ekranu i pulpitu są w tablicy narzędzi od razu, bez mostka
 # tool_search → tool_describe → tool_call (34 błędy formatu w 7 dni; odłożonych było 3 do 13 narzędzi).
-# Przycinanie starych wyników narzędzi wyłączone (0): włączone 27.11 przy 80 tys. tokenów, a T1 (OLX na telefonie)
-# dwa razy doszedł potem do limitu 200 wywołań (3 i 4 oferty z 5), wobec 181 wywołań i 6 ofert przed włączeniem;
-# próba A/B 28.11 za zgodą JARO. Próg kompresji 700k bez zmian.
+# Przycinanie starych wyników narzędzi wyłączone (0): z przycinaniem od 80 tys. tokenów T1 (OLX na telefonie) dwa razy
+# stanął na limicie 200 wywołań (3 i 4 oferty z 5), bez niego 28.11 dał 5 ofert z linkami w 52 min (A/B za zgodą
+# JARO). Próg kompresji 700k bez zmian.
+# Prośba o zgodę (dziś tylko płatność i zakup) czeka na JARO dobę zamiast 300 s: panel pokazuje ją przy agencie jako
+# pulsujące PYTANIE (26.11 prośba Bigshorta wygasła po 300 s, zanim JARO ją zobaczył).
 MODELE_Z_OBRAZEM = {"commandcode": {"deepseek/deepseek-v4.1-flash": True, "deepseek/deepseek-v4-flash": True,
                                     "moonshotai/Kimi-K2.6": True, "deepseek/deepseek-v4-pro": False}}
 KLUCZE_WSZYSTKICH = {"updates.check": False,          # jak hermes.BEZPIECZNE dla hosta (build ich nie ustawia)
@@ -73,7 +75,7 @@ KLUCZE_WSZYSTKICH = {"updates.check": False,          # jak hermes.BEZPIECZNE dl
                      **{f"providers.{dostawca}.models": {m: {"supports_vision": v} for m, v in modele.items()}
                         for dostawca, modele in MODELE_Z_OBRAZEM.items()},
                      "auxiliary.vision.timeout": 45, "auxiliary.vision.reasoning_effort": "low",
-                     "tools.tool_search.enabled": "off"}
+                     "tools.tool_search.enabled": "off", "approvals.timeout": 86400}
 CZAS_BUILDU = 3600.0             # pierwszy build klonuje 34 repo skilli (ok. 0,9 GB), kolejne biorą je z <cache>/build
 CZAS_INSTALACJI = 3600.0         # profile update kopiuje skille 10 profili, zasiew skarbca, lint
 # Tokeny ścieżek E4 (wspólny kontrakt build.py, install_fleet.py i skilli; docs/NATYWNIE.md S06, F12, F14, F17)

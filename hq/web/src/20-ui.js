@@ -149,7 +149,7 @@ class OslonaWidoku extends React.Component {
 }
 
 // jedna ikona widoku w pasku i w jego nagłówku
-const IKONY_WIDOKOW = { aktualizacje: "repeat", mozg: "spark", ustawienia: "gear" };
+const IKONY_WIDOKOW = { aktualizacje: "repeat", os: "os", mozg: "spark", ustawienia: "gear" };
 // Nagłówek widoku bez rozmówcy (Aktualizacje, Mózg, Ustawienia): ta sama belka co nad rozmową (`j-gora`: 56 px, na
 // wysokości logo Jarvo, tytuł 15 px, pod nim szara linia opisu, ikona w miejscu awatara), żeby każdy widok zaczynał
 // się tak samo (19.11 właściciel: „Operator jest idealnie na wysokości Jarvo, a Aktualizacje dziwnie niżej”).

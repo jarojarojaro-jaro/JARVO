@@ -50,6 +50,8 @@ const IKONY = {
   plus: "M12 5v14M5 12h14",
   bolt: "M13 2 4.5 13.5H11L10 22l8.5-11.5H12z",
   user: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M8 7a4 4 0 1 0 8 0a4 4 0 1 0 -8 0",
+  // oś floty: paski zadań przesunięte w czasie (jak wykres Gantta)
+  os: "M3 5h9M7 10h11M5 15h7M10 20h11",
 };
 const IKONY_PELNE = new Set(["stop", "play"]);
 

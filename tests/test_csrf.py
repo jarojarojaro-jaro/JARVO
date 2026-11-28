@@ -204,7 +204,9 @@ def test_odczyty_hq_bez_skutkow(monkeypatch):
         # zakłada silnik)
         "/raporty", "/raporty/kalendarz",
         # limity planów (limity.py): `omp usage --json`, wynik w pamięci procesu, bez zapisu panelu
-        "/limity"}
+        "/limity",
+        # oś floty (os_floty.py lista, wpis): os-floty.db tylko do odczytu (mode=ro); bazę pisze zbieracz silnika
+        "/flota/os", "/flota/os/{id:path}"}
     zapis = {t.path for t in _trasy(api.router) if "POST" in t.methods}
     assert "/anim/info" in zapis
 
