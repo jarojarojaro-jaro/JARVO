@@ -655,7 +655,13 @@ class Sesja:
     skrzynka kończy się i zwalnia blokadę."""
 
     def __init__(self, w, wyslij=telegram):
-        self.w, self.tg = w, wyslij
+        def tg(tekst: str, czat: str, watek: str) -> bool:
+            ok = wyslij(tekst, czat, watek)
+            if ok is False:
+                log(w, f"Telegram: nie wysłałem wiadomości ({czat or 'dom Jarva'}, wątek {watek or '-'}), "
+                       f"początek: {' '.join(tekst.split())[:80]}")
+            return ok
+        self.w, self.tg = w, tg
         self.rpc: Rpc | None = None
         self.tura: Tura | None = None
         self.komendy: dict[str, dict] = {}         # id żądania RPC → komenda w toku

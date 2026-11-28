@@ -296,6 +296,26 @@ def test_wyslij_do_watku_grupy(inst, monkeypatch):
     assert wc.polecenie_telegram_wyslij(u, _a(watek="abc"), [], ot) == 2
 
 
+def test_wyslij_ponawia_po_zerwanym_polaczeniu_ale_nie_po_bledzie_api(inst, monkeypatch):
+    """28.11: „Connection reset by peer” przy wysyłce = zgubione powiadomienie Kernela, że GPU jest włączone."""
+    u, ot, _api, _f = inst
+    proby = []
+
+    def api(token, metoda, dane=None, **_k):
+        proby.append(dane["text"])
+        if len(proby) == 1:
+            raise wc.BladTelegrama(0, "brak połączenia z Telegramem ([Errno 104] Connection reset by peer)")
+        if dane["text"] == "zly":
+            raise wc.BladTelegrama(400, "Bad Request: message thread not found")
+
+    monkeypatch.setattr(wc, "api_telegrama", api)
+    monkeypatch.setattr(wc, "PONOW_WYSYLKI_S", (0.0, 0.0, 0.0))
+    monkeypatch.setattr(sys, "stdin", io.StringIO("Zobaczyłem, że jaroserverai jest włączony"))
+    assert wc.polecenie_telegram_wyslij(u, _a(czat=GRUPA, watek="11"), [], ot) == 0 and len(proby) == 2
+    monkeypatch.setattr(sys, "stdin", io.StringIO("zly"))
+    assert wc.polecenie_telegram_wyslij(u, _a(czat=GRUPA, watek="11"), [], ot) == 1 and proby[2:] == ["zly"]
+
+
 def test_proba_idzie_do_domu_jarva(inst, capsys):
     """17.11: próbna wiadomość (jak każda, którą Jarvo wysyła sam) do tematu General grupy, bez message_thread_id;
     bez grupy do DM właściciela."""

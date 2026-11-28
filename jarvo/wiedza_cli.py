@@ -1571,6 +1571,9 @@ def kawalki_wiadomosci(tekst: str, limit: int = LIMIT_WIADOMOSCI) -> list[str]:
     return [w.rstrip("\n") for w in wynik if w.strip()]
 
 
+PONOW_WYSYLKI_S = (2.0, 5.0, 15.0)   # przerwy przed kolejnymi próbami, gdy nie ma połączenia z Telegramem (kod 0)
+
+
 def polecenie_telegram_wyslij(u: Uklad, a, _reszta, _ot) -> int:
     """Tekst z wejścia do domu Jarva (zwykły tekst, długi w kilku wiadomościach): temat General grupy Jarvo HQ, bez
     grupy DM właściciela (dom_jarva); skrypty na serwerze i odpowiedzi sesji zewnętrznych (skrzynka `<dopisek>`
@@ -1601,7 +1604,14 @@ def polecenie_telegram_wyslij(u: Uklad, a, _reszta, _ot) -> int:
         dane["message_thread_id"] = int(watek)
     try:
         for kawalek in kawalki_wiadomosci(tekst):
-            api_telegrama(token, "sendMessage", {**dane, "text": kawalek})
+            for przerwa in (*PONOW_WYSYLKI_S, None):
+                try:
+                    api_telegrama(token, "sendMessage", {**dane, "text": kawalek})
+                    break
+                except BladTelegrama as e:      # 28.11: jedno „Connection reset” gubiło powiadomienie Kernela o GPU
+                    if e.kod or przerwa is None:
+                        raise
+                    time.sleep(przerwa)
     except BladTelegrama as e:
         print(f"BŁĄD: nie wysłałem wiadomości ({e}). {rada_telegrama(e, grupa=cel.startswith('-'))}", file=sys.stderr)
         return 1
