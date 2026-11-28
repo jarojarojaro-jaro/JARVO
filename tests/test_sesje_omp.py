@@ -360,6 +360,25 @@ def test_licznik_po_compact_i_zmianach_z_terminala(w, at):
     assert (om.licznik(w)["myslenie"], om.licznik(w)["fast"]) == ("xhigh", True)
 
 
+def test_licznik_z_biezacej_galezi(w, at):
+    """28.11: sesja wróciła do starszego wpisu, niżej w pliku została kompresja porzuconej gałęzi (50 tys.): panel
+    pokazywał 5%, a omp 58% z odpowiedzi na bieżącej gałęzi."""
+    om.wyslij(w, "x", "k1")
+    so.skrzynka(w, Telegram())
+    (w.skrzynka / om.PLIK_LICZNIKA).unlink()
+    teraz = datetime.datetime.now(datetime.timezone.utc)
+    iso = lambda s: (teraz + datetime.timedelta(seconds=s)).isoformat().replace("+00:00", "Z")  # noqa: E731
+    wpisy = [{"type": "message", "id": "a1", "parentId": None, "timestamp": iso(-60),
+              "message": {"role": "assistant", "usage": {"input": 10, "cacheRead": 578820, "cacheWrite": 0}}},
+             {"type": "compaction", "id": "c9", "parentId": "x9", "timestamp": iso(-30), "summary": "…",
+              "tokensBefore": 754006, "tokensAfter": 50206},
+             {"type": "custom", "customType": "session_exit", "data": {}, "id": "e1", "parentId": "a1", "timestamp": iso(-10)}]
+    with om.plik_sesji(w).open("a", encoding="utf-8") as f:
+        f.write("".join(json.dumps(e, separators=(",", ":")) + "\n" for e in wpisy))
+    lic = om.licznik(w)
+    assert lic["kontekst"] == 578830 and lic["kompresja"] is None
+
+
 def test_odpowiedz_tury_to_wszystkie_teksty_po_ostatnim_narzedziu():
     """23.11: Kernel napisał podsumowanie 13 linków, w tej chwili doszedł dopisek, dopisał zdanie o nim i właściciel
     dostał tylko to zdanie. Odpowiedź tury = wszystkie teksty po ostatnim wywołaniu narzędzia; komentarz przy

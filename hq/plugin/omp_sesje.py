@@ -516,6 +516,8 @@ def _zmiana(s: dict, linia: bytes) -> None:
         if po:
             w["kontekst"] = po
         w["kompresja"] = {"przed": przed, "po": po, "czas": czas}
+        if s["wpis"]:
+            s["galaz"][s["wpis"]] = (po, w["kompresja"])
     elif typ == "thinking_level_change" and str(e.get("thinkingLevel") or "") in MYSLENIE:
         w["myslenie_sesji"], w["myslenie_czas"] = str(e["thinkingLevel"]), czas
     elif typ == "service_tier_change":
@@ -525,6 +527,51 @@ def _zmiana(s: dict, linia: bytes) -> None:
 
 
 _DEKODER = json.JSONDecoder()
+_GLOWA = re.compile(rb'\{"type": ?"[^"]+", ?"id": ?"([^"]+)", ?"parentId": ?(?:"([^"]+)"|null)')
+
+
+def _wpis_drzewa(s: dict, linia: bytes) -> str | None:
+    """Id wpisu z linii sesji i jego rodzic w drzewie rozmowy; ostatni wpis z id to bieżący (od niego omp wznawia).
+    Odpowiedź i kompresja zaczynają się od type, id, parentId; inne wpisy (`custom` z danymi przed id, w danych bywa
+    obce `"id"`) są krótkie: `json.loads`."""
+    m = _GLOWA.match(linia)
+    if m:
+        i, rodzic = m.group(1).decode("ascii", "replace"), m.group(2).decode("ascii", "replace") if m.group(2) else None
+    elif linia.startswith(b"{") and not linia.startswith(b'{"type":"message"'):
+        try:
+            e = json.loads(linia)
+        except ValueError:
+            return None
+        if not isinstance(e, dict) or not isinstance(e.get("id"), str):
+            return None
+        i, rodzic = e["id"], e["parentId"] if isinstance(e.get("parentId"), str) else None
+    else:
+        return None
+    s["rodzic"][i] = rodzic
+    s["lisc"] = i
+    return i
+
+
+def _na_galezi(s: dict) -> None:
+    """Kontekst i ostatnia kompresja z gałęzi bieżącego wpisu, nie z ostatniej linii pliku: po powrocie do starszego
+    wpisu (navigate_tree, straż końca) porzucona gałąź stoi w pliku niżej (28.11: panel 5% z kompresji porzuconej
+    gałęzi, omp 58%). Liczone raz na bieżący wpis."""
+    lisc = s["lisc"]
+    if lisc is None or s["lisc_policzony"] == lisc:
+        return
+    kontekst, kompresja, i, ostatni, widziane = 0, None, lisc, lisc, set()
+    while i is not None and i not in widziane and not (kontekst and kompresja):
+        widziane.add(i)
+        z = s["galaz"].get(i)
+        if z:
+            kontekst = kontekst or z[0]
+            kompresja = kompresja or z[1]
+        ostatni, i = i, s["rodzic"].get(i)
+    if kontekst:
+        s["wynik"]["kontekst"] = kontekst
+    if kompresja or (i is None and ostatni in s["rodzic"]):   # cała gałąź do korzenia bez kompresji: żadnej
+        s["wynik"]["kompresja"] = kompresja
+    s["lisc_policzony"] = lisc
 
 
 def _napis_po(linia: bytes, klucz: bytes, przed: int) -> str:
@@ -542,6 +589,7 @@ def _dolicz(s: dict, linia: bytes) -> None:
     zwarty JSON: wtedy bez parsowania całej linii (treść odpowiedzi bywa duża): `usage` to ostatni taki klucz w linii,
     przed nim `model` i `provider` wiadomości, a `timestamp` wpisu stoi na początku linii (przed `message`). Linia ze
     spacjami po dwukropkach (inny zapis) idzie przez pełny `json.loads`."""
+    s["wpis"] = _wpis_drzewa(s, linia)
     if linia.startswith(_ZMIANY):
         _zmiana(s, linia)
         return
@@ -583,6 +631,8 @@ def _dolicz_usage(s: dict, u: dict, model: str, dostawca: str, kiedy: str) -> No
     w["koszt"] += koszt
     kontekst = _liczba(u, "input") + _liczba(u, "cacheRead") + _liczba(u, "cacheWrite")
     w["kontekst"] = kontekst or w["kontekst"]       # odpowiedź z błędem dostawcy ma same zera
+    if kontekst and s["wpis"]:
+        s["galaz"][s["wpis"]] = (kontekst, None)
     w["model"], w["dostawca"] = model, dostawca
     if kiedy and koszt:
         try:
@@ -606,7 +656,8 @@ def podsumowanie_sesji(w: Wpis) -> dict:
             st = plik.stat()
             s = _podsumowania.get(klucz)
             if s is None or s["ino"] != st.st_ino or st.st_size < s["od"]:
-                s = {"ino": st.st_ino, "od": 0, "wynik": _podsumowanie_puste(), "dni": {}}
+                s = {"ino": st.st_ino, "od": 0, "wynik": _podsumowanie_puste(), "dni": {}, "rodzic": {}, "galaz": {},
+                     "lisc": None, "lisc_policzony": None, "wpis": None}
             if st.st_size > s["od"]:
                 with plik.open("rb") as f:
                     f.seek(s["od"])
@@ -621,6 +672,7 @@ def podsumowanie_sesji(w: Wpis) -> dict:
                             _dolicz(s, linia)
                         s["od"] += koniec
                         reszta = dane[koniec:]
+            _na_galezi(s)
             _podsumowania[klucz] = s
         except OSError:
             return {**_podsumowanie_puste(), "koszt_dzis": 0.0}
